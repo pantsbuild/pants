@@ -219,8 +219,8 @@ impl<'de> Deserialize<'de> for Digest {
   }
 }
 
-impl From<&[u8]> for Digest {
-  fn from(bytes: &[u8]) -> Self {
+impl Digest {
+  pub fn of_bytes(bytes: &[u8]) -> Self {
     let mut hasher = Sha256::default();
     hasher.input(bytes);
 

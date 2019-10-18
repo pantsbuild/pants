@@ -294,7 +294,7 @@ pub fn digest(req: MultiPlatformExecuteProcessRequest, metadata: &ExecuteProcess
       .map(|(_a, _b, er)| er.get_action_digest().get_hash().to_string())
       .collect();
   hashes.sort();
-  Digest::from(
+  Digest::of_bytes(
     hashes
         .iter()
         .fold(String::new(), |mut acc, hash| {

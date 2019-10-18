@@ -26,10 +26,15 @@ static NAILGUN_MAIN_CLASS: &str = "com.martiansoftware.nailgun.NGServer";
 static ARGS_TO_START_NAILGUN: [&str; 1] = [":0"];
 
 // We can hardcode this because we mix it into the digest in the EPR.
+// TODO(8480) This can go away when we port the fetching of the clients and servers to the rust stack.
 static NG_CLIENT_PATH: &str = "bin/ng/1.0.0/ng";
 
-// TODO(8481) The input_files arg should be calculated from deeply fingerprinting the classpath.
-fn get_nailgun_request(args: Vec<String>, _input_files: Digest, jdk: Option<PathBuf>, platform: Platform) -> ExecuteProcessRequest {
+///
+/// Constructs the ExecuteProcessRequest that would be used
+/// to start the nailgun servers if we needed to.
+///
+// TODO(8481) We should calculate the input_files by deeply fingerprinting the classpath.
+fn construct_nailgun_server_request(args: Vec<String>, jdk: Option<PathBuf>, platform: Platform) -> ExecuteProcessRequest {
     let mut full_args = args;
     full_args.push(NAILGUN_MAIN_CLASS.to_string());
     full_args.extend(ARGS_TO_START_NAILGUN.iter().map(|a| a.to_string()));
@@ -66,12 +71,12 @@ pub struct NailgunCommandRunner {
 }
 
 impl NailgunCommandRunner {
-    pub fn new(runner: super::local::CommandRunner, metadata: ExecuteProcessRequestMetadata, python_distribution_absolute_path: PathBuf) -> Self {
+    pub fn new(runner: crate::local::CommandRunner, metadata: ExecuteProcessRequestMetadata, python_distribution_absolute_path: PathBuf, workdir_base: PathBuf) -> Self {
         NailgunCommandRunner {
             inner: Arc::new(runner),
             nailgun_pool: NailgunPool::new(),
             metadata: metadata,
-            workdir_base: std::env::temp_dir(),
+            workdir_base: workdir_base,
             python_distribution_absolute_path: python_distribution_absolute_path,
         }
     }
@@ -79,13 +84,13 @@ impl NailgunCommandRunner {
     // Ensure that the workdir for the given nailgun name exists.
     fn get_nailguns_workdir(&self, nailgun_name: &NailgunProcessName) -> Result<PathBuf, String> {
         let workdir = self.workdir_base.clone().join(nailgun_name);
-        if self.workdir_base.exists() {
-            debug!("Creating nailgun workdir at {:?}", self.workdir_base);
-            std::fs::create_dir_all(workdir.clone())
+        if !workdir.exists() {
+            debug!("Creating nailgun workdir at {:?}", &workdir);
+            fs::safe_create_dir_all(&workdir)
                 .map_err(|err| format!("Error creating the nailgun workdir! {}", err))
                 .map(|_| workdir)
         } else {
-            debug!("nailgun workdir {:?} exits. Reusing that...", self.workdir_base);
+            debug!("nailgun workdir {:?} exits. Reusing that...", &workdir);
             Ok(workdir)
         }
     }
@@ -152,7 +157,7 @@ impl super::CommandRunner for NailgunCommandRunner {
 
         // Separate argument lists, to form distinct EPRs for (1) starting the nailgun server and (2) running the client in it.
         let ParsedJVMCommandLines { nailgun_args, client_args, client_main_class } = ParsedJVMCommandLines::parse_command_lines(&client_req.argv).expect("Error parsing command lines!!");
-        let nailgun_req = get_nailgun_request(nailgun_args, client_req.input_files, client_req.jdk_home.clone(), client_req.target_platform);
+        let nailgun_req = construct_nailgun_server_request(nailgun_args, client_req.jdk_home.clone(), client_req.target_platform);
         trace!("Extracted nailgun request:\n {:#?}", &nailgun_req);
 
         let nailgun_req_digest = crate::digest(MultiPlatformExecuteProcessRequest::from(nailgun_req.clone()), &self.metadata);
@@ -197,5 +202,78 @@ impl super::CommandRunner for NailgunCommandRunner {
     fn extract_compatible_request(&self, req: &MultiPlatformExecuteProcessRequest) -> Option<ExecuteProcessRequest> {
         // Request compatibility should be the same as for the local runner, so we just delegate this.
         self.inner.extract_compatible_request(req)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::nailgun::NailgunCommandRunner;
+    use store::Store;
+    use tempfile::TempDir;
+    use crate::ExecuteProcessRequestMetadata    ;
+    use std::path::PathBuf;
+
+    fn mock_nailgun_runner(workdir_base: Option<PathBuf>) -> NailgunCommandRunner {
+        let store_dir = TempDir::new().unwrap();
+        let executor = task_executor::Executor::new();
+        let store =  Store::local_only(executor.clone(), store_dir.path()).unwrap();
+        let local_runner = crate::local::CommandRunner::new(
+            store,
+            executor.clone(),
+            std::env::temp_dir(),
+            true,
+        );
+        let metadata = ExecuteProcessRequestMetadata {
+            instance_name: None,
+            cache_key_gen_version: None,
+            platform_properties: vec![]
+        };
+        let python_distribution = PathBuf::from("/usr/bin/python");
+        let workdir_base = workdir_base.unwrap_or(std::env::temp_dir());
+
+        NailgunCommandRunner::new(
+            local_runner,
+            metadata,
+            python_distribution,
+            workdir_base,
+        )
+
+    }
+
+    fn unique_temp_dir(base_dir: PathBuf, prefix: Option<String>) -> TempDir {
+        tempfile::Builder::new()
+            .prefix(&(prefix.unwrap_or("".to_string())))
+            .tempdir_in(&base_dir)
+            .expect("Error making tempdir for local process execution: {:?}")
+    }
+
+    #[test]
+    fn get_workdir_creates_directory_if_it_doesnt_exist() {
+        let mock_workdir_base = unique_temp_dir(std::env::temp_dir(), None).into_path();
+        let mock_nailgun_name = "mock_non_existing_workdir".to_string();
+        let runner = mock_nailgun_runner(Some(mock_workdir_base.clone()));
+
+        let target_workdir = mock_workdir_base.join(mock_nailgun_name.clone());
+        assert!(!target_workdir.exists());
+        let res = runner.get_nailguns_workdir(&mock_nailgun_name);
+        assert_eq!(res, Ok(target_workdir.clone()));
+        assert!(target_workdir.exists());
+    }
+
+    #[test]
+    fn get_workdir_returns_the_workdir_when_it_exists() {
+        let mock_workdir_base = unique_temp_dir(std::env::temp_dir(), None).into_path();
+        let mock_nailgun_name = "mock_existing_workdir".to_string();
+        let runner = mock_nailgun_runner(Some(mock_workdir_base.clone()));
+
+        let target_workdir = mock_workdir_base.join(mock_nailgun_name.clone());
+        assert!(!target_workdir.exists());
+        let creation_res = fs::safe_create_dir_all(&target_workdir);
+        assert!(creation_res.is_ok());
+        assert!(target_workdir.exists());
+
+        let res = runner.get_nailguns_workdir(&mock_nailgun_name);
+        assert_eq!(res, Ok(target_workdir.clone()));
+        assert!(target_workdir.exists());
     }
 }
