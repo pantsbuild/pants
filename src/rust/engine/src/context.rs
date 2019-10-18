@@ -156,6 +156,7 @@ impl Core {
               local_command_runner,
               process_execution_metadata.clone(),
               local_python_distribution_absolute_path,
+              std::env::temp_dir(),
             )
           )
         } else {

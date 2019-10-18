@@ -155,11 +155,7 @@ impl NailgunCommandRunner {
     }
 
     fn get_python_distribution(&self) -> String {
-        self.python_distribution_absolute_path
-            .clone()
-            .into_os_string()
-            .into_string()
-            .expect("The path of your python distribution is not UTF-8!")
+        format!("{}", self.python_distribution_absolute_path.display())
     }
 }
 
@@ -197,7 +193,7 @@ impl super::CommandRunner for NailgunCommandRunner {
 
         self.materialize_workdir_for_server(&workdir_for_this_nailgun, &nailgun_req, client_req.input_files, context.workunit_store.clone())
             .and_then(move |_metadata| {
-                // Connect to a running nailgun, starting one appropriate one up.
+                // Connect to a running nailgun.
                 nailgun_pool.connect(nailgun_name.clone(), nailgun_req, &workdir_for_this_nailgun1, nailgun_req_digest)
             })
             .map_err(|e| format!("Failed to connect to nailgun! {}", e))
