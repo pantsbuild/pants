@@ -42,7 +42,6 @@ class RscCompileIntegration(BaseCompileIT):
   @ensure_compile_rsc_execution_strategy
   def test_executing_multi_target_binary(self):
     pants_run = self.do_command('run', 'examples/src/scala/org/pantsbuild/example/hello/exe')
-    print(pants_run.stdout_data)
     self.assertIn('Hello, Resource World!', pants_run.stdout_data)
 
   @ensure_compile_rsc_execution_strategy
@@ -57,12 +56,6 @@ class RscCompileIntegration(BaseCompileIT):
   def test_rsc_hermetic_jvm_options(self):
     pants_run = self.run_pants(['compile', 'examples/src/scala/org/pantsbuild/example/hello/exe'],
       config={
-        'cache.compile.rsc': {'ignore': True},
-        'jvm-platform': {'compiler': 'rsc'},
-        'compile.rsc': {
-          'workflow': 'rsc-and-zinc',
-          'execution_strategy': 'hermetic',
-        },
         'rsc': {
           'jvm_options': [
             '-Djava.security.manager=java.util.Optional'
