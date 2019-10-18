@@ -17,19 +17,6 @@ python_tests(
   tags = {'integration'},
 )
 
-python_tests(
-  name='rsc_compile_integration_manual',
-  sources=['test_rsc_compile_integration_manual.py'],
-  dependencies=[
-    'src/python/pants/util:contextutil',
-    'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
-    'tests/python/pants_test:test_base',
-    'examples/src/scala/org/pantsbuild/example:hello_directory',
-  ],
-  timeout = 600,
-  tags = {'integration'},
-)
-
 
 python_tests(
   name = 'rsc_compile',
