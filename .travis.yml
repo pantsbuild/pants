@@ -178,10 +178,7 @@ matrix:
     os: osx
     osx_image: xcode8
     script:
-    - ./build-support/bin/ci.py --bootstrap --python-version 3.6
-    - ./build-support/bin/release.sh -f
-    - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex
-      ${BOOTSTRAPPED_PEX_URL_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - echo 'hello'
     stage: Bootstrap Pants
   - after_failure:
     - ./build-support/bin/ci-failure.sh
