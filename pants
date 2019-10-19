@@ -35,7 +35,7 @@
 # The script defaults to running with Python 3. To use a specific Python version,
 # such as 3.7, prefix the script with `PY=python3.7`.
 
-set -e
+set -ex
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
