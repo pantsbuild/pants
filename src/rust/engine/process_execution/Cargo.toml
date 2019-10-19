@@ -37,6 +37,7 @@ workunit_store = { path = "../workunit_store" }
 [dev-dependencies]
 maplit = "1.0.1"
 mock = { path = "../testutil/mock" }
+parking_lot = "0.6"
 spectral = "0.6.0"
 tempfile = "3"
 testutil = { path = "../testutil" }
