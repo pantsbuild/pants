@@ -7,10 +7,6 @@ not undergone the vetting associated with ``stable`` releases.
 1.22.0rc0 (10/20/2019)
 ------------------------
 
-API Changes
-~~~~~~~~~~~
-
-
 New Features
 ~~~~~~~~~~~~
 
@@ -43,7 +39,6 @@ Refactoring, Improvements, and Tooling
 
 * Restore pycodestyle (#8471)
   `PR #8471 <https://github.com/pantsbuild/pants/pull/8471>`_
->`_ttps://github.com/pantsbuild/pants/pull/8350/commits/bdd2b9ee0ea89028d7844ac34e957b3b0caedb87)
 
 * Remove `enum()` to consolidate around standard library Enum (#8475)
   `PR #8475 <https://github.com/pantsbuild/pants/pull/8475>`_
@@ -67,7 +62,6 @@ Refactoring, Improvements, and Tooling
 
 * Use `collections.Enum` instead of `enum()` (#8443)
   `PR #8443 <https://github.com/pantsbuild/pants/pull/8443>`_
->`_ttps://github.com/pantsbuild/pants/pull/8451).
 
 * Prepare 1.21.0. (#8474)
   `PR #8474 <https://github.com/pantsbuild/pants/pull/8474>`_
@@ -76,7 +70,6 @@ Refactoring, Improvements, and Tooling
   `PR #8467 <https://github.com/pantsbuild/pants/pull/8467>`_
 
 * Use `partially_type_checked` tag for incremental type hinting of Pants repo (#8464)
-  `Issue #6742): <https://github.com/pantsbuild/pants/issues/6742):>`_
   `PR #8464 <https://github.com/pantsbuild/pants/pull/8464>`_
 
 * Use Duration not f64 (#8396)
