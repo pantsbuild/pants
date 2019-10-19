@@ -138,7 +138,6 @@ Refactoring, Improvements, and Tooling
 
 * Improve support for `Enum`s as option types (#8458)
   `PR #8458 <https://github.com/pantsbuild/pants/pull/8458>`_
-  `Comment #8451 <https://github.com/pantsbuild/pants/pull/8451#discussion_r334075761>`
 
 * Port `test_pytest_run_integration.py` to V2 (#8466)
   `PR #8466 <https://github.com/pantsbuild/pants/pull/8466>`_
