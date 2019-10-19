@@ -1,11 +1,12 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from enum import Enum
 from typing import Callable, List
 
 from pants.engine.rules import rule
-from pants.util.collections import Enum
 from pants.util.memo import memoized_classproperty, memoized_property
+from pants.util.meta import match
 from pants.util.osutil import get_normalized_os_name
 
 
@@ -20,9 +21,9 @@ class Platform(Enum):
 
   @memoized_property
   def runtime_lib_path_env_var(self) -> str:
-    return self.match({
-      Platform.darwin: "DYLD_LIBRARY_PATH",
-      Platform.linux: "LD_LIBRARY_PATH",
+    return match(self, {
+      self.darwin: "DYLD_LIBRARY_PATH",
+      self.linux: "LD_LIBRARY_PATH",
     })
 
 

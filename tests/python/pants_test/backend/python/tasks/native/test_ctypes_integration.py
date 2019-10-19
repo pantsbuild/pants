@@ -16,6 +16,7 @@ from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import is_executable, read_file, safe_file_dump
+from pants.util.meta import match
 from pants_test.backend.python.tasks.python_task_test_base import name_and_platform
 
 
@@ -26,7 +27,7 @@ def invoke_pex_for_output(pex_file_to_run):
 def _toolchain_variants(func):
   @wraps(func)
   def wrapper(*args, **kwargs):
-    for variant in ToolchainVariant.all_values():
+    for variant in ToolchainVariant.__members__.values():
       func(*args, toolchain_variant=variant, **kwargs)
   return wrapper
 
@@ -73,7 +74,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
       # for both C and C++ compilation.
       # TODO(#6866): don't parse info logs for testing! There is a TODO in test_cpp_compile.py
       # in the native backend testing to traverse the PATH to find the selected compiler.
-      compiler_names_to_check = toolchain_variant.match({
+      compiler_names_to_check = match(toolchain_variant, {
         ToolchainVariant.gnu: ['gcc', 'g++'],
         ToolchainVariant.llvm: ['clang', 'clang++'],
       })
@@ -83,7 +84,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
 
       # All of our toolchains currently use the C++ compiler's filename as argv[0] for the linker,
       # so there is only one name to check.
-      linker_names_to_check = toolchain_variant.match({
+      linker_names_to_check = match(toolchain_variant, {
         ToolchainVariant.gnu: ['g++'],
         ToolchainVariant.llvm: ['clang++'],
       })
@@ -103,7 +104,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
 
       dist_name, dist_version, wheel_platform = name_and_platform(wheel_dist)
       self.assertEqual(dist_name, 'ctypes_test')
-      contains_current_platform = Platform.current.match({
+      contains_current_platform = match(Platform.current, {
         Platform.darwin: wheel_platform.startswith('macosx'),
         Platform.linux: wheel_platform.startswith('linux'),
       })
@@ -152,14 +153,14 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
         workdir=os.path.join(buildroot.new_buildroot, '.pants.d'),
       )
       self.assert_failure(pants_binary_strict_deps_failure)
-      self.assertIn(toolchain_variant.match({
+      self.assertIn(match(toolchain_variant, {
         ToolchainVariant.gnu: "fatal error: some_math.h: No such file or directory",
         ToolchainVariant.llvm: "fatal error: 'some_math.h' file not found"
       }), pants_binary_strict_deps_failure.stdout_data)
 
     # TODO(#6848): we need to provide the libstdc++.so.6.dylib which comes with gcc on osx in the
     # DYLD_LIBRARY_PATH during the 'run' goal somehow.
-    attempt_pants_run = Platform.current.match({
+    attempt_pants_run = match(Platform.current, {
       Platform.darwin: toolchain_variant == ToolchainVariant.llvm,
       Platform.linux: True,
     })
@@ -187,7 +188,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
 
     # TODO(#6848): this fails when run with gcc on osx as it requires gcc's libstdc++.so.6.dylib to
     # be available on the runtime library path.
-    attempt_pants_run = Platform.current.match({
+    attempt_pants_run = match(Platform.current, {
       Platform.darwin: toolchain_variant == ToolchainVariant.llvm,
       Platform.linux: True,
     })
@@ -233,7 +234,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
     """
     # TODO(#6848): this fails when run with gcc on osx as it requires gcc's libstdc++.so.6.dylib to
     # be available on the runtime library path.
-    attempt_pants_run = Platform.current.match({
+    attempt_pants_run = match(Platform.current, {
       Platform.darwin: toolchain_variant == ToolchainVariant.llvm,
       Platform.linux: True,
     })

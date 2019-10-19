@@ -2,14 +2,14 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from abc import abstractmethod
+from enum import Enum
 
 from pants.build_graph.mirrored_target_option_mixin import MirroredTargetOptionMixin
 from pants.engine.platform import Platform
 from pants.option.compiler_option_sets_mixin import CompilerOptionSetsMixin
 from pants.subsystem.subsystem import Subsystem
-from pants.util.collections import Enum
 from pants.util.memo import memoized_property
-from pants.util.meta import classproperty
+from pants.util.meta import classproperty, match
 
 
 class ToolchainVariant(Enum):
@@ -37,7 +37,7 @@ class NativeBuildStep(CompilerOptionSetsMixin, MirroredTargetOptionMixin, Subsys
                   'for targets of this language.')
 
     register('--toolchain-variant', advanced=True,
-             default=Platform.current.match({
+             default=match(Platform.current, {
                Platform.darwin: ToolchainVariant.llvm,
                Platform.linux: ToolchainVariant.gnu,
              }),

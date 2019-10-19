@@ -9,6 +9,7 @@ from pants.binaries.binary_tool import NativeTool
 from pants.engine.platform import Platform
 from pants.engine.rules import rule
 from pants.util.memo import memoized_method, memoized_property
+from pants.util.meta import match
 
 
 class GCC(NativeTool):
@@ -41,7 +42,7 @@ class GCC(NativeTool):
 
   @memoized_method
   def _common_lib_dirs(self, platform):
-    lib64_tuples = platform.match({
+    lib64_tuples = match(platform, {
       Platform.darwin: [],
       Platform.linux: [('lib64',)]
     })

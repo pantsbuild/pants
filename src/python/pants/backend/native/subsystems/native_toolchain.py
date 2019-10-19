@@ -23,6 +23,7 @@ from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
+from pants.util.meta import match
 
 
 class NativeToolchain(Subsystem):
@@ -119,7 +120,7 @@ class LLVMCppToolchain:
 @rule
 async def select_libc_objects(platform: Platform, native_toolchain: NativeToolchain) -> LibcObjects:
   # We use lambdas here to avoid searching for libc on osx, where it will fail.
-  paths = platform.match({
+  paths = match(platform, {
     Platform.darwin: lambda: [],
     Platform.linux: lambda: native_toolchain._libc_dev.get_libc_objects(),
   })()

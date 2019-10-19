@@ -11,6 +11,7 @@ from pants.engine.platform import Platform
 from pants.engine.rules import RootRule, rule
 from pants.util.dirutil import is_readable_dir
 from pants.util.memo import memoized_method, memoized_property
+from pants.util.meta import match
 
 
 class LLVMReleaseUrlGenerator(BinaryToolUrlGenerator):
@@ -81,7 +82,7 @@ class LLVM(NativeTool):
   def linker(self, platform: Platform) -> Linker:
     return Linker(
       path_entries=self.path_entries,
-      exe_filename=platform.match({
+      exe_filename=match(platform, {
         Platform.darwin: "ld64.lld",
         Platform.linux: "lld",
       }),
