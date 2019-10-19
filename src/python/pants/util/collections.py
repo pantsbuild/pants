@@ -2,17 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import collections
-from enum import Enum as StdLibEnum
-from typing import (
-  Callable,
-  DefaultDict,
-  Iterable,
-  Mapping,
-  MutableMapping,
-  TypeVar,
-  ValuesView,
-  cast,
-)
+from typing import Callable, DefaultDict, Iterable, MutableMapping, TypeVar
 
 
 _K = TypeVar('_K')
@@ -73,43 +63,3 @@ def assert_single_element(iterable: Iterable[_T]) -> _T:
     return first_item
 
   raise ValueError(f"iterable {iterable!r} has more than one element.")
-
-
-_E = TypeVar('_E', bound='Enum')
-
-
-class EnumMatchError(ValueError):
-  """Issue when using match() on an enum."""
-
-
-class InexhaustiveMatchError(EnumMatchError):
-  """Not all values of the enum specified in the pattern match."""
-
-
-class UnrecognizedMatchError(EnumMatchError):
-  """A value is used that is not a part of the enum."""
-
-
-class Enum(StdLibEnum):
-
-  @classmethod
-  def all_values(cls) -> ValuesView['Enum']:
-    return cls.__members__.values()
-
-  def match(self, enum_values_to_results: Mapping[_E, _V]) -> _V:
-    unrecognized_values = [
-      value for value in enum_values_to_results if value not in self.all_values()
-    ]
-    missing_values = [
-      value for value in self.all_values() if value not in enum_values_to_results
-    ]
-    if unrecognized_values:
-      raise UnrecognizedMatchError(
-        f"Match includes values not defined in the enum. Unrecognized: {unrecognized_values}"
-      )
-    if missing_values:
-      raise InexhaustiveMatchError(
-        f"All enum values must be covered by the match. Missing: {missing_values}"
-      )
-    typed_self = cast(_E, self)
-    return enum_values_to_results[typed_self]
