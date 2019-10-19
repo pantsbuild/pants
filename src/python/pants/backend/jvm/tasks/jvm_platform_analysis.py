@@ -291,12 +291,6 @@ class JvmPlatformExplain(JvmPlatformAnalysisMixin, ConsoleTask):
              help='Limit jvm platform possibility explanation to targets whose specs match this '
                   'regex pattern.')
 
-    # TODO: remove `_register_console_transitivity_option` from ConsoleTask when this deprecation
-    # cycle is complete!
-    register('--transitive', type=bool,
-             removal_version='1.22.0.dev0',
-             removal_hint='Use --list-transitive-deps instead!',
-             help='List transitive dependencies in analysis output.')
     register('--list-transitive-deps', type=bool,
              help='List transitive dependencies in analysis output.')
 
