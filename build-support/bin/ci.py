@@ -42,7 +42,7 @@ def main() -> None:
     if args.cargo_audit:
       run_cargo_audit()
     if args.unit_tests:
-      run_unit_tests(oauth_token_path=remote_execution_oauth_token_path)
+      run_unit_tests(oauth_token_path=remote_execution_oauth_token_path, shard=args.unit_shard)
     if args.rust_tests:
       run_rust_tests()
     if args.jvm_tests:
@@ -125,6 +125,11 @@ def create_parser() -> argparse.ArgumentParser:
     help="Divide integration tests into TOTAL_SHARDS shards and just run those in SHARD_NUMBER. "
          "E.g. `-i 0/2` and `-i 1/2` will split the tests in half."
   )
+  parser.add_argument(
+    "--unit-shard", metavar="SHARD_NUMBER/TOTAL_SHARDS", default=None,
+    help="Divide unit tests into TOTAL_SHARDS shards and just run those in SHARD_NUMBER. "
+         "E.g. `-i 0/2` and `-i 1/2` will split the tests in half."
+  )
   parser.add_argument("--plugin-tests", action="store_true", help="Run tests for pants-plugins.")
   parser.add_argument(
     "--platform-specific-tests", action="store_true", help="Test platform-specific behavior."
@@ -172,23 +177,24 @@ def set_run_from_pex() -> None:
 def maybe_get_remote_execution_oauth_token_path(
   *, remote_execution_enabled: bool
 ) -> Iterator[Optional[str]]:
-  if not remote_execution_enabled:
-    yield None
-    return
-  command = (
-    ["./pants.pex", "--quiet", "run", "build-support/bin:get_rbe_token"]
-    if os.getenv("CI")
-    else ["gcloud", "auth", "application-default", "print-access-token"]
-  )
-  token: str = subprocess.run(
-    command, encoding="utf-8", stdout=subprocess.PIPE, check=True
-  ).stdout
-  if not os.getenv("CI"):
-    token = token.splitlines()[0]
-  with tempfile.NamedTemporaryFile(mode="w+") as tf:
-    tf.write(token)
-    tf.seek(0)
-    yield tf.name
+  # if not remote_execution_enabled:
+  #   yield None
+  #   return
+  # command = (
+  #   ["./pants.pex", "--quiet", "run", "build-support/bin:get_rbe_token"]
+  #   if os.getenv("CI")
+  #   else ["gcloud", "auth", "application-default", "print-access-token"]
+  # )
+  # token: str = subprocess.run(
+  #   command, encoding="utf-8", stdout=subprocess.PIPE, check=True
+  # ).stdout
+  # if not os.getenv("CI"):
+  #   token = token.splitlines()[0]
+  # with tempfile.NamedTemporaryFile(mode="w+") as tf:
+  #   tf.write(token)
+  #   tf.seek(0)
+  #   yield tf.name
+  yield '123'
 
 # -------------------------------------------------------------------------
 # Blacklists
@@ -420,14 +426,14 @@ def run_cargo_audit() -> None:
       die("Cargo audit failure")
 
 
-def run_unit_tests(*, oauth_token_path: Optional[str] = None) -> None:
+def run_unit_tests(*, oauth_token_path: Optional[str] = None, shard=None) -> None:
   target_sets = TestTargetSets.calculate(
     test_type=TestType.unit, remote_execution_enabled=oauth_token_path is not None
   )
   if target_sets.v2_remote:
     _run_command(
       command=TestStrategy.v2_remote.pants_command(
-        targets=target_sets.v2_remote, oauth_token_path=oauth_token_path
+        targets=target_sets.v2_remote, oauth_token_path=oauth_token_path, shard=shard
       ),
       slug="UnitTestsV2Remote",
       start_message="Running unit tests via remote V2 strategy",
@@ -435,14 +441,14 @@ def run_unit_tests(*, oauth_token_path: Optional[str] = None) -> None:
     )
   if target_sets.v2_local:
     _run_command(
-      command=TestStrategy.v2_local.pants_command(targets=target_sets.v2_local),
+      command=TestStrategy.v2_local.pants_command(targets=target_sets.v2_local, shard=shard),
       slug="UnitTestsV2Local",
       start_message="Running unit tests via local V2 strategy",
       die_message="Unit test failure (local V2)",
     )
   if target_sets.v1_chroot:
     _run_command(
-      command=TestStrategy.v1_chroot.pants_command(targets=target_sets.v1_chroot),
+      command=TestStrategy.v1_chroot.pants_command(targets=target_sets.v1_chroot, shard=shard),
       slug="UnitTestsV1Chroot",
       start_message="Running unit tests via local V1 chroot strategy",
       die_message="Unit test failure (V1 chroot)",
@@ -450,7 +456,7 @@ def run_unit_tests(*, oauth_token_path: Optional[str] = None) -> None:
 
   if target_sets.v1_no_chroot:
     _run_command(
-      command=TestStrategy.v1_no_chroot.pants_command(targets=target_sets.v1_no_chroot),
+      command=TestStrategy.v1_no_chroot.pants_command(targets=target_sets.v1_no_chroot, shard=shard),
       slug="UnitTestsV1NoChroot",
       start_message="Running unit tests via local V1 no-chroot strategy",
       die_message="Unit test failure (V1 no-chroot)",
