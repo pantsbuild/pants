@@ -3,9 +3,8 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import FrozenInstanceError
-from enum import Enum
 from functools import wraps
-from typing import Any, Callable, Mapping, Optional, Type, TypeVar, Union, cast
+from typing import Any, Callable, Optional, Type, TypeVar, Union
 
 
 T = TypeVar("T")

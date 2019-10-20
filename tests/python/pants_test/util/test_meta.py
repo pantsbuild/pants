@@ -1,6 +1,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+
 import unittest
 from abc import ABC, abstractmethod
 from dataclasses import FrozenInstanceError, dataclass
@@ -345,36 +346,3 @@ class FrozenAfterInitTest(unittest.TestCase):
     test = Test(x=0)
     with self.assertRaises(FrozenInstanceError):
       test.x = 1
-
-
-class EnumMatchTest(unittest.TestCase):
-
-  class Test(Enum):
-    dog = 0
-    cat = 1
-    pig = 2
-
-  def test_valid_match(self) -> None:
-    match_mapping = {
-      EnumMatchTest.Test.dog: "woof",
-      EnumMatchTest.Test.cat: "meow",
-      EnumMatchTest.Test.pig: "oink",
-    }
-    self.assertEqual("woof", match(EnumMatchTest.Test.dog, match_mapping))
-    self.assertEqual("meow", match(EnumMatchTest.Test.cat, match_mapping))
-    self.assertEqual("oink", match(EnumMatchTest.Test.pig, match_mapping))
-
-  def test_inexhaustive_match(self) -> None:
-    with self.assertRaises(InexhaustiveMatchError):
-      match(EnumMatchTest.Test.pig, {
-        EnumMatchTest.Test.pig: "oink",
-      })
-
-  def test_unrecognized_match(self) -> None:
-    with self.assertRaises(UnrecognizedMatchError):
-      match(EnumMatchTest.Test.pig, {  # type: ignore
-        EnumMatchTest.Test.dog: "woof",
-        EnumMatchTest.Test.cat: "meow",
-        EnumMatchTest.Test.pig: "oink",
-        "horse": "neigh",
-      })

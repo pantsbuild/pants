@@ -8,8 +8,8 @@ from pants.backend.native.subsystems.utils.archive_file_mapper import ArchiveFil
 from pants.binaries.binary_tool import NativeTool
 from pants.engine.platform import Platform
 from pants.engine.rules import rule
+from pants.util import enums
 from pants.util.memo import memoized_method, memoized_property
-from pants.util.meta import match
 
 
 class GCC(NativeTool):
@@ -42,7 +42,7 @@ class GCC(NativeTool):
 
   @memoized_method
   def _common_lib_dirs(self, platform):
-    lib64_tuples = match(platform, {
+    lib64_tuples = enums.match(platform, {
       Platform.darwin: [],
       Platform.linux: [('lib64',)]
     })

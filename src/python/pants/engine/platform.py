@@ -5,8 +5,8 @@ from enum import Enum
 from typing import Callable, List
 
 from pants.engine.rules import rule
+from pants.util import enums
 from pants.util.memo import memoized_classproperty, memoized_property
-from pants.util.meta import match
 from pants.util.osutil import get_normalized_os_name
 
 
@@ -21,7 +21,7 @@ class Platform(Enum):
 
   @memoized_property
   def runtime_lib_path_env_var(self) -> str:
-    return match(self, {
+    return enums.match(self, {
       self.darwin: "DYLD_LIBRARY_PATH",
       self.linux: "LD_LIBRARY_PATH",
     })

@@ -15,8 +15,9 @@ from pants.backend.python.tasks.build_local_python_distributions import (
 from pants.backend.python.tasks.resolve_requirements import ResolveRequirements
 from pants.backend.python.tasks.select_interpreter import SelectInterpreter
 from pants.testutil.task_test_base import DeclarativeTaskTestMixin
+from pants.util import enums
 from pants.util.collections import assert_single_element
-from pants.util.meta import classproperty, match
+from pants.util.meta import classproperty
 from pants_test.backend.python.tasks.python_task_test_base import (
   PythonTaskTestBase,
   name_and_platform,
@@ -120,7 +121,7 @@ class BuildLocalPythonDistributionsTestBase(PythonTaskTestBase, DeclarativeTaskT
     self.assertEquals(dist, expected_name)
     self.assertEquals(version, expected_snapshot_version)
 
-    expected_platform = match(expected_platform, {
+    expected_platform = enums.match(expected_platform, {
       BuildLocalPythonDistributionsTestBase.ExpectedPlatformType.any: "any",
       BuildLocalPythonDistributionsTestBase.ExpectedPlatformType.current: normalized_current_platform(),
     })

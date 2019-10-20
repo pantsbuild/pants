@@ -31,10 +31,11 @@ from pants.engine.fs import (
   PathGlobsAndRoot,
 )
 from pants.engine.isolated_process import ExecuteProcessRequest
+from pants.util import enums
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import fast_relpath
 from pants.util.memo import memoized_method, memoized_property
-from pants.util.meta import classproperty, match
+from pants.util.meta import classproperty
 from pants.util.strutil import safe_shlex_join
 
 
@@ -364,7 +365,7 @@ class BaseZincCompile(JvmCompile):
     self.log_zinc_file(ctx.analysis_file)
     self.write_argsfile(ctx, zinc_args)
 
-    return match(self.execution_strategy, {
+    return enums.match(self.execution_strategy, {
       self.ExecutionStrategy.hermetic: lambda: self._compile_hermetic(
         jvm_options, ctx, classes_dir, jar_file, compiler_bridge_classpath_entry,
         dependency_classpath, scalac_classpath_entries),
