@@ -148,7 +148,7 @@ matrix:
       -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY27_VERSION}" "${PYENV_PY36_VERSION}"
+    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY36_VERSION}"
     before_script:
     - ulimit -c unlimited
     - ulimit -n 8192
@@ -164,7 +164,6 @@ matrix:
     - PATH="/usr/local/opt/openssl/bin:${PATH}"
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
     - CACHE_NAME=bootstrap.osx.py36
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
@@ -189,7 +188,7 @@ matrix:
       -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY27_VERSION}" "${PYENV_PY37_VERSION}"
+    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY37_VERSION}"
     before_script:
     - ulimit -c unlimited
     - ulimit -n 8192
@@ -205,7 +204,6 @@ matrix:
     - PATH="/usr/local/opt/openssl/bin:${PATH}"
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
     - CACHE_NAME=bootstrap.osx.py37
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.osx
@@ -283,7 +281,7 @@ matrix:
       -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY27_VERSION}" "${PYENV_PY36_VERSION}"
+    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY36_VERSION}"
     before_script:
     - ulimit -c unlimited
     - ulimit -n 8192
@@ -299,7 +297,6 @@ matrix:
     - PATH="/usr/local/opt/openssl/bin:${PATH}"
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
     - CACHE_NAME=bootstrap.osx.py36
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
@@ -792,7 +789,7 @@ matrix:
       -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY27_VERSION}" "${PYENV_PY36_VERSION}"
+    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY36_VERSION}"
     before_script:
     - ulimit -c unlimited
     - ulimit -n 8192
@@ -802,7 +799,6 @@ matrix:
     - PATH="/usr/local/opt/openssl/bin:${PATH}"
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
     - PREPARE_DEPLOY=1
@@ -2064,7 +2060,6 @@ matrix:
     - PATH="/usr/local/opt/openssl/bin:${PATH}"
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
     - CACHE_NAME=rust_tests.osx
     name: Rust tests - OSX
@@ -2078,7 +2073,7 @@ matrix:
       -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY27_VERSION}" "${PYENV_PY36_VERSION}"
+    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY36_VERSION}"
     before_script:
     - ulimit -c unlimited
     - ulimit -n 8192
@@ -2088,7 +2083,6 @@ matrix:
     - PATH="/usr/local/opt/openssl/bin:${PATH}"
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
     - CACHE_NAME=osx_platform_tests.py36
@@ -2103,7 +2097,7 @@ matrix:
       -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY27_VERSION}" "${PYENV_PY37_VERSION}"
+    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY37_VERSION}"
     before_script:
     - ulimit -c unlimited
     - ulimit -n 8192
@@ -2113,7 +2107,6 @@ matrix:
     - PATH="/usr/local/opt/openssl/bin:${PATH}"
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.osx
     - CACHE_NAME=osx_platform_tests.py37
@@ -2128,7 +2121,7 @@ matrix:
       -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY27_VERSION}" "${PYENV_PY36_VERSION}"
+    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY36_VERSION}"
     before_script:
     - ulimit -c unlimited
     - ulimit -n 8192
@@ -2138,7 +2131,6 @@ matrix:
     - PATH="/usr/local/opt/openssl/bin:${PATH}"
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
     - CACHE_NAME=osx_sanity.10_12.py36
@@ -2154,7 +2146,7 @@ matrix:
       -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY27_VERSION}" "${PYENV_PY37_VERSION}"
+    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY37_VERSION}"
     before_script:
     - ulimit -c unlimited
     - ulimit -n 8192
@@ -2164,7 +2156,6 @@ matrix:
     - PATH="/usr/local/opt/openssl/bin:${PATH}"
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.osx
     - CACHE_NAME=osx_sanity.10_12.py37
@@ -2180,7 +2171,7 @@ matrix:
       -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY27_VERSION}" "${PYENV_PY36_VERSION}"
+    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY36_VERSION}"
     before_script:
     - ulimit -c unlimited
     - ulimit -n 8192
@@ -2190,7 +2181,6 @@ matrix:
     - PATH="/usr/local/opt/openssl/bin:${PATH}"
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
     - CACHE_NAME=osx_sanity.10_13.py36
@@ -2206,7 +2196,7 @@ matrix:
       -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY27_VERSION}" "${PYENV_PY37_VERSION}"
+    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY37_VERSION}"
     before_script:
     - ulimit -c unlimited
     - ulimit -n 8192
@@ -2216,7 +2206,6 @@ matrix:
     - PATH="/usr/local/opt/openssl/bin:${PATH}"
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.osx
     - CACHE_NAME=osx_sanity.10_13.py37
