@@ -3,6 +3,7 @@ python_library(
     'src/python/pants/backend/native',
     'src/python/pants/backend/python/tasks',
     'src/python/pants/util:collections',
+    'src/python/pants/util:enums',
     'src/python/pants/util:meta',
     'tests/python/pants_test/backend/python/tasks:python_task_test_base',
     'tests/python/pants_test/engine:scheduler_test_base',
