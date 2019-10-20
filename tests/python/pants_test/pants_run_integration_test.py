@@ -213,6 +213,8 @@ class PantsRunIntegrationTest(unittest.TestCase):
         # Ensure that the underlying ./pants invocation doesn't run from sources
         # (and therefore bootstrap) if we don't want it to.
         'RUN_PANTS_FROM_PEX',
+        # Used to ignore `DeprecationWarning`s in CI.
+        'PYTHONWARNINGS',
       ]
 
   def setUp(self):
