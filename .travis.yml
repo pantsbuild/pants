@@ -665,7 +665,7 @@ matrix:
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=unit_tests.py36
     language: python
-    name: Unit tests (Python 3.6)
+    name: Unit tests shard 1 (Python 3.6)
     os: linux
     python:
     - '2.7'
@@ -725,7 +725,7 @@ matrix:
       - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
       - CACHE_NAME=unit_tests.py36
     language: python
-    name: Unit tests (Python 3.6)
+    name: Unit tests shard 0 (Python 3.6)
     os: linux
     python:
       - '2.7'
