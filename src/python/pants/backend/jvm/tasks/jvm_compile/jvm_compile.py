@@ -908,12 +908,16 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
       return [self._rehome(l) for l in underlying_libs]
 
     def find_libs_path_globs(self, names):
-      libs_abs = self._underlying.find_libs(names)
-      libs_unrooted = [self._unroot_lib_path(l) for l in libs_abs]
-      path_globs = PathGlobsAndRoot(
-        PathGlobs(tuple(libs_unrooted)),
-        self._underlying.home)
-      return (libs_unrooted, path_globs)
+      path_globs = []
+      filenames = []
+      # We have to move the jars to top level directory because globbing jdk home with symlinks
+      # would cause failing to scan the directory. https://github.com/pantsbuild/pants/issues/8460
+      for lib_abs in self._underlying.find_libs(names):
+        root = os.path.dirname(lib_abs)
+        filename = os.path.basename(lib_abs)
+        filenames.append(filename)
+        path_globs.append(PathGlobsAndRoot(PathGlobs((filename,)), root))
+      return (filenames, path_globs)
 
     @property
     def java(self):
