@@ -19,7 +19,6 @@ env:
   - BOOTSTRAPPED_PEX_BUCKET=ci-public.pantsbuild.org
   - BOOTSTRAPPED_PEX_KEY_PREFIX=${TRAVIS_BUILD_NUMBER}/${TRAVIS_BUILD_ID}/pants.pex
   - BOOTSTRAPPED_PEX_URL_PREFIX=s3://${BOOTSTRAPPED_PEX_BUCKET}/${BOOTSTRAPPED_PEX_KEY_PREFIX}
-  - PYENV_PY27_VERSION=2.7.15
   - PYENV_PY36_VERSION=3.6.8
   - PYENV_PY37_VERSION=3.7.2
   - PYENV_ROOT="${PYENV_ROOT:-${HOME}/.pants_pyenv}"
@@ -50,7 +49,7 @@ matrix:
     - find build-support -name "*.py[co]" -delete
     before_install:
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 3.6.7 3.7.1
     before_script:
     - ulimit -c unlimited
     cache:
@@ -70,7 +69,6 @@ matrix:
     name: Build Linux native engine and pants.pex (Python 3.6)
     os: linux
     python:
-    - '2.7'
     - '3.6'
     - '3.7'
     script:
@@ -106,7 +104,7 @@ matrix:
     - find build-support -name "*.py[co]" -delete
     before_install:
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 3.6.7 3.7.1
     before_script:
     - ulimit -c unlimited
     cache:
@@ -125,7 +123,6 @@ matrix:
     name: Build Linux native engine and pants.pex (Python 3.7)
     os: linux
     python:
-    - '2.7'
     - '3.6'
     - '3.7'
     script:
@@ -241,7 +238,7 @@ matrix:
     - find build-support -name "*.py[co]" -delete
     before_install:
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 3.6.7 3.7.1
     before_script:
     - ulimit -c unlimited
     cache:
@@ -261,7 +258,6 @@ matrix:
     name: Build Linux native engine and pants.pex (Python 3.6)
     os: linux
     python:
-    - '2.7'
     - '3.6'
     - '3.7'
     script:
@@ -344,7 +340,7 @@ matrix:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 3.6.7 3.7.1
     - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v0.2.1/travis-wait-enhanced_0.2.1_linux_x86_64.tar.gz"
       | tar -zxvf - travis-wait-enhanced
     - mv travis-wait-enhanced /home/travis/bin/
@@ -371,7 +367,6 @@ matrix:
     name: Unit tests (Python 3.7)
     os: linux
     python:
-    - '2.7'
     - '3.6'
     - '3.7'
     script:
@@ -405,7 +400,7 @@ matrix:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 3.6.7 3.7.1
     - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v0.2.1/travis-wait-enhanced_0.2.1_linux_x86_64.tar.gz"
       | tar -zxvf - travis-wait-enhanced
     - mv travis-wait-enhanced /home/travis/bin/
@@ -432,7 +427,6 @@ matrix:
     name: Integration tests - V2 (Python 3.7)
     os: linux
     python:
-    - '2.7'
     - '3.6'
     - '3.7'
     script:
@@ -466,7 +460,7 @@ matrix:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 3.6.7 3.7.1
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
       ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
@@ -489,7 +483,6 @@ matrix:
     name: Self-checks and lint (Python 3.6)
     os: linux
     python:
-    - '2.7'
     - '3.6'
     - '3.7'
     script:
@@ -523,7 +516,7 @@ matrix:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 3.6.7 3.7.1
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
       ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
@@ -547,7 +540,6 @@ matrix:
     name: Self-checks and lint (Python 3.7)
     os: linux
     python:
-    - '2.7'
     - '3.6'
     - '3.7'
     script:
@@ -563,7 +555,7 @@ matrix:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 3.6.7 3.7.1
     - sudo apt-get install -y pkg-config fuse libfuse-dev
     - sudo modprobe fuse
     - sudo chmod 666 /dev/fuse
@@ -585,7 +577,6 @@ matrix:
     name: Clippy (Rust linter)
     os: linux
     python:
-    - '2.7'
     - '3.6'
     - '3.7'
     script:
@@ -597,7 +588,7 @@ matrix:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 3.6.7 3.7.1
     - sudo apt-get install -y pkg-config fuse libfuse-dev
     - sudo modprobe fuse
     - sudo chmod 666 /dev/fuse
@@ -608,7 +599,6 @@ matrix:
     name: Cargo audit
     os: linux
     python:
-    - '2.7'
     - '3.6'
     - '3.7'
     script:
@@ -641,7 +631,7 @@ matrix:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 3.6.7 3.7.1
     - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v0.2.1/travis-wait-enhanced_0.2.1_linux_x86_64.tar.gz"
       | tar -zxvf - travis-wait-enhanced
     - mv travis-wait-enhanced /home/travis/bin/
@@ -667,7 +657,6 @@ matrix:
     name: Unit tests (Python 3.6)
     os: linux
     python:
-    - '2.7'
     - '3.6'
     - '3.7'
     script:
@@ -701,7 +690,7 @@ matrix:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 3.6.7 3.7.1
     - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v0.2.1/travis-wait-enhanced_0.2.1_linux_x86_64.tar.gz"
       | tar -zxvf - travis-wait-enhanced
     - mv travis-wait-enhanced /home/travis/bin/
@@ -727,7 +716,6 @@ matrix:
     name: Integration tests - V2 (Python 3.6)
     os: linux
     python:
-    - '2.7'
     - '3.6'
     - '3.7'
     script:
@@ -761,7 +749,7 @@ matrix:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 3.6.7 3.7.1
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
       ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
@@ -786,7 +774,6 @@ matrix:
     name: Build Linux wheels (Python 3.6)
     os: linux
     python:
-    - '2.7'
     - '3.6'
     - '3.7'
     script:
@@ -856,7 +843,7 @@ matrix:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 3.6.7 3.7.1
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
       ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
@@ -879,7 +866,6 @@ matrix:
     name: Integration tests  - V1 - shard 0 (Python 3.6)
     os: linux
     python:
-    - '2.7'
     - '3.6'
     - '3.7'
     script:
@@ -913,7 +899,7 @@ matrix:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 3.6.7 3.7.1
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
       ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
@@ -936,7 +922,6 @@ matrix:
     name: Integration tests  - V1 - shard 1 (Python 3.6)
     os: linux
     python:
-    - '2.7'
     - '3.6'
     - '3.7'
     script:
@@ -970,7 +955,7 @@ matrix:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 3.6.7 3.7.1
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
       ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
@@ -993,7 +978,6 @@ matrix:
     name: Integration tests  - V1 - shard 2 (Python 3.6)
     os: linux
     python:
-    - '2.7'
     - '3.6'
     - '3.7'
     script:
@@ -1027,7 +1011,7 @@ matrix:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 3.6.7 3.7.1
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
       ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
@@ -1050,7 +1034,6 @@ matrix:
     name: Integration tests  - V1 - shard 3 (Python 3.6)
     os: linux
     python:
-    - '2.7'
     - '3.6'
     - '3.7'
     script:
@@ -1084,7 +1067,7 @@ matrix:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 3.6.7 3.7.1
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
       ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
@@ -1107,7 +1090,6 @@ matrix:
     name: Integration tests  - V1 - shard 4 (Python 3.6)
     os: linux
     python:
-    - '2.7'
     - '3.6'
     - '3.7'
     script:
@@ -1141,7 +1123,7 @@ matrix:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 3.6.7 3.7.1
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
       ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
@@ -1164,7 +1146,6 @@ matrix:
     name: Integration tests  - V1 - shard 5 (Python 3.6)
     os: linux
     python:
-    - '2.7'
     - '3.6'
     - '3.7'
     script:
@@ -1198,7 +1179,7 @@ matrix:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 3.6.7 3.7.1
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
       ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
@@ -1221,7 +1202,6 @@ matrix:
     name: Integration tests  - V1 - shard 6 (Python 3.6)
     os: linux
     python:
-    - '2.7'
     - '3.6'
     - '3.7'
     script:
@@ -1255,7 +1235,7 @@ matrix:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 3.6.7 3.7.1
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
       ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
@@ -1279,7 +1259,6 @@ matrix:
     name: Integration tests with Pantsd - V1 - shard 0 (Python 3.6)
     os: linux
     python:
-    - '2.7'
     - '3.6'
     - '3.7'
     script:
@@ -1313,7 +1292,7 @@ matrix:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 3.6.7 3.7.1
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
       ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
@@ -1337,7 +1316,6 @@ matrix:
     name: Integration tests with Pantsd - V1 - shard 1 (Python 3.6)
     os: linux
     python:
-    - '2.7'
     - '3.6'
     - '3.7'
     script:
@@ -1371,7 +1349,7 @@ matrix:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 3.6.7 3.7.1
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
       ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
@@ -1395,7 +1373,6 @@ matrix:
     name: Integration tests with Pantsd - V1 - shard 2 (Python 3.6)
     os: linux
     python:
-    - '2.7'
     - '3.6'
     - '3.7'
     script:
@@ -1429,7 +1406,7 @@ matrix:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 3.6.7 3.7.1
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
       ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
@@ -1453,7 +1430,6 @@ matrix:
     name: Integration tests with Pantsd - V1 - shard 3 (Python 3.6)
     os: linux
     python:
-    - '2.7'
     - '3.6'
     - '3.7'
     script:
@@ -1487,7 +1463,7 @@ matrix:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 3.6.7 3.7.1
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
       ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
@@ -1511,7 +1487,6 @@ matrix:
     name: Integration tests with Pantsd - V1 - shard 4 (Python 3.6)
     os: linux
     python:
-    - '2.7'
     - '3.6'
     - '3.7'
     script:
@@ -1545,7 +1520,7 @@ matrix:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 3.6.7 3.7.1
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
       ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
@@ -1569,7 +1544,6 @@ matrix:
     name: Integration tests with Pantsd - V1 - shard 5 (Python 3.6)
     os: linux
     python:
-    - '2.7'
     - '3.6'
     - '3.7'
     script:
@@ -1603,7 +1577,7 @@ matrix:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 3.6.7 3.7.1
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
       ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
@@ -1627,7 +1601,6 @@ matrix:
     name: Integration tests with Pantsd - V1 - shard 6 (Python 3.6)
     os: linux
     python:
-    - '2.7'
     - '3.6'
     - '3.7'
     script:
@@ -1661,7 +1634,7 @@ matrix:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 3.6.7 3.7.1
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
       ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
@@ -1685,7 +1658,6 @@ matrix:
     name: Integration tests  - V1 - shard 0 (Python 3.7)
     os: linux
     python:
-    - '2.7'
     - '3.6'
     - '3.7'
     script:
@@ -1719,7 +1691,7 @@ matrix:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 3.6.7 3.7.1
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
       ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
@@ -1743,7 +1715,6 @@ matrix:
     name: Integration tests  - V1 - shard 1 (Python 3.7)
     os: linux
     python:
-    - '2.7'
     - '3.6'
     - '3.7'
     script:
@@ -1777,7 +1748,7 @@ matrix:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 3.6.7 3.7.1
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
       ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
@@ -1801,7 +1772,6 @@ matrix:
     name: Integration tests  - V1 - shard 2 (Python 3.7)
     os: linux
     python:
-    - '2.7'
     - '3.6'
     - '3.7'
     script:
@@ -1835,7 +1805,7 @@ matrix:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 3.6.7 3.7.1
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
       ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
@@ -1859,7 +1829,6 @@ matrix:
     name: Integration tests  - V1 - shard 3 (Python 3.7)
     os: linux
     python:
-    - '2.7'
     - '3.6'
     - '3.7'
     script:
@@ -1893,7 +1862,7 @@ matrix:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 3.6.7 3.7.1
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
       ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
@@ -1917,7 +1886,6 @@ matrix:
     name: Integration tests  - V1 - shard 4 (Python 3.7)
     os: linux
     python:
-    - '2.7'
     - '3.6'
     - '3.7'
     script:
@@ -1951,7 +1919,7 @@ matrix:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 3.6.7 3.7.1
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
       ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
@@ -1975,7 +1943,6 @@ matrix:
     name: Integration tests  - V1 - shard 5 (Python 3.7)
     os: linux
     python:
-    - '2.7'
     - '3.6'
     - '3.7'
     script:
@@ -2009,7 +1976,7 @@ matrix:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 3.6.7 3.7.1
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
       ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
@@ -2033,7 +2000,6 @@ matrix:
     name: Integration tests  - V1 - shard 6 (Python 3.7)
     os: linux
     python:
-    - '2.7'
     - '3.6'
     - '3.7'
     script:
@@ -2049,7 +2015,7 @@ matrix:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 3.6.7 3.7.1
     - sudo apt-get install -y pkg-config fuse libfuse-dev
     - sudo modprobe fuse
     - sudo chmod 666 /dev/fuse
@@ -2071,7 +2037,6 @@ matrix:
     name: Rust tests - Linux
     os: linux
     python:
-    - '2.7'
     - '3.6'
     - '3.7'
     script:
@@ -2288,7 +2253,7 @@ matrix:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 3.6.7 3.7.1
     - sudo apt-get install -y pkg-config fuse libfuse-dev
     - sudo modprobe fuse
     - sudo chmod 666 /dev/fuse
@@ -2315,7 +2280,6 @@ matrix:
     name: JVM tests (Python 3.6)
     os: linux
     python:
-    - '2.7'
     - '3.6'
     - '3.7'
     script:
@@ -2348,7 +2312,7 @@ matrix:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 3.6.7 3.7.1
     - sudo apt-get install -y pkg-config fuse libfuse-dev
     - sudo modprobe fuse
     - sudo chmod 666 /dev/fuse
@@ -2376,7 +2340,6 @@ matrix:
     name: JVM tests (Python 3.7)
     os: linux
     python:
-    - '2.7'
     - '3.6'
     - '3.7'
     script:
