@@ -106,7 +106,7 @@ dependencies = [
  "copy_dir 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "dir-diff 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.28 (registry+https://github.com/rust-lang/crates.io-index)",
- "grpcio 0.3.0 (git+https://github.com/pantsbuild/grpc-rs.git?rev=9dd357da5a2f231ce254d8abdd46068198637beb)",
+ "grpcio 0.3.0 (git+https://github.com/pantsbuild/grpc-rs.git?rev=b582ef3dc4e8c7289093c8febff8dadf0997b532)",
  "grpcio-compiler 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "hashing 0.0.1",
  "prost 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -977,10 +977,10 @@ dependencies = [
 [[package]]
 name = "grpcio"
 version = "0.3.0"
-source = "git+https://github.com/pantsbuild/grpc-rs.git?rev=9dd357da5a2f231ce254d8abdd46068198637beb#9dd357da5a2f231ce254d8abdd46068198637beb"
+source = "git+https://github.com/pantsbuild/grpc-rs.git?rev=b582ef3dc4e8c7289093c8febff8dadf0997b532#b582ef3dc4e8c7289093c8febff8dadf0997b532"
 dependencies = [
  "futures 0.1.28 (registry+https://github.com/rust-lang/crates.io-index)",
- "grpcio-sys 0.2.3 (git+https://github.com/pantsbuild/grpc-rs.git?rev=9dd357da5a2f231ce254d8abdd46068198637beb)",
+ "grpcio-sys 0.2.3 (git+https://github.com/pantsbuild/grpc-rs.git?rev=b582ef3dc4e8c7289093c8febff8dadf0997b532)",
  "libc 0.2.60 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "protobuf 2.0.6 (git+https://github.com/pantsbuild/rust-protobuf?rev=171611c33ec92f07e1b7107327f6d0139a7afebf)",
@@ -998,7 +998,7 @@ dependencies = [
 [[package]]
 name = "grpcio-sys"
 version = "0.2.3"
-source = "git+https://github.com/pantsbuild/grpc-rs.git?rev=9dd357da5a2f231ce254d8abdd46068198637beb#9dd357da5a2f231ce254d8abdd46068198637beb"
+source = "git+https://github.com/pantsbuild/grpc-rs.git?rev=b582ef3dc4e8c7289093c8febff8dadf0997b532#b582ef3dc4e8c7289093c8febff8dadf0997b532"
 dependencies = [
  "cc 1.0.37 (registry+https://github.com/rust-lang/crates.io-index)",
  "cmake 0.1.40 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1506,7 +1506,7 @@ dependencies = [
  "bazel_protos 0.0.1",
  "bytes 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.28 (registry+https://github.com/rust-lang/crates.io-index)",
- "grpcio 0.3.0 (git+https://github.com/pantsbuild/grpc-rs.git?rev=9dd357da5a2f231ce254d8abdd46068198637beb)",
+ "grpcio 0.3.0 (git+https://github.com/pantsbuild/grpc-rs.git?rev=b582ef3dc4e8c7289093c8febff8dadf0997b532)",
  "hashing 0.0.1",
  "parking_lot 0.6.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "protobuf 2.0.6 (git+https://github.com/pantsbuild/rust-protobuf?rev=171611c33ec92f07e1b7107327f6d0139a7afebf)",
@@ -1808,7 +1808,7 @@ dependencies = [
  "digest 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "fs 0.0.1",
  "futures 0.1.28 (registry+https://github.com/rust-lang/crates.io-index)",
- "grpcio 0.3.0 (git+https://github.com/pantsbuild/grpc-rs.git?rev=9dd357da5a2f231ce254d8abdd46068198637beb)",
+ "grpcio 0.3.0 (git+https://github.com/pantsbuild/grpc-rs.git?rev=b582ef3dc4e8c7289093c8febff8dadf0997b532)",
  "hashing 0.0.1",
  "libc 0.2.60 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2532,7 +2532,7 @@ dependencies = [
  "dirs 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "fs 0.0.1",
  "futures 0.1.28 (registry+https://github.com/rust-lang/crates.io-index)",
- "grpcio 0.3.0 (git+https://github.com/pantsbuild/grpc-rs.git?rev=9dd357da5a2f231ce254d8abdd46068198637beb)",
+ "grpcio 0.3.0 (git+https://github.com/pantsbuild/grpc-rs.git?rev=b582ef3dc4e8c7289093c8febff8dadf0997b532)",
  "hashing 0.0.1",
  "indexmap 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "itertools 0.7.11 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -3452,9 +3452,9 @@ dependencies = [
 "checksum git2-curl 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "d58551e903ed7e2d6fe3a2f3c7efa3a784ec29b19d0fbb035aaf0497c183fbdd"
 "checksum glob 0.2.11 (registry+https://github.com/rust-lang/crates.io-index)" = "8be18de09a56b60ed0edf84bc9df007e30040691af7acd1c41874faac5895bfb"
 "checksum globset 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)" = "925aa2cac82d8834e2b2a4415b6f6879757fb5c0928fc445ae76461a12eed8f2"
-"checksum grpcio 0.3.0 (git+https://github.com/pantsbuild/grpc-rs.git?rev=9dd357da5a2f231ce254d8abdd46068198637beb)" = "<none>"
+"checksum grpcio 0.3.0 (git+https://github.com/pantsbuild/grpc-rs.git?rev=b582ef3dc4e8c7289093c8febff8dadf0997b532)" = "<none>"
 "checksum grpcio-compiler 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "a63ccc27b0099347d2bea2c3d0f1c79c018a13cfd08b814a1992e341b645d5e1"
-"checksum grpcio-sys 0.2.3 (git+https://github.com/pantsbuild/grpc-rs.git?rev=9dd357da5a2f231ce254d8abdd46068198637beb)" = "<none>"
+"checksum grpcio-sys 0.2.3 (git+https://github.com/pantsbuild/grpc-rs.git?rev=b582ef3dc4e8c7289093c8febff8dadf0997b532)" = "<none>"
 "checksum h2 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)" = "a539b63339fbbb00e081e84b6e11bd1d9634a82d91da2984a18ac74a8823f392"
 "checksum heck 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "20564e78d53d2bb135c343b3f47714a56af2061f1c928fdb541dc7b9fdd94205"
 "checksum hex 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)" = "805026a5d0141ffc30abb3be3173848ad46a1b1664fe632428479619a3644d77"
