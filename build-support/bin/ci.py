@@ -177,24 +177,23 @@ def set_run_from_pex() -> None:
 def maybe_get_remote_execution_oauth_token_path(
   *, remote_execution_enabled: bool
 ) -> Iterator[Optional[str]]:
-  # if not remote_execution_enabled:
-  #   yield None
-  #   return
-  # command = (
-  #   ["./pants.pex", "--quiet", "run", "build-support/bin:get_rbe_token"]
-  #   if os.getenv("CI")
-  #   else ["gcloud", "auth", "application-default", "print-access-token"]
-  # )
-  # token: str = subprocess.run(
-  #   command, encoding="utf-8", stdout=subprocess.PIPE, check=True
-  # ).stdout
-  # if not os.getenv("CI"):
-  #   token = token.splitlines()[0]
-  # with tempfile.NamedTemporaryFile(mode="w+") as tf:
-  #   tf.write(token)
-  #   tf.seek(0)
-  #   yield tf.name
-  yield '123'
+  if not remote_execution_enabled:
+    yield None
+    return
+  command = (
+    ["./pants.pex", "--quiet", "run", "build-support/bin:get_rbe_token"]
+    if os.getenv("CI")
+    else ["gcloud", "auth", "application-default", "print-access-token"]
+  )
+  token: str = subprocess.run(
+    command, encoding="utf-8", stdout=subprocess.PIPE, check=True
+  ).stdout
+  if not os.getenv("CI"):
+    token = token.splitlines()[0]
+  with tempfile.NamedTemporaryFile(mode="w+") as tf:
+    tf.write(token)
+    tf.seek(0)
+    yield tf.name
 
 # -------------------------------------------------------------------------
 # Blacklists
