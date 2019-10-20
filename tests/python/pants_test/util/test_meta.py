@@ -6,7 +6,8 @@ from abc import ABC, abstractmethod
 from dataclasses import FrozenInstanceError, dataclass
 
 from pants.testutil.test_base import TestBase
-from pants.util.meta import SingletonMetaclass, classproperty, frozen_after_init, staticproperty
+from pants.util.meta import (SingletonMetaclass, classproperty, frozen_after_init,
+                             sentinel_attribute, staticproperty)
 
 
 class AbstractClassTest(TestBase):
@@ -244,6 +245,22 @@ with an @classproperty decorator."""):
       def f(cls):
         return 'hello'
     self.assertEqual(Concrete2.f, 'hello')
+
+
+class SentinelAttributeTest(unittest.TestCase):
+
+  def test_sentinel_attribute(self):
+    @sentinel_attribute('_test_attr_name')
+    def f(cls):
+      return f.define_instance_of(cls)
+
+    @f
+    class C:
+      pass
+
+    self.assertEqual(f.sentinel_attribute, '_test_attr_name')
+    self.assertTrue(C._test_attr_name)
+    self.assertTrue(f.is_instance(C))
 
 
 class FrozenAfterInitTest(unittest.TestCase):
