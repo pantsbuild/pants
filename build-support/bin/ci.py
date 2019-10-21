@@ -425,7 +425,7 @@ def run_cargo_audit() -> None:
       die("Cargo audit failure")
 
 
-def run_unit_tests(*, oauth_token_path: Optional[str] = None, shard=None) -> None:
+def run_unit_tests(*, oauth_token_path: Optional[str] = None, shard: Optional[str] = None) -> None:
   target_sets = TestTargetSets.calculate(
     test_type=TestType.unit, remote_execution_enabled=oauth_token_path is not None
   )
