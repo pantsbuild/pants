@@ -468,7 +468,7 @@ def unit_tests(python_version: PythonVersion) -> List[Dict]:
   def make_shard(*, shard_num: int) -> Dict:
     shard = {
       **linux_shard(python_version=python_version, install_travis_wait=True),
-      "name": f"Unit tests (Python {python_version.decimal})",
+      "name": f"Unit tests (Python {python_version.decimal}) shard {shard_num}",
       "script": [
         "travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py --unit-tests --plugin-tests "
         f"--unit-shard {shard_num}/{num_unit_test_shards} --remote-execution-enabled --python-version {python_version.decimal}"
