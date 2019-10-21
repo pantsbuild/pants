@@ -122,7 +122,6 @@ impl ParsedJVMCommandLines {
 #[cfg(test)]
 mod tests {
     use crate::nailgun::parsed_jvm_command_lines::ParsedJVMCommandLines;
-    use itertools::Itertools;
 
     #[derive(Debug)]
     struct CLIBuilder {

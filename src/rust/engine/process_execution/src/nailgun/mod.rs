@@ -243,7 +243,7 @@ impl super::CommandRunner for NailgunCommandRunner {
 mod tests {
     use crate::nailgun::{NailgunCommandRunner, NAILGUN_MAIN_CLASS, ARGS_TO_START_NAILGUN, NAILGUN_PORT_ENV_VAR_FOR_CLIENT};
     use store::Store;
-    use tempfile::{TempDir, NamedTempFile};
+    use tempfile::TempDir;
     use crate::{ExecuteProcessRequestMetadata, Platform, ExecuteProcessRequest};
     use std::path::PathBuf;
     use hashing::EMPTY_DIGEST;
@@ -388,7 +388,8 @@ mod tests {
     fn materializing_workdir_for_server_creates_a_link_for_the_jdk() {
         let workdir_base_tempdir = unique_temp_dir(std::env::temp_dir(), None);
         let workdir_base = workdir_base_tempdir.path().to_owned();
-        let mock_jdk_path = unique_temp_file().path().to_owned();
+        let mock_jdk_dir = unique_temp_dir(std::env::temp_dir(), None);
+        let mock_jdk_path = mock_jdk_dir.path().to_owned();
         let runner = mock_nailgun_runner(Some(workdir_base));
         let nailgun_name = "mock_server".to_string();
 

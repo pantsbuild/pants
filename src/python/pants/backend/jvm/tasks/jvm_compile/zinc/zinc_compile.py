@@ -24,7 +24,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnitLabel
-from pants.binaries.binary_tool import NativeTool, Script
+from pants.binaries.binary_tool import Script
 from pants.binaries.binary_util import BinaryToolUrlGenerator
 from pants.engine.fs import (
   EMPTY_DIRECTORY_DIGEST,
@@ -46,6 +46,7 @@ _SCALAC_PLUGIN_INFO_FILE = 'scalac-plugin.xml'
 
 logger = logging.getLogger(__name__)
 
+
 class NailgunClientBinary(Script):
   options_scope = 'nailgun-client'
   name = 'ng'
@@ -56,6 +57,7 @@ class NailgunClientBinary(Script):
       def generate_urls(self, version, host_platform):
         return ["https://github.com/facebook/nailgun/releases/download/nailgun-all-v1.0.0/ng.py"]
     return NailgunClientBinaryUrlGenerator()
+
 
 class BaseZincCompile(JvmCompile):
   """An abstract base class for zinc compilation tasks."""
