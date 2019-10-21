@@ -166,6 +166,9 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                   'etc. For example, the setup script we distribute at https://www.pantsbuild.org/install.html#recommended-installation '
                   'uses this value to determine which Python version to run with. You may find the '
                   'version of the pants instance you are running using -v, -V, or --version.')
+    register('--pants-bin-name', advanced=True, default='/.pants',
+             help='The name of the script or binary used to invoke pants. '
+                  'Useful when printing help messages.')
 
     register('--plugins', advanced=True, type=list, help='Load these plugins.')
     register('--plugin-cache-dir', advanced=True,
