@@ -52,6 +52,10 @@ class RscCompileIntegration(BaseCompileIT):
   def test_java_sources(self):
     self.do_command('compile', 'testprojects/src/scala/org/pantsbuild/testproject/javasources')
 
+  @ensure_compile_rsc_execution_strategy
+  def test_node_dependencies(self):
+    self.do_command('compile', 'contrib/node/examples/src/java/org/pantsbuild/testproject/jsresources')
+
   def test_rsc_hermetic_jvm_options(self):
     pants_run = self.run_pants(['compile', 'examples/src/scala/org/pantsbuild/example/hello/exe'],
       config={

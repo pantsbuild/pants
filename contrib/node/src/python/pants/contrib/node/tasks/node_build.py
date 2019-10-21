@@ -29,7 +29,7 @@ class NodeBuild(NodeTask):
         Digest.load(relpath),
       ),
     ])
-    return ClasspathEntry(relpath, classes_dir_snapshot.directory_digest)
+    return ClasspathEntry(results_dir, classes_dir_snapshot.directory_digest)
 
   @classmethod
   def product_types(cls):
