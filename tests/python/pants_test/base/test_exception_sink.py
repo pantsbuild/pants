@@ -69,7 +69,7 @@ class TestExceptionSink(TestBase):
         getproctitle_mock.assert_called_once()
 
       # This should have created two log files, one specific to the current pid.
-      self.assertEqual(os.listdir(tmpdir), ['logs'])
+      self.assertEqual(os.listdir(tmpdir), ['.pants-fatal-exception-logs'])
 
       cur_process_error_log_path = ExceptionSink.exceptions_log_path(for_pid=pid, in_dir=tmpdir)
       self.assertTrue(os.path.isfile(cur_process_error_log_path))

@@ -272,7 +272,7 @@ class ExceptionSink:
     in_dir = in_dir or cls._log_dir
     return os.path.join(
       in_dir,
-      'logs',
+      '.pants-fatal-exception-logs',
       'exceptions{}.log'.format(intermediate_filename_component))
 
   @classmethod
