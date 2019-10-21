@@ -30,8 +30,12 @@ use hex;
 
 use digest::{Digest as DigestTrait, FixedOutput};
 use serde::ser::{Serialize, SerializeStruct, Serializer};
+use serde::{Deserialize, Deserializer};
 use sha2::Sha256;
 
+use serde::de::{MapAccess, Visitor};
+use serde::export::fmt::Error;
+use serde::export::Formatter;
 use std::fmt;
 use std::io::{self, Write};
 
@@ -106,6 +110,37 @@ impl Serialize for Fingerprint {
   }
 }
 
+impl<'de> Deserialize<'de> for Fingerprint {
+  fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+  where
+    D: Deserializer<'de>,
+  {
+    struct FingerprintVisitor;
+
+    impl<'de> Visitor<'de> for FingerprintVisitor {
+      type Value = Fingerprint;
+
+      fn expecting(&self, formatter: &mut Formatter) -> Result<(), Error> {
+        formatter.write_str("struct Fingerprint")
+      }
+
+      fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+      where
+        E: serde::de::Error,
+      {
+        Fingerprint::from_hex_string(v).map_err(|err| {
+          serde::de::Error::invalid_value(
+            serde::de::Unexpected::Str(&format!("{:?}: {}", v, err)),
+            &format!("A hex representation of a {} byte value", FINGERPRINT_SIZE).as_str(),
+          )
+        })
+      }
+    }
+
+    deserializer.deserialize_string(FingerprintVisitor)
+  }
+}
+
 ///
 /// A Digest is a fingerprint, as well as the size in bytes of the plaintext for which that is the
 /// fingerprint.
@@ -125,6 +160,62 @@ impl Serialize for Digest {
     obj.serialize_field("fingerprint", &self.0)?;
     obj.serialize_field("size_bytes", &self.1)?;
     obj.end()
+  }
+}
+
+#[derive(Deserialize)]
+#[serde(field_identifier, rename_all = "snake_case")]
+enum Field {
+  Fingerprint,
+  SizeBytes,
+}
+
+impl<'de> Deserialize<'de> for Digest {
+  fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+  where
+    D: Deserializer<'de>,
+  {
+    struct DigestVisitor;
+
+    impl<'de> Visitor<'de> for DigestVisitor {
+      type Value = Digest;
+
+      fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("struct digest")
+      }
+
+      fn visit_map<V>(self, mut map: V) -> Result<Digest, V::Error>
+      where
+        V: MapAccess<'de>,
+      {
+        use serde::de;
+
+        let mut fingerprint = None;
+        let mut size_bytes = None;
+        while let Some(key) = map.next_key()? {
+          match key {
+            Field::Fingerprint => {
+              if fingerprint.is_some() {
+                return Err(de::Error::duplicate_field("fingerprint"));
+              }
+              fingerprint = Some(map.next_value()?);
+            }
+            Field::SizeBytes => {
+              if size_bytes.is_some() {
+                return Err(de::Error::duplicate_field("size_bytes"));
+              }
+              size_bytes = Some(map.next_value()?);
+            }
+          }
+        }
+        let fingerprint = fingerprint.ok_or_else(|| de::Error::missing_field("fingerprint"))?;
+        let size_bytes = size_bytes.ok_or_else(|| de::Error::missing_field("size_bytes"))?;
+        Ok(Digest(fingerprint, size_bytes))
+      }
+    }
+
+    const FIELDS: &[&str] = &["fingerprint", "size_bytes"];
+    deserializer.deserialize_struct("digest", FIELDS, DigestVisitor)
   }
 }
 
@@ -268,13 +359,13 @@ mod fingerprint_tests {
 
 #[cfg(test)]
 mod digest_tests {
-  use self::serde_test::{assert_ser_tokens, Token};
+  use self::serde_test::{assert_tokens, Token};
   use super::Digest;
   use super::Fingerprint;
   use serde_test;
 
   #[test]
-  fn serialize_to_str() {
+  fn serialize_and_deserialize() {
     let digest = Digest(
       Fingerprint::from_hex_string(
         "0123456789abcdeffedcba98765432100000000000000000ffffffffffffffff",
@@ -282,7 +373,7 @@ mod digest_tests {
       .unwrap(),
       1,
     );
-    assert_ser_tokens(
+    assert_tokens(
       &digest,
       &[
         Token::Struct {
