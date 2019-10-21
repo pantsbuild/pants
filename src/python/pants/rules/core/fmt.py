@@ -38,10 +38,9 @@ def fmt(console: Console, targets: HydratedTargets, union_membership: UnionMembe
   results = yield [
           Get(FmtResult, TargetWithSources, target.adaptor)
           for target in targets
-           # We will want to remove the workaround that filters adaptors which have a `sources`
-           # attribute.
-           # See https://github.com/pantsbuild/pants/issues/4535
-          if union_membership.is_member(FmtTarget, target.adaptor) and hasattr(target.adaptor, "sources")
+          # TODO: make TargetAdaptor return a 'sources' field with an empty snapshot instead of
+          # raising to remove the hasattr() checks here!
+          if union_membership.is_member(TargetWithSources, target.adaptor) and hasattr(target.adaptor, "sources")
           ]
 
   for result in results:
