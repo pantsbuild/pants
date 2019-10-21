@@ -26,10 +26,10 @@ env:
   - PATH="${PYENV_ROOT}/shims:${PATH}"
   - AWS_CLI_ROOT="${HOME}/.aws_cli"
   - AWS_ACCESS_KEY_ID__TO_BE_REEXPORTED_ON_DEPLOYS=AKIAV6A6G7RQWPRUWIXR
-  - MODE=debug
   - secure: hFVAQGLVkexzTd3f9NF+JoG1dE+CPICKqOcdvQYv8+YB2rwwqu0/J6MnqKUZSmec4AM4ZvyPUBIHnSw8aMJysYs+GZ6iG/8ZRRmdbmo2WBPbSZ+ThRZxx/F6AjmovUmf8Zt366ZAZXpc9NHKREkTUGl6UL7FFe9+ouVnb90asdw=
   - RUST_BACKTRACE="all"
   - PYTHONWARNINGS=ignore::DeprecationWarning
+  - MODE=debug
 matrix:
   include:
   - addons:
@@ -179,7 +179,10 @@ matrix:
     os: osx
     osx_image: xcode8
     script:
-    - echo 'hello'
+    - ./build-support/bin/ci.py --bootstrap --python-version 3.6
+    - ./build-support/bin/release.sh -f
+    - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex
+      ${BOOTSTRAPPED_PEX_URL_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     stage: Bootstrap Pants
   - after_failure:
     - ./build-support/bin/ci-failure.sh
@@ -2437,5 +2440,4 @@ stages:
   name: Deploy Pants Pex
 - if: tag IS NOT present AND type NOT IN (pull_request, cron)
   name: Deploy Pants Pex Unstable
-
 
