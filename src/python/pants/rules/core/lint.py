@@ -14,7 +14,7 @@ from pants.engine.legacy.structs import (
 )
 from pants.engine.rules import console_rule
 from pants.engine.selectors import Get
-from pants.rules.core.fmt import FmtTarget
+from pants.rules.core.fmt import TargetWithSources
 
 
 @dataclass(frozen=True)
@@ -35,7 +35,7 @@ class Lint(Goal):
 @console_rule
 def lint(console: Console, targets: HydratedTargets) -> Lint:
   results = yield [
-          Get(LintResult, FmtTarget, target.adaptor)
+          Get(LintResult, TargetWithSources, target.adaptor)
           for target in targets
           # @union assumes that all targets passed implement the union, so we manually
           # filter the targets we know do; this should probably no-op or log or something
