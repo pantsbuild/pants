@@ -462,17 +462,22 @@ def cargo_audit() -> Dict:
 # Unit tests
 # -------------------------------------------------------------------------
 
-def unit_tests(python_version: PythonVersion) -> Dict:
-  shard = {
-    **linux_shard(python_version=python_version, install_travis_wait=True),
-    "name": f"Unit tests (Python {python_version.decimal})",
-    "script": [
-      "travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py --unit-tests --plugin-tests "
-      f"--remote-execution-enabled --python-version {python_version.decimal}"
-    ],
-  }
-  shard["env"] = shard.get("env", []) + [f"CACHE_NAME=unit_tests.py{python_version.number}"]
-  return shard
+def unit_tests(python_version: PythonVersion) -> List[Dict]:
+  num_unit_test_shards = 2
+
+  def make_shard(*, shard_num: int) -> Dict:
+    shard = {
+      **linux_shard(python_version=python_version, install_travis_wait=True),
+      "name": f"Unit tests (Python {python_version.decimal})",
+      "script": [
+        "travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py --unit-tests --plugin-tests "
+        f"--unit-shard {shard_num}/{num_unit_test_shards} --remote-execution-enabled --python-version {python_version.decimal}"
+      ],
+    }
+    shard["env"] = shard.get("env", []) + [f"CACHE_NAME=unit_tests.py{python_version.number}"]
+    return shard
+
+  return [make_shard(shard_num=i) for i in range(num_unit_test_shards)]
 
 # ----------------------------------------------------------------------
 # Build wheels
@@ -772,12 +777,12 @@ def main() -> None:
       # https://docs.google.com/document/d/1gL3D1f-AzL_LzRxWLskCpVQ2ZlB_26GTETgXkXsrpDY/edit#heading=h.akhkfdtqfpw,
       # the RBE token server will only give tokens to job numbers #5 and #6, so we must do this
       # for the cron jobs to work with remoting.
-      unit_tests(PythonVersion.py37),
+      *unit_tests(PythonVersion.py37),
       integration_tests_v2(PythonVersion.py37),
       *[lint(v) for v in PythonVersion],
       clippy(),
       cargo_audit(),
-      unit_tests(PythonVersion.py36),
+      *unit_tests(PythonVersion.py36),
       integration_tests_v2(PythonVersion.py36),
       build_wheels_linux(),
       build_wheels_osx(),
