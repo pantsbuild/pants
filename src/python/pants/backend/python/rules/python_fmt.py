@@ -75,7 +75,7 @@ def get_black_input(
   yield BlackInput(config_path, resolved_requirements_pex, merged_input_files)
 
 
-def generate_black_pex_args(files: Set[str], config_path: str, *, check_only: bool) -> Tuple[str, ...]:
+def _generate_black_pex_args(files: Set[str], config_path: str, *, check_only: bool) -> Tuple[str, ...]:
   # The exclude option from Black only works on recursive invocations,
   # so call black with the directories in which the files are present
   # and passing the full file names with the include option
@@ -92,7 +92,7 @@ def generate_black_pex_args(files: Set[str], config_path: str, *, check_only: bo
   return pex_args
 
 
-def generate_black_request(
+def _generate_black_request(
   wrapped_target: FormattablePythonTarget,
   black_input: BlackInput,
   python_setup: PythonSetup,
@@ -101,7 +101,7 @@ def generate_black_request(
   check_only: bool,
   ):
   target = wrapped_target.target
-  pex_args = generate_black_pex_args(target.sources.snapshot.files, black_input.config_path, check_only = check_only)
+  pex_args = _generate_black_pex_args(target.sources.snapshot.files, black_input.config_path, check_only = check_only)
 
   request = black_input.resolved_requirements_pex.create_execute_request(
     python_setup=python_setup,
@@ -123,7 +123,7 @@ def fmt_with_black(
   subprocess_encoding_environment: SubprocessEncodingEnvironment,
   ) -> FmtResult:
 
-  request = generate_black_request(wrapped_target, black_input, python_setup, subprocess_encoding_environment, check_only = False)
+  request = _generate_black_request(wrapped_target, black_input, python_setup, subprocess_encoding_environment, check_only = False)
 
   result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, request)
 
@@ -142,7 +142,7 @@ def lint_with_black(
   subprocess_encoding_environment: SubprocessEncodingEnvironment,
   ) -> LintResult:
 
-  request = generate_black_request(wrapped_target, black_input, python_setup, subprocess_encoding_environment, check_only = True)
+  request = _generate_black_request(wrapped_target, black_input, python_setup, subprocess_encoding_environment, check_only = True)
 
   result = yield Get(FallibleExecuteProcessResult, ExecuteProcessRequest, request)
 
