@@ -25,7 +25,7 @@ from pants.engine.legacy.structs import (
 )
 from pants.engine.rules import UnionRule, optionable_rule, rule
 from pants.engine.selectors import Get
-from pants.rules.core.fmt import FmtResult, FmtTarget
+from pants.rules.core.fmt import FmtResult, TargetWithSources
 from pants.rules.core.lint import LintResult
 
 
@@ -193,11 +193,11 @@ def rules():
     get_black_input,
     fmt_with_black,
     lint_with_black,
-    UnionRule(FmtTarget, PythonTargetAdaptor),
-    UnionRule(FmtTarget, PythonAppAdaptor),
-    UnionRule(FmtTarget, PythonBinaryAdaptor),
-    UnionRule(FmtTarget, PythonTestsAdaptor),
-    UnionRule(FmtTarget, PantsPluginAdaptor),
+    UnionRule(TargetWithSources, PythonTargetAdaptor),
+    UnionRule(TargetWithSources, PythonAppAdaptor),
+    UnionRule(TargetWithSources, PythonBinaryAdaptor),
+    UnionRule(TargetWithSources, PythonTestsAdaptor),
+    UnionRule(TargetWithSources, PantsPluginAdaptor),
     optionable_rule(Black),
     optionable_rule(PythonSetup),
   ]

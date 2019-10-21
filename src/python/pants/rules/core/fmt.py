@@ -27,7 +27,7 @@ class FmtResult:
 
 
 @union
-class FmtTarget:
+class TargetWithSources:
   """A union for registration of a formattable target type."""
 
 
@@ -42,7 +42,7 @@ class Fmt(Goal):
 @console_rule
 def fmt(console: Console, targets: HydratedTargets) -> Fmt:
   results = yield [
-          Get(FmtResult, FmtTarget, target.adaptor)
+          Get(FmtResult, TargetWithSources, target.adaptor)
           for target in targets
           # @union assumes that all targets passed implement the union, so we manually
           # filter the targets we know do; this should probably no-op or log or something
