@@ -107,6 +107,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Joshua Humphries
 + Justin Trobec
 + Karin Lundberg
++ Kaushik Srenevasan
 + Ken Kawamoto
 + Kevin Oliver
 + Kevin Sweeney

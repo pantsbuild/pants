@@ -4,6 +4,85 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.22.0rc0 (10/20/2019)
+------------------------
+
+New Features
+~~~~~~~~~~~~
+
+* Add duration to Job to prep for calculating critical path (#8441)
+  `PR #8441 <https://github.com/pantsbuild/pants/pull/8441>`_
+
+* Only resolve requirements from PythonRequirementLibrary targets for setup_requires in python_dist() (#8442)
+  `PR #8442 <https://github.com/pantsbuild/pants/pull/8442>`_
+
+Bugfixes
+~~~~~~~~
+
+* fix NameError in ExceptionSink.trapped_signals() if .reset_signal_handler() raises (#8482)
+  `PR #8482 <https://github.com/pantsbuild/pants/pull/8482>`_
+
+* Fix undigested m.jar under validated targets (#8479)
+  `PR #8479 <https://github.com/pantsbuild/pants/pull/8479>`_
+
+* Fix async_semaphore deadlock, and only fail speculation if primary command fails. (#8374)
+  `PR #8374 <https://github.com/pantsbuild/pants/pull/8374>`_
+
+* Fix missing digest for m.jar (#8447)
+  `PR #8447 <https://github.com/pantsbuild/pants/pull/8447>`_
+
+* Use jvm options from RSC subsystem for RSC invocation (#8434)
+  `PR #8434 <https://github.com/pantsbuild/pants/pull/8434>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Restore pycodestyle (#8471)
+  `PR #8471 <https://github.com/pantsbuild/pants/pull/8471>`_
+
+* Remove `enum()` to consolidate around standard library Enum (#8475)
+  `PR #8475 <https://github.com/pantsbuild/pants/pull/8475>`_
+  `PR #8467 <https://github.com/pantsbuild/pants/pull/8467>`_
+
+* Type check core base code (#8462)
+  `PR #8462 <https://github.com/pantsbuild/pants/pull/8462>`_
+
+* Code Issues 900 Pull requests 121 Projects 5 Wiki Security Insights Explicitly delete file before writing it using the materialize_directory API (#8436)
+  `PR #8436 <https://github.com/pantsbuild/pants/pull/8436>`_
+
+* Squashed commit of the following: (#8302)
+  `PR #8302 <https://github.com/pantsbuild/pants/pull/8302>`_
+
+* Revert "Modify `engine.objects.Collection` to work with type hints (#8467)" (#8476)
+  `PR #8467 <https://github.com/pantsbuild/pants/pull/8467>`_
+  `PR #8476 <https://github.com/pantsbuild/pants/pull/8476>`_
+
+* Use `collections.Enum` for Nailgun task related code (#8461)
+  `PR #8461 <https://github.com/pantsbuild/pants/pull/8461>`_
+
+* Use `collections.Enum` instead of `enum()` (#8443)
+  `PR #8443 <https://github.com/pantsbuild/pants/pull/8443>`_
+
+* Prepare 1.21.0. (#8474)
+  `PR #8474 <https://github.com/pantsbuild/pants/pull/8474>`_
+
+* Modify `engine.objects.Collection` to work with type hints (#8467)
+  `PR #8467 <https://github.com/pantsbuild/pants/pull/8467>`_
+
+* Use `partially_type_checked` tag for incremental type hinting of Pants repo (#8464)
+  `PR #8464 <https://github.com/pantsbuild/pants/pull/8464>`_
+
+* Use Duration not f64 (#8396)
+  `Issue #54361 <https://github.com/rust-lang/rust/issues/54361>`_
+  `PR #8396 <https://github.com/pantsbuild/pants/pull/8396>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Propose guidance around contentious decisions. (#8438)
+  `PR #8438 <https://github.com/pantsbuild/pants/pull/8438>`_
+
+
 1.22.0.dev2 (10/13/2019)
 ------------------------
 
@@ -59,7 +138,6 @@ Refactoring, Improvements, and Tooling
 
 * Improve support for `Enum`s as option types (#8458)
   `PR #8458 <https://github.com/pantsbuild/pants/pull/8458>`_
-  `Comment #8451 <https://github.com/pantsbuild/pants/pull/8451#discussion_r334075761>`
 
 * Port `test_pytest_run_integration.py` to V2 (#8466)
   `PR #8466 <https://github.com/pantsbuild/pants/pull/8466>`_
