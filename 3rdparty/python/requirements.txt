@@ -4,6 +4,8 @@ beautifulsoup4>=4.6.0,<4.7
 cffi==1.12.3
 contextlib2==0.5.5
 coverage>=4.5,<4.6
+# TODO remove this pin once we resolve https://github.com/pantsbuild/pants/issues/8502
+cryptography==2.7
 dataclasses==0.6
 docutils==0.14
 fasteners==0.14.1
