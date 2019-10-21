@@ -150,18 +150,16 @@ impl Core {
     );
 
     let maybe_nailgunnable_local_command_runner: Box<dyn process_execution::CommandRunner> =
-        if process_execution_local_enable_nailgun {
-          Box::new(
-            process_execution::nailgun::NailgunCommandRunner::new(
-              local_command_runner,
-              process_execution_metadata.clone(),
-              local_python_distribution_absolute_path,
-              std::env::temp_dir(),
-            )
-          )
-        } else {
-          Box::new(local_command_runner)
-        };
+      if process_execution_local_enable_nailgun {
+        Box::new(process_execution::nailgun::CommandRunner::new(
+          local_command_runner,
+          process_execution_metadata.clone(),
+          local_python_distribution_absolute_path,
+          std::env::temp_dir(),
+        ))
+      } else {
+        Box::new(local_command_runner)
+      };
 
     let mut command_runner: Box<dyn process_execution::CommandRunner> =
       Box::new(BoundedCommandRunner::new(

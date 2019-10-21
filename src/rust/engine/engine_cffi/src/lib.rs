@@ -443,10 +443,8 @@ fn make_core(
       )
     })?;
 
-  let local_python_distribution_absolute_path = PathBuf::from(
-    local_python_distribution_absolute_path_buf
-        .to_os_string()
-  );
+  let local_python_distribution_absolute_path =
+    PathBuf::from(local_python_distribution_absolute_path_buf.to_os_string());
 
   let remote_execution_headers = remote_execution_headers_buf.to_map("remote-execution-headers")?;
   Core::new(

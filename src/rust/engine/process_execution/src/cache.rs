@@ -9,7 +9,7 @@ use futures::Future;
 use log::{debug, warn};
 use protobuf::Message;
 
-use boxfuture::{Boxable, BoxFuture};
+use boxfuture::{BoxFuture, Boxable};
 use hashing::Fingerprint;
 use sharded_lmdb::ShardedLmdb;
 use store::Store;
@@ -78,7 +78,6 @@ impl crate::CommandRunner for CommandRunner {
 }
 
 impl CommandRunner {
-
   fn lookup(
     &self,
     fingerprint: Fingerprint,

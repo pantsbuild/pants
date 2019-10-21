@@ -412,10 +412,10 @@ class BaseZincCompile(JvmCompile):
   @memoized_method
   def _nailgun_server_classpath_entry(self):
     nailgun_jar = self.tool_jar('nailgun-server')
-    nailgun_jar_snapshot = self.context._scheduler.capture_snapshots((PathGlobsAndRoot(
+    nailgun_jar_snapshot, = self.context._scheduler.capture_snapshots((PathGlobsAndRoot(
       PathGlobs((fast_relpath(nailgun_jar, get_buildroot()),)),
       get_buildroot()
-    ),))[0]
+    ),))
     nailgun_jar_digest = nailgun_jar_snapshot.directory_digest
     return ClasspathEntry(nailgun_jar, nailgun_jar_digest)
 
@@ -439,9 +439,10 @@ class BaseZincCompile(JvmCompile):
     snapshots.extend(java_sources_snapshots)
 
     # Ensure the dependencies and compiler bridge jars are available in the execution sandbox.
-    relevant_classpath_entries = dependency_classpath + \
-                                 [compiler_bridge_classpath_entry] + \
-                                 [self._nailgun_server_classpath_entry()] # We include nailgun-server, to use it to start servers when needed from the hermetic execution case.
+    relevant_classpath_entries = (dependency_classpath + [
+      compiler_bridge_classpath_entry,
+      self._nailgun_server_classpath_entry(), # We include nailgun-server, to use it to start servers when needed from the hermetic execution case.
+    ])
     directory_digests = [
       entry.directory_digest for entry in relevant_classpath_entries if entry.directory_digest
     ]
@@ -526,7 +527,7 @@ class BaseZincCompile(JvmCompile):
       description="zinc compile for {}".format(ctx.target.address.spec),
       unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule=merged_local_only_scratch_inputs,
       jdk_home=self._zinc.underlying_dist.home,
-      nailgunnable=True,
+      is_nailgunnable=True,
     )
     res = self.context.execute_process_synchronously_or_raise(
       req, self.name(), [WorkUnitLabel.COMPILER])

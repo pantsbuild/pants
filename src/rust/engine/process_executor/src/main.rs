@@ -181,7 +181,8 @@ fn main() {
               .takes_value(true)
               .required(false)
               .default_value("false")
-              .help("Whether or not to run the process on a Nailgun server. This will very likely start a new Nailgun server.")
+              .help("Whether or not to enable running the process through a Nailgun server.\
+                        This will likely start a new Nailgun server as a side effect.")
       )
     .setting(AppSettings::TrailingVarArg)
     .arg(
@@ -328,7 +329,7 @@ fn main() {
     jdk_home: args.value_of("jdk").map(PathBuf::from),
     target_platform: Platform::try_from(&args.value_of("target-platform").unwrap().to_string())
       .expect("invalid value for `target-platform"),
-    is_nailgunnable: is_nailgunnable
+    is_nailgunnable,
   };
 
   let runner: Box<dyn process_execution::CommandRunner> = match server_arg {

@@ -285,23 +285,26 @@ pub trait CommandRunner: Send + Sync {
   }
 }
 
-// TODO possibly move to the MEPR struct, or to the hashing crate?
-pub fn digest(req: MultiPlatformExecuteProcessRequest, metadata: &ExecuteProcessRequestMetadata) -> Digest {
+// TODO(#8513) possibly move to the MEPR struct, or to the hashing crate?
+pub fn digest(
+  req: MultiPlatformExecuteProcessRequest,
+  metadata: &ExecuteProcessRequestMetadata,
+) -> Digest {
   let mut hashes: Vec<String> = req
-      .0
-      .values()
-      .map(|ref epr| crate::remote::make_execute_request(epr, metadata.clone()).unwrap())
-      .map(|(_a, _b, er)| er.get_action_digest().get_hash().to_string())
-      .collect();
+    .0
+    .values()
+    .map(|ref epr| crate::remote::make_execute_request(epr, metadata.clone()).unwrap())
+    .map(|(_a, _b, er)| er.get_action_digest().get_hash().to_string())
+    .collect();
   hashes.sort();
   Digest::of_bytes(
     hashes
-        .iter()
-        .fold(String::new(), |mut acc, hash| {
-          acc.push_str(&hash);
-          acc
-        })
-        .as_bytes(),
+      .iter()
+      .fold(String::new(), |mut acc, hash| {
+        acc.push_str(&hash);
+        acc
+      })
+      .as_bytes(),
   )
 }
 

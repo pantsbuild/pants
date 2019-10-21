@@ -37,7 +37,7 @@ class ExecuteProcessRequest:
   timeout_seconds: Union[int, float]
   unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: Digest
   jdk_home: Optional[str]
-  nailgunnable: bool
+  is_nailgunnable: bool
 
   def __init__(
     self,
@@ -51,7 +51,7 @@ class ExecuteProcessRequest:
     timeout_seconds: Union[int, float] = _default_timeout_seconds,
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: Digest = EMPTY_DIRECTORY_DIGEST,
     jdk_home: Optional[str] = None,
-    nailgunnable: bool = False,
+    is_nailgunnable: bool = False,
   ) -> None:
     self.argv = argv
     self.input_files = input_files
@@ -62,7 +62,7 @@ class ExecuteProcessRequest:
     self.timeout_seconds = timeout_seconds
     self.unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule = unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule
     self.jdk_home = jdk_home
-    self.nailgunnable = nailgunnable
+    self.is_nailgunnable = is_nailgunnable
 
 
 @frozen_after_init
