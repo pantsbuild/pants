@@ -8,6 +8,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
     'tests/python/pants_test:test_base',
+    'contrib/node:examples_directory',
     'examples/src/scala/org/pantsbuild/example:hello_directory',
     'testprojects/src/scala/org/pantsbuild/testproject:javadepsonscalatransitive_directory',
     'testprojects/src/scala/org/pantsbuild/testproject:javasources_directory',
