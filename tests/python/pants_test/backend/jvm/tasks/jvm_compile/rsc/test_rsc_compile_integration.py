@@ -40,6 +40,22 @@ class RscCompileIntegration(BaseCompileIT):
       self.assert_is_file(rsc_header_jar)
 
   @ensure_compile_rsc_execution_strategy
+  def test_basic_binary_youtline(self):
+    with self.do_command_yielding_workdir('--compile-rsc-workflow=outline-and-zinc', 'compile', 'testprojects/src/scala/org/pantsbuild/testproject/mutual:bin') as pants_run:
+      zinc_compiled_classfile = os.path.join(
+        pants_run.workdir,
+        'compile/rsc/current/testprojects.src.scala.org.pantsbuild.testproject.mutual.mutual/current/zinc',
+        'classes/org/pantsbuild/testproject/mutual/A.class')
+      self.assert_is_file(zinc_compiled_classfile)
+      rsc_header_jar = os.path.join(
+        pants_run.workdir,
+        'compile/rsc/current/testprojects.src.scala.org.pantsbuild.testproject.mutual.mutual/current/rsc',
+        'm.jar')
+      import pdb
+      pdb.set_trace()
+      self.assert_is_file(rsc_header_jar)
+
+  @ensure_compile_rsc_execution_strategy
   def test_executing_multi_target_binary(self):
     pants_run = self.do_command('run', 'examples/src/scala/org/pantsbuild/example/hello/exe')
     self.assertIn('Hello, Resource World!', pants_run.stdout_data)
@@ -63,6 +79,28 @@ class RscCompileIntegration(BaseCompileIT):
         'jvm-platform': {'compiler': 'rsc'},
         'compile.rsc': {
           'workflow': 'rsc-and-zinc',
+          'execution_strategy': 'hermetic',
+        },
+        'rsc': {
+          'jvm_options': [
+            '-Djava.security.manager=java.util.Optional'
+          ]
+        }
+      })
+    self.assert_failure(pants_run)
+    self.assertIn(
+      'Could not create SecurityManager: java.util.Optional',
+      pants_run.stdout_data,
+      'Pants run is expected to fail and contain error about loading an invalid security '
+      'manager class, but it did not.')
+
+  def test_youtline_hermetic_jvm_options(self):
+    pants_run = self.run_pants(['compile', 'examples/src/scala/org/pantsbuild/example/hello/exe'],
+      config={
+        'cache.compile.rsc': {'ignore': True},
+        'jvm-platform': {'compiler': 'rsc'},
+        'compile.rsc': {
+          'workflow': 'outline-and-zinc',
           'execution_strategy': 'hermetic',
         },
         'rsc': {
