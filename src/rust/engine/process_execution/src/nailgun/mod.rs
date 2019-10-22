@@ -130,6 +130,7 @@ pub struct CommandRunner {
   metadata: ExecuteProcessRequestMetadata,
   workdir_base: PathBuf,
   python_distribution_absolute_path: PathBuf,
+  executor: task_executor::Executor,
 }
 
 impl CommandRunner {
@@ -138,6 +139,7 @@ impl CommandRunner {
     metadata: ExecuteProcessRequestMetadata,
     python_distribution_absolute_path: PathBuf,
     workdir_base: PathBuf,
+    executor: task_executor::Executor,
   ) -> Self {
     CommandRunner {
       inner: Arc::new(runner),
@@ -145,20 +147,21 @@ impl CommandRunner {
       metadata: metadata,
       workdir_base: workdir_base,
       python_distribution_absolute_path: python_distribution_absolute_path,
+      executor: executor,
     }
   }
 
   // Ensure that the workdir for the given nailgun name exists.
   fn get_nailgun_workdir(&self, nailgun_name: &NailgunProcessName) -> Result<PathBuf, String> {
     let workdir = self.workdir_base.clone().join(nailgun_name);
-    if !workdir.exists() {
+    if workdir.exists() {
+      debug!("Nailgun workdir {:?} exits. Reusing that...", &workdir);
+      Ok(workdir)
+    } else {
       debug!("Creating nailgun workdir at {:?}", &workdir);
       fs::safe_create_dir_all(&workdir)
         .map_err(|err| format!("Error creating the nailgun workdir! {}", err))
         .map(|_| workdir)
-    } else {
-      debug!("nailgun workdir {:?} exits. Reusing that...", &workdir);
-      Ok(workdir)
     }
   }
 
@@ -195,29 +198,29 @@ impl CommandRunner {
                 let jdk_home_in_workdir = workdir_for_server2.clone().join(".jdk");
                 let jdk_home_in_workdir2 = jdk_home_in_workdir.clone();
                 let jdk_home_in_workdir3 = jdk_home_in_workdir.clone();
-                if !jdk_home_in_workdir.exists() {
-                    futures::future::result(
-                        symlink(requested_jdk_home, jdk_home_in_workdir)
-                            .map_err(|err| format!("Error making new symlink for local execution in workdir {:?}: {:?}", &workdir_for_server2, err))
-                    )
+                if jdk_home_in_workdir.exists() {
+                  let maybe_existing_jdk = read_link(jdk_home_in_workdir).map_err(|e| format!("{}", e));
+                  let maybe_existing_jdk2 = maybe_existing_jdk.clone();
+                  if maybe_existing_jdk.is_err() || (maybe_existing_jdk.is_ok() && maybe_existing_jdk.unwrap() != requested_jdk_home) {
+                    let res = remove_file(jdk_home_in_workdir2)
+                        .map_err(|err| format!(
+                          "Error removing existing (but incorrect) jdk symlink. We wanted it to point to {:?}, but it pointed to {:?}. {}",
+                          &requested_jdk_home, &maybe_existing_jdk2, err
+                        ))
+                        .and_then(|_| {
+                          symlink(requested_jdk_home, jdk_home_in_workdir3)
+                              .map_err(|err| format!("Error overwriting symlink for local execution in workdir {:?}: {:?}", &workdir_for_server2, err))
+                        });
+                    futures::future::result(res)
+                  } else {
+                    debug!("JDK home for Nailgun already exists in {:?}. Using that one.", &workdir_for_server4);
+                    futures::future::ok(())
+                  }
                 } else {
-                    let maybe_existing_jdk = read_link(jdk_home_in_workdir).map_err(|e| format!("{}", e));
-                    let maybe_existing_jdk2 = maybe_existing_jdk.clone();
-                    if maybe_existing_jdk.is_err() || (maybe_existing_jdk.is_ok() && maybe_existing_jdk.unwrap() != requested_jdk_home) {
-                        let res = remove_file(jdk_home_in_workdir2)
-                            .map_err(|err| format!(
-                                "Error removing existing (but incorrect) jdk symlink. We wanted it to point to {:?}, but it pointed to {:?}. {}",
-                                &requested_jdk_home, &maybe_existing_jdk2, err
-                            ))
-                            .and_then(|_| {
-                                symlink(requested_jdk_home, jdk_home_in_workdir3)
-                                    .map_err(|err| format!("Error overwriting symlink for local execution in workdir {:?}: {:?}", &workdir_for_server2, err))
-                            });
-                        futures::future::result(res)
-                    } else {
-                        debug!("JDK home for Nailgun already exists in {:?}. Using that one.", &workdir_for_server4);
-                        futures::future::ok(())
-                    }
+                  futures::future::result(
+                    symlink(requested_jdk_home, jdk_home_in_workdir)
+                        .map_err(|err| format!("Error making new symlink for local execution in workdir {:?}: {:?}", &workdir_for_server2, err))
+                  )
                 }
         })
         .inspect(move |_| debug!("Materialized directory {:?} before connecting to nailgun server.", &workdir_for_server3))
@@ -272,6 +275,7 @@ impl super::CommandRunner for CommandRunner {
 
     let workdir_for_this_nailgun = try_future!(self.get_nailgun_workdir(&nailgun_name));
     let workdir_for_this_nailgun1 = workdir_for_this_nailgun.clone();
+    let executor = self.executor.clone();
 
     self
       .materialize_workdir_for_server(
@@ -282,11 +286,15 @@ impl super::CommandRunner for CommandRunner {
       )
       .and_then(move |_metadata| {
         // Connect to a running nailgun.
-        nailgun_pool.connect(
-          nailgun_name.clone(),
-          nailgun_req,
-          &workdir_for_this_nailgun1,
-          nailgun_req_digest,
+        executor.spawn_on_io_pool(
+          futures::future::lazy(move || {
+            nailgun_pool.connect(
+              nailgun_name.clone(),
+              nailgun_req,
+              &workdir_for_this_nailgun1,
+              nailgun_req_digest,
+            )
+          })
         )
       })
       .map_err(|e| format!("Failed to connect to nailgun! {}", e))
