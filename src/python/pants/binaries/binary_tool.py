@@ -11,7 +11,6 @@ from pants.fs.archive import XZCompressedTarArchiver, create_archiver
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method, memoized_property
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -229,3 +228,6 @@ class XZ(NativeTool):
 
   def _executable_location(self):
     return os.path.join(self.select(), 'bin', 'xz')
+
+
+# TODO: add @rules for downloading from UrlToFetch!

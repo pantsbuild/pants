@@ -1,12 +1,15 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-
+import logging
 from collections.abc import MutableMapping, MutableSequence
 
 from pants.engine.addressable import addressable, addressable_list
 from pants.engine.objects import Serializable, SerializableFactory, Validatable, ValidationError
 from pants.util.objects import SubclassesOf, SuperclassesOf
+
+
+logger = logging.getLogger(__name__)
 
 
 def _normalize_utf8_keys(kwargs):
@@ -294,6 +297,7 @@ class StructWithDeps(Struct):
     :param list dependencies: The direct dependencies of this struct.
     """
     # TODO: enforce the type of variants using the Addressable framework.
+    logger.debug(f'{type(self).__name__} -> kwargs: {kwargs}')
     super().__init__(**kwargs)
     self.dependencies = dependencies
 
