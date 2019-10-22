@@ -65,13 +65,13 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
     self._executor_workdir = os.path.join(self.context.options.for_global_scope().pants_workdir,
                                           *id_tuple)
 
-  def create_java_executor(self, dist=None):
+  def create_java_executor(self, dist=None, force_subprocess=False):
     """Create java executor that uses this task's ng daemon, if allowed.
 
     Call only in execute() or later. TODO: Enforce this.
     """
     dist = dist or self.dist
-    if self.execution_strategy == self.ExecutionStrategy.nailgun:
+    if self.execution_strategy == self.ExecutionStrategy.nailgun and not force_subprocess:
       classpath = os.pathsep.join(self.tool_classpath('nailgun-server'))
       return NailgunExecutor(self._identity,
                              self._executor_workdir,
@@ -84,7 +84,7 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
       return SubprocessExecutor(dist)
 
   def runjava(self, classpath, main, jvm_options=None, args=None, workunit_name=None,
-              workunit_labels=None, workunit_log_config=None, dist=None):
+              workunit_labels=None, workunit_log_config=None, dist=None, force_subprocess=False):
     """Runs the java main using the given classpath and args.
 
     If --execution-strategy=subprocess is specified then the java main is run in a freshly spawned
@@ -93,12 +93,12 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
 
     :API: public
     """
-    executor = self.create_java_executor(dist=dist)
+    executor = self.create_java_executor(dist=dist, force_subprocess=force_subprocess)
 
     # Creating synthetic jar to work around system arg length limit is not necessary
     # when `NailgunExecutor` is used because args are passed through socket, therefore turning off
     # creating synthetic jar if nailgun is used.
-    create_synthetic_jar = self.execution_strategy != self.ExecutionStrategy.nailgun
+    create_synthetic_jar = self.execution_strategy != self.ExecutionStrategy.nailgun or force_subprocess
     try:
       return util.execute_java(classpath=classpath,
                                main=main,
