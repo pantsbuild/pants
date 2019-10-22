@@ -12,17 +12,18 @@ use log::{debug, info, trace};
 use parking_lot::Mutex;
 use regex::Regex;
 
-use hashing::Digest;
+use hashing::{Digest, Fingerprint};
 use lazy_static::lazy_static;
 
 use crate::ExecuteProcessRequest;
+use digest::Digest as DigestTrait;
+use sha2::Sha256;
 
 lazy_static! {
   static ref NAILGUN_PORT_REGEX: Regex = Regex::new(r".*\s+port\s+(\d+)\.$").unwrap();
 }
 
 pub type NailgunProcessName = String;
-type NailgunProcessFingerprint = Digest;
 type NailgunProcessMap = HashMap<NailgunProcessName, NailgunProcess>;
 pub type Port = usize;
 
@@ -55,6 +56,13 @@ impl NailgunPool {
     trace!("Locking nailgun process pool so that only one can be connecting at a time.");
     let mut processes = self.processes.lock();
 
+    let jdk_path = startup_options.jdk_home.clone().ok_or(format!(
+      "jdk_home is not set for nailgun server startup request {:#?}",
+      &startup_options
+    ))?;
+    let requested_server_fingerprint =
+      NailgunProcessFingerprint::new(nailgun_req_digest, jdk_path)?;
+
     let maybe_process = processes.get_mut(&name);
     let connection_result = if let Some(process) = maybe_process {
       // Clone some fields that we need for later
@@ -85,9 +93,9 @@ impl NailgunPool {
             "Found nailgun process {}, with fingerprint {:?}",
             &name, process_fingerprint
           );
-          if nailgun_req_digest == process_fingerprint {
+          if requested_server_fingerprint == process_fingerprint {
             debug!("The fingerprint of the running nailgun {:?} matches the requested fingerprint {:?}. Connecting to existing server.",
-                               nailgun_req_digest, process_fingerprint);
+                   requested_server_fingerprint, process_fingerprint);
             Ok(process_port)
           } else {
             // The running process doesn't coincide with the options we want.
@@ -100,7 +108,7 @@ impl NailgunPool {
               name,
               startup_options,
               workdir_path,
-              nailgun_req_digest,
+              requested_server_fingerprint,
             )
           }
         }
@@ -112,7 +120,7 @@ impl NailgunPool {
             name,
             startup_options,
             workdir_path,
-            nailgun_req_digest,
+            requested_server_fingerprint,
           )
         }
         Err(e) => Err(e),
@@ -128,7 +136,7 @@ impl NailgunPool {
         name,
         startup_options,
         workdir_path,
-        nailgun_req_digest,
+        requested_server_fingerprint,
       )
     };
     trace!("Unlocking nailgun process pool.");
@@ -141,7 +149,7 @@ impl NailgunPool {
     name: String,
     startup_options: ExecuteProcessRequest,
     workdir_path: &PathBuf,
-    nailgun_req_digest: Digest,
+    nailgun_server_fingerprint: NailgunProcessFingerprint,
   ) -> Result<Port, String> {
     debug!(
       "Starting new nailgun server for {}, with options {:?}",
@@ -151,7 +159,7 @@ impl NailgunPool {
       name.clone(),
       startup_options,
       workdir_path,
-      nailgun_req_digest,
+      nailgun_server_fingerprint,
     )
     .and_then(move |process| {
       let port = process.port;
@@ -194,7 +202,7 @@ impl NailgunProcess {
     name: NailgunProcessName,
     startup_options: ExecuteProcessRequest,
     workdir_path: &PathBuf,
-    nailgun_req_digest: Digest,
+    nailgun_server_fingerprint: NailgunProcessFingerprint,
   ) -> Result<NailgunProcess, String> {
     let cmd = startup_options.argv[0].clone();
     // TODO: This is an expensive operation, and thus we info! it.
@@ -230,7 +238,7 @@ impl NailgunProcess {
         );
         Ok(NailgunProcess {
           port: port,
-          fingerprint: nailgun_req_digest,
+          fingerprint: nailgun_server_fingerprint,
           name: name,
           handle: Arc::new(Mutex::new(child)),
         })
@@ -242,5 +250,30 @@ impl Drop for NailgunProcess {
   fn drop(&mut self) {
     debug!("Exiting nailgun server process {:?}", self);
     let _ = self.handle.lock().kill();
+  }
+}
+
+#[derive(Clone, Hash, PartialEq, Eq, Debug)]
+pub struct NailgunProcessFingerprint(pub Fingerprint);
+
+impl NailgunProcessFingerprint {
+  pub fn new(nailgun_server_req_digest: Digest, jdk_path: PathBuf) -> Result<Self, String> {
+    let jdk_version_output = std::process::Command::new(jdk_path.join("bin").join("java"))
+      .arg("-version")
+      .output()
+      .map_err(|err| {
+        format!(
+          "Failed to get version of the jdk for fingerprinting {}",
+          err
+        )
+      })?;
+
+    let mut hasher = Sha256::default();
+    hasher.input(nailgun_server_req_digest.0);
+    hasher.input(jdk_path.to_string_lossy().as_bytes());
+    hasher.input(jdk_version_output.stdout);
+    Ok(NailgunProcessFingerprint(Fingerprint::from_bytes_unsafe(
+      &hasher.result(),
+    )))
   }
 }

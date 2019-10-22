@@ -43,11 +43,12 @@ static NG_CLIENT_PATH: &str = "bin/ng/1.0.0/ng";
 ///
 // TODO(8481) We should calculate the input_files by deeply fingerprinting the classpath.
 fn construct_nailgun_server_request(
-  args: Vec<String>,
+  nailgun_name: &String,
+  args_for_the_jvm: Vec<String>,
   jdk: Option<PathBuf>,
   platform: Platform,
 ) -> ExecuteProcessRequest {
-  let mut full_args = args;
+  let mut full_args = args_for_the_jvm;
   full_args.push(NAILGUN_MAIN_CLASS.to_string());
   full_args.extend(ARGS_TO_START_NAILGUN.iter().map(|a| a.to_string()));
 
@@ -58,7 +59,7 @@ fn construct_nailgun_server_request(
     output_files: BTreeSet::new(),
     output_directories: BTreeSet::new(),
     timeout: Duration::new(1000, 0),
-    description: String::from("ExecuteProcessRequest to start a nailgun"),
+    description: format!("Start a nailgun server for {}", nailgun_name),
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
       hashing::EMPTY_DIGEST,
     jdk_home: jdk,
@@ -75,44 +76,44 @@ fn construct_nailgun_client_request(
   nailgun_port: Port,
 ) -> ExecuteProcessRequest {
   let ExecuteProcessRequest {
-    argv: argv,
-    input_files: input_files,
-    description: description,
-    env: env,
-    output_files: output_files,
-    output_directories: output_directories,
-    timeout: timeout,
-    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: unsafe_files,
-    jdk_home: jdk_home,
-    target_platform: target_platform,
-    is_nailgunnable: is_nailgunnable,
+    argv: _,
+    input_files,
+    description,
+    env: original_request_env,
+    output_files,
+    output_directories,
+    timeout,
+    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule,
+    jdk_home: _,
+    target_platform,
+    is_nailgunnable,
   } = original_req;
-  let mut client_argv = vec![
+  let full_client_cli = vec![
     python_distribution,
     NG_CLIENT_PATH.to_string(),
     "--".to_string(),
     client_main_class,
   ]
   .into_iter()
-  .chain(argv.into_iter())
+  .chain(client_args.into_iter())
   .collect();
-  let mut client_env = env;
+  let mut client_env = original_request_env;
   client_env.insert(
     NAILGUN_PORT_ENV_VAR_FOR_CLIENT.into(),
     nailgun_port.to_string(),
   );
   ExecuteProcessRequest {
-    argv: client_argv,
+    argv: full_client_cli,
     input_files,
     description,
     env: client_env,
     output_files,
     output_directories,
     timeout,
-    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: unsafe_files,
+    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule,
     jdk_home: None,
     target_platform,
-    is_nailgunnable
+    is_nailgunnable,
   }
 }
 
@@ -257,7 +258,13 @@ impl super::CommandRunner for CommandRunner {
       client_main_class,
     } = ParsedJVMCommandLines::parse_command_lines(&client_req.argv)
       .expect("Error parsing command lines!!");
+
+    let nailgun_name = CommandRunner::calculate_nailgun_name(&client_main_class);
+    let nailgun_name2 = nailgun_name.clone();
+    let nailgun_name3 = nailgun_name.clone();
+
     let nailgun_req = construct_nailgun_server_request(
+      &nailgun_name,
       nailgun_args,
       client_req.jdk_home.clone(),
       client_req.target_platform,
@@ -268,10 +275,6 @@ impl super::CommandRunner for CommandRunner {
       MultiPlatformExecuteProcessRequest::from(nailgun_req.clone()),
       &self.metadata,
     );
-
-    let nailgun_name = CommandRunner::calculate_nailgun_name(&client_main_class);
-    let nailgun_name2 = nailgun_name.clone();
-    let nailgun_name3 = nailgun_name.clone();
 
     let workdir_for_this_nailgun = try_future!(self.get_nailgun_workdir(&nailgun_name));
     let workdir_for_this_nailgun1 = workdir_for_this_nailgun.clone();
@@ -286,16 +289,14 @@ impl super::CommandRunner for CommandRunner {
       )
       .and_then(move |_metadata| {
         // Connect to a running nailgun.
-        executor.spawn_on_io_pool(
-          futures::future::lazy(move || {
-            nailgun_pool.connect(
-              nailgun_name.clone(),
-              nailgun_req,
-              &workdir_for_this_nailgun1,
-              nailgun_req_digest,
-            )
-          })
-        )
+        executor.spawn_on_io_pool(futures::future::lazy(move || {
+          nailgun_pool.connect(
+            nailgun_name.clone(),
+            nailgun_req,
+            &workdir_for_this_nailgun1,
+            nailgun_req_digest,
+          )
+        }))
       })
       .map_err(|e| format!("Failed to connect to nailgun! {}", e))
       .and_then(move |nailgun_port| {
@@ -356,7 +357,13 @@ mod tests {
     let python_distribution = PathBuf::from("/usr/bin/python");
     let workdir_base = workdir_base.unwrap_or(std::env::temp_dir());
 
-    CommandRunner::new(local_runner, metadata, python_distribution, workdir_base)
+    CommandRunner::new(
+      local_runner,
+      metadata,
+      python_distribution,
+      workdir_base,
+      executor.clone(),
+    )
   }
 
   fn unique_temp_dir(base_dir: PathBuf, prefix: Option<String>) -> TempDir {
@@ -418,7 +425,12 @@ mod tests {
 
   #[test]
   fn creating_nailgun_server_request_updates_the_cli() {
-    let req = super::construct_nailgun_server_request(Vec::new(), None, Platform::None);
+    let req = super::construct_nailgun_server_request(
+      &NAILGUN_MAIN_CLASS.to_string(),
+      Vec::new(),
+      None,
+      Platform::None,
+    );
     assert_eq!(req.argv[0], NAILGUN_MAIN_CLASS);
     assert_eq!(req.argv[1..], ARGS_TO_START_NAILGUN);
   }
