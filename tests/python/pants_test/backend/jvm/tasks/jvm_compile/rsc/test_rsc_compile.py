@@ -49,7 +49,7 @@ class RscCompileTest(NailgunTaskTestBase):
       target_type=JavaLibrary,
       sources=['com/example/Foo.java'],
       dependencies=[],
-      tags={'use-compiler:rsc-and-zinc'}
+      tags={f'use-compiler:{RscCompile.JvmCompileWorkflowType.rsc_and_zinc.value}'}
     )
     scala_target = self.make_target(
       'scala/classpath:scala_lib',
@@ -104,7 +104,7 @@ class RscCompileTest(NailgunTaskTestBase):
       target_type=ScalaLibrary,
       sources=['com/example/Foo.scala'],
       dependencies=[],
-      tags={'use-compiler:rsc-and-zinc'},
+      tags={f'use-compiler:{RscCompile.JvmCompileWorkflowType.rsc_and_zinc.value}'},
     )
 
     with temporary_dir() as tmp_dir:
@@ -129,9 +129,13 @@ class RscCompileTest(NailgunTaskTestBase):
                      }
                      write_to_cache(java/classpath:java_lib) <- {}
                      double_check_cache(scala/classpath:scala_lib) <- {
-                       zinc[zinc-only](scala/classpath:scala_lib)
+                       rsc(scala/classpath:scala_lib),
+                       zinc[rsc-and-zinc](scala/classpath:scala_lib)
                      }
-                     zinc[zinc-only](scala/classpath:scala_lib) <- {
+                     rsc(scala/classpath:scala_lib) <- {
+                       write_to_cache(scala/classpath:scala_lib)
+                     }
+                     zinc[rsc-and-zinc](scala/classpath:scala_lib) <- {
                        write_to_cache(scala/classpath:scala_lib)
                      }
                      write_to_cache(scala/classpath:scala_lib) <- {}

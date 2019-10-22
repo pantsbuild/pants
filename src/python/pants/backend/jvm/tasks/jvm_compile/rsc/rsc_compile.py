@@ -329,9 +329,19 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
 
   @memoized_method
   def _identify_workflow_tags(self, target):
+    all_tags = [self._compiler_tags.get(tag) for tag in target.tags]
+    filtered_tags = filter(None, all_tags)
+
+    prefix = self.get_options().force_compiler_tag_prefix
+    valid_values = [w.value for w in self.JvmCompileWorkflowType.all_values()]
+
+    for tag in target.tags:
+      if tag.startswith(f"{prefix}:"):
+        tag_workflow_value = tag.split(":")[1]
+        if tag_workflow_value not in valid_values:
+          raise ValueError(f"Invalid workflow tag specified for target {target}: {tag_workflow_value}; "
+          f"workflow must be one of {valid_values}")
     try:
-      all_tags = [self._compiler_tags.get(tag) for tag in target.tags]
-      filtered_tags = filter(None, all_tags)
       return assert_single_element(list(filtered_tags))
     except StopIteration:
       return None
