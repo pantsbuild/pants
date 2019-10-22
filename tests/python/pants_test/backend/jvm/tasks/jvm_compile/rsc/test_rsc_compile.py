@@ -49,7 +49,7 @@ class RscCompileTest(NailgunTaskTestBase):
       target_type=JavaLibrary,
       sources=['com/example/Foo.java'],
       dependencies=[],
-      tags={'use-compiler:rsc-then-zinc'}
+      tags={f'use-compiler:{RscCompile.JvmCompileWorkflowType.rsc_and_zinc.value}'}
     )
     scala_target = self.make_target(
       'scala/classpath:scala_lib',
@@ -104,7 +104,7 @@ class RscCompileTest(NailgunTaskTestBase):
       target_type=ScalaLibrary,
       sources=['com/example/Foo.scala'],
       dependencies=[],
-      tags={'use-compiler:rsc-then-zinc'},
+      tags={f'use-compiler:{RscCompile.JvmCompileWorkflowType.rsc_and_zinc.value}'},
     )
 
     with temporary_dir() as tmp_dir:
@@ -129,9 +129,13 @@ class RscCompileTest(NailgunTaskTestBase):
                      }
                      write_to_cache(java/classpath:java_lib) <- {}
                      double_check_cache(scala/classpath:scala_lib) <- {
-                       zinc[zinc-only](scala/classpath:scala_lib)
+                       rsc(scala/classpath:scala_lib),
+                       zinc[rsc-and-zinc](scala/classpath:scala_lib)
                      }
-                     zinc[zinc-only](scala/classpath:scala_lib) <- {
+                     rsc(scala/classpath:scala_lib) <- {
+                       write_to_cache(scala/classpath:scala_lib)
+                     }
+                     zinc[rsc-and-zinc](scala/classpath:scala_lib) <- {
                        write_to_cache(scala/classpath:scala_lib)
                      }
                      write_to_cache(scala/classpath:scala_lib) <- {}
@@ -174,8 +178,21 @@ class RscCompileTest(NailgunTaskTestBase):
         dependee_graph)
 
   def test_rsc_dep_for_scala_java_and_test_targets(self):
+    self._test_outlining_dep_for_scala_java_and_test_targets(False)
+
+  def test_youtline_dep_for_scala_java_and_test_targets(self):
+    self._test_outlining_dep_for_scala_java_and_test_targets(True)
+
+  def _test_outlining_dep_for_scala_java_and_test_targets(self, youtline):
+    if youtline:
+      workflow = RscCompile.JvmCompileWorkflowType.outline_and_zinc
+      key_str = "outline"
+    else:
+      workflow = RscCompile.JvmCompileWorkflowType.rsc_and_zinc
+      key_str = "rsc"
+
     self.set_options(workflow=RankedValue(
-      value=RscCompile.JvmCompileWorkflowType.rsc_and_zinc,
+      value=workflow,
       rank=RankedValue.CONFIG,
     ))
     self.init_dependencies_for_scala_libraries()
@@ -222,52 +239,53 @@ class RscCompileTest(NailgunTaskTestBase):
       dependee_graph = self.construct_dependee_graph_str(jobs, task)
 
       self.maxDiff = None
-      self.assertEqual(dedent("""
-                     double_check_cache(java/classpath:java_lib) <- {
+      # Double curly braces {{}} because f-string
+      self.assertEqual(dedent(f"""
+                     double_check_cache(java/classpath:java_lib) <- {{
                        zinc[zinc-java](java/classpath:java_lib)
-                     }
-                     zinc[zinc-java](java/classpath:java_lib) <- {
+                     }}
+                     zinc[zinc-java](java/classpath:java_lib) <- {{
                        write_to_cache(java/classpath:java_lib)
-                     }
-                     write_to_cache(java/classpath:java_lib) <- {}
-                     double_check_cache(scala/classpath:scala_lib) <- {
-                       rsc(scala/classpath:scala_lib),
-                       zinc[rsc-and-zinc](scala/classpath:scala_lib)
-                     }
-                     rsc(scala/classpath:scala_lib) <- {
+                     }}
+                     write_to_cache(java/classpath:java_lib) <- {{}}
+                     double_check_cache(scala/classpath:scala_lib) <- {{
+                       {key_str}(scala/classpath:scala_lib),
+                       zinc[{key_str}-and-zinc](scala/classpath:scala_lib)
+                     }}
+                     {key_str}(scala/classpath:scala_lib) <- {{
                        write_to_cache(scala/classpath:scala_lib),
                        double_check_cache(scala/classpath:scala_test),
                        zinc[zinc-only](scala/classpath:scala_test)
-                     }
-                     zinc[rsc-and-zinc](scala/classpath:scala_lib) <- {
+                     }}
+                     zinc[{key_str}-and-zinc](scala/classpath:scala_lib) <- {{
                        write_to_cache(scala/classpath:scala_lib)
-                     }
-                     write_to_cache(scala/classpath:scala_lib) <- {}
-                     double_check_cache(scala/classpath:scala_dep) <- {
-                       rsc(scala/classpath:scala_dep),
-                       zinc[rsc-and-zinc](scala/classpath:scala_dep)
-                     }
-                     rsc(scala/classpath:scala_dep) <- {
+                     }}
+                     write_to_cache(scala/classpath:scala_lib) <- {{}}
+                     double_check_cache(scala/classpath:scala_dep) <- {{
+                       {key_str}(scala/classpath:scala_dep),
+                       zinc[{key_str}-and-zinc](scala/classpath:scala_dep)
+                     }}
+                     {key_str}(scala/classpath:scala_dep) <- {{
                        double_check_cache(scala/classpath:scala_lib),
-                       rsc(scala/classpath:scala_lib),
-                       zinc[rsc-and-zinc](scala/classpath:scala_lib),
+                       {key_str}(scala/classpath:scala_lib),
+                       zinc[{key_str}-and-zinc](scala/classpath:scala_lib),
                        write_to_cache(scala/classpath:scala_dep),
                        double_check_cache(scala/classpath:scala_test),
                        zinc[zinc-only](scala/classpath:scala_test)
-                     }
-                     zinc[rsc-and-zinc](scala/classpath:scala_dep) <- {
+                     }}
+                     zinc[{key_str}-and-zinc](scala/classpath:scala_dep) <- {{
                        double_check_cache(java/classpath:java_lib),
                        zinc[zinc-java](java/classpath:java_lib),
                        write_to_cache(scala/classpath:scala_dep)
-                     }
-                     write_to_cache(scala/classpath:scala_dep) <- {}
-                     double_check_cache(scala/classpath:scala_test) <- {
+                     }}
+                     write_to_cache(scala/classpath:scala_dep) <- {{}}
+                     double_check_cache(scala/classpath:scala_test) <- {{
                        zinc[zinc-only](scala/classpath:scala_test)
-                     }
-                     zinc[zinc-only](scala/classpath:scala_test) <- {
+                     }}
+                     zinc[zinc-only](scala/classpath:scala_test) <- {{
                        write_to_cache(scala/classpath:scala_test)
-                     }
-                     write_to_cache(scala/classpath:scala_test) <- {}
+                     }}
+                     write_to_cache(scala/classpath:scala_test) <- {{}}
                      """).strip(),
         dependee_graph)
 
