@@ -21,6 +21,7 @@ def ensure_compile_rsc_execution_strategy(workflow):
 
     return wrapper
   return decorator
+  
 
 class RscCompileIntegrationBase(BaseCompileIT):
 
