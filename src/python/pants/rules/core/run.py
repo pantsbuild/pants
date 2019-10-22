@@ -4,11 +4,7 @@
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal
-from pants.engine.interactive_runner import (
-  InteractiveProcessRequest,
-  InteractiveRunner,
-  RunLocation,
-)
+from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
 from pants.engine.rules import console_rule
 
 
@@ -24,7 +20,7 @@ def run(console: Console, runner: InteractiveRunner, build_file_addresses: Build
   request = InteractiveProcessRequest(
     argv=["/usr/bin/python"],
     env=("TEST_ENV", "TEST"),
-    run_location=RunLocation.WORKSPACE
+    run_in_workspace=False,
   )
 
   try:

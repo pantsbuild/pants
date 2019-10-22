@@ -552,8 +552,6 @@ class SchedulerSession:
     )
     return self._scheduler._raise_or_return(result)
 
-
-
   def materialize_directories(self, directories_paths_and_digests):
     """Creates the specified directories on the file system.
     :param directories_paths_and_digests tuple<DirectoryToMaterialize>: Tuple of the path and

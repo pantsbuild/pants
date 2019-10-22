@@ -10,10 +10,6 @@ from typing import Any, Dict, Tuple
 from pants.base.exception_sink import ExceptionSink
 
 
-
-RunLocation = Enum("RunLocation", "WORKSPACE TEMPDIR")
-
-
 @dataclass(frozen=True)
 class InteractiveProcessResult:
   process_exit_code: int
@@ -23,7 +19,7 @@ class InteractiveProcessResult:
 class InteractiveProcessRequest:
   argv: Tuple[str, ...]
   env: Tuple[str, ...] = ()
-  run_location: RunLocation = RunLocation.TEMPDIR
+  run_in_workspace: bool = False
 
 
 @dataclass(frozen=True)

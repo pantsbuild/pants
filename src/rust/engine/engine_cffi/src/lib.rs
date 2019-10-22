@@ -60,6 +60,7 @@ use std::os::raw;
 use std::panic;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
+use tempfile::TempDir;
 
 #[cfg(test)]
 mod tests;
@@ -914,6 +915,17 @@ pub extern "C" fn run_local_interactive_process(
     for (key, value) in env.iter() {
       command.env(key, value);
     }
+
+    let run_in_workspace = externs::project_bool(&value, "run_in_workspace");
+    let maybe_tempdir = if run_in_workspace {
+      None
+    } else {
+      Some(TempDir::new().map_err(|err| format!("Error creating tempdir: {}", err))?)
+    };
+
+    maybe_tempdir
+      .as_ref()
+      .map(|ref tempdir| command.current_dir(tempdir.path()));
 
     let mut subprocess = command.spawn().map_err(|e| e.to_string())?;
     let exit_status = subprocess.wait().map_err(|e| e.to_string())?;
