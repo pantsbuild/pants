@@ -74,22 +74,46 @@ fn construct_nailgun_client_request(
   client_args: Vec<String>,
   nailgun_port: Port,
 ) -> ExecuteProcessRequest {
-  let mut client_req = original_req;
-  client_req.argv = vec![
+  let ExecuteProcessRequest {
+    argv: argv,
+    input_files: input_files,
+    description: description,
+    env: env,
+    output_files: output_files,
+    output_directories: output_directories,
+    timeout: timeout,
+    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: unsafe_files,
+    jdk_home: jdk_home,
+    target_platform: target_platform,
+    is_nailgunnable: is_nailgunnable,
+  } = original_req;
+  let mut client_argv = vec![
     python_distribution,
     NG_CLIENT_PATH.to_string(),
     "--".to_string(),
     client_main_class,
   ]
   .into_iter()
-  .chain(client_args.into_iter())
+  .chain(argv.into_iter())
   .collect();
-  client_req.jdk_home = None;
-  client_req.env.insert(
+  let mut client_env = env;
+  client_env.insert(
     NAILGUN_PORT_ENV_VAR_FOR_CLIENT.into(),
     nailgun_port.to_string(),
   );
-  client_req
+  ExecuteProcessRequest {
+    argv: client_argv,
+    input_files,
+    description,
+    env: client_env,
+    output_files,
+    output_directories,
+    timeout,
+    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: unsafe_files,
+    jdk_home: None,
+    target_platform,
+    is_nailgunnable
+  }
 }
 
 ///
