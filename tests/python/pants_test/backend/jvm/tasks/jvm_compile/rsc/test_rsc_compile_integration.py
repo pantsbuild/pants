@@ -51,8 +51,6 @@ class RscCompileIntegration(BaseCompileIT):
         pants_run.workdir,
         'compile/rsc/current/testprojects.src.scala.org.pantsbuild.testproject.mutual.mutual/current/rsc',
         'm.jar')
-      import pdb
-      pdb.set_trace()
       self.assert_is_file(rsc_header_jar)
 
   @ensure_compile_rsc_execution_strategy

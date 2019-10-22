@@ -857,7 +857,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     else:
       main = 'rsc.cli.Main'
       tool_name = 'rsc'
-      tool_classpath = self._scalac_classpath
+      tool_classpath = self._rsc_classpath
       nailgun_classpath = self._nailgunnable_combined_classpath
 
     with self.context.new_workunit(tool_name) as wu:
