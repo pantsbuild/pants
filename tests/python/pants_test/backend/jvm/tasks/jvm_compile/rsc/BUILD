@@ -14,7 +14,7 @@ python_tests(
     'testprojects/src/scala/org/pantsbuild/testproject:javasources_directory',
     'testprojects/src/scala/org/pantsbuild/testproject:mutual_directory',
   ],
-  timeout = 600,
+  timeout = 1200,
   tags = {'integration'},
 )
 

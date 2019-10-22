@@ -402,10 +402,10 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
 
       rsc_cc = compile_contexts[target].rsc_cc
 
-      youtline = rsc_cc.workflow == self.JvmCompileWorkflowType.outline_and_zinc
-      outliner = 'scalac-outliner' if youtline else 'rsc'
+      use_youtline = rsc_cc.workflow == self.JvmCompileWorkflowType.outline_and_zinc
+      outliner = 'scalac-outliner' if use_youtline else 'rsc'
 
-      if youtline and Semver.parse(self._scala_library_version) < Semver.parse("2.12.9"):
+      if use_youtline and Semver.parse(self._scala_library_version) < Semver.parse("2.12.9"):
         raise RuntimeError(
           f"To use scalac's built-in outlining, scala version must be at least 2.12.9, but got {self._scala_library_version}")
 
@@ -413,7 +413,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       if not vts.valid:
         counter_val = str(counter()).rjust(counter.format_length(), ' ')
         counter_str = '[{}/{}] '.format(counter_val, counter.size)
-        action_str = 'Outlining ' if youtline else 'Rsc-ing '
+        action_str = 'Outlining ' if use_youtline else 'Rsc-ing '
 
         self.context.log.info(
           counter_str,
@@ -474,7 +474,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
           })()
 
           youtline_args = []
-          if youtline:
+          if use_youtline:
             youtline_args = [
               f"-Xplugin:{self._wartremover_classpath[0]}",
               "-P:wartremover:traverser:org.wartremover.warts.PublicInference",
@@ -493,7 +493,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
 
           self.write_argsfile(ctx, args)
 
-          self._runtool(distribution, input_digest, ctx, youtline)
+          self._runtool(distribution, input_digest, ctx, use_youtline)
 
         self._record_target_stats(tgt,
           len(classpath_entry_paths),
@@ -541,7 +541,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         options_scope=self.options_scope)
 
     def make_outline_job(target, dep_targets):
-      if workflow.value == 'outline-and-zinc':
+      if workflow == self.JvmCompileWorkflowType.outline_and_zinc:
         target_key = self._outline_key_for_target(target)
       else:
         target_key = self._rsc_key_for_target(target)
@@ -734,14 +734,14 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       ))
 
   def _runtool_hermetic(self, main, tool_name, distribution, input_digest, ctx):
-    youtline = tool_name == 'scalac-outliner'
+    use_youtline = tool_name == 'scalac-outliner'
     
-    tool_classpath_abs = self._scalac_classpath if youtline else self._rsc_classpath
+    tool_classpath_abs = self._scalac_classpath if use_youtline else self._rsc_classpath
     tool_classpath = fast_relpath_collection(tool_classpath_abs)
 
     rsc_jvm_options = Rsc.global_instance().get_options().jvm_options
 
-    if not youtline and self._rsc.use_native_image:
+    if not use_youtline and self._rsc.use_native_image:
       if rsc_jvm_options:
         raise ValueError(
           "`{}` got non-empty jvm_options when running with a graal native-image, but this is "
@@ -821,7 +821,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
   def _runtool_nonhermetic(self, parent_workunit, classpath, main, tool_name, distribution, ctx):
     # Scalac -Youtline cannot coexist with zinc jar in the same nailgun in a mulitithreaded run
     # Forcing scalac -Youtline to run as a separate process circumvents this problem
-    youtline = tool_name == 'scalac-outliner'
+    use_youtline = tool_name == 'scalac-outliner'
 
     result = self.runjava(
       classpath=classpath,
@@ -831,7 +831,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       workunit_name=tool_name,
       workunit_labels=[WorkUnitLabel.COMPILER],
       dist=distribution,
-      force_subprocess=youtline
+      force_subprocess=use_youtline
     )
     if result != 0:
       raise TaskError('Running {} failed'.format(tool_name))
@@ -845,8 +845,8 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       raise Exception('couldnt find work unit for underlying execution')
     return runjava_workunit
 
-  def _runtool(self, distribution, input_digest, ctx, youtline):
-    if youtline:
+  def _runtool(self, distribution, input_digest, ctx, use_youtline):
+    if use_youtline:
       main = 'scala.tools.nsc.Main'
       tool_name = 'scalac-outliner'
       tool_classpath = self._scalac_classpath
