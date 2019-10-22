@@ -100,6 +100,7 @@ def run_python_test(
     pex_path=f'./{output_pytest_requirements_pex_filename}',
     pex_args=test_target_sources_file_names,
     input_files=merged_input_files,
+    env={'PEX_VERBOSE': '9'},
     description=f'Run Pytest for {test_target.address.reference()}',
   )
 
