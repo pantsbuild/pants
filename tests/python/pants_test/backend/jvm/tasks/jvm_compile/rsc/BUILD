@@ -8,9 +8,6 @@ python_library(
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
     'tests/python/pants_test:test_base',
-<<<<<<< 220a130e3688165583f0f1019fc81818a4d52737
-    'contrib/node:examples_directory',
-=======
   ],
 )
 
@@ -19,7 +16,7 @@ python_tests(
   sources=['test_rsc_compile_integration.py'],
   dependencies=[
     ':rsc_compile_integration_base',
->>>>>>> Separate RscCompileIntegration tests into rsc and youtline workflows
+    'contrib/node:examples_directory',
     'examples/src/scala/org/pantsbuild/example:hello_directory',
     'testprojects/src/scala/org/pantsbuild/testproject:javadepsonscalatransitive_directory',
     'testprojects/src/scala/org/pantsbuild/testproject:javasources_directory',
