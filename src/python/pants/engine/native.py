@@ -9,12 +9,33 @@ import sys
 import sysconfig
 import traceback
 from contextlib import closing
+from types import GeneratorType
 from typing import Any, NamedTuple, Tuple, Type
 
 import cffi
 import pkg_resources
 from twitter.common.collections.orderedset import OrderedSet
 
+from pants.base.project_tree import Dir, File, Link
+from pants.build_graph.address import Address
+from pants.engine.fs import (
+  Digest,
+  DirectoriesToMerge,
+  DirectoryWithPrefixToAdd,
+  DirectoryWithPrefixToStrip,
+  FileContent,
+  FilesContent,
+  InputFilesContent,
+  MaterializeDirectoriesResult,
+  MaterializeDirectoryResult,
+  PathGlobs,
+  Snapshot,
+  UrlToFetch,
+)
+from pants.engine.isolated_process import (
+  FallibleExecuteProcessResult,
+  MultiPlatformExecuteProcessRequest,
+)
 from pants.engine.selectors import Get
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import read_file, safe_mkdir, safe_mkdtemp
@@ -817,29 +838,7 @@ class Native(metaclass=SingletonMetaclass):
                     local_store_dir,
                     ignore_patterns,
                     execution_options,
-                    construct_directory_digest,
-                    construct_snapshot,
-                    construct_file_content,
-                    construct_files_content,
-                    construct_process_result,
-                    construct_materialize_directory_result,
-                    construct_materialize_directories_results,
-                    type_address,
-                    type_path_globs,
-                    type_directory_digest,
-                    type_snapshot,
-                    type_merge_snapshots_request,
-                    type_directory_with_prefix_to_strip,
-                    type_directory_with_prefix_to_add,
-                    type_files_content,
-                    type_input_files_content,
-                    type_dir,
-                    type_file,
-                    type_link,
-                    type_multi_platform_process_request,
-                    type_process_result,
-                    type_generator,
-                    type_url_to_fetch):
+                    ):
     """Create and return an ExternContext and native Scheduler."""
 
     def func(fn):
@@ -851,30 +850,30 @@ class Native(metaclass=SingletonMetaclass):
     scheduler_result = self.lib.scheduler_create(
         tasks,
         # Constructors/functions.
-        func(construct_directory_digest),
-        func(construct_snapshot),
-        func(construct_file_content),
-        func(construct_files_content),
-        func(construct_process_result),
-        func(construct_materialize_directory_result),
-        func(construct_materialize_directories_results),
+        func(Digest),
+        func(Snapshot),
+        func(FileContent),
+        func(FilesContent),
+        func(FallibleExecuteProcessResult),
+        func(MaterializeDirectoryResult),
+        func(MaterializeDirectoriesResult),
         # Types.
-        ti(type_address),
-        ti(type_path_globs),
-        ti(type_directory_digest),
-        ti(type_snapshot),
-        ti(type_merge_snapshots_request),
-        ti(type_directory_with_prefix_to_strip),
-        ti(type_directory_with_prefix_to_add),
-        ti(type_files_content),
-        ti(type_input_files_content),
-        ti(type_dir),
-        ti(type_file),
-        ti(type_link),
-        ti(type_multi_platform_process_request),
-        ti(type_process_result),
-        ti(type_generator),
-        ti(type_url_to_fetch),
+        ti(Address),
+        ti(PathGlobs),
+        ti(Digest),
+        ti(Snapshot),
+        ti(DirectoriesToMerge),
+        ti(DirectoryWithPrefixToStrip),
+        ti(DirectoryWithPrefixToAdd),
+        ti(FilesContent),
+        ti(InputFilesContent),
+        ti(Dir),
+        ti(File),
+        ti(Link),
+        ti(MultiPlatformExecuteProcessRequest),
+        ti(FallibleExecuteProcessResult),
+        ti(GeneratorType),
+        ti(UrlToFetch),
         ti(str),
         ti(bytes),
         # Project tree.

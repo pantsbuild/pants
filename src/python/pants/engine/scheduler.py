@@ -9,32 +9,10 @@ import time
 import traceback
 from dataclasses import dataclass
 from textwrap import dedent
-from types import GeneratorType
 from typing import Any
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE
-from pants.base.project_tree import Dir, File, Link
-from pants.build_graph.address import Address
-from pants.engine.fs import (
-  Digest,
-  DirectoriesToMerge,
-  DirectoryToMaterialize,
-  DirectoryWithPrefixToAdd,
-  DirectoryWithPrefixToStrip,
-  FileContent,
-  FilesContent,
-  InputFilesContent,
-  MaterializeDirectoriesResult,
-  MaterializeDirectoryResult,
-  PathGlobs,
-  PathGlobsAndRoot,
-  Snapshot,
-  UrlToFetch,
-)
-from pants.engine.isolated_process import (
-  FallibleExecuteProcessResult,
-  MultiPlatformExecuteProcessRequest,
-)
+from pants.engine.fs import Digest, DirectoryToMaterialize, PathGlobsAndRoot
 from pants.engine.native import Function, TypeId
 from pants.engine.nodes import Return, Throw
 from pants.engine.objects import Collection
@@ -116,29 +94,6 @@ class Scheduler:
       local_store_dir=local_store_dir,
       ignore_patterns=project_tree.ignore_patterns,
       execution_options=execution_options,
-      construct_directory_digest=Digest,
-      construct_snapshot=Snapshot,
-      construct_file_content=FileContent,
-      construct_files_content=FilesContent,
-      construct_process_result=FallibleExecuteProcessResult,
-      construct_materialize_directory_result=MaterializeDirectoryResult,
-      construct_materialize_directories_results=MaterializeDirectoriesResult,
-      type_address=Address,
-      type_path_globs=PathGlobs,
-      type_directory_digest=Digest,
-      type_snapshot=Snapshot,
-      type_merge_snapshots_request=DirectoriesToMerge,
-      type_directory_with_prefix_to_strip=DirectoryWithPrefixToStrip,
-      type_directory_with_prefix_to_add=DirectoryWithPrefixToAdd,
-      type_files_content=FilesContent,
-      type_input_files_content=InputFilesContent,
-      type_dir=Dir,
-      type_file=File,
-      type_link=Link,
-      type_multi_platform_process_request=MultiPlatformExecuteProcessRequest,
-      type_process_result=FallibleExecuteProcessResult,
-      type_generator=GeneratorType,
-      type_url_to_fetch=UrlToFetch,
     )
 
     # If configured, visualize the rule graph before asserting that it is valid.
