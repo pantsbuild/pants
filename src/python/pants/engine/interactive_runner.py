@@ -7,6 +7,8 @@ from subprocess import Popen
 from pants.engine.rules import RootRule
 from tempfile import TemporaryDirectory
 from typing import Any, Dict, Tuple
+from pants.base.exception_sink import ExceptionSink
+
 
 
 RunLocation = Enum("RunLocation", "WORKSPACE TEMPDIR")
@@ -29,6 +31,7 @@ class InteractiveRunner:
   _scheduler: Any
 
   def run_local_interactive_process(self, request: InteractiveProcessRequest) -> InteractiveProcessResult:
+    ExceptionSink.toggle_ignoring_sigint_v2_engine(True)
     return self._scheduler.run_local_interactive_process(request)
 
 

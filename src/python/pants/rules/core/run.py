@@ -1,8 +1,6 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import time
-
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal
@@ -39,4 +37,4 @@ def run(console: Console, runner: InteractiveRunner, build_file_addresses: Build
 
 
 def rules():
-  return [run] 
+  return [run]

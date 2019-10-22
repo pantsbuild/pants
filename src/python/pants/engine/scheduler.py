@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from textwrap import dedent
 from typing import Any
 
+from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE
 from pants.engine.fs import Digest, DirectoryToMaterialize, PathGlobsAndRoot
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveProcessResult
@@ -400,6 +401,8 @@ class SchedulerSession:
     start_time = time.time()
     roots = list(zip(execution_request.roots,
                      self._scheduler._run_and_return_roots(self._session, execution_request.native)))
+
+    ExceptionSink.toggle_ignoring_sigint_v2_engine(False)
 
     self._maybe_visualize()
 
