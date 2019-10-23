@@ -177,6 +177,9 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     register('--extra-rsc-args', type=list, default=[],
              help='Extra arguments to pass to the rsc invocation.')
 
+    register('--allow-public-inference', type=bool, default=False,
+             help='Allow public type member inference when workflow is outline-and-zinc. Otherwise, unannotated public types will be a compile error.', fingerprint=True)
+
     cls.register_jvm_tool(
       register,
       'rsc',
@@ -475,15 +478,19 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
 
           youtline_args = []
           if use_youtline:
-            youtline_args = [
+            wartremover_args = [
               f"-Xplugin:{self._wartremover_classpath[0]}",
               "-P:wartremover:traverser:org.wartremover.warts.PublicInference",
               "-Ycache-plugin-class-loader:last-modified",
+            ]
+            youtline_args = [
               "-Youtline",
               "-Ystop-after:pickler",
               "-Ypickle-write",
               rsc_jar_file_relative_path,
             ]
+            if not self.get_options().allow_public_inference:
+              youtline_args = wartremover_args + youtline_args
 
           target_sources = ctx.sources
           args = [
