@@ -1,7 +1,7 @@
 use super::{BackoffConfig, EntryType};
 
-use bazel_protos;
-use boxfuture::{BoxFuture, Boxable};
+use bazel_protos::{self, call_option};
+use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::{Bytes, BytesMut};
 use concrete_time::TimeSpan;
 use digest::{Digest as DigestTrait, FixedOutput};
@@ -11,7 +11,7 @@ use hashing::{Digest, Fingerprint};
 use serverset::{Retry, Serverset};
 use sha2::Sha256;
 use std::cmp::min;
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 use std::time::Duration;
 use uuid;
@@ -25,7 +25,7 @@ pub struct ByteStore {
   rpc_attempts: usize,
   env: Arc<grpcio::Environment>,
   serverset: Serverset<grpcio::Channel>,
-  authorization_header: Option<String>,
+  headers: BTreeMap<String, String>,
 }
 
 impl ByteStore {
@@ -65,7 +65,10 @@ impl ByteStore {
       rpc_attempts: rpc_retries + 1,
       env,
       serverset,
-      authorization_header: oauth_bearer_token.map(|t| format!("Bearer {}", t)),
+      headers: oauth_bearer_token
+        .iter()
+        .map(|t| (String::from("authorization"), format!("Bearer {}", t)))
+        .collect(),
     })
   }
 
@@ -109,18 +112,6 @@ impl ByteStore {
     )
   }
 
-  fn call_option(&self) -> grpcio::CallOption {
-    let mut call_option = grpcio::CallOption::default();
-    if let Some(ref authorization_header) = self.authorization_header {
-      let mut builder = grpcio::MetadataBuilder::with_capacity(1);
-      builder
-        .add_str("authorization", &authorization_header)
-        .unwrap();
-      call_option = call_option.headers(builder.build());
-    }
-    call_option
-  }
-
   pub fn store_bytes(
     &self,
     bytes: Bytes,
@@ -146,7 +137,7 @@ impl ByteStore {
     self
       .with_byte_stream_client(move |client| {
         match client
-          .write_opt(store.call_option().timeout(store.upload_timeout))
+          .write_opt(try_future!(call_option(&store.headers, None)).timeout(store.upload_timeout))
           .map(|v| (v, client))
         {
           Err(err) => future::err(format!(
@@ -269,7 +260,7 @@ impl ByteStore {
               req.set_read_limit(0);
               req
             },
-            store.call_option(),
+            try_future!(call_option(&store.headers, None)),
           )
           .map(|stream| (stream, client))
         {
@@ -338,7 +329,7 @@ impl ByteStore {
     self
       .with_cas_client(move |client| {
         client
-          .find_missing_blobs_opt(&request, store.call_option())
+          .find_missing_blobs_opt(&request, call_option(&store.headers, None)?)
           .map_err(|err| {
             format!(
               "Error from server in response to find_missing_blobs_request: {:?}",
