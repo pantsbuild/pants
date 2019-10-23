@@ -923,9 +923,9 @@ pub extern "C" fn run_local_interactive_process(
       Some(TempDir::new().map_err(|err| format!("Error creating tempdir: {}", err))?)
     };
 
-    maybe_tempdir
-      .as_ref()
-      .map(|ref tempdir| command.current_dir(tempdir.path()));
+    if let Some(ref tempdir) = maybe_tempdir {
+      command.current_dir(tempdir.path());
+    }
 
     let mut subprocess = command.spawn().map_err(|e| e.to_string())?;
     let exit_status = subprocess.wait().map_err(|e| e.to_string())?;
