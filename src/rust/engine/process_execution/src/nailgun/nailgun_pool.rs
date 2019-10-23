@@ -52,6 +52,7 @@ impl NailgunPool {
     startup_options: ExecuteProcessRequest,
     workdir_path: &PathBuf,
     nailgun_req_digest: Digest,
+    build_id_requesting_connection: String,
   ) -> Result<Port, String> {
     trace!("Locking nailgun process pool so that only one can be connecting at a time.");
     let mut processes = self.processes.lock();
@@ -66,10 +67,11 @@ impl NailgunPool {
     let maybe_process = processes.get_mut(&name);
     let connection_result = if let Some(process) = maybe_process {
       // Clone some fields that we need for later
-      let (process_name, process_fingerprint, process_port) = (
+      let (process_name, process_fingerprint, process_port, build_id_that_started_the_server) = (
         process.name.clone(),
         process.fingerprint.clone(),
         process.port,
+        process.build_id.clone()
       );
 
       debug!(
@@ -99,17 +101,32 @@ impl NailgunPool {
             Ok(process_port)
           } else {
             // The running process doesn't coincide with the options we want.
-            // Restart it.
-            debug!("The options for process {} are different to the startup_options! \n Startup Options: {:?}\n Process Cmd: {:?}",
-                               &process_name, startup_options, process_fingerprint
-                        );
-            self.start_new_nailgun(
-              &mut *processes,
-              name,
-              startup_options,
-              workdir_path,
-              requested_server_fingerprint,
-            )
+            if build_id_that_started_the_server == build_id_requesting_connection {
+              Err(format!(
+                   "Trying to change the JVM options for a running nailgun server that was started this run, with name {}.\
+                    There is exactly one nailgun server per task, so it shouldn't be possible to change the options of a nailgun server mid-run.\
+                    This might be a problem with how we calculate the keys of nailgun servers (https://github.com/pantsbuild/pants/issues/8527).",
+                    &name)
+              )
+            } else {
+              // Restart it.
+              // Since the stored server was started in a different pants run,
+              // no client will be running on that server.
+              debug!("The options for server process {} are different to the startup_options, \
+                      and the original process was started in a different pants run.\n\
+                      Startup Options: {:?}\n Process Cmd: {:?}",
+                     &process_name, startup_options, process_fingerprint
+              );
+              debug!("Restarting the server...");
+              self.start_new_nailgun(
+                &mut *processes,
+                name,
+                startup_options,
+                workdir_path,
+                requested_server_fingerprint,
+                build_id_requesting_connection,
+              )
+            }
           }
         }
         Ok(_) => {
@@ -121,6 +138,7 @@ impl NailgunPool {
             startup_options,
             workdir_path,
             requested_server_fingerprint,
+            build_id_requesting_connection,
           )
         }
         Err(e) => Err(e),
@@ -137,6 +155,7 @@ impl NailgunPool {
         startup_options,
         workdir_path,
         requested_server_fingerprint,
+        build_id_requesting_connection,
       )
     };
     trace!("Unlocking nailgun process pool.");
@@ -150,6 +169,7 @@ impl NailgunPool {
     startup_options: ExecuteProcessRequest,
     workdir_path: &PathBuf,
     nailgun_server_fingerprint: NailgunProcessFingerprint,
+    build_id: String,
   ) -> Result<Port, String> {
     debug!(
       "Starting new nailgun server for {}, with options {:?}",
@@ -160,6 +180,7 @@ impl NailgunPool {
       startup_options,
       workdir_path,
       nailgun_server_fingerprint,
+      build_id,
     )
     .and_then(move |process| {
       let port = process.port;
@@ -174,6 +195,7 @@ impl NailgunPool {
 pub struct NailgunProcess {
   pub name: NailgunProcessName,
   pub fingerprint: NailgunProcessFingerprint,
+  pub build_id: String,
   pub port: Port,
   pub handle: Arc<Mutex<std::process::Child>>,
 }
@@ -203,6 +225,7 @@ impl NailgunProcess {
     startup_options: ExecuteProcessRequest,
     workdir_path: &PathBuf,
     nailgun_server_fingerprint: NailgunProcessFingerprint,
+    build_id: String,
   ) -> Result<NailgunProcess, String> {
     let cmd = startup_options.argv[0].clone();
     // TODO: This is an expensive operation, and thus we info! it.
@@ -241,6 +264,7 @@ impl NailgunProcess {
           fingerprint: nailgun_server_fingerprint,
           name: name,
           handle: Arc::new(Mutex::new(child)),
+          build_id: build_id
         })
       })
   }

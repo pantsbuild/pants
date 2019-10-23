@@ -172,6 +172,9 @@ impl CommandRunner {
     }
   }
 
+  // TODO(#8527) Make this name the name of the task (in v1) or some other more intentional scope (v2).
+  //      Using the main class here is fragile, because two tasks might want to run the same main class,
+  //      but in different nailgun servers.
   fn calculate_nailgun_name(main_class: &String) -> NailgunProcessName {
     format!("nailgun_server_{}", main_class)
   }
@@ -285,6 +288,7 @@ impl super::CommandRunner for CommandRunner {
     let workdir_for_this_nailgun = try_future!(self.get_nailgun_workdir(&nailgun_name));
     let workdir_for_this_nailgun1 = workdir_for_this_nailgun.clone();
     let executor = self.executor.clone();
+    let build_id = context.build_id.clone();
 
     self
       .materialize_workdir_for_server(
@@ -301,6 +305,7 @@ impl super::CommandRunner for CommandRunner {
             nailgun_req,
             &workdir_for_this_nailgun1,
             nailgun_req_digest,
+            build_id
           )
         }))
       })
