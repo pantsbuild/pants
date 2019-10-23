@@ -538,6 +538,40 @@ class Function(NamedTuple):
   key: Key
 
 
+class EngineTypes(NamedTuple):
+  """Python types that need to be passed to the engine.
+
+  N.B. EngineTypes needs to correspond field-by-field to the Types struct defined in
+  `src/rust/engine/src/types.rs` in order to avoid breakage
+  (field definition order matters, not just the names of fields!)."""
+
+  construct_directory_digest: Function
+  directory_digest: TypeId
+  construct_snapshot: Function
+  snapshot: TypeId
+  construct_file_content: Function
+  construct_files_content: Function
+  files_content: TypeId
+  construct_process_result: Function
+  construct_materialize_directories_results: Function
+  construct_materialize_directory_result: Function
+  address: TypeId
+  path_globs: TypeId
+  directories_to_merge: TypeId
+  directory_with_prefix_to_strip: TypeId
+  directory_with_prefix_to_add: TypeId
+  input_files_content: TypeId
+  dir: TypeId
+  file: TypeId
+  link: TypeId
+  multi_platform_process_request: TypeId
+  process_result: TypeId
+  generator: TypeId
+  url_to_fetch: TypeId
+  string: TypeId
+  bytes: TypeId
+
+
 class PyResult(NamedTuple):
   """Corresponds to the native object of the same name."""
   is_throw: bool
@@ -847,35 +881,37 @@ class Native(metaclass=SingletonMetaclass):
     def ti(type_obj):
       return TypeId(self.context.to_id(type_obj))
 
+    engine_types = EngineTypes(
+        construct_directory_digest=func(Digest),
+        directory_digest=ti(Digest),
+        construct_snapshot=func(Snapshot),
+        snapshot=ti(Snapshot),
+        construct_file_content=func(FileContent),
+        construct_files_content=func(FilesContent),
+        files_content=ti(FilesContent),
+        construct_process_result=func(FallibleExecuteProcessResult),
+        construct_materialize_directories_results=func(MaterializeDirectoriesResult),
+        construct_materialize_directory_result=func(MaterializeDirectoryResult),
+        address=ti(Address),
+        path_globs=ti(PathGlobs),
+        directories_to_merge=ti(DirectoriesToMerge),
+        directory_with_prefix_to_strip=ti(DirectoryWithPrefixToStrip),
+        directory_with_prefix_to_add=ti(DirectoryWithPrefixToAdd),
+        input_files_content=ti(InputFilesContent),
+        dir=ti(Dir),
+        file=ti(File),
+        link=ti(Link),
+        multi_platform_process_request=ti(MultiPlatformExecuteProcessRequest),
+        process_result=ti(FallibleExecuteProcessResult),
+        generator=ti(GeneratorType),
+        url_to_fetch=ti(UrlToFetch),
+        string=ti(str),
+        bytes=ti(bytes),
+      )
+
     scheduler_result = self.lib.scheduler_create(
         tasks,
-        # Constructors/functions.
-        func(Digest),
-        func(Snapshot),
-        func(FileContent),
-        func(FilesContent),
-        func(FallibleExecuteProcessResult),
-        func(MaterializeDirectoryResult),
-        func(MaterializeDirectoriesResult),
-        # Types.
-        ti(Address),
-        ti(PathGlobs),
-        ti(Digest),
-        ti(Snapshot),
-        ti(DirectoriesToMerge),
-        ti(DirectoryWithPrefixToStrip),
-        ti(DirectoryWithPrefixToAdd),
-        ti(FilesContent),
-        ti(InputFilesContent),
-        ti(Dir),
-        ti(File),
-        ti(Link),
-        ti(MultiPlatformExecuteProcessRequest),
-        ti(FallibleExecuteProcessResult),
-        ti(GeneratorType),
-        ti(UrlToFetch),
-        ti(str),
-        ti(bytes),
+        engine_types,
         # Project tree.
         self.context.utf8_buf(build_root),
         self.context.utf8_buf(local_store_dir),
