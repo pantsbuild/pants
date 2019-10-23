@@ -58,6 +58,7 @@ fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {
       hashing::EMPTY_DIGEST,
     jdk_home: None,
     target_platform: Platform::None,
+    is_nailgunnable: false,
   };
 
   let local_result = runtime.block_on(local.run(request.clone().into(), Context::default()));
