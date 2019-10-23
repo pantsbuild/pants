@@ -265,13 +265,17 @@ impl super::CommandRunner for CommandRunner {
       nailgun_args,
       client_args,
       client_main_class,
-    } = try_future!(ParsedJVMCommandLines::parse_command_lines(&original_request.argv));
+    } = try_future!(ParsedJVMCommandLines::parse_command_lines(
+      &original_request.argv
+    ));
 
     let nailgun_name = CommandRunner::calculate_nailgun_name(&client_main_class);
     let nailgun_name2 = nailgun_name.clone();
     let nailgun_name3 = nailgun_name.clone();
 
-    let jdk_home = try_future!(original_request.jdk_home.clone().ok_or(format!("JDK home must be specified for all nailgunnable requests.")));
+    let jdk_home = try_future!(original_request.jdk_home.clone().ok_or(format!(
+      "JDK home must be specified for all nailgunnable requests."
+    )));
     let nailgun_req = construct_nailgun_server_request(
       &nailgun_name,
       nailgun_args,
@@ -305,7 +309,7 @@ impl super::CommandRunner for CommandRunner {
             nailgun_req,
             &workdir_for_this_nailgun1,
             nailgun_req_digest,
-            build_id
+            build_id,
           )
         }))
       })

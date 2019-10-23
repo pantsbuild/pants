@@ -80,7 +80,7 @@ impl ParsedJVMCommandLines {
         .take_while_ref(|elem| {
           ParsedJVMCommandLines::is_flag(elem) && !ParsedJVMCommandLines::is_classpath_flag(elem)
         })
-          .cloned()
+        .cloned()
         .collect(),
     )
   }

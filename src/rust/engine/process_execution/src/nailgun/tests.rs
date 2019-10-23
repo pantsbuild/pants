@@ -1,5 +1,5 @@
 use crate::nailgun::{
-    CommandRunner, ARGS_TO_START_NAILGUN, NAILGUN_MAIN_CLASS, NAILGUN_PORT_ENV_VAR_FOR_CLIENT,
+  CommandRunner, ARGS_TO_START_NAILGUN, NAILGUN_MAIN_CLASS, NAILGUN_PORT_ENV_VAR_FOR_CLIENT,
 };
 use crate::{ExecuteProcessRequest, ExecuteProcessRequestMetadata, Platform};
 use hashing::EMPTY_DIGEST;
@@ -11,205 +11,201 @@ use tempfile::TempDir;
 use workunit_store::WorkUnitStore;
 
 fn mock_nailgun_runner(workdir_base: Option<PathBuf>) -> CommandRunner {
-    let store_dir = TempDir::new().unwrap();
-    let executor = task_executor::Executor::new();
-    let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
-    let local_runner =
-        crate::local::CommandRunner::new(store, executor.clone(), std::env::temp_dir(), true);
-    let metadata = ExecuteProcessRequestMetadata {
-        instance_name: None,
-        cache_key_gen_version: None,
-        platform_properties: vec![],
-    };
-    let python_distribution = PathBuf::from("/usr/bin/python");
-    let workdir_base = workdir_base.unwrap_or(std::env::temp_dir());
+  let store_dir = TempDir::new().unwrap();
+  let executor = task_executor::Executor::new();
+  let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
+  let local_runner =
+    crate::local::CommandRunner::new(store, executor.clone(), std::env::temp_dir(), true);
+  let metadata = ExecuteProcessRequestMetadata {
+    instance_name: None,
+    cache_key_gen_version: None,
+    platform_properties: vec![],
+  };
+  let python_distribution = PathBuf::from("/usr/bin/python");
+  let workdir_base = workdir_base.unwrap_or(std::env::temp_dir());
 
-    CommandRunner::new(
-        local_runner,
-        metadata,
-        python_distribution,
-        workdir_base,
-        executor.clone(),
-    )
+  CommandRunner::new(
+    local_runner,
+    metadata,
+    python_distribution,
+    workdir_base,
+    executor.clone(),
+  )
 }
 
 fn unique_temp_dir(base_dir: PathBuf, prefix: Option<String>) -> TempDir {
-    tempfile::Builder::new()
-        .prefix(&(prefix.unwrap_or("".to_string())))
-        .tempdir_in(&base_dir)
-        .expect("Error making tempdir for local process execution: {:?}")
+  tempfile::Builder::new()
+    .prefix(&(prefix.unwrap_or("".to_string())))
+    .tempdir_in(&base_dir)
+    .expect("Error making tempdir for local process execution: {:?}")
 }
 
 fn mock_nailgunnable_request(jdk_home: Option<PathBuf>) -> ExecuteProcessRequest {
-    ExecuteProcessRequest {
-        argv: vec![],
-        env: Default::default(),
-        input_files: EMPTY_DIGEST,
-        output_files: Default::default(),
-        output_directories: Default::default(),
-        timeout: Default::default(),
-        description: "".to_string(),
-        unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
-        jdk_home: jdk_home,
-        target_platform: Platform::Darwin,
-        is_nailgunnable: true,
-    }
+  ExecuteProcessRequest {
+    argv: vec![],
+    env: Default::default(),
+    input_files: EMPTY_DIGEST,
+    output_files: Default::default(),
+    output_directories: Default::default(),
+    timeout: Default::default(),
+    description: "".to_string(),
+    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
+    jdk_home: jdk_home,
+    target_platform: Platform::Darwin,
+    is_nailgunnable: true,
+  }
 }
 
 #[test]
 fn get_workdir_creates_directory_if_it_doesnt_exist() {
-    let mock_workdir_base = unique_temp_dir(std::env::temp_dir(), None)
-        .path()
-        .to_owned();
-    let mock_nailgun_name = "mock_non_existing_workdir".to_string();
-    let runner = mock_nailgun_runner(Some(mock_workdir_base.clone()));
+  let mock_workdir_base = unique_temp_dir(std::env::temp_dir(), None)
+    .path()
+    .to_owned();
+  let mock_nailgun_name = "mock_non_existing_workdir".to_string();
+  let runner = mock_nailgun_runner(Some(mock_workdir_base.clone()));
 
-    let target_workdir = mock_workdir_base.join(mock_nailgun_name.clone());
-    assert!(!target_workdir.exists());
-    let res = runner.get_nailgun_workdir(&mock_nailgun_name);
-    assert_eq!(res, Ok(target_workdir.clone()));
-    assert!(target_workdir.exists());
+  let target_workdir = mock_workdir_base.join(mock_nailgun_name.clone());
+  assert!(!target_workdir.exists());
+  let res = runner.get_nailgun_workdir(&mock_nailgun_name);
+  assert_eq!(res, Ok(target_workdir.clone()));
+  assert!(target_workdir.exists());
 }
 
 #[test]
 fn get_workdir_returns_the_workdir_when_it_exists() {
-    let mock_workdir_base = unique_temp_dir(std::env::temp_dir(), None)
-        .path()
-        .to_owned();
-    let mock_nailgun_name = "mock_existing_workdir".to_string();
-    let runner = mock_nailgun_runner(Some(mock_workdir_base.clone()));
+  let mock_workdir_base = unique_temp_dir(std::env::temp_dir(), None)
+    .path()
+    .to_owned();
+  let mock_nailgun_name = "mock_existing_workdir".to_string();
+  let runner = mock_nailgun_runner(Some(mock_workdir_base.clone()));
 
-    let target_workdir = mock_workdir_base.join(mock_nailgun_name.clone());
-    assert!(!target_workdir.exists());
-    let creation_res = fs::safe_create_dir_all(&target_workdir);
-    assert!(creation_res.is_ok());
-    assert!(target_workdir.exists());
+  let target_workdir = mock_workdir_base.join(mock_nailgun_name.clone());
+  assert!(!target_workdir.exists());
+  let creation_res = fs::safe_create_dir_all(&target_workdir);
+  assert!(creation_res.is_ok());
+  assert!(target_workdir.exists());
 
-    let res = runner.get_nailgun_workdir(&mock_nailgun_name);
-    assert_eq!(res, Ok(target_workdir.clone()));
-    assert!(target_workdir.exists());
+  let res = runner.get_nailgun_workdir(&mock_nailgun_name);
+  assert_eq!(res, Ok(target_workdir.clone()));
+  assert!(target_workdir.exists());
 }
 
 #[test]
 fn creating_nailgun_server_request_updates_the_cli() {
-    let req = super::construct_nailgun_server_request(
-        &NAILGUN_MAIN_CLASS.to_string(),
-        Vec::new(),
-        PathBuf::from(""),
-        Platform::None,
-    );
-    assert_eq!(req.argv[0], NAILGUN_MAIN_CLASS);
-    assert_eq!(req.argv[1..], ARGS_TO_START_NAILGUN);
+  let req = super::construct_nailgun_server_request(
+    &NAILGUN_MAIN_CLASS.to_string(),
+    Vec::new(),
+    PathBuf::from(""),
+    Platform::None,
+  );
+  assert_eq!(req.argv[0], NAILGUN_MAIN_CLASS);
+  assert_eq!(req.argv[1..], ARGS_TO_START_NAILGUN);
 }
 
 #[test]
 fn creating_nailgun_client_request_inserts_port_as_an_env_var() {
-    let original_req = mock_nailgunnable_request(None);
-    let req = super::construct_nailgun_client_request(
-        original_req,
-        "".to_string(),
-        "".to_string(),
-        vec![],
-        1234,
-    );
-    assert_eq!(
-        req.env.get(NAILGUN_PORT_ENV_VAR_FOR_CLIENT),
-        Some(&String::from("1234"))
-    );
+  let original_req = mock_nailgunnable_request(None);
+  let req = super::construct_nailgun_client_request(
+    original_req,
+    "".to_string(),
+    "".to_string(),
+    vec![],
+    1234,
+  );
+  assert_eq!(
+    req.env.get(NAILGUN_PORT_ENV_VAR_FOR_CLIENT),
+    Some(&String::from("1234"))
+  );
 }
 
 #[test]
 fn creating_nailgun_client_request_removes_jdk_home() {
-    let original_req = mock_nailgunnable_request(Some(PathBuf::from("some/path")));
-    let req = super::construct_nailgun_client_request(
-        original_req,
-        "".to_string(),
-        "".to_string(),
-        vec![],
-        1234,
-    );
-    assert_eq!(req.jdk_home, None);
+  let original_req = mock_nailgunnable_request(Some(PathBuf::from("some/path")));
+  let req = super::construct_nailgun_client_request(
+    original_req,
+    "".to_string(),
+    "".to_string(),
+    vec![],
+    1234,
+  );
+  assert_eq!(req.jdk_home, None);
 }
 
 #[test]
 fn nailgun_name_is_the_main_class() {
-    let main_class = "my.main.class".to_string();
-    let name = super::CommandRunner::calculate_nailgun_name(&main_class);
-    assert_eq!(name, format!("nailgun_server_{}", main_class));
+  let main_class = "my.main.class".to_string();
+  let name = super::CommandRunner::calculate_nailgun_name(&main_class);
+  assert_eq!(name, format!("nailgun_server_{}", main_class));
 }
 
 fn materialize_with_jdk(
-    runner: &CommandRunner,
-    dir: PathBuf,
-    jdk_path: PathBuf,
+  runner: &CommandRunner,
+  dir: PathBuf,
+  jdk_path: PathBuf,
 ) -> Result<(), String> {
-    let executor = task_executor::Executor::new();
-    let materializer = runner.materialize_workdir_for_server(
-        dir,
-        Some(jdk_path),
-        EMPTY_DIGEST,
-        WorkUnitStore::new(),
-    );
-    executor.block_on(materializer)
+  let executor = task_executor::Executor::new();
+  let materializer =
+    runner.materialize_workdir_for_server(dir, Some(jdk_path), EMPTY_DIGEST, WorkUnitStore::new());
+  executor.block_on(materializer)
 }
 
 #[test]
 fn materializing_workdir_for_server_creates_a_link_for_the_jdk() {
-    let workdir_base_tempdir = unique_temp_dir(std::env::temp_dir(), None);
-    let workdir_base = workdir_base_tempdir.path().to_owned();
-    let mock_jdk_dir = unique_temp_dir(std::env::temp_dir(), None);
-    let mock_jdk_path = mock_jdk_dir.path().to_owned();
-    let runner = mock_nailgun_runner(Some(workdir_base));
-    let nailgun_name = "mock_server".to_string();
+  let workdir_base_tempdir = unique_temp_dir(std::env::temp_dir(), None);
+  let workdir_base = workdir_base_tempdir.path().to_owned();
+  let mock_jdk_dir = unique_temp_dir(std::env::temp_dir(), None);
+  let mock_jdk_path = mock_jdk_dir.path().to_owned();
+  let runner = mock_nailgun_runner(Some(workdir_base));
+  let nailgun_name = "mock_server".to_string();
 
-    let workdir_for_server = runner
-        .get_nailgun_workdir(&nailgun_name)
-        .expect("Error creating workdir for nailgun server");
-    println!("Workdir for server {:?}", &workdir_for_server);
+  let workdir_for_server = runner
+    .get_nailgun_workdir(&nailgun_name)
+    .expect("Error creating workdir for nailgun server");
+  println!("Workdir for server {:?}", &workdir_for_server);
 
-    // Assert that the materialization was successful
-    let materialization_result =
-        materialize_with_jdk(&runner, workdir_for_server.clone(), mock_jdk_path.clone());
-    assert_eq!(materialization_result, Ok(()));
+  // Assert that the materialization was successful
+  let materialization_result =
+    materialize_with_jdk(&runner, workdir_for_server.clone(), mock_jdk_path.clone());
+  assert_eq!(materialization_result, Ok(()));
 
-    // Assert that the symlink points to the requested jdk
-    let materialized_jdk_path = workdir_for_server.join(".jdk");
-    let materialized_jdk = read_link(materialized_jdk_path);
-    assert!(materialized_jdk.is_ok());
-    assert_eq!(materialized_jdk.unwrap(), mock_jdk_path);
+  // Assert that the symlink points to the requested jdk
+  let materialized_jdk_path = workdir_for_server.join(".jdk");
+  let materialized_jdk = read_link(materialized_jdk_path);
+  assert!(materialized_jdk.is_ok());
+  assert_eq!(materialized_jdk.unwrap(), mock_jdk_path);
 }
 
 #[test]
 fn materializing_workdir_for_server_replaces_jdk_link_if_a_different_one_is_requested() {
-    let workdir_base_tempdir = unique_temp_dir(std::env::temp_dir(), None);
-    let workdir_base = workdir_base_tempdir.path().to_owned();
+  let workdir_base_tempdir = unique_temp_dir(std::env::temp_dir(), None);
+  let workdir_base = workdir_base_tempdir.path().to_owned();
 
-    let _ = workdir_base_tempdir.into_path();
+  let _ = workdir_base_tempdir.into_path();
 
-    let runner = mock_nailgun_runner(Some(workdir_base));
-    let nailgun_name = "mock_server".to_string();
+  let runner = mock_nailgun_runner(Some(workdir_base));
+  let nailgun_name = "mock_server".to_string();
 
-    let original_mock_jdk_dir = unique_temp_dir(std::env::temp_dir(), None);
-    let original_mock_jdk_path = original_mock_jdk_dir.path().to_owned();
-    let requested_mock_jdk_dir = unique_temp_dir(std::env::temp_dir(), None);
-    let requested_mock_jdk_path = requested_mock_jdk_dir.path().to_owned();
+  let original_mock_jdk_dir = unique_temp_dir(std::env::temp_dir(), None);
+  let original_mock_jdk_path = original_mock_jdk_dir.path().to_owned();
+  let requested_mock_jdk_dir = unique_temp_dir(std::env::temp_dir(), None);
+  let requested_mock_jdk_path = requested_mock_jdk_dir.path().to_owned();
 
-    let workdir_for_server = runner
-        .get_nailgun_workdir(&nailgun_name)
-        .expect("Error creating workdir for nailgun server");
-    let materialized_jdk_path = workdir_for_server.join(".jdk");
+  let workdir_for_server = runner
+    .get_nailgun_workdir(&nailgun_name)
+    .expect("Error creating workdir for nailgun server");
+  let materialized_jdk_path = workdir_for_server.join(".jdk");
 
-    // Manually create a symlink to one of the jdk files
-    let symlink_res = symlink(original_mock_jdk_path, materialized_jdk_path.clone());
-    assert!(symlink_res.is_ok());
+  // Manually create a symlink to one of the jdk files
+  let symlink_res = symlink(original_mock_jdk_path, materialized_jdk_path.clone());
+  assert!(symlink_res.is_ok());
 
-    // Trigger materialization of the nailgun server workdir
-    let materialization_result =
-        materialize_with_jdk(&runner, workdir_for_server, requested_mock_jdk_path.clone());
-    assert!(materialization_result.is_ok());
+  // Trigger materialization of the nailgun server workdir
+  let materialization_result =
+    materialize_with_jdk(&runner, workdir_for_server, requested_mock_jdk_path.clone());
+  assert!(materialization_result.is_ok());
 
-    // Assert that the symlink points to the requested jdk, and not the original one
-    let materialized_jdk = read_link(materialized_jdk_path);
-    assert!(materialized_jdk.is_ok());
-    assert_eq!(materialized_jdk.unwrap(), requested_mock_jdk_path);
+  // Assert that the symlink points to the requested jdk, and not the original one
+  let materialized_jdk = read_link(materialized_jdk_path);
+  assert!(materialized_jdk.is_ok());
+  assert_eq!(materialized_jdk.unwrap(), requested_mock_jdk_path);
 }

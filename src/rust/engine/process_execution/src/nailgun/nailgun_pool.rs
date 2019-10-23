@@ -71,7 +71,7 @@ impl NailgunPool {
         process.name.clone(),
         process.fingerprint.clone(),
         process.port,
-        process.build_id.clone()
+        process.build_id.clone(),
       );
 
       debug!(
@@ -112,10 +112,11 @@ impl NailgunPool {
               // Restart it.
               // Since the stored server was started in a different pants run,
               // no client will be running on that server.
-              debug!("The options for server process {} are different to the startup_options, \
-                      and the original process was started in a different pants run.\n\
-                      Startup Options: {:?}\n Process Cmd: {:?}",
-                     &process_name, startup_options, process_fingerprint
+              debug!(
+                "The options for server process {} are different to the startup_options, \
+                 and the original process was started in a different pants run.\n\
+                 Startup Options: {:?}\n Process Cmd: {:?}",
+                &process_name, startup_options, process_fingerprint
               );
               debug!("Restarting the server...");
               self.start_new_nailgun(
@@ -264,7 +265,7 @@ impl NailgunProcess {
           fingerprint: nailgun_server_fingerprint,
           name: name,
           handle: Arc::new(Mutex::new(child)),
-          build_id: build_id
+          build_id: build_id,
         })
       })
   }
@@ -276,7 +277,6 @@ impl Drop for NailgunProcess {
     let _ = self.handle.lock().kill();
   }
 }
-
 
 /// The fingerprint of an nailgun server process.
 ///

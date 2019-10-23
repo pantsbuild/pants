@@ -61,7 +61,7 @@ class ExecutionOptions:
   remote_oauth_bearer_token_path: Any
   remote_execution_extra_platform_properties: Any
   remote_execution_headers: Any
-  process_execution_local_enable_nailgun: Any
+  process_execution_local_enable_nailgun: bool
 
   @classmethod
   def from_bootstrap_options(cls, bootstrap_options):
