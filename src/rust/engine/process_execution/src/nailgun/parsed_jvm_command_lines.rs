@@ -2,7 +2,7 @@ use itertools::Itertools;
 use std::slice::Iter;
 
 /// Represents the result of parsing the args of a nailgunnable ExecuteProcessRequest
-/// TODO(8481) We may want to split the classpath by the ":", and store it as a Vec<String>
+/// TODO(#8481) We may want to split the classpath by the ":", and store it as a Vec<String>
 ///         to allow for deep fingerprinting.
 #[derive(PartialEq, Eq, Debug)]
 pub struct ParsedJVMCommandLines {
@@ -65,7 +65,7 @@ impl ParsedJVMCommandLines {
   fn parse_jdk(args_to_consume: &mut Iter<String>) -> Result<String, String> {
     args_to_consume
       .next()
-      .filter(|&e| e == &".jdk/bin/java".to_string())
+      .filter(|&e| e == ".jdk/bin/java")
       .ok_or(format!(
         "Every command line must start with a call to the jdk."
       ))
@@ -80,7 +80,7 @@ impl ParsedJVMCommandLines {
         .take_while_ref(|elem| {
           ParsedJVMCommandLines::is_flag(elem) && !ParsedJVMCommandLines::is_classpath_flag(elem)
         })
-        .map(|e| e.clone())
+          .cloned()
         .collect(),
     )
   }

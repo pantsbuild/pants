@@ -47,11 +47,11 @@ static NG_CLIENT_PATH: &str = "bin/ng/1.0.0/ng";
 /// Constructs the ExecuteProcessRequest that would be used
 /// to start the nailgun servers if we needed to.
 ///
-// TODO(8481) We should calculate the input_files by deeply fingerprinting the classpath.
+// TODO(#8481) We should calculate the input_files by deeply fingerprinting the classpath.
 fn construct_nailgun_server_request(
   nailgun_name: &String,
   args_for_the_jvm: Vec<String>,
-  jdk: Option<PathBuf>,
+  jdk: PathBuf,
   platform: Platform,
 ) -> ExecuteProcessRequest {
   let mut full_args = args_for_the_jvm;
@@ -68,7 +68,7 @@ fn construct_nailgun_server_request(
     description: format!("Start a nailgun server for {}", nailgun_name),
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
       hashing::EMPTY_DIGEST,
-    jdk_home: jdk,
+    jdk_home: Some(jdk),
     target_platform: platform,
     is_nailgunnable: true,
   }
@@ -179,8 +179,8 @@ impl CommandRunner {
     format!("nailgun_server_{}", main_class)
   }
 
-  // TODO(8481) When we correctly set the input_files field of the nailgun EPR, we won't need to pass it here as an argument.
-  // TODO(8489) We should move this code to NailgunPool. This returns a Future, so this will involve making the struct Futures-aware.
+  // TODO(#8481) When we correctly set the input_files field of the nailgun EPR, we won't need to pass it here as an argument.
+  // TODO(#8489) We should move this code to NailgunPool. This returns a Future, so this will involve making the struct Futures-aware.
   fn materialize_workdir_for_server(
     &self,
     workdir_for_server: PathBuf,
@@ -202,7 +202,7 @@ impl CommandRunner {
 
     self.inner
             .store
-            // TODO(8481) This materializes the input files in the client req, which is a superset of the files we need (we only need the classpath, not the input files)
+            // TODO(#8481) This materializes the input files in the client req, which is a superset of the files we need (we only need the classpath, not the input files)
             .materialize_directory(workdir_for_server.clone(), input_files, workunit_store)
             .and_then(move |_metadata| {
                 let jdk_home_in_workdir = workdir_for_server2.clone().join(".jdk");
@@ -252,31 +252,31 @@ impl super::CommandRunner for CommandRunner {
     let inner = self.inner.clone();
     let python_distribution = self.get_python_distribution_path();
 
-    let client_req = self.extract_compatible_request(&req).unwrap();
+    let original_request = self.extract_compatible_request(&req).unwrap();
 
-    if !client_req.is_nailgunnable {
+    if !original_request.is_nailgunnable {
       trace!("The request is not nailgunnable! Short-circuiting to regular process execution");
       return self.inner.run(req, context);
     }
-    debug!("Running request under nailgun:\n {:#?}", &client_req);
+    debug!("Running request under nailgun:\n {:#?}", &original_request);
 
     // Separate argument lists, to form distinct EPRs for (1) starting the nailgun server and (2) running the client in it.
     let ParsedJVMCommandLines {
       nailgun_args,
       client_args,
       client_main_class,
-    } = ParsedJVMCommandLines::parse_command_lines(&client_req.argv)
-      .expect("Error parsing command lines!!");
+    } = try_future!(ParsedJVMCommandLines::parse_command_lines(&original_request.argv));
 
     let nailgun_name = CommandRunner::calculate_nailgun_name(&client_main_class);
     let nailgun_name2 = nailgun_name.clone();
     let nailgun_name3 = nailgun_name.clone();
 
+    let jdk_home = try_future!(original_request.jdk_home.clone().ok_or(format!("JDK home must be specified for all nailgunnable requests.")));
     let nailgun_req = construct_nailgun_server_request(
       &nailgun_name,
       nailgun_args,
-      client_req.jdk_home.clone(),
-      client_req.target_platform,
+      jdk_home,
+      original_request.target_platform,
     );
     trace!("Extracted nailgun request:\n {:#?}", &nailgun_req);
 
@@ -294,7 +294,7 @@ impl super::CommandRunner for CommandRunner {
       .materialize_workdir_for_server(
         workdir_for_this_nailgun.clone(),
         nailgun_req.jdk_home.clone(),
-        client_req.input_files,
+        original_request.input_files,
         context.workunit_store.clone(),
       )
       .and_then(move |_metadata| {
@@ -314,7 +314,7 @@ impl super::CommandRunner for CommandRunner {
         // Run the client request in the nailgun we have active.
         debug!("Got nailgun port {:#?}", nailgun_port);
         let full_client_req = construct_nailgun_client_request(
-          client_req,
+          original_request,
           python_distribution,
           client_main_class,
           client_args,

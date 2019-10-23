@@ -1,5 +1,6 @@
 use crate::nailgun::parsed_jvm_command_lines::ParsedJVMCommandLines;
 
+// TODO we should be able to use https://docs.rs/crate/derive_builder/0.8.0
 #[derive(Debug)]
 struct CLIBuilder {
     jdk: Option<String>,

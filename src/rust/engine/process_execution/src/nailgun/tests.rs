@@ -95,7 +95,7 @@ fn creating_nailgun_server_request_updates_the_cli() {
     let req = super::construct_nailgun_server_request(
         &NAILGUN_MAIN_CLASS.to_string(),
         Vec::new(),
-        None,
+        PathBuf::from(""),
         Platform::None,
     );
     assert_eq!(req.argv[0], NAILGUN_MAIN_CLASS);

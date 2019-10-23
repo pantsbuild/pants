@@ -277,6 +277,13 @@ impl Drop for NailgunProcess {
   }
 }
 
+
+/// The fingerprint of an nailgun server process.
+///
+/// This is calculated by hashing together:
+///   - The jvm options and classpath used to create the server
+///   - The path to the jdk
+///   - The output of calling `<jdk>/bin/java -version`
 #[derive(Clone, Hash, PartialEq, Eq, Debug)]
 pub struct NailgunProcessFingerprint(pub Fingerprint);
 
