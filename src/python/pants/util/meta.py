@@ -137,4 +137,8 @@ def frozen_after_init(cls: Type[T]) -> Type[T]:
 
   cls.__init__ = new_init  # type: ignore
   cls.__setattr__ = new_setattr  # type: ignore
+  setattr(cls, frozen_after_init.sentinel_attr, True) # type: ignore
+
   return cls
+
+frozen_after_init.sentinel_attr = '_frozen_after_init' # type: ignore
