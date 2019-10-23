@@ -30,7 +30,7 @@ impl ParsedJVMCommandLines {
   ///
   /// We think these assumptions are valid as per: https://github.com/pantsbuild/pants/issues/8387
   ///
-  pub fn parse_command_lines(args: &Vec<String>) -> Result<ParsedJVMCommandLines, String> {
+  pub fn parse_command_lines(args: &[String]) -> Result<ParsedJVMCommandLines, String> {
     let mut args_to_consume = args.iter();
 
     let jdk = Self::parse_jdk(&mut args_to_consume)?;
@@ -66,9 +66,7 @@ impl ParsedJVMCommandLines {
     args_to_consume
       .next()
       .filter(|&e| e == ".jdk/bin/java")
-      .ok_or(format!(
-        "Every command line must start with a call to the jdk."
-      ))
+      .ok_or_else(|| "Every command line must start with a call to the jdk.".to_string())
       .map(|e| e.clone())
   }
 
@@ -89,12 +87,12 @@ impl ParsedJVMCommandLines {
     let classpath_flag = args_to_consume
       .next()
       .filter(|e| ParsedJVMCommandLines::is_classpath_flag(&e))
-      .ok_or_else(|| format!("No classpath flag found."))
+      .ok_or_else(|| "No classpath flag found.".to_string())
       .map(|e| e.clone())?;
 
     let classpath_value = args_to_consume
       .next()
-      .ok_or(format!("No classpath value found!"))
+      .ok_or_else(|| "No classpath value found!".to_string())
       .and_then(|elem| {
         if ParsedJVMCommandLines::is_flag(elem) {
           Err(format!(
@@ -114,19 +112,19 @@ impl ParsedJVMCommandLines {
     args_to_consume
       .next()
       .filter(|e| !ParsedJVMCommandLines::is_flag(e))
-      .ok_or("No main class provided.".to_string())
+      .ok_or_else(|| "No main class provided.".to_string())
       .map(|e| e.clone())
   }
 
   fn parse_to_end(args_to_consume: &mut Iter<String>) -> Result<Vec<String>, String> {
-    Ok(args_to_consume.map(|e| e.clone()).collect())
+    Ok(args_to_consume.cloned().collect())
   }
 
-  fn is_flag(arg: &String) -> bool {
-    arg.starts_with("-") || arg.starts_with("@")
+  fn is_flag(arg: &str) -> bool {
+    arg.starts_with('-') || arg.starts_with('@')
   }
 
-  fn is_classpath_flag(arg: &String) -> bool {
+  fn is_classpath_flag(arg: &str) -> bool {
     arg == "-cp" || arg == "-classpath"
   }
 }

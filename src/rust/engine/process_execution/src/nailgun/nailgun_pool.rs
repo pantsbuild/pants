@@ -57,10 +57,12 @@ impl NailgunPool {
     trace!("Locking nailgun process pool so that only one can be connecting at a time.");
     let mut processes = self.processes.lock();
 
-    let jdk_path = startup_options.jdk_home.clone().ok_or(format!(
-      "jdk_home is not set for nailgun server startup request {:#?}",
-      &startup_options
-    ))?;
+    let jdk_path = startup_options.jdk_home.clone().ok_or_else(|| {
+      format!(
+        "jdk_home is not set for nailgun server startup request {:#?}",
+        &startup_options
+      )
+    })?;
     let requested_server_fingerprint =
       NailgunProcessFingerprint::new(nailgun_req_digest, jdk_path)?;
 
@@ -202,7 +204,10 @@ pub struct NailgunProcess {
 }
 
 fn read_port(child: &mut std::process::Child) -> Result<Port, String> {
-  let stdout = child.stdout.as_mut().ok_or(format!("No Stdout found!"));
+  let stdout = child
+    .stdout
+    .as_mut()
+    .ok_or_else(|| "No Stdout found!".to_string());
   stdout.and_then(|stdout| {
     let reader = io::BufReader::new(stdout);
     let line = reader

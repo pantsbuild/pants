@@ -49,7 +49,7 @@ static NG_CLIENT_PATH: &str = "bin/ng/1.0.0/ng";
 ///
 // TODO(#8481) We should calculate the input_files by deeply fingerprinting the classpath.
 fn construct_nailgun_server_request(
-  nailgun_name: &String,
+  nailgun_name: &str,
   args_for_the_jvm: Vec<String>,
   jdk: PathBuf,
   platform: Platform,
@@ -82,7 +82,7 @@ fn construct_nailgun_client_request(
   nailgun_port: Port,
 ) -> ExecuteProcessRequest {
   let ExecuteProcessRequest {
-    argv: _,
+    argv: _argv,
     input_files,
     description,
     env: original_request_env,
@@ -90,7 +90,7 @@ fn construct_nailgun_client_request(
     output_directories,
     timeout,
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule,
-    jdk_home: _,
+    jdk_home: _jdk_home,
     target_platform,
     is_nailgunnable,
   } = original_req;
@@ -159,7 +159,7 @@ impl CommandRunner {
   }
 
   // Ensure that the workdir for the given nailgun name exists.
-  fn get_nailgun_workdir(&self, nailgun_name: &NailgunProcessName) -> Result<PathBuf, String> {
+  fn get_nailgun_workdir(&self, nailgun_name: &str) -> Result<PathBuf, String> {
     let workdir = self.workdir_base.clone().join(nailgun_name);
     if workdir.exists() {
       debug!("Nailgun workdir {:?} exits. Reusing that...", &workdir);
@@ -175,7 +175,7 @@ impl CommandRunner {
   // TODO(#8527) Make this name the name of the task (in v1) or some other more intentional scope (v2).
   //      Using the main class here is fragile, because two tasks might want to run the same main class,
   //      but in different nailgun servers.
-  fn calculate_nailgun_name(main_class: &String) -> NailgunProcessName {
+  fn calculate_nailgun_name(main_class: &str) -> NailgunProcessName {
     format!("nailgun_server_{}", main_class)
   }
 
@@ -189,9 +189,9 @@ impl CommandRunner {
     workunit_store: WorkUnitStore,
   ) -> BoxFuture<(), String> {
     if requested_jdk_home.is_none() {
-      return futures::future::err(format!(
-        "No JDK specified when materializing the server directory"
-      ))
+      return futures::future::err(
+        "No JDK specified when materializing the server directory".to_string(),
+      )
       .to_boxed();
     }
     let requested_jdk_home = requested_jdk_home.unwrap();
@@ -273,9 +273,10 @@ impl super::CommandRunner for CommandRunner {
     let nailgun_name2 = nailgun_name.clone();
     let nailgun_name3 = nailgun_name.clone();
 
-    let jdk_home = try_future!(original_request.jdk_home.clone().ok_or(format!(
-      "JDK home must be specified for all nailgunnable requests."
-    )));
+    let jdk_home = try_future!(original_request
+      .jdk_home
+      .clone()
+      .ok_or_else(|| "JDK home must be specified for all nailgunnable requests.".to_string()));
     let nailgun_req = construct_nailgun_server_request(
       &nailgun_name,
       nailgun_args,
