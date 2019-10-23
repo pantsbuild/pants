@@ -2,12 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from pants.util.collections import Enum
-from subprocess import Popen
-from pants.engine.rules import RootRule
-from tempfile import TemporaryDirectory
-from typing import Any, Dict, Tuple
+from typing import Any, Tuple
+
 from pants.base.exception_sink import ExceptionSink
+from pants.engine.rules import RootRule
 
 
 @dataclass(frozen=True)
