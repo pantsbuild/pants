@@ -6,7 +6,7 @@ from pants.util.contextutil import environment_as
 from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test import BaseCompileIT
 
 
-def ensure_compile_rsc_execution_strategy(workflow):
+def ensure_compile_rsc_execution_strategy(workflow, **env_kwargs):
   """A decorator for running an integration test with ivy and coursier as the resolver."""
 
   def decorator(f):
@@ -16,7 +16,8 @@ def ensure_compile_rsc_execution_strategy(workflow):
           HERMETIC_ENV='PANTS_COMPILE_RSC_EXECUTION_STRATEGY',
           PANTS_COMPILE_RSC_EXECUTION_STRATEGY=strategy.value,
           PANTS_COMPILE_RSC_WORKFLOW=workflow.value,
-          PANTS_CACHE_COMPILE_RSC_IGNORE='True'):
+          PANTS_CACHE_COMPILE_RSC_IGNORE='True',
+          **env_kwargs):
           f(self, *args, **kwargs)
 
     return wrapper

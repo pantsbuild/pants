@@ -155,6 +155,10 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     rsc_and_zinc = "rsc-and-zinc"
     outline_and_zinc = "outline-and-zinc"
 
+    @classmethod
+    def valid_workflow_values(cls):
+      return [w.value for w in RscCompile.JvmCompileWorkflowType.all_values()]
+
   @memoized_property
   def _compiler_tags(self):
     return {
@@ -178,7 +182,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
              help='Extra arguments to pass to the rsc invocation.')
 
     register('--allow-public-inference', type=bool, default=False,
-             help='Allow public type member inference when workflow is outline-and-zinc. Otherwise, unannotated public types will be a compile error.', fingerprint=True)
+             help='Allow public type member inference when workflow is outline-and-zinc. Otherwise, unannotated public types will be a compile error. Note that public inference will significantly slow down outlining. Does not work for rsc-and-zinc.', fingerprint=True)
 
     cls.register_jvm_tool(
       register,
@@ -336,7 +340,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     filtered_tags = filter(None, all_tags)
 
     prefix = self.get_options().force_compiler_tag_prefix
-    valid_values = [w.value for w in self.JvmCompileWorkflowType.all_values()]
+    valid_values = self.JvmCompileWorkflowType.valid_workflow_values()
 
     for tag in target.tags:
       if tag.startswith(f"{prefix}:"):
@@ -355,6 +359,18 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
   @memoized_method
   def _classify_target_compile_workflow(self, target):
     """Return the compile workflow to use for this target."""
+
+    workflow_env_var = "PANTS_WORKFLOW_OVERRIDE"
+    valid_values = self.JvmCompileWorkflowType.valid_workflow_values()
+    if workflow_env_var in os.environ:
+      workflow_override = os.environ[workflow_env_var]
+      if workflow_override not in valid_values:
+        raise ValueError(f"Invalid workflow tag specified for environment variable PANTS_WORKFLOW_OVERRIDE={workflow_override}"
+          f"workflow must be one of {valid_values}")
+
+      return self.JvmCompileWorkflowType(workflow_override)
+
+
     # scala_library() targets may have a `.java_sources` property.
     java_sources = getattr(target, 'java_sources', [])
     if java_sources or target.has_sources('.java'):

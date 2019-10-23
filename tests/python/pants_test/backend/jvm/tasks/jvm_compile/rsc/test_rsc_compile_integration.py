@@ -25,6 +25,22 @@ class RscCompileIntegration(RscCompileIntegrationBase):
         'm.jar')
       self.assert_is_file(rsc_header_jar)
 
+  @ensure_compile_rsc_execution_strategy(
+    RscCompileIntegrationBase.rsc_and_zinc,
+    PANTS_WORKFLOW_OVERRIDE="zinc-only")
+  def test_workflow_override(self):
+    with self.do_command_yielding_workdir('compile', 'testprojects/src/scala/org/pantsbuild/testproject/mutual:bin') as pants_run:
+      zinc_compiled_classfile = os.path.join(
+        pants_run.workdir,
+        'compile/rsc/current/testprojects.src.scala.org.pantsbuild.testproject.mutual.mutual/current/zinc',
+        'classes/org/pantsbuild/testproject/mutual/A.class')
+      self.assert_is_file(zinc_compiled_classfile)
+      rsc_header_jar = os.path.join(
+        pants_run.workdir,
+        'compile/rsc/current/testprojects.src.scala.org.pantsbuild.testproject.mutual.mutual/current/rsc',
+        'm.jar')
+      self.assert_is_not_file(rsc_header_jar)
+
   @ensure_compile_rsc_execution_strategy(RscCompileIntegrationBase.rsc_and_zinc)
   def test_executing_multi_target_binary(self):
     pants_run = self.do_command('run', 'examples/src/scala/org/pantsbuild/example/hello/exe')
