@@ -152,12 +152,17 @@ impl CommandRunner {
     &self,
     execute_request: &Arc<bazel_protos::remote_execution::ExecuteRequest>,
     build_id: String,
+    action_digest: hashing::Digest,
   ) -> BoxFuture<OperationOrStatus, String> {
     let stream = try_future!(self
       .execution_client
       .execute_opt(
         &execute_request,
-        try_future!(call_option(&self.headers, Some(build_id),))
+        try_future!(call_option(
+          &self.headers,
+          Some(build_id),
+          Some(action_digest)
+        ))
       )
       .map_err(rpcerror_to_string));
     stream
@@ -249,6 +254,7 @@ impl super::CommandRunner for CommandRunner {
 
     match execute_request_result {
       Ok((action, command, execute_request)) => {
+        let action_digest = try_future!(execute_request.get_action_digest().into());
         let command_runner = self.clone();
         let execute_request = Arc::new(execute_request);
 
@@ -279,7 +285,7 @@ impl super::CommandRunner for CommandRunner {
                 command
               );
               command_runner
-                .oneshot_execute(&execute_request, build_id)
+                .oneshot_execute(&execute_request, build_id, action_digest)
                 .join(future::ok(history))
             }
           })
@@ -344,6 +350,7 @@ impl super::CommandRunner for CommandRunner {
                                 }
                               }).to_boxed(),
                               build_id,
+                              action_digest,
                               history,
                               maybe_cancel_remote_exec_token,
                             )
@@ -359,6 +366,7 @@ impl super::CommandRunner for CommandRunner {
                               execute_request,
                               store.ensure_remote_has_recursive(missing_digests, workunit_store.clone()).map(|_| ()).to_boxed(),
                               build_id,
+                              action_digest,
                               history,
                               maybe_cancel_remote_exec_token,
                             )
@@ -407,7 +415,7 @@ impl super::CommandRunner for CommandRunner {
                               operations_client
                                   .get_operation_opt(
                                     &operation_request,
-                                    call_option(&command_runner.headers, Some(build_id))?,
+                                    call_option(&command_runner.headers, Some(build_id), Some(action_digest))?,
                                   )
                                   .or_else(move |err| {
                                     rpcerror_recover_cancelled(operation_request.take_name(), err)
@@ -494,7 +502,7 @@ impl CommandRunner {
     }
 
     // Validate that any configured static headers are valid.
-    call_option(&headers, None)?;
+    call_option(&headers, None, None)?;
 
     let command_runner = CommandRunner {
       metadata,
@@ -751,6 +759,7 @@ impl CommandRunner {
     execute_request: Arc<bazel_protos::remote_execution::ExecuteRequest>,
     prefix_future: BoxFuture<(), String>,
     build_id: String,
+    action_digest: hashing::Digest,
     history: ExecutionHistory,
     maybe_cancel_remote_exec_token: Option<CancelRemoteExecutionToken>,
   ) -> BoxFuture<
@@ -781,7 +790,7 @@ impl CommandRunner {
 
     let command_runner = self.clone();
     prefix_future
-      .and_then(move |()| command_runner.oneshot_execute(&execute_request, build_id))
+      .and_then(move |()| command_runner.oneshot_execute(&execute_request, build_id, action_digest))
       .map({
         let operations_client = self.operations_client.clone();
         let executor = self.executor.clone();

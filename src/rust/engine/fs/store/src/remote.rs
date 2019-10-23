@@ -137,7 +137,9 @@ impl ByteStore {
     self
       .with_byte_stream_client(move |client| {
         match client
-          .write_opt(try_future!(call_option(&store.headers, None)).timeout(store.upload_timeout))
+          .write_opt(
+            try_future!(call_option(&store.headers, None, None)).timeout(store.upload_timeout),
+          )
           .map(|v| (v, client))
         {
           Err(err) => future::err(format!(
@@ -260,7 +262,7 @@ impl ByteStore {
               req.set_read_limit(0);
               req
             },
-            try_future!(call_option(&store.headers, None)),
+            try_future!(call_option(&store.headers, None, None)),
           )
           .map(|stream| (stream, client))
         {
@@ -329,7 +331,7 @@ impl ByteStore {
     self
       .with_cas_client(move |client| {
         client
-          .find_missing_blobs_opt(&request, call_option(&store.headers, None)?)
+          .find_missing_blobs_opt(&request, call_option(&store.headers, None, None)?)
           .map_err(|err| {
             format!(
               "Error from server in response to find_missing_blobs_request: {:?}",
