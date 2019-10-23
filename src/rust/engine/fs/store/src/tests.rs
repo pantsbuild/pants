@@ -8,7 +8,7 @@ use bytes::Bytes;
 use digest::{Digest as DigestTrait, FixedOutput};
 use futures::Future;
 use hashing::{Digest, Fingerprint};
-use maplit::btreemap;
+use maplit::{btreemap, btreeset};
 use mock::StubCAS;
 use protobuf::Message;
 use serverset::BackoffConfig;
@@ -1240,19 +1240,15 @@ fn returns_upload_summary_on_empty_cas() {
   .expect("Error uploading file");
 
   // We store all 3 files, and so we must sum their digests
-  let test_data = vec![
-    testdir.digest().1,
-    testroland.digest().1,
-    testcatnip.digest().1,
-  ];
-  let test_bytes = test_data.iter().sum();
+  let test_data = btreeset![testdir.digest(), testroland.digest(), testcatnip.digest(),];
+  let test_bytes = test_data.iter().map(|digest| digest.1).sum();
   summary.upload_wall_time = Duration::default();
   assert_eq!(
     summary,
     UploadSummary {
       ingested_file_count: test_data.len(),
       ingested_file_bytes: test_bytes,
-      uploaded_file_count: test_data.len(),
+      uploaded_files: test_data,
       uploaded_file_bytes: test_bytes,
       upload_wall_time: Duration::default(),
     }
@@ -1290,7 +1286,7 @@ fn summary_does_not_count_things_in_cas() {
     UploadSummary {
       ingested_file_count: 1,
       ingested_file_bytes: testroland.digest().1,
-      uploaded_file_count: 1,
+      uploaded_files: btreeset! { testroland.digest(), },
       uploaded_file_bytes: testroland.digest().1,
       upload_wall_time: Duration::default(),
     }
@@ -1312,7 +1308,7 @@ fn summary_does_not_count_things_in_cas() {
     UploadSummary {
       ingested_file_count: 3,
       ingested_file_bytes: testdir.digest().1 + testroland.digest().1 + testcatnip.digest().1,
-      uploaded_file_count: 2,
+      uploaded_files: btreeset! {testdir.digest(), testcatnip.digest() },
       uploaded_file_bytes: testdir.digest().1 + testcatnip.digest().1,
       upload_wall_time: Duration::default(),
     }

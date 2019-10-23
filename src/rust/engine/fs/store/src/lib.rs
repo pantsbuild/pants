@@ -42,7 +42,7 @@ use hashing::Digest;
 use protobuf::Message;
 use serde_derive::Serialize;
 pub use serverset::BackoffConfig;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::os::unix::fs::OpenOptionsExt;
@@ -71,11 +71,11 @@ mod remote_tests;
 // Summary of the files and directories uploaded with an operation
 // ingested_file_{count, bytes}: Number and combined size of processed files
 // uploaded_file_{count, bytes}: Number and combined size of files uploaded to the remote
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize)]
 pub struct UploadSummary {
   pub ingested_file_count: usize,
   pub ingested_file_bytes: usize,
-  pub uploaded_file_count: usize,
+  pub uploaded_files: BTreeSet<hashing::Digest>,
   pub uploaded_file_bytes: usize,
   #[serde(skip)]
   pub upload_wall_time: Duration,
@@ -553,8 +553,8 @@ impl Store {
         UploadSummary {
           ingested_file_count: ingested_file_sizes.len(),
           ingested_file_bytes: ingested_file_sizes.sum(),
-          uploaded_file_count: uploaded_file_sizes.len(),
           uploaded_file_bytes: uploaded_file_sizes.sum(),
+          uploaded_files: uploaded_digests.into_iter().collect(),
           upload_wall_time: start_time.elapsed(),
         }
       })

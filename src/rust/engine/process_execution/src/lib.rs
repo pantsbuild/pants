@@ -227,10 +227,23 @@ impl FallibleExecuteProcessResult {
   }
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct LengthSerializedBTreeSet {
+  length: usize,
+  values: BTreeSet<hashing::Digest>,
+}
+
+impl LengthSerializedBTreeSet {
+  fn extend<I: Iterator<Item = hashing::Digest>>(&mut self, other: I) {
+    self.values.extend(other);
+    self.length = self.values.len();
+  }
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct ExecutionStats {
   uploaded_bytes: usize,
-  uploaded_file_count: usize,
+  uploaded_files: LengthSerializedBTreeSet,
   upload: Duration,
   remote_queue: Option<Duration>,
   remote_input_fetch: Option<Duration>,
@@ -241,7 +254,9 @@ pub struct ExecutionStats {
 
 impl AddAssign<UploadSummary> for ExecutionStats {
   fn add_assign(&mut self, summary: UploadSummary) {
-    self.uploaded_file_count += summary.uploaded_file_count;
+    self
+      .uploaded_files
+      .extend(summary.uploaded_files.into_iter());
     self.uploaded_bytes += summary.uploaded_file_bytes;
     self.upload += summary.upload_wall_time;
   }

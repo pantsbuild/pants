@@ -433,18 +433,13 @@ impl super::CommandRunner for CommandRunner {
               )
             },
           )
-          .map(move |resp| {
-            let mut attempts = String::new();
-            for (i, attempt) in resp.execution_attempts.iter().enumerate() {
-              attempts += &format!("\nAttempt {}: {:?}", i, attempt);
-            }
+          .inspect(move |resp| {
             debug!(
-              "Finished remote exceution of {} after {} attempts: Stats: {}",
+              "Finished remote execution of {} after {} attempts: Stats: {}",
               description2,
               resp.execution_attempts.len(),
-              attempts
+              resp.execution_attempts.iter().enumerate().map(|(i, attempt)| format!("\nAttempt {}: {:?}", i, attempt)).collect::<Vec<_>>().join(""),
             );
-            resp
           })
           .to_boxed()
       }
@@ -639,7 +634,7 @@ impl CommandRunner {
         let status = execute_response.take_status();
         if grpcio::RpcStatusCode::from(status.get_code()) == grpcio::RpcStatusCode::Ok {
           let mut execution_attempts = std::mem::replace(&mut attempts.attempts, vec![]);
-          execution_attempts.push(attempts.current_attempt);
+          execution_attempts.push(attempts.current_attempt.clone());
           return populate_fallible_execution_result(
             self.store.clone(),
             execute_response,
