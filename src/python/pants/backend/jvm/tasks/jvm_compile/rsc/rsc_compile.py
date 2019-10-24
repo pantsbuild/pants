@@ -33,7 +33,7 @@ from pants.task.scm_publish_mixin import Semver
 from pants.util.collections import Enum, assert_single_element
 from pants.util.contextutil import Timer
 from pants.util.dirutil import fast_relpath, fast_relpath_optional, safe_mkdir
-from pants.util.memo import memoized_method, memoized_property
+from pants.util.memo import memoized_classproperty, memoized_method, memoized_property
 from pants.util.strutil import safe_shlex_join
 
 
@@ -155,7 +155,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     rsc_and_zinc = "rsc-and-zinc"
     outline_and_zinc = "outline-and-zinc"
 
-    @classmethod
+    @memoized_classproperty
     def valid_workflow_values(cls):
       return [w.value for w in RscCompile.JvmCompileWorkflowType.all_values()]
 
@@ -181,6 +181,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       help='The default workflow to use to compile JVM targets. This is overriden on a per-target basis with the force-compiler-tag-prefix tag.', fingerprint=True)
 
     register('--workflow-override', type=cls.JvmCompileWorkflowType,
+    choices=cls.JvmCompileWorkflowType.all_values(),
       default=None, metavar='<workflow_override>',
       help='The workflow to use to compile JVM targets, overriding the "workflow" option as well as any force-compiler-tag-prefix tags applied to targets. An example use case is to quickly turn off outlining workflows in case of errors.', fingerprint=True)
 
@@ -346,7 +347,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     filtered_tags = filter(None, all_tags)
 
     prefix = self.get_options().force_compiler_tag_prefix
-    valid_values = self.JvmCompileWorkflowType.valid_workflow_values()
+    valid_values = self.JvmCompileWorkflowType.valid_workflow_values
 
     for tag in target.tags:
       if tag.startswith(f"{prefix}:"):
@@ -367,14 +368,10 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     """Return the compile workflow to use for this target."""
 
     workflow_override = self.get_options().workflow_override
+    print("woo", workflow_override)
 
     if workflow_override is not None:
-      valid_values = self.JvmCompileWorkflowType.valid_workflow_values()
-      if workflow_override not in valid_values:
-        raise ValueError(f"Invalid workflow tag specified for environment variable PANTS_WORKFLOW_OVERRIDE={workflow_override}"
-          f"workflow must be one of {valid_values}")
-      else:
-        return self.JvmCompileWorkflowType(workflow_override)
+      return self.JvmCompileWorkflowType(workflow_override)
 
 
     # scala_library() targets may have a `.java_sources` property.
