@@ -26,6 +26,7 @@ mod parsed_jvm_command_lines;
 #[cfg(test)]
 mod parsed_jvm_command_lines_tests;
 
+use async_semaphore::AsyncSemaphore;
 pub use nailgun_pool::NailgunPool;
 use parsed_jvm_command_lines::ParsedJVMCommandLines;
 use std::fs::{read_link, remove_file};
@@ -134,6 +135,7 @@ fn construct_nailgun_client_request(
 pub struct CommandRunner {
   inner: Arc<super::local::CommandRunner>,
   nailgun_pool: NailgunPool,
+  async_semaphore: async_semaphore::AsyncSemaphore,
   metadata: ExecuteProcessRequestMetadata,
   workdir_base: PathBuf,
   python_distribution_absolute_path: PathBuf,
@@ -151,6 +153,7 @@ impl CommandRunner {
     CommandRunner {
       inner: Arc::new(runner),
       nailgun_pool: NailgunPool::new(),
+      async_semaphore: AsyncSemaphore::new(1),
       metadata: metadata,
       workdir_base: workdir_base,
       python_distribution_absolute_path: python_distribution_absolute_path,
@@ -191,38 +194,40 @@ impl CommandRunner {
     // Materialize the directory for running the nailgun server, if we need to.
     let workdir_for_server2 = workdir_for_server.clone();
 
-    self.inner
-            .store
-            // TODO(#8481) This materializes the input files in the client req, which is a superset of the files we need (we only need the classpath, not the input files)
-            .materialize_directory(workdir_for_server.clone(), input_files, workunit_store)
-            .and_then(move |_metadata| {
-                let jdk_home_in_workdir = &workdir_for_server.clone().join(".jdk");
-                let jdk_home_in_workdir2 = jdk_home_in_workdir.clone();
-                let jdk_home_in_workdir3 = jdk_home_in_workdir.clone();
-                if jdk_home_in_workdir.exists() {
-                  let maybe_existing_jdk = read_link(jdk_home_in_workdir).map_err(|e| format!("{}", e));
-                  let maybe_existing_jdk2 = maybe_existing_jdk.clone();
-                  if maybe_existing_jdk.is_err() || (maybe_existing_jdk.is_ok() && maybe_existing_jdk.unwrap() != requested_jdk_home) {
-                    remove_file(jdk_home_in_workdir2)
-                        .map_err(|err| format!(
-                          "Error removing existing (but incorrect) jdk symlink. We wanted it to point to {:?}, but it pointed to {:?}. {}",
-                          &requested_jdk_home, &maybe_existing_jdk2, err
-                        ))
-                        .and_then(|_| {
-                          symlink(requested_jdk_home, jdk_home_in_workdir3)
-                              .map_err(|err| format!("Error overwriting symlink for local execution in workdir {:?}: {:?}", &workdir_for_server, err))
-                        })
-                  } else {
-                    debug!("JDK home for Nailgun already exists in {:?}. Using that one.", &workdir_for_server);
-                    Ok(())
-                  }
-                } else {
-                  symlink(requested_jdk_home, jdk_home_in_workdir)
-                      .map_err(|err| format!("Error making new symlink for local execution in workdir {:?}: {:?}", &workdir_for_server, err))
-                }
+    let store = self.inner.store.clone();
+
+    self.async_semaphore.with_acquired(move || {
+        // TODO(#8481) This materializes the input files in the client req, which is a superset of the files we need (we only need the classpath, not the input files)
+        store.materialize_directory(workdir_for_server.clone(), input_files, workunit_store)
+        .and_then(move |_metadata| {
+          let jdk_home_in_workdir = &workdir_for_server.clone().join(".jdk");
+          let jdk_home_in_workdir2 = jdk_home_in_workdir.clone();
+          let jdk_home_in_workdir3 = jdk_home_in_workdir.clone();
+          if jdk_home_in_workdir.exists() {
+            let maybe_existing_jdk = read_link(jdk_home_in_workdir).map_err(|e| format!("{}", e));
+            let maybe_existing_jdk2 = maybe_existing_jdk.clone();
+            if maybe_existing_jdk.is_err() || (maybe_existing_jdk.is_ok() && maybe_existing_jdk.unwrap() != requested_jdk_home) {
+              remove_file(jdk_home_in_workdir2)
+                  .map_err(|err| format!(
+                    "Error removing existing (but incorrect) jdk symlink. We wanted it to point to {:?}, but it pointed to {:?}. {}",
+                    &requested_jdk_home, &maybe_existing_jdk2, err
+                  ))
+                  .and_then(|_| {
+                    symlink(requested_jdk_home, jdk_home_in_workdir3)
+                        .map_err(|err| format!("Error overwriting symlink for local execution in workdir {:?}: {:?}", &workdir_for_server, err))
+                  })
+            } else {
+              debug!("JDK home for Nailgun already exists in {:?}. Using that one.", &workdir_for_server);
+              Ok(())
+            }
+          } else {
+            symlink(requested_jdk_home, jdk_home_in_workdir)
+                .map_err(|err| format!("Error making new symlink for local execution in workdir {:?}: {:?}", &workdir_for_server, err))
+          }
         })
         .inspect(move |_| debug!("Materialized directory {:?} before connecting to nailgun server.", &workdir_for_server2))
         .to_boxed()
+    })
   }
 
   fn get_python_distribution_path(&self) -> String {
