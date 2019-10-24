@@ -145,7 +145,7 @@ fn materialize_with_jdk(
 ) -> Result<(), String> {
   let executor = task_executor::Executor::new();
   let materializer =
-    runner.materialize_workdir_for_server(dir, Some(jdk_path), EMPTY_DIGEST, WorkUnitStore::new());
+    runner.materialize_workdir_for_server(dir, jdk_path, EMPTY_DIGEST, WorkUnitStore::new());
   executor.block_on(materializer)
 }
 
@@ -179,8 +179,6 @@ fn materializing_workdir_for_server_creates_a_link_for_the_jdk() {
 fn materializing_workdir_for_server_replaces_jdk_link_if_a_different_one_is_requested() {
   let workdir_base_tempdir = unique_temp_dir(std::env::temp_dir(), None);
   let workdir_base = workdir_base_tempdir.path().to_owned();
-
-  let _ = workdir_base_tempdir.into_path();
 
   let runner = mock_nailgun_runner(Some(workdir_base));
   let nailgun_name = "mock_server".to_string();

@@ -184,56 +184,44 @@ impl CommandRunner {
   fn materialize_workdir_for_server(
     &self,
     workdir_for_server: PathBuf,
-    requested_jdk_home: Option<PathBuf>,
+    requested_jdk_home: PathBuf,
     input_files: Digest,
     workunit_store: WorkUnitStore,
   ) -> BoxFuture<(), String> {
-    if requested_jdk_home.is_none() {
-      return futures::future::err(
-        "No JDK specified when materializing the server directory".to_string(),
-      )
-      .to_boxed();
-    }
-    let requested_jdk_home = requested_jdk_home.unwrap();
     // Materialize the directory for running the nailgun server, if we need to.
     let workdir_for_server2 = workdir_for_server.clone();
-    let workdir_for_server3 = workdir_for_server.clone();
-    let workdir_for_server4 = workdir_for_server.clone();
 
     self.inner
             .store
             // TODO(#8481) This materializes the input files in the client req, which is a superset of the files we need (we only need the classpath, not the input files)
             .materialize_directory(workdir_for_server.clone(), input_files, workunit_store)
             .and_then(move |_metadata| {
-                let jdk_home_in_workdir = workdir_for_server2.clone().join(".jdk");
+                let jdk_home_in_workdir = &workdir_for_server.clone().join(".jdk");
                 let jdk_home_in_workdir2 = jdk_home_in_workdir.clone();
                 let jdk_home_in_workdir3 = jdk_home_in_workdir.clone();
                 if jdk_home_in_workdir.exists() {
                   let maybe_existing_jdk = read_link(jdk_home_in_workdir).map_err(|e| format!("{}", e));
                   let maybe_existing_jdk2 = maybe_existing_jdk.clone();
                   if maybe_existing_jdk.is_err() || (maybe_existing_jdk.is_ok() && maybe_existing_jdk.unwrap() != requested_jdk_home) {
-                    let res = remove_file(jdk_home_in_workdir2)
+                    remove_file(jdk_home_in_workdir2)
                         .map_err(|err| format!(
                           "Error removing existing (but incorrect) jdk symlink. We wanted it to point to {:?}, but it pointed to {:?}. {}",
                           &requested_jdk_home, &maybe_existing_jdk2, err
                         ))
                         .and_then(|_| {
                           symlink(requested_jdk_home, jdk_home_in_workdir3)
-                              .map_err(|err| format!("Error overwriting symlink for local execution in workdir {:?}: {:?}", &workdir_for_server2, err))
-                        });
-                    futures::future::result(res)
+                              .map_err(|err| format!("Error overwriting symlink for local execution in workdir {:?}: {:?}", &workdir_for_server, err))
+                        })
                   } else {
-                    debug!("JDK home for Nailgun already exists in {:?}. Using that one.", &workdir_for_server4);
-                    futures::future::ok(())
+                    debug!("JDK home for Nailgun already exists in {:?}. Using that one.", &workdir_for_server);
+                    Ok(())
                   }
                 } else {
-                  futures::future::result(
-                    symlink(requested_jdk_home, jdk_home_in_workdir)
-                        .map_err(|err| format!("Error making new symlink for local execution in workdir {:?}: {:?}", &workdir_for_server2, err))
-                  )
+                  symlink(requested_jdk_home, jdk_home_in_workdir)
+                      .map_err(|err| format!("Error making new symlink for local execution in workdir {:?}: {:?}", &workdir_for_server, err))
                 }
         })
-        .inspect(move |_| debug!("Materialized directory {:?} before connecting to nailgun server.", &workdir_for_server3))
+        .inspect(move |_| debug!("Materialized directory {:?} before connecting to nailgun server.", &workdir_for_server2))
         .to_boxed()
   }
 
@@ -280,7 +268,7 @@ impl super::CommandRunner for CommandRunner {
     let nailgun_req = construct_nailgun_server_request(
       &nailgun_name,
       nailgun_args,
-      jdk_home,
+      jdk_home.clone(),
       original_request.target_platform,
     );
     trace!("Extracted nailgun request:\n {:#?}", &nailgun_req);
@@ -298,7 +286,7 @@ impl super::CommandRunner for CommandRunner {
     self
       .materialize_workdir_for_server(
         workdir_for_this_nailgun.clone(),
-        nailgun_req.jdk_home.clone(),
+        jdk_home,
         original_request.input_files,
         context.workunit_store.clone(),
       )

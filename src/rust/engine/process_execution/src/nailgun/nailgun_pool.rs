@@ -288,26 +288,18 @@ impl Drop for NailgunProcess {
 /// This is calculated by hashing together:
 ///   - The jvm options and classpath used to create the server
 ///   - The path to the jdk
-///   - The output of calling `<jdk>/bin/java -version`
 #[derive(Clone, Hash, PartialEq, Eq, Debug)]
 pub struct NailgunProcessFingerprint(pub Fingerprint);
 
 impl NailgunProcessFingerprint {
   pub fn new(nailgun_server_req_digest: Digest, jdk_path: PathBuf) -> Result<Self, String> {
-    let jdk_version_output = std::process::Command::new(jdk_path.join("bin").join("java"))
-      .arg("-version")
-      .output()
-      .map_err(|err| {
-        format!(
-          "Failed to get version of the jdk for fingerprinting {}",
-          err
-        )
-      })?;
+    let jdk_realpath = jdk_path
+      .canonicalize()
+      .map_err(|err| format!("Error getting the realpath of the jdk home: {}", err))?;
 
     let mut hasher = Sha256::default();
     hasher.input(nailgun_server_req_digest.0);
-    hasher.input(jdk_path.to_string_lossy().as_bytes());
-    hasher.input(jdk_version_output.stdout);
+    hasher.input(jdk_realpath.to_string_lossy().as_bytes());
     Ok(NailgunProcessFingerprint(Fingerprint::from_bytes_unsafe(
       &hasher.result(),
     )))
