@@ -536,7 +536,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       # depends on. It depends on completion of the same dependencies as the rsc job in order to run
       # as late as possible, while still running before rsc or zinc.
       return Job(key=cache_doublecheck_key,
-        fn=functools.partial(self._default_double_check_cache_for_vts, ivts),
+        fn=functools.partial(self._double_check_cache_for_vts, ivts, zinc_compile_context),
         dependencies=list(dep_keys),
         options_scope=self.options_scope)
 

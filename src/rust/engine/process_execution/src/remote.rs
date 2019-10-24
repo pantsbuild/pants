@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use bazel_protos;
+use bazel_protos::{self, call_option};
 use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::Bytes;
 use concrete_time::TimeSpan;
@@ -155,7 +155,10 @@ impl CommandRunner {
   ) -> BoxFuture<OperationOrStatus, String> {
     let stream = try_future!(self
       .execution_client
-      .execute_opt(&execute_request, try_future!(self.call_option(build_id)))
+      .execute_opt(
+        &execute_request,
+        try_future!(call_option(&self.headers, Some(build_id),))
+      )
       .map_err(rpcerror_to_string));
     stream
       .take(1)
@@ -401,11 +404,10 @@ impl super::CommandRunner for CommandRunner {
                                     )
                                   })
                                   .and_then(move |_| {
-                              let call_option = command_runner.call_option(build_id)?;
                               operations_client
                                   .get_operation_opt(
                                     &operation_request,
-                                    call_option,
+                                    call_option(&command_runner.headers, Some(build_id))?,
                                   )
                                   .or_else(move |err| {
                                     rpcerror_recover_cancelled(operation_request.take_name(), err)
@@ -491,6 +493,9 @@ impl CommandRunner {
       );
     }
 
+    // Validate that any configured static headers are valid.
+    call_option(&headers, None)?;
+
     let command_runner = CommandRunner {
       metadata,
       headers,
@@ -505,37 +510,7 @@ impl CommandRunner {
       backoff_max_wait,
     };
 
-    // Validate that any configured static headers are valid.
-    command_runner.call_option(String::new())?;
-
     Ok(command_runner)
-  }
-
-  fn call_option(&self, build_id: String) -> Result<grpcio::CallOption, String> {
-    let mut builder = grpcio::MetadataBuilder::with_capacity(self.headers.len() + 1);
-    for (header_name, header_value) in &self.headers {
-      builder
-        .add_str(header_name, header_value)
-        .map_err(|err| format!("Error setting header {}: {}", header_name, err))?;
-    }
-    let mut metadata = bazel_protos::remote_execution::RequestMetadata::new();
-    metadata.set_tool_details({
-      let mut tool_details = bazel_protos::remote_execution::ToolDetails::new();
-      tool_details.set_tool_name(String::from("pants"));
-      tool_details
-    });
-    metadata.set_tool_invocation_id(build_id);
-    // TODO: Maybe set action_id too
-    let bytes = metadata
-      .write_to_bytes()
-      .map_err(|err| format!("Error serializing request metadata proto bytes: {}", err))?;
-    builder
-      .add_bytes(
-        "google.devtools.remoteexecution.v1test.requestmetadata-bin",
-        &bytes,
-      )
-      .map_err(|err| format!("Error setting request metadata header: {}", err))?;
-    Ok(grpcio::CallOption::default().headers(builder.build()))
   }
 
   fn store_proto_locally<P: protobuf::Message>(
