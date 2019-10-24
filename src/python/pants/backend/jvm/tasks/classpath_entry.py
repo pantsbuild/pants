@@ -28,7 +28,8 @@ class ClasspathEntry:
 
   def hydrate_missing_directory_digest(self, directory_digest):
     assert os.path.exists(self.path), f'Classpath entry {self} with digest to be mutated should point to an existing file or directory!'
-    assert self.directory_digest is None, f'Classpath entry {self} with digest to be mutated is expected to *not* have a digest set!'
+    assert self.directory_digest is None or self._directory_digest == directory_digest, f'Classpath entry {self} with digest {self.directory_digest} to be mutated is expected to be None ' \
+                                                                                        f'or the same as the incoming digest {directory_digest}!'
     self._directory_digest = directory_digest
 
   @property
