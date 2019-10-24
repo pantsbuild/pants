@@ -33,7 +33,7 @@ from pants.task.scm_publish_mixin import Semver
 from pants.util.collections import Enum, assert_single_element
 from pants.util.contextutil import Timer
 from pants.util.dirutil import fast_relpath, fast_relpath_optional, safe_mkdir
-from pants.util.memo import memoized_classproperty, memoized_method, memoized_property
+from pants.util.memo import memoized_method, memoized_property
 from pants.util.strutil import safe_shlex_join
 
 
@@ -155,10 +155,6 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     rsc_and_zinc = "rsc-and-zinc"
     outline_and_zinc = "outline-and-zinc"
 
-    @memoized_classproperty
-    def valid_workflow_values(cls):
-      return [w.value for w in RscCompile.JvmCompileWorkflowType.all_values()]
-
   @memoized_property
   def _compiler_tags(self):
     return {
@@ -177,11 +173,12 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
            'specified on the cli.')
 
     register('--workflow', type=cls.JvmCompileWorkflowType,
+      choices=cls.JvmCompileWorkflowType.all_values(),
       default=cls.JvmCompileWorkflowType.zinc_only, metavar='<workflow>',
       help='The default workflow to use to compile JVM targets. This is overriden on a per-target basis with the force-compiler-tag-prefix tag.', fingerprint=True)
 
     register('--workflow-override', type=cls.JvmCompileWorkflowType,
-    choices=cls.JvmCompileWorkflowType.all_values(),
+      choices=cls.JvmCompileWorkflowType.all_values(),
       default=None, metavar='<workflow_override>',
       help='The workflow to use to compile JVM targets, overriding the "workflow" option as well as any force-compiler-tag-prefix tags applied to targets. An example use case is to quickly turn off outlining workflows in case of errors.', fingerprint=True)
 
@@ -343,19 +340,9 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
 
   @memoized_method
   def _identify_workflow_tags(self, target):
-    all_tags = [self._compiler_tags.get(tag) for tag in target.tags]
-    filtered_tags = filter(None, all_tags)
-
-    prefix = self.get_options().force_compiler_tag_prefix
-    valid_values = self.JvmCompileWorkflowType.valid_workflow_values
-
-    for tag in target.tags:
-      if tag.startswith(f"{prefix}:"):
-        tag_workflow_value = tag.split(":")[1]
-        if tag_workflow_value not in valid_values:
-          raise ValueError(f"Invalid workflow tag specified for target {target}: {tag_workflow_value}; "
-          f"workflow must be one of {valid_values}")
     try:
+      all_tags = [self._compiler_tags.get(tag) for tag in target.tags]
+      filtered_tags = filter(None, all_tags)
       return assert_single_element(list(filtered_tags))
     except StopIteration:
       return None
@@ -368,7 +355,6 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     """Return the compile workflow to use for this target."""
 
     workflow_override = self.get_options().workflow_override
-    print("woo", workflow_override)
 
     if workflow_override is not None:
       return self.JvmCompileWorkflowType(workflow_override)
