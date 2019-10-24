@@ -33,6 +33,7 @@ python_tests(
     ':rsc_compile_integration_base',
     'examples/src/scala/org/pantsbuild/example:hello_directory',
     'testprojects/src/scala/org/pantsbuild/testproject:mutual_directory',
+    'testprojects/src/scala/org/pantsbuild/testproject:public_inference_directory',
   ],
   timeout = 600,
   tags = {'integration'},

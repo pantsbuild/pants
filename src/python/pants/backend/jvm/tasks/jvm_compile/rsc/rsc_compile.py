@@ -494,11 +494,6 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
 
           youtline_args = []
           if use_youtline:
-            wartremover_args = [
-              f"-Xplugin:{self._wartremover_classpath[0]}",
-              "-P:wartremover:traverser:org.wartremover.warts.PublicInference",
-              "-Ycache-plugin-class-loader:last-modified",
-            ]
             youtline_args = [
               "-Youtline",
               "-Ystop-after:pickler",
@@ -506,6 +501,11 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
               rsc_jar_file_relative_path,
             ]
             if not self.get_options().allow_public_inference:
+              wartremover_args = [
+                f"-Xplugin:{self._wartremover_classpath[0]}",
+                "-P:wartremover:traverser:org.wartremover.warts.PublicInference",
+                "-Ycache-plugin-class-loader:last-modified",
+              ]
               youtline_args = wartremover_args + youtline_args
 
           target_sources = ctx.sources
