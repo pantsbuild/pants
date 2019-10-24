@@ -171,12 +171,18 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
+
     register('--force-compiler-tag-prefix', default='use-compiler', metavar='<tag>',
       help='Always compile targets marked with this tag with rsc, unless the workflow is '
            'specified on the cli.')
+
     register('--workflow', type=cls.JvmCompileWorkflowType,
       default=cls.JvmCompileWorkflowType.zinc_only, metavar='<workflow>',
-      help='The workflow to use to compile JVM targets.', fingerprint=True)
+      help='The default workflow to use to compile JVM targets. This is overriden on a per-target basis with the force-compiler-tag-prefix tag.', fingerprint=True)
+
+    register('--workflow-override', type=cls.JvmCompileWorkflowType,
+      default=None, metavar='<workflow_override>',
+      help='The workflow to use to compile JVM targets, overriding the "workflow" option as well as any force-compiler-tag-prefix tags applied to targets. An example use case is to quickly turn off outlining workflows in case of errors.', fingerprint=True)
 
     register('--extra-rsc-args', type=list, default=[],
              help='Extra arguments to pass to the rsc invocation.')
@@ -360,15 +366,15 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
   def _classify_target_compile_workflow(self, target):
     """Return the compile workflow to use for this target."""
 
-    workflow_env_var = "PANTS_WORKFLOW_OVERRIDE"
-    valid_values = self.JvmCompileWorkflowType.valid_workflow_values()
-    if workflow_env_var in os.environ:
-      workflow_override = os.environ[workflow_env_var]
+    workflow_override = self.get_options().workflow_override
+
+    if workflow_override is not None:
+      valid_values = self.JvmCompileWorkflowType.valid_workflow_values()
       if workflow_override not in valid_values:
         raise ValueError(f"Invalid workflow tag specified for environment variable PANTS_WORKFLOW_OVERRIDE={workflow_override}"
           f"workflow must be one of {valid_values}")
-
-      return self.JvmCompileWorkflowType(workflow_override)
+      else:
+        return self.JvmCompileWorkflowType(workflow_override)
 
 
     # scala_library() targets may have a `.java_sources` property.
