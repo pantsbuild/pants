@@ -7,6 +7,7 @@ import os
 import re
 import textwrap
 import zipfile
+from asyncio import Lock
 from collections import defaultdict
 from contextlib import closing
 from xml.etree import ElementTree
@@ -300,7 +301,9 @@ class BaseZincCompile(JvmCompile):
     if self.get_options().use_barebones_logger:
       zinc_args.append('--use-barebones-logger')
 
-    compiler_bridge_classpath_entry = self._zinc.compile_compiler_bridge(self.context)
+    lock = Lock()
+    with (yield from lock):
+      compiler_bridge_classpath_entry = self._zinc.compile_compiler_bridge(self.context)
     zinc_args.extend(['-compiled-bridge-jar', relative_to_exec_root(compiler_bridge_classpath_entry.path)])
     zinc_args.extend(['-scala-path', ':'.join(scala_path)])
 
