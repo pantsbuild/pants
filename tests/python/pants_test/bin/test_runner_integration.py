@@ -21,7 +21,7 @@ class RunnerIntegrationTest(PantsRunIntegrationTest):
       'deprecation-warning-task',
     ]
 
-    warning_run = self.run_pants(cmdline)
+    warning_run = self.run_pants(cmdline, extra_env={'PYTHONWARNINGS': ''})
     self.assert_success(warning_run)
     self.assertRegex(
       warning_run.stderr_data,
