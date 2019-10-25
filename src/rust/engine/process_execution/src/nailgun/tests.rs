@@ -144,8 +144,13 @@ fn materialize_with_jdk(
   jdk_path: PathBuf,
 ) -> Result<(), String> {
   let executor = task_executor::Executor::new();
-  let materializer =
-    runner.materialize_workdir_for_server(dir, jdk_path, EMPTY_DIGEST, WorkUnitStore::new());
+  let materializer = CommandRunner::materialize_workdir_for_server(
+    runner.inner.store.clone(),
+    dir,
+    jdk_path,
+    EMPTY_DIGEST,
+    WorkUnitStore::new(),
+  );
   executor.block_on(materializer)
 }
 

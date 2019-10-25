@@ -30,6 +30,7 @@ use async_semaphore::AsyncSemaphore;
 pub use nailgun_pool::NailgunPool;
 use parsed_jvm_command_lines::ParsedJVMCommandLines;
 use std::fs::{read_link, remove_file};
+use store::Store;
 use workunit_store::WorkUnitStore;
 
 // Hardcoded constants for connecting to nailgun
@@ -185,7 +186,7 @@ impl CommandRunner {
   // TODO(#8481) When we correctly set the input_files field of the nailgun EPR, we won't need to pass it here as an argument.
   // TODO(#8489) We should move this code to NailgunPool. This returns a Future, so this will involve making the struct Futures-aware.
   fn materialize_workdir_for_server(
-    &self,
+    store: Store,
     workdir_for_server: PathBuf,
     requested_jdk_home: PathBuf,
     input_files: Digest,
@@ -194,11 +195,8 @@ impl CommandRunner {
     // Materialize the directory for running the nailgun server, if we need to.
     let workdir_for_server2 = workdir_for_server.clone();
 
-    let store = self.inner.store.clone();
-
-    self.async_semaphore.with_acquired(move || {
-        // TODO(#8481) This materializes the input files in the client req, which is a superset of the files we need (we only need the classpath, not the input files)
-        store.materialize_directory(workdir_for_server.clone(), input_files, workunit_store)
+    // TODO(#8481) This materializes the input files in the client req, which is a superset of the files we need (we only need the classpath, not the input files)
+    store.materialize_directory(workdir_for_server.clone(), input_files, workunit_store)
         .and_then(move |_metadata| {
           let jdk_home_in_workdir = &workdir_for_server.clone().join(".jdk");
           let jdk_home_in_workdir2 = jdk_home_in_workdir.clone();
@@ -227,7 +225,6 @@ impl CommandRunner {
         })
         .inspect(move |_| debug!("Materialized directory {:?} before connecting to nailgun server.", &workdir_for_server2))
         .to_boxed()
-    })
   }
 
   fn get_python_distribution_path(&self) -> String {
@@ -246,6 +243,7 @@ impl super::CommandRunner for CommandRunner {
     let python_distribution = self.get_python_distribution_path();
 
     let original_request = self.extract_compatible_request(&req).unwrap();
+    let original_request2 = original_request.clone();
 
     if !original_request.is_nailgunnable {
       trace!("The request is not nailgunnable! Short-circuiting to regular process execution");
@@ -287,32 +285,39 @@ impl super::CommandRunner for CommandRunner {
     let workdir_for_this_nailgun1 = workdir_for_this_nailgun.clone();
     let executor = self.executor.clone();
     let build_id = context.build_id.clone();
+    let store = self.inner.store.clone();
+    let workunit_store = context.workunit_store.clone();
 
     self
-      .materialize_workdir_for_server(
-        workdir_for_this_nailgun.clone(),
-        jdk_home,
-        original_request.input_files,
-        context.workunit_store.clone(),
-      )
-      .and_then(move |_metadata| {
-        // Connect to a running nailgun.
-        executor.spawn_on_io_pool(futures::future::lazy(move || {
-          nailgun_pool.connect(
-            nailgun_name.clone(),
-            nailgun_req,
-            &workdir_for_this_nailgun1,
-            nailgun_req_digest,
-            build_id,
-          )
-        }))
+      .async_semaphore
+      .with_acquired(move || {
+        Self::materialize_workdir_for_server(
+          store,
+          workdir_for_this_nailgun.clone(),
+          jdk_home,
+          original_request.input_files,
+          workunit_store,
+        )
+        .and_then(move |_metadata| {
+          // Connect to a running nailgun.
+          executor.spawn_on_io_pool(futures::future::lazy(move || {
+            nailgun_pool.connect(
+              nailgun_name.clone(),
+              nailgun_req,
+              &workdir_for_this_nailgun1,
+              nailgun_req_digest,
+              build_id,
+            )
+          }))
+        })
+        .map_err(|e| format!("Failed to connect to nailgun! {}", e))
       })
-      .map_err(|e| format!("Failed to connect to nailgun! {}", e))
+      .inspect(move |_| debug!("Connected to nailgun instance {}", &nailgun_name3))
       .and_then(move |nailgun_port| {
         // Run the client request in the nailgun we have active.
         debug!("Got nailgun port {:#?}", nailgun_port);
         let full_client_req = construct_nailgun_client_request(
-          original_request,
+          original_request2,
           python_distribution,
           client_main_class,
           client_args,
@@ -325,7 +330,6 @@ impl super::CommandRunner for CommandRunner {
           context,
         )
       })
-      .inspect(move |_| debug!("Connected to nailgun instance {}", &nailgun_name3))
       .to_boxed()
   }
 

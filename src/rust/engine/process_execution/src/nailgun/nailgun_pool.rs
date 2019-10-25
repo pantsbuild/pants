@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::Arc;
 
-use log::{debug, info, trace};
+use log::{debug, info};
 use parking_lot::Mutex;
 use regex::Regex;
 
@@ -54,8 +54,9 @@ impl NailgunPool {
     nailgun_req_digest: Digest,
     build_id_requesting_connection: String,
   ) -> Result<Port, String> {
-    trace!("Locking nailgun process pool so that only one can be connecting at a time.");
+    debug!("Locking nailgun process pool so that only one can be connecting at a time.");
     let mut processes = self.processes.lock();
+    debug!("Locked!");
 
     let jdk_path = startup_options.jdk_home.clone().ok_or_else(|| {
       format!(
@@ -161,7 +162,7 @@ impl NailgunPool {
         build_id_requesting_connection,
       )
     };
-    trace!("Unlocking nailgun process pool.");
+    debug!("Unlocking nailgun process pool.");
     connection_result
   }
 
