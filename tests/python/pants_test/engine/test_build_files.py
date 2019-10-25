@@ -292,20 +292,25 @@ class InlinedGraphTest(GraphTestBase):
 
     self.assertEqual(java1, self.resolve(scheduler, java1_address))
 
-  def do_test_trace_message(self, scheduler, parsed_address, expected_string=None):
+  def do_test_trace_message(self, scheduler, parsed_address, expected_regex=None):
     # Confirm that the root failed, and that a cycle occurred deeper in the graph.
     request, state = self._populate(scheduler, parsed_address)
     self.assertEqual(type(state), Throw)
     trace_message = '\n'.join(scheduler.trace(request))
 
     self.assert_throws_are_leaves(trace_message, Throw.__name__)
-    if expected_string:
-      self.assertIn(expected_string, trace_message)
+    if expected_regex:
+      print(trace_message)
+      self.assertRegex(trace_message, expected_regex)
 
-  def do_test_cycle(self, address_str):
+  def do_test_cycle(self, address_str, cyclic_address_str):
     scheduler = self.create_json()
     parsed_address = Address.parse(address_str)
-    self.do_test_trace_message(scheduler, parsed_address, 'Dep graph contained a cycle:')
+    self.do_test_trace_message(
+        scheduler,
+        parsed_address,
+        f'(?ms)Dep graph contained a cycle:.*{cyclic_address_str}.* <-.*{cyclic_address_str}.* <-'
+      )
 
   def assert_throws_are_leaves(self, error_msg, throw_name):
     def indent_of(s):
@@ -326,13 +331,13 @@ class InlinedGraphTest(GraphTestBase):
       assert_equal_or_more_indentation(current_line, line_above)
 
   def test_cycle_self(self):
-    self.do_test_cycle('graph_test:self_cycle')
+    self.do_test_cycle('graph_test:self_cycle', 'graph_test:self_cycle')
 
   def test_cycle_direct(self):
-    self.do_test_cycle('graph_test:direct_cycle')
+    self.do_test_cycle('graph_test:direct_cycle', 'graph_test:direct_cycle')
 
   def test_cycle_indirect(self):
-    self.do_test_cycle('graph_test:indirect_cycle')
+    self.do_test_cycle('graph_test:indirect_cycle', 'graph_test:one')
 
   def test_type_mismatch_error(self):
     scheduler = self.create_json()

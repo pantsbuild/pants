@@ -125,12 +125,15 @@ impl<N: Node> InnerGraph<N> {
   ///
   fn report_cycle(&self, src_id: EntryId, dst_id: EntryId) -> Option<Vec<Entry<N>>> {
     if src_id == dst_id {
-      return Some(vec![self.entry_for_id(src_id).unwrap().clone()]);
+      let entry = self.entry_for_id(src_id).unwrap();
+      return Some(vec![entry.clone(), entry.clone()]);
     }
     if !self.detect_cycle(src_id, dst_id) {
       return None;
     }
-    Self::shortest_path(&self.pg, dst_id, src_id).map(|path| {
+    Self::shortest_path(&self.pg, dst_id, src_id).map(|mut path| {
+      path.reverse();
+      path.push(dst_id);
       path
         .into_iter()
         .map(|index| self.entry_for_id(index).unwrap().clone())
@@ -653,7 +656,7 @@ impl<N: Node> Graph<N> {
           // TODO: doing cycle detection under the lock... unfortunate, but probably unavoidable
           // without a much more complicated algorithm.
           let potential_dst_id = inner.ensure_entry(dst_node.clone());
-          if let Some(cycle_path) = Self::detect_cycle(src_id, potential_dst_id, &mut inner) {
+          if let Some(cycle_path) = Self::report_cycle(src_id, potential_dst_id, &mut inner) {
             // Cyclic dependency: render an error.
             let path_strs = cycle_path
               .into_iter()
@@ -688,7 +691,7 @@ impl<N: Node> Graph<N> {
     }
   }
 
-  fn detect_cycle(
+  fn report_cycle(
     src_id: EntryId,
     potential_dst_id: EntryId,
     inner: &mut InnerGraph<N>,

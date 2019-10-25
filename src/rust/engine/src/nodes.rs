@@ -1294,7 +1294,12 @@ impl NodeError for Failure {
     Failure::Invalidated
   }
 
-  fn cyclic(path: Vec<String>) -> Failure {
+  fn cyclic(mut path: Vec<String>) -> Failure {
+    let path_len = path.len();
+    if path_len > 1 {
+      path[0] += " <-";
+      path[path_len - 1] += " <-"
+    }
     throw(&format!(
       "Dep graph contained a cycle:\n  {}",
       path.join("\n  ")
