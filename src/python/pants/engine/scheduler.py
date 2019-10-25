@@ -169,7 +169,8 @@ class Scheduler:
         registered.add(key)
 
         if type(rule) is TaskRule:
-          self._register_task(output_type, rule, rule_index.union_rules)
+          for rule_version in rule.all_polymorphic_versions(rule_index.union_rules):
+            self._register_task(output_type, rule_version, rule_index.union_rules)
         else:
           raise ValueError('Unexpected Rule type: {}'.format(rule))
 

@@ -15,7 +15,8 @@ from pants.engine.fs import (
   DirectoryWithPrefixToAdd,
 )
 from pants.engine.isolated_process import ExecuteProcessResult, MultiPlatformExecuteProcessRequest
-from pants.engine.legacy.structs import PythonTargetAdaptor, TargetAdaptor
+from pants.engine.legacy.graph import HydrateableField, HydratedField
+from pants.engine.legacy.structs import BaseGlobs, SourcesField, TargetAdaptor
 from pants.engine.platform import Platform, PlatformConstraint
 from pants.engine.rules import rule, subsystem_rule
 from pants.engine.selectors import Get

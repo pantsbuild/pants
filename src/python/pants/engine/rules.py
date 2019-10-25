@@ -343,6 +343,29 @@ class TaskRule(Rule):
   cacheable: bool
   name: Optional[str]
 
+  def all_polymorphic_versions(self, union_rules: Dict[Type, typing.Iterable[type]]) -> 'Tuple[TaskRule, ...]':
+    for i, selector in enumerate(self.input_selectors):
+      if getattr(selector, '_is_union', False):
+        for union_member in union_rules.get(selector, []):
+          more_concrete_selectors = self.input_selectors[:i] + (union_member,) + self.input_selectors[(i + 1):]
+          # FIXME: `dataclasses.replace()` will use incorrect kwargs, because we've overridden __init__!
+          new_task = TaskRule(
+            output_type=self.output_type,
+            input_selectors=more_concrete_selectors,
+            input_gets=self.input_gets,
+            func=self.func,
+            dependency_rules=self.dependency_rules,
+            dependency_optionables=self.dependency_optionables,
+            cacheable=self.cacheable,
+          )
+          # NB: We do not check that `more_concrete_selectors` does not itself contain more unions,
+          # nor even whether `union_member` is a union. This technically allows for transitive union
+          # relationships, which...isn't a bad idea at all?????!!!
+          yield from new_task.all_polymorphic_versions(union_rules)
+        break
+    else:
+      yield self
+
   def __init__(
     self,
     output_type: Type,

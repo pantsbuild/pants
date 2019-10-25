@@ -4,6 +4,7 @@
 import dataclasses
 import logging
 import os.path
+from abc import ABC, abstractproperty
 from collections import defaultdict, deque
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -46,7 +47,7 @@ from pants.engine.legacy.structs import (
 from pants.engine.mapper import ResolveError
 from pants.engine.objects import Collection
 from pants.engine.parser import HydratedStruct
-from pants.engine.rules import RootRule, rule
+from pants.engine.rules import RootRule, UnionRule, rule, union
 from pants.engine.selectors import Get, MultiGet
 from pants.option.global_options import (
   GlobalOptions,
@@ -613,9 +614,22 @@ def _eager_fileset_with_spec(
                               include_dirs=include_dirs)
 
 
+class GeneralAddressable(ABC):
+
+  @abstractproperty
+  def address(self) -> Address: ...
+
+
+@union
+class SourcesLikeField(GeneralAddressable):
+
+  @abstractproperty
+  def path_globs(self) -> PathGlobs: ...
+
+
 @rule
 async def hydrate_sources(
-  sources_field: SourcesField, glob_match_error_behavior: GlobMatchErrorBehavior,
+  sources_field: SourcesLikeField, glob_match_error_behavior: GlobMatchErrorBehavior,
 ) -> HydratedField:
   """Given a SourcesField, request a Snapshot for its path_globs and create an EagerFilesetWithSpec.
   """
@@ -784,4 +798,5 @@ def create_legacy_graph_tasks():
     sources_snapshots_from_filesystem_specs,
     RootRule(FilesystemSpecs),
     RootRule(OwnersRequest),
+    UnionRule(SourcesLikeField, SourcesField),
   ]
