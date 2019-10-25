@@ -13,7 +13,6 @@ from pants.engine.native import Native
 from pants.engine.rules import RootRule, UnionRule, rule, union
 from pants.engine.scheduler import ExecutionError, SchedulerSession
 from pants.engine.selectors import Get, Params
-from pants.util.meta import frozen_after_init
 from pants_test.engine.util import assert_equal_with_printing, remove_locations_from_traceback
 from pants_test.test_base import TestBase
 
@@ -61,43 +60,6 @@ class D:
 def transitive_coroutine_rule(c: C) -> D:
   b = yield Get(B, C, c)
   yield D(b)
-
-
-@dataclass
-class NonFrozenDataclass:
-  x: int
-
-
-@frozen_after_init
-@dataclass(unsafe_hash=True)
-class FrozenAfterInit:
-  x: int
-
-  def __init__(self, x):
-    # This is an example of how you can assign within __init__() with @frozen_after_init. This
-    # particular example is not intended to be super useful.
-    self.x = x + 1
-
-
-@rule
-def use_frozen_after_init_object(x: FrozenAfterInit) -> int:
-  return x.x
-
-
-@dataclass(frozen=True)
-class FrozenFieldsDataclass:
-  x: int
-  y: str
-
-
-@dataclass(frozen=True)
-class ResultDataclass:
-  something: str
-
-
-@rule
-def dataclass_rule(obj: FrozenFieldsDataclass) -> ResultDataclass:
-  return ResultDataclass(something=f'x={obj.x}, y={obj.y}')
 
 
 @union
@@ -217,10 +179,6 @@ class SchedulerTest(TestBase):
       consumes_a_and_b,
       transitive_b_c,
       transitive_coroutine_rule,
-      dataclass_rule,
-      RootRule(FrozenAfterInit),
-      use_frozen_after_init_object,
-      RootRule(FrozenFieldsDataclass),
       RootRule(UnionWrapper),
       UnionRule(UnionBase, UnionA),
       UnionRule(UnionWithNonMemberErrorMsg, UnionX),
@@ -285,17 +243,6 @@ Type A is not a member of the UnionBase @union
     expected_msg = "specific error message for UnionA instance"
     with self._assert_execution_error(expected_msg):
       self.scheduler.product_request(UnionX, [Params(UnionWrapper(UnionA()))])
-
-  def test_dataclass_products_rule(self):
-    result, = self.scheduler.product_request(
-      ResultDataclass,
-      [Params(FrozenFieldsDataclass(3, "test string"))])
-    self.assertEquals(result.something, 'x=3, y=test string')
-
-    result, = self.scheduler.product_request(
-      int,
-      [Params(FrozenAfterInit(x=3))])
-    self.assertEquals(result, 4)
 
 
 class SchedulerWithNestedRaiseTest(TestBase):
@@ -410,23 +357,3 @@ Exception: WithDeps(Inner(InnerEntry { params: {TypeCheckFailWrapper}, rule: Tas
                                raise Exception(f'An exception for {type(x).__name__}')
                            Exception: An exception for B''').lstrip() + '\n\n',  # Traces include two empty lines after.
                                trace)
-
-
-class RuleIndexingErrorTest(TestBase):
-
-  def test_non_frozen_dataclass_error(self):
-    with self.assertRaisesWithMessage(TypeError, dedent("""\
-      RootRule declared type <class 'pants_test.engine.test_scheduler.NonFrozenDataclass'> is a dataclass declared without `frozen=True`, or without both `unsafe_hash=True` and the `@frozen_after_init` decorator! The engine requires that fields in params are immutable for stable hashing!""")):
-      RootRule(NonFrozenDataclass)
-
-    with self.assertRaisesWithMessage(TypeError, dedent("""\
-      @rule input selector <class 'pants_test.engine.test_scheduler.NonFrozenDataclass'> is a dataclass declared without `frozen=True`, or without both `unsafe_hash=True` and the `@frozen_after_init` decorator! The engine requires that fields in params are immutable for stable hashing!""")):
-      @rule
-      def f(x: NonFrozenDataclass) -> int:
-        return 3
-
-    with self.assertRaisesWithMessage(TypeError, dedent("""\
-      @rule output type <class 'pants_test.engine.test_scheduler.NonFrozenDataclass'> is a dataclass declared without `frozen=True`, or without both `unsafe_hash=True` and the `@frozen_after_init` decorator! The engine requires that fields in params are immutable for stable hashing!""")):
-      @rule
-      def f(x: int) -> NonFrozenDataclass:
-        return NonFrozenDataclass(x=x)

@@ -70,7 +70,6 @@ GLOBAL_ENV_VARS = [
   # https://docs.travis-ci.com/user/environment-variables#defining-encrypted-variables-in-travisyml.
   {"secure": "hFVAQGLVkexzTd3f9NF+JoG1dE+CPICKqOcdvQYv8+YB2rwwqu0/J6MnqKUZSmec4AM4ZvyPUBIHnSw8aMJysYs+GZ6iG/8ZRRmdbmo2WBPbSZ+ThRZxx/F6AjmovUmf8Zt366ZAZXpc9NHKREkTUGl6UL7FFe9+ouVnb90asdw="},
   'RUST_BACKTRACE="all"',
-  'PYTHONWARNINGS=ignore::DeprecationWarning',
 ]
 
 # ----------------------------------------------------------------------

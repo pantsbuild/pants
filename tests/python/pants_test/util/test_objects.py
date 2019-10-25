@@ -190,16 +190,12 @@ class TypedCollectionTest(TypeConstraintTestBase):
     self.assertTrue(collection_constraint.satisfied_by([self.B(), self.C(), self.BPrime()]))
     self.assertFalse(collection_constraint.satisfied_by([self.B(), self.A()]))
 
-  def test_complex_sub_constraint(self):
+  def test_no_complex_sub_constraint(self):
     sub_collection = TypedCollection(Exactly(self.A))
-    nested_collection = TypedCollection(sub_collection)
-    self.assertTrue(nested_collection.satisfied_by(()))
-    self.assertTrue(nested_collection.satisfied_by([]))
-
-    self.assertTrue(nested_collection.satisfied_by([[]]))
-    self.assertTrue(nested_collection.satisfied_by([[self.A()]]))
-
-    self.assertFalse(nested_collection.satisfied_by([[self.B()]]))
+    with self.assertRaisesWithMessage(
+        TypeError,
+        "constraint for collection must be a TypeOnlyConstraint! was: {}".format(sub_collection)):
+      TypedCollection(sub_collection)
 
   def test_validate(self):
     collection_exactly_a_or_b = TypedCollection(Exactly(self.A, self.B))
