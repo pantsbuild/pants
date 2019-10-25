@@ -428,5 +428,5 @@ class RuleIndexingErrorTest(TestBase):
     with self.assertRaisesWithMessage(TypeError, dedent("""\
       @rule output type <class 'pants_test.engine.test_scheduler.NonFrozenDataclass'> is a dataclass declared without `frozen=True`, or without both `unsafe_hash=True` and the `@frozen_after_init` decorator! The engine requires that fields in params are immutable for stable hashing!""")):
       @rule
-      def g(x: int) -> NonFrozenDataclass:
+      def f(x: int) -> NonFrozenDataclass:
         return NonFrozenDataclass(x=x)
