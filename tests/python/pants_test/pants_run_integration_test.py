@@ -355,6 +355,8 @@ class PantsRunIntegrationTest(unittest.TestCase):
           env[h] = os.getenv(h)
     else:
       env = os.environ.copy()
+
+    env.update(PYTHONWARNINGS='ignore::DeprecationWarning')
     if extra_env:
       env.update(extra_env)
     env.update(PYTHONPATH=os.pathsep.join(sys.path))
