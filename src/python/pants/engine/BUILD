@@ -164,7 +164,6 @@ python_library(
   sources=['rules.py'],
   dependencies=[
     '3rdparty/python:asttokens',
-    '3rdparty/python:dataclasses',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':goal',
     ':selectors',
