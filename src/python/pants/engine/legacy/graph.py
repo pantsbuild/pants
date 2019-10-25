@@ -44,10 +44,10 @@ from pants.engine.legacy.structs import (
   SourcesField,
   TargetAdaptor,
 )
-from pants.engine.mapper import ResolveError
+from pants.engine.mapper import AddressMapper, ResolveError
 from pants.engine.objects import Collection
 from pants.engine.parser import HydratedStruct
-from pants.engine.rules import RootRule, UnionRule, rule, union
+from pants.engine.rules import RootRule, UnionMembership, UnionRule, rule, union
 from pants.engine.selectors import Get, MultiGet
 from pants.option.global_options import (
   GlobalOptions,
@@ -573,6 +573,23 @@ async def hydrated_targets(addresses: Addresses) -> HydratedTargets:
   return HydratedTargets(targets)
 
 
+
+@dataclass(frozen=True)
+class DehydratedField:
+  underlying: Any
+
+
+FieldAdaptors = Collection.of(DehydratedField)
+
+
+@rule
+def extract_fields(target_adaptor: TargetAdaptor, union_rules: UnionMembership) -> FieldAdaptors:
+  return FieldAdaptors(tuple(
+    DehydratedField(f)
+    for f in target_adaptor.field_adaptors
+  ))
+
+
 @dataclass(frozen=True)
 class HydratedField:
   """A wrapper for a fully constructed replacement kwarg for a HydratedTarget."""
@@ -585,9 +602,9 @@ async def hydrate_target(hydrated_struct: HydratedStruct) -> HydratedTarget:
   """Construct a HydratedTarget from a TargetAdaptor and hydrated versions of its adapted fields."""
   target_adaptor = cast(TargetAdaptor, hydrated_struct.value)
   # Hydrate the fields of the adaptor and re-construct it.
-  hydrated_fields = await MultiGet(
-    Get[HydratedField](HydrateableField, fa) for fa in target_adaptor.field_adaptors
-  )
+  field_adaptors = await Get[FieldAdaptors](TargetAdaptor, target_adaptor)
+  hydrated_fields = await MultiGet(Get[HydratedField](HydrateableField, fa.underlying)
+                                   for fa in field_adaptors)
   kwargs = target_adaptor.kwargs()
   for field in hydrated_fields:
     kwargs[field.name] = field.value
@@ -625,6 +642,9 @@ class SourcesLikeField(GeneralAddressable):
 
   @abstractproperty
   def path_globs(self) -> PathGlobs: ...
+
+  @abstractproperty
+  def filespec(self): ...
 
 
 @rule
@@ -799,4 +819,6 @@ def create_legacy_graph_tasks():
     RootRule(FilesystemSpecs),
     RootRule(OwnersRequest),
     UnionRule(SourcesLikeField, SourcesField),
+    extract_fields,
+    RootRule(TargetAdaptor),
   ]
