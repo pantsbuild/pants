@@ -278,12 +278,52 @@ class UnionRule:
   union_base: Type
   union_member: Type
 
+  class _CompareTypeDeclarationsError(TypeError): pass
+
+  def _compare_declarations_for_abstract_method(self, abstract_method_name) -> None:
+    """Validate that `self.union_member` contains a definition for each abstract method in `self.union_base`."""
+    maybe_typed_method_decl = getattr(self.union_base, abstract_method_name)
+    member_method_decl = getattr(self.union_member, abstract_method_name, None)
+    if member_method_decl is None:
+      maybe_dataclass_field_type = self.union_member.__annotations__.get(abstract_method_name, None)
+      if maybe_dataclass_field_type is None:
+        raise self._CompareTypeDeclarationsError(f'Was not defined on attempted union member!')
+      if not isinstance(maybe_typed_method_decl, property):
+        raise self._CompareTypeDeclarationsError(
+          f'Was not defined as an @abstractproperty in the union base!')
+      union_base_decl_types = maybe_typed_method_decl.fget.__annotations__
+      union_member_decl_types = {'return': maybe_dataclass_field_type}
+    else:
+      # If the method was a property, get the underlying function.
+      if isinstance(maybe_typed_method_decl, property):
+        if not isinstance(member_method_decl, property):
+          raise self._CompareTypeDeclarationsError(f'Was not defined as a property in the union member!')
+        maybe_typed_method_decl = maybe_typed_method_decl.fget
+        member_method_decl = member_method_decl.fget
+      union_base_decl_types = maybe_typed_method_decl.__annotations__
+      union_member_decl_types = member_method_decl.__annotations__
+
+    if union_base_decl_types != union_member_decl_types:
+      raise self._CompareTypeDeclarationsError(f'Declared types did not match! '
+                                               f'Base: {union_base_decl_types}, '
+                                               f'member: {union_member_decl_types}')
+
   def __post_init__(self) -> None:
     if not union.is_instance(self.union_base):
       raise ValueError(
         f'union_base must be a type annotated with @union: was {self.union_base} '
         f'(type {type(self.union_base).__name__})'
       )
+
+    if issubclass(self.union_base, ABC):
+      for abstract_method_name in self.union_base.__abstractmethods__:
+        try:
+          self._compare_declarations_for_abstract_method(abstract_method_name)
+        except self._CompareTypeDeclarationsError as e:
+          raise self._CompareTypeDeclarationsError(
+            f'Error while comparing declarations of the abstract method or property '
+            f'`{abstract_method_name}` on ABC @union base '
+            f'{self.union_base}, for union member {self.union_member}: {e}')
 
 
 @dataclass(frozen=True)
@@ -344,11 +384,12 @@ class TaskRule(Rule):
   name: Optional[str]
 
   def all_polymorphic_versions(self, union_rules: Dict[Type, typing.Iterable[type]]) -> 'Tuple[TaskRule, ...]':
+    """Substitute any @union bases in `input_selectors` with all the members of that union, recursively."""
     for i, selector in enumerate(self.input_selectors):
       if getattr(selector, '_is_union', False):
         for union_member in union_rules.get(selector, []):
           more_concrete_selectors = self.input_selectors[:i] + (union_member,) + self.input_selectors[(i + 1):]
-          # FIXME: `dataclasses.replace()` will use incorrect kwargs, because we've overridden __init__!
+          # NB: `dataclasses.replace()` will use incorrect kwargs, because we've overridden __init__!
           new_task = TaskRule(
             output_type=self.output_type,
             input_selectors=more_concrete_selectors,
@@ -360,7 +401,7 @@ class TaskRule(Rule):
           )
           # NB: We do not check that `more_concrete_selectors` does not itself contain more unions,
           # nor even whether `union_member` is a union. This technically allows for transitive union
-          # relationships, which...isn't a bad idea at all?????!!!
+          # relationships.
           yield from new_task.all_polymorphic_versions(union_rules)
         break
     else:

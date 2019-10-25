@@ -573,23 +573,6 @@ async def hydrated_targets(addresses: Addresses) -> HydratedTargets:
   return HydratedTargets(targets)
 
 
-
-@dataclass(frozen=True)
-class DehydratedField:
-  underlying: Any
-
-
-FieldAdaptors = Collection.of(DehydratedField)
-
-
-@rule
-def extract_fields(target_adaptor: TargetAdaptor, union_rules: UnionMembership) -> FieldAdaptors:
-  return FieldAdaptors(tuple(
-    DehydratedField(f)
-    for f in target_adaptor.field_adaptors
-  ))
-
-
 @dataclass(frozen=True)
 class HydratedField:
   """A wrapper for a fully constructed replacement kwarg for a HydratedTarget."""
@@ -639,12 +622,13 @@ class GeneralAddressable(ABC):
 
 @union
 class SourcesLikeField(GeneralAddressable):
+  """An @union base class which will check that any union member contains path_globs and filespecs methods."""
 
   @abstractproperty
   def path_globs(self) -> PathGlobs: ...
 
   @abstractproperty
-  def filespec(self): ...
+  def filespecs(self) -> Any: ...
 
 
 @rule
@@ -819,6 +803,4 @@ def create_legacy_graph_tasks():
     RootRule(FilesystemSpecs),
     RootRule(OwnersRequest),
     UnionRule(SourcesLikeField, SourcesField),
-    extract_fields,
-    RootRule(TargetAdaptor),
   ]

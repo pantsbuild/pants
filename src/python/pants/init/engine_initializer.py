@@ -136,7 +136,7 @@ def _legacy_symbol_table(build_file_aliases: BuildFileAliases) -> SymbolTable:
   # API until after https://github.com/pantsbuild/pants/issues/3560 has been completed.
   # These should likely move onto Target subclasses as the engine gets deeper into beta
   # territory.
-  table['python_library'] = TargetAdaptor
+  table['python_library'] = PythonTargetAdaptor
   table['jvm_app'] = JvmAppAdaptor
   table['jvm_binary'] = JvmBinaryAdaptor
   table['python_app'] = PythonAppAdaptor
