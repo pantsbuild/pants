@@ -167,15 +167,26 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
+
     register('--force-compiler-tag-prefix', default='use-compiler', metavar='<tag>',
       help='Always compile targets marked with this tag with rsc, unless the workflow is '
            'specified on the cli.')
+
     register('--workflow', type=cls.JvmCompileWorkflowType,
+      choices=cls.JvmCompileWorkflowType.all_values(),
       default=cls.JvmCompileWorkflowType.zinc_only, metavar='<workflow>',
-      help='The workflow to use to compile JVM targets.', fingerprint=True)
+      help='The default workflow to use to compile JVM targets. This is overriden on a per-target basis with the force-compiler-tag-prefix tag.', fingerprint=True)
+
+    register('--workflow-override', type=cls.JvmCompileWorkflowType,
+      choices=cls.JvmCompileWorkflowType.all_values(),
+      default=None, metavar='<workflow_override>',
+      help='The workflow to use to compile JVM targets, overriding the "workflow" option as well as any force-compiler-tag-prefix tags applied to targets. An example use case is to quickly turn off outlining workflows in case of errors.', fingerprint=True)
 
     register('--extra-rsc-args', type=list, default=[],
              help='Extra arguments to pass to the rsc invocation.')
+
+    register('--allow-public-inference', type=bool, default=False,
+             help='Allow public type member inference when workflow is outline-and-zinc. Otherwise, unannotated public types will be a compile error. Note that public inference will significantly slow down outlining. Does not work for rsc-and-zinc.', fingerprint=True)
 
     cls.register_jvm_tool(
       register,
@@ -329,19 +340,9 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
 
   @memoized_method
   def _identify_workflow_tags(self, target):
-    all_tags = [self._compiler_tags.get(tag) for tag in target.tags]
-    filtered_tags = filter(None, all_tags)
-
-    prefix = self.get_options().force_compiler_tag_prefix
-    valid_values = [w.value for w in self.JvmCompileWorkflowType.all_values()]
-
-    for tag in target.tags:
-      if tag.startswith(f"{prefix}:"):
-        tag_workflow_value = tag.split(":")[1]
-        if tag_workflow_value not in valid_values:
-          raise ValueError(f"Invalid workflow tag specified for target {target}: {tag_workflow_value}; "
-          f"workflow must be one of {valid_values}")
     try:
+      all_tags = [self._compiler_tags.get(tag) for tag in target.tags]
+      filtered_tags = filter(None, all_tags)
       return assert_single_element(list(filtered_tags))
     except StopIteration:
       return None
@@ -352,6 +353,13 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
   @memoized_method
   def _classify_target_compile_workflow(self, target):
     """Return the compile workflow to use for this target."""
+
+    workflow_override = self.get_options().workflow_override
+
+    if workflow_override is not None:
+      return self.JvmCompileWorkflowType(workflow_override)
+
+
     # scala_library() targets may have a `.java_sources` property.
     java_sources = getattr(target, 'java_sources', [])
     if java_sources or target.has_sources('.java'):
@@ -476,14 +484,18 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
           youtline_args = []
           if use_youtline:
             youtline_args = [
-              f"-Xplugin:{self._wartremover_classpath[0]}",
-              "-P:wartremover:traverser:org.wartremover.warts.PublicInference",
-              "-Ycache-plugin-class-loader:last-modified",
               "-Youtline",
               "-Ystop-after:pickler",
               "-Ypickle-write",
               rsc_jar_file_relative_path,
             ]
+            if not self.get_options().allow_public_inference:
+              wartremover_args = [
+                f"-Xplugin:{self._wartremover_classpath[0]}",
+                "-P:wartremover:traverser:org.wartremover.warts.PublicInference",
+                "-Ycache-plugin-class-loader:last-modified",
+              ]
+              youtline_args = wartremover_args + youtline_args
 
           target_sources = ctx.sources
           args = [
