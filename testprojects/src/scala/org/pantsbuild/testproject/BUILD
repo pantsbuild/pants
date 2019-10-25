@@ -14,6 +14,7 @@ target(
     ':javasources_directory',
     ':mutual_directory',
     ':procedure_syntax_directory',
+    ':public_inference_directory',
     ':publish_directory',
     ':rsc_compat_directory',
     ':scaladepsonboth_directory',
@@ -75,6 +76,11 @@ files(
 files(
   name = 'procedure_syntax_directory',
   sources = rglobs('procedure_syntax/*'),
+)
+
+files(
+  name = 'public_inference_directory',
+  sources = rglobs('public_inference/*'),
 )
 
 files(
