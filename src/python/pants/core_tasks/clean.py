@@ -33,7 +33,7 @@ class Clean(Task):
 
     # Creates, and eventually deletes, trash dir created in .pants_cleanall.
     with temporary_dir(cleanup=False, root_dir=os.path.dirname(pants_wd), prefix=".pants_cleanall") as tmpdir:
-      logger.debug('Moving trash to {} for deletion'.format(tmpdir))
+      logger.debug(f'Moving trash to {tmpdir} for deletion')
 
       tmp_trash = os.path.join(tmpdir, "trash")
 
@@ -52,8 +52,9 @@ class Clean(Task):
           finally:
             os._exit(0)
         else:
-          logger.debug("Forked an asynchronous clean-all worker at pid: {}".format(pid))
+          logger.debug(f"Forked an asynchronous clean-all worker at pid: {pid}")
       else:
         # Recursively removes pants cache; user waits patiently.
-        logger.info('For async removal, run `./pants clean-all --async`')
+        logger.info(f'For async removal, run'
+                    f' `{self.get_options().pants_bin_name} clean-all --async`')
         safe_rmtree(pants_trash)
