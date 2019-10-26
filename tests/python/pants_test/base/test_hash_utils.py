@@ -187,6 +187,7 @@ class CoercingJsonEncodingTest(unittest.TestCase):
       pig = 2
     self.assertEqual(self._coercing_json_encode([Test.dog, Test.cat, Test.pig]), '[0, 1, 2]')
 
+
 class JsonHashingTest(unittest.TestCase):
 
   def test_known_checksums(self):

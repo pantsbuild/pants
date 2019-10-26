@@ -15,16 +15,11 @@ from pants.engine.fs import (
   DirectoriesToMerge,
   DirectoryWithPrefixToAdd,
 )
-from pants.engine.isolated_process import (
-  ExecuteProcessRequest,
-  ExecuteProcessResult,
-  MultiPlatformExecuteProcessRequest,
-)
+from pants.engine.isolated_process import ExecuteProcessResult, MultiPlatformExecuteProcessRequest
 from pants.engine.legacy.structs import PythonTargetAdaptor, TargetAdaptor
 from pants.engine.platform import Platform, PlatformConstraint
-from pants.engine.rules import RootRule, optionable_rule, rule
+from pants.engine.rules import optionable_rule, rule
 from pants.engine.selectors import Get
-from pants.util.strutil import create_path_env_var
 
 
 @dataclass(frozen=True)
@@ -45,6 +40,7 @@ class PexRequirements:
 
       all_target_requirements.extend(additional_requirements)
     return PexRequirements(requirements=tuple(sorted(all_target_requirements)))
+
 
 @dataclass(frozen=True)
 class PexInterpreterContraints:

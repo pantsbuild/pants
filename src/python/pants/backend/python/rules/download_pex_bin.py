@@ -34,15 +34,14 @@ class DownloadedPexBin(HermeticPex):
     :param python_setup: The parameters for selecting python interpreters to use when invoking the
                          pex tool.
     :param subprocess_encoding_environment: The locale settings to use for the pex tool invocation.
-    :param pex_path: The path within `input_files` of the pex tool.
+    :param pex_build_environment: The build environment for the pex tool.
     :param pex_args: The arguments to pass to the pex CLI tool.
     :param description: A description of the process execution to be performed.
     :param input_files: The files that contain the pex CLI tool itself and any input files it needs
                         to run against. By default just the files that contain the pex CLI tool
                         itself. To merge in additional files, include the `directory_digest` in
                         `DirectoriesToMerge` request.
-    :param env: The environment to run the pex CLI tool in.
-    :param **kwargs: Any additional :class:`ExecuteProcessRequest` kwargs to pass through.
+    :param kwargs: Any additional :class:`ExecuteProcessRequest` kwargs to pass through.
     """
 
     return super().create_execute_request(
@@ -60,8 +59,8 @@ class DownloadedPexBin(HermeticPex):
 @rule
 def download_pex_bin() -> DownloadedPexBin:
   # TODO: Inject versions and digests here through some option, rather than hard-coding it.
-  url = 'https://github.com/pantsbuild/pex/releases/download/v1.6.11/pex'
-  digest = Digest('7a8fdfce2de22d25ba38afaa9df0282c33dd436959b3a5c3f788ded2ccc2cae9', 1867604)
+  url = 'https://github.com/pantsbuild/pex/releases/download/v1.6.12/pex'
+  digest = Digest('ce64cb72cd23d2123dd48126af54ccf2b718d9ecb98c2ed3045ed1802e89e7e1', 1842359)
   snapshot = yield Get(Snapshot, UrlToFetch(url, digest))
   yield DownloadedPexBin(executable=snapshot.files[0], directory_digest=snapshot.directory_digest)
 

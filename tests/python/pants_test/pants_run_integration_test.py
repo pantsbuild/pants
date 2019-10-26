@@ -528,6 +528,9 @@ class PantsRunIntegrationTest(unittest.TestCase):
   def assert_is_file(self, file_path):
     self.assertTrue(os.path.isfile(file_path), f'file path {file_path} does not exist!')
 
+  def assert_is_not_file(self, file_path):
+    self.assertFalse(os.path.isfile(file_path), f'file path {file_path} exists!')
+
   def normalize(self, s: str) -> str:
     """Removes escape sequences (e.g. colored output) and all whitespace from string s."""
     return ''.join(strip_color(s).split())

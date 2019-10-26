@@ -12,7 +12,7 @@ from contextlib import contextmanager
 from pants.scm.scm import Scm
 from pants.util.contextutil import pushd
 from pants.util.memo import memoized_method
-from pants.util.strutil import ensure_binary, ensure_text
+from pants.util.strutil import ensure_text
 
 
 # 40 is Linux's hard-coded limit for total symlinks followed when resolving a path.

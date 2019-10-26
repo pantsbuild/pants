@@ -16,6 +16,7 @@ def get_generated_shared_lib(lib_name):
 asdf_cpp_lib_path = get_generated_shared_lib('asdf-cpp_ctypes-with-extra-compiler-flags')
 asdf_cpp_lib = ctypes.CDLL(asdf_cpp_lib_path)
 
+
 def f(x):
   multiplied = asdf_cpp_lib.multiply_by_something(42)
   return multiplied

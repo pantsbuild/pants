@@ -112,3 +112,8 @@ page(
   name='notes-1.21.x',
   source='1.21.x.rst'
 )
+
+page(
+  name='notes-1.22.x',
+  source='1.22.x.rst'
+)
