@@ -98,8 +98,6 @@ python_library(
   sources = ['objects.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/base:deprecated',
-    ':collections',
     ':strutil',
     ':memo',
     ':meta',

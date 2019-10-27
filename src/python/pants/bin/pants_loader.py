@@ -28,11 +28,13 @@ class PantsLoader:
     #
     # However, we do turn off deprecation warnings for libraries that Pants uses for which we do
     # not have a fixed upstream version, typically because the library is no longer maintained.
-    if not os.environ.get('PYTHONWARNINGS'):
-      warnings.simplefilter('default', category=DeprecationWarning)
+    warnings.simplefilter('default', category=DeprecationWarning)
     # TODO: Eric-Arellano has emailed the author to see if he is willing to accept a PR fixing the
     # deprecation warnings and to release the fix. If he says yes, remove this once fixed.
     warnings.filterwarnings('ignore', category=DeprecationWarning, module="ansicolors")
+    # Silence this ubiquitous warning. Several of our 3rd party deps incur this.
+    warnings.filterwarnings('ignore', category=DeprecationWarning,
+        message="Using or importing the ABCs from 'collections' instead of from 'collections.abc' is deprecated")
 
   @classmethod
   def ensure_locale(cls):
@@ -48,7 +50,7 @@ class PantsLoader:
         Fix it by setting the LC_* and LANG environment settings. Example:
           LC_ALL=en_US.UTF-8
           LANG=en_US.UTF-8
-        Or, bypass it by setting the below environment variable.
+        Or, bypass it by setting the below environment variable. 
           {}=1
         Note: we cannot guarantee consistent behavior with this bypass enabled.
         """.format(encoding, cls.ENCODING_IGNORE_ENV_VAR)

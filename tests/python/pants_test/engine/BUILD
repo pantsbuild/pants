@@ -154,7 +154,7 @@ python_tests(
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/engine/examples:mapper_test',
     'tests/python/pants_test/engine/examples:parsers',
-  ],
+  ]
 )
 
 python_tests(
