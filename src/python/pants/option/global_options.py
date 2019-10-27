@@ -343,7 +343,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--watchman-supportdir', advanced=True, default='bin/watchman',
              help='Find watchman binaries under this dir. Used as part of the path to lookup '
                   'the binary with --binaries-baseurls and --pants-bootstrapdir.')
-    register('--watchman-startup-timeout', type=float, advanced=True, default=30.0,
+    register('--watchman-startup-timeout', type=float, advanced=True, default=60.0,
              help='The watchman socket timeout (in seconds) for the initial `watch-project` command. '
                   'This may need to be set higher for larger repos due to watchman startup cost.')
     register('--watchman-socket-timeout', type=float, advanced=True, default=0.1,
