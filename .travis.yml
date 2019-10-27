@@ -355,7 +355,6 @@ matrix:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -416,7 +415,6 @@ matrix:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -474,7 +472,6 @@ matrix:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -531,7 +528,6 @@ matrix:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -652,7 +648,6 @@ matrix:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -712,7 +707,6 @@ matrix:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -770,7 +764,6 @@ matrix:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -864,7 +857,6 @@ matrix:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -921,7 +913,6 @@ matrix:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -978,7 +969,6 @@ matrix:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -1035,7 +1025,6 @@ matrix:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -1092,7 +1081,6 @@ matrix:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -1149,7 +1137,6 @@ matrix:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -1206,7 +1193,6 @@ matrix:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -1263,7 +1249,6 @@ matrix:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -1321,7 +1306,6 @@ matrix:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -1379,7 +1363,6 @@ matrix:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -1437,7 +1420,6 @@ matrix:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -1495,7 +1477,6 @@ matrix:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -1553,7 +1534,6 @@ matrix:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -1611,7 +1591,6 @@ matrix:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -1669,7 +1648,6 @@ matrix:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -1727,7 +1705,6 @@ matrix:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -1785,7 +1762,6 @@ matrix:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -1843,7 +1819,6 @@ matrix:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -1901,7 +1876,6 @@ matrix:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -1959,7 +1933,6 @@ matrix:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -2017,7 +1990,6 @@ matrix:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -2300,7 +2272,6 @@ matrix:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -2360,7 +2331,6 @@ matrix:
       directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
