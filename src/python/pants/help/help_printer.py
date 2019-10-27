@@ -25,14 +25,18 @@ class HelpPrinter:
     self._options = options
     self._help_request = help_request or self._options.help_request
 
+  @property
+  def bin_name(self):
+    return self._options.for_global_scope().pants_bin_name
+
   def print_help(self):
     """Print help to the console.
 
     :return: 0 on success, 1 on failure
     """
     def print_hint():
-      print('Use `pants goals` to list goals.')
-      print('Use `pants help` to get help.')
+      print(f'Use `{self.bin_name} goals` to list goals.')
+      print(f'Use `{self.bin_name} help` to get help.')
     if isinstance(self._help_request, VersionHelp):
       print(pants_version())
     elif isinstance(self._help_request, OptionsHelp):
@@ -50,8 +54,7 @@ class HelpPrinter:
     return 0
 
   def _print_goals_help(self):
-    print('\nUse `pants help <goal>` to get help for a particular goal.\n')
-
+    print(f'\nUse `{self.bin_name} help $goal` to get help for a particular goal.\n')
     global_options = self._options.for_global_scope()
     goal_descriptions = {}
     if global_options.v2:
@@ -93,12 +96,12 @@ class HelpPrinter:
     else:
       print(pants_release())
       print('\nUsage:')
-      print('  ./pants [option ...] [goal ...] [target...]  Attempt the specified goals.')
-      print('  ./pants help                                 Get help.')
-      print('  ./pants help [goal]                          Get help for a goal.')
-      print('  ./pants help-advanced [goal]                 Get help for a goal\'s advanced options.')
-      print('  ./pants help-all                             Get help for all goals.')
-      print('  ./pants goals                                List all installed goals.')
+      print(f'  {self.bin_name} [option ...] [goal ...] [target...]  Attempt the specified goals.')
+      print(f'  {self.bin_name} help                                 Get help.')
+      print(f'  {self.bin_name} help [goal]                          Get help for a goal.')
+      print(f'  {self.bin_name} help-advanced [goal]                 Get help for a goal\'s advanced options.')
+      print(f'  {self.bin_name} help-all                             Get help for all goals.')
+      print(f'  {self.bin_name} goals                                List all installed goals.')
       print('')
       print('  [target] accepts two special forms:')
       print('    dir:  to include all targets in the specified directory.')

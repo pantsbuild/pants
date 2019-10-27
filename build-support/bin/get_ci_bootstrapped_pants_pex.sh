@@ -28,3 +28,9 @@ chmod 755 ./pants.pex
 # bytes before the zip magic number (in our case, the pex shebang), even though the unzip
 # operation otherwise succeeds.
 unzip -j pants.pex pants/engine/native_engine.so -d src/python/pants/engine/ || true
+
+# TODO: As of 2019/10/24, we've seen sigbus errors while starting tests that feel potentially related
+# to either the PEX or native_engine.so just having finished extraction. If we continue to see those
+# issues, we can assume that this `sync` call is not necessary: otherwise, can assume that it is due
+# to some behavior of either 1) the aws tool, 2) chmod, 3) zip extraction.
+sync
