@@ -31,6 +31,10 @@ nuke_if_too_big "${HOME}/.cache/pants/tools" 128
 nuke_if_too_big "${HOME}/.cache/pants/zinc" 128
 nuke_if_too_big "${HOME}/.ivy2/pants" 512
 nuke_if_too_big "${HOME}/.npm" 128
-nuke_if_too_big "${HOME}/.cache/pants/rust/cargo" 1024
 nuke_if_too_big build-support/virtualenvs 128
 nuke_if_too_big src/rust/engine/target 1024
+
+# Note that we don't prune all of ${HOME}/.cache/pants/rust/cargo, as it mostly contains git
+# checkouts of rust deps, notably grpc, which is huge and takes forever to clone.
+# We don't expect that data to grow rapidly anyway.
+nuke_if_too_big "${HOME}/.cache/pants/rust/cargo/registry" 512
