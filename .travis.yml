@@ -22,7 +22,8 @@ env:
   - PYENV_PY27_VERSION=2.7.15
   - PYENV_PY36_VERSION=3.6.8
   - PYENV_PY37_VERSION=3.7.2
-  - PYENV_ROOT="${PYENV_ROOT:-${HOME}/.pants_pyenv}"
+  - PYENV_ROOT_OSX=${HOME}/.pants_pyenv
+  - PYENV_ROOT="${PYENV_ROOT:-${PYENV_ROOT_OSX}}"
   - PATH="${PYENV_ROOT}/shims:${PATH}"
   - AWS_CLI_ROOT="${HOME}/.aws_cli"
   - AWS_ACCESS_KEY_ID__TO_BE_REEXPORTED_ON_DEPLOYS=AKIAV6A6G7RQWPRUWIXR
@@ -57,7 +58,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/rust/cargo
       - build-support/virtualenvs
       - src/rust/engine/target
@@ -114,7 +115,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/rust/cargo
       - build-support/virtualenvs
       - src/rust/engine/target
@@ -161,7 +162,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/rust/cargo
       - build-support/virtualenvs
       - src/rust/engine/target
@@ -203,7 +204,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/rust/cargo
       - build-support/virtualenvs
       - src/rust/engine/target
@@ -252,7 +253,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/rust/cargo
       - build-support/virtualenvs
       - src/rust/engine/target
@@ -300,7 +301,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/rust/cargo
       - build-support/virtualenvs
       - src/rust/engine/target
@@ -361,7 +362,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
@@ -423,7 +424,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
@@ -482,7 +483,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
@@ -540,7 +541,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
@@ -585,7 +586,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/rust/cargo
       - build-support/virtualenvs
       - src/rust/engine/target
@@ -663,7 +664,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
@@ -724,7 +725,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
@@ -783,7 +784,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
@@ -878,7 +879,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
@@ -936,7 +937,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
@@ -994,7 +995,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
@@ -1052,7 +1053,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
@@ -1110,7 +1111,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
@@ -1168,7 +1169,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
@@ -1226,7 +1227,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
@@ -1284,7 +1285,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
@@ -1343,7 +1344,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
@@ -1402,7 +1403,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
@@ -1461,7 +1462,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
@@ -1520,7 +1521,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
@@ -1579,7 +1580,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
@@ -1638,7 +1639,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
@@ -1697,7 +1698,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
@@ -1756,7 +1757,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
@@ -1815,7 +1816,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
@@ -1874,7 +1875,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
@@ -1933,7 +1934,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
@@ -1992,7 +1993,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
@@ -2051,7 +2052,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
@@ -2096,7 +2097,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/rust/cargo
       - build-support/virtualenvs
       - src/rust/engine/target
@@ -2127,7 +2128,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/rust/cargo
       - build-support/virtualenvs
       - src/rust/engine/target
@@ -2337,7 +2338,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
@@ -2398,7 +2399,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
