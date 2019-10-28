@@ -4,7 +4,7 @@ function nuke_if_too_big() {
   path=$1
   limit_mb=$2
   echo "## Pruning ${path} (if larger than ${limit_mb}MB)..."
-  if [ -d ${path} ]; then
+  if [[ -d "${path}" ]]; then
     actual_mb=$(du -m -d0 "${path}" | cut -f 1)
     echo "Size of ${path}: ${actual_mb}MB"
     if (( actual_mb > limit_mb )); then
