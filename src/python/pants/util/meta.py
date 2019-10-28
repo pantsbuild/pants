@@ -1,6 +1,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import types
 from abc import ABC, abstractmethod
 from dataclasses import FrozenInstanceError
 from functools import wraps
@@ -136,7 +137,14 @@ class _ClassDecoratorWithSentinelAttribute(ABC):
         ...
 
     def define_instance_of(self, obj: Type, **kwargs) -> Type:
-        return type(obj.__name__, (obj,), {"_decorated_type_checkable_type": type(self), **kwargs})
+        def update_class(ns):
+            ns["_decorated_type_checkable_type"] = type(self)
+            ns.update(**kwargs)
+            return ns
+
+        bases = [obj, *getattr(obj, "__orig_bases__", [])]
+
+        return types.new_class(obj.__name__, bases=tuple(bases), kwds=None, exec_body=update_class)
 
     def is_instance(self, obj: Type) -> bool:
         return getattr(obj, "_decorated_type_checkable_type", None) is type(self)
@@ -193,4 +201,4 @@ def frozen_after_init(cls: C) -> C:
     cls.__init__ = new_init
     cls.__setattr__ = new_setattr
 
-    return cls
+    return frozen_after_init.define_instance_of(cls)

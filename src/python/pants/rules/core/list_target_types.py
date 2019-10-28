@@ -98,8 +98,8 @@ class FieldInfo:
                 fallback_to_ancestors=True,
                 ignored_ancestors={
                     *Field.mro(),
-                    AsyncField,
-                    PrimitiveField,
+                    *AsyncField.mro(),
+                    *PrimitiveField.mro(),
                     BoolField,
                     FloatField,
                     IntField,

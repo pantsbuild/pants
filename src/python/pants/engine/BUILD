@@ -207,6 +207,7 @@ python_library(
   name='rules',
   sources=['rules.py'],
   dependencies=[
+    '3rdparty/python:dataclasses',
     ':goal',
     ':selectors',
     'src/python/pants/util:collections',

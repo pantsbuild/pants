@@ -2,13 +2,14 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import ast
+import dataclasses
 import inspect
 import itertools
 import sys
 import typing
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Optional, Tuple, Type, get_type_hints
+from typing import Callable, Dict, List, Optional, Set, Tuple, Type, get_type_hints
 
 from pants.engine.goal import Goal
 from pants.engine.objects import union
@@ -356,6 +357,20 @@ class Rule(ABC):
         """A tuple of Optionable classes that are known to be necessary to run this rule."""
         return ()
 
+    @classmethod
+    def _validate_type_field(cls, type_obj, description):
+        if not isinstance(type_obj, type):
+            raise TypeError(f"{description} provided to @rules must be types! Was: {type_obj}.")
+        if dataclasses.is_dataclass(type_obj):
+            if not type_obj.__dataclass_params__.frozen:
+                if not frozen_after_init.is_instance(type_obj):
+                    raise TypeError(
+                        f"{description} {type_obj} is a dataclass declared without `frozen=True`, or without "
+                        "both `unsafe_hash=True` and the `@frozen_after_init` decorator! "
+                        "The engine requires that fields in params are immutable for stable hashing!"
+                    )
+        return type_obj
+
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
@@ -387,8 +402,15 @@ class TaskRule(Rule):
         cacheable: bool = True,
         name: Optional[str] = None,
     ):
-        self._output_type = output_type
-        self.input_selectors = input_selectors
+        self._output_type = self._validate_type_field(output_type, "@rule output type")
+        self.input_selectors = tuple(
+            self._validate_type_field(t, "@rule input selector") for t in input_selectors
+        )
+        for g in input_gets:
+            product_type = g.product
+            subject_type = g.subject_declared_type
+            self._validate_type_field(product_type, "Get product type")
+            self._validate_type_field(subject_type, "Get subject type")
         self.input_gets = input_gets
         self.func = func  # type: ignore[assignment] # cannot assign to a method
         self._dependency_rules = dependency_rules or ()
@@ -431,7 +453,7 @@ class RootRule(Rule):
     _output_type: Type
 
     def __init__(self, output_type: Type) -> None:
-        self._output_type = output_type
+        self._output_type = self._validate_type_field(output_type, "RootRule declared type")
 
     @property
     def output_type(self):

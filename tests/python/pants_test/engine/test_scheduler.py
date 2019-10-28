@@ -20,6 +20,7 @@ from pants.testutil.engine.util import (
     remove_locations_from_traceback,
 )
 from pants.testutil.test_base import TestBase
+from pants.util.meta import frozen_after_init
 
 
 @dataclass(frozen=True)
@@ -65,6 +66,43 @@ class D:
 async def transitive_coroutine_rule(c: C) -> D:
     b = await Get[B](C, c)
     return D(b)
+
+
+@dataclass
+class NonFrozenDataclass:
+    x: int
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class FrozenAfterInit:
+    x: int
+
+    def __init__(self, x):
+        # This is an example of how you can assign within __init__() with @frozen_after_init. This
+        # particular example is not intended to be super useful.
+        self.x = x + 1
+
+
+@rule
+def use_frozen_after_init_object(x: FrozenAfterInit) -> int:
+    return x.x
+
+
+@dataclass(frozen=True)
+class FrozenFieldsDataclass:
+    x: int
+    y: str
+
+
+@dataclass(frozen=True)
+class ResultDataclass:
+    something: str
+
+
+@rule
+def dataclass_rule(obj: FrozenFieldsDataclass) -> ResultDataclass:
+    return ResultDataclass(something=f"x={obj.x}, y={obj.y}")
 
 
 @union
@@ -178,6 +216,10 @@ class SchedulerTest(TestBase):
             consumes_a_and_b,
             transitive_b_c,
             transitive_coroutine_rule,
+            dataclass_rule,
+            RootRule(FrozenAfterInit),
+            use_frozen_after_init_object,
+            RootRule(FrozenFieldsDataclass),
             RootRule(UnionWrapper),
             UnionRule(UnionBase, UnionA),
             UnionRule(UnionWithNonMemberErrorMsg, UnionX),
@@ -238,6 +280,15 @@ class SchedulerTest(TestBase):
     def test_union_rules_no_docstring(self):
         with self._assert_execution_error("specific error message for UnionA instance"):
             self.request_single_product(UnionX, Params(UnionWrapper(UnionA())))
+
+    def test_dataclass_products_rule(self):
+        (result,) = self.scheduler.product_request(
+            ResultDataclass, [Params(FrozenFieldsDataclass(3, "test string"))]
+        )
+        self.assertEquals(result.something, "x=3, y=test string")
+
+        (result,) = self.scheduler.product_request(int, [Params(FrozenAfterInit(x=3))])
+        self.assertEquals(result, 4)
 
 
 class SchedulerWithNestedRaiseTest(TestBase):
@@ -395,3 +446,39 @@ class SchedulerWithNestedRaiseTest(TestBase):
             + "\n\n",  # Traces include two empty lines after.
             trace,
         )
+
+
+class RuleIndexingErrorTest(TestBase):
+    def test_non_frozen_dataclass_error(self):
+        with self.assertRaisesWithMessage(
+            TypeError,
+            dedent(
+                """\
+                RootRule declared type <class 'pants_test.engine.test_scheduler.NonFrozenDataclass'> is a dataclass declared without `frozen=True`, or without both `unsafe_hash=True` and the `@frozen_after_init` decorator! The engine requires that fields in params are immutable for stable hashing!"""
+            ),
+        ):
+            RootRule(NonFrozenDataclass)
+
+        with self.assertRaisesWithMessage(
+            TypeError,
+            dedent(
+                """\
+                @rule input selector <class 'pants_test.engine.test_scheduler.NonFrozenDataclass'> is a dataclass declared without `frozen=True`, or without both `unsafe_hash=True` and the `@frozen_after_init` decorator! The engine requires that fields in params are immutable for stable hashing!"""
+            ),
+        ):
+
+            @rule
+            def f(x: NonFrozenDataclass) -> int:
+                return 3
+
+        with self.assertRaisesWithMessage(
+            TypeError,
+            dedent(
+                """\
+                @rule output type <class 'pants_test.engine.test_scheduler.NonFrozenDataclass'> is a dataclass declared without `frozen=True`, or without both `unsafe_hash=True` and the `@frozen_after_init` decorator! The engine requires that fields in params are immutable for stable hashing!"""
+            ),
+        ):
+
+            @rule
+            def g(x: int) -> NonFrozenDataclass:
+                return NonFrozenDataclass(x=x)

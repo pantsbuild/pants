@@ -21,7 +21,7 @@ from pants.util.ordered_set import OrderedSet
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(frozen=True)
 class BuildConfiguration:
     """Stores the types and helper functions exposed to BUILD files."""
 

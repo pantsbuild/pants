@@ -46,6 +46,7 @@ def get_docstring(
     :param ignored_ancestors: if `fallback_to_ancestors` is True, do not use the docstring from
         these ancestors.
     """
+    ignored_ancestors_set = frozenset(ignored_ancestors)
     if cls.__doc__ is not None:
         docstring = cls.__doc__.strip()
     else:
@@ -56,7 +57,8 @@ def get_docstring(
             (
                 ancestor_cls.__doc__.strip()
                 for ancestor_cls in cls.mro()[1:]
-                if ancestor_cls not in ignored_ancestors and ancestor_cls.__doc__ is not None
+                if ((ancestor_cls not in ignored_ancestors_set) and
+                    (ancestor_cls.__doc__ is not None))
             ),
             None,
         )
