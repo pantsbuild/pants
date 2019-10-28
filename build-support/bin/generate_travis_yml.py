@@ -202,7 +202,7 @@ CACHE_PANTS_RUN = {
       # We include the lmdb_store to include a local process cache, so that hopefully we don't
       # need to re-run processes (particularly tests) which have already run.
       # TODO(#8041): Prune this directory before storing the cache.
-      #'${HOME}/.cache/pants/lmdb_store',
+      '${HOME}/.cache/pants/lmdb_store',
       '${HOME}/.cache/pants/tools',
       '${HOME}/.cache/pants/zinc',
       '${HOME}/.ivy2/pants',
