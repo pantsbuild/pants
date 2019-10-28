@@ -806,6 +806,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       # Since this is always hermetic, we need to use `underlying.home` because
       # ExecuteProcessRequest requires an existing, local jdk location.
       jdk_home=distribution.underlying_home,
+      is_nailgunnable=True,
     )
     res = self.context.execute_process_synchronously_without_raising(
       epr,

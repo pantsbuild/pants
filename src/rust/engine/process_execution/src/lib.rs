@@ -41,6 +41,7 @@ use store::UploadSummary;
 use workunit_store::WorkUnitStore;
 
 use async_semaphore::AsyncSemaphore;
+use hashing::Digest;
 
 pub mod cache;
 #[cfg(test)]
@@ -57,6 +58,8 @@ pub mod remote_tests;
 pub mod speculate;
 #[cfg(test)]
 mod speculate_tests;
+
+pub mod nailgun;
 
 extern crate uname;
 
@@ -158,6 +161,8 @@ pub struct ExecuteProcessRequest {
   ///
   pub jdk_home: Option<PathBuf>,
   pub target_platform: Platform,
+
+  pub is_nailgunnable: bool,
 }
 
 impl TryFrom<MultiPlatformExecuteProcessRequest> for ExecuteProcessRequest {
@@ -278,6 +283,29 @@ pub trait CommandRunner: Send + Sync {
   fn num_waiters(&self) -> usize {
     panic!("This method is abstract and not implemented for this type")
   }
+}
+
+// TODO(#8513) possibly move to the MEPR struct, or to the hashing crate?
+pub fn digest(
+  req: MultiPlatformExecuteProcessRequest,
+  metadata: &ExecuteProcessRequestMetadata,
+) -> Digest {
+  let mut hashes: Vec<String> = req
+    .0
+    .values()
+    .map(|ref epr| crate::remote::make_execute_request(epr, metadata.clone()).unwrap())
+    .map(|(_a, _b, er)| er.get_action_digest().get_hash().to_string())
+    .collect();
+  hashes.sort();
+  Digest::of_bytes(
+    hashes
+      .iter()
+      .fold(String::new(), |mut acc, hash| {
+        acc.push_str(&hash);
+        acc
+      })
+      .as_bytes(),
+  )
 }
 
 ///

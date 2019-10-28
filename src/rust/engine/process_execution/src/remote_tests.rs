@@ -72,6 +72,7 @@ fn local_only_scratch_files_ignored() {
       hashing::EMPTY_DIGEST,
     jdk_home: None,
     target_platform: Platform::None,
+    is_nailgunnable: false,
   };
 
   let req2 = ExecuteProcessRequest {
@@ -95,6 +96,7 @@ fn local_only_scratch_files_ignored() {
       TestDirectory::containing_falcons_dir().digest(),
     jdk_home: None,
     target_platform: Platform::None,
+    is_nailgunnable: false,
   };
 
   assert_eq!(
@@ -127,6 +129,7 @@ fn make_execute_request() {
       hashing::EMPTY_DIGEST,
     jdk_home: None,
     target_platform: Platform::None,
+    is_nailgunnable: false,
   };
 
   let mut want_command = bazel_protos::remote_execution::Command::new();
@@ -209,6 +212,7 @@ fn make_execute_request_with_instance_name() {
       hashing::EMPTY_DIGEST,
     jdk_home: None,
     target_platform: Platform::None,
+    is_nailgunnable: false,
   };
 
   let mut want_command = bazel_protos::remote_execution::Command::new();
@@ -299,6 +303,7 @@ fn make_execute_request_with_cache_key_gen_version() {
       hashing::EMPTY_DIGEST,
     jdk_home: None,
     target_platform: Platform::None,
+    is_nailgunnable: false,
   };
 
   let mut want_command = bazel_protos::remote_execution::Command::new();
@@ -385,6 +390,7 @@ fn make_execute_request_with_jdk() {
       hashing::EMPTY_DIGEST,
     jdk_home: Some(PathBuf::from("/tmp")),
     target_platform: Platform::None,
+    is_nailgunnable: false,
   };
 
   let mut want_command = bazel_protos::remote_execution::Command::new();
@@ -449,6 +455,7 @@ fn make_execute_request_with_jdk_and_extra_platform_properties() {
       hashing::EMPTY_DIGEST,
     jdk_home: Some(PathBuf::from("/tmp")),
     target_platform: Platform::None,
+    is_nailgunnable: false,
   };
 
   let mut want_command = bazel_protos::remote_execution::Command::new();
@@ -555,6 +562,7 @@ fn server_rejecting_execute_request_gives_error() {
               hashing::EMPTY_DIGEST,
             jdk_home: None,
             target_platform: Platform::None,
+            is_nailgunnable: false,
           },
           empty_request_metadata(),
         )
@@ -1034,6 +1042,7 @@ fn timeout_after_sufficiently_delayed_getoperations() {
       hashing::EMPTY_DIGEST,
     jdk_home: None,
     target_platform: Platform::None,
+    is_nailgunnable: false,
   };
 
   let op_name = "gimme-foo".to_string();
@@ -1084,6 +1093,7 @@ fn dropped_request_cancels() {
       hashing::EMPTY_DIGEST,
     jdk_home: None,
     target_platform: Platform::None,
+    is_nailgunnable: false,
   };
 
   let op_name = "gimme-foo".to_string();
@@ -2247,6 +2257,7 @@ pub fn echo_foo_request() -> MultiPlatformExecuteProcessRequest {
       hashing::EMPTY_DIGEST,
     jdk_home: None,
     target_platform: Platform::None,
+    is_nailgunnable: false,
   };
   req.into()
 }
@@ -2558,6 +2569,7 @@ fn cat_roland_request() -> MultiPlatformExecuteProcessRequest {
       hashing::EMPTY_DIGEST,
     jdk_home: None,
     target_platform: Platform::None,
+    is_nailgunnable: false,
   };
   req.into()
 }
@@ -2575,6 +2587,7 @@ fn echo_roland_request() -> MultiPlatformExecuteProcessRequest {
       hashing::EMPTY_DIGEST,
     jdk_home: None,
     target_platform: Platform::None,
+    is_nailgunnable: false,
   };
   req.into()
 }
