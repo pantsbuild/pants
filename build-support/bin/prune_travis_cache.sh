@@ -21,8 +21,10 @@ function nuke_if_too_big() {
 
 # Prune the dirs we cache on travis if they get too big.
 # Note that some of these dirs are only relevant to native code building shards, and others only to
-# pants running shards. However there's no harm in checking them all in both cases.
+# pants running shards. And some only to linux or only to osx.
+# However there's no harm in checking them all in all cases.
 
+nuke_if_too_big "${HOME}/.pants_pyenv" 512
 nuke_if_too_big "${HOME}/.aws_cli" 128
 nuke_if_too_big "${HOME}/.cache/pants/lmdb_store" 1024
 nuke_if_too_big "${HOME}/.cache/pants/tools" 128

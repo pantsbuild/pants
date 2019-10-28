@@ -58,7 +58,8 @@ GLOBAL_ENV_VARS = [
   # NB: We must set `PYENV_ROOT` on macOS for Pyenv to work properly. However, on Linux, we must not
   # override the default value because Linux pre-installs Python via Pyenv and we must keep their
   # $PYENV_ROOT for this to still work.
-  'PYENV_ROOT="${PYENV_ROOT:-${HOME}/.pants_pyenv}"',
+  'PYENV_ROOT_OSX=${HOME}/.pants_pyenv',
+  'PYENV_ROOT="${PYENV_ROOT:-${PYENV_ROOT_OSX}}"',
   'PATH="${PYENV_ROOT}/shims:${PATH}"',
   'AWS_CLI_ROOT="${HOME}/.aws_cli"',
   # NB: We use this verbose name so that AWS does not pick up the env var $AWS_ACCESS_KEY_ID on
@@ -156,7 +157,9 @@ def docker_run_travis_ci_image(command: str) -> str:
 # The default timeout is 180 seconds, and our larger cache uploads exceed this.
 # TODO: Now that we trim caches, perhaps we no longer need this modified timeout.
 _cache_timeout = 500
-_cache_common_directories = ['${AWS_CLI_ROOT}']
+# NB: Attempting to cache directories that don't exist (e.g., the custom osx pyenv root on linux) causes no harm,
+# and simplifies the code.
+_cache_common_directories = ['${AWS_CLI_ROOT}', '${PYENV_ROOT_OSX}']
 # Ensure permissions to do the below removals, which happen with or without caching enabled.
 _cache_set_required_permissions = 'sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"'
 
