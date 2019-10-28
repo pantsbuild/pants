@@ -154,7 +154,7 @@ def docker_run_travis_ci_image(command: str) -> str:
 # ----------------------------------------------------------------------
 
 # The default timeout is 180 seconds, and our larger cache uploads exceed this.
-# TODO: Figure out why we have such large caches (2-7GB) and try to trim them.
+# TODO: Now that we trim caches, perhaps we no longer need this modified timeout.
 _cache_timeout = 500
 _cache_common_directories = ['${AWS_CLI_ROOT}', '${PYENV_ROOT}']
 # Ensure permissions to do the below removals, which happen with or without caching enabled.
@@ -167,6 +167,7 @@ CACHE_NATIVE_ENGINE = {
     # get bytecode compiled in non-yet-understood circumstances leading to
     # a full cache re-pack due to new bytecode files.
     'find build-support -name "*.py[co]" -delete',
+    './build-support/bin/prune_travis_cache.sh',
   ],
   "cache": {
     "timeout": _cache_timeout,
@@ -195,13 +196,13 @@ CACHE_PANTS_RUN = {
     'rm -rf ${HOME}/.ivy2/pants/com.example',
     # Render a summary to assist with further tuning the cache.
     'du -m -d2 ${HOME}/.cache/pants | sort -r -n',
+    './build-support/bin/prune_travis_cache.sh',
   ],
   "cache": {
     "timeout": _cache_timeout,
     "directories": _cache_common_directories + [
       # We include the lmdb_store to include a local process cache, so that hopefully we don't
       # need to re-run processes (particularly tests) which have already run.
-      # TODO(#8041): Prune this directory before storing the cache.
       '${HOME}/.cache/pants/lmdb_store',
       '${HOME}/.cache/pants/tools',
       '${HOME}/.cache/pants/zinc',
