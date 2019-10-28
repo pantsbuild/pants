@@ -547,21 +547,27 @@ def integration_tests_v1(python_version: PythonVersion, *, use_pantsd: bool = Fa
   return [make_shard(shard_num=i) for i in range(num_integration_shards)]
 
 
-def integration_tests_v2(python_version: PythonVersion) -> Dict:
-  shard = {
-    **linux_shard(python_version=python_version, install_travis_wait=True),
-    "name": f"Integration tests - V2 (Python {python_version.decimal})",
-    "script": [
-      (
-        "travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py --integration-tests-v2 "
-        f"--remote-execution-enabled --python-version {python_version.decimal}"
-      ),
+def integration_tests_v2(python_version: PythonVersion) -> List[Dict]:
+  num_integration_shards = 2
+
+  def make_shard(*, shard_num: int) -> Dict:
+    shard = {
+      **linux_shard(python_version=python_version, install_travis_wait=True),
+      "name": f"Integration tests - V2 - shard {shard_num} (Python {python_version.decimal})",
+      "script": [
+        (
+          # TODO: Now that we shard, do we need the wait-enhanced?
+          "travis-wait-enhanced --timeout 65m --interval 9m -- "
+          "./build-support/bin/ci.py --integration-tests-v2 --integration-shard "
+          f"{shard_num}/{num_integration_shards} --remote-execution-enabled --python-version {python_version.decimal}"
+        ),
+      ]
+    }
+    shard["env"] = shard.get("env", []) + [
+      f"CACHE_NAME=integration.v2.py{python_version.number}"
     ]
-  }
-  shard["env"] = shard.get("env", []) + [
-    f"CACHE_NAME=integration.v2.py{python_version.number}"
-  ]
-  return shard
+    return shard
+  return [make_shard(shard_num=i) for i in range(num_integration_shards)]
 
 # -------------------------------------------------------------------------
 # Rust tests
@@ -772,12 +778,12 @@ def main() -> None:
       # the RBE token server will only give tokens to job numbers #5 and #6, so we must do this
       # for the cron jobs to work with remoting.
       unit_tests(PythonVersion.py37),
-      integration_tests_v2(PythonVersion.py37),
+      *integration_tests_v2(PythonVersion.py37),
       *[lint(v) for v in PythonVersion],
       clippy(),
       cargo_audit(),
       unit_tests(PythonVersion.py36),
-      integration_tests_v2(PythonVersion.py36),
+      *integration_tests_v2(PythonVersion.py36),
       build_wheels_linux(),
       build_wheels_osx(),
       *integration_tests_v1(PythonVersion.py36),

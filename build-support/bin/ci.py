@@ -50,7 +50,8 @@ def main() -> None:
     if args.integration_tests_v1:
       run_integration_tests_v1(shard=args.integration_shard)
     if args.integration_tests_v2:
-      run_integration_tests_v2(oauth_token_path=remote_execution_oauth_token_path)
+      run_integration_tests_v2(oauth_token_path=remote_execution_oauth_token_path,
+                               shard=args.integration_shard)
     if args.plugin_tests:
       run_plugin_tests(oauth_token_path=remote_execution_oauth_token_path)
     if args.platform_specific_tests:
@@ -511,14 +512,14 @@ def run_integration_tests_v1(*, shard: Optional[str]) -> None:
     )
 
 
-def run_integration_tests_v2(*, oauth_token_path: Optional[str] = None) -> None:
+def run_integration_tests_v2(*, oauth_token_path: Optional[str], shard: Optional[str]) -> None:
   target_sets = TestTargetSets.calculate(
     test_type=TestType.integration, remote_execution_enabled=oauth_token_path is not None
   )
   if target_sets.v2_remote:
     _run_command(
       command=TestStrategy.v2_remote.pants_command(
-        targets=target_sets.v2_remote, oauth_token_path=oauth_token_path
+        targets=target_sets.v2_remote, oauth_token_path=oauth_token_path, shard=shard
       ),
       slug="IntegrationTestsV2Remote",
       start_message="Running integration tests via V2 remote strategy.",
@@ -526,7 +527,7 @@ def run_integration_tests_v2(*, oauth_token_path: Optional[str] = None) -> None:
     )
   if target_sets.v2_local:
     _run_command(
-      command=TestStrategy.v2_local.pants_command(targets=target_sets.v2_local),
+      command=TestStrategy.v2_local.pants_command(targets=target_sets.v2_local, shard=shard),
       slug="IntegrationTestsV2Local",
       start_message="Running integration tests via V2 local strategy.",
       die_message="Integration test failure (V2 local)",
