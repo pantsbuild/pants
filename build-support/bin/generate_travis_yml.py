@@ -156,7 +156,7 @@ def docker_run_travis_ci_image(command: str) -> str:
 # The default timeout is 180 seconds, and our larger cache uploads exceed this.
 # TODO: Now that we trim caches, perhaps we no longer need this modified timeout.
 _cache_timeout = 500
-_cache_common_directories = ['${AWS_CLI_ROOT}', '${PYENV_ROOT}']
+_cache_common_directories = ['${AWS_CLI_ROOT}']
 # Ensure permissions to do the below removals, which happen with or without caching enabled.
 _cache_set_required_permissions = 'sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"'
 
