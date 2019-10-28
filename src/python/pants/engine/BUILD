@@ -198,7 +198,6 @@ python_library(
     ':rules',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:specs',
-    'src/python/pants/build_graph',
     'src/python/pants/rules/core:core',
   ]
 )
@@ -208,6 +207,8 @@ python_library(
   sources=['native.py'],
   dependencies=[
     ':native_engine_shared_library',
+    ':fs',
+    ':isolated_process',
     ':selectors',
     '3rdparty/python:cffi',
     '3rdparty/python:setuptools',
