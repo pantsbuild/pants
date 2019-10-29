@@ -248,10 +248,8 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
       target_libraries = OrderedSet()
       if isinstance(current_target, JarLibrary):
         target_libraries = OrderedSet(iter_transitive_jars(current_target))
-
       for dep in current_target.dependencies:
         info['targets'].append(dep.address.spec)
-
         if isinstance(dep, JarLibrary):
           for jar in dep.jar_dependencies:
             target_libraries.add(M2Coordinate(jar.org, jar.name, jar.rev))
