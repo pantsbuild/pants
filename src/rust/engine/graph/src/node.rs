@@ -48,9 +48,9 @@ pub trait NodeError: Clone + Debug + Eq + Send {
   fn invalidated() -> Self;
 
   ///
-  /// Creates an instance that represents that a Node dependency was cyclic.
+  /// Creates an instance that represents that a Node dependency was cyclic along the given path.
   ///
-  fn cyclic() -> Self;
+  fn cyclic(path: Vec<String>) -> Self;
 }
 
 ///
