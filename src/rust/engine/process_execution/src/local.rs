@@ -5,6 +5,8 @@ use boxfuture::{try_future, BoxFuture, Boxable};
 use fs::{self, GlobExpansionConjunction, GlobMatching, PathGlobs, StrictGlobMatching};
 use futures::{future, Future, Stream};
 use log::info;
+use nails::execution::{ChildOutput, ExitCode};
+
 use std::collections::{BTreeSet, HashSet};
 use std::ffi::OsStr;
 use std::fs::create_dir_all;
@@ -98,16 +100,6 @@ pub struct StreamedHermeticCommand {
 }
 
 ///
-/// The possible incremental outputs of a spawned child process.
-///
-#[derive(Debug)]
-enum ChildOutput {
-  Stdout(Bytes),
-  Stderr(Bytes),
-  Exit(i32),
-}
-
-///
 /// A streaming command that accepts no input stream and does not consult the `PATH`.
 ///
 impl StreamedHermeticCommand {
@@ -159,11 +151,11 @@ impl StreamedHermeticCommand {
         let stderr_stream = FramedRead::new(child.stderr().take().unwrap(), BytesCodec::new())
           .map(|bytes| ChildOutput::Stderr(bytes.into()));
         let exit_stream = child.into_stream().map(|exit_status| {
-          ChildOutput::Exit(
+          ChildOutput::Exit(ExitCode(
             exit_status
               .code()
               .or_else(|| exit_status.signal().map(Neg::neg))
-              .expect("Child process should exit via returned code or signal."),
+              .expect("Child process should exit via returned code or signal."))
           )
         });
 
@@ -180,14 +172,14 @@ impl StreamedHermeticCommand {
 ///
 /// The fully collected outputs of a completed child process.
 ///
-struct ChildResults {
-  stdout: Bytes,
-  stderr: Bytes,
-  exit_code: i32,
+pub struct ChildResults {
+  pub stdout: Bytes,
+  pub stderr: Bytes,
+  pub exit_code: i32,
 }
 
 impl ChildResults {
-  fn collect_from<E>(
+  pub fn collect_from<E>(
     stream: impl Stream<Item = ChildOutput, Error = E> + Send,
   ) -> impl Future<Item = ChildResults, Error = E> {
     let init = (
@@ -202,7 +194,7 @@ impl ChildResults {
           match child_output {
             ChildOutput::Stdout(bytes) => stdout.extend_from_slice(&bytes),
             ChildOutput::Stderr(bytes) => stderr.extend_from_slice(&bytes),
-            ChildOutput::Exit(code) => exit_code = code,
+            ChildOutput::Exit(code) => exit_code = code.0,
           };
           Ok((stdout, stderr, exit_code)) as Result<_, E>
         },

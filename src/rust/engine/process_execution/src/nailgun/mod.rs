@@ -5,11 +5,14 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use futures::future::Future;
-use log::{debug, trace};
-
 use boxfuture::{try_future, BoxFuture, Boxable};
-use hashing::Digest;
+use futures::future::Future;
+use futures::stream::Stream;
+use hashing::{Digest, EMPTY_DIGEST};
+use log::{debug, trace};
+use nails::execution::{child_channel, ChildInput, ChildOutput, Command};
+use tokio_core::net::TcpStream;
+use tokio_core::reactor::Core;
 
 use crate::nailgun::nailgun_pool::{NailgunProcessName, Port};
 use crate::{
@@ -325,10 +328,7 @@ impl super::CommandRunner for CommandRunner {
         );
         debug!("Running client request on nailgun {}", &nailgun_name2);
         trace!("Client request: {:#?}", full_client_req);
-        inner.run(
-          MultiPlatformExecuteProcessRequest::from(full_client_req),
-          context,
-        )
+        run_nailgun_process(full_client_req, &workdir_for_this_nailgun1, nailgun_port)
       })
       .to_boxed()
   }
@@ -340,4 +340,49 @@ impl super::CommandRunner for CommandRunner {
     // Request compatibility should be the same as for the local runner, so we just delegate this.
     self.inner.extract_compatible_request(req)
   }
+}
+
+fn run_nailgun_process(
+  full_client_req: ExecuteProcessRequest,
+  working_dir: &PathBuf,
+  nailgun_port: Port
+) -> BoxFuture<FallibleExecuteProcessResult, String> {
+
+  // A task to render stdout.
+  //
+  let (stdio_write, stdio_read) = child_channel::<ChildOutput>();
+  let child_results_future = super::local::ChildResults::collect_from(stdio_read.map_err(|()| unreachable!()));
+
+  let cmd = Command {
+    command: full_client_req.argv[0],
+    args: full_client_req.argv[1..].to_vec(),
+    env: full_client_req.env.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
+    working_dir: working_dir.to_path_buf()
+  };
+
+  let mut core = Core::new().unwrap();
+  let handle = core.handle();
+  let addr= format!("127.0.0.1:{}", nailgun_port).parse().unwrap();
+
+  // And the connection.
+  let (_stdin_write, stdin_read) = child_channel::<ChildInput>();
+  let connection = TcpStream::connect(&addr, &handle)
+      .and_then(|stream| nails::client_handle_connection(stream, cmd, stdio_write, stdin_read))
+      .map_err(|e| format!("Error communicating with server: {}", e));
+
+  debug!("Connecting to server at {}...", addr);
+
+  connection
+    .join(child_results_future)
+    .map(move |(_, child_results)| {
+      FallibleExecuteProcessResult {
+        stdout: child_results.stdout,
+        stderr: child_results.stderr,
+        exit_code: child_results.exit_code,
+        // TODO: extract a function from the local command runner to capture the contents of the output directory
+        output_directory: EMPTY_DIGEST,
+        execution_attempts: vec![],
+      }
+    })
+    .to_boxed()
 }
