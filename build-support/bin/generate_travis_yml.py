@@ -204,9 +204,6 @@ CACHE_PANTS_RUN = {
   "cache": {
     "timeout": _cache_timeout,
     "directories": _cache_common_directories + [
-      # We include the lmdb_store to include a local process cache, so that hopefully we don't
-      # need to re-run processes (particularly tests) which have already run.
-      '${HOME}/.cache/pants/lmdb_store',
       '${HOME}/.cache/pants/tools',
       '${HOME}/.cache/pants/zinc',
       '${HOME}/.ivy2/pants',
