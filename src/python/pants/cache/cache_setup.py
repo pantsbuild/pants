@@ -270,11 +270,7 @@ class CacheFactory:
     if compression not in range(1, 10):
       raise ValueError('compression_level must be an integer 1-9: {}'.format(compression))
 
-    # While compiling a largish target for the first time we end up making
-    # ~500k calls to readlink to expand the .pants.d symlink, which, in a
-    # virtual filesystem like FUSE might not be cached. Caching it improves the
-    # build time by upto 30%.
-    artifact_root = os.readlink(self._options.pants_workdir) if os.path.islink(self._options.pants_workdir) else self._options.pants_workdir
+    artifact_root = self._options.pants_workdir
 
     def create_local_cache(parent_path):
       path = os.path.join(parent_path, self._cache_dirname)
