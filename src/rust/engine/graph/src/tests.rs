@@ -290,7 +290,7 @@ fn cyclic_dirtying() {
 
 #[test]
 fn critical_path() {
-  use super::entry::{Entry, EntryKey};
+  use super::entry::Entry;
   // First, let's describe the scenario with plain data.
   //
   // We label the nodes with static strings to help visualise the situation.
@@ -327,7 +327,7 @@ fn critical_path() {
         .unwrap(),
     )
   };
-  let node_key = |node: &str| EntryKey::Valid(tnode(node));
+  let node_key = |node: &str| tnode(node);
   let node_entry = |node: &str| Entry::new(node_key(node));
   let node_and_duration_from_entry = |entry: &super::entry::Entry<TNode>| nodes[entry.node().0];
   let node_duration =
@@ -616,7 +616,7 @@ impl NodeError for TError {
     TError::Invalidated
   }
 
-  fn cyclic() -> Self {
+  fn cyclic(_path: Vec<String>) -> Self {
     TError::Cyclic
   }
 }
