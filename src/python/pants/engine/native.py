@@ -9,12 +9,33 @@ import sys
 import sysconfig
 import traceback
 from contextlib import closing
+from types import GeneratorType
 from typing import Any, NamedTuple, Tuple, Type
 
 import cffi
 import pkg_resources
 from twitter.common.collections.orderedset import OrderedSet
 
+from pants.base.project_tree import Dir, File, Link
+from pants.build_graph.address import Address
+from pants.engine.fs import (
+  Digest,
+  DirectoriesToMerge,
+  DirectoryWithPrefixToAdd,
+  DirectoryWithPrefixToStrip,
+  FileContent,
+  FilesContent,
+  InputFilesContent,
+  MaterializeDirectoriesResult,
+  MaterializeDirectoryResult,
+  PathGlobs,
+  Snapshot,
+  UrlToFetch,
+)
+from pants.engine.isolated_process import (
+  FallibleExecuteProcessResult,
+  MultiPlatformExecuteProcessRequest,
+)
 from pants.engine.selectors import Get
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import read_file, safe_mkdir, safe_mkdtemp
@@ -517,6 +538,40 @@ class Function(NamedTuple):
   key: Key
 
 
+class EngineTypes(NamedTuple):
+  """Python types that need to be passed to the engine.
+
+  N.B. EngineTypes needs to correspond field-by-field to the Types struct defined in
+  `src/rust/engine/src/types.rs` in order to avoid breakage
+  (field definition order matters, not just the names of fields!)."""
+
+  construct_directory_digest: Function
+  directory_digest: TypeId
+  construct_snapshot: Function
+  snapshot: TypeId
+  construct_file_content: Function
+  construct_files_content: Function
+  files_content: TypeId
+  construct_process_result: Function
+  construct_materialize_directories_results: Function
+  construct_materialize_directory_result: Function
+  address: TypeId
+  path_globs: TypeId
+  directories_to_merge: TypeId
+  directory_with_prefix_to_strip: TypeId
+  directory_with_prefix_to_add: TypeId
+  input_files_content: TypeId
+  dir: TypeId
+  file: TypeId
+  link: TypeId
+  multi_platform_process_request: TypeId
+  process_result: TypeId
+  generator: TypeId
+  url_to_fetch: TypeId
+  string: TypeId
+  bytes: TypeId
+
+
 class PyResult(NamedTuple):
   """Corresponds to the native object of the same name."""
   is_throw: bool
@@ -817,29 +872,7 @@ class Native(metaclass=SingletonMetaclass):
                     local_store_dir,
                     ignore_patterns,
                     execution_options,
-                    construct_directory_digest,
-                    construct_snapshot,
-                    construct_file_content,
-                    construct_files_content,
-                    construct_process_result,
-                    construct_materialize_directory_result,
-                    construct_materialize_directories_results,
-                    type_address,
-                    type_path_globs,
-                    type_directory_digest,
-                    type_snapshot,
-                    type_merge_snapshots_request,
-                    type_directory_with_prefix_to_strip,
-                    type_directory_with_prefix_to_add,
-                    type_files_content,
-                    type_input_files_content,
-                    type_dir,
-                    type_file,
-                    type_link,
-                    type_multi_platform_process_request,
-                    type_process_result,
-                    type_generator,
-                    type_url_to_fetch):
+                    ):
     """Create and return an ExternContext and native Scheduler."""
 
     def func(fn):
@@ -848,35 +881,37 @@ class Native(metaclass=SingletonMetaclass):
     def ti(type_obj):
       return TypeId(self.context.to_id(type_obj))
 
+    engine_types = EngineTypes(
+        construct_directory_digest=func(Digest),
+        directory_digest=ti(Digest),
+        construct_snapshot=func(Snapshot),
+        snapshot=ti(Snapshot),
+        construct_file_content=func(FileContent),
+        construct_files_content=func(FilesContent),
+        files_content=ti(FilesContent),
+        construct_process_result=func(FallibleExecuteProcessResult),
+        construct_materialize_directories_results=func(MaterializeDirectoriesResult),
+        construct_materialize_directory_result=func(MaterializeDirectoryResult),
+        address=ti(Address),
+        path_globs=ti(PathGlobs),
+        directories_to_merge=ti(DirectoriesToMerge),
+        directory_with_prefix_to_strip=ti(DirectoryWithPrefixToStrip),
+        directory_with_prefix_to_add=ti(DirectoryWithPrefixToAdd),
+        input_files_content=ti(InputFilesContent),
+        dir=ti(Dir),
+        file=ti(File),
+        link=ti(Link),
+        multi_platform_process_request=ti(MultiPlatformExecuteProcessRequest),
+        process_result=ti(FallibleExecuteProcessResult),
+        generator=ti(GeneratorType),
+        url_to_fetch=ti(UrlToFetch),
+        string=ti(str),
+        bytes=ti(bytes),
+      )
+
     scheduler_result = self.lib.scheduler_create(
         tasks,
-        # Constructors/functions.
-        func(construct_directory_digest),
-        func(construct_snapshot),
-        func(construct_file_content),
-        func(construct_files_content),
-        func(construct_process_result),
-        func(construct_materialize_directory_result),
-        func(construct_materialize_directories_results),
-        # Types.
-        ti(type_address),
-        ti(type_path_globs),
-        ti(type_directory_digest),
-        ti(type_snapshot),
-        ti(type_merge_snapshots_request),
-        ti(type_directory_with_prefix_to_strip),
-        ti(type_directory_with_prefix_to_add),
-        ti(type_files_content),
-        ti(type_input_files_content),
-        ti(type_dir),
-        ti(type_file),
-        ti(type_link),
-        ti(type_multi_platform_process_request),
-        ti(type_process_result),
-        ti(type_generator),
-        ti(type_url_to_fetch),
-        ti(str),
-        ti(bytes),
+        engine_types,
         # Project tree.
         self.context.utf8_buf(build_root),
         self.context.utf8_buf(local_store_dir),
@@ -904,6 +939,8 @@ class Native(metaclass=SingletonMetaclass):
         self.context.utf8_buf(execution_options.process_execution_speculation_strategy),
         execution_options.process_execution_use_local_cache,
         self.context.utf8_dict(execution_options.remote_execution_headers),
+        self.context.utf8_buf(sys.executable),
+        execution_options.process_execution_local_enable_nailgun,
       )
     if scheduler_result.is_throw:
       value = self.context.from_value(scheduler_result.throw_handle)

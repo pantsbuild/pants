@@ -31,6 +31,7 @@ fn stdout() {
       hashing::EMPTY_DIGEST,
     jdk_home: None,
     target_platform: Platform::None,
+    is_nailgunnable: false,
   });
 
   assert_eq!(
@@ -60,6 +61,7 @@ fn stdout_and_stderr_and_exit_code() {
       hashing::EMPTY_DIGEST,
     jdk_home: None,
     target_platform: Platform::None,
+    is_nailgunnable: false,
   });
 
   assert_eq!(
@@ -90,6 +92,7 @@ fn capture_exit_code_signal() {
       hashing::EMPTY_DIGEST,
     jdk_home: None,
     target_platform: Platform::None,
+    is_nailgunnable: false,
   });
 
   assert_eq!(
@@ -123,6 +126,7 @@ fn env() {
       hashing::EMPTY_DIGEST,
     jdk_home: None,
     target_platform: Platform::None,
+    is_nailgunnable: false,
   });
 
   let stdout = String::from_utf8(result.unwrap().stdout.to_vec()).unwrap();
@@ -162,6 +166,7 @@ fn env_is_deterministic() {
         hashing::EMPTY_DIGEST,
       jdk_home: None,
       target_platform: Platform::None,
+      is_nailgunnable: false,
     }
   }
 
@@ -185,6 +190,7 @@ fn binary_not_found() {
       hashing::EMPTY_DIGEST,
     jdk_home: None,
     target_platform: Platform::None,
+    is_nailgunnable: false,
   })
   .expect_err("Want Err");
 }
@@ -203,6 +209,7 @@ fn output_files_none() {
       hashing::EMPTY_DIGEST,
     jdk_home: None,
     target_platform: Platform::None,
+    is_nailgunnable: false,
   });
   assert_eq!(
     result.unwrap(),
@@ -234,6 +241,7 @@ fn output_files_one() {
       hashing::EMPTY_DIGEST,
     jdk_home: None,
     target_platform: Platform::None,
+    is_nailgunnable: false,
   });
 
   assert_eq!(
@@ -271,6 +279,7 @@ fn output_dirs() {
       hashing::EMPTY_DIGEST,
     jdk_home: None,
     target_platform: Platform::None,
+    is_nailgunnable: false,
   });
 
   assert_eq!(
@@ -309,6 +318,7 @@ fn output_files_many() {
       hashing::EMPTY_DIGEST,
     jdk_home: None,
     target_platform: Platform::None,
+    is_nailgunnable: false,
   });
 
   assert_eq!(
@@ -345,6 +355,7 @@ fn output_files_execution_failure() {
       hashing::EMPTY_DIGEST,
     jdk_home: None,
     target_platform: Platform::None,
+    is_nailgunnable: false,
   });
 
   assert_eq!(
@@ -379,6 +390,7 @@ fn output_files_partial_output() {
       hashing::EMPTY_DIGEST,
     jdk_home: None,
     target_platform: Platform::None,
+    is_nailgunnable: false,
   });
 
   assert_eq!(
@@ -411,6 +423,7 @@ fn output_overlapping_file_and_dir() {
       hashing::EMPTY_DIGEST,
     jdk_home: None,
     target_platform: Platform::None,
+    is_nailgunnable: false,
   });
 
   assert_eq!(
@@ -443,6 +456,7 @@ fn jdk_symlink() {
       hashing::EMPTY_DIGEST,
     jdk_home: Some(preserved_work_tmpdir.path().to_path_buf()),
     target_platform: Platform::None,
+    is_nailgunnable: false,
   });
   assert_eq!(
     result,
@@ -478,6 +492,7 @@ fn test_directory_preservation() {
         hashing::EMPTY_DIGEST,
       jdk_home: None,
       target_platform: Platform::None,
+      is_nailgunnable: false,
     },
     preserved_work_root.clone(),
     false,
@@ -518,6 +533,7 @@ fn test_directory_preservation_error() {
         hashing::EMPTY_DIGEST,
       jdk_home: None,
       target_platform: Platform::None,
+      is_nailgunnable: false,
     },
     preserved_work_root.clone(),
     false,
@@ -555,6 +571,7 @@ fn all_containing_directories_for_outputs_are_created() {
       hashing::EMPTY_DIGEST,
     jdk_home: None,
     target_platform: Platform::None,
+    is_nailgunnable: false,
   });
 
   assert_eq!(
@@ -587,6 +604,7 @@ fn output_empty_dir() {
       hashing::EMPTY_DIGEST,
     jdk_home: None,
     target_platform: Platform::None,
+    is_nailgunnable: false,
   });
 
   assert_eq!(
@@ -633,6 +651,7 @@ fn local_only_scratch_files_materialized() {
         roland_directory_digest,
       jdk_home: None,
       target_platform: Platform::None,
+      is_nailgunnable: false,
     },
     work_dir.path().to_owned(),
     true,

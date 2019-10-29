@@ -219,6 +219,18 @@ impl<'de> Deserialize<'de> for Digest {
   }
 }
 
+impl Digest {
+  pub fn of_bytes(bytes: &[u8]) -> Self {
+    let mut hasher = Sha256::default();
+    hasher.input(bytes);
+
+    Digest(
+      Fingerprint::from_bytes_unsafe(&hasher.fixed_result()),
+      bytes.len(),
+    )
+  }
+}
+
 ///
 /// A Write instance that fingerprints all data that passes through it.
 ///

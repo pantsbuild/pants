@@ -27,9 +27,9 @@ use bytes::{Bytes, BytesMut};
 use workunit_store::WorkUnitStore;
 
 pub struct CommandRunner {
-  store: Store,
+  pub store: Store,
   executor: task_executor::Executor,
-  work_dir: PathBuf,
+  pub work_dir: PathBuf,
   cleanup_local_dirs: bool,
   platform: Platform,
 }
@@ -93,7 +93,7 @@ impl CommandRunner {
   }
 }
 
-struct StreamedHermeticCommand {
+pub struct StreamedHermeticCommand {
   inner: Command,
 }
 

@@ -19,6 +19,7 @@ fn execute_process_request_equality() {
             unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule,
             jdk_home: None,
             target_platform: Platform::None,
+            is_nailgunnable: false,
         };
 
   fn hash<Hashable: Hash>(hashable: &Hashable) -> u64 {
