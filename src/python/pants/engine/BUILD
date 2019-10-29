@@ -219,6 +219,7 @@ python_library(
   dependencies=[
     ':native_engine_shared_library',
     ':fs',
+    ':interactive_runner',
     ':isolated_process',
     ':selectors',
     '3rdparty/python:cffi',
