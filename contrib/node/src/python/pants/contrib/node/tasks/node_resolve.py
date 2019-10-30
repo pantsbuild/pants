@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-from hashlib import sha1
 from typing import Dict, Optional, Type
 
 from pants.base.build_environment import get_buildroot
