@@ -400,7 +400,7 @@ class ExceptionSink:
 
   @classmethod
   def toggle_ignoring_sigint_v2_engine(cls, toggle: bool):
-    cls._signal_handler._toggle_ignoring_sigint_v2_engine(cls)
+    cls._signal_handler._toggle_ignoring_sigint_v2_engine(toggle)
 
   @classmethod
   def _iso_timestamp_for_now(cls):
