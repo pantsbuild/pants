@@ -188,6 +188,9 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     register('--allow-public-inference', type=bool, default=False,
              help='Allow public type member inference when workflow is outline-and-zinc. Otherwise, unannotated public types will be a compile error. Note that public inference will significantly slow down outlining. Does not work for rsc-and-zinc.', fingerprint=True)
 
+    register('--zinc-outline', type=bool, default=False,
+             help='Outline via Zinc when workflow is outline-and-zinc instead of a standalone scalac tool. This allows outlining to happen in the same nailgun instance as zinc compiles.', fingerprint=True)
+
     cls.register_jvm_tool(
       register,
       'rsc',
@@ -444,9 +447,11 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         classpath_directory_digests = []
         classpath_product = self.context.products.get_data('rsc_mixed_compile_classpath')
         classpath_entries = classpath_product.get_classpath_entries_for_targets(dependencies_for_target)
+
+        hermetic = self.execution_strategy == self.ExecutionStrategy.hermetic
         for _conf, classpath_entry in classpath_entries:
           classpath_paths.append(fast_relpath(classpath_entry.path, get_buildroot()))
-          if self.execution_strategy == self.ExecutionStrategy.hermetic and not classpath_entry.directory_digest:
+          if hermetic and not classpath_entry.directory_digest:
             raise AssertionError(
               "ClasspathEntry {} didn't have a Digest, so won't be present for hermetic "
               "execution of {}".format(classpath_entry, outliner)
@@ -498,14 +503,19 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
               youtline_args = wartremover_args + youtline_args
 
           target_sources = ctx.sources
-          args = [
-                   '-cp', os.pathsep.join(classpath_entry_paths),
-                   '-d', rsc_jar_file_relative_path,
-                 ] + self.get_options().extra_rsc_args + youtline_args + target_sources
+          
+          # TODO: m.jar digests aren't found, so hermetic will fail.
+          if use_youtline and not hermetic and self.get_options().zinc_outline:
+            self._zinc_outline(ctx, classpath_paths, target_sources, youtline_args)
+          else:
+            args = [
+                    '-cp', os.pathsep.join(classpath_entry_paths),
+                    '-d', rsc_jar_file_relative_path,
+                  ] + self.get_options().extra_rsc_args + youtline_args + target_sources
 
-          self.write_argsfile(ctx, args)
+            self.write_argsfile(ctx, args)
 
-          self._runtool(distribution, input_digest, ctx, use_youtline)
+            self._runtool(distribution, input_digest, ctx, use_youtline)
 
         self._record_target_stats(tgt,
           len(classpath_entry_paths),
@@ -724,9 +734,12 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     return self.RscZincMergedCompileContexts(
       rsc_cc=RscCompileContext(
         target=target,
-        analysis_file=None,
-        classes_dir=None,
-        jar_file=None,
+        # The analysis_file and classes_dir are not supposed to be useful
+        # It's a hacky way of preserving most of the logic in zinc_compile.py
+        # While allowing it to use RscCompileContexts for outlining.
+        analysis_file=os.path.join(rsc_dir, 'z.analysis.outline'),
+        classes_dir=ClasspathEntry(os.path.join(rsc_dir, 'zinc_classes'), None),
+        jar_file=ClasspathEntry(os.path.join(rsc_dir, 'z.jar.useless')),
         args_file=os.path.join(rsc_dir, 'rsc_args'),
         rsc_jar_file=ClasspathEntry(os.path.join(rsc_dir, 'm.jar')),
         log_dir=os.path.join(rsc_dir, 'logs'),
@@ -857,6 +870,54 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     if runjava_workunit is None:
       raise Exception('couldnt find work unit for underlying execution')
     return runjava_workunit
+
+  # Mostly a copy-paste from ZincCompile.compile with many options removed
+  def _zinc_outline(self, ctx, relative_classpath, target_sources, youtline_args):
+    zinc_youtline_args = [f'-S{arg}' for arg in youtline_args]
+    zinc_file_manager = DependencyContext.global_instance().defaulted_property(ctx.target, 'zinc_file_manager')
+
+    def relative_to_exec_root(path):
+      return fast_relpath(path, get_buildroot())
+
+    analysis_cache = relative_to_exec_root(ctx.analysis_file)
+    classes_dir = relative_to_exec_root(ctx.classes_dir.path)
+
+    scalac_classpath_entries = self.scalac_classpath_entries()
+    scala_path = [relative_to_exec_root(classpath_entry.path) for classpath_entry in scalac_classpath_entries]
+
+    zinc_args = []
+    zinc_args.extend([
+      '-log-level', self.get_options().level,
+      '-analysis-cache', analysis_cache,
+      '-classpath', os.pathsep.join(relative_classpath),
+    ])
+
+    compiler_bridge_classpath_entry = self._zinc.compile_compiler_bridge(self.context)
+    zinc_args.extend(['-compiled-bridge-jar', relative_to_exec_root(compiler_bridge_classpath_entry.path)])
+    zinc_args.extend(['-scala-path', ':'.join(scala_path)])
+
+    zinc_args.extend(zinc_youtline_args)
+
+    if not zinc_file_manager:
+      zinc_args.append('-no-zinc-file-manager')
+
+    jvm_options = []
+
+    if self.javac_classpath():
+      jvm_options.extend(['-Xbootclasspath/p:{}'.format(':'.join(self.javac_classpath()))])
+
+    jvm_options.extend(self._jvm_options)
+
+    zinc_args.extend(ctx.sources)
+
+    self.log_zinc_file(ctx.analysis_file)
+    self.write_argsfile(ctx, zinc_args)
+
+    return self.execution_strategy.match({
+      self.ExecutionStrategy.hermetic: lambda: None,
+      self.ExecutionStrategy.subprocess: lambda: self._compile_nonhermetic(jvm_options, ctx, classes_dir),
+      self.ExecutionStrategy.nailgun: lambda: self._compile_nonhermetic(jvm_options, ctx, classes_dir),
+    })()
 
   def _runtool(self, distribution, input_digest, ctx, use_youtline):
     if use_youtline:
