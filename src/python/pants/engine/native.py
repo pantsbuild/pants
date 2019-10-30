@@ -939,7 +939,6 @@ class Native(metaclass=SingletonMetaclass):
         self.context.utf8_buf(execution_options.process_execution_speculation_strategy),
         execution_options.process_execution_use_local_cache,
         self.context.utf8_dict(execution_options.remote_execution_headers),
-        self.context.utf8_buf(sys.executable),
         execution_options.process_execution_local_enable_nailgun,
       )
     if scheduler_result.is_throw:

@@ -39,14 +39,6 @@ use workunit_store::WorkUnitStore;
 static NAILGUN_MAIN_CLASS: &str = "com.martiansoftware.nailgun.NGServer";
 static ARGS_TO_START_NAILGUN: [&str; 1] = [":0"];
 
-static NAILGUN_PORT_ENV_VAR_FOR_CLIENT: &str = "NAILGUN_PORT";
-
-// We can hardcode this because we mix it into the digest in the EPR.
-// TODO(#8480) This hardcoded path can go away
-//              when we port the fetching of the clients and servers to the rust stack,
-//              or when we switch to a different client.
-static NG_CLIENT_PATH: &str = "bin/ng/1.0.0/ng";
-
 ///
 /// Constructs the ExecuteProcessRequest that would be used
 /// to start the nailgun servers if we needed to.
@@ -80,10 +72,8 @@ fn construct_nailgun_server_request(
 
 fn construct_nailgun_client_request(
   original_req: ExecuteProcessRequest,
-  python_distribution: String,
   client_main_class: String,
-  client_args: Vec<String>,
-  nailgun_port: Port,
+  mut client_args: Vec<String>,
 ) -> ExecuteProcessRequest {
   let ExecuteProcessRequest {
     argv: _argv,
@@ -98,25 +88,12 @@ fn construct_nailgun_client_request(
     target_platform,
     is_nailgunnable,
   } = original_req;
-  let full_client_cli = vec![
-    python_distribution,
-    NG_CLIENT_PATH.to_string(),
-    "--".to_string(),
-    client_main_class,
-  ]
-  .into_iter()
-  .chain(client_args.into_iter())
-  .collect();
-  let mut client_env = original_request_env;
-  client_env.insert(
-    NAILGUN_PORT_ENV_VAR_FOR_CLIENT.into(),
-    nailgun_port.to_string(),
-  );
+  client_args.insert(0, client_main_class);
   ExecuteProcessRequest {
-    argv: full_client_cli,
+    argv: client_args,
     input_files,
     description,
-    env: client_env,
+    env: original_request_env,
     output_files,
     output_directories,
     timeout,
@@ -141,7 +118,6 @@ pub struct CommandRunner {
   async_semaphore: async_semaphore::AsyncSemaphore,
   metadata: ExecuteProcessRequestMetadata,
   workdir_base: PathBuf,
-  python_distribution_absolute_path: PathBuf,
   executor: task_executor::Executor,
 }
 
@@ -149,7 +125,6 @@ impl CommandRunner {
   pub fn new(
     runner: crate::local::CommandRunner,
     metadata: ExecuteProcessRequestMetadata,
-    python_distribution_absolute_path: PathBuf,
     workdir_base: PathBuf,
     executor: task_executor::Executor,
   ) -> Self {
@@ -159,7 +134,6 @@ impl CommandRunner {
       async_semaphore: AsyncSemaphore::new(1),
       metadata: metadata,
       workdir_base: workdir_base,
-      python_distribution_absolute_path: python_distribution_absolute_path,
       executor: executor,
     }
   }
@@ -228,10 +202,6 @@ impl CommandRunner {
         .inspect(move |_| debug!("Materialized directory {:?} before connecting to nailgun server.", &workdir_for_server2))
         .to_boxed()
   }
-
-  fn get_python_distribution_path(&self) -> String {
-    format!("{}", self.python_distribution_absolute_path.display())
-  }
 }
 
 impl super::CommandRunner for CommandRunner {
@@ -241,7 +211,6 @@ impl super::CommandRunner for CommandRunner {
     context: Context,
   ) -> BoxFuture<FallibleExecuteProcessResult, String> {
     let nailgun_pool = self.nailgun_pool.clone();
-    let python_distribution = self.get_python_distribution_path();
 
     let original_request = self.extract_compatible_request(&req).unwrap();
     let original_request2 = original_request.clone();
@@ -318,13 +287,8 @@ impl super::CommandRunner for CommandRunner {
       .and_then(move |nailgun_port| {
         // Run the client request in the nailgun we have active.
         debug!("Got nailgun port {} for {}", nailgun_port, nailgun_name2);
-        let full_client_req = construct_nailgun_client_request(
-          original_request2,
-          python_distribution,
-          client_main_class,
-          client_args,
-          nailgun_port,
-        );
+        let full_client_req =
+          construct_nailgun_client_request(original_request2, client_main_class, client_args);
         trace!("Client request: {:#?}", full_client_req);
         run_nailgun_process(full_client_req, &workdir_for_this_nailgun2, nailgun_port)
       })
@@ -345,8 +309,10 @@ fn run_nailgun_process(
   working_dir: &PathBuf,
   nailgun_port: Port,
 ) -> BoxFuture<FallibleExecuteProcessResult, String> {
+  // TODO: There are a lot of other components of `ExecuteProcessRequest` that are not implemented
+  // here yet.
+
   // A task to render stdout.
-  //
   let (stdio_write, stdio_read) = child_channel::<ChildOutput>();
   let child_results_future =
     super::local::ChildResults::collect_from(stdio_read.map_err(|()| unreachable!()));
