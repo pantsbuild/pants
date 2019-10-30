@@ -155,8 +155,8 @@ impl StreamedHermeticCommand {
             exit_status
               .code()
               .or_else(|| exit_status.signal().map(Neg::neg))
-              .expect("Child process should exit via returned code or signal."))
-          )
+              .expect("Child process should exit via returned code or signal."),
+          ))
         });
 
         Ok(
