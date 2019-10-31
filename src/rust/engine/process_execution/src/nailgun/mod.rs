@@ -1,7 +1,7 @@
 use std::collections::btree_map::BTreeMap;
 use std::collections::btree_set::BTreeSet;
 use std::os::unix::fs::symlink;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -13,6 +13,7 @@ use log::{debug, trace};
 use nails::execution::{child_channel, ChildInput, ChildOutput, Command};
 use tokio::net::TcpStream;
 
+use crate::local::CapturedWorkdir;
 use crate::nailgun::nailgun_pool::{NailgunProcessName, Port};
 use crate::{
   Context, ExecuteProcessRequest, ExecuteProcessRequestMetadata, FallibleExecuteProcessResult,
@@ -34,6 +35,7 @@ use parsed_jvm_command_lines::ParsedJVMCommandLines;
 use std::fs::{read_link, remove_file};
 use store::Store;
 use workunit_store::WorkUnitStore;
+use std::net::SocketAddr;
 
 // Hardcoded constants for connecting to nailgun
 static NAILGUN_MAIN_CLASS: &str = "com.martiansoftware.nailgun.NGServer";
@@ -290,7 +292,15 @@ impl super::CommandRunner for CommandRunner {
         let full_client_req =
           construct_nailgun_client_request(original_request2, client_main_class, client_args);
         trace!("Client request: {:#?}", full_client_req);
-        run_nailgun_process(full_client_req, &workdir_for_this_nailgun2, nailgun_port)
+        Self::run_and_capture_workdir(
+          full_client_req,
+          context,
+          store.clone(),
+          executor.clone(),
+          true,
+          &workdir_for_this_nailgun2,
+          Some(nailgun_port)
+        )
       })
       .to_boxed()
   }
@@ -304,11 +314,21 @@ impl super::CommandRunner for CommandRunner {
   }
 }
 
+impl CapturedWorkdir for CommandRunner {
+    fn run_in_workdir(
+        workdir_path: &Path,
+        req: ExecuteProcessRequest,
+        nailgun_port: Option<Port>
+    ) -> Result<Box<dyn Stream<Item = ChildOutput, Error = String> + Send>, String> {
+        run_nailgun_process(req, workdir_path, nailgun_port)
+    }
+}
+
 fn run_nailgun_process(
   full_client_req: ExecuteProcessRequest,
-  working_dir: &PathBuf,
-  nailgun_port: Port,
-) -> BoxFuture<FallibleExecuteProcessResult, String> {
+  working_dir: &Path,
+  nailgun_port: Option<Port>,
+) -> Result<Box<dyn Stream<Item = ChildOutput, Error = String> + Send>, String> {
   // TODO: There are a lot of other components of `ExecuteProcessRequest` that are not implemented
   // here yet.
 
@@ -328,14 +348,15 @@ fn run_nailgun_process(
     working_dir: working_dir.to_path_buf(),
   };
 
-  let addr = format!("127.0.0.1:{}", nailgun_port).parse().unwrap();
+  let addr: SocketAddr = format!("127.0.0.1:{:?}", Some(nailgun_port).unwrap()).parse().unwrap();
 
   // And the connection.
   let (_stdin_write, stdin_read) = child_channel::<ChildInput>();
 
   debug!("Connecting to server at {}...", addr);
 
-  TcpStream::connect(&addr)
+  Ok(
+    TcpStream::connect(&addr)
     .and_then(move |stream| nails::client_handle_connection(stream, cmd, stdio_write, stdin_read))
     .map_err(|e| format!("Error communicating with server: {}", e))
     .join(child_results_future)
@@ -350,4 +371,5 @@ fn run_nailgun_process(
       }
     })
     .to_boxed()
+  )
 }

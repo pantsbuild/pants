@@ -27,6 +27,7 @@ use crate::{
 
 use bytes::{Bytes, BytesMut};
 use workunit_store::WorkUnitStore;
+use crate::nailgun::nailgun_pool::Port;
 
 pub struct CommandRunner {
   pub store: Store,
@@ -238,13 +239,22 @@ impl super::CommandRunner for CommandRunner {
     context: Context,
   ) -> BoxFuture<FallibleExecuteProcessResult, String> {
     let req = self.extract_compatible_request(&req).unwrap();
-    Self::run_and_capture_workdir(req, context, self.store.clone(), self.executor.clone(), self.cleanup_local_dirs, &self.work_dir)
+    Self::run_and_capture_workdir(
+      req,
+      context,
+      self.store.clone(),
+      self.executor.clone(),
+      self.cleanup_local_dirs,
+      &self.work_dir,
+      None
+    )
   }
 }
 impl CapturedWorkdir for CommandRunner {
   fn run_in_workdir(
     workdir_path: &Path,
-    req: ExecuteProcessRequest
+    req: ExecuteProcessRequest,
+    nailgun_port: Option<Port>
   ) -> Result<Box<dyn Stream<Item = ChildOutput, Error = String> + Send>, String> {
     StreamedHermeticCommand::new(&req.argv[0])
         .args(&req.argv[1..])
@@ -259,31 +269,7 @@ impl CapturedWorkdir for CommandRunner {
   }
 }
 
-
-//with_captured_workdir(epr, |workdir| {
-//StreamedHermeticCommand::new(&argv[0])
-//.args(&argv[1..])
-//.current_dir(&workdir_path)
-//.envs(env)
-//.stream()
-//})
-
-
-
-//fn with_captured_workdir<F: FnOnce<&Path, BoxFuture<ChildResults, String>>>(
-//  epr: ExecuteProcessRequest,
-//  execute_process: F
-//) -> BoxFuture<FallibleExecuteProcessResult, String> {
-//  run() before process goes here
-//      .and_then(|workdir| {
-//        execute_process(workdir)
-//      })
-//      .and_then(|child_results| {
-//        run() After process goes here
-//      })
-//}
-
-trait CapturedWorkdir {
+pub trait CapturedWorkdir {
 
   fn run_and_capture_workdir(
 
@@ -292,7 +278,8 @@ trait CapturedWorkdir {
     store: Store,
     executor: task_executor::Executor,
     cleanup_local_dirs: bool,
-    workdir_base: &Path
+    workdir_base: &Path,
+    nailgun_port: Option<Port>
 
   ) -> BoxFuture<FallibleExecuteProcessResult, String> {
     let workdir = try_future!(tempfile::Builder::new()
@@ -367,7 +354,7 @@ trait CapturedWorkdir {
           Ok(())
         })
         .and_then(move |()| {
-          Self::run_in_workdir(&workdir_path, req2)
+          Self::run_in_workdir(&workdir_path, req2, nailgun_port)
         })
         // NB: We fully buffer up the `Stream` above into final `ChildResults` below and so could
         // instead be using `CommandExt::output_async` above to avoid the `ChildResults::collect_from`
@@ -423,15 +410,8 @@ trait CapturedWorkdir {
           result
         })
         .to_boxed()
-
-//        .and_then(|workdir| {
-//          Self::run_in_workdir(workdir);
-//        })
-//        .and_then(|child_results| {
-//          run() After process goes here
-//        })
   }
 
-  fn run_in_workdir(workdir_path: &Path, req: ExecuteProcessRequest) -> Result<Box<dyn Stream<Item = ChildOutput, Error = String> + Send>, String>;
+  fn run_in_workdir(workdir_path: &Path, req: ExecuteProcessRequest, nailgun_port: Option<Port>) -> Result<Box<dyn Stream<Item = ChildOutput, Error = String> + Send>, String>;
 }
 
