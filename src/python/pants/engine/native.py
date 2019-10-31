@@ -873,8 +873,18 @@ class Native(metaclass=SingletonMetaclass):
       self.lib.execution_request_create(),
       self.lib.execution_request_destroy)
 
-  def new_session(self, scheduler, should_record_zipkin_spans, should_render_ui, ui_worker_count, build_id):
-    return self.gc(self.lib.session_create(scheduler, should_record_zipkin_spans, should_render_ui, ui_worker_count, self.context.utf8_buf(build_id)), self.lib.session_destroy)
+  def new_session(self, scheduler, should_record_zipkin_spans, should_render_ui, ui_worker_count, build_id, should_report_workunits: bool):
+    return self.gc(
+      self.lib.session_create(
+        scheduler,
+        should_record_zipkin_spans,
+        should_render_ui,
+        ui_worker_count,
+        self.context.utf8_buf(build_id),
+        should_report_workunits,
+      ),
+      self.lib.session_destroy
+    )
 
   def new_scheduler(self,
                     tasks,

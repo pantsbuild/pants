@@ -52,7 +52,6 @@ use logging::{Destination, Logger};
 use rule_graph::{GraphMaker, RuleGraph};
 use std::any::Any;
 use std::borrow::Borrow;
-use std::collections::HashSet;
 use std::ffi::CStr;
 use std::fs::File;
 use std::io;
@@ -390,9 +389,8 @@ fn make_core(
   )
 }
 
-fn workunits_to_py_tuple_value(workunits: &HashSet<WorkUnit>) -> Value {
+fn workunits_to_py_tuple_value<'a>(workunits: &mut impl Iterator<Item = &'a WorkUnit>) -> Value {
   let workunit_values = workunits
-    .iter()
     .map(|workunit: &WorkUnit| {
       let mut workunit_zipkin_trace_info = vec![
         externs::store_utf8("name"),
@@ -419,6 +417,22 @@ fn workunits_to_py_tuple_value(workunits: &HashSet<WorkUnit>) -> Value {
   externs::store_tuple(&workunit_values)
 }
 
+#[no_mangle]
+pub extern "C" fn poll_session_workunits(
+  scheduler_ptr: *mut Scheduler,
+  session_ptr: *mut Session,
+) -> Handle {
+  with_scheduler(scheduler_ptr, |_scheduler| {
+    with_session(session_ptr, |session| {
+      let value = session.workunit_store().with_latest_workunits(|workunits| {
+        let mut iter = workunits.iter();
+        workunits_to_py_tuple_value(&mut iter)
+      });
+      value.into()
+    })
+  })
+}
+
 ///
 /// Returns a Handle representing a dictionary where key is metric name string and value is
 /// metric value int.
@@ -437,8 +451,9 @@ pub extern "C" fn scheduler_metrics(
         .collect::<Vec<_>>();
       if session.should_record_zipkin_spans() {
         let workunits = session.workunit_store().get_workunits();
-
-        let value = workunits_to_py_tuple_value(&workunits.lock());
+        let locked = workunits.lock();
+        let mut iter = locked.iter();
+        let value = workunits_to_py_tuple_value(&mut iter);
         values.push(externs::store_utf8("engine_workunits"));
         values.push(value);
       };
@@ -649,6 +664,7 @@ pub extern "C" fn session_create(
   should_render_ui: bool,
   ui_worker_count: u64,
   build_id: Buffer,
+  should_report_workunits: bool,
 ) -> *const Session {
   let build_id = build_id
     .to_string()
@@ -660,6 +676,7 @@ pub extern "C" fn session_create(
       should_render_ui,
       ui_worker_count as usize,
       build_id,
+      should_report_workunits,
     )))
   })
 }
