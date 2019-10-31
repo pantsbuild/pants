@@ -251,7 +251,11 @@ impl CapturedWorkdir for CommandRunner {
         .current_dir(&workdir_path)
         .envs(req.env)
         .stream()
-        .map(Box::new)
+        .map(|s| {
+          // NB: Converting from `impl Stream` to `Box<dyn Stream>` requires this odd dance.
+          let stream: Box<dyn Stream<Item = _, Error = _> + Send> = Box::new(s);
+          stream
+        })
   }
 }
 
@@ -306,14 +310,12 @@ trait CapturedWorkdir {
 
     let store2 = store.clone();
 
-
-    let env = req.env;
+    let req2 = req.clone();
     let output_file_paths = req.output_files;
     let output_file_paths2 = output_file_paths.clone();
     let output_dir_paths = req.output_directories;
     let output_dir_paths2 = output_dir_paths.clone();
 
-    let argv = req.argv;
     let req_description = req.description;
     let maybe_jdk_home = req.jdk_home;
     let unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule =
@@ -365,7 +367,7 @@ trait CapturedWorkdir {
           Ok(())
         })
         .and_then(move |()| {
-          Self::run_in_workdir(&workdir_path, req)
+          Self::run_in_workdir(&workdir_path, req2)
         })
         // NB: We fully buffer up the `Stream` above into final `ChildResults` below and so could
         // instead be using `CommandExt::output_async` above to avoid the `ChildResults::collect_from`
