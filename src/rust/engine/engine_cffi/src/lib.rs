@@ -52,6 +52,7 @@ use logging::{Destination, Logger};
 use rule_graph::{GraphMaker, RuleGraph};
 use std::any::Any;
 use std::borrow::Borrow;
+use std::collections::HashSet;
 use std::ffi::CStr;
 use std::fs::File;
 use std::io;
@@ -61,6 +62,7 @@ use std::panic;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tempfile::TempDir;
+use workunit_store::WorkUnit;
 
 #[cfg(test)]
 mod tests;
@@ -395,6 +397,35 @@ fn make_core(
   )
 }
 
+fn workunits_to_py_tuple_value(workunits: &HashSet<WorkUnit>) -> Value {
+  let workunit_values = workunits
+    .iter()
+    .map(|workunit: &WorkUnit| {
+      let mut workunit_zipkin_trace_info = vec![
+        externs::store_utf8("name"),
+        externs::store_utf8(&workunit.name),
+        externs::store_utf8("start_secs"),
+        externs::store_u64(workunit.time_span.start.secs),
+        externs::store_utf8("start_nanos"),
+        externs::store_u64(u64::from(workunit.time_span.start.nanos)),
+        externs::store_utf8("duration_secs"),
+        externs::store_u64(workunit.time_span.duration.secs),
+        externs::store_utf8("duration_nanos"),
+        externs::store_u64(u64::from(workunit.time_span.duration.nanos)),
+        externs::store_utf8("span_id"),
+        externs::store_utf8(&workunit.span_id),
+      ];
+      if let Some(parent_id) = &workunit.parent_id {
+        workunit_zipkin_trace_info.push(externs::store_utf8("parent_id"));
+        workunit_zipkin_trace_info.push(externs::store_utf8(parent_id));
+      }
+      externs::store_dict(&workunit_zipkin_trace_info)
+    })
+    .collect::<Vec<_>>();
+
+  externs::store_tuple(&workunit_values)
+}
+
 ///
 /// Returns a Handle representing a dictionary where key is metric name string and value is
 /// metric value int.
@@ -412,35 +443,11 @@ pub extern "C" fn scheduler_metrics(
         .flat_map(|(metric, value)| vec![externs::store_utf8(metric), externs::store_i64(value)])
         .collect::<Vec<_>>();
       if session.should_record_zipkin_spans() {
-        let workunits = session
-          .workunit_store()
-          .get_workunits()
-          .lock()
-          .iter()
-          .map(|workunit| {
-            let mut workunit_zipkin_trace_info = vec![
-              externs::store_utf8("name"),
-              externs::store_utf8(&workunit.name),
-              externs::store_utf8("start_secs"),
-              externs::store_u64(workunit.time_span.start.secs),
-              externs::store_utf8("start_nanos"),
-              externs::store_u64(u64::from(workunit.time_span.start.nanos)),
-              externs::store_utf8("duration_secs"),
-              externs::store_u64(workunit.time_span.duration.secs),
-              externs::store_utf8("duration_nanos"),
-              externs::store_u64(u64::from(workunit.time_span.duration.nanos)),
-              externs::store_utf8("span_id"),
-              externs::store_utf8(&workunit.span_id),
-            ];
-            if let Some(parent_id) = &workunit.parent_id {
-              workunit_zipkin_trace_info.push(externs::store_utf8("parent_id"));
-              workunit_zipkin_trace_info.push(externs::store_utf8(parent_id));
-            }
-            externs::store_dict(&workunit_zipkin_trace_info)
-          })
-          .collect::<Vec<_>>();
+        let workunits = session.workunit_store().get_workunits();
+
+        let value = workunits_to_py_tuple_value(&workunits.lock());
         values.push(externs::store_utf8("engine_workunits"));
-        values.push(externs::store_tuple(&workunits));
+        values.push(value);
       };
       externs::store_dict(&values).into()
     })
