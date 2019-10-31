@@ -136,7 +136,6 @@ def warn_or_error(
   frame_info: Optional[inspect.FrameInfo] = None,
   context: int = 1,
   ensure_stderr: bool = False,
-  print_warning: bool = True,
 ) -> None:
   """Check the removal_version against the current pants version.
 
@@ -188,7 +187,7 @@ def warn_or_error(
   else:
     context_lines = '<no code context available>'
 
-  if removal_semver > PANTS_SEMVER and print_warning:
+  if removal_semver > PANTS_SEMVER:
     if ensure_stderr:
       # No warning filters can stop us from printing this message directly to stderr.
       warning_msg = warnings.formatwarning(
