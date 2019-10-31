@@ -41,7 +41,7 @@ python_tests(
   dependencies = [
     'src/python/pants/build_graph',
     'src/python/pants/engine/legacy:graph',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil/subsystem',
   ]
 )
 
@@ -99,7 +99,7 @@ python_tests(
     'src/python/pants/base:payload_field',
     'src/python/pants/build_graph',
     'tests/python/pants_test:test_base',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil/subsystem',
   ]
 )
 
@@ -123,7 +123,7 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/source',
     'tests/python/pants_test:test_base',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil/subsystem',
   ]
 )
 

@@ -8,14 +8,3 @@ python_tests(
     'src/python/pants/subsystem',
   ],
 )
-
-python_library(
-  name='subsystem_utils',
-  sources=['subsystem_util.py'],
-  dependencies=[
-    'src/python/pants/base:deprecated',
-    'src/python/pants/build_graph',
-    'src/python/pants/subsystem',
-    'tests/python/pants_test/option/util',
-  ],
-)

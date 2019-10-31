@@ -21,7 +21,7 @@ from pants.java.distribution.distribution import (
 )
 from pants.util.contextutil import environment_as, temporary_dir, temporary_file
 from pants.util.dirutil import chmod_plus_x, safe_open, touch
-from pants_test.subsystem.subsystem_util import global_subsystem_instance
+from pants.testutil.subsystem.util import global_subsystem_instance
 
 
 class EXE:

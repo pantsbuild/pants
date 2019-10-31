@@ -30,6 +30,9 @@ from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source.source_root import SourceRootConfig
 from pants.subsystem.subsystem import Subsystem
 from pants.task.goal_options_mixin import GoalOptionsMixin
+from pants.testutil.engine.util import init_native
+from pants.testutil.option.fakes import create_options_for_optionables
+from pants.testutil.subsystem.util import init_subsystem, init_subsystems
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import (
@@ -44,9 +47,7 @@ from pants.util.dirutil import (
 from pants.util.memo import memoized_method
 from pants.util.meta import classproperty
 from pants_test.base.context_utils import create_context_from_options
-from pants_test.engine.util import init_native
-from pants_test.option.util.fakes import create_options_for_optionables
-from pants_test.subsystem import subsystem_util
+
 
 
 class AbstractTestGenerator(ABC):
@@ -324,7 +325,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
 
     self._build_configuration = self.build_config()
     self._inited_target = False
-    subsystem_util.init_subsystem(Target.TagAssignments)
+    init_subsystem(Target.TagAssignments)
 
   def buildroot_files(self, relpath=None):
     """Returns the set of all files under the test build root.
@@ -526,7 +527,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
 
   def _init_target_subsystem(self):
     if not self._inited_target:
-      subsystem_util.init_subsystems(self.subsystems)
+      init_subsystems(self.subsystems)
       self._inited_target = True
 
   def target(self, spec):

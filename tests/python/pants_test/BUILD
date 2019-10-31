@@ -10,7 +10,7 @@ python_library(
     'tests/python/pants_test/jvm:nailgun_task_test_base',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
     'tests/python/pants_test/engine:engine_test_base',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil/subsystem',
   ],
   provides=pants_setup_py(
     name='pantsbuild.pants.testinfra',
@@ -73,12 +73,12 @@ python_library(
     'src/python/pants/source',
     'src/python/pants/subsystem',
     'src/python/pants/task',
+    'src/python/pants/testutil/engine',
+    'src/python/pants/testutil/option',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
     'tests/python/pants_test/base:context_utils',
-    'tests/python/pants_test/engine:util',
-    'tests/python/pants_test/option/util',
   ]
 )
 
@@ -116,7 +116,7 @@ python_tests(
     'src/python/pants/backend/jvm/subsystems:junit',
     'src/python/pants/build_graph',
     'src/python/pants/source',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil/subsystem',
   ]
 )
 

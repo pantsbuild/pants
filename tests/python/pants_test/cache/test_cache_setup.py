@@ -20,8 +20,8 @@ from pants.cache.resolver import Resolver
 from pants.cache.restful_artifact_cache import RESTfulArtifactCache
 from pants.subsystem.subsystem import Subsystem
 from pants.task.task import Task
+from pants.testutil.option.fakes import create_options
 from pants.util.contextutil import temporary_dir
-from pants_test.option.util.fakes import create_options
 from pants_test.test_base import TestBase
 from pants_test.testutils.mock_logger import MockLogger
 

@@ -8,7 +8,7 @@ from pants.backend.project_info.tasks.depmap import Depmap
 from pants.backend.python.register import build_file_aliases as register_python
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.build_graph.register import build_file_aliases as register_core
-from pants_test.subsystem import subsystem_util
+from pants.testutil.subsystem.util import init_subsystem
 from pants_test.task_test_base import ConsoleTaskTestBase
 
 
@@ -25,7 +25,7 @@ class DepmapTest(BaseDepmapTest):
 
   def setUp(self):
     super().setUp()
-    subsystem_util.init_subsystem(PythonBinary.Defaults)
+    init_subsystem(PythonBinary.Defaults)
 
     def add_to_build_file(path, name, type, deps=(), **kwargs):
       self.add_to_build_file(path, dedent("""

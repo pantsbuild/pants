@@ -6,7 +6,7 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.source.source_root import SourceRootConfig
-from pants_test.subsystem.subsystem_util import init_subsystems
+from pants.testutil.subsystem.util import init_subsystems
 from pants_test.test_base import TestBase
 
 

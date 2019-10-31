@@ -16,7 +16,7 @@ python_tests(
     'contrib/buildrefactor/src/python/pants/contrib/buildrefactor',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil/subsystem',
     'tests/python/pants_test:task_test_base',
   ]
 )
@@ -30,7 +30,7 @@ python_tests(
     'contrib/buildrefactor/src/python/pants/contrib/buildrefactor',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/base:build_environment',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil/subsystem',
     'tests/python/pants_test:task_test_base',
   ]
 )

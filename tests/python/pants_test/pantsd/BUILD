@@ -97,7 +97,7 @@ python_tests(
   coverage = ['pants.pantsd.watchman_launcher'],
   dependencies = [
     'tests/python/pants_test/pantsd:test_deps',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil/subsystem',
     'src/python/pants/pantsd:watchman_launcher'
   ]
 )

@@ -89,7 +89,7 @@ python_tests(
   sources = ['test_resolver.py'],
   dependencies = [
     'src/python/pants/cache',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil/subsystem',
   ]
 )
 

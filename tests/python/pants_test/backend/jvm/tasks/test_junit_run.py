@@ -27,7 +27,7 @@ from pants.java.executor import SubprocessExecutor
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import touch
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
-from pants_test.subsystem.subsystem_util import global_subsystem_instance, init_subsystem
+from pants.testutil.subsystem.util import global_subsystem_instance, init_subsystem
 from pants_test.task_test_base import ensure_cached
 
 

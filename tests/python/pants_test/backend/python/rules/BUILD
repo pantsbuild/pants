@@ -13,7 +13,7 @@ python_tests(
     'src/python/pants/util:collections',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:test_base',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil/subsystem',
   ]
 )
 

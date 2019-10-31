@@ -6,7 +6,7 @@ python_tests(
   sources=['test_bootstrapper.py'],
   dependencies=[
     'src/python/pants/ivy',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil/subsystem',
   ]
 )
 
@@ -16,6 +16,6 @@ python_tests(
   dependencies=[
     'src/python/pants/ivy',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil/subsystem',
   ]
 )

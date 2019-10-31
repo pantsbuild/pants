@@ -54,7 +54,7 @@ python_library(
     'src/python/pants/build_graph',
     'src/python/pants/goal:context',
     'src/python/pants/goal:run_tracker',
-    'tests/python/pants_test/option/util',
+    'src/python/pants/testutil/option',
   ]
 )
 
@@ -199,8 +199,8 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:osutil',
+    'src/python/pants/testutil/option',
     'tests/python/pants_test:test_base',
-    'tests/python/pants_test/option/util',
   ],
   tags={'platform_specific_behavior'},
 )

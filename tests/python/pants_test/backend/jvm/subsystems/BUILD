@@ -10,7 +10,7 @@ python_tests(
     'src/python/pants/java:executor',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil/subsystem',
   ]
 )
 
@@ -26,7 +26,7 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:scalastyle',
     'src/python/pants/backend/jvm/tasks/jvm_compile/zinc',
     'tests/python/pants_test/jvm:nailgun_task_test_base',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil/subsystem',
   ]
 )
 
@@ -43,7 +43,7 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:scalastyle',
     'src/python/pants/backend/jvm/tasks/jvm_compile/zinc',
     'tests/python/pants_test/jvm:nailgun_task_test_base',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil/subsystem',
   ]
 )
 
@@ -67,7 +67,7 @@ python_tests(
     'src/python/pants/fs',
     'src/python/pants/java/distribution',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil/subsystem',
     'tests/python/pants_test:int-test',
     'testprojects/src/java/org/pantsbuild/testproject:shading_directory',
     'testprojects/3rdparty:managed_directory',
@@ -87,7 +87,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test:test_base',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil/subsystem',
   ]
 )
 
@@ -99,7 +99,7 @@ python_tests(
     'src/python/pants/java/distribution',
     'src/python/pants/java:executor',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil/subsystem',
     'tests/python/pants_test:int-test',
     'testprojects/src/java/org/pantsbuild/testproject:depman_directory',
     'testprojects/tests/java/org/pantsbuild/testproject:depman_directory',

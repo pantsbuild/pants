@@ -10,7 +10,7 @@ from pants.fs.archive import ZIP
 from pants.java.distribution.distribution import DistributionLocator
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
-from pants_test.subsystem.subsystem_util import init_subsystem
+from pants.testutil.subsystem.util import init_subsystem
 
 
 class ShaderIntegrationTest(PantsRunIntegrationTest):

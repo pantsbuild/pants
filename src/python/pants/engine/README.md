@@ -192,7 +192,7 @@ of `Nodes` as their dependencies change.
 
 The recommended way to install `@rule`s is to return them as a list from a `def rules()` definition
 in a plugin's `register.py` file. Unit tests can either invoke `@rule`s with fully mocked
-dependencies via `pants_test.engine.util.run_rule`, or extend `pants_test.test_base.TestBase` to
+dependencies via `pants.testutil.engine.util.run_rule`, or extend `pants_test.test_base.TestBase` to
 construct and execute a scheduler for a given set of rules.
 
 In general, there are two types of rules that you can define:

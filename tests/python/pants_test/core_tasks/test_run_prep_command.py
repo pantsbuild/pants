@@ -10,7 +10,7 @@ from pants.build_graph.target import Target
 from pants.core_tasks.run_prep_command import RunPrepCommandBase
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import touch
-from pants_test.subsystem.subsystem_util import init_subsystem
+from pants.testutil.subsystem.util import init_subsystem
 from pants_test.task_test_base import TaskTestBase
 
 

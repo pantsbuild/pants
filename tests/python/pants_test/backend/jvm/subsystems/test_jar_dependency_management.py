@@ -9,7 +9,7 @@ from pants.backend.jvm.subsystems.jar_dependency_management import (
 )
 from pants.java.jar.jar_dependency_utils import M2Coordinate
 from pants.subsystem.subsystem import Subsystem
-from pants_test.subsystem.subsystem_util import global_subsystem_instance
+from pants.testutil.subsystem.util import global_subsystem_instance
 from pants_test.test_base import TestBase
 
 

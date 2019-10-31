@@ -17,7 +17,7 @@ python_tests(
     'src/python/pants/source',
     'src/python/pants/source:payload_fields',
     'tests/python/pants_test:test_base',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil/subsystem',
   ]
 )
 

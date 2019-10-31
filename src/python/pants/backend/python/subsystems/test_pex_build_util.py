@@ -11,8 +11,8 @@ from pex.pex_builder import PEXBuilder
 from pants.backend.python.subsystems.pex_build_util import PexBuilderWrapper
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.source.source_root import SourceRootConfig
+from pants.testutil.subsystem.util import init_subsystem
 from pants.util.contextutil import open_zip, temporary_dir, temporary_file_path
-from pants_test.subsystem import subsystem_util
 from pants_test.test_base import TestBase
 
 
@@ -32,7 +32,7 @@ class TestPexBuilderWrapper(TestBase):
 
   @staticmethod
   def pex_builder_wrapper(**kwargs):
-    subsystem_util.init_subsystem(PexBuilderWrapper.Factory)
+    init_subsystem(PexBuilderWrapper.Factory)
     return PexBuilderWrapper.Factory.create(PEXBuilder(**kwargs))
 
   @staticmethod
@@ -47,7 +47,7 @@ class TestPexBuilderWrapper(TestBase):
       yield pathlib.Path(chroot)
 
   def test(self):
-    subsystem_util.init_subsystem(SourceRootConfig)
+    init_subsystem(SourceRootConfig)
     self.create_file('src/python/package/module.py')
     implicit_package_target = self.make_target(spec='src/python/package',
                                                target_type=PythonLibrary,

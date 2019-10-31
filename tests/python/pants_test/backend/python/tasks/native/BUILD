@@ -23,7 +23,7 @@ python_tests(
     'tests/python/pants_test/backend/python/tasks/util',
     'tests/python/pants_test/backend/python/tasks:python_task_test_base',
     'tests/python/pants_test/engine:scheduler_test_base',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil/subsystem',
     'tests/python/pants_test:interpreter_selection_utils',
     'tests/python/pants_test:task_test_base',
   ],

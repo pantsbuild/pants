@@ -23,7 +23,7 @@ from pants.util.contextutil import environment_as, pushd, temporary_dir
 from pants.util.dirutil import is_executable, safe_open
 from pants.util.strutil import safe_shlex_join
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
-from pants_test.subsystem.subsystem_util import global_subsystem_instance, init_subsystems
+from pants.testutil.subsystem.util import global_subsystem_instance, init_subsystems
 from pants_test.test_base import TestBase
 
 

@@ -13,9 +13,9 @@ python_library(
     'src/python/pants/engine:rules',
     'src/python/pants/engine:scheduler',
     'src/python/pants/engine:struct',
+    'src/python/pants/testutil/option',
     'src/python/pants/util:objects',
-    'tests/python/pants_test/option/util',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil/subsystem',
   ],
 )
 
@@ -179,7 +179,7 @@ python_tests(
     'src/python/pants/engine:rules',
     'src/python/pants/engine:selectors',
     'tests/python/pants_test/engine/examples:parsers',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil/subsystem',
     'tests/python/pants_test:test_base',
   ]
 )

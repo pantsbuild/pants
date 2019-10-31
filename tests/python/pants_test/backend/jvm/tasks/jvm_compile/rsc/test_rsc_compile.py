@@ -18,7 +18,7 @@ from pants.java.jar.jar_dependency import JarDependency
 from pants.option.ranked_value import RankedValue
 from pants.util.contextutil import temporary_dir
 from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
-from pants_test.subsystem.subsystem_util import init_subsystem
+from pants.testutil.subsystem.util import init_subsystem
 
 
 class LightWeightVTS:

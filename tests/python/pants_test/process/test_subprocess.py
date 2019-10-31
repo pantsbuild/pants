@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.process.subprocess import Subprocess
-from pants_test.subsystem.subsystem_util import global_subsystem_instance
+from pants.testutil.subsystem.util import global_subsystem_instance
 from pants_test.test_base import TestBase
 
 

@@ -5,8 +5,8 @@ python_tests(
   sources=['test_errorprone.py'],
   dependencies=[
     'contrib/errorprone/src/python/pants/contrib/errorprone/tasks',
+    'src/python/pants/testutil/option',
     'tests/python/pants_test/jvm:nailgun_task_test_base',
-    'tests/python/pants_test/option/util',
     'tests/python/pants_test:test_base',
   ]
 )

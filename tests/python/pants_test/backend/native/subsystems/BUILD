@@ -10,7 +10,7 @@ python_tests(
     'tests/python/pants_test:test_base',
     'tests/python/pants_test/backend/native/util',
     'tests/python/pants_test/engine:scheduler_test_base',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil/subsystem',
   ],
   tags={'platform_specific_behavior'},
   timeout=120,

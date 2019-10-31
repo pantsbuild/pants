@@ -16,7 +16,7 @@ python_tests(
   dependencies=[
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/java/jar',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil/subsystem',
   ]
 )
 
@@ -49,7 +49,7 @@ python_tests(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/build_graph',
     'tests/python/pants_test:test_base',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil/subsystem',
   ],
 )
 

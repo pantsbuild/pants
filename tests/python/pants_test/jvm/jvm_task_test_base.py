@@ -6,7 +6,7 @@ import os
 from pants.backend.jvm.subsystems.resolve_subsystem import JvmResolveSubsystem
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.util.dirutil import safe_file_dump, safe_mkdir, safe_mkdtemp
-from pants_test.subsystem.subsystem_util import init_subsystem
+from pants.testutil.subsystem.util import init_subsystem
 from pants_test.task_test_base import TaskTestBase
 
 

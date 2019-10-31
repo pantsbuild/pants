@@ -6,7 +6,7 @@ python_tests(
   dependencies=[
     'contrib/jax_ws/src/python/pants/contrib/jax_ws/tasks',
     'tests/python/pants_test/jvm:nailgun_task_test_base',
-    'tests/python/pants_test/option/util',
+    'src/python/pants/testutil/option',
     'tests/python/pants_test:test_base',
   ]
 )

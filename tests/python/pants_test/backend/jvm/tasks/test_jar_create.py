@@ -15,7 +15,7 @@ from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.util.contextutil import open_zip
 from pants_test.jvm.jar_task_test_base import JarTaskTestBase
-from pants_test.subsystem.subsystem_util import init_subsystem
+from pants.testutil.subsystem.util import init_subsystem
 from pants_test.task_test_base import ensure_cached
 
 

@@ -7,7 +7,7 @@ python_tests(
   dependencies=[
     'contrib/node/src/python/pants/contrib/node/subsystems',
     'tests/python/pants_test/base:context_utils',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil/subsystem',
   ]
 )
 

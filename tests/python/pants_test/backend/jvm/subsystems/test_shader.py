@@ -10,7 +10,7 @@ from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import safe_delete
-from pants_test.subsystem.subsystem_util import init_subsystem
+from pants.testutil.subsystem.util import init_subsystem
 
 
 class ShaderTest(unittest.TestCase):

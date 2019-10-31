@@ -11,7 +11,7 @@ from pants.fs.archive import TGZ
 from pants.init.repro import Repro, Reproducer
 from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import safe_file_dump
-from pants_test.subsystem.subsystem_util import global_subsystem_instance
+from pants.testutil.subsystem.util import global_subsystem_instance
 
 
 class ReproTest(unittest.TestCase):

@@ -6,7 +6,7 @@ python_library(
   dependencies = [
     'contrib/python/src/python/pants/contrib/python/checks/checker',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/option/util',
+    'src/python/pants/testutil/option',
   ],
 )
 
@@ -16,7 +16,7 @@ python_tests(
     'contrib/python/src/python/pants/contrib/python/checks/checker',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/option/util',
+    'src/python/pants/testutil/option',
     'tests/python/pants_test:test_base',
   ]
 )

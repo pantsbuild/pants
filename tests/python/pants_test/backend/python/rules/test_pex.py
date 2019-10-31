@@ -30,7 +30,7 @@ from pants.engine.selectors import Params
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_dir
 from pants.util.strutil import create_path_env_var
-from pants_test.subsystem.subsystem_util import init_subsystems
+from pants.testutil.subsystem.util import init_subsystems
 from pants_test.test_base import TestBase
 
 

@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.subsystem.subsystem import Subsystem
-from pants_test.option.util.fakes import create_options_for_optionables
+from pants.testutil.option.fakes import create_options_for_optionables
 
 
 def global_subsystem_instance(subsystem_type, options=None):
@@ -61,7 +61,7 @@ def init_subsystems(subsystem_types, options=None):
 
 def init_subsystem(subsystem_type, options=None):
   """
-  Singular form of :func:`pants_test.subsystem.subsystem_util.init_subsystems`
+  Singular form of :func:`pants.testutil.subsystem.util.init_subsystems`
 
   :API: public
 
