@@ -29,4 +29,7 @@ pub struct Types {
   pub url_to_fetch: TypeId,
   pub string: TypeId,
   pub bytes: TypeId,
+  pub construct_interactive_process_result: Function,
+  pub interactive_process_request: TypeId,
+  pub interactive_process_result: TypeId,
 }

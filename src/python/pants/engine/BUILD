@@ -101,6 +101,17 @@ python_library(
 )
 
 python_library(
+  name='interactive_runner',
+  sources=['interactive_runner.py'],
+  dependencies=[
+    '3rdparty/python:dataclasses',
+    'src/python/pants/base:exception_sink',
+    ':rules',
+    ':platform',
+  ]
+)
+
+python_library(
   name='isolated_process',
   sources=['isolated_process.py'],
   dependencies=[
@@ -208,6 +219,7 @@ python_library(
   dependencies=[
     ':native_engine_shared_library',
     ':fs',
+    ':interactive_runner',
     ':isolated_process',
     ':selectors',
     '3rdparty/python:cffi',

@@ -32,6 +32,7 @@ from pants.engine.fs import (
   Snapshot,
   UrlToFetch,
 )
+from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveProcessResult
 from pants.engine.isolated_process import (
   FallibleExecuteProcessResult,
   MultiPlatformExecuteProcessRequest,
@@ -359,7 +360,7 @@ class _FFISpecification(object):
     c = self._ffi.from_handle(context_handle)
     return c.utf8_buf(str(c.from_id(type_id.tup_0).__name__))
 
-  # If we try to pass a None to the CFFI layer, it will silently fail 
+  # If we try to pass a None to the CFFI layer, it will silently fail
   # in a weird way. So instead we use the empty string/bytestring as
   # a de-facto null value, in both `extern_val_to_str` and
   # `extern_val_to_bytes`.
@@ -570,6 +571,9 @@ class EngineTypes(NamedTuple):
   url_to_fetch: TypeId
   string: TypeId
   bytes: TypeId
+  construct_interactive_process_result: Function
+  interactive_process_request: TypeId
+  interactive_process_result: TypeId
 
 
 class PyResult(NamedTuple):
@@ -692,9 +696,11 @@ class Native(metaclass=SingletonMetaclass):
     When an exception is raised in the body of a CFFI extern, the `onerror` handler is used to
     capture it, storing the exception info as an instance of `CFFIExternMethodRuntimeErrorInfo` with
     `.add_cffi_extern_method_runtime_exception()`. The scheduler will then check whether any
-    exceptions were stored by calling `.cffi_extern_method_runtime_exceptions()` after specific
-    calls to the native library which may raise. `.reset_cffi_extern_method_runtime_exceptions()`
-    should be called after the stored exception has been handled or before it is re-raised.
+    exceptions were stored by calling `.consume_cffi_extern_method_runtime_exceptions()` after
+    specific calls to the native library which may raise.
+
+    Note that `.consume_cffi_extern_method_runtime_exceptions()` will also clear out all stored
+    exceptions, so exceptions should be stored separately after consumption.
 
     Some ways that exceptions in CFFI extern methods can be handled are described in
     https://cffi.readthedocs.io/en/latest/using.html#extern-python-reference.
@@ -706,8 +712,13 @@ class Native(metaclass=SingletonMetaclass):
   def reset_cffi_extern_method_runtime_exceptions(self):
     self._errors_during_execution = []
 
-  def cffi_extern_method_runtime_exceptions(self):
+  def _peek_cffi_extern_method_runtime_exceptions(self):
     return self._errors_during_execution
+
+  def consume_cffi_extern_method_runtime_exceptions(self):
+    res = self._peek_cffi_extern_method_runtime_exceptions()
+    self.reset_cffi_extern_method_runtime_exceptions()
+    return res
 
   def add_cffi_extern_method_runtime_exception(self, error_info):
     assert isinstance(error_info, self.CFFIExternMethodRuntimeErrorInfo)
@@ -907,7 +918,10 @@ class Native(metaclass=SingletonMetaclass):
         url_to_fetch=ti(UrlToFetch),
         string=ti(str),
         bytes=ti(bytes),
-      )
+        construct_interactive_process_result=func(InteractiveProcessResult),
+        interactive_process_request=ti(InteractiveProcessRequest),
+        interactive_process_result=ti(InteractiveProcessResult),
+    )
 
     scheduler_result = self.lib.scheduler_create(
         tasks,

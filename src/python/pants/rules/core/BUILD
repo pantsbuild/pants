@@ -5,6 +5,7 @@ python_library(
       'src/python/pants/build_graph',
       'src/python/pants/engine:goal',
       'src/python/pants/engine:rules',
+      'src/python/pants/engine:interactive_runner',
       'src/python/pants/engine:selectors',
       'src/python/pants/engine:addressable',
       'src/python/pants/engine:console',
