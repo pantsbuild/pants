@@ -28,6 +28,8 @@ class ScalaFix(RewriteBase):
              help='The config file to use (in HOCON format).')
     register('--rules', default='ProcedureSyntax', type=str, fingerprint=True,
              help='The `rules` arg to scalafix: generally a name like `ProcedureSyntax`.')
+    register('--scala-version', default='2.12.10', type=str, fingerprint=True,
+             help='The Scala version that the source code was compiled with.')
     register('--semantic', type=bool, default=False, fingerprint=True,
              help='True to enable `semantic` scalafix rules by requesting compilation and '
                   'providing the target classpath to scalafix. To enable this option, you '
@@ -88,6 +90,7 @@ class ScalaFix(RewriteBase):
     tool_classpath = self.tool_classpath('scalafix-tool-classpath')
     if tool_classpath:
       args.append('--tool-classpath={}'.format(os.pathsep.join(tool_classpath)))
+    args.append('--scala-version={}'.format(self.get_options().scala_version))
     if self.get_options().semantic:
       # If semantic checks are enabled, we need the full classpath for these targets.
       runtime_classpath = self.context.products.get_data('runtime_classpath')
