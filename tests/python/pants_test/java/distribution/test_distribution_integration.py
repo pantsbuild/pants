@@ -6,9 +6,9 @@ from contextlib import contextmanager
 from unittest import skipIf
 
 from pants.java.distribution.distribution import Distribution, DistributionLocator
+from pants.testutil.subsystem.util import global_subsystem_instance
 from pants.util.osutil import OS_ALIASES, get_os_name
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
-from pants.testutil.subsystem.util import global_subsystem_instance
 
 
 @contextmanager

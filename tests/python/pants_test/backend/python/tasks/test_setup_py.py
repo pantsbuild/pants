@@ -19,11 +19,11 @@ from pants.build_graph.prep_command import PrepCommand
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.fs.archive import TGZ
+from pants.testutil.subsystem.util import init_subsystem
 from pants.util.contextutil import temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 from pants_test.interpreter_selection_utils import skip_unless_python36_present
-from pants.testutil.subsystem.util import init_subsystem
 
 
 class SetupPyTestBase(PythonTaskTestBase):

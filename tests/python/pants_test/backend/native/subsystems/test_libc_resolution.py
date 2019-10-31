@@ -4,8 +4,8 @@
 from pants.backend.native.config.environment import Platform
 from pants.backend.native.subsystems.libc_dev import LibcDev
 from pants.backend.native.subsystems.utils.parse_search_dirs import ParseSearchDirs
-from pants_test.backend.native.util.platform_utils import platform_specific
 from pants.testutil.subsystem.util import global_subsystem_instance, init_subsystems
+from pants_test.backend.native.util.platform_utils import platform_specific
 from pants_test.test_base import TestBase
 
 

@@ -13,9 +13,9 @@ from pants.backend.jvm.tasks.jar_create import JarCreate, is_jvm_library
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
+from pants.testutil.subsystem.util import init_subsystem
 from pants.util.contextutil import open_zip
 from pants_test.jvm.jar_task_test_base import JarTaskTestBase
-from pants.testutil.subsystem.util import init_subsystem
 from pants_test.task_test_base import ensure_cached
 
 

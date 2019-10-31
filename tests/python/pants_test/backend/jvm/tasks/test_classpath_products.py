@@ -17,9 +17,9 @@ from pants.base.exceptions import TaskError
 from pants.build_graph.target import Target
 from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
+from pants.testutil.subsystem.util import init_subsystem
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import relativize_paths
-from pants.testutil.subsystem.util import init_subsystem
 from pants_test.test_base import TestBase
 from pants_test.testutils.file_test_util import check_file_content, contains_exact_files
 

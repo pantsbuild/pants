@@ -8,8 +8,8 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.scalastyle import Scalastyle
 from pants.java.jar.jar_dependency import JarDependency
-from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 from pants.testutil.subsystem.util import init_subsystem
+from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 
 
 class CustomScalaTest(NailgunTaskTestBase):

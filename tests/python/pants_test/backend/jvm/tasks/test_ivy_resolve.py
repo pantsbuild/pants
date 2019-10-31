@@ -22,10 +22,10 @@ from pants.ivy.bootstrapper import Bootstrapper
 from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency import JarDependency
 from pants.task.task import Task
+from pants.testutil.subsystem.util import init_subsystem
 from pants.util.contextutil import temporary_dir, temporary_file_path
 from pants.util.dirutil import safe_delete
 from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
-from pants.testutil.subsystem.util import init_subsystem
 from pants_test.task_test_base import TaskTestBase, ensure_cached
 
 

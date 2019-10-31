@@ -16,8 +16,8 @@ from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.target import Target
 from pants.java.jar.jar_dependency import JarDependency
 from pants.java.jar.jar_dependency_utils import M2Coordinate
-from pants_test.backend.jvm.tasks.jvm_binary_task_test_base import JvmBinaryTaskTestBase
 from pants.testutil.subsystem.util import global_subsystem_instance
+from pants_test.backend.jvm.tasks.jvm_binary_task_test_base import JvmBinaryTaskTestBase
 
 
 class TestJarDependencyManagementSetup(JvmBinaryTaskTestBase):

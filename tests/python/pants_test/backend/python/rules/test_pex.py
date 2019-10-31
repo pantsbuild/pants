@@ -27,10 +27,10 @@ from pants.engine.fs import Digest, DirectoryToMaterialize, FileContent, InputFi
 from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
+from pants.testutil.subsystem.util import init_subsystems
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_dir
 from pants.util.strutil import create_path_env_var
-from pants.testutil.subsystem.util import init_subsystems
 from pants_test.test_base import TestBase
 
 

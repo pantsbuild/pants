@@ -8,9 +8,9 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.prep_command import PrepCommand
 from pants.build_graph.target import Target
 from pants.core_tasks.run_prep_command import RunPrepCommandBase
+from pants.testutil.subsystem.util import init_subsystem
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import touch
-from pants.testutil.subsystem.util import init_subsystem
 from pants_test.task_test_base import TaskTestBase
 
 

@@ -4,8 +4,8 @@
 import unittest
 
 from pants.ivy.ivy_subsystem import IvySubsystem
-from pants.util.contextutil import environment_as
 from pants.testutil.subsystem.util import global_subsystem_instance
+from pants.util.contextutil import environment_as
 
 
 class IvySubsystemTest(unittest.TestCase):

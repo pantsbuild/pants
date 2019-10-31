@@ -12,8 +12,8 @@ from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.scalastyle import FileExcluder, Scalastyle
 from pants.base.exceptions import TaskError
 from pants.java.jar.jar_dependency import JarDependency
-from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 from pants.testutil.subsystem.util import init_subsystem
+from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 from pants_test.task_test_base import ensure_cached
 
 

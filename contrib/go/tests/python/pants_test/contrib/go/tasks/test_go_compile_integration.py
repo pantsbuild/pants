@@ -3,8 +3,8 @@
 
 import os
 
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 from pants.testutil.subsystem.util import global_subsystem_instance
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 from pants_test.testutils.file_test_util import contains_exact_files
 
 from pants.contrib.go.subsystems.go_distribution import GoDistribution
