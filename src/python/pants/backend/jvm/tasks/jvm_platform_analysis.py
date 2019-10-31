@@ -290,13 +290,6 @@ class JvmPlatformExplain(JvmPlatformAnalysisMixin, ConsoleTask):
     register('--filter',
              help='Limit jvm platform possibility explanation to targets whose specs match this '
                   'regex pattern.')
-
-    # TODO: remove `_register_console_transitivity_option` from ConsoleTask when this deprecation
-    # cycle is complete!
-    register('--transitive', type=bool,
-             removal_version='1.22.0.dev0',
-             removal_hint='Use --list-transitive-deps instead!',
-             help='List transitive dependencies in analysis output.')
     register('--list-transitive-deps', type=bool,
              help='List transitive dependencies in analysis output.')
 
@@ -315,7 +308,7 @@ class JvmPlatformExplain(JvmPlatformAnalysisMixin, ConsoleTask):
 
   @memoized_property
   def dependency_map(self):
-    if not (self.get_options().transitive or self.get_options().list_transitive_deps):
+    if not self.get_options().list_transitive_deps:
       return self.jvm_dependency_map
     full_map = self._unfiltered_jvm_dependency_map(fully_transitive=True)
     return {target: deps for target, deps in full_map.items()

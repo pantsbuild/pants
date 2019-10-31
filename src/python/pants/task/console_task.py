@@ -20,10 +20,7 @@ class ConsoleTask(QuietTaskMixin, HasTransitiveOptionMixin, Task):
 
   @classproperty
   def _register_console_transitivity_option(cls):
-    """Some tasks register their own --transitive option, which act differently.
-
-    TODO: This method is temporary and should be removed in 1.22.0.dev0.
-    """
+    """Some tasks register their own --transitive option, which act differently."""
     return True
 
   @classmethod
