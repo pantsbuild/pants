@@ -109,8 +109,56 @@ class _GoalOptions(object):
   """A marker trait for the anonymous inner `Goal.Options` classes for `Goal`s."""
 
 
+class Outputting:
+  """A mixin for Goal that adds Options to support the `output` context manager.
+
+  Allows output to go to a file or to stdout.
+
+  Useful for goals that write non-line-oriented output, such as JSON.
+  """
+
+  @classmethod
+  def register_options(cls, register):
+    super().register_options(register)
+    register('--output-file', metavar='<path>',
+             help='Write output to this file.  If unspecified, writes to stdout.')
+
+  @classmethod
+  @contextmanager
+  def output(cls, output_options, console):
+    """Given Goal.Options and a Console, yields functions for writing to stdout and printing to stderr.
+
+    The passed options instance will generally be the `Goal.Options` of a `Outputting` `Goal`.
+    """
+    if type(output_options) != cls.Options:
+      raise AssertionError(
+          'Expected Options for `{}`, got: {}'.format(cls.__name__, output_options))
+
+    stdout_file = None
+
+    if output_options.values.output_file:
+      stdout_file = open(output_options.values.output_file, 'w')
+      write_stdout = lambda msg: stdout_file.write(msg)
+    else:
+      write_stdout = lambda msg: console.write_stdout(msg)
+
+    print_stderr = lambda msg: console.print_stderr(msg)
+
+    try:
+      yield write_stdout, print_stderr
+    finally:
+      if stdout_file:
+        stdout_file.close()
+      console.flush()
+
+
 class LineOriented:
-  """A mixin for Goal that adds Options to support the `line_oriented` context manager."""
+  """A mixin for Goal that adds Options to support the `line_oriented` context manager.
+
+  Allows output to go to a file or to stdout.
+
+  Useful for goals that write line-by-line output.
+  """
 
   @classmethod
   def register_options(cls, register):
@@ -118,7 +166,7 @@ class LineOriented:
     register('--sep', default='\\n', metavar='<separator>',
              help='String to use to separate result lines.')
     register('--output-file', metavar='<path>',
-             help='Write line-oriented output to this file instead.')
+             help='Print line-oriented output to this file.  If unspecified, prints to stdout.')
 
   @classmethod
   @contextmanager
@@ -129,13 +177,13 @@ class LineOriented:
     """
     if type(line_oriented_options) != cls.Options:
       raise AssertionError(
-          'Expected Options for `{}`, got: {}'.format(cls.__name__, line_oriented_options))
+        'Expected Options for `{}`, got: {}'.format(cls.__name__, line_oriented_options))
 
-    output_file = line_oriented_options.values.output_file
+    stdout_file = None
     sep = line_oriented_options.values.sep.encode().decode('unicode_escape')
 
-    if output_file:
-      stdout_file = open(output_file, 'w')
+    if line_oriented_options.values.output_file:
+      stdout_file = open(line_oriented_options.values.output_file, 'w')
       print_stdout = lambda msg: print(msg, file=stdout_file, end=sep)
     else:
       print_stdout = lambda msg: console.print_stdout(msg, end=sep)
@@ -145,6 +193,6 @@ class LineOriented:
     try:
       yield print_stdout, print_stderr
     finally:
-      if output_file:
+      if stdout_file:
         stdout_file.close()
       console.flush()
