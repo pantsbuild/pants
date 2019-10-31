@@ -9,9 +9,9 @@ python_tests(
     'src/python/pants/bin',
     'src/python/pants/build_graph',
     'src/python/pants/engine/legacy:address_mapper',
+    'src/python/pants/testutil/engine',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/engine:util',
     'tests/python/pants_test:test_base',
   ]
 )
@@ -135,7 +135,7 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/engine/legacy:graph',
     'src/python/pants/init',
-    'tests/python/pants_test/engine:util',
+    'src/python/pants/testutil/engine',
     'tests/python/pants_test:test_base',
   ]
 )
@@ -175,8 +175,8 @@ python_tests(
     'src/python/pants/bin',
     'src/python/pants/build_graph',
     'src/python/pants/init',
+    'src/python/pants/testutil/engine',
     'tests/python/pants_test:test_base',
-    'tests/python/pants_test/engine:util',
   ]
 )
 

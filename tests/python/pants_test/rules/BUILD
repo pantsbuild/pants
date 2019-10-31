@@ -9,8 +9,8 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/engine/legacy:graph',
     'src/python/pants/rules/core',
+    'src/python/pants/testutil/engine',
     'tests/python/pants_test:test_base',
-    'tests/python/pants_test/engine:util',
   ]
 )
 
@@ -34,8 +34,8 @@ python_tests(
     'src/python/pants/engine/legacy:graph',
     'src/python/pants/engine/legacy:structs',
     'src/python/pants/rules/core',
+    'src/python/pants/testutil/engine',
     'tests/python/pants_test:test_base',
-    'tests/python/pants_test/engine:util',
   ]
 )
 

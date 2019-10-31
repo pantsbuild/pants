@@ -49,7 +49,6 @@ from pants.util.meta import classproperty
 from pants_test.base.context_utils import create_context_from_options
 
 
-
 class AbstractTestGenerator(ABC):
   """A mixin that facilitates test generation at runtime."""
 
