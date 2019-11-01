@@ -739,7 +739,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         # While allowing it to use RscCompileContexts for outlining.
         analysis_file=os.path.join(rsc_dir, 'z.analysis.outline'),
         classes_dir=ClasspathEntry(os.path.join(rsc_dir, 'zinc_classes'), None),
-        jar_file=ClasspathEntry(os.path.join(rsc_dir, 'z.jar.useless')),
+        jar_file=None,
         args_file=os.path.join(rsc_dir, 'rsc_args'),
         rsc_jar_file=ClasspathEntry(os.path.join(rsc_dir, 'm.jar')),
         log_dir=os.path.join(rsc_dir, 'logs'),
