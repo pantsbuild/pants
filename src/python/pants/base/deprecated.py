@@ -136,6 +136,7 @@ def warn_or_error(
   frame_info: Optional[inspect.FrameInfo] = None,
   context: int = 1,
   ensure_stderr: bool = False,
+  print_warning: bool = True,
 ) -> None:
   """Check the removal_version against the current pants version.
 
@@ -193,7 +194,7 @@ def warn_or_error(
       warning_msg = warnings.formatwarning(
         msg, DeprecationWarning, filename, line_number, line=context_lines)
       print(warning_msg, file=sys.stderr)
-    else:
+    elif print_warning:
       # This output is filtered by warning filters.
       with _greater_warnings_context(context_lines):
         warnings.warn_explicit(

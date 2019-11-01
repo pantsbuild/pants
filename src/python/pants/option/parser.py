@@ -432,7 +432,7 @@ class Parser:
 
     if args:
       dest = self.parse_dest(*args, **kwargs)
-      self._check_deprecated(dest, kwargs)
+      self._check_deprecated(dest, kwargs, print_warning=False)
     
     # Prevent further registration in enclosing scopes.
     ancestor = self._parent_parser
@@ -462,7 +462,7 @@ class Parser:
         raise OptionAlreadyRegistered(self.scope, arg)
     self._known_args.update(args)
 
-  def _check_deprecated(self, dest, kwargs):
+  def _check_deprecated(self, dest, kwargs, print_warning=True):
     """Checks option for deprecation and issues a warning/error if necessary."""
     removal_version = kwargs.get('removal_version', None)
     if removal_version is not None:
@@ -472,6 +472,7 @@ class Parser:
         deprecation_start_version=kwargs.get('deprecation_start_version', None),
         hint=kwargs.get('removal_hint', None),
         stacklevel=9999,  # Out of range stacklevel to suppress printing src line.
+        print_warning=print_warning,
       )
 
   _allowed_registration_kwargs = {
