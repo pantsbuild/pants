@@ -126,7 +126,7 @@ class Outputting:
   @classmethod
   @contextmanager
   def output(cls, output_options, console):
-    """Given Goal.Options and a Console, yields functions for writing to stdout and printing to stderr.
+    """Given Goal.Options and a Console, yields a function for writing output.
 
     The passed options instance will generally be the `Goal.Options` of a `Outputting` `Goal`.
     """
@@ -142,10 +142,8 @@ class Outputting:
     else:
       write_stdout = lambda msg: console.write_stdout(msg)
 
-    print_stderr = lambda msg: console.print_stderr(msg)
-
     try:
-      yield write_stdout, print_stderr
+      yield write_stdout
     finally:
       if stdout_file:
         stdout_file.close()
