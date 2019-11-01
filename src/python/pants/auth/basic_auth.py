@@ -84,7 +84,7 @@ class BasicAuth(Subsystem):
       auth = requests.auth.HTTPBasicAuth(creds.username, creds.password)
     else:
       auth = None  # requests will use the netrc creds.
-    response = requests.get(url, auth=auth, headers={'User-Agent': f"pants/v{VERSION}"})
+    response = requests.get(url, auth=auth, headers={'User-Agent': f'pants/v{VERSION}'})
 
     if response.status_code != requests.codes.ok:
       if response.status_code == requests.codes.unauthorized:
