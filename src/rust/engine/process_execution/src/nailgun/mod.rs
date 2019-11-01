@@ -14,7 +14,7 @@ use nails::execution::{child_channel, ChildInput, ChildOutput, Command};
 use tokio::net::TcpStream;
 
 use crate::local::CapturedWorkdir;
-use crate::nailgun::nailgun_pool::{NailgunProcessName, Port};
+use crate::nailgun::nailgun_pool::NailgunProcessName;
 use crate::{
   Context, ExecuteProcessRequest, ExecuteProcessRequestMetadata, FallibleExecuteProcessResult,
   MultiPlatformExecuteProcessRequest, Platform,
@@ -114,6 +114,7 @@ fn construct_nailgun_client_request(
 /// If that flag is set, it will connect to a running nailgun server and run the command there.
 /// Otherwise, it will just delegate to the regular local runner.
 ///
+#[derive(Clone)]
 pub struct CommandRunner {
   inner: Arc<super::local::CommandRunner>,
   nailgun_pool: NailgunPool,
@@ -212,10 +213,7 @@ impl super::CommandRunner for CommandRunner {
     req: MultiPlatformExecuteProcessRequest,
     context: Context,
   ) -> BoxFuture<FallibleExecuteProcessResult, String> {
-    let nailgun_pool = self.nailgun_pool.clone();
-
     let original_request = self.extract_compatible_request(&req).unwrap();
-    let original_request2 = original_request.clone();
 
     if !original_request.is_nailgunnable {
       trace!("The request is not nailgunnable! Short-circuiting to regular process execution");
@@ -223,28 +221,63 @@ impl super::CommandRunner for CommandRunner {
     }
     debug!("Running request under nailgun:\n {:#?}", &original_request);
 
+    let executor = self.executor.clone();
+    let store = self.inner.store.clone();
+    let ParsedJVMCommandLines {
+      client_main_class, ..
+    } = try_future!(ParsedJVMCommandLines::parse_command_lines(
+      &original_request.argv
+    ));
+    let nailgun_name = CommandRunner::calculate_nailgun_name(&client_main_class);
+    let workdir_for_this_nailgun = try_future!(self.get_nailgun_workdir(&nailgun_name));
+
+    self.run_and_capture_workdir(
+      original_request,
+      context,
+      store,
+      executor,
+      true,
+      &workdir_for_this_nailgun,
+    )
+  }
+
+  fn extract_compatible_request(
+    &self,
+    req: &MultiPlatformExecuteProcessRequest,
+  ) -> Option<ExecuteProcessRequest> {
+    // Request compatibility should be the same as for the local runner, so we just delegate this.
+    self.inner.extract_compatible_request(req)
+  }
+}
+
+impl CapturedWorkdir for CommandRunner {
+  fn run_in_workdir(
+    &self,
+    workdir_path: &Path,
+    req: ExecuteProcessRequest,
+    context: Context,
+  ) -> Result<Box<dyn Stream<Item = ChildOutput, Error = String> + Send>, String> {
     // Separate argument lists, to form distinct EPRs for (1) starting the nailgun server and (2) running the client in it.
     let ParsedJVMCommandLines {
       nailgun_args,
       client_args,
       client_main_class,
-    } = try_future!(ParsedJVMCommandLines::parse_command_lines(
-      &original_request.argv
-    ));
+    } = ParsedJVMCommandLines::parse_command_lines(&req.argv)?;
 
     let nailgun_name = CommandRunner::calculate_nailgun_name(&client_main_class);
     let nailgun_name2 = nailgun_name.clone();
     let nailgun_name3 = nailgun_name.clone();
+    let client_workdir = workdir_path.to_path_buf();
 
-    let jdk_home = try_future!(original_request
+    let jdk_home = req
       .jdk_home
       .clone()
-      .ok_or_else(|| "JDK home must be specified for all nailgunnable requests.".to_string()));
+      .ok_or("JDK home must be specified for all nailgunnable requests.")?;
     let nailgun_req = construct_nailgun_server_request(
       &nailgun_name,
       nailgun_args,
       jdk_home.clone(),
-      original_request.target_platform,
+      req.target_platform,
     );
     trace!("Extracted nailgun request:\n {:#?}", &nailgun_req);
 
@@ -253,24 +286,27 @@ impl super::CommandRunner for CommandRunner {
       &self.metadata,
     );
 
-    let workdir_for_this_nailgun = try_future!(self.get_nailgun_workdir(&nailgun_name));
+    let nailgun_pool = self.nailgun_pool.clone();
+    let req2 = req.clone();
+    let workdir_for_this_nailgun = self.get_nailgun_workdir(&nailgun_name)?;
     let workdir_for_this_nailgun1 = workdir_for_this_nailgun.clone();
-    let workdir_for_this_nailgun2 = workdir_for_this_nailgun.clone();
     let executor = self.executor.clone();
-    let executor2 = self.executor.clone();
     let build_id = context.build_id.clone();
     let store = self.inner.store.clone();
-    let store2 = self.inner.store.clone();
     let workunit_store = context.workunit_store.clone();
 
-    self
+    // Streams to read child output from
+    let (stdio_write, stdio_read) = child_channel::<ChildOutput>();
+    let (_stdin_write, stdin_read) = child_channel::<ChildInput>();
+
+    let nails_command = self
       .async_semaphore
       .with_acquired(move || {
         Self::materialize_workdir_for_server(
           store,
           workdir_for_this_nailgun.clone(),
           jdk_home,
-          original_request.input_files,
+          req.input_files,
           workunit_store,
         )
         .and_then(move |_metadata| {
@@ -291,70 +327,32 @@ impl super::CommandRunner for CommandRunner {
       .and_then(move |nailgun_port| {
         // Run the client request in the nailgun we have active.
         debug!("Got nailgun port {} for {}", nailgun_port, nailgun_name2);
-        let full_client_req =
-          construct_nailgun_client_request(original_request2, client_main_class, client_args);
-        trace!("Client request: {:#?}", full_client_req);
-        Self::run_and_capture_workdir(
-          full_client_req,
-          context,
-          store2,
-          executor2,
-          true,
-          &workdir_for_this_nailgun2,
-          Some(nailgun_port),
-        )
-      })
-      .to_boxed()
-  }
-
-  fn extract_compatible_request(
-    &self,
-    req: &MultiPlatformExecuteProcessRequest,
-  ) -> Option<ExecuteProcessRequest> {
-    // Request compatibility should be the same as for the local runner, so we just delegate this.
-    self.inner.extract_compatible_request(req)
-  }
-}
-
-impl CapturedWorkdir for CommandRunner {
-  fn run_in_workdir(
-    workdir_path: &Path,
-    req: ExecuteProcessRequest,
-    nailgun_port: Option<Port>,
-  ) -> Result<Box<dyn Stream<Item = ChildOutput, Error = String> + Send>, String> {
-    // A task to render stdout.
-    let (stdio_write, stdio_read) = child_channel::<ChildOutput>();
-    let (_stdin_write, stdin_read) = child_channel::<ChildInput>();
-
-    let cmd = Command {
-      command: req.argv[0].clone(),
-      args: req.argv[1..].to_vec(),
-      env: req
-        .env
-        .iter()
-        .map(|(k, v)| (k.clone(), v.clone()))
-        .collect(),
-      working_dir: workdir_path.to_path_buf(),
-    };
-
-    let addr: SocketAddr = format!(
-      "127.0.0.1:{:?}",
-      nailgun_port.ok_or("Must pass a nailgun port to run_nailgun_process")?
-    )
-    .parse()
-    .unwrap();
-
-    debug!("Connecting to server at {}...", addr);
-    Ok(Box::new(
-      stdio_read.map_err(|()| unreachable!()).select(
+        let client_req = construct_nailgun_client_request(req2, client_main_class, client_args);
+        let cmd = Command {
+          command: client_req.argv[0].clone(),
+          args: client_req.argv[1..].to_vec(),
+          env: client_req
+            .env
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect(),
+          working_dir: client_workdir,
+        };
+        trace!("Client request: {:#?}", client_req);
+        let addr: SocketAddr = format!("127.0.0.1:{:?}", nailgun_port).parse().unwrap();
+        debug!("Connecting to server at {}...", addr);
         TcpStream::connect(&addr)
           .and_then(move |stream| {
             nails::client_handle_connection(stream, cmd, stdio_write, stdin_read)
           })
           .map_err(|e| format!("Error communicating with server: {}", e))
           .map(ChildOutput::Exit)
-          .into_stream(),
-      ),
+      });
+
+    Ok(Box::new(
+      stdio_read
+        .map_err(|()| unreachable!())
+        .select(nails_command.into_stream()),
     ))
   }
 }
