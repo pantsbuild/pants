@@ -25,9 +25,9 @@ use crate::{
   Platform,
 };
 
+use crate::nailgun::nailgun_pool::Port;
 use bytes::{Bytes, BytesMut};
 use workunit_store::WorkUnitStore;
-use crate::nailgun::nailgun_pool::Port;
 
 pub struct CommandRunner {
   pub store: Store,
@@ -246,7 +246,7 @@ impl super::CommandRunner for CommandRunner {
       self.executor.clone(),
       self.cleanup_local_dirs,
       &self.work_dir,
-      None
+      None,
     )
   }
 }
@@ -254,33 +254,30 @@ impl CapturedWorkdir for CommandRunner {
   fn run_in_workdir(
     workdir_path: &Path,
     req: ExecuteProcessRequest,
-    nailgun_port: Option<Port>
+    _nailgun_port: Option<Port>,
   ) -> Result<Box<dyn Stream<Item = ChildOutput, Error = String> + Send>, String> {
     StreamedHermeticCommand::new(&req.argv[0])
-        .args(&req.argv[1..])
-        .current_dir(&workdir_path)
-        .envs(req.env)
-        .stream()
-        .map(|s| {
-          // NB: Converting from `impl Stream` to `Box<dyn Stream>` requires this odd dance.
-          let stream: Box<dyn Stream<Item = _, Error = _> + Send> = Box::new(s);
-          stream
-        })
+      .args(&req.argv[1..])
+      .current_dir(&workdir_path)
+      .envs(req.env)
+      .stream()
+      .map(|s| {
+        // NB: Converting from `impl Stream` to `Box<dyn Stream>` requires this odd dance.
+        let stream: Box<dyn Stream<Item = _, Error = _> + Send> = Box::new(s);
+        stream
+      })
   }
 }
 
 pub trait CapturedWorkdir {
-
   fn run_and_capture_workdir(
-
     req: ExecuteProcessRequest,
     context: Context,
     store: Store,
     executor: task_executor::Executor,
     cleanup_local_dirs: bool,
     workdir_base: &Path,
-    nailgun_port: Option<Port>
-
+    nailgun_port: Option<Port>,
   ) -> BoxFuture<FallibleExecuteProcessResult, String> {
     let workdir = try_future!(tempfile::Builder::new()
       .prefix("process-execution")
@@ -306,112 +303,113 @@ pub trait CapturedWorkdir {
     let req_description = req.description;
     let maybe_jdk_home = req.jdk_home;
     let unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule =
-        req.unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule;
+      req.unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule;
 
     store
-        .materialize_directory(
-          workdir_path.clone(),
-          req.input_files,
-          context.workunit_store.clone(),
-        )
-        .and_then({
-          let workunit_store = context.workunit_store.clone();
-          move |_metadata| {
-            store2.materialize_directory(
-              workdir_path4,
-              unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule,
-              workunit_store,
+      .materialize_directory(
+        workdir_path.clone(),
+        req.input_files,
+        context.workunit_store.clone(),
+      )
+      .and_then({
+        let workunit_store = context.workunit_store.clone();
+        move |_metadata| {
+          store2.materialize_directory(
+            workdir_path4,
+            unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule,
+            workunit_store,
+          )
+        }
+      })
+      .and_then(move |_metadata| {
+        maybe_jdk_home.map_or(Ok(()), |jdk_home| {
+          symlink(jdk_home, workdir_path3.clone().join(".jdk"))
+            .map_err(|err| format!("Error making symlink for local execution: {:?}", err))
+        })?;
+        // The bazel remote execution API specifies that the parent directories for output files and
+        // output directories should be created before execution completes: see
+        //   https://github.com/pantsbuild/pants/issues/7084.
+        let parent_paths_to_create: HashSet<_> = output_file_paths2
+          .iter()
+          .chain(output_dir_paths2.iter())
+          .filter_map(|rel_path| rel_path.parent())
+          .map(|parent_relpath| workdir_path3.join(parent_relpath))
+          .collect();
+        // TODO: we use a HashSet to deduplicate directory paths to create, but it would probably be
+        // even more efficient to only retain the directories at greatest nesting depth, as
+        // create_dir_all() will ensure all parents are created. At that point, we might consider
+        // explicitly enumerating all the directories to be created and just using create_dir(),
+        // unless there is some optimization in create_dir_all() that makes that less efficient.
+        for path in parent_paths_to_create {
+          create_dir_all(path.clone()).map_err(|err| {
+            format!(
+              "Error making parent directory {:?} for local execution: {:?}",
+              path, err
             )
-          }
-        })
-        .and_then(move |_metadata| {
-          maybe_jdk_home.map_or(Ok(()), |jdk_home| {
-            symlink(jdk_home, workdir_path3.clone().join(".jdk"))
-                .map_err(|err| format!("Error making symlink for local execution: {:?}", err))
           })?;
-          // The bazel remote execution API specifies that the parent directories for output files and
-          // output directories should be created before execution completes: see
-          //   https://github.com/pantsbuild/pants/issues/7084.
-          let parent_paths_to_create: HashSet<_> = output_file_paths2
-              .iter()
-              .chain(output_dir_paths2.iter())
-              .filter_map(|rel_path| rel_path.parent())
-              .map(|parent_relpath| workdir_path3.join(parent_relpath))
-              .collect();
-          // TODO: we use a HashSet to deduplicate directory paths to create, but it would probably be
-          // even more efficient to only retain the directories at greatest nesting depth, as
-          // create_dir_all() will ensure all parents are created. At that point, we might consider
-          // explicitly enumerating all the directories to be created and just using create_dir(),
-          // unless there is some optimization in create_dir_all() that makes that less efficient.
-          for path in parent_paths_to_create {
-            create_dir_all(path.clone()).map_err(|err| {
+        }
+        Ok(())
+      })
+      .and_then(move |()| Self::run_in_workdir(&workdir_path, req2, nailgun_port))
+      // NB: We fully buffer up the `Stream` above into final `ChildResults` below and so could
+      // instead be using `CommandExt::output_async` above to avoid the `ChildResults::collect_from`
+      // code. The idea going forward though is we eventually want to pass incremental results on
+      // down the line for streaming process results to console logs, etc. as tracked by:
+      //   https://github.com/pantsbuild/pants/issues/6089
+      .and_then(ChildResults::collect_from)
+      .and_then(move |child_results| {
+        let output_snapshot = if output_file_paths.is_empty() && output_dir_paths.is_empty() {
+          future::ok(store::Snapshot::empty()).to_boxed()
+        } else {
+          // Use no ignore patterns, because we are looking for explicitly listed paths.
+          future::done(fs::PosixFS::new(workdir_path2, &[], executor))
+            .map_err(|err| {
               format!(
-                "Error making parent directory {:?} for local execution: {:?}",
-                path, err
+                "Error making posix_fs to fetch local process execution output files: {}",
+                err
               )
-            })?;
-          }
-          Ok(())
-        })
-        .and_then(move |()| {
-          Self::run_in_workdir(&workdir_path, req2, nailgun_port)
-        })
-        // NB: We fully buffer up the `Stream` above into final `ChildResults` below and so could
-        // instead be using `CommandExt::output_async` above to avoid the `ChildResults::collect_from`
-        // code. The idea going forward though is we eventually want to pass incremental results on
-        // down the line for streaming process results to console logs, etc. as tracked by:
-        //   https://github.com/pantsbuild/pants/issues/6089
-        .and_then(ChildResults::collect_from)
-        .and_then(move |child_results| {
-          let output_snapshot = if output_file_paths.is_empty() && output_dir_paths.is_empty() {
-            future::ok(store::Snapshot::empty()).to_boxed()
-          } else {
-            // Use no ignore patterns, because we are looking for explicitly listed paths.
-            future::done(fs::PosixFS::new(workdir_path2, &[], executor))
-                .map_err(|err| {
-                  format!(
-                    "Error making posix_fs to fetch local process execution output files: {}",
-                    err
-                  )
-                })
-                .map(Arc::new)
-                .and_then(|posix_fs| {
-                  CommandRunner::construct_output_snapshot(
-                    store,
-                    posix_fs,
-                    output_file_paths,
-                    output_dir_paths,
-                  )
-                })
-                .to_boxed()
-          };
+            })
+            .map(Arc::new)
+            .and_then(|posix_fs| {
+              CommandRunner::construct_output_snapshot(
+                store,
+                posix_fs,
+                output_file_paths,
+                output_dir_paths,
+              )
+            })
+            .to_boxed()
+        };
 
-          output_snapshot
-              .map(move |snapshot| FallibleExecuteProcessResult {
-                stdout: child_results.stdout,
-                stderr: child_results.stderr,
-                exit_code: child_results.exit_code,
-                output_directory: snapshot.digest,
-                execution_attempts: vec![],
-              })
-              .to_boxed()
-        })
-        .then(move |result| {
-          // Force workdir not to get dropped until after we've ingested the outputs
-          if !cleanup_local_dirs {
-            // This consumes the `TempDir` without deleting directory on the filesystem, meaning
-            // that the temporary directory will no longer be automatically deleted when dropped.
-            let preserved_path = workdir.into_path();
-            info!(
-              "preserved local process execution dir `{:?}` for {:?}",
-              preserved_path, req_description
-            );
-          } // Else, workdir gets dropped here
-          result
-        })
-        .to_boxed()
+        output_snapshot
+          .map(move |snapshot| FallibleExecuteProcessResult {
+            stdout: child_results.stdout,
+            stderr: child_results.stderr,
+            exit_code: child_results.exit_code,
+            output_directory: snapshot.digest,
+            execution_attempts: vec![],
+          })
+          .to_boxed()
+      })
+      .then(move |result| {
+        // Force workdir not to get dropped until after we've ingested the outputs
+        if !cleanup_local_dirs {
+          // This consumes the `TempDir` without deleting directory on the filesystem, meaning
+          // that the temporary directory will no longer be automatically deleted when dropped.
+          let preserved_path = workdir.into_path();
+          info!(
+            "preserved local process execution dir `{:?}` for {:?}",
+            preserved_path, req_description
+          );
+        } // Else, workdir gets dropped here
+        result
+      })
+      .to_boxed()
   }
 
-  fn run_in_workdir(workdir_path: &Path, req: ExecuteProcessRequest, nailgun_port: Option<Port>) -> Result<Box<dyn Stream<Item = ChildOutput, Error = String> + Send>, String>;
+  fn run_in_workdir(
+    workdir_path: &Path,
+    req: ExecuteProcessRequest,
+    nailgun_port: Option<Port>,
+  ) -> Result<Box<dyn Stream<Item = ChildOutput, Error = String> + Send>, String>;
 }
-

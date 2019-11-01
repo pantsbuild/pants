@@ -1,6 +1,4 @@
-use crate::nailgun::{
-  CommandRunner, ARGS_TO_START_NAILGUN, NAILGUN_MAIN_CLASS, NAILGUN_PORT_ENV_VAR_FOR_CLIENT,
-};
+use crate::nailgun::{CommandRunner, ARGS_TO_START_NAILGUN, NAILGUN_MAIN_CLASS};
 use crate::{ExecuteProcessRequest, ExecuteProcessRequestMetadata, Platform};
 use hashing::EMPTY_DIGEST;
 use std::fs::read_link;
@@ -21,16 +19,9 @@ fn mock_nailgun_runner(workdir_base: Option<PathBuf>) -> CommandRunner {
     cache_key_gen_version: None,
     platform_properties: vec![],
   };
-  let python_distribution = PathBuf::from("/usr/bin/python");
   let workdir_base = workdir_base.unwrap_or(std::env::temp_dir());
 
-  CommandRunner::new(
-    local_runner,
-    metadata,
-    python_distribution,
-    workdir_base,
-    executor.clone(),
-  )
+  CommandRunner::new(local_runner, metadata, workdir_base, executor.clone())
 }
 
 fn unique_temp_dir(base_dir: PathBuf, prefix: Option<String>) -> TempDir {
@@ -103,31 +94,9 @@ fn creating_nailgun_server_request_updates_the_cli() {
 }
 
 #[test]
-fn creating_nailgun_client_request_inserts_port_as_an_env_var() {
-  let original_req = mock_nailgunnable_request(None);
-  let req = super::construct_nailgun_client_request(
-    original_req,
-    "".to_string(),
-    "".to_string(),
-    vec![],
-    1234,
-  );
-  assert_eq!(
-    req.env.get(NAILGUN_PORT_ENV_VAR_FOR_CLIENT),
-    Some(&String::from("1234"))
-  );
-}
-
-#[test]
 fn creating_nailgun_client_request_removes_jdk_home() {
   let original_req = mock_nailgunnable_request(Some(PathBuf::from("some/path")));
-  let req = super::construct_nailgun_client_request(
-    original_req,
-    "".to_string(),
-    "".to_string(),
-    vec![],
-    1234,
-  );
+  let req = super::construct_nailgun_client_request(original_req, "".to_string(), vec![]);
   assert_eq!(req.jdk_home, None);
 }
 

@@ -8,7 +8,7 @@ use std::time::Duration;
 use boxfuture::{try_future, BoxFuture, Boxable};
 use futures::future::Future;
 use futures::stream::Stream;
-use hashing::{Digest, EMPTY_DIGEST};
+use hashing::Digest;
 use log::{debug, trace};
 use nails::execution::{child_channel, ChildInput, ChildOutput, Command};
 use tokio::net::TcpStream;
@@ -33,9 +33,9 @@ use async_semaphore::AsyncSemaphore;
 pub use nailgun_pool::NailgunPool;
 use parsed_jvm_command_lines::ParsedJVMCommandLines;
 use std::fs::{read_link, remove_file};
+use std::net::SocketAddr;
 use store::Store;
 use workunit_store::WorkUnitStore;
-use std::net::SocketAddr;
 
 // Hardcoded constants for connecting to nailgun
 static NAILGUN_MAIN_CLASS: &str = "com.martiansoftware.nailgun.NGServer";
@@ -257,8 +257,10 @@ impl super::CommandRunner for CommandRunner {
     let workdir_for_this_nailgun1 = workdir_for_this_nailgun.clone();
     let workdir_for_this_nailgun2 = workdir_for_this_nailgun.clone();
     let executor = self.executor.clone();
+    let executor2 = self.executor.clone();
     let build_id = context.build_id.clone();
     let store = self.inner.store.clone();
+    let store2 = self.inner.store.clone();
     let workunit_store = context.workunit_store.clone();
 
     self
@@ -295,11 +297,11 @@ impl super::CommandRunner for CommandRunner {
         Self::run_and_capture_workdir(
           full_client_req,
           context,
-          store.clone(),
-          executor.clone(),
+          store2,
+          executor2,
           true,
           &workdir_for_this_nailgun2,
-          Some(nailgun_port)
+          Some(nailgun_port),
         )
       })
       .to_boxed()
@@ -315,61 +317,44 @@ impl super::CommandRunner for CommandRunner {
 }
 
 impl CapturedWorkdir for CommandRunner {
-    fn run_in_workdir(
-        workdir_path: &Path,
-        req: ExecuteProcessRequest,
-        nailgun_port: Option<Port>
-    ) -> Result<Box<dyn Stream<Item = ChildOutput, Error = String> + Send>, String> {
-        run_nailgun_process(req, workdir_path, nailgun_port)
-    }
-}
+  fn run_in_workdir(
+    workdir_path: &Path,
+    req: ExecuteProcessRequest,
+    nailgun_port: Option<Port>,
+  ) -> Result<Box<dyn Stream<Item = ChildOutput, Error = String> + Send>, String> {
+    // A task to render stdout.
+    let (stdio_write, stdio_read) = child_channel::<ChildOutput>();
+    let (_stdin_write, stdin_read) = child_channel::<ChildInput>();
 
-fn run_nailgun_process(
-  full_client_req: ExecuteProcessRequest,
-  working_dir: &Path,
-  nailgun_port: Option<Port>,
-) -> Result<Box<dyn Stream<Item = ChildOutput, Error = String> + Send>, String> {
-  // TODO: There are a lot of other components of `ExecuteProcessRequest` that are not implemented
-  // here yet.
+    let cmd = Command {
+      command: req.argv[0].clone(),
+      args: req.argv[1..].to_vec(),
+      env: req
+        .env
+        .iter()
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect(),
+      working_dir: workdir_path.to_path_buf(),
+    };
 
-  // A task to render stdout.
-  let (stdio_write, stdio_read) = child_channel::<ChildOutput>();
-  let child_results_future =
-    super::local::ChildResults::collect_from(stdio_read.map_err(|()| unreachable!()));
+    let addr: SocketAddr = format!(
+      "127.0.0.1:{:?}",
+      nailgun_port.ok_or("Must pass a nailgun port to run_nailgun_process")?
+    )
+    .parse()
+    .unwrap();
 
-  let cmd = Command {
-    command: full_client_req.argv[0].clone(),
-    args: full_client_req.argv[1..].to_vec(),
-    env: full_client_req
-      .env
-      .iter()
-      .map(|(k, v)| (k.clone(), v.clone()))
-      .collect(),
-    working_dir: working_dir.to_path_buf(),
-  };
-
-  let addr: SocketAddr = format!("127.0.0.1:{:?}", Some(nailgun_port).unwrap()).parse().unwrap();
-
-  // And the connection.
-  let (_stdin_write, stdin_read) = child_channel::<ChildInput>();
-
-  debug!("Connecting to server at {}...", addr);
-
-  Ok(
-    TcpStream::connect(&addr)
-    .and_then(move |stream| nails::client_handle_connection(stream, cmd, stdio_write, stdin_read))
-    .map_err(|e| format!("Error communicating with server: {}", e))
-    .join(child_results_future)
-    .map(|(_, child_results)| {
-      FallibleExecuteProcessResult {
-        stdout: child_results.stdout,
-        stderr: child_results.stderr,
-        exit_code: child_results.exit_code,
-        // TODO: extract a function from the local command runner to capture the contents of the output directory
-        output_directory: EMPTY_DIGEST,
-        execution_attempts: vec![],
-      }
-    })
-    .to_boxed()
-  )
+    debug!("Connecting to server at {}...", addr);
+    Ok(Box::new(
+      stdio_read.map_err(|()| unreachable!()).select(
+        TcpStream::connect(&addr)
+          .and_then(move |stream| {
+            nails::client_handle_connection(stream, cmd, stdio_write, stdin_read)
+          })
+          .map_err(|e| format!("Error communicating with server: {}", e))
+          .map(ChildOutput::Exit)
+          .into_stream(),
+      ),
+    ))
+  }
 }
