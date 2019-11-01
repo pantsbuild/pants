@@ -185,9 +185,6 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     register('--extra-rsc-args', type=list, default=[],
              help='Extra arguments to pass to the rsc invocation.')
 
-    register('--allow-public-inference', type=bool, default=False,
-             help='Allow public type member inference when workflow is outline-and-zinc. Otherwise, unannotated public types will be a compile error. Note that public inference will significantly slow down outlining. Does not work for rsc-and-zinc.', fingerprint=True)
-
     register('--zinc-outline', type=bool, default=False,
              help='Outline via Zinc when workflow is outline-and-zinc instead of a standalone scalac tool. This allows outlining to happen in the same nailgun instance as zinc compiles.', fingerprint=True)
 
@@ -227,21 +224,6 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       ]
     )
 
-    cls.register_jvm_tool(
-      register,
-      'wartremover-outliner',
-      classpath=[
-        JarDependency(
-          org='org.wartremover',
-          name=f'wartremover_{scalac_outliner_version}',
-          rev='2.4.3',
-        ),
-      ],
-      custom_rules=[
-        Shader.exclude_package('wartremover', recursive=True),
-      ]
-    )
-
   @classmethod
   def product_types(cls):
     return super(RscCompile, cls).product_types() + ['rsc_mixed_compile_classpath']
@@ -257,10 +239,6 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
   @memoized_property
   def _scalac_classpath(self):
     return self.tool_classpath('scalac-outliner')
-
-  @memoized_property
-  def _wartremover_classpath(self):
-    return self.tool_classpath('wartremover-outliner')
 
   @memoized_property
   def _scala_library_version(self):
@@ -494,13 +472,6 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
               "-Ypickle-write",
               rsc_jar_file_relative_path,
             ]
-            if not self.get_options().allow_public_inference:
-              wartremover_args = [
-                f"-Xplugin:{self._wartremover_classpath[0]}",
-                "-P:wartremover:traverser:org.wartremover.warts.PublicInference",
-                "-Ycache-plugin-class-loader:last-modified",
-              ]
-              youtline_args = wartremover_args + youtline_args
 
           target_sources = ctx.sources
           
