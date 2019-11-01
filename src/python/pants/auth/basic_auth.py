@@ -12,6 +12,7 @@ from pants.auth.cookies import Cookies
 from pants.subsystem.subsystem import Subsystem
 from pants.version import VERSION
 
+
 @dataclass (frozen=True)
 class Authentication:
   headers: Dict[str, str]
