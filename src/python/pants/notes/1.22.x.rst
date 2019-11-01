@@ -3,6 +3,55 @@
 
 This document describes releases leading up to the ``1.22.x`` ``stable`` series.
 
+1.22.0rc1 (11/01/2019)
+------------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Allow users to override compile.rsc workflows via env var and add --allow-public-inference option (#8537)
+  `PR #8537 <https://github.com/pantsbuild/pants/pull/8537>`_
+
+* Add workflow option for -Youtline as an outliner (#8427)
+  `PR #8427 <https://github.com/pantsbuild/pants/pull/8427>`_
+
+Bugfixes
+~~~~~~~~
+
+* Revert "Squashed commit of the following: (#8302)" (#8551)
+  `PR #8551 <https://github.com/pantsbuild/pants/pull/8551>`_
+
+* Add lock around bootstrap compiler bridge jar (#8535)
+  `PR #8535 <https://github.com/pantsbuild/pants/pull/8535>`_
+
+* Fix assertion on hydrate_missing_directory_digest (#8534)
+  `PR #8534 <https://github.com/pantsbuild/pants/pull/8534>`_
+
+* Fix zinc jar missing digest on double check cache hit (#8532)
+  `PR #8532 <https://github.com/pantsbuild/pants/pull/8532>`_
+
+* Ensure node build products added to the classpath have been snapshotted (#8514)
+  `PR #8514 <https://github.com/pantsbuild/pants/pull/8514>`_
+
+* Avoid globbing jdk home with symlinks (#8484)
+  `PR #8484 <https://github.com/pantsbuild/pants/pull/8484>`_
+
+* pin cryptography lib to 2.7 (#8515)
+  `PR #8515 <https://github.com/pantsbuild/pants/pull/8515>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Increase our client count and sync bootstrapped files. (#8536)
+  `PR #8536 <https://github.com/pantsbuild/pants/pull/8536>`_
+
+* Move rust tests into their own files (#8512)
+  `PR #8512 <https://github.com/pantsbuild/pants/pull/8512>`_
+
+* Digest can be deserialized as well as serialized (#8497)
+  `PR #8497 <https://github.com/pantsbuild/pants/pull/8497>`_
+
+
 1.22.0rc0 (10/20/2019)
 ------------------------
 
