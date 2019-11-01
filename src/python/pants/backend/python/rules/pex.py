@@ -43,7 +43,7 @@ class PexRequirements:
 
 
 @dataclass(frozen=True)
-class PexInterpreterContraints:
+class PexInterpreterConstraints:
   constraint_set: FrozenSet[str] = frozenset()
 
   def generate_pex_arg_list(self) -> List[str]:
@@ -53,7 +53,7 @@ class PexInterpreterContraints:
     return args
 
   @classmethod
-  def create_from_adaptors(cls, adaptors: Tuple[PythonTargetAdaptor, ...], python_setup: PythonSetup) -> 'PexInterpreterContraints':
+  def create_from_adaptors(cls, adaptors: Tuple[PythonTargetAdaptor, ...], python_setup: PythonSetup) -> 'PexInterpreterConstraints':
     interpreter_constraints = frozenset(
       constraint
       for target_adaptor in adaptors
@@ -61,7 +61,7 @@ class PexInterpreterContraints:
         getattr(target_adaptor, 'compatibility', None)
       )
     )
-    return PexInterpreterContraints(constraint_set=interpreter_constraints)
+    return PexInterpreterConstraints(constraint_set=interpreter_constraints)
 
 
 @dataclass(frozen=True)
@@ -69,7 +69,7 @@ class CreatePex:
   """Represents a generic request to create a PEX from its inputs."""
   output_filename: str
   requirements: PexRequirements = PexRequirements()
-  interpreter_constraints: PexInterpreterContraints = PexInterpreterContraints()
+  interpreter_constraints: PexInterpreterConstraints = PexInterpreterConstraints()
   entry_point: Optional[str] = None
   input_files_digest: Optional[Digest] = None
 

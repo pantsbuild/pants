@@ -10,7 +10,7 @@ from pants.backend.python.rules.download_pex_bin import download_pex_bin
 from pants.backend.python.rules.pex import (
   CreatePex,
   Pex,
-  PexInterpreterContraints,
+  PexInterpreterConstraints,
   PexRequirements,
   create_pex,
 )
@@ -55,7 +55,7 @@ class TestResolveRequirements(TestBase):
 
   def create_pex_and_get_all_data(self, *, requirements=PexRequirements(),
       entry_point=None,
-      interpreter_constraints=PexInterpreterContraints(),
+      interpreter_constraints=PexInterpreterConstraints(),
       input_files: Digest = None) -> (Dict, List[str]):
     def hashify_optional_collection(iterable):
       return tuple(sorted(iterable)) if iterable is not None else tuple()
@@ -87,7 +87,7 @@ class TestResolveRequirements(TestBase):
 
   def create_pex_and_get_pex_info(
     self, *, requirements=PexRequirements(), entry_point=None,
-    interpreter_constraints=PexInterpreterContraints(),
+    interpreter_constraints=PexInterpreterConstraints(),
     input_files: Digest = None) -> Dict:
     return self.create_pex_and_get_all_data(requirements=requirements, entry_point=entry_point, interpreter_constraints=interpreter_constraints,
         input_files=input_files)['info']
@@ -128,7 +128,7 @@ class TestResolveRequirements(TestBase):
     self.assertEqual(pex_info["entry_point"], entry_point)
 
   def test_interpreter_constraints(self) -> None:
-    constraints = PexInterpreterContraints(
+    constraints = PexInterpreterConstraints(
         constraint_set=frozenset(sorted({"CPython>=2.7,<3", "CPython>=3.6,<4"})))
     pex_info = self.create_pex_and_get_pex_info(interpreter_constraints=constraints)
     self.assertEqual(frozenset(pex_info["interpreter_constraints"]), constraints.constraint_set)

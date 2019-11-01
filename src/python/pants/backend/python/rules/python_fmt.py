@@ -6,7 +6,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Set, Tuple
 
-from pants.backend.python.rules.pex import CreatePex, Pex, PexInterpreterContraints, PexRequirements
+from pants.backend.python.rules.pex import (
+  CreatePex,
+  Pex,
+  PexInterpreterConstraints,
+  PexRequirements,
+)
 from pants.backend.python.subsystems.black import Black
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
@@ -56,7 +61,7 @@ def get_black_input(
     Pex, CreatePex(
       output_filename="black.pex",
       requirements=PexRequirements(requirements=tuple(black.get_requirement_specs())),
-      interpreter_constraints=PexInterpreterContraints(constraint_set=frozenset(black.default_interpreter_constraints)),
+      interpreter_constraints=PexInterpreterConstraints(constraint_set=frozenset(black.default_interpreter_constraints)),
       entry_point=black.get_entry_point(),
     )
   )
