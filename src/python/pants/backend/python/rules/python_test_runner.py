@@ -2,7 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.backend.python.rules.inject_init import InjectedInitDigest
-from pants.backend.python.rules.pex import CreatePex, Pex, PexInterpreterContraints, PexRequirements
+from pants.backend.python.rules.pex import (
+  CreatePex,
+  Pex,
+  PexInterpreterConstraints,
+  PexRequirements,
+)
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
@@ -34,7 +39,7 @@ def run_python_test(
   all_targets = transitive_hydrated_targets.closure
   all_target_adaptors = tuple(t.adaptor for t in all_targets)
 
-  interpreter_constraints = PexInterpreterContraints.create_from_adaptors(
+  interpreter_constraints = PexInterpreterConstraints.create_from_adaptors(
     adaptors=tuple(all_target_adaptors),
     python_setup=python_setup
   )
