@@ -228,7 +228,6 @@ pub extern "C" fn scheduler_create(
   process_execution_speculation_strategy_buf: Buffer,
   process_execution_use_local_cache: bool,
   remote_execution_headers_buf: BufferBuffer,
-  local_python_distribution_absolute_path_buf: Buffer,
   process_execution_local_enable_nailgun: bool,
 ) -> RawResult {
   match make_core(
@@ -282,7 +281,6 @@ pub extern "C" fn scheduler_create(
     process_execution_speculation_strategy_buf,
     process_execution_use_local_cache,
     remote_execution_headers_buf,
-    local_python_distribution_absolute_path_buf,
     process_execution_local_enable_nailgun,
   ) {
     Ok(core) => RawResult {
@@ -349,7 +347,6 @@ fn make_core(
   process_execution_speculation_strategy_buf: Buffer,
   process_execution_use_local_cache: bool,
   remote_execution_headers_buf: BufferBuffer,
-  local_python_distribution_absolute_path_buf: Buffer,
   process_execution_local_enable_nailgun: bool,
 ) -> Result<Core, String> {
   let root_type_ids = root_type_ids.to_vec();
@@ -443,9 +440,6 @@ fn make_core(
       )
     })?;
 
-  let local_python_distribution_absolute_path =
-    PathBuf::from(local_python_distribution_absolute_path_buf.to_os_string());
-
   let remote_execution_headers = remote_execution_headers_buf.to_map("remote-execution-headers")?;
   Core::new(
     root_type_ids.clone(),
@@ -488,7 +482,6 @@ fn make_core(
     process_execution_speculation_strategy,
     process_execution_use_local_cache,
     remote_execution_headers,
-    local_python_distribution_absolute_path,
     process_execution_local_enable_nailgun,
   )
 }

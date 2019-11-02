@@ -24,8 +24,6 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnitLabel
-from pants.binaries.binary_tool import Script
-from pants.binaries.binary_util import BinaryToolUrlGenerator
 from pants.engine.fs import (
   EMPTY_DIRECTORY_DIGEST,
   DirectoryToMaterialize,
@@ -45,18 +43,6 @@ _SCALAC_PLUGIN_INFO_FILE = 'scalac-plugin.xml'
 
 
 logger = logging.getLogger(__name__)
-
-
-class NailgunClientBinary(Script):
-  options_scope = 'nailgun-client'
-  name = 'ng'
-  default_version = '1.0.0'
-
-  def get_external_url_generator(self):
-    class NailgunClientBinaryUrlGenerator(BinaryToolUrlGenerator):
-      def generate_urls(self, version, host_platform):
-        return ["https://github.com/facebook/nailgun/releases/download/nailgun-all-v1.0.0/ng.py"]
-    return NailgunClientBinaryUrlGenerator()
 
 
 class BaseZincCompile(JvmCompile):
@@ -169,7 +155,7 @@ class BaseZincCompile(JvmCompile):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super().subsystem_dependencies() + (Zinc.Factory, JvmPlatform, NailgunClientBinary,)
+    return super().subsystem_dependencies() + (Zinc.Factory, JvmPlatform,)
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -456,9 +442,6 @@ class BaseZincCompile(JvmCompile):
     directory_digests.extend(
       classpath_entry.directory_digest for classpath_entry in scalac_classpath_entries
     )
-
-    _, nailgun_client_snapshot = NailgunClientBinary.global_instance().hackily_snapshot(self.context)
-    directory_digests.append(nailgun_client_snapshot.directory_digest)
 
     if self._zinc.use_native_image:
       if jvm_options:
