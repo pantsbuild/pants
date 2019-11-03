@@ -1067,6 +1067,7 @@ class GlobalOptions(Subsystem):
                 "The `--loop` option requires `--enable-pantsd`, in order to watch files."
             )
 
+
         if opts.remote_execution and not opts.remote_execution_server:
             raise OptionsError(
                 "The `--remote-execution` option requires also setting "
