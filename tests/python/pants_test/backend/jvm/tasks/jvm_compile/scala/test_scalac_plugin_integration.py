@@ -76,7 +76,7 @@ class ScalacPluginIntegrationTest(BaseCompileIT):
     }
     self._do_test(['args', 'from', 'target', 'local'], config, 'local')
 
-  def test_compiler_option_sets_required_scalac_plugins(self):
+  def test_compiler_option_sets_enabled_scalac_plugins(self):
     self._do_test_global(
       args=[],
       extra_config={
@@ -87,7 +87,7 @@ class ScalacPluginIntegrationTest(BaseCompileIT):
               '-S-P:simple_scalac_plugin:def',
             ],
           },
-          'compiler_option_sets_required_scalac_plugins': {
+          'compiler_option_sets_enabled_scalac_plugins': {
             'option-set-requiring-scalac-plugin': ['simple_scalac_plugin'],
           },
         }

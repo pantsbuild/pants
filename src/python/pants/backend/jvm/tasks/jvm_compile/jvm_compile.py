@@ -101,7 +101,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
              default=list(cls.get_no_warning_args_default()),
              help='Extra compiler args to use when warnings are disabled.')
 
-    register('--compiler-option-sets-required-scalac-plugins', advanced=True, type=dict,
+    register('--compiler-option-sets-enabled-scalac-plugins', advanced=True, type=dict,
              fingerprint=True,
              help='A mapping of (compiler option set name) -> (list of scalac plugin names to '
                   'be enabled when this option set is enabled).')
@@ -649,7 +649,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
       tuple(
         plugin_name
         for option_set_name in compiler_option_sets
-        for plugin_name in self.get_options().compiler_option_sets_required_scalac_plugins.get(option_set_name, [])
+        for plugin_name in self.get_options().compiler_option_sets_enabled_scalac_plugins.get(option_set_name, [])
       )
     )
     # Allow multiple flags and also comma-separated values in a single flag.
