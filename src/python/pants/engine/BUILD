@@ -178,7 +178,6 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':goal',
     ':selectors',
-    'src/python/pants/base:specs',
     'src/python/pants/util:collections',
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',

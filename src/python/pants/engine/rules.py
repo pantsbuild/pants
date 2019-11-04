@@ -17,7 +17,6 @@ from typing import Any, Callable, Dict, Optional, Tuple, Type, cast
 import asttokens
 from twitter.common.collections import OrderedSet
 
-from pants.base.deprecated import deprecated_conditional
 from pants.engine.goal import Goal
 from pants.engine.selectors import Get
 from pants.util.collections import assert_single_element
