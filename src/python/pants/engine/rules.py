@@ -17,7 +17,6 @@ from typing import Any, Callable, Dict, Optional, Tuple, Type, cast
 import asttokens
 from twitter.common.collections import OrderedSet
 
-from pants.base.deprecated import deprecated_conditional
 from pants.engine.goal import Goal
 from pants.engine.selectors import Get
 from pants.util.collections import assert_single_element
@@ -319,31 +318,6 @@ def _ensure_type_annotation(
 
 
 def rule(*args, cacheable=True) -> Callable:
-
-  deprecated_conditional(
-    predicate=lambda: len(args) == 2,
-    removal_version="1.23.0.dev0",
-    entity_description="Using the old style of annotating types for an @rule",
-    hint_message=(
-      "Remove all arguments to the @rule or @console_rule decorator, then move the types into "
-      f"type hints for the decorated function. Given {args}."
-    ),
-  )
-
-  if len(args) == 2:
-    return_type, parameter_types = args
-    if not isinstance(return_type, type):
-      raise ValueError(f'The return_type decorator parameter must be a type, '
-                       f'given {return_type} of type {type(return_type)}.')
-    if not isinstance(parameter_types, Iterable):
-      raise ValueError('The parameter_types decorator parameter must be an iterable.')
-    for index, parameter_type in enumerate(parameter_types):
-      if not isinstance(parameter_type, type):
-        raise ValueError(f'The parameter_types decorator parameter must contain only types. '
-                         f'Element {index} (0-based) {parameter_type} is of type '
-                         f'{type(parameter_type)}')
-    return _make_rule(return_type, parameter_types, cacheable=cacheable)
-
   if len(args) != 1 and not inspect.isfunction(args[0]):
     raise ValueError(
       'The @rule decorator expects no arguments and for the function it decorates to be '
