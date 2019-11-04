@@ -171,10 +171,10 @@ class OptionsFingerprinter:
     converted to encode its keys with `stable_option_fingerprint()`, as is done in the `fingerprint()`
     method.
     """
-    final = defaultdict(dict)
+    final = defaultdict(list)
     for k, v in option_val.items():
-      for path in v.split(','):
+      for path in sorted(v.split(',')):
         with open(path, 'r') as f:
-          final[k][path] = f.read()
+          final[k].append(f.read())
     fingerprint = stable_option_fingerprint(final)
     return fingerprint
