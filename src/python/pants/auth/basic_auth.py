@@ -10,6 +10,7 @@ import www_authenticate
 
 from pants.auth.cookies import Cookies
 from pants.subsystem.subsystem import Subsystem
+from pants.version import VERSION
 
 
 @dataclass (frozen=True)
@@ -84,7 +85,7 @@ class BasicAuth(Subsystem):
       auth = requests.auth.HTTPBasicAuth(creds.username, creds.password)
     else:
       auth = None  # requests will use the netrc creds.
-    response = requests.get(url, auth=auth)
+    response = requests.get(url, auth=auth, headers={'User-Agent': f'pants/v{VERSION}'})
 
     if response.status_code != requests.codes.ok:
       if response.status_code == requests.codes.unauthorized:
