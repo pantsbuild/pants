@@ -173,8 +173,11 @@ class OptionsFingerprinter:
     """
     final = defaultdict(list)
     for k, v in option_val.items():
-      for path in sorted(v.split(',')):
-        with open(path, 'r') as f:
-          final[k].append(f.read())
+      for sub_value in sorted(v.split(',')):
+        if os.path.isfile(sub_value):
+          with open(sub_value, 'r') as f:
+            final[k].append(f.read())
+        else:
+          final[k].append(sub_value)
     fingerprint = stable_option_fingerprint(final)
     return fingerprint
