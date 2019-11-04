@@ -4,6 +4,110 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.23.0dev0 (11/03/2019)
+------------------------
+
+New Features
+~~~~~~~~~~~~
+* Add Zinc for outlining support (#8560)
+  `PR #8560 <https://github.com/pantsbuild/pants/pull/8560>`_
+
+* Create infrastructure for running interactive local process (#8495)
+  `PR #8495 <https://github.com/pantsbuild/pants/pull/8495>`_
+
+* Add lint-v2 implementation for python with black, and script to be used in pre-commit hook (#8553)
+  `PR #8553 <https://github.com/pantsbuild/pants/pull/8553>`_
+
+* Implement Nailgun in V2 hermetic execution (#8371)
+  `PR #8371 <https://github.com/pantsbuild/pants/pull/8371>`_
+
+* An option to pass in the name of the pants binary. (#8517)
+  `PR #8517 <https://github.com/pantsbuild/pants/pull/8517>`_
+
+* Add workflow option for -Youtline as an outliner (#8427)
+  `PR #8427 <https://github.com/pantsbuild/pants/pull/8427>`_
+
+API Changes
+~~~~~~~~~~~
+* Allow users to override compile.rsc workflows via env var and add --allow-public-inference option (#8537)
+  `PR #8537 <https://github.com/pantsbuild/pants/pull/8537>`_
+
+Bugfixes
+~~~~~~~~
+* Add lock around bootstrap compiler bridge jar (#8535)
+  `PR #8535 <https://github.com/pantsbuild/pants/pull/8535>`_
+
+* Fix assertion on hydrate_missing_directory_digest (#8534)
+  `PR #8534 <https://github.com/pantsbuild/pants/pull/8534>`_
+
+* Fix zinc jar missing digest on double check cache hit (#8532)
+  `PR #8532 <https://github.com/pantsbuild/pants/pull/8532>`_
+
+* Ensure node build products added to the classpath have been snapshotted (#8514)
+  `PR #8514 <https://github.com/pantsbuild/pants/pull/8514>`_
+
+* Avoid globbing jdk home with symlinks (#8484)
+  `PR #8484 <https://github.com/pantsbuild/pants/pull/8484>`_
+
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Create Python workunit value using separate function (#8559)
+  `PR #8559 <https://github.com/pantsbuild/pants/pull/8559>`_
+
+* Rust nails client for local hermetic nailgun execution. (#8564)
+  `PR #8564 <https://github.com/pantsbuild/pants/pull/8564>`_
+
+* Fix typo: "PythonInterpreterCon*s*traints" (#8566)
+  `PR #8566 <https://github.com/pantsbuild/pants/pull/8566>`_
+
+* Render cyclic path in node error to avoid --print-exception-stacktrace (#8422)
+  `PR #8422 <https://github.com/pantsbuild/pants/pull/8422>`_
+
+* Temporarily disable speculation in travis. (#8546)
+  `PR #8546 <https://github.com/pantsbuild/pants/pull/8546>`_
+
+* Trim travis cache. (#8545)
+  `PR #8545 <https://github.com/pantsbuild/pants/pull/8545>`_
+
+* Revert "Squashed commit of the following: (#8302)" (#8551)
+  `PR #8302 <https://github.com/pantsbuild/pants/pull/8302>`_
+  `PR #8551 <https://github.com/pantsbuild/pants/pull/8551>`_
+
+* Reduce boilerplate in FFI scheduler initialization (#8522)
+  `PR #8522 <https://github.com/pantsbuild/pants/pull/8522>`_
+
+* Ability to manually turn off pants pex creation for test running. (#8525)
+  `PR #8525 <https://github.com/pantsbuild/pants/pull/8525>`_
+
+* Bump the default watchman startup timeout to 60 seconds. (#8544)
+  `PR #8544 <https://github.com/pantsbuild/pants/pull/8544>`_
+
+* Don't display a ubiquitous warning triggered on python 3.7. (#8523)
+  `PR #8523 <https://github.com/pantsbuild/pants/pull/8523>`_
+
+* Increase our client count and sync bootstrapped files. (#8536)
+  `PR #8536 <https://github.com/pantsbuild/pants/pull/8536>`_
+
+* Move CallOption construction to common location (#8529)
+  `PR #8529 <https://github.com/pantsbuild/pants/pull/8529>`_
+
+* Move rust tests into their own files (#8512)
+  `PR #8512 <https://github.com/pantsbuild/pants/pull/8512>`_
+
+* Update to pantsbuild/grpc-rs:pants-use latest. (#8507)
+  `PR #8507 <https://github.com/pantsbuild/pants/pull/8507>`_
+
+* pin cryptography lib to 2.7 (#8515)
+  `PR #8515 <https://github.com/pantsbuild/pants/pull/8515>`_
+
+* Digest can be deserialized as well as serialized (#8497)
+  `PR #8497 <https://github.com/pantsbuild/pants/pull/8497>`_
+
+* Upgrade pex to 1.6.12. (#8493)
+  `PR #8493 <https://github.com/pantsbuild/pants/pull/8493>`_
+
+
 1.22.0rc0 (10/20/2019)
 ------------------------
 
