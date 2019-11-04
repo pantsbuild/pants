@@ -194,7 +194,7 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
 
             site.getsitepackages = lambda: sys.path[:]
 
-
+            
             runpy.run_module('mypy', run_name='__main__')
           """))
           exe_fp.flush()
