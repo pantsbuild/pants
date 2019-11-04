@@ -157,7 +157,9 @@ def warn_or_error(
                   in a warning message.
   :param ensure_stderr: Whether use warnings.warn, or use warnings.showwarning to print
                         directly to stderr.
-  :param print_warning: Whether a warnings.WarningMessage object should be created.
+  :param print_warning: Whether to print a warning for deprecations *before* their removal.
+                        If this flag is off, an exception will still be raised for options
+                        past their deprecation date.
   :raises DeprecationApplicationError: if the removal_version parameter is invalid.
   :raises CodeRemovedError: if the current version is later than the version marked for removal.
   """
