@@ -71,7 +71,6 @@ Refactoring, Improvements, and Tooling
   `PR #8545 <https://github.com/pantsbuild/pants/pull/8545>`_
 
 * Revert "Squashed commit of the following: (#8302)" (#8551)
-  `PR #8302 <https://github.com/pantsbuild/pants/pull/8302>`_
   `PR #8551 <https://github.com/pantsbuild/pants/pull/8551>`_
 
 * Reduce boilerplate in FFI scheduler initialization (#8522)
