@@ -17,7 +17,7 @@ from pants.util.contextutil import temporary_dir
 
 class Run(Goal):
   """Runs a runnable target."""
-  name = 'v2-run'
+  name = 'run'
 
 
 @console_rule
