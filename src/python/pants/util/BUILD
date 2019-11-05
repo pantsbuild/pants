@@ -96,6 +96,7 @@ python_library(
 python_library(
   name = 'objects',
   sources = ['objects.py'],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
