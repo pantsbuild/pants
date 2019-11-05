@@ -10,7 +10,6 @@ from pants.help.build_dictionary_info_extracter import (
   BuildSymbolInfo,
   FunctionArg,
 )
-from pants.util.objects import datatype
 
 
 class BuildDictionaryInfoExtracterTest(unittest.TestCase):
@@ -228,26 +227,3 @@ class BuildDictionaryInfoExtracterTest(unittest.TestCase):
                                        [FunctionArg('bar', 'Bar details.', False, None),
                                         FunctionArg('baz', 'Baz details.', True, 42)])],
                       extracter.get_object_factory_info())
-
-  def test_get_object_info_datatype(self):
-    class FooDatatype(datatype(['bar', 'baz'])):
-      """Foo docstring."""
-
-      def __new__(cls, bar, baz=42):
-        """
-        :param bar: Bar details.
-        :param int baz: Baz details.
-        """
-        return super().__new__(cls, bar, baz)
-
-    bfa = BuildFileAliases(targets={},
-      objects={
-        'foo': FooDatatype
-      },
-      context_aware_object_factories={},
-    )
-    extracter = BuildDictionaryInfoExtracter(bfa)
-    self.assertEqual([BuildSymbolInfo('foo', 'Foo docstring.', [],
-                                       [FunctionArg('bar', 'Bar details.', False, None),
-                                        FunctionArg('baz', 'Baz details.', True, 42)])],
-                      extracter.get_object_info())
