@@ -149,6 +149,7 @@ class Validatable(ABC):
 
 _C = TypeVar("_C")
 
+
 class Collection(Generic[_C], Iterable):
   """Constructs classes representing collections of objects of a particular type.
 

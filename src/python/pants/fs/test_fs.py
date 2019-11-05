@@ -15,7 +15,6 @@ from pants.engine.fs import (
   Workspace,
 )
 from pants.engine.goal import Goal
-from pants.engine.objects import Collection
 from pants.engine.rules import RootRule, console_rule
 from pants.engine.selectors import Get
 from pants.util.contextutil import temporary_dir
