@@ -19,7 +19,7 @@ class RscCompileIntegrationYoutline(RscCompileIntegrationBase):
 
   @ensure_compile_rsc_execution_strategy(
     RscCompileIntegrationBase.outline_and_zinc,
-    PANTS_COMPILE_RSC_WORKFLOW_OVERRIDE="zinc-only")
+    PANTS_COMPILE_RSC_SCALA_WORKFLOW_OVERRIDE="zinc-only")
   def test_workflow_override(self):
     self._testproject_compile("mutual", "bin", "A", outline_result=False)
 

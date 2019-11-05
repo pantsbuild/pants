@@ -177,10 +177,10 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       default=cls.JvmCompileWorkflowType.zinc_only, metavar='<workflow>',
       help='The default workflow to use to compile JVM targets. This is overriden on a per-target basis with the force-compiler-tag-prefix tag.', fingerprint=True)
 
-    register('--workflow-override', type=cls.JvmCompileWorkflowType,
+    register('--scala-workflow-override', type=cls.JvmCompileWorkflowType,
       choices=cls.JvmCompileWorkflowType.all_values(),
       default=None, metavar='<workflow_override>',
-      help='The workflow to use to compile JVM targets, overriding the "workflow" option as well as any force-compiler-tag-prefix tags applied to targets. An example use case is to quickly turn off outlining workflows in case of errors.', fingerprint=True)
+      help='Experimental option. The workflow to use to compile Scala targets, overriding the "workflow" option as well as any force-compiler-tag-prefix tags applied to targets. An example use case is to quickly turn off outlining workflows in case of errors.', fingerprint=True)
 
     register('--extra-rsc-args', type=list, default=[],
              help='Extra arguments to pass to the rsc invocation.')
@@ -334,13 +334,6 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
   @memoized_method
   def _classify_target_compile_workflow(self, target):
     """Return the compile workflow to use for this target."""
-
-    workflow_override = self.get_options().workflow_override
-
-    if workflow_override is not None:
-      return self.JvmCompileWorkflowType(workflow_override)
-
-
     # scala_library() targets may have a `.java_sources` property.
     java_sources = getattr(target, 'java_sources', [])
     if java_sources or target.has_sources('.java'):
@@ -348,6 +341,9 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       # java yet.
       return self.JvmCompileWorkflowType.zinc_java
     if target.has_sources('.scala'):
+      workflow_override = self.get_options().scala_workflow_override
+      if workflow_override is not None:
+        return self.JvmCompileWorkflowType(workflow_override)
       return self.get_scalar_mirrored_target_option('workflow', target)
     return None
 
