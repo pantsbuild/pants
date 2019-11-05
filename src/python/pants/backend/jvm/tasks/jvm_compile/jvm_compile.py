@@ -101,6 +101,11 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
              default=list(cls.get_no_warning_args_default()),
              help='Extra compiler args to use when warnings are disabled.')
 
+    register('--compiler-option-sets-enabled-scalac-plugins', advanced=True, type=dict,
+             fingerprint=True,
+             help='A mapping of (compiler option set name) -> (list of scalac plugin names to '
+                  'be enabled when this option set is enabled).')
+
     register('--debug-symbols', type=bool, fingerprint=True,
              help='Compile with debug symbol enabled.')
 
@@ -633,10 +638,19 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     # Note that we get() options and getattr() target fields and task methods,
     # so we're robust when those don't exist (or are None).
     plugins_key = '{}_plugins'.format(compiler)
+
+    dep_context = DependencyContext.global_instance()
+    compiler_option_sets = dep_context.defaulted_property(target, 'compiler_option_sets')
+
     requested_plugins = (
       tuple(getattr(self, plugins_key, []) or []) +
       tuple(options_src.get_options().get(plugins_key, []) or []) +
-      tuple((getattr(target, plugins_key, []) or []))
+      tuple((getattr(target, plugins_key, []) or [])) +
+      tuple(
+        plugin_name
+        for option_set_name in compiler_option_sets
+        for plugin_name in self.get_options().compiler_option_sets_enabled_scalac_plugins.get(option_set_name, [])
+      )
     )
     # Allow multiple flags and also comma-separated values in a single flag.
     requested_plugins = {p for val in requested_plugins for p in val.split(',')}
