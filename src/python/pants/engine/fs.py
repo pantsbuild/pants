@@ -28,7 +28,8 @@ class FileContent:
     )
 
 
-FilesContent = Collection.of(FileContent)
+class FilesContent(Collection[FileContent]):
+  pass
 
 
 class InputFilesContent(FilesContent):
@@ -170,7 +171,8 @@ class DirectoryToMaterialize:
   directory_digest: Digest
 
 
-DirectoriesToMaterialize = Collection.of(DirectoryToMaterialize)
+class DirectoriesToMaterialize(Collection[DirectoryToMaterialize]):
+  pass
 
 
 @dataclass(frozen=True)
@@ -179,7 +181,8 @@ class MaterializeDirectoryResult:
   output_paths: Tuple[str, ...]
 
 
-MaterializeDirectoriesResult = Collection.of(MaterializeDirectoryResult)
+class MaterializeDirectoriesResult(Collection[MaterializeDirectoryResult]):
+  pass
 
 
 @dataclass(frozen=True)

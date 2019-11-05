@@ -2,12 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import inspect
-import sys
+import typing
 from abc import ABC, abstractmethod
 from collections import namedtuple
-
-from pants.util.memo import memoized_classmethod
-from pants.util.objects import Exactly, TypedCollection, datatype
+from collections.abc import Iterable
+from typing import Generic, Iterator, TypeVar
 
 
 class SerializationError(Exception):
@@ -148,37 +147,23 @@ class Validatable(ABC):
     """
 
 
-class Collection:
+_C = TypeVar("_C")
+
+
+class Collection(Generic[_C], Iterable):
   """Constructs classes representing collections of objects of a particular type.
 
   The produced class will expose its values under a field named dependencies - this is a stable API
   which may be consumed e.g. over FFI from the engine.
 
   Python consumers of a Collection should prefer to use its standard iteration API.
-
-  Note that elements of a Collection are type-checked upon construction.
   """
 
-  @memoized_classmethod
-  def of(cls, *element_types):
-    union = '|'.join(element_type.__name__ for element_type in element_types)
-    type_name = '{}.of({})'.format(cls.__name__, union)
-    type_checked_collection_class = datatype([
-      # Create a datatype with a single field 'dependencies' which is type-checked on construction
-      # to be a collection containing elements of only the exact `element_types` specified.
-      ('dependencies', TypedCollection(Exactly(*element_types)))
-    ], superclass_name=cls.__name__)
-    supertypes = (cls, type_checked_collection_class)
-    properties = {'element_types': element_types}
-    collection_of_type = type(type_name, supertypes, properties)
+  def __init__(self, dependencies: typing.Iterable[_C]) -> None:
+    self.dependencies = tuple(dependencies)
 
-    # Expose the custom class type at the module level to be pickle compatible.
-    setattr(sys.modules[cls.__module__], type_name, collection_of_type)
-
-    return collection_of_type
-
-  def __iter__(self):
+  def __iter__(self) -> Iterator[_C]:
     return iter(self.dependencies)
 
-  def __bool__(self):
+  def __bool__(self) -> bool:
     return bool(self.dependencies)
