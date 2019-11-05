@@ -110,87 +110,62 @@ class _GoalOptions(object):
 
 
 class Outputting:
-  """A mixin for Goal that adds Options to support the `output` context manager.
+  """A mixin for Goal that adds options to support output-related context managers.
 
   Allows output to go to a file or to stdout.
 
-  Useful for goals that write non-line-oriented output, such as JSON.
+  Useful for goals whose purpose is to emit output to the end user (as distinct from incidental logging to stderr).
   """
 
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
     register('--output-file', metavar='<path>',
-             help='Write output to this file.  If unspecified, writes to stdout.')
+             help='Output to this file.  If unspecified, outputs to stdout.')
 
   @classmethod
   @contextmanager
-  def output(cls, output_options, console):
-    """Given Goal.Options and a Console, yields a function for writing output.
+  def output(cls, options, console):
+    """Given Goal.Options and a Console, yields a function for writing data to stdout, or a file.
 
-    The passed options instance will generally be the `Goal.Options` of a `Outputting` `Goal`.
+    The passed options instance will generally be the `Goal.Options` of an `Outputting` `Goal`.
     """
-    if type(output_options) != cls.Options:
-      raise AssertionError(
-          'Expected Options for `{}`, got: {}'.format(cls.__name__, output_options))
+    with cls.output_sink(options, console) as output_sink:
+      yield lambda msg: output_sink.write(msg)
 
+  @classmethod
+  @contextmanager
+  def output_sink(cls, options, console):
+    if type(options) != cls.Options:
+      raise AssertionError('Expected Options for `{}`, got: {}'.format(cls.__name__, options))
     stdout_file = None
-
-    if output_options.values.output_file:
-      stdout_file = open(output_options.values.output_file, 'w')
-      write_stdout = lambda msg: stdout_file.write(msg)
+    if options.values.output_file:
+      stdout_file = open(options.values.output_file, 'w')
+      output_sink = stdout_file
     else:
-      write_stdout = lambda msg: console.write_stdout(msg)
-
+      output_sink = console.stdout
     try:
-      yield write_stdout
+      yield output_sink
     finally:
+      output_sink.flush()
       if stdout_file:
         stdout_file.close()
-      console.flush()
 
 
-class LineOriented:
-  """A mixin for Goal that adds Options to support the `line_oriented` context manager.
-
-  Allows output to go to a file or to stdout.
-
-  Useful for goals that write line-by-line output.
-  """
-
+class LineOriented(Outputting):
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
     register('--sep', default='\\n', metavar='<separator>',
-             help='String to use to separate result lines.')
-    register('--output-file', metavar='<path>',
-             help='Print line-oriented output to this file.  If unspecified, prints to stdout.')
+             help='String to use to separate lines in line-oriented output.')
 
   @classmethod
   @contextmanager
-  def line_oriented(cls, line_oriented_options, console):
-    """Given Goal.Options and a Console, yields functions for writing to stdout and stderr, respectively.
+  def line_oriented(cls, options, console):
+    """Given Goal.Options and a Console, yields a function for printing lines to stdout or a file.
 
-    The passed options instance will generally be the `Goal.Options` of a `LineOriented` `Goal`.
+    The passed options instance will generally be the `Goal.Options` of an `Outputting` `Goal`.
     """
-    if type(line_oriented_options) != cls.Options:
-      raise AssertionError(
-        'Expected Options for `{}`, got: {}'.format(cls.__name__, line_oriented_options))
-
-    stdout_file = None
-    sep = line_oriented_options.values.sep.encode().decode('unicode_escape')
-
-    if line_oriented_options.values.output_file:
-      stdout_file = open(line_oriented_options.values.output_file, 'w')
-      print_stdout = lambda msg: print(msg, file=stdout_file, end=sep)
-    else:
-      print_stdout = lambda msg: console.print_stdout(msg, end=sep)
-
-    print_stderr = lambda msg: console.print_stderr(msg)
-
-    try:
-      yield print_stdout, print_stderr
-    finally:
-      if stdout_file:
-        stdout_file.close()
-      console.flush()
+    sep = options.values.sep.encode().decode('unicode_escape')
+    with cls.output_sink(options, console) as output_sink:
+      yield lambda msg: print(msg, file=output_sink, end=sep)
