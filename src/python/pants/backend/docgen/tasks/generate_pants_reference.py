@@ -8,8 +8,7 @@ from pants.goal.goal import Goal
 from pants.help.build_dictionary_info_extracter import BuildDictionaryInfoExtracter
 from pants.help.help_info_extracter import HelpInfoExtracter
 from pants.help.scope_info_iterator import ScopeInfoIterator
-from pants.option.arg_splitter import GLOBAL_SCOPE
-from pants.option.scope import ScopeInfo
+from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.task.task import Task
 from pants.util.dirutil import safe_open
 

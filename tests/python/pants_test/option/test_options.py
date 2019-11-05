@@ -15,7 +15,6 @@ from packaging.version import Version
 from pants.base.deprecated import CodeRemovedError
 from pants.base.hash_utils import CoercingEncoder
 from pants.engine.fs import FileContent
-from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.config import Config
 from pants.option.custom_types import UnsetBool, file_option, target_option
 from pants.option.errors import (
@@ -39,7 +38,7 @@ from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.parser import Parser
 from pants.option.ranked_value import RankedValue
-from pants.option.scope import ScopeInfo
+from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.util.collections import Enum, assert_single_element
 from pants.util.contextutil import temporary_file, temporary_file_path
 from pants.util.dirutil import safe_mkdtemp

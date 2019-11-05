@@ -11,11 +11,11 @@ from typing import Tuple
 
 from pants.base.build_environment import get_default_pants_config_file
 from pants.engine.fs import FileContent
-from pants.option.arg_splitter import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
 from pants.option.config import Config
 from pants.option.custom_types import ListValueComponent
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.options import Options
+from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
 from pants.util.dirutil import read_file
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.strutil import ensure_text
