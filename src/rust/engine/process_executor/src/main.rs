@@ -361,6 +361,7 @@ fn main() {
           store.clone(),
           Platform::Linux,
           executor.clone(),
+          std::time::Duration::from_secs(45),
           std::time::Duration::from_millis(500),
           std::time::Duration::from_secs(5),
         )

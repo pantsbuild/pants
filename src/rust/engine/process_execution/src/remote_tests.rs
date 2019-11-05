@@ -769,6 +769,7 @@ pub fn sends_headers() {
     store,
     Platform::Linux,
     runtime.clone(),
+    Duration::from_secs(0),
     Duration::from_millis(0),
     Duration::from_secs(0),
   )
@@ -932,6 +933,7 @@ fn ensure_inline_stdio_is_stored() {
     store,
     Platform::Linux,
     runtime.clone(),
+    Duration::from_secs(0),
     Duration::from_millis(0),
     Duration::from_secs(0),
   )
@@ -1464,6 +1466,7 @@ fn execute_missing_file_uploads_if_known() {
     store,
     Platform::Linux,
     runtime.clone(),
+    Duration::from_secs(0),
     Duration::from_millis(0),
     Duration::from_secs(0),
   )
@@ -1570,6 +1573,7 @@ fn execute_missing_file_uploads_if_known_status() {
     store,
     Platform::Linux,
     runtime.clone(),
+    Duration::from_secs(0),
     Duration::from_millis(0),
     Duration::from_secs(0),
   )
@@ -1649,6 +1653,7 @@ fn execute_missing_file_errors_if_unknown() {
     store,
     Platform::Linux,
     runtime.clone(),
+    Duration::from_secs(0),
     Duration::from_millis(0),
     Duration::from_secs(0),
   )
@@ -2462,6 +2467,7 @@ fn create_command_runner(
     store,
     Platform::Linux,
     runtime,
+    Duration::from_secs(1), // We use a low queue_buffer_time to ensure that tests do not take too long.
     backoff_incremental_wait,
     backoff_max_wait,
   )

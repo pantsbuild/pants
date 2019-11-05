@@ -182,6 +182,7 @@ impl Core {
             // need to take an option all the way down here and into the remote::CommandRunner struct.
             Platform::Linux,
             executor.clone(),
+            std::time::Duration::from_secs(45),
             std::time::Duration::from_millis(500),
             std::time::Duration::from_secs(5),
           )?),
