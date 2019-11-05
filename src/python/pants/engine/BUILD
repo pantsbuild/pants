@@ -28,7 +28,7 @@ python_library(
     'src/python/pants/build_graph',
     'src/python/pants/util:memo',
     'src/python/pants/util:objects',
-  ]
+  ],
 )
 
 python_library(
@@ -141,6 +141,7 @@ python_library(
 python_library(
   name='objects',
   sources=['objects.py'],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -163,7 +164,7 @@ python_library(
       'src/python/pants/util:collections',
       'src/python/pants/util:memo',
       'src/python/pants/util:osutil',
-  ]
+  ],
 )
 
 python_library(
@@ -177,7 +178,7 @@ python_library(
     'src/python/pants/util:collections',
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
-  ]
+  ],
 )
 
 python_library(
@@ -187,7 +188,8 @@ python_library(
     '3rdparty/python:dataclasses',
     'src/python/pants/util:meta',
     'src/python/pants/util:objects',
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -232,6 +234,7 @@ python_library(
   dependencies=[
     '3rdparty/python:ansicolors',
   ],
+  tags = {'partially_type_checked'},
 )
 
 resources(
