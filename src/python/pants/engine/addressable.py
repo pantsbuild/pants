@@ -12,7 +12,8 @@ from pants.engine.objects import Collection, Resolvable, Serializable
 from pants.util.objects import TypeConstraintError
 
 
-Addresses = Collection[Address]
+class Addresses(Collection[Address]):
+  pass
 
 
 @dataclass(frozen=True)
@@ -29,7 +30,8 @@ class BuildFileAddresses(Collection[BuildFileAddress]):
     return [bfa.to_address() for bfa in self]
 
 
-ProvenancedBuildFileAddresses = Collection[ProvenancedBuildFileAddress]
+class ProvenancedBuildFileAddresses(Collection[ProvenancedBuildFileAddress]):
+  pass
 
 
 class NotSerializableError(TypeError):

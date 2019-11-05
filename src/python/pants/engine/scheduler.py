@@ -322,13 +322,16 @@ class Scheduler:
     )
 
 
-_PathGlobsAndRootCollection = Collection[PathGlobsAndRoot]
+class _PathGlobsAndRootCollection(Collection[PathGlobsAndRoot]):
+  pass
 
 
-_DirectoryDigests = Collection[Digest]
+class _DirectoryDigests(Collection[Digest]):
+  pass
 
 
-_DirectoriesToMaterialize = Collection[DirectoryToMaterialize]
+class _DirectoriesToMaterialize(Collection[DirectoryToMaterialize]):
+  pass
 
 
 class SchedulerSession:
