@@ -10,6 +10,7 @@ from pants.engine.fs import (
   DirectoryToMaterialize,
   FileContent,
   InputFilesContent,
+  MaterializeDirectoriesResult,
   MaterializeDirectoryResult,
   Workspace,
 )
@@ -92,12 +93,7 @@ class FileSystemTest(TestBase):
         DirectoryToMaterialize(path=tmp_dir, directory_digest=digest),
       ))
 
-      # Generic classes lose type variable information at runtime, so, at runtime, `output` is a
-      # generic `pants.engine.objects.Collection`, even though MyPy can distinguish that it really
-      # is a `Collection[MaterializeDirectoryResult]` (aka `MaterializeDirectoriesResult`):
-      # https://mypy.readthedocs.io/en/latest/generics.html#generic-class-internals. We rely on
-      # MyPy to enforce valid type usage at compile-time for us.
-      self.assertEqual(type(output), Collection)
+      self.assertEqual(type(output), MaterializeDirectoriesResult)
       materialize_result = output.dependencies[0]
       self.assertEqual(type(materialize_result), MaterializeDirectoryResult)
       self.assertEqual(materialize_result.output_paths,
