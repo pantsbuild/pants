@@ -12,7 +12,7 @@ from collections import OrderedDict
 from collections.abc import Iterable
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import Any, Callable, Dict, Optional, Tuple, Type, cast
+from typing import Any, Callable, Dict, Optional, Tuple, Type
 
 import asttokens
 from twitter.common.collections import OrderedSet
@@ -314,7 +314,7 @@ def _ensure_type_annotation(
   if not isinstance(annotation, type):
     raise raise_type(f'The annotation for {name} must be a type, '
                      f'got {annotation} of type {type(annotation)}.')
-  return cast(type, annotation)
+  return annotation
 
 
 def rule(*args, cacheable=True) -> Callable:
@@ -470,7 +470,7 @@ class TaskRule(Rule):
     self._output_type = output_type
     self.input_selectors = input_selectors
     self.input_gets = input_gets
-    self.func = func
+    self.func = func  # type: ignore
     self._dependency_rules = dependency_rules or ()
     self._dependency_optionables = dependency_optionables or ()
     self.cacheable = cacheable
