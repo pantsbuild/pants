@@ -147,26 +147,6 @@ impl<N: Node> EntryState<N> {
 }
 
 ///
-/// Because there are guaranteed to be more edges than nodes in Graphs, we mark cyclic
-/// dependencies via a wrapper around the Node (rather than adding a byte to every
-/// valid edge).
-///
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub(crate) enum EntryKey<N: Node> {
-  Valid(N),
-  Cyclic(N),
-}
-
-impl<N: Node> EntryKey<N> {
-  pub(crate) fn content(&self) -> &N {
-    match self {
-      &EntryKey::Valid(ref v) => v,
-      &EntryKey::Cyclic(ref v) => v,
-    }
-  }
-}
-
-///
 /// An Entry and its adjacencies.
 ///
 #[derive(Clone, Debug)]
@@ -174,7 +154,7 @@ pub struct Entry<N: Node> {
   // TODO: This is a clone of the Node, which is also kept in the `nodes` map. It would be
   // nice to avoid keeping two copies of each Node, but tracking references between the two
   // maps is painful.
-  node: EntryKey<N>,
+  node: N,
 
   state: Arc<Mutex<EntryState<N>>>,
 }
@@ -185,7 +165,7 @@ impl<N: Node> Entry<N> {
   /// the EntryId of an Entry until after it is stored in the Graph, and we need the EntryId
   /// in order to run the Entry.
   ///
-  pub(crate) fn new(node: EntryKey<N>) -> Entry<N> {
+  pub(crate) fn new(node: N) -> Entry<N> {
     Entry {
       node: node,
       state: Arc::new(Mutex::new(EntryState::initial())),
@@ -193,7 +173,7 @@ impl<N: Node> Entry<N> {
   }
 
   pub fn node(&self) -> &N {
-    self.node.content()
+    &self.node
   }
 
   ///
@@ -216,7 +196,7 @@ impl<N: Node> Entry<N> {
   ///
   pub(crate) fn run<C>(
     context_factory: &C,
-    entry_key: &EntryKey<N>,
+    node: &N,
     entry_id: EntryId,
     run_token: RunToken,
     generation: Generation,
@@ -228,77 +208,67 @@ impl<N: Node> Entry<N> {
   {
     // Increment the RunToken to uniquely identify this work.
     let run_token = run_token.next();
-    match entry_key {
-      &EntryKey::Valid(ref n) => {
-        let context = context_factory.clone_for(entry_id);
-        let node = n.clone();
+    let context = context_factory.clone_for(entry_id);
+    let node = node.clone();
 
-        context_factory.spawn(future::lazy(move || {
-          // If we have previous result generations, compare them to all current dependency
-          // generations (which, if they are dirty, will cause recursive cleaning). If they
-          // match, we can consider the previous result value to be clean for reuse.
-          let was_clean = if let Some(previous_dep_generations) = previous_dep_generations {
-            let context2 = context.clone();
-            context
-              .graph()
-              .dep_generations(entry_id, &context)
-              .then(move |generation_res| match generation_res {
-                Ok(ref dep_generations) if dep_generations == &previous_dep_generations => {
-                  // Dependencies have not changed: Node is clean.
-                  Ok(true)
-                }
-                _ => {
-                  // If dependency generations mismatched or failed to fetch, clear its
-                  // dependencies and indicate that it should re-run.
-                  context2.graph().clear_deps(entry_id, run_token);
-                  Ok(false)
-                }
-              })
-              .to_boxed()
-          } else {
-            future::ok(false).to_boxed()
-          };
-
-          // If the Node was clean, complete it. Otherwise, re-run.
-          was_clean.and_then(move |was_clean| {
-            if was_clean {
-              // No dependencies have changed: we can complete the Node without changing its
-              // previous_result or generation.
-              context
-                .graph()
-                .complete(&context, entry_id, run_token, None);
-              future::ok(()).to_boxed()
-            } else {
-              // The Node needs to (re-)run!
-              let context2 = context.clone();
-              node
-                .run(context)
-                .then(move |res| {
-                  context2
-                    .graph()
-                    .complete(&context2, entry_id, run_token, Some(res));
-                  Ok(())
-                })
-                .to_boxed()
+    context_factory.spawn(future::lazy(move || {
+      // If we have previous result generations, compare them to all current dependency
+      // generations (which, if they are dirty, will cause recursive cleaning). If they
+      // match, we can consider the previous result value to be clean for reuse.
+      let was_clean = if let Some(previous_dep_generations) = previous_dep_generations {
+        let context2 = context.clone();
+        context
+          .graph()
+          .dep_generations(entry_id, &context)
+          .then(move |generation_res| match generation_res {
+            Ok(ref dep_generations) if dep_generations == &previous_dep_generations => {
+              // Dependencies have not changed: Node is clean.
+              Ok(true)
+            }
+            _ => {
+              // If dependency generations mismatched or failed to fetch, clear its
+              // dependencies and indicate that it should re-run.
+              context2.graph().clear_deps(entry_id, run_token);
+              Ok(false)
             }
           })
-        }));
+          .to_boxed()
+      } else {
+        future::ok(false).to_boxed()
+      };
 
-        EntryState::Running {
-          waiters: Vec::new(),
-          start_time: Instant::now(),
-          run_token,
-          generation,
-          previous_result,
-          dirty: false,
+      // If the Node was clean, complete it. Otherwise, re-run.
+      was_clean.and_then(move |was_clean| {
+        if was_clean {
+          // No dependencies have changed: we can complete the Node without changing its
+          // previous_result or generation.
+          context
+            .graph()
+            .complete(&context, entry_id, run_token, None);
+          future::ok(()).to_boxed()
+        } else {
+          // The Node needs to (re-)run!
+          let context2 = context.clone();
+          node
+            .run(context)
+            .then(move |res| {
+              context2
+                .graph()
+                .complete(&context2, entry_id, run_token, Some(res));
+              Ok(())
+            })
+            .to_boxed()
         }
-      }
-      &EntryKey::Cyclic(_) => EntryState::Completed {
-        result: EntryResult::Clean(Err(N::Error::cyclic())),
-        dep_generations: Vec::new(),
-        run_token,
-        generation,
-      },
+      })
+    }));
+
+    EntryState::Running {
+      waiters: Vec::new(),
+      start_time: Instant::now(),
+      run_token,
+      generation,
+      previous_result,
+      dirty: false,
     }
   }
 
@@ -339,7 +309,7 @@ impl<N: Node> Entry<N> {
           ref result,
           generation,
           ..
-        } if self.node.content().cacheable() && !result.is_dirty() => {
+        } if self.node.cacheable() && !result.is_dirty() => {
           return future::result(result.as_ref().clone())
             .map(move |res| (res, generation))
             .to_boxed();
@@ -374,10 +344,10 @@ impl<N: Node> Entry<N> {
             "Re-starting node {:?}. It was: previous_result={:?}, cacheable={}",
             self.node,
             result,
-            self.node.content().cacheable()
+            self.node.cacheable()
           );
           assert!(
-            result.is_dirty() || !self.node.content().cacheable(),
+            result.is_dirty() || !self.node.cacheable(),
             "A clean Node should not reach this point: {:?}",
             result
           );
@@ -394,12 +364,12 @@ impl<N: Node> Entry<N> {
             entry_id,
             run_token,
             generation,
-            if self.node.content().cacheable() {
+            if self.node.cacheable() {
               Some(dep_generations)
             } else {
               None
             },
-            if self.node.content().cacheable() {
+            if self.node.cacheable() {
               Some(result)
             } else {
               None
@@ -684,6 +654,6 @@ impl<N: Node> Entry<N> {
       Some(Err(ref x)) => format!("{:?}", x),
       None => "<None>".to_string(),
     };
-    format!("{} == {}", self.node.content(), state).replace("\"", "\\\"")
+    format!("{} == {}", self.node, state).replace("\"", "\\\"")
   }
 }

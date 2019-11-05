@@ -137,7 +137,7 @@ class PythonInterpreterCache(Subsystem):
     for interpreter_dir in os.listdir(self._cache_dir):
       pi = self._interpreter_from_relpath(interpreter_dir, filters=filters)
       if pi:
-        logger.debug('Detected interpreter {}: {}'.format(pi.binary, str(pi.identity)))
+        logger.debug(f'Detected interpreter {pi.binary}: {pi.identity}')
         yield pi
 
   def _setup_paths(self, paths, filters=()):
@@ -166,9 +166,8 @@ class PythonInterpreterCache(Subsystem):
     filters = filters if any(filters) else self.python_setup.interpreter_constraints
     setup_paths = self.python_setup.interpreter_search_paths
     logger.debug(
-      'Initializing Python interpreter cache matching filters `{}` from paths `{}`'.format(
-        ':'.join(filters), ':'.join(setup_paths)))
-
+      f"Initializing Python interpreter cache matching filters `{':'.join(filters)}` "
+      f"from paths `{':'.join(setup_paths)}`")
     interpreters = []
     def unsatisfied_filters():
       return [f for f in filters if len(list(self._matching(interpreters, [f]))) == 0]
@@ -179,7 +178,7 @@ class PythonInterpreterCache(Subsystem):
         interpreters.extend(self._setup_paths(setup_paths, filters=filters))
 
     for filt in unsatisfied_filters():
-      logger.debug('No valid interpreters found for {}!'.format(filt))
+      logger.debug(f'No valid interpreters found for {filt}!')
 
     matches = list(self._matching(interpreters, filters=filters))
     if len(matches) == 0:
@@ -191,11 +190,11 @@ class PythonInterpreterCache(Subsystem):
 
   def _purge_interpreter(self, interpreter_dir):
     try:
-      logger.info('Detected stale interpreter `{}` in the interpreter cache, purging.'
-                  .format(interpreter_dir))
+      logger.info(f'Detected stale interpreter `{interpreter_dir}` in the interpreter cache, '
+                  f'purging.')
       shutil.rmtree(interpreter_dir, ignore_errors=True)
     except Exception as e:
       logger.warning(
-        'Caught exception {!r} during interpreter purge. Please run `./pants clean-all`!'
-        .format(e)
+        f'Caught exception {e!r} during interpreter purge. '
+        f'Please run `{self.get_options().pants_bin_name} clean-all`!'
       )

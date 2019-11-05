@@ -41,6 +41,7 @@ class Zinc:
   ZINC_BOOTSTRAPPER_TOOL_NAME = 'zinc-bootstrapper'
 
   _lock = Lock()
+  _compiler_bridge_lock = Lock()
 
   # This is both a NativeTool (for the graal native image of zinc), _and_ a Subsystem by its own
   # right. We're not allowed to explicitly inherit from both because of MRO.
@@ -340,6 +341,12 @@ class Zinc:
 
   @memoized_method
   def compile_compiler_bridge(self, context):
+    # This method can be called concurrently by compile.rsc workers,
+    # and it manipulates the same files and symlinks, hence the lock.
+    with self._compiler_bridge_lock:
+      return self._compile_compiler_bridge(context)
+
+  def _compile_compiler_bridge(self, context):
     """Compile the compiler bridge to be used by zinc, using our scala bootstrapper.
     It will compile and cache the jar, and materialize it if not already there.
 

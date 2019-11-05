@@ -22,7 +22,8 @@ env:
   - PYENV_PY27_VERSION=2.7.15
   - PYENV_PY36_VERSION=3.6.8
   - PYENV_PY37_VERSION=3.7.2
-  - PYENV_ROOT="${PYENV_ROOT:-${HOME}/.pants_pyenv}"
+  - PYENV_ROOT_OSX=${HOME}/.pants_pyenv
+  - PYENV_ROOT="${PYENV_ROOT:-${PYENV_ROOT_OSX}}"
   - PATH="${PYENV_ROOT}/shims:${PATH}"
   - AWS_CLI_ROOT="${HOME}/.aws_cli"
   - AWS_ACCESS_KEY_ID__TO_BE_REEXPORTED_ON_DEPLOYS=AKIAV6A6G7RQWPRUWIXR
@@ -48,6 +49,7 @@ matrix:
     before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
     - find build-support -name "*.py[co]" -delete
+    - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
@@ -56,7 +58,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/rust/cargo
       - build-support/virtualenvs
       - src/rust/engine/target
@@ -104,6 +106,7 @@ matrix:
     before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
     - find build-support -name "*.py[co]" -delete
+    - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
@@ -112,7 +115,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/rust/cargo
       - build-support/virtualenvs
       - src/rust/engine/target
@@ -146,6 +149,7 @@ matrix:
     before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
     - find build-support -name "*.py[co]" -delete
+    - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64
       -o /usr/local/bin/jq
@@ -158,7 +162,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/rust/cargo
       - build-support/virtualenvs
       - src/rust/engine/target
@@ -187,6 +191,7 @@ matrix:
     before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
     - find build-support -name "*.py[co]" -delete
+    - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64
       -o /usr/local/bin/jq
@@ -199,7 +204,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/rust/cargo
       - build-support/virtualenvs
       - src/rust/engine/target
@@ -239,6 +244,7 @@ matrix:
     before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
     - find build-support -name "*.py[co]" -delete
+    - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
@@ -247,7 +253,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/rust/cargo
       - build-support/virtualenvs
       - src/rust/engine/target
@@ -282,6 +288,7 @@ matrix:
     before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
     - find build-support -name "*.py[co]" -delete
+    - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64
       -o /usr/local/bin/jq
@@ -294,7 +301,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/rust/cargo
       - build-support/virtualenvs
       - src/rust/engine/target
@@ -339,6 +346,7 @@ matrix:
     - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
     - rm -rf ${HOME}/.ivy2/pants/com.example
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
+    - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
@@ -354,8 +362,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -400,6 +407,7 @@ matrix:
     - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
     - rm -rf ${HOME}/.ivy2/pants/com.example
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
+    - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
@@ -415,8 +423,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -461,6 +468,7 @@ matrix:
     - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
     - rm -rf ${HOME}/.ivy2/pants/com.example
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
+    - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
@@ -473,8 +481,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -518,6 +525,7 @@ matrix:
     - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
     - rm -rf ${HOME}/.ivy2/pants/com.example
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
+    - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
@@ -530,8 +538,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -558,6 +565,7 @@ matrix:
   - before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
     - find build-support -name "*.py[co]" -delete
+    - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
@@ -574,7 +582,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/rust/cargo
       - build-support/virtualenvs
       - src/rust/engine/target
@@ -636,6 +644,7 @@ matrix:
     - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
     - rm -rf ${HOME}/.ivy2/pants/com.example
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
+    - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
@@ -651,8 +660,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -696,6 +704,7 @@ matrix:
     - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
     - rm -rf ${HOME}/.ivy2/pants/com.example
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
+    - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
@@ -711,8 +720,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -756,6 +764,7 @@ matrix:
     - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
     - rm -rf ${HOME}/.ivy2/pants/com.example
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
+    - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
@@ -769,8 +778,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -851,6 +859,7 @@ matrix:
     - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
     - rm -rf ${HOME}/.ivy2/pants/com.example
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
+    - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
@@ -863,8 +872,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -908,6 +916,7 @@ matrix:
     - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
     - rm -rf ${HOME}/.ivy2/pants/com.example
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
+    - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
@@ -920,8 +929,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -965,6 +973,7 @@ matrix:
     - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
     - rm -rf ${HOME}/.ivy2/pants/com.example
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
+    - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
@@ -977,8 +986,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -1022,6 +1030,7 @@ matrix:
     - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
     - rm -rf ${HOME}/.ivy2/pants/com.example
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
+    - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
@@ -1034,8 +1043,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -1079,6 +1087,7 @@ matrix:
     - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
     - rm -rf ${HOME}/.ivy2/pants/com.example
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
+    - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
@@ -1091,8 +1100,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -1136,6 +1144,7 @@ matrix:
     - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
     - rm -rf ${HOME}/.ivy2/pants/com.example
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
+    - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
@@ -1148,8 +1157,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -1193,6 +1201,7 @@ matrix:
     - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
     - rm -rf ${HOME}/.ivy2/pants/com.example
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
+    - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
@@ -1205,8 +1214,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -1250,6 +1258,7 @@ matrix:
     - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
     - rm -rf ${HOME}/.ivy2/pants/com.example
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
+    - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
@@ -1262,8 +1271,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -1308,6 +1316,7 @@ matrix:
     - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
     - rm -rf ${HOME}/.ivy2/pants/com.example
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
+    - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
@@ -1320,8 +1329,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -1366,6 +1374,7 @@ matrix:
     - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
     - rm -rf ${HOME}/.ivy2/pants/com.example
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
+    - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
@@ -1378,8 +1387,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -1424,6 +1432,7 @@ matrix:
     - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
     - rm -rf ${HOME}/.ivy2/pants/com.example
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
+    - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
@@ -1436,8 +1445,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -1482,6 +1490,7 @@ matrix:
     - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
     - rm -rf ${HOME}/.ivy2/pants/com.example
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
+    - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
@@ -1494,8 +1503,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -1540,6 +1548,7 @@ matrix:
     - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
     - rm -rf ${HOME}/.ivy2/pants/com.example
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
+    - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
@@ -1552,8 +1561,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -1598,6 +1606,7 @@ matrix:
     - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
     - rm -rf ${HOME}/.ivy2/pants/com.example
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
+    - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
@@ -1610,8 +1619,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -1656,6 +1664,7 @@ matrix:
     - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
     - rm -rf ${HOME}/.ivy2/pants/com.example
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
+    - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
@@ -1668,8 +1677,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -1714,6 +1722,7 @@ matrix:
     - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
     - rm -rf ${HOME}/.ivy2/pants/com.example
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
+    - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
@@ -1726,8 +1735,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -1772,6 +1780,7 @@ matrix:
     - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
     - rm -rf ${HOME}/.ivy2/pants/com.example
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
+    - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
@@ -1784,8 +1793,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -1830,6 +1838,7 @@ matrix:
     - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
     - rm -rf ${HOME}/.ivy2/pants/com.example
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
+    - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
@@ -1842,8 +1851,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -1888,6 +1896,7 @@ matrix:
     - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
     - rm -rf ${HOME}/.ivy2/pants/com.example
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
+    - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
@@ -1900,8 +1909,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -1946,6 +1954,7 @@ matrix:
     - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
     - rm -rf ${HOME}/.ivy2/pants/com.example
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
+    - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
@@ -1958,8 +1967,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -2004,6 +2012,7 @@ matrix:
     - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
     - rm -rf ${HOME}/.ivy2/pants/com.example
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
+    - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
@@ -2016,8 +2025,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -2044,6 +2052,7 @@ matrix:
   - before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
     - find build-support -name "*.py[co]" -delete
+    - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
@@ -2060,7 +2069,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/rust/cargo
       - build-support/virtualenvs
       - src/rust/engine/target
@@ -2081,6 +2090,7 @@ matrix:
   - before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
     - find build-support -name "*.py[co]" -delete
+    - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY36_VERSION}"
     - brew cask install osxfuse
@@ -2090,7 +2100,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/rust/cargo
       - build-support/virtualenvs
       - src/rust/engine/target
@@ -2283,6 +2293,7 @@ matrix:
     - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
     - rm -rf ${HOME}/.ivy2/pants/com.example
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
+    - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
@@ -2299,8 +2310,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -2343,6 +2353,7 @@ matrix:
     - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
     - rm -rf ${HOME}/.ivy2/pants/com.example
     - du -m -d2 ${HOME}/.cache/pants | sort -r -n
+    - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
@@ -2359,8 +2370,7 @@ matrix:
     cache:
       directories:
       - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
+      - ${PYENV_ROOT_OSX}
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants

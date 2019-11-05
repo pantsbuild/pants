@@ -1,6 +1,4 @@
-scala_library(
-    tags = {"use-compiler:rsc-then-zinc"},
-)
+scala_library()
 
 jvm_binary(
     name = "bin",

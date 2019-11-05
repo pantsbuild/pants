@@ -2,16 +2,16 @@ use crate::{
   Context, ExecuteProcessRequest, ExecuteProcessRequestMetadata, FallibleExecuteProcessResult,
   MultiPlatformExecuteProcessRequest,
 };
-use boxfuture::{BoxFuture, Boxable};
+use std::sync::Arc;
+
 use bytes::Bytes;
-use digest::{Digest as DigestTrait, FixedOutput};
 use futures::Future;
-use hashing::{Digest, Fingerprint};
 use log::{debug, warn};
 use protobuf::Message;
-use sha2::Sha256;
+
+use boxfuture::{BoxFuture, Boxable};
+use hashing::Fingerprint;
 use sharded_lmdb::ShardedLmdb;
-use std::sync::Arc;
 use store::Store;
 
 #[derive(Clone)]
@@ -36,7 +36,7 @@ impl crate::CommandRunner for CommandRunner {
     req: MultiPlatformExecuteProcessRequest,
     context: Context,
   ) -> BoxFuture<FallibleExecuteProcessResult, String> {
-    let digest = self.digest(req.clone());
+    let digest = crate::digest(req.clone(), &self.metadata);
     let key = digest.0;
 
     let command_runner = self.clone();
@@ -78,35 +78,6 @@ impl crate::CommandRunner for CommandRunner {
 }
 
 impl CommandRunner {
-  fn bytes_to_digest(&self, bytes: &[u8]) -> Digest {
-    let mut hasher = Sha256::default();
-    hasher.input(bytes);
-
-    Digest(
-      Fingerprint::from_bytes_unsafe(&hasher.fixed_result()),
-      bytes.len(),
-    )
-  }
-
-  fn digest(&self, req: MultiPlatformExecuteProcessRequest) -> Digest {
-    let mut hashes: Vec<String> = req
-      .0
-      .values()
-      .map(|ref epr| crate::remote::make_execute_request(epr, self.metadata.clone()).unwrap())
-      .map(|(_a, _b, er)| er.get_action_digest().get_hash().to_string())
-      .collect();
-    hashes.sort();
-    self.bytes_to_digest(
-      hashes
-        .iter()
-        .fold(String::new(), |mut acc, hash| {
-          acc.push_str(&hash);
-          acc
-        })
-        .as_bytes(),
-    )
-  }
-
   fn lookup(
     &self,
     fingerprint: Fingerprint,
@@ -175,120 +146,5 @@ impl CommandRunner {
           .map_err(|err| format!("Error serializing execute process result to cache: {}", err))
       })
       .and_then(move |bytes| process_execution_store.store_bytes(fingerprint, bytes, false))
-  }
-}
-
-#[cfg(test)]
-mod test {
-  use crate::{
-    CommandRunner as CommandRunnerTrait, Context, ExecuteProcessRequestMetadata,
-    FallibleExecuteProcessResult,
-  };
-  use crate::{ExecuteProcessRequest, Platform};
-  use hashing::EMPTY_DIGEST;
-  use sharded_lmdb::ShardedLmdb;
-  use std::collections::{BTreeMap, BTreeSet};
-  use std::io::Write;
-  use std::path::PathBuf;
-  use std::sync::Arc;
-  use std::time::Duration;
-  use store::Store;
-  use tempfile::TempDir;
-  use testutil::data::TestData;
-
-  struct RoundtripResults {
-    uncached: Result<FallibleExecuteProcessResult, String>,
-    maybe_cached: Result<FallibleExecuteProcessResult, String>,
-  }
-
-  fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {
-    let runtime = task_executor::Executor::new();
-    let work_dir = TempDir::new().unwrap();
-    let store_dir = TempDir::new().unwrap();
-    let store = Store::local_only(runtime.clone(), store_dir.path()).unwrap();
-    let local = crate::local::CommandRunner::new(
-      store.clone(),
-      runtime.clone(),
-      work_dir.path().to_owned(),
-      true,
-    );
-
-    let script_dir = TempDir::new().unwrap();
-    let script_path = script_dir.path().join("script");
-    std::fs::File::create(&script_path)
-      .and_then(|mut file| {
-        writeln!(
-          file,
-          "echo -n {} > roland && echo Hello && echo >&2 World; exit {}",
-          TestData::roland().string(),
-          script_exit_code
-        )
-      })
-      .unwrap();
-
-    let request = ExecuteProcessRequest {
-      argv: vec![
-        testutil::path::find_bash(),
-        format!("{}", script_path.display()),
-      ],
-      env: BTreeMap::new(),
-      input_files: EMPTY_DIGEST,
-      output_files: vec![PathBuf::from("roland")].into_iter().collect(),
-      output_directories: BTreeSet::new(),
-      timeout: Duration::from_millis(1000),
-      description: "bash".to_string(),
-      unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
-        hashing::EMPTY_DIGEST,
-      jdk_home: None,
-      target_platform: Platform::None,
-    };
-
-    let local_result = runtime.block_on(local.run(request.clone().into(), Context::default()));
-
-    let cache_dir = TempDir::new().unwrap();
-    let caching = crate::cache::CommandRunner {
-      underlying: Arc::new(local),
-      file_store: store.clone(),
-      process_execution_store: ShardedLmdb::new(
-        cache_dir.path().to_owned(),
-        50 * 1024 * 1024,
-        runtime.clone(),
-      )
-      .unwrap(),
-      metadata: ExecuteProcessRequestMetadata {
-        instance_name: None,
-        cache_key_gen_version: None,
-        platform_properties: vec![],
-      },
-    };
-
-    let uncached_result = runtime.block_on(caching.run(request.clone().into(), Context::default()));
-
-    assert_eq!(local_result, uncached_result);
-
-    // Removing the file means that were the command to be run again without any caching, it would
-    // fail due to a FileNotFound error. So, If the second run succeeds, that implies that the
-    // cache was successfully used.
-    std::fs::remove_file(&script_path).unwrap();
-    let maybe_cached_result = runtime.block_on(caching.run(request.into(), Context::default()));
-
-    RoundtripResults {
-      uncached: uncached_result,
-      maybe_cached: maybe_cached_result,
-    }
-  }
-
-  #[test]
-  fn cache_success() {
-    let results = run_roundtrip(0);
-    assert_eq!(results.uncached, results.maybe_cached);
-  }
-
-  #[test]
-  fn failures_not_cached() {
-    let results = run_roundtrip(1);
-    assert_ne!(results.uncached, results.maybe_cached);
-    assert_eq!(results.uncached.unwrap().exit_code, 1);
-    assert_eq!(results.maybe_cached.unwrap().exit_code, 127); // aka the return code for file not found
   }
 }

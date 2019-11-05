@@ -101,6 +101,11 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
              default=list(cls.get_no_warning_args_default()),
              help='Extra compiler args to use when warnings are disabled.')
 
+    register('--compiler-option-sets-enabled-scalac-plugins', advanced=True, type=dict,
+             fingerprint=True,
+             help='A mapping of (compiler option set name) -> (list of scalac plugin names to '
+                  'be enabled when this option set is enabled).')
+
     register('--debug-symbols', type=bool, fingerprint=True,
              help='Compile with debug symbol enabled.')
 
@@ -633,10 +638,19 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     # Note that we get() options and getattr() target fields and task methods,
     # so we're robust when those don't exist (or are None).
     plugins_key = '{}_plugins'.format(compiler)
+
+    dep_context = DependencyContext.global_instance()
+    compiler_option_sets = dep_context.defaulted_property(target, 'compiler_option_sets')
+
     requested_plugins = (
       tuple(getattr(self, plugins_key, []) or []) +
       tuple(options_src.get_options().get(plugins_key, []) or []) +
-      tuple((getattr(target, plugins_key, []) or []))
+      tuple((getattr(target, plugins_key, []) or [])) +
+      tuple(
+        plugin_name
+        for option_set_name in compiler_option_sets
+        for plugin_name in self.get_options().compiler_option_sets_enabled_scalac_plugins.get(option_set_name, [])
+      )
     )
     # Allow multiple flags and also comma-separated values in a single flag.
     requested_plugins = {p for val in requested_plugins for p in val.split(',')}
@@ -908,12 +922,16 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
       return [self._rehome(l) for l in underlying_libs]
 
     def find_libs_path_globs(self, names):
-      libs_abs = self._underlying.find_libs(names)
-      libs_unrooted = [self._unroot_lib_path(l) for l in libs_abs]
-      path_globs = PathGlobsAndRoot(
-        PathGlobs(tuple(libs_unrooted)),
-        self._underlying.home)
-      return (libs_unrooted, path_globs)
+      path_globs = []
+      filenames = []
+      # We have to move the jars to top level directory because globbing jdk home with symlinks
+      # would cause failing to scan the directory. https://github.com/pantsbuild/pants/issues/8460
+      for lib_abs in self._underlying.find_libs(names):
+        root = os.path.dirname(lib_abs)
+        filename = os.path.basename(lib_abs)
+        filenames.append(filename)
+        path_globs.append(PathGlobsAndRoot(PathGlobs((filename,)), root))
+      return (filenames, path_globs)
 
     @property
     def java(self):

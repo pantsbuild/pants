@@ -48,6 +48,7 @@ class SignalHandler:
   def __init__(self):
     self._ignore_sigint_lock = threading.Lock()
     self._threads_ignoring_sigint = 0
+    self._ignoring_sigint_v2_engine = False
 
   def _check_sigint_gate_is_correct(self):
     assert self._threads_ignoring_sigint >= 0, \
@@ -57,8 +58,13 @@ class SignalHandler:
     with self._ignore_sigint_lock:
       self._check_sigint_gate_is_correct()
       threads_ignoring_sigint = self._threads_ignoring_sigint
-    if threads_ignoring_sigint == 0:
+      ignoring_sigint_v2_engine = self._ignoring_sigint_v2_engine
+    if threads_ignoring_sigint == 0 and not ignoring_sigint_v2_engine:
       self.handle_sigint(signum, _frame)
+
+  def _toggle_ignoring_sigint_v2_engine(self, toggle: bool):
+    with self._ignore_sigint_lock:
+      self._ignoring_sigint_v2_engine = toggle
 
   @contextmanager
   def _ignoring_sigint(self):
@@ -371,8 +377,8 @@ class ExceptionSink:
 
     NB: This method calls signal.signal(), which will crash if not called from the main thread!
     """
+    previous_signal_handler = cls.reset_signal_handler(new_signal_handler)
     try:
-      previous_signal_handler = cls.reset_signal_handler(new_signal_handler)
       yield
     finally:
       cls.reset_signal_handler(previous_signal_handler)
@@ -391,6 +397,10 @@ class ExceptionSink:
     """
     with cls._signal_handler._ignoring_sigint():
       yield
+
+  @classmethod
+  def toggle_ignoring_sigint_v2_engine(cls, toggle: bool):
+    cls._signal_handler._toggle_ignoring_sigint_v2_engine(toggle)
 
   @classmethod
   def _iso_timestamp_for_now(cls):

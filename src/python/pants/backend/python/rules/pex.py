@@ -15,16 +15,11 @@ from pants.engine.fs import (
   DirectoriesToMerge,
   DirectoryWithPrefixToAdd,
 )
-from pants.engine.isolated_process import (
-  ExecuteProcessRequest,
-  ExecuteProcessResult,
-  MultiPlatformExecuteProcessRequest,
-)
+from pants.engine.isolated_process import ExecuteProcessResult, MultiPlatformExecuteProcessRequest
 from pants.engine.legacy.structs import PythonTargetAdaptor, TargetAdaptor
 from pants.engine.platform import Platform, PlatformConstraint
-from pants.engine.rules import RootRule, optionable_rule, rule
+from pants.engine.rules import optionable_rule, rule
 from pants.engine.selectors import Get
-from pants.util.strutil import create_path_env_var
 
 
 @dataclass(frozen=True)
@@ -46,8 +41,9 @@ class PexRequirements:
       all_target_requirements.extend(additional_requirements)
     return PexRequirements(requirements=tuple(sorted(all_target_requirements)))
 
+
 @dataclass(frozen=True)
-class PexInterpreterContraints:
+class PexInterpreterConstraints:
   constraint_set: FrozenSet[str] = frozenset()
 
   def generate_pex_arg_list(self) -> List[str]:
@@ -57,7 +53,7 @@ class PexInterpreterContraints:
     return args
 
   @classmethod
-  def create_from_adaptors(cls, adaptors: Tuple[PythonTargetAdaptor, ...], python_setup: PythonSetup) -> 'PexInterpreterContraints':
+  def create_from_adaptors(cls, adaptors: Tuple[PythonTargetAdaptor, ...], python_setup: PythonSetup) -> 'PexInterpreterConstraints':
     interpreter_constraints = frozenset(
       constraint
       for target_adaptor in adaptors
@@ -65,7 +61,7 @@ class PexInterpreterContraints:
         getattr(target_adaptor, 'compatibility', None)
       )
     )
-    return PexInterpreterContraints(constraint_set=interpreter_constraints)
+    return PexInterpreterConstraints(constraint_set=interpreter_constraints)
 
 
 @dataclass(frozen=True)
@@ -73,7 +69,7 @@ class CreatePex:
   """Represents a generic request to create a PEX from its inputs."""
   output_filename: str
   requirements: PexRequirements = PexRequirements()
-  interpreter_constraints: PexInterpreterContraints = PexInterpreterContraints()
+  interpreter_constraints: PexInterpreterConstraints = PexInterpreterConstraints()
   entry_point: Optional[str] = None
   input_files_digest: Optional[Digest] = None
 

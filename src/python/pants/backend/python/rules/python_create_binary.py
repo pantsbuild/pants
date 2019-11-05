@@ -2,11 +2,15 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.backend.python.rules.inject_init import InjectedInitDigest
-from pants.backend.python.rules.pex import CreatePex, Pex, PexInterpreterContraints, PexRequirements
+from pants.backend.python.rules.pex import (
+  CreatePex,
+  Pex,
+  PexInterpreterConstraints,
+  PexRequirements,
+)
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.engine.fs import Digest, DirectoriesToMerge
-from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.legacy.graph import BuildFileAddresses, HydratedTarget, TransitiveHydratedTargets
 from pants.engine.legacy.structs import PythonBinaryAdaptor
 from pants.engine.rules import UnionRule, rule
@@ -25,7 +29,7 @@ def create_python_binary(python_binary_adaptor: PythonBinaryAdaptor,
   all_target_adaptors = [t.adaptor for t in all_targets]
 
 
-  interpreter_constraints = PexInterpreterContraints.create_from_adaptors(
+  interpreter_constraints = PexInterpreterConstraints.create_from_adaptors(
     adaptors=tuple(all_targets),
     python_setup=python_setup
   )

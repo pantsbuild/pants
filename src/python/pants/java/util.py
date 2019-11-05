@@ -58,6 +58,8 @@ def execute_java(classpath, main, jvm_options=None, args=None, executor=None,
     a temporary directory will be provided and cleaned up upon process exit.
   :param file stdin: The stdin handle to use: by default None, meaning that stdin will
     not be propagated into the process.
+  :param bool force_subprocess: an optional boolean whether or not to force subprocess execution
+    regardless of executor
 
   Returns the exit code of the java program.
   Raises `pants.java.Executor.Error` if there was a problem launching java itself.

@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+from collections import defaultdict
 from hashlib import sha1
 
 from pants.base.build_environment import get_buildroot
@@ -170,13 +171,13 @@ class OptionsFingerprinter:
     converted to encode its keys with `stable_option_fingerprint()`, as is done in the `fingerprint()`
     method.
     """
-    return stable_option_fingerprint({
-      k: self._expand_possible_file_value(v) for k, v in option_val.items()
-    })
-
-  def _expand_possible_file_value(self, value):
-    """If the value is a file, returns its contents. Otherwise return the original value."""
-    if value and os.path.isfile(str(value)):
-      with open(value, 'r') as f:
-        return f.read()
-    return value
+    final = defaultdict(list)
+    for k, v in option_val.items():
+      for sub_value in sorted(v.split(',')):
+        if os.path.isfile(sub_value):
+          with open(sub_value, 'r') as f:
+            final[k].append(f.read())
+        else:
+          final[k].append(sub_value)
+    fingerprint = stable_option_fingerprint(final)
+    return fingerprint

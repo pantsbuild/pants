@@ -51,8 +51,7 @@ class ReportingServerRun(QuietTaskMixin, Task):
       manager.daemonize()
       manager.await_socket(10)
 
-      logger.info('Launched server with pid {pid} at http://localhost:{port}'
-                  .format(pid=manager.pid, port=manager.socket))
-      logger.info('To kill, run `./pants killserver`')
+      logger.info(f'Launched server with pid {manager.pid} at http://localhost:{manager.socket}')
+      logger.info(f'To kill, run `{self.get_options().pants_bin_name} killserver`')
 
     self._maybe_open(manager.socket)

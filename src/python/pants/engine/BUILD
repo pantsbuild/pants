@@ -101,6 +101,17 @@ python_library(
 )
 
 python_library(
+  name='interactive_runner',
+  sources=['interactive_runner.py'],
+  dependencies=[
+    '3rdparty/python:dataclasses',
+    'src/python/pants/base:exception_sink',
+    ':rules',
+    ':platform',
+  ]
+)
+
+python_library(
   name='isolated_process',
   sources=['isolated_process.py'],
   dependencies=[
@@ -163,7 +174,6 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':goal',
     ':selectors',
-    'src/python/pants/base:specs',
     'src/python/pants/util:collections',
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
@@ -194,7 +204,6 @@ python_library(
     ':rules',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:specs',
-    'src/python/pants/build_graph',
     'src/python/pants/rules/core:core',
   ]
 )
@@ -204,6 +213,9 @@ python_library(
   sources=['native.py'],
   dependencies=[
     ':native_engine_shared_library',
+    ':fs',
+    ':interactive_runner',
+    ':isolated_process',
     ':selectors',
     '3rdparty/python:cffi',
     '3rdparty/python:setuptools',
