@@ -5,7 +5,7 @@ from twitter.common.collections import OrderedSet
 
 from pants.build_graph.target import Target
 from pants.build_graph.target_scopes import Scope, Scopes
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 class ScopesTest(TestBase):

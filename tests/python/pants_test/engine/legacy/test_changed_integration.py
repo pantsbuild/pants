@@ -7,11 +7,11 @@ from contextlib import contextmanager
 from textwrap import dedent
 
 from pants.base.build_environment import get_buildroot
+from pants.testutil.git_util import initialize_repo
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
+from pants.testutil.test_base import AbstractTestGenerator
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import safe_delete, safe_mkdir, safe_open, touch
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
-from pants_test.test_base import AbstractTestGenerator
-from pants_test.testutils.git_util import initialize_repo
 
 
 def lines_to_set(str_or_list):

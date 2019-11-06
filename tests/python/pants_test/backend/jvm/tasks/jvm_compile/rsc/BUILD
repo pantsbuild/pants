@@ -7,7 +7,7 @@ python_library(
   dependencies=[
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
   ],
 )
 
@@ -47,7 +47,7 @@ python_tests(
     'src/python/pants/backend/jvm/tasks/jvm_compile',
     'src/python/pants/backend/jvm/tasks/jvm_compile/rsc',
     'src/python/pants/backend/jvm/tasks:classpath_products',
-    'tests/python/pants_test/jvm:nailgun_task_test_base',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil/jvm:nailgun_task_test_base',
+    'src/python/pants/testutil/subsystem',
   ],
 )

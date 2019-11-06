@@ -11,7 +11,7 @@ from pants.base.parse_context import ParseContext
 from pants.build_graph.address import Address
 from pants.build_graph.app_base import Bundle, DirectoryReMapper
 from pants.source.wrapped_globs import Globs
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 def _bundle(rel_path):

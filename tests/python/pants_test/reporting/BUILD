@@ -17,7 +17,7 @@ python_tests(
     '3rdparty/python:parameterized',
     '3rdparty/python:py-zipkin',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'examples/src/java/org/pantsbuild/example:hello_directory',
     'examples/src/scala/org/pantsbuild/example:several_scala_targets_directory',
   ],
@@ -34,7 +34,7 @@ python_tests(
     'src/python/pants/reporting',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
   ],
 )
 
@@ -44,6 +44,6 @@ python_tests(
   dependencies = [
     'src/python/pants/base:workunit',
     'src/python/pants/reporting',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
   ],
 )

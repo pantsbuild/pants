@@ -18,8 +18,8 @@ from pants.rules.core.test import (
   coordinator_of_tests,
   fast_test,
 )
-from pants_test.engine.util import MockConsole, run_rule
-from pants_test.test_base import TestBase
+from pants.testutil.engine.util import MockConsole, run_rule
+from pants.testutil.test_base import TestBase
 
 
 class TestTest(TestBase):

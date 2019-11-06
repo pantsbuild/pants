@@ -10,8 +10,8 @@ from pex.orderedset import OrderedSet
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.legacy.graph import HydratedTarget, TransitiveHydratedTargets
 from pants.rules.core.filedeps import file_deps
-from pants_test.engine.util import MockConsole, run_rule
-from pants_test.test_base import TestBase
+from pants.testutil.engine.util import MockConsole, run_rule
+from pants.testutil.test_base import TestBase
 
 
 @unittest.skip(reason='Bitrot discovered during #6880: should be ported to ConsoleRuleTestBase.')

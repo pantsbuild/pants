@@ -6,8 +6,8 @@ import itertools
 from pants.engine.round_engine import RoundEngine
 from pants.goal.goal import Goal
 from pants.task.task import Task
-from pants_test.engine.base_engine_test import EngineTestBase
-from pants_test.test_base import TestBase
+from pants.testutil.engine.base_engine_test import EngineTestBase
+from pants.testutil.test_base import TestBase
 
 
 class RoundEngineTest(EngineTestBase, TestBase):

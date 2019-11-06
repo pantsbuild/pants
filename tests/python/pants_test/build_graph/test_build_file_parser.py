@@ -11,7 +11,7 @@ from pants.build_graph.address import BuildFileAddress
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.build_file_parser import BuildFileParser
 from pants.build_graph.target import Target
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 class ErrorTarget(Target):

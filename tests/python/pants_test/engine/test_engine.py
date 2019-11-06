@@ -8,8 +8,8 @@ from textwrap import dedent
 from pants.engine.rules import RootRule, rule
 from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Get
+from pants.testutil.engine.util import assert_equal_with_printing, remove_locations_from_traceback
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
-from pants_test.engine.util import assert_equal_with_printing, remove_locations_from_traceback
 
 
 class A:

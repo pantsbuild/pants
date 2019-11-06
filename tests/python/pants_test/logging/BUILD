@@ -7,7 +7,7 @@ python_tests(
     'test_native_engine_logging.py'
   ],
   dependencies=[
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'tests/python/pants_test/pantsd:pantsd_integration_test_base',
   ],
   tags = {'integration'},
@@ -20,7 +20,7 @@ python_tests(
   ],
   dependencies=[
     'src/python/pants/goal:run_tracker',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'tests/python/pants_test/logging/data:plugin',
   ],
   tags = {'integration'},

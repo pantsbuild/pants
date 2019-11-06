@@ -7,9 +7,9 @@ from collections import defaultdict
 from itertools import chain
 
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.testutil.task_test_base import TaskTestBase
 from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import safe_mkdir, touch
-from pants_test.task_test_base import TaskTestBase
 
 from pants.contrib.go.targets.go_library import GoLibrary
 from pants.contrib.go.targets.go_remote_library import GoRemoteLibrary

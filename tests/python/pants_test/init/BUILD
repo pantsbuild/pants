@@ -21,9 +21,9 @@ python_tests(
     'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil/subsystem',
     'tests/python/pants_test:interpreter_selection_utils',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
   ],
   coverage = ['pants.init'],
 )

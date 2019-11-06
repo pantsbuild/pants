@@ -5,7 +5,7 @@ import ast
 import textwrap
 import unittest
 
-from pants_test.option.util.fakes import create_options
+from pants.testutil.option.fakes import create_options
 
 from pants.contrib.python.checks.checker.common import (CheckstylePlugin, CheckSyntaxError, Nit,
                                                         OffByOneList, PythonFile)

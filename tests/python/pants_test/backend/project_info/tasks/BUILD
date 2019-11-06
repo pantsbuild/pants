@@ -20,7 +20,7 @@ python_tests(
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/python:python_requirement',
     'src/python/pants/build_graph',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/testutil:task_test_base',
   ]
 )
 
@@ -35,8 +35,8 @@ python_tests(
     'src/python/pants/backend/python/targets',
     'src/python/pants/build_graph',
     'src/python/pants/subsystem',
-    'tests/python/pants_test/subsystem:subsystem_utils',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/testutil/subsystem',
+    'src/python/pants/testutil:task_test_base',
   ]
 )
 
@@ -63,8 +63,8 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:osutil',
-    'tests/python/pants_test/subsystem:subsystem_utils',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/testutil/subsystem',
+    'src/python/pants/testutil:task_test_base',
   ]
 )
 
@@ -81,8 +81,8 @@ python_tests(
     'src/python/pants/ivy',
     'src/python/pants/java/distribution',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test/subsystem:subsystem_utils',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil/subsystem',
+    'src/python/pants/testutil:int-test',
     'testprojects/maven_layout:provided_patching_directory',
     'testprojects/src/java/org/pantsbuild/testproject:exclude_directory',
     'testprojects/src/scala/org/pantsbuild/testproject:unicode_directory',
@@ -103,8 +103,8 @@ python_tests(
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/project_info/tasks:filedeps',
     'src/python/pants/build_graph',
-    'tests/python/pants_test:test_base',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/testutil:test_base',
+    'src/python/pants/testutil:task_test_base',
   ],
 )
 
@@ -121,7 +121,7 @@ python_tests(
   sources = ['test_idea_plugin_integration.py'],
   dependencies = [
     'src/python/pants/backend/project_info/tasks:idea_plugin_gen',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'examples/src/scala/org/pantsbuild/example:hello_directory',
     'testprojects/src/python:antlr_directory',
   ],

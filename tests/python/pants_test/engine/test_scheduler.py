@@ -13,8 +13,8 @@ from pants.engine.native import Native
 from pants.engine.rules import RootRule, UnionRule, rule, union
 from pants.engine.scheduler import ExecutionError, SchedulerSession
 from pants.engine.selectors import Get, Params
-from pants_test.engine.util import assert_equal_with_printing, remove_locations_from_traceback
-from pants_test.test_base import TestBase
+from pants.testutil.engine.util import assert_equal_with_printing, remove_locations_from_traceback
+from pants.testutil.test_base import TestBase
 
 
 @dataclass(frozen=True)

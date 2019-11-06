@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 class FingerprintStrategyTest(TestBase):

@@ -8,8 +8,8 @@ from pants.backend.project_info.tasks.depmap import Depmap
 from pants.backend.python.register import build_file_aliases as register_python
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.build_graph.register import build_file_aliases as register_core
+from pants.testutil.task_test_base import ConsoleTaskTestBase
 from pants_test.subsystem import subsystem_util
-from pants_test.task_test_base import ConsoleTaskTestBase
 
 
 class BaseDepmapTest(ConsoleTaskTestBase):

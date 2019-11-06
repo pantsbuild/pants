@@ -8,9 +8,9 @@ from urllib.parse import parse_qs
 
 from pants.auth.cookies import Cookies
 from pants.goal.run_tracker import RunTracker
+from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_file_path
 from pants.version import VERSION
-from pants_test.test_base import TestBase
 
 
 class RunTrackerTest(TestBase):

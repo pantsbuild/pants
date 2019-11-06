@@ -7,16 +7,16 @@ from contextlib import contextmanager
 
 from pants.backend.python.interpreter_cache import PythonInterpreter, PythonInterpreterCache
 from pants.subsystem.subsystem import Subsystem
-from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import safe_mkdir
-from pants_test.interpreter_selection_utils import (
+from pants.testutil.interpreter_selection_utils import (
   PY_27,
   PY_36,
   python_interpreter_path,
   skip_unless_python27_and_python36_present,
 )
-from pants_test.test_base import TestBase
-from pants_test.testutils.pexrc_util import setup_pexrc_with_pex_python_path
+from pants.testutil.pexrc_util import setup_pexrc_with_pex_python_path
+from pants.testutil.test_base import TestBase
+from pants.util.contextutil import temporary_dir
+from pants.util.dirutil import safe_mkdir
 
 
 class TestInterpreterCache(TestBase):

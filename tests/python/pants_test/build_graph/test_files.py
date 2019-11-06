@@ -3,7 +3,7 @@
 
 from pants.build_graph.files import Files
 from pants.source.wrapped_globs import Globs
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 class FilesTest(TestBase):

@@ -3,7 +3,7 @@
 
 from pants.backend.codegen.wire.java.java_wire_library import JavaWireLibrary
 from pants.base.exceptions import TargetDefinitionException
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 class JavaWireLibraryTest(TestBase):

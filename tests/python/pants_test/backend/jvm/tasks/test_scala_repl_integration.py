@@ -3,7 +3,7 @@
 
 from textwrap import dedent
 
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
 
 
 class ScalaReplIntegrationTest(PantsRunIntegrationTest):

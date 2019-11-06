@@ -8,7 +8,7 @@ from textwrap import dedent
 
 from pants.base.exceptions import TaskError
 from pants.build_graph.target import Target
-from pants_test.task_test_base import TaskTestBase
+from pants.testutil.task_test_base import TaskTestBase
 
 from pants.contrib.node.subsystems.resolvers.node_preinstalled_module_resolver import \
   NodePreinstalledModuleResolver

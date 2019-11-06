@@ -7,7 +7,7 @@ import os
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
 from pants.build_graph.files import Files
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 # Macro that adds the specified tag.

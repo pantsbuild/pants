@@ -11,7 +11,7 @@ python_tests(
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/base:build_environment',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test/subsystem:subsystem_utils',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/testutil/subsystem',
+    'src/python/pants/testutil:task_test_base',
   ]
 )

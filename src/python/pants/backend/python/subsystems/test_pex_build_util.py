@@ -11,9 +11,9 @@ from pex.pex_builder import PEXBuilder
 from pants.backend.python.subsystems.pex_build_util import PexBuilderWrapper
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.source.source_root import SourceRootConfig
+from pants.testutil.test_base import TestBase
 from pants.util.contextutil import open_zip, temporary_dir, temporary_file_path
 from pants_test.subsystem import subsystem_util
-from pants_test.test_base import TestBase
 
 
 class TestPexBuilderWrapper(TestBase):

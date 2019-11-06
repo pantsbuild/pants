@@ -6,7 +6,7 @@ from typing import List, Optional
 
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.build_graph.target import Target
-from pants_test.task_test_base import TaskTestBase
+from pants.testutil.task_test_base import TaskTestBase
 
 from pants.contrib.mypy.tasks.mypy_task import MypyTask
 

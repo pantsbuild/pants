@@ -7,7 +7,7 @@ python_tests(
   dependencies=[
     'src/python/pants/backend/jvm:artifact',
     'src/python/pants/backend/jvm:repository',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
   ]
 )
 

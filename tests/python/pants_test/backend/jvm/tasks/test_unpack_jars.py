@@ -12,9 +12,9 @@ from pants.backend.jvm.tasks.unpack_jars import UnpackJars, UnpackJarsFingerprin
 from pants.java.jar.jar_dependency import JarDependency
 from pants.java.jar.jar_dependency_utils import M2Coordinate
 from pants.task.unpack_remote_sources_base import UnpackedArchives
+from pants.testutil.task_test_base import TaskTestBase
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import open_zip, temporary_dir
-from pants_test.task_test_base import TaskTestBase
 
 
 class UnpackJarsTest(TaskTestBase):

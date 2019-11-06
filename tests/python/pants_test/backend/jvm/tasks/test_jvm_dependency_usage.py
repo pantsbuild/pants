@@ -6,8 +6,8 @@ import os
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.jvm_dependency_usage import DependencyUsageGraph, JvmDependencyUsage
+from pants.testutil.task_test_base import TaskTestBase, ensure_cached
 from pants.util.dirutil import safe_mkdir, touch
-from pants_test.task_test_base import TaskTestBase, ensure_cached
 
 
 class TestJvmDependencyUsage(TaskTestBase):

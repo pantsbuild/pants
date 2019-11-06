@@ -6,7 +6,7 @@ import os
 from pants.backend.codegen.grpcio.python.grpcio_prep import GrpcioPrep
 from pants.backend.codegen.grpcio.python.grpcio_run import GrpcioRun
 from pants.backend.python.targets.python_library import PythonLibrary
-from pants_test.task_test_base import TaskTestBase
+from pants.testutil.task_test_base import TaskTestBase
 
 
 class GrpcioTestBase(TaskTestBase):

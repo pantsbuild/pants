@@ -28,11 +28,11 @@ from pants.engine.fs import (
 )
 from pants.engine.scheduler import ExecutionError
 from pants.option.global_options import GlobMatchErrorBehavior
+from pants.testutil.test_base import TestBase
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import http_server, temporary_dir
 from pants.util.dirutil import relative_symlink, safe_file_dump
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
-from pants_test.test_base import TestBase
 
 
 class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):

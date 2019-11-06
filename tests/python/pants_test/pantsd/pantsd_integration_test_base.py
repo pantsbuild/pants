@@ -10,9 +10,9 @@ import psutil
 from colors import bold, cyan, magenta
 
 from pants.pantsd.process_manager import ProcessManager
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest, read_pantsd_log
+from pants.testutil.process_test_util import no_lingering_process_by_command
 from pants.util.collections import recursively_update
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest, read_pantsd_log
-from pants_test.testutils.process_test_util import no_lingering_process_by_command
 
 
 def banner(s):

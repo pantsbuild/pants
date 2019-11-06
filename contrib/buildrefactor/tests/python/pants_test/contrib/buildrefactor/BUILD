@@ -16,8 +16,8 @@ python_tests(
     'contrib/buildrefactor/src/python/pants/contrib/buildrefactor',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test/subsystem:subsystem_utils',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/testutil/subsystem',
+    'src/python/pants/testutil:task_test_base',
   ]
 )
 
@@ -30,8 +30,8 @@ python_tests(
     'contrib/buildrefactor/src/python/pants/contrib/buildrefactor',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/base:build_environment',
-    'tests/python/pants_test/subsystem:subsystem_utils',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/testutil/subsystem',
+    'src/python/pants/testutil:task_test_base',
   ]
 )
 
@@ -40,7 +40,7 @@ python_tests(
   name='meta_rename_integration',
   sources=['test_meta_rename_integration.py'],
   dependencies=[
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'testprojects/tests/java/org/pantsbuild/testproject:buildrefactor_directory',
   ],
   tags={'integration'},
@@ -51,7 +51,7 @@ python_tests(
   name='buildozer_integration',
   sources=['test_buildozer_integration.py'],
   dependencies=[
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'testprojects/tests/java/org/pantsbuild/testproject:buildrefactor_directory',
   ],
   tags={'integration'},

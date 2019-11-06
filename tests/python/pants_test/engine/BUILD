@@ -26,7 +26,7 @@ python_tests(
     ':engine_test_base',
     'src/python/pants/base:exceptions',
     'src/python/pants/engine:legacy_engine',
-    'tests/python/pants_test/base:context_utils',
+    'src/python/pants/testutil/base:context_utils',
   ],
 )
 
@@ -37,7 +37,7 @@ python_tests(
     ':engine_test_base',
     'src/python/pants/engine:legacy_engine',
     'src/python/pants/task',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
   ],
 )
 
@@ -57,7 +57,7 @@ python_tests(
     ':scheduler_test_base',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:nodes',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
     'tests/python/pants_test/engine/examples:fs_test',
   ]
 )
@@ -72,7 +72,7 @@ python_tests(
     'src/python/pants/engine:rules',
     'src/python/pants/engine:selectors',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
     'tests/python/pants_test/engine/examples:fs_test',
     'tests/python/pants_test/engine/examples:scheduler_inputs',
   ]
@@ -108,7 +108,7 @@ python_tests(
     'src/python/pants/engine:scheduler',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/engine/examples:scheduler_inputs',
-    'tests/python/pants_test/engine:util',
+    'src/python/pants/testutil/engine:util',
   ]
 )
 
@@ -169,8 +169,8 @@ python_tests(
     'src/python/pants/engine:rules',
     'src/python/pants/engine:selectors',
     'tests/python/pants_test/engine/examples:parsers',
-    'tests/python/pants_test/subsystem:subsystem_utils',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil/subsystem',
+    'src/python/pants/testutil:test_base',
   ]
 )
 
@@ -185,7 +185,7 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/engine:scheduler',
     'tests/python/pants_test/engine/examples:scheduler_inputs',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
   ]
 )
 
@@ -194,7 +194,7 @@ python_tests(
   sources=['test_scheduler_integration.py'],
   dependencies=[
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'examples/src/scala/org/pantsbuild/example:hello_directory',
   ],
   tags={'integration'},

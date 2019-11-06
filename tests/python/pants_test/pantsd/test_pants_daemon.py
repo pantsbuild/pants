@@ -7,8 +7,8 @@ import unittest.mock
 
 from pants.pantsd.pants_daemon import PantsDaemon, _LoggerStream
 from pants.pantsd.service.pants_service import PantsService, PantsServices
+from pants.testutil.test_base import TestBase
 from pants.util.contextutil import stdio_as
-from pants_test.test_base import TestBase
 
 
 PATCH_OPTS = dict(autospec=True, spec_set=True)

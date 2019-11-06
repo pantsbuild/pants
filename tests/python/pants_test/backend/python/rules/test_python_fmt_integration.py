@@ -6,9 +6,9 @@ from contextlib import contextmanager
 from os.path import relpath
 from pathlib import Path
 
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import temporary_dir, temporary_file_path
 from pants.util.dirutil import safe_file_dump
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 def write_build_file(root_dir):

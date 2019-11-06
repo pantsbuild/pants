@@ -4,7 +4,7 @@
 from pants.base.workunit import WorkUnit
 from pants.reporting.json_reporter import JsonReporter
 from pants.reporting.report import Report
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 class FakeRunTracker:

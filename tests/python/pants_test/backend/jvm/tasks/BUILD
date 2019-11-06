@@ -6,7 +6,7 @@ python_library(
   sources = ['missing_jvm_check.py'],
   dependencies = [
     'src/python/pants/java/distribution',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil/subsystem',
   ]
 )
 
@@ -19,7 +19,7 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:binary_create',
     'src/python/pants/java/jar',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test/jvm:jvm_tool_task_test_base',
+    'src/python/pants/testutil/jvm:jvm_tool_task_test_base',
   ]
 )
 
@@ -36,8 +36,8 @@ python_tests(
     'src/python/pants/java:executor',
     'src/python/pants/task',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test/jvm:jvm_tool_task_test_base',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil/jvm:jvm_tool_task_test_base',
+    'src/python/pants/testutil/subsystem',
   ]
 )
 
@@ -45,7 +45,7 @@ python_tests(
   name = 'bootstrap_jvm_tools_integration',
   sources = ['test_bootstrap_jvm_tools_integration.py'],
   dependencies = [
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
   ],
   tags = {'integration'},
 )
@@ -57,7 +57,7 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:benchmark_run',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
-    'tests/python/pants_test/jvm:jvm_tool_task_test_base',
+    'src/python/pants/testutil/jvm:jvm_tool_task_test_base',
   ]
 )
 
@@ -65,7 +65,7 @@ python_tests(
   name = 'benchmark_run_integration',
   sources = ['test_benchmark_run_integration.py'],
   dependencies = [
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'testprojects/src/java/org/pantsbuild/testproject:bench_directory',
   ],
   tags = {'integration'},
@@ -79,7 +79,7 @@ python_tests(
     'src/python/pants/base:build_environment',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'examples/src/java/org/pantsbuild/example:autovalue_directory',
     'testprojects/src/java/org/pantsbuild/testproject:deployexcludes_directory',
     'testprojects/src/java/org/pantsbuild/testproject:manifest_directory',
@@ -128,8 +128,8 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:checkstyle',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
-    'tests/python/pants_test/jvm:nailgun_task_test_base',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/testutil/jvm:nailgun_task_test_base',
+    'src/python/pants/testutil:task_test_base',
   ]
 )
 
@@ -138,7 +138,7 @@ python_tests(
   sources = ['test_checkstyle_integration.py'],
   dependencies = [
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'examples/src/java/org/pantsbuild/example:hello_directory',
     'testprojects/3rdparty:checkstyle_directory',
   ],
@@ -157,7 +157,7 @@ python_tests(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:check_published_deps',
     'src/python/pants/build_graph',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/testutil:task_test_base',
   ]
 )
 
@@ -175,9 +175,9 @@ python_tests(
     'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test:test_base',
-    'tests/python/pants_test/subsystem:subsystem_utils',
-    'tests/python/pants_test/testutils:file_test_util',
+    'src/python/pants/testutil:test_base',
+    'src/python/pants/testutil/subsystem',
+    'src/python/pants/testutil:file_test_util',
   ]
 )
 
@@ -190,7 +190,7 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:classpath_products',
     'src/python/pants/backend/jvm/tasks:classpath_util',
     'src/python/pants/goal:products',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
   ]
 )
 
@@ -206,8 +206,8 @@ python_tests(
     'src/python/pants/base:exceptions',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/jvm:jvm_task_test_base',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil/jvm:jvm_task_test_base',
+    'src/python/pants/testutil/subsystem',
   ],
 )
 
@@ -230,7 +230,7 @@ python_tests(
   name = 'intransitive_integration',
   sources = ['test_intransitive_integration.py'],
   dependencies = [
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'testprojects/src/java/org/pantsbuild/testproject:intransitive_directory',
   ],
   timeout=300,
@@ -246,7 +246,7 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:jar_import_products',
     'src/python/pants/java/jar',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test/jvm:nailgun_task_test_base',
+    'src/python/pants/testutil/jvm:nailgun_task_test_base',
   ]
 )
 
@@ -255,7 +255,7 @@ python_tests(
   sources = ['test_ivy_outdated_integration.py'],
   dependencies = [
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
   ],
   tags = {'integration'},
 )
@@ -274,10 +274,10 @@ python_tests(
     'src/python/pants/java/jar',
     'src/python/pants/task',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test/jvm:jvm_tool_task_test_base',
-    'tests/python/pants_test/jvm:nailgun_task_test_base',
-    'tests/python/pants_test/subsystem:subsystem_utils',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/testutil/jvm:jvm_tool_task_test_base',
+    'src/python/pants/testutil/jvm:nailgun_task_test_base',
+    'src/python/pants/testutil/subsystem',
+    'src/python/pants/testutil:task_test_base',
   ]
 )
 
@@ -296,10 +296,10 @@ python_tests(
     'src/python/pants/java/jar',
     'src/python/pants/task',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test/jvm:jvm_tool_task_test_base',
-    'tests/python/pants_test/jvm:nailgun_task_test_base',
-    'tests/python/pants_test/subsystem:subsystem_utils',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/testutil/jvm:jvm_tool_task_test_base',
+    'src/python/pants/testutil/jvm:nailgun_task_test_base',
+    'src/python/pants/testutil/subsystem',
+    'src/python/pants/testutil:task_test_base',
   ]
 )
 
@@ -308,7 +308,7 @@ python_tests(
   sources = ['test_coursier_integration.py'],
   dependencies = [
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'examples/tests/scala/org/pantsbuild/example:hello_directory',
   ],
   tags = {'integration'},
@@ -321,7 +321,7 @@ python_tests(
     'examples/src/scala/org/pantsbuild/example:hello_directory',
     'src/java/org/pantsbuild:junit_directory',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'testprojects/src/java/org/pantsbuild/testproject:unicode_directory',
   ],
   timeout = 240,
@@ -341,8 +341,8 @@ python_tests(
     'src/python/pants/java/jar',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/backend/jvm/tasks/ivy_utils_resources',
-    'tests/python/pants_test:test_base',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil:test_base',
+    'src/python/pants/testutil/subsystem',
   ]
 )
 
@@ -360,10 +360,10 @@ python_tests(
     'src/python/pants/java/jar',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/base:context_utils',
-    'tests/python/pants_test/jvm:jar_task_test_base',
-    'tests/python/pants_test:task_test_base',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil/base:context_utils',
+    'src/python/pants/testutil/jvm:jar_task_test_base',
+    'src/python/pants/testutil:task_test_base',
+    'src/python/pants/testutil/subsystem',
   ],
 )
 
@@ -379,8 +379,8 @@ python_tests(
     'src/python/pants/scm:scm',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/jvm:nailgun_task_test_base',
-    'tests/python/pants_test/testutils:mock_logger',
+    'src/python/pants/testutil/jvm:nailgun_task_test_base',
+    'src/python/pants/testutil:mock_logger',
   ],
 )
 
@@ -392,7 +392,7 @@ python_tests(
     'src/python/pants/base:build_environment',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'tests/python/pants_test/tasks:jar_publish_resources_directory',
     'testprojects/src/java/org/pantsbuild/testproject:publish_directory',
     'testprojects/src/scala/org/pantsbuild/testproject:publish_directory',
@@ -412,8 +412,8 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/jvm:jar_task_test_base',
-    'tests/python/pants_test/jvm:jvm_tool_task_test_base',
+    'src/python/pants/testutil/jvm:jar_task_test_base',
+    'src/python/pants/testutil/jvm:jvm_tool_task_test_base',
   ]
 )
 
@@ -432,9 +432,9 @@ python_tests(
     'src/python/pants/java:executor',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/jvm:jvm_tool_task_test_base',
-    'tests/python/pants_test/subsystem:subsystem_utils',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/testutil/jvm:jvm_tool_task_test_base',
+    'src/python/pants/testutil/subsystem',
+    'src/python/pants/testutil:task_test_base',
   ]
 )
 
@@ -444,7 +444,7 @@ python_tests(
   dependencies = [
     ':missing_jvm_check',
     'src/python/pants/base:build_environment',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'testprojects/tests/java/org/pantsbuild/testproject:coverage_directory',
     'testprojects/tests/java/org/pantsbuild/testproject:cucumber_directory',
     'testprojects/tests/java/org/pantsbuild/testproject:htmlreport_directory',
@@ -464,7 +464,7 @@ python_tests(
   dependencies = [
     'src/python/pants/base:build_environment',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'examples/tests/java/org/pantsbuild/example:hello_directory',
     'examples/tests/scala/org/pantsbuild/example:hello_directory',
     'testprojects/maven_layout:junit_resource_collision_directory',
@@ -484,7 +484,7 @@ python_tests(
   sources = ['test_junit_tests_concurrency_integration.py'],
   dependencies = [
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'testprojects/tests/java/org/pantsbuild/testproject:parallel_directory',
     'testprojects/tests/java/org/pantsbuild/testproject:parallelclassesandmethods_directory',
     'testprojects/tests/java/org/pantsbuild/testproject:parallelmethods_directory',
@@ -499,7 +499,7 @@ python_library(
   dependencies = [
     'src/python/pants/backend/jvm/tasks:classpath_products',
     'src/python/pants/java/jar',
-    'tests/python/pants_test/jvm:nailgun_task_test_base',
+    'src/python/pants/testutil/jvm:nailgun_task_test_base',
   ]
 )
 
@@ -509,7 +509,7 @@ python_tests(
   dependencies = [
     'src/python/pants/fs',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'testprojects/maven_layout:resource_collision_directory',
     'testprojects/src/java/org/pantsbuild/testproject:unicode_directory',
   ],
@@ -525,7 +525,7 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:classpath_products',
     'src/python/pants/backend/jvm/tasks:jvm_dependency_usage',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/testutil:task_test_base',
   ]
 )
 
@@ -534,7 +534,7 @@ python_tests(
   sources = ['test_jvm_dependency_usage_integration.py'],
   dependencies = [
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'testprojects/src/java/org/pantsbuild/testproject:nocache_directory',
     'testprojects/src/java/org/pantsbuild/testproject:unicode_directory',
   ],
@@ -549,7 +549,7 @@ python_tests(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:jvm_platform_analysis',
     'src/python/pants/build_graph',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/testutil:task_test_base',
   ]
 )
 
@@ -560,7 +560,7 @@ python_tests(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:jvm_platform_analysis',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
   ],
   tags = {'integration'},
 )
@@ -572,7 +572,7 @@ python_tests(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:run_jvm_prep_command',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/testutil:task_test_base',
   ]
 )
 
@@ -582,7 +582,7 @@ python_tests(
   dependencies = [
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'testprojects/src/java/org/pantsbuild/testproject:jvmprepcommand_directory',
   ],
   tags = {'integration'},
@@ -595,8 +595,8 @@ python_tests(
   dependencies = [
     'src/python/pants/backend/jvm/tasks:classpath_products',
     'src/python/pants/backend/jvm/tasks:jvm_task',
-    'tests/python/pants_test/jvm:jvm_task_test_base',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/testutil/jvm:jvm_task_test_base',
+    'src/python/pants/testutil:task_test_base',
   ]
 )
 
@@ -608,7 +608,7 @@ python_tests(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:jvm_run',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test/jvm:jvm_task_test_base',
+    'src/python/pants/testutil/jvm:jvm_task_test_base',
   ]
 )
 
@@ -616,7 +616,7 @@ python_tests(
   name = 'jvm_run_integration',
   sources = ['test_jvm_run_integration.py'],
   dependencies = [
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'testprojects/maven_layout:resource_collision_directory',
     'testprojects/src/java/org/pantsbuild/testproject:cwdexample_directory',
     'testprojects/src/java/org/pantsbuild/testproject:extra_jvm_options_directory',
@@ -633,7 +633,7 @@ python_tests(
     ':jvmdoc_gen_testdata',
     'src/python/pants/backend/jvm/tasks:jvmdoc_gen',
     'src/python/pants/base:exceptions',
-    'tests/python/pants_test/jvm:jvm_task_test_base'
+    'src/python/pants/testutil/jvm:jvm_task_test_base'
   ]
 )
 
@@ -654,7 +654,7 @@ python_tests(
     'src/python/pants/base:payload_field',
     'src/python/pants/build_graph',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/testutil:task_test_base',
   ]
 )
 
@@ -667,7 +667,7 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:prepare_resources',
     'src/python/pants/build_graph',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/testutil:task_test_base',
   ]
 )
 
@@ -680,7 +680,7 @@ python_tests(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:prepare_services',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/testutil:task_test_base',
   ]
 )
 
@@ -704,8 +704,8 @@ python_tests(
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
     'src/python/pants/source',
-    'tests/python/pants_test/jvm:nailgun_task_test_base',
-    'tests/python/pants_test/subsystem:subsystem_utils'
+    'src/python/pants/testutil/jvm:nailgun_task_test_base',
+    'src/python/pants/testutil/subsystem'
   ],
 )
 
@@ -714,7 +714,7 @@ python_tests(
   sources = ['test_scalafix.py'],
   dependencies = [
     'src/python/pants/backend/jvm/tasks:scalafix',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'testprojects/src/scala/org/pantsbuild/testproject:procedure_syntax_directory',
     'testprojects/src/scala/org/pantsbuild/testproject:rsc_compat_directory',
   ],
@@ -734,9 +734,9 @@ python_tests(
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/backend/jvm/tasks:scalastyle',
     'src/python/pants/base:exceptions',
-    'tests/python/pants_test/jvm:nailgun_task_test_base',
-    'tests/python/pants_test/subsystem:subsystem_utils',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/testutil/jvm:nailgun_task_test_base',
+    'src/python/pants/testutil/subsystem',
+    'src/python/pants/testutil:task_test_base',
   ]
 )
 
@@ -744,7 +744,7 @@ python_tests(
   name = 'scala_repl_integration',
   sources = ['test_scala_repl_integration.py'],
   dependencies = [
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'examples/src/scala/org/pantsbuild/example:hello_directory',
     'testprojects/src/scala/org/pantsbuild/testproject:unicode_directory',
   ],
@@ -756,7 +756,7 @@ python_tests(
   name = 'scope_provided_integration',
   sources = ['test_scope_provided_integration.py'],
   dependencies = [
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'testprojects/maven_layout:provided_patching_directory',
     'testprojects/src/java/org/pantsbuild/testproject:provided_directory',
   ],
@@ -768,7 +768,7 @@ python_tests(
   name = 'scope_runtime_integration',
   sources = ['test_scope_runtime_integration.py'],
   dependencies = [
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'testprojects/src/java/org/pantsbuild/testproject:runtime_directory',
   ],
   timeout=300,
@@ -782,7 +782,7 @@ python_tests(
     'src/python/pants/base:build_environment',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'testprojects/src/java/org/pantsbuild/testproject:junit_directory',
   ],
   timeout=300,
@@ -799,7 +799,7 @@ python_tests(
     'src/python/pants/java/jar',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/testutil:task_test_base',
   ]
 )
 
@@ -807,8 +807,8 @@ python_tests(
   name = 'export_classpath_integration',
   sources = ['test_export_classpath_integration.py'],
   dependencies = [
-    'tests/python/pants_test:task_test_base',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:task_test_base',
+    'src/python/pants/testutil:int-test',
     'examples/src/java/org/pantsbuild/example:hello_directory',
     'testprojects/src/java/org/pantsbuild/testproject:exclude_directory',
   ],
@@ -825,9 +825,9 @@ python_tests(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:classmap',
     'src/python/pants/java/jar',
-    'tests/python/pants_test/jvm:jvm_task_test_base',
-    'tests/python/pants_test/subsystem:subsystem_utils',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/testutil/jvm:jvm_task_test_base',
+    'src/python/pants/testutil/subsystem',
+    'src/python/pants/testutil:task_test_base',
   ],
 )
 
@@ -835,8 +835,8 @@ python_tests(
   name = 'classmap_integration',
   sources = ['test_classmap_integration.py'],
   dependencies = [
-    'tests/python/pants_test:task_test_base',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:task_test_base',
+    'src/python/pants/testutil:int-test',
     'testprojects/src/java/org/pantsbuild/testproject:unicode_directory',
     'testprojects/tests/java/org/pantsbuild/testproject:testjvms_directory',
   ],
@@ -854,6 +854,6 @@ python_tests(
     'src/python/pants/java:nailgun_executor',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/jvm:jvm_tool_task_test_base',
+    'src/python/pants/testutil/jvm:jvm_tool_task_test_base',
   ],
 )

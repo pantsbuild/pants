@@ -5,7 +5,7 @@ import unittest.mock
 from contextlib import contextmanager
 
 from pants.pantsd.watchman_client import StreamableWatchmanClient
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 class TestWatchmanClient(TestBase):

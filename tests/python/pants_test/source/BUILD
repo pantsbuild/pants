@@ -6,7 +6,7 @@ python_tests(
   sources = ['test_filespec.py'],
   dependencies = [
     'src/python/pants/source',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
   ]
 )
 
@@ -16,8 +16,8 @@ python_tests(
   dependencies = [
     'src/python/pants/source',
     'src/python/pants/source:payload_fields',
-    'tests/python/pants_test:test_base',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil:test_base',
+    'src/python/pants/testutil/subsystem',
   ]
 )
 
@@ -26,7 +26,7 @@ python_tests(
   sources = ['test_source_root.py'],
   dependencies = [
     'src/python/pants/source',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
   ]
 )
 
@@ -37,6 +37,6 @@ python_tests(
     'src/python/pants/base:payload',
     'src/python/pants/build_graph',
     'src/python/pants/source',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
   ]
 )

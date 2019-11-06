@@ -15,8 +15,8 @@ from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.build_environment import get_buildroot
-from pants_test.subsystem.subsystem_util import global_subsystem_instance
-from pants_test.task_test_base import TaskTestBase
+from pants.testutil.subsystem.util import global_subsystem_instance
+from pants.testutil.task_test_base import TaskTestBase
 
 
 class ApacheThriftPyGenTest(TaskTestBase):

@@ -12,7 +12,7 @@ from pants.backend.docgen.register import build_file_aliases
 from pants.backend.docgen.tasks import markdown_to_html_utils
 from pants.backend.docgen.tasks.markdown_to_html import MarkdownToHtml
 from pants.base.exceptions import TaskError
-from pants_test.task_test_base import TaskTestBase
+from pants.testutil.task_test_base import TaskTestBase
 
 
 ABC = """able

@@ -19,7 +19,7 @@ python_tests(
     'src/python/pants/base:build_root',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
   ]
 )
 
@@ -27,7 +27,7 @@ python_tests(
   name = 'exclude_target_regexp_integration',
   sources = [ 'test_exclude_target_regexp_integration.py' ],
   dependencies = [
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'testprojects/src/java/org/pantsbuild/testproject:phrases_directory',
   ],
   tags = {'integration'},
@@ -41,7 +41,7 @@ python_tests(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:cmd_line_spec_parser',
     'src/python/pants/build_graph',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
   ]
 )
 
@@ -61,7 +61,7 @@ python_tests(
     'src/python/pants/base:deprecated',
     'src/python/pants/util:collections',
     'src/python/pants:version',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
   ],
 )
 
@@ -81,7 +81,7 @@ python_tests(
   sources = ['test_fingerprint_strategy.py'],
   dependencies = [
     'src/python/pants/base:fingerprint_strategy',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
   ]
 )
 
@@ -90,7 +90,7 @@ python_tests(
   sources = ['test_generator.py'],
   dependencies = [
     'src/python/pants/base:generator',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
   ]
 )
 
@@ -128,7 +128,7 @@ python_tests(
     'src/python/pants/base:payload',
     'src/python/pants/base:payload_field',
     'src/python/pants/build_graph',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
   ]
 )
 
@@ -139,7 +139,7 @@ python_tests(
     'src/python/pants/java/jar',
     'src/python/pants/backend/python:python_requirement',
     'src/python/pants/base:payload_field',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
   ]
 )
 
@@ -156,7 +156,7 @@ python_tests(
   sources = ['test_revision.py'],
   dependencies = [
     'src/python/pants/base:revision',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
   ]
 )
 
@@ -166,7 +166,7 @@ python_tests(
   dependencies = [
     'src/python/pants/base:run_info',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
   ]
 )
 
@@ -195,8 +195,8 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:osutil',
-    'tests/python/pants_test:test_base',
-    'tests/python/pants_test/option/util',
+    'src/python/pants/testutil:test_base',
+    'src/python/pants/testutil/option',
   ],
   tags={'platform_specific_behavior'},
 )
@@ -207,7 +207,7 @@ python_tests(
   dependencies = [
     'src/python/pants/base:exception_sink',
     'src/python/pants/util:osutil',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'testprojects/src/python:coordinated_runs_directory',
     'testprojects:pants_plugins_directory',
   ],
@@ -219,7 +219,7 @@ python_tests(
   name = 'exiter_integration',
   sources = [ 'test_exiter_integration.py' ],
   dependencies = [
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'testprojects/src/python:unicode_directory',
   ],
   tags = {'integration'},

@@ -9,8 +9,8 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from pants.auth.basic_auth import BasicAuth, BasicAuthCreds, BasicAuthException
 from pants.auth.cookies import Cookies
+from pants.testutil.test_base import TestBase
 from pants.util.contextutil import environment_as, temporary_dir
-from pants_test.test_base import TestBase
 
 
 class RequestHandlerForTest(BaseHTTPRequestHandler):

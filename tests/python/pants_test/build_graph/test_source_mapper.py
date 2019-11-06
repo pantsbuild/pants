@@ -8,7 +8,7 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.legacy.graph import OwnersRequest
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 class SourceMapperTest(TestBase):

@@ -10,8 +10,8 @@ from pants.base.hash_utils import stable_json_sha1
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 from pants.build_graph.target import Target
+from pants.testutil.task_test_base import TaskTestBase
 from pants.util.dirutil import touch
-from pants_test.task_test_base import TaskTestBase
 
 
 class ResourcesTaskTestBase(TaskTestBase):

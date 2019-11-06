@@ -8,8 +8,8 @@ from contextlib import contextmanager
 from textwrap import dedent
 
 from pants.base.build_environment import get_buildroot
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest, ensure_cached
 from pants.util.contextutil import temporary_dir
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_cached
 
 
 class CheckstyleIntegrationTest(PantsRunIntegrationTest):

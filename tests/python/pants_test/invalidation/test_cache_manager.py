@@ -7,8 +7,8 @@ import tempfile
 
 from pants.invalidation.build_invalidator import BuildInvalidator, CacheKeyGenerator
 from pants.invalidation.cache_manager import InvalidationCacheManager, VersionedTargetSet
+from pants.testutil.test_base import TestBase
 from pants.util.dirutil import safe_mkdir, safe_rmtree
-from pants_test.test_base import TestBase
 
 
 class InvalidationCacheManagerTest(TestBase):

@@ -11,8 +11,8 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.register import build_file_aliases as register_core
 from pants.build_graph.target import Target
 from pants.task.simple_codegen_task import SimpleCodegenTask
+from pants.testutil.task_test_base import TaskTestBase, ensure_cached
 from pants.util.dirutil import safe_mkdtemp
-from pants_test.task_test_base import TaskTestBase, ensure_cached
 
 
 # A dummy target with sources= and copied= fields.

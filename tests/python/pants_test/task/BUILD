@@ -6,7 +6,7 @@ python_tests(
   sources = ['test_console_task.py'],
   dependencies = [
     'src/python/pants/task',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/testutil:task_test_base',
   ]
 )
 
@@ -14,7 +14,7 @@ python_tests(
   name = 'goal_options_mixin_integration',
   sources = ['test_goal_options_mixin_integration.py'],
   dependencies = [
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'tests/python/pants_test/task/echo_plugin:plugin',
   ],
   tags = {'integration'},
@@ -27,7 +27,7 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/task',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
   ]
 )
 
@@ -41,7 +41,7 @@ python_tests(
     'src/python/pants/task',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/testutil:task_test_base',
   ],
 )
 
@@ -63,7 +63,7 @@ python_tests(
     'src/python/pants/cache:cache',
     'src/python/pants/task',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/testutil:task_test_base',
   ]
 )
 
@@ -73,7 +73,7 @@ python_tests(
   dependencies=[
     'src/python/pants/task',
     'src/python/pants/util:process_handler',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/testutil:task_test_base',
   ]
 )
 
@@ -82,6 +82,6 @@ python_tests(
   sources=['test_unpack_remote_sources_base.py'],
   dependencies=[
     'src/python/pants/task',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
   ],
 )

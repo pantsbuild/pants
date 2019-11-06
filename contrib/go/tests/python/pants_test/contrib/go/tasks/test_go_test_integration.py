@@ -4,8 +4,8 @@
 import os
 from textwrap import dedent
 
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.dirutil import safe_open
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class GoTestIntegrationTest(PantsRunIntegrationTest):

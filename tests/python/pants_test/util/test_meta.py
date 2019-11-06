@@ -5,8 +5,8 @@ import unittest
 from abc import ABC, abstractmethod
 from dataclasses import FrozenInstanceError, dataclass
 
+from pants.testutil.test_base import TestBase
 from pants.util.meta import SingletonMetaclass, classproperty, frozen_after_init, staticproperty
-from pants_test.test_base import TestBase
 
 
 class AbstractClassTest(TestBase):

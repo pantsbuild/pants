@@ -6,9 +6,9 @@ import json
 from pants.engine.fs import Digest, PathGlobs, Snapshot
 from pants.rules.core import list_roots
 from pants.source.source_root import SourceRoot, SourceRootCategories, SourceRootConfig
-from pants_test.console_rule_test_base import ConsoleRuleTestBase
-from pants_test.engine.util import run_rule
-from pants_test.test_base import TestBase
+from pants.testutil.console_rule_test_base import ConsoleRuleTestBase
+from pants.testutil.engine.util import run_rule
+from pants.testutil.test_base import TestBase
 
 
 class AllRootsTest(TestBase):

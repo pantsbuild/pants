@@ -10,7 +10,7 @@ python_tests(
   dependencies=[
     'contrib/cpp/src/python/pants/contrib/cpp/toolchain:toolchain',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
   ],
   tags={'integration'},
 )

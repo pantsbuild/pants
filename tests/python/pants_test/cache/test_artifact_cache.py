@@ -14,10 +14,10 @@ from pants.cache.local_artifact_cache import LocalArtifactCache, TempLocalArtifa
 from pants.cache.pinger import BestUrlSelector, InvalidRESTfulCacheProtoError
 from pants.cache.restful_artifact_cache import RESTfulArtifactCache
 from pants.invalidation.build_invalidator import CacheKey
+from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir, temporary_file, temporary_file_path
 from pants.util.dirutil import safe_mkdir
 from pants_test.cache.cache_server import cache_server
-from pants_test.test_base import TestBase
 
 
 TEST_CONTENT1 = b'muppet'

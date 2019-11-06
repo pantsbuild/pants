@@ -3,7 +3,7 @@
 
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 class PythonBinaryTest(TestBase):

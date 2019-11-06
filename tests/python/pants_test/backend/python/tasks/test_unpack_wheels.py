@@ -9,8 +9,8 @@ from pants.backend.python.targets.python_requirement_library import PythonRequir
 from pants.backend.python.targets.unpacked_whls import UnpackedWheels
 from pants.backend.python.tasks.unpack_wheels import UnpackWheels, UnpackWheelsFingerprintStrategy
 from pants.task.unpack_remote_sources_base import UnpackedArchives
+from pants.testutil.task_test_base import TaskTestBase
 from pants.util.collections import assert_single_element
-from pants_test.task_test_base import TaskTestBase
 
 
 class UnpackWheelsTest(TaskTestBase):

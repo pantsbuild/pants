@@ -3,7 +3,7 @@
 
 import os
 
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class FiledepsIntegrationTest(PantsRunIntegrationTest):

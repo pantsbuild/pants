@@ -11,9 +11,9 @@ from pants.binaries.binary_util import (
   HostPlatform,
 )
 from pants.option.scope import GLOBAL_SCOPE
+from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_file_dump
-from pants_test.test_base import TestBase
 
 
 class DefaultVersion(BinaryToolBase):

@@ -14,8 +14,8 @@ from pants.backend.codegen.antlr.java.antlr_java_gen import AntlrJavaGen
 from pants.backend.codegen.antlr.java.java_antlr_library import JavaAntlrLibrary
 from pants.base.exceptions import TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.testutil.jvm.nailgun_task_test_base import NailgunTaskTestBase
 from pants.util.dirutil import safe_mkdtemp
-from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 
 
 @dataclass(frozen=True)

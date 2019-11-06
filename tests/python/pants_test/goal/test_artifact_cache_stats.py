@@ -9,8 +9,8 @@ import requests
 from pants.cache.artifact import ArtifactError
 from pants.cache.artifact_cache import NonfatalArtifactCacheError, UnreadableArtifact
 from pants.goal.artifact_cache_stats import ArtifactCacheStats
+from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir
-from pants_test.test_base import TestBase
 
 
 class ArtifactCacheStatsTest(TestBase):

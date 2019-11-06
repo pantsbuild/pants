@@ -8,8 +8,8 @@ from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.prepare_services import PrepareServices
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.java.jar.exclude import Exclude
+from pants.testutil.task_test_base import TaskTestBase
 from pants.util.contextutil import temporary_dir
-from pants_test.task_test_base import TaskTestBase
 
 
 class PrepareServicesTest(TaskTestBase):

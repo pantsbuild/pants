@@ -7,7 +7,7 @@ from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.exceptions import TaskError
 from pants.build_graph.register import build_file_aliases as register_core
-from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
+from pants.testutil.jvm.nailgun_task_test_base import NailgunTaskTestBase
 
 from pants.contrib.googlejavaformat.googlejavaformat import (GoogleJavaFormat,
                                                              GoogleJavaFormatCheckFormat)

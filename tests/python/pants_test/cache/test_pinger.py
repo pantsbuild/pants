@@ -10,7 +10,7 @@ import responses
 from requests import RequestException
 
 from pants.cache.pinger import BestUrlSelector, InvalidRESTfulCacheProtoError, Pinger
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 class TestPinger(TestBase):

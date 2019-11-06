@@ -5,8 +5,8 @@ import os
 import subprocess
 import unittest
 
+from pants.testutil.subsystem.util import global_subsystem_instance
 from pants.util.contextutil import environment_as
-from pants_test.subsystem.subsystem_util import global_subsystem_instance
 
 from pants.contrib.go.subsystems.go_distribution import GoDistribution
 

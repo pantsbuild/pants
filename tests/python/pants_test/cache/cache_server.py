@@ -8,9 +8,9 @@ import socketserver
 from contextlib import contextmanager
 from multiprocessing import Process, Queue
 
+from pants.testutil.file_test_util import exact_files
 from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import safe_mkdir
-from pants_test.testutils.file_test_util import exact_files
 
 
 # NB: All API methods should follow redirects, so we always inject one redirect for all handler

@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.java.distribution.distribution import DistributionLocator
-from pants_test.subsystem.subsystem_util import init_subsystem
+from pants.testutil.subsystem.util import init_subsystem
 
 
 def is_missing_jvm(version):

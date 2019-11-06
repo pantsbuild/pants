@@ -6,8 +6,8 @@ from collections import namedtuple
 from contextlib import contextmanager
 from unittest import expectedFailure
 
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import temporary_dir
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class JarDependencyManagementIntegrationTest(PantsRunIntegrationTest):

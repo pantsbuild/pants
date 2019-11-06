@@ -6,7 +6,7 @@ python_tests(
   dependencies = [
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/testutils:git_util',
+    'src/python/pants/testutil:git_util',
     'build-support/bin:bash_scripts',
     'build-support/bin:python_scripts',
   ]

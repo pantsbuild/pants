@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from textwrap import dedent
 
 from pants.build_graph.address_lookup_error import AddressLookupError
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 from pants.contrib.go.register import build_file_aliases
 

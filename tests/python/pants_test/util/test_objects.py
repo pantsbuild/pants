@@ -1,8 +1,8 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from pants.testutil.test_base import TestBase
 from pants.util.objects import Exactly, SubclassesOf, SuperclassesOf, TypeConstraintError
-from pants_test.test_base import TestBase
 
 
 class TypeConstraintTestBase(TestBase):

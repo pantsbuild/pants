@@ -3,7 +3,7 @@
 
 from pants.build_graph.address import Address
 from pants.build_graph.target import Target
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 class ContextTest(TestBase):

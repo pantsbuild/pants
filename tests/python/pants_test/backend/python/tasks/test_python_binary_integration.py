@@ -8,8 +8,8 @@ from textwrap import dedent
 
 from pex.pex_info import PexInfo
 
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import open_zip, temporary_dir
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 _LINUX_PLATFORM = "linux-x86_64"

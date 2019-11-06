@@ -3,7 +3,7 @@
 
 from pants.option.parser_hierarchy import InvalidScopeError, all_enclosing_scopes, enclosing_scope
 from pants.option.scope import GLOBAL_SCOPE
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 class TestEnclosingScopeTraversal(TestBase):

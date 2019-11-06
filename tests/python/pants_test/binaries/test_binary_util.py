@@ -14,10 +14,10 @@ from pants.binaries.binary_util import (
   select,
 )
 from pants.net.http.fetcher import Fetcher
+from pants.testutil.test_base import TestBase
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import is_readable_dir, safe_file_dump, safe_open
-from pants_test.test_base import TestBase
 
 
 logger = logging.getLogger(__name__)

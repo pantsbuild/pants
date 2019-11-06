@@ -85,10 +85,10 @@ python_tests(
   name = 'test_maven_layout',
   sources = ['test_maven_layout.py'],
   dependencies = [
-    ':test_base',
     'src/python/pants/backend/jvm/subsystems:junit',
     'src/python/pants/build_graph',
     'src/python/pants/source',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil:test_base',
+    'src/python/pants/testutil/subsystem',
   ]
 )
