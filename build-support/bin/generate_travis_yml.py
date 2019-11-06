@@ -58,7 +58,8 @@ GLOBAL_ENV_VARS = [
   # NB: We must set `PYENV_ROOT` on macOS for Pyenv to work properly. However, on Linux, we must not
   # override the default value because Linux pre-installs Python via Pyenv and we must keep their
   # $PYENV_ROOT for this to still work.
-  'PYENV_ROOT="${PYENV_ROOT:-${HOME}/.pants_pyenv}"',
+  'PYENV_ROOT_OSX=${HOME}/.pants_pyenv',
+  'PYENV_ROOT="${PYENV_ROOT:-${PYENV_ROOT_OSX}}"',
   'PATH="${PYENV_ROOT}/shims:${PATH}"',
   'AWS_CLI_ROOT="${HOME}/.aws_cli"',
   # NB: We use this verbose name so that AWS does not pick up the env var $AWS_ACCESS_KEY_ID on
@@ -154,9 +155,11 @@ def docker_run_travis_ci_image(command: str) -> str:
 # ----------------------------------------------------------------------
 
 # The default timeout is 180 seconds, and our larger cache uploads exceed this.
-# TODO: Figure out why we have such large caches (2-7GB) and try to trim them.
+# TODO: Now that we trim caches, perhaps we no longer need this modified timeout.
 _cache_timeout = 500
-_cache_common_directories = ['${AWS_CLI_ROOT}', '${PYENV_ROOT}']
+# NB: Attempting to cache directories that don't exist (e.g., the custom osx pyenv root on linux) causes no harm,
+# and simplifies the code.
+_cache_common_directories = ['${AWS_CLI_ROOT}', '${PYENV_ROOT_OSX}']
 # Ensure permissions to do the below removals, which happen with or without caching enabled.
 _cache_set_required_permissions = 'sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"'
 
@@ -167,6 +170,7 @@ CACHE_NATIVE_ENGINE = {
     # get bytecode compiled in non-yet-understood circumstances leading to
     # a full cache re-pack due to new bytecode files.
     'find build-support -name "*.py[co]" -delete',
+    './build-support/bin/prune_travis_cache.sh',
   ],
   "cache": {
     "timeout": _cache_timeout,
@@ -195,14 +199,11 @@ CACHE_PANTS_RUN = {
     'rm -rf ${HOME}/.ivy2/pants/com.example',
     # Render a summary to assist with further tuning the cache.
     'du -m -d2 ${HOME}/.cache/pants | sort -r -n',
+    './build-support/bin/prune_travis_cache.sh',
   ],
   "cache": {
     "timeout": _cache_timeout,
     "directories": _cache_common_directories + [
-      # We include the lmdb_store to include a local process cache, so that hopefully we don't
-      # need to re-run processes (particularly tests) which have already run.
-      # TODO(#8041): Prune this directory before storing the cache.
-      '${HOME}/.cache/pants/lmdb_store',
       '${HOME}/.cache/pants/tools',
       '${HOME}/.cache/pants/zinc',
       '${HOME}/.ivy2/pants',

@@ -2,16 +2,16 @@ use crate::{
   Context, ExecuteProcessRequest, ExecuteProcessRequestMetadata, FallibleExecuteProcessResult,
   MultiPlatformExecuteProcessRequest,
 };
-use boxfuture::{BoxFuture, Boxable};
+use std::sync::Arc;
+
 use bytes::Bytes;
-use digest::{Digest as DigestTrait, FixedOutput};
 use futures::Future;
-use hashing::{Digest, Fingerprint};
 use log::{debug, warn};
 use protobuf::Message;
-use sha2::Sha256;
+
+use boxfuture::{BoxFuture, Boxable};
+use hashing::Fingerprint;
 use sharded_lmdb::ShardedLmdb;
-use std::sync::Arc;
 use store::Store;
 
 #[derive(Clone)]
@@ -36,7 +36,7 @@ impl crate::CommandRunner for CommandRunner {
     req: MultiPlatformExecuteProcessRequest,
     context: Context,
   ) -> BoxFuture<FallibleExecuteProcessResult, String> {
-    let digest = self.digest(req.clone());
+    let digest = crate::digest(req.clone(), &self.metadata);
     let key = digest.0;
 
     let command_runner = self.clone();
@@ -78,35 +78,6 @@ impl crate::CommandRunner for CommandRunner {
 }
 
 impl CommandRunner {
-  fn bytes_to_digest(&self, bytes: &[u8]) -> Digest {
-    let mut hasher = Sha256::default();
-    hasher.input(bytes);
-
-    Digest(
-      Fingerprint::from_bytes_unsafe(&hasher.fixed_result()),
-      bytes.len(),
-    )
-  }
-
-  fn digest(&self, req: MultiPlatformExecuteProcessRequest) -> Digest {
-    let mut hashes: Vec<String> = req
-      .0
-      .values()
-      .map(|ref epr| crate::remote::make_execute_request(epr, self.metadata.clone()).unwrap())
-      .map(|(_a, _b, er)| er.get_action_digest().get_hash().to_string())
-      .collect();
-    hashes.sort();
-    self.bytes_to_digest(
-      hashes
-        .iter()
-        .fold(String::new(), |mut acc, hash| {
-          acc.push_str(&hash);
-          acc
-        })
-        .as_bytes(),
-    )
-  }
-
   fn lookup(
     &self,
     fingerprint: Fingerprint,

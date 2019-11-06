@@ -4,14 +4,18 @@
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Set
+from typing import Any, Set, Tuple
 
 from pants.backend.python.rules.pex import CreatePex, Pex, PexInterpreterContraints, PexRequirements
 from pants.backend.python.subsystems.black import Black
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
-from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
+from pants.engine.isolated_process import (
+  ExecuteProcessRequest,
+  ExecuteProcessResult,
+  FallibleExecuteProcessResult,
+)
 from pants.engine.legacy.structs import (
   PantsPluginAdaptor,
   PythonAppAdaptor,
@@ -21,7 +25,8 @@ from pants.engine.legacy.structs import (
 )
 from pants.engine.rules import UnionRule, optionable_rule, rule
 from pants.engine.selectors import Get
-from pants.rules.core.fmt import FmtResult, FmtTarget
+from pants.rules.core.fmt import FmtResult, TargetWithSources
+from pants.rules.core.lint import LintResult
 
 
 # Note: this is a workaround until https://github.com/pantsbuild/pants/issues/8343 is addressed
@@ -32,13 +37,18 @@ class FormattablePythonTarget:
   target: Any
 
 
+@dataclass(frozen=True)
+class BlackInput:
+  config_path: Path
+  resolved_requirements_pex: Pex
+  merged_input_files: Digest
+
+
 @rule
-def run_black(
+def get_black_input(
   wrapped_target: FormattablePythonTarget,
   black: Black,
-  python_setup: PythonSetup,
-  subprocess_encoding_environment: SubprocessEncodingEnvironment,
-  ) -> FmtResult:
+  ) -> BlackInput:
   config_path = black.get_options().config
   config_snapshot = yield Get(Snapshot, PathGlobs(include=(config_path,)))
 
@@ -62,33 +72,82 @@ def run_black(
     Digest,
     DirectoriesToMerge(directories=tuple(all_input_digests)),
   )
+  yield BlackInput(config_path, resolved_requirements_pex, merged_input_files)
 
+
+def _generate_black_pex_args(files: Set[str], config_path: str, *, check_only: bool) -> Tuple[str, ...]:
   # The exclude option from Black only works on recursive invocations,
   # so call black with the directories in which the files are present
   # and passing the full file names with the include option
   dirs: Set[str] = set()
-  for filename in target.sources.snapshot.files:
+  for filename in files:
     dirs.add(f"{Path(filename).parent}")
   pex_args= tuple(sorted(dirs))
+  if check_only:
+    pex_args += ("--check", )
   if config_path:
     pex_args += ("--config", config_path)
-  if target.sources.snapshot.files:
-    pex_args += ("--include", "|".join(re.escape(f) for f in target.sources.snapshot.files))
+  if files:
+    pex_args += ("--include", "|".join(re.escape(f) for f in files))
+  return pex_args
 
-  request = resolved_requirements_pex.create_execute_request(
+
+def _generate_black_request(
+  wrapped_target: FormattablePythonTarget,
+  black_input: BlackInput,
+  python_setup: PythonSetup,
+  subprocess_encoding_environment: SubprocessEncodingEnvironment,
+  *,
+  check_only: bool,
+  ):
+  target = wrapped_target.target
+  pex_args = _generate_black_pex_args(target.sources.snapshot.files, black_input.config_path, check_only = check_only)
+
+  request = black_input.resolved_requirements_pex.create_execute_request(
     python_setup=python_setup,
     subprocess_encoding_environment=subprocess_encoding_environment,
     pex_path="./black.pex",
     pex_args=pex_args,
-    input_files=merged_input_files,
+    input_files=black_input.merged_input_files,
     output_files=target.sources.snapshot.files,
     description=f'Run Black for {target.address.reference()}',
   )
+  return request
+
+
+@rule
+def fmt_with_black(
+  wrapped_target: FormattablePythonTarget,
+  black_input: BlackInput,
+  python_setup: PythonSetup,
+  subprocess_encoding_environment: SubprocessEncodingEnvironment,
+  ) -> FmtResult:
+
+  request = _generate_black_request(wrapped_target, black_input, python_setup, subprocess_encoding_environment, check_only = False)
 
   result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, request)
 
   yield FmtResult(
     digest=result.output_directory_digest,
+    stdout=result.stdout.decode(),
+    stderr=result.stderr.decode(),
+  )
+
+
+@rule
+def lint_with_black(
+  wrapped_target: FormattablePythonTarget,
+  black_input: BlackInput,
+  python_setup: PythonSetup,
+  subprocess_encoding_environment: SubprocessEncodingEnvironment,
+  ) -> LintResult:
+
+  request = _generate_black_request(wrapped_target, black_input, python_setup, subprocess_encoding_environment, check_only = True)
+
+  result = yield Get(FallibleExecuteProcessResult, ExecuteProcessRequest, request)
+
+  yield LintResult(
+    exit_code=result.exit_code,
     stdout=result.stdout.decode(),
     stderr=result.stderr.decode(),
   )
@@ -131,12 +190,14 @@ def rules():
     binary_adaptor,
     tests_adaptor,
     plugin_adaptor,
-    run_black,
-    UnionRule(FmtTarget, PythonTargetAdaptor),
-    UnionRule(FmtTarget, PythonAppAdaptor),
-    UnionRule(FmtTarget, PythonBinaryAdaptor),
-    UnionRule(FmtTarget, PythonTestsAdaptor),
-    UnionRule(FmtTarget, PantsPluginAdaptor),
+    get_black_input,
+    fmt_with_black,
+    lint_with_black,
+    UnionRule(TargetWithSources, PythonTargetAdaptor),
+    UnionRule(TargetWithSources, PythonAppAdaptor),
+    UnionRule(TargetWithSources, PythonBinaryAdaptor),
+    UnionRule(TargetWithSources, PythonTestsAdaptor),
+    UnionRule(TargetWithSources, PantsPluginAdaptor),
     optionable_rule(Black),
     optionable_rule(PythonSetup),
   ]

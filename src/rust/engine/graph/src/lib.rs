@@ -34,7 +34,7 @@ mod entry;
 mod node;
 
 pub use crate::entry::Entry;
-use crate::entry::{EntryKey, Generation, RunToken};
+use crate::entry::{Generation, RunToken};
 
 use std::collections::binary_heap::BinaryHeap;
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -48,7 +48,7 @@ use fnv::FnvHasher;
 
 use futures::future::{self, Future};
 use indexmap::IndexSet;
-use log::{info, trace, warn};
+use log::{debug, trace, warn};
 use parking_lot::Mutex;
 use petgraph::graph::DiGraph;
 use petgraph::visit::EdgeRef;
@@ -67,7 +67,7 @@ pub struct InvalidationResult {
   pub dirtied: usize,
 }
 
-type Nodes<N> = HashMap<EntryKey<N>, EntryId>;
+type Nodes<N> = HashMap<N, EntryId>;
 
 struct InnerGraph<N: Node> {
   nodes: Nodes<N>,
@@ -79,7 +79,7 @@ struct InnerGraph<N: Node> {
 }
 
 impl<N: Node> InnerGraph<N> {
-  fn entry_id(&self, node: &EntryKey<N>) -> Option<&EntryId> {
+  fn entry_id(&self, node: &N) -> Option<&EntryId> {
     self.nodes.get(node)
   }
 
@@ -99,11 +99,11 @@ impl<N: Node> InnerGraph<N> {
       .expect("The unsafe_entry_for_id method should only be used in read-only methods!")
   }
 
-  fn ensure_entry(&mut self, node: EntryKey<N>) -> EntryId {
+  fn ensure_entry(&mut self, node: N) -> EntryId {
     InnerGraph::ensure_entry_internal(&mut self.pg, &mut self.nodes, node)
   }
 
-  fn ensure_entry_internal(pg: &mut PGraph<N>, nodes: &mut Nodes<N>, node: EntryKey<N>) -> EntryId {
+  fn ensure_entry_internal(pg: &mut PGraph<N>, nodes: &mut Nodes<N>, node: N) -> EntryId {
     if let Some(&id) = nodes.get(&node) {
       return id;
     }
@@ -125,12 +125,15 @@ impl<N: Node> InnerGraph<N> {
   ///
   fn report_cycle(&self, src_id: EntryId, dst_id: EntryId) -> Option<Vec<Entry<N>>> {
     if src_id == dst_id {
-      return Some(vec![self.entry_for_id(src_id).unwrap().clone()]);
+      let entry = self.entry_for_id(src_id).unwrap();
+      return Some(vec![entry.clone(), entry.clone()]);
     }
     if !self.detect_cycle(src_id, dst_id) {
       return None;
     }
-    Self::shortest_path(&self.pg, dst_id, src_id).map(|path| {
+    Self::shortest_path(&self.pg, dst_id, src_id).map(|mut path| {
+      path.reverse();
+      path.push(dst_id);
       path
         .into_iter()
         .map(|index| self.entry_for_id(index).unwrap().clone())
@@ -221,7 +224,7 @@ impl<N: Node> InnerGraph<N> {
     // Add a single source that's a parent to all roots
     let srcs = roots
       .iter()
-      .filter_map(|n| self.entry_id(&EntryKey::Valid(n.clone())))
+      .filter_map(|n| self.entry_id(n))
       .cloned()
       .collect::<Vec<_>>();
     let src = graph.add_node(None);
@@ -312,7 +315,7 @@ impl<N: Node> InnerGraph<N> {
       .nodes
       .iter()
       .filter_map(|(entry, &entry_id)| {
-        if predicate(entry.content()) {
+        if predicate(entry) {
           Some(entry_id)
         } else {
           None
@@ -377,7 +380,7 @@ impl<N: Node> InnerGraph<N> {
 
     let root_entries = roots
       .iter()
-      .filter_map(|n| self.entry_id(&EntryKey::Valid(n.clone())))
+      .filter_map(|n| self.entry_id(n))
       .cloned()
       .collect();
 
@@ -408,7 +411,7 @@ impl<N: Node> InnerGraph<N> {
   fn trace<T: NodeTracer<N>>(&self, roots: &[N], file_path: &Path) -> Result<(), String> {
     let root_ids: IndexSet<EntryId, FNV> = roots
       .iter()
-      .filter_map(|nk| self.entry_id(&EntryKey::Valid(nk.clone())))
+      .filter_map(|nk| self.entry_id(nk))
       .cloned()
       .collect();
 
@@ -549,7 +552,7 @@ impl<N: Node> InnerGraph<N> {
     queue.extend(
       roots
         .iter()
-        .filter_map(|nk| self.entry_id(&EntryKey::Valid(nk.clone())))
+        .filter_map(|nk| self.entry_id(nk))
         .filter_map(|eid| queue_entry(*eid)),
     );
 
@@ -583,8 +586,7 @@ impl<N: Node> InnerGraph<N> {
   fn reachable_digest_count(&self, roots: &[N]) -> usize {
     let root_ids = roots
       .iter()
-      .cloned()
-      .filter_map(|node| self.entry_id(&EntryKey::Valid(node)))
+      .filter_map(|node| self.entry_id(node))
       .cloned()
       .collect();
     self
@@ -653,22 +655,22 @@ impl<N: Node> Graph<N> {
         let dst_id = {
           // TODO: doing cycle detection under the lock... unfortunate, but probably unavoidable
           // without a much more complicated algorithm.
-          let potential_dst_id = inner.ensure_entry(EntryKey::Valid(dst_node.clone()));
-          match Self::detect_cycle(src_id, potential_dst_id, &mut inner) {
-            Ok(true) => {
-              // Cyclic dependency: declare a dependency on a copy of the Node that is marked Cyclic.
-              inner.ensure_entry(EntryKey::Cyclic(dst_node))
-            }
-            Ok(false) => {
-              // Valid dependency.
-              trace!(
-                "Adding dependency from {:?} to {:?}",
-                inner.entry_for_id(src_id).unwrap().node(),
-                inner.entry_for_id(potential_dst_id).unwrap().node()
-              );
-              potential_dst_id
-            }
-            Err(err) => return futures::future::err(err).to_boxed(),
+          let potential_dst_id = inner.ensure_entry(dst_node.clone());
+          if let Some(cycle_path) = Self::report_cycle(src_id, potential_dst_id, &mut inner) {
+            // Cyclic dependency: render an error.
+            let path_strs = cycle_path
+              .into_iter()
+              .map(|e| e.node().to_string())
+              .collect();
+            return futures::future::err(N::Error::cyclic(path_strs)).to_boxed();
+          } else {
+            // Valid dependency.
+            trace!(
+              "Adding dependency from {:?} to {:?}",
+              inner.entry_for_id(src_id).unwrap().node(),
+              inner.entry_for_id(potential_dst_id).unwrap().node()
+            );
+            potential_dst_id
           }
         };
         // All edges get a weight of 1.0 so that we can Bellman-Ford over the graph, treating each
@@ -689,11 +691,11 @@ impl<N: Node> Graph<N> {
     }
   }
 
-  fn detect_cycle(
+  fn report_cycle(
     src_id: EntryId,
     potential_dst_id: EntryId,
     inner: &mut InnerGraph<N>,
-  ) -> Result<bool, N::Error> {
+  ) -> Option<Vec<Entry<N>>> {
     let mut counter = 0;
     loop {
       // Find one cycle if any cycles exist.
@@ -707,14 +709,14 @@ impl<N: Node> Graph<N> {
           .collect();
         if dirty_nodes.is_empty() {
           // We detected a cycle with no dirty nodes - there's a cycle and there's nothing we can do
-          // to remove it.
-          info!(
+          // to remove it. We only log at debug because the UI will render the cycle.
+          debug!(
             "Detected cycle considering adding edge from {:?} to {:?}; existing path: {:?}",
             inner.entry_for_id(src_id).unwrap(),
             inner.entry_for_id(potential_dst_id).unwrap(),
             cycle_path
           );
-          return Ok(true);
+          return Some(cycle_path);
         }
         counter += 1;
         // Obsolete edges from a dirty node may cause fake cycles to be detected if there was a
@@ -733,12 +735,12 @@ impl<N: Node> Graph<N> {
             "Couldn't remove cycle containing dirty nodes after {} attempts; nodes in cycle: {:?}",
             counter, cycle_path
           );
-          return Err(N::Error::cyclic());
+          return Some(cycle_path);
         }
         // Clear the dirty nodes, removing the edges from them, and try again.
         inner.invalidate_from_roots(|node| dirty_nodes.contains(node));
       } else {
-        return Ok(false);
+        return None;
       }
     }
   }
@@ -766,7 +768,7 @@ impl<N: Node> Graph<N> {
       if inner.draining {
         None
       } else {
-        let id = inner.ensure_entry(EntryKey::Valid(node));
+        let id = inner.ensure_entry(node);
         inner.entry_for_id(id).cloned().map(|entry| (entry, id))
       }
     };
