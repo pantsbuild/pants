@@ -3,8 +3,7 @@
 
 from pathlib import Path
 
-from pants.build_graph.address import Address
-from pants.engine.addressable import BuildFileAddresses
+from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.console import Console
 from pants.engine.fs import DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal
@@ -20,12 +19,8 @@ class Run(Goal):
   name = 'run'
 
 
-#TODO(gregs) - the `run` rule should really only accept a single target, but we don't have the infrastructure
-# yet to support a console rule that can request one and only one target (rather than BuildFileAddresses plural
-# or Specs plural). 
 @console_rule
-def run(console: Console, workspace: Workspace, runner: InteractiveRunner, addresses: BuildFileAddresses) -> Run:
-  bfa = addresses.dependencies[0]
+def run(console: Console, workspace: Workspace, runner: InteractiveRunner, bfa: BuildFileAddress) -> Run:
   target = bfa.to_address()
   binary = yield Get(CreatedBinary, Address, target)
 

@@ -16,8 +16,11 @@ from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.file_system_project_tree import FileSystemProjectTree
+from pants.base.specs import Specs
+from pants.build_graph.address import BuildFileAddress
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.remote_sources import RemoteSources
+from pants.engine.addressable import BuildFileAddresses
 from pants.engine.build_files import create_graph_rules
 from pants.engine.console import Console
 from pants.engine.fs import Workspace, create_fs_rules
@@ -46,7 +49,7 @@ from pants.engine.parser import SymbolTable
 from pants.engine.platform import create_platform_rules
 from pants.engine.rules import RootRule, UnionMembership, rule
 from pants.engine.scheduler import Scheduler
-from pants.engine.selectors import Params
+from pants.engine.selectors import Get, Params
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
 from pants.option.global_options import (
   DEFAULT_EXECUTION_OPTIONS,
@@ -371,6 +374,13 @@ class EngineInitializer:
     def build_root_singleton() -> BuildRoot:
       return BuildRoot.instance
 
+    @rule
+    def single_build_file_address(specs: Specs) -> BuildFileAddress:
+      build_file_addresses = yield Get(BuildFileAddresses, Specs, specs)
+      if len(build_file_addresses.dependencies) != 1:
+        raise Exception("This goal only works with a single target, but has been given multiple targets.")
+      yield build_file_addresses.dependencies[0]
+
     # Create a Scheduler containing graph and filesystem rules, with no installed goals. The
     # LegacyBuildGraph will explicitly request the products it needs.
     rules = (
@@ -381,6 +391,7 @@ class EngineInitializer:
         symbol_table_singleton,
         union_membership_singleton,
         build_root_singleton,
+        single_build_file_address,
       ] +
       create_legacy_graph_tasks() +
       create_fs_rules() +
