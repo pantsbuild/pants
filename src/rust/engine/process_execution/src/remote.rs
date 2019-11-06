@@ -111,6 +111,9 @@ pub struct CommandRunner {
   store: Store,
   platform: Platform,
   executor: task_executor::Executor,
+  // We use a buffer time for queuing of process requests so that the process's requested timeout more
+  // accurately reflects how long the caller intended the process to last.
+  queue_buffer_time: Duration,
   backoff_incremental_wait: Duration,
   backoff_max_wait: Duration,
 }
@@ -373,10 +376,12 @@ impl super::CommandRunner for CommandRunner {
                               (1 + iter_num) * command_runner.backoff_incremental_wait,
                             );
 
-                            // take the grpc result and cancel the op if too much time has passed.
+                            // Take the grpc result and cancel the op if too much time has passed.
+                            // This timeout is here to make sure that if something goes wrong, e.g.
+                            // the connection hangs, we don't poll forever.
                             let elapsed = start_time.elapsed();
 
-                            if elapsed > timeout {
+                            if elapsed > timeout + command_runner.queue_buffer_time {
                               let ExecutionHistory {
                                 mut attempts,
                                 mut current_attempt,
@@ -463,6 +468,7 @@ impl CommandRunner {
     store: Store,
     platform: Platform,
     executor: task_executor::Executor,
+    queue_buffer_time: Duration,
     backoff_incremental_wait: Duration,
     backoff_max_wait: Duration,
   ) -> Result<CommandRunner, String> {
@@ -506,6 +512,7 @@ impl CommandRunner {
       store,
       platform,
       executor,
+      queue_buffer_time,
       backoff_incremental_wait,
       backoff_max_wait,
     };
