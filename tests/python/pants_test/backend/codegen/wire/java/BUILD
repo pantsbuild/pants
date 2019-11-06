@@ -26,7 +26,9 @@ python_tests(
   sources = globs('*_integration.py'),
   dependencies = [
     'src/python/pants/base:build_environment',
+    'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
+    'tests/python/pants_test/testutils:file_test_util',
     'examples/src/java/org/pantsbuild/example:wire_directory',
   ],
   tags = {'integration'},

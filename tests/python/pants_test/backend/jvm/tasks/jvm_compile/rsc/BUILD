@@ -48,5 +48,6 @@ python_tests(
     'src/python/pants/backend/jvm/tasks/jvm_compile/rsc',
     'src/python/pants/backend/jvm/tasks:classpath_products',
     'tests/python/pants_test/jvm:nailgun_task_test_base',
+    'tests/python/pants_test/subsystem:subsystem_utils',
   ],
 )
