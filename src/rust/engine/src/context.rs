@@ -81,7 +81,6 @@ impl Core {
     process_execution_speculation_strategy: String,
     process_execution_use_local_cache: bool,
     remote_execution_headers: BTreeMap<String, String>,
-    local_python_distribution_absolute_path: PathBuf,
     process_execution_local_enable_nailgun: bool,
   ) -> Result<Core, String> {
     // Randomize CAS address order to avoid thundering herds from common config.
@@ -154,7 +153,6 @@ impl Core {
         Box::new(process_execution::nailgun::CommandRunner::new(
           local_command_runner,
           process_execution_metadata.clone(),
-          local_python_distribution_absolute_path,
           std::env::temp_dir(),
           executor.clone(),
         ))
@@ -184,6 +182,7 @@ impl Core {
             // need to take an option all the way down here and into the remote::CommandRunner struct.
             Platform::Linux,
             executor.clone(),
+            std::time::Duration::from_secs(45),
             std::time::Duration::from_millis(500),
             std::time::Duration::from_secs(5),
           )?),

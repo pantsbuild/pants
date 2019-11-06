@@ -5,6 +5,8 @@ use boxfuture::{try_future, BoxFuture, Boxable};
 use fs::{self, GlobExpansionConjunction, GlobMatching, PathGlobs, StrictGlobMatching};
 use futures::{future, Future, Stream};
 use log::info;
+use nails::execution::{ChildOutput, ExitCode};
+
 use std::collections::{BTreeSet, HashSet};
 use std::ffi::OsStr;
 use std::fs::create_dir_all;
@@ -26,9 +28,11 @@ use crate::{
 use bytes::{Bytes, BytesMut};
 use workunit_store::WorkUnitStore;
 
+#[derive(Clone)]
 pub struct CommandRunner {
   pub store: Store,
   executor: task_executor::Executor,
+  // TODO: change work_dir to work_dir_base
   pub work_dir: PathBuf,
   cleanup_local_dirs: bool,
   platform: Platform,
@@ -98,16 +102,6 @@ pub struct StreamedHermeticCommand {
 }
 
 ///
-/// The possible incremental outputs of a spawned child process.
-///
-#[derive(Debug)]
-enum ChildOutput {
-  Stdout(Bytes),
-  Stderr(Bytes),
-  Exit(i32),
-}
-
-///
 /// A streaming command that accepts no input stream and does not consult the `PATH`.
 ///
 impl StreamedHermeticCommand {
@@ -159,12 +153,12 @@ impl StreamedHermeticCommand {
         let stderr_stream = FramedRead::new(child.stderr().take().unwrap(), BytesCodec::new())
           .map(|bytes| ChildOutput::Stderr(bytes.into()));
         let exit_stream = child.into_stream().map(|exit_status| {
-          ChildOutput::Exit(
+          ChildOutput::Exit(ExitCode(
             exit_status
               .code()
               .or_else(|| exit_status.signal().map(Neg::neg))
               .expect("Child process should exit via returned code or signal."),
-          )
+          ))
         });
 
         Ok(
@@ -180,14 +174,14 @@ impl StreamedHermeticCommand {
 ///
 /// The fully collected outputs of a completed child process.
 ///
-struct ChildResults {
-  stdout: Bytes,
-  stderr: Bytes,
-  exit_code: i32,
+pub struct ChildResults {
+  pub stdout: Bytes,
+  pub stderr: Bytes,
+  pub exit_code: i32,
 }
 
 impl ChildResults {
-  fn collect_from<E>(
+  pub fn collect_from<E>(
     stream: impl Stream<Item = ChildOutput, Error = E> + Send,
   ) -> impl Future<Item = ChildResults, Error = E> {
     let init = (
@@ -202,7 +196,7 @@ impl ChildResults {
           match child_output {
             ChildOutput::Stdout(bytes) => stdout.extend_from_slice(&bytes),
             ChildOutput::Stderr(bytes) => stderr.extend_from_slice(&bytes),
-            ChildOutput::Exit(code) => exit_code = code,
+            ChildOutput::Exit(code) => exit_code = code.0,
           };
           Ok((stdout, stderr, exit_code)) as Result<_, E>
         },
@@ -244,36 +238,78 @@ impl super::CommandRunner for CommandRunner {
     req: MultiPlatformExecuteProcessRequest,
     context: Context,
   ) -> BoxFuture<FallibleExecuteProcessResult, String> {
+    let req = self.extract_compatible_request(&req).unwrap();
+    self.run_and_capture_workdir(
+      req,
+      context,
+      self.store.clone(),
+      self.executor.clone(),
+      self.cleanup_local_dirs,
+      &self.work_dir,
+    )
+  }
+}
+impl CapturedWorkdir for CommandRunner {
+  fn run_in_workdir(
+    &self,
+    workdir_path: &Path,
+    req: ExecuteProcessRequest,
+    _context: Context,
+  ) -> Result<Box<dyn Stream<Item = ChildOutput, Error = String> + Send>, String> {
+    StreamedHermeticCommand::new(&req.argv[0])
+      .args(&req.argv[1..])
+      .current_dir(&workdir_path)
+      .envs(req.env)
+      .stream()
+      .map(|s| {
+        // NB: Converting from `impl Stream` to `Box<dyn Stream>` requires this odd dance.
+        let stream: Box<dyn Stream<Item = _, Error = _> + Send> = Box::new(s);
+        stream
+      })
+  }
+}
+
+pub trait CapturedWorkdir {
+  fn run_and_capture_workdir(
+    &self,
+    req: ExecuteProcessRequest,
+    context: Context,
+    store: Store,
+    executor: task_executor::Executor,
+    cleanup_local_dirs: bool,
+    workdir_base: &Path,
+  ) -> BoxFuture<FallibleExecuteProcessResult, String>
+  where
+    Self: Send + Sync + Clone + 'static,
+  {
     let workdir = try_future!(tempfile::Builder::new()
       .prefix("process-execution")
-      .tempdir_in(&self.work_dir)
+      .tempdir_in(workdir_base)
       .map_err(|err| format!(
         "Error making tempdir for local process execution: {:?}",
         err
       )));
-    let req = self.extract_compatible_request(&req).unwrap();
+
     let workdir_path = workdir.path().to_owned();
     let workdir_path2 = workdir_path.clone();
     let workdir_path3 = workdir_path.clone();
     let workdir_path4 = workdir_path.clone();
-    let store = self.store.clone();
-    let store2 = self.store.clone();
-    let executor = self.executor.clone();
 
-    let env = req.env;
+    let store2 = store.clone();
+
+    let command_runner = self.clone();
+    let req2 = req.clone();
     let output_file_paths = req.output_files;
     let output_file_paths2 = output_file_paths.clone();
     let output_dir_paths = req.output_directories;
     let output_dir_paths2 = output_dir_paths.clone();
-    let cleanup_local_dirs = self.cleanup_local_dirs;
-    let argv = req.argv;
+
     let req_description = req.description;
     let maybe_jdk_home = req.jdk_home;
     let unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule =
       req.unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule;
 
-    self
-      .store
+    store
       .materialize_directory(
         workdir_path.clone(),
         req.input_files,
@@ -318,13 +354,7 @@ impl super::CommandRunner for CommandRunner {
         }
         Ok(())
       })
-      .and_then(move |()| {
-        StreamedHermeticCommand::new(&argv[0])
-          .args(&argv[1..])
-          .current_dir(&workdir_path)
-          .envs(env)
-          .stream()
-      })
+      .and_then(move |()| command_runner.run_in_workdir(&workdir_path, req2, context))
       // NB: We fully buffer up the `Stream` above into final `ChildResults` below and so could
       // instead be using `CommandExt::output_async` above to avoid the `ChildResults::collect_from`
       // code. The idea going forward though is we eventually want to pass incremental results on
@@ -380,4 +410,11 @@ impl super::CommandRunner for CommandRunner {
       })
       .to_boxed()
   }
+
+  fn run_in_workdir(
+    &self,
+    workdir_path: &Path,
+    req: ExecuteProcessRequest,
+    context: Context,
+  ) -> Result<Box<dyn Stream<Item = ChildOutput, Error = String> + Send>, String>;
 }

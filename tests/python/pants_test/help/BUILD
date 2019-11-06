@@ -8,7 +8,6 @@ python_tests(
   dependencies=[
     'src/python/pants/build_graph',
     'src/python/pants/help',
-    'src/python/pants/util:objects',
   ]
 )
 

@@ -9,7 +9,7 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.files import Files
 from pants.build_graph.target_filter_subsystem import TargetFilter
 from pants.cache.cache_setup import CacheSetup
-from pants.option.arg_splitter import GLOBAL_SCOPE
+from pants.option.scope import GLOBAL_SCOPE
 from pants.subsystem.subsystem import Subsystem
 from pants.subsystem.subsystem_client_mixin import SubsystemDependency
 from pants.task.task import Task

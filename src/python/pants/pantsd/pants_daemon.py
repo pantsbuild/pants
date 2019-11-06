@@ -18,9 +18,9 @@ from pants.engine.native import Native
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.logging import init_rust_logger, setup_logging
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
-from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.options_fingerprinter import OptionsFingerprinter
+from pants.option.scope import GLOBAL_SCOPE
 from pants.pantsd.process_manager import FingerprintedProcessManager
 from pants.pantsd.service.fs_event_service import FSEventService
 from pants.pantsd.service.pailgun_service import PailgunService

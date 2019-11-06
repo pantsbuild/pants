@@ -378,7 +378,7 @@ class TransitiveHydratedTargets:
   closure: Any
 
 
-class HydratedTargets(Collection.of(HydratedTarget)):
+class HydratedTargets(Collection[HydratedTarget]):
   """An intransitive set of HydratedTarget objects."""
 
 

@@ -14,11 +14,10 @@ from pants.base.build_environment import (
   get_pants_configdir,
   pants_version,
 )
-from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.custom_types import dir_option, file_option
 from pants.option.errors import OptionsError
 from pants.option.optionable import Optionable
-from pants.option.scope import ScopeInfo
+from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
 from pants.util.collections import Enum
 

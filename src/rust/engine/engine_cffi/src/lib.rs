@@ -52,6 +52,7 @@ use logging::{Destination, Logger};
 use rule_graph::{GraphMaker, RuleGraph};
 use std::any::Any;
 use std::borrow::Borrow;
+use std::collections::HashSet;
 use std::ffi::CStr;
 use std::fs::File;
 use std::io;
@@ -61,6 +62,7 @@ use std::panic;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tempfile::TempDir;
+use workunit_store::WorkUnit;
 
 #[cfg(test)]
 mod tests;
@@ -205,7 +207,6 @@ pub extern "C" fn scheduler_create(
   process_execution_speculation_strategy_buf: Buffer,
   process_execution_use_local_cache: bool,
   remote_execution_headers_buf: BufferBuffer,
-  local_python_distribution_absolute_path_buf: Buffer,
   process_execution_local_enable_nailgun: bool,
 ) -> RawResult {
   match make_core(
@@ -235,7 +236,6 @@ pub extern "C" fn scheduler_create(
     process_execution_speculation_strategy_buf,
     process_execution_use_local_cache,
     remote_execution_headers_buf,
-    local_python_distribution_absolute_path_buf,
     process_execution_local_enable_nailgun,
   ) {
     Ok(core) => RawResult {
@@ -278,7 +278,6 @@ fn make_core(
   process_execution_speculation_strategy_buf: Buffer,
   process_execution_use_local_cache: bool,
   remote_execution_headers_buf: BufferBuffer,
-  local_python_distribution_absolute_path_buf: Buffer,
   process_execution_local_enable_nailgun: bool,
 ) -> Result<Core, String> {
   let root_type_ids = root_type_ids.to_vec();
@@ -345,9 +344,6 @@ fn make_core(
       )
     })?;
 
-  let local_python_distribution_absolute_path =
-    PathBuf::from(local_python_distribution_absolute_path_buf.to_os_string());
-
   let remote_execution_headers = remote_execution_headers_buf.to_map("remote-execution-headers")?;
   Core::new(
     root_type_ids.clone(),
@@ -390,9 +386,37 @@ fn make_core(
     process_execution_speculation_strategy,
     process_execution_use_local_cache,
     remote_execution_headers,
-    local_python_distribution_absolute_path,
     process_execution_local_enable_nailgun,
   )
+}
+
+fn workunits_to_py_tuple_value(workunits: &HashSet<WorkUnit>) -> Value {
+  let workunit_values = workunits
+    .iter()
+    .map(|workunit: &WorkUnit| {
+      let mut workunit_zipkin_trace_info = vec![
+        externs::store_utf8("name"),
+        externs::store_utf8(&workunit.name),
+        externs::store_utf8("start_secs"),
+        externs::store_u64(workunit.time_span.start.secs),
+        externs::store_utf8("start_nanos"),
+        externs::store_u64(u64::from(workunit.time_span.start.nanos)),
+        externs::store_utf8("duration_secs"),
+        externs::store_u64(workunit.time_span.duration.secs),
+        externs::store_utf8("duration_nanos"),
+        externs::store_u64(u64::from(workunit.time_span.duration.nanos)),
+        externs::store_utf8("span_id"),
+        externs::store_utf8(&workunit.span_id),
+      ];
+      if let Some(parent_id) = &workunit.parent_id {
+        workunit_zipkin_trace_info.push(externs::store_utf8("parent_id"));
+        workunit_zipkin_trace_info.push(externs::store_utf8(parent_id));
+      }
+      externs::store_dict(&workunit_zipkin_trace_info)
+    })
+    .collect::<Vec<_>>();
+
+  externs::store_tuple(&workunit_values)
 }
 
 ///
@@ -412,35 +436,11 @@ pub extern "C" fn scheduler_metrics(
         .flat_map(|(metric, value)| vec![externs::store_utf8(metric), externs::store_i64(value)])
         .collect::<Vec<_>>();
       if session.should_record_zipkin_spans() {
-        let workunits = session
-          .workunit_store()
-          .get_workunits()
-          .lock()
-          .iter()
-          .map(|workunit| {
-            let mut workunit_zipkin_trace_info = vec![
-              externs::store_utf8("name"),
-              externs::store_utf8(&workunit.name),
-              externs::store_utf8("start_secs"),
-              externs::store_u64(workunit.time_span.start.secs),
-              externs::store_utf8("start_nanos"),
-              externs::store_u64(u64::from(workunit.time_span.start.nanos)),
-              externs::store_utf8("duration_secs"),
-              externs::store_u64(workunit.time_span.duration.secs),
-              externs::store_utf8("duration_nanos"),
-              externs::store_u64(u64::from(workunit.time_span.duration.nanos)),
-              externs::store_utf8("span_id"),
-              externs::store_utf8(&workunit.span_id),
-            ];
-            if let Some(parent_id) = &workunit.parent_id {
-              workunit_zipkin_trace_info.push(externs::store_utf8("parent_id"));
-              workunit_zipkin_trace_info.push(externs::store_utf8(parent_id));
-            }
-            externs::store_dict(&workunit_zipkin_trace_info)
-          })
-          .collect::<Vec<_>>();
+        let workunits = session.workunit_store().get_workunits();
+
+        let value = workunits_to_py_tuple_value(&workunits.lock());
         values.push(externs::store_utf8("engine_workunits"));
-        values.push(externs::store_tuple(&workunits));
+        values.push(value);
       };
       externs::store_dict(&values).into()
     })

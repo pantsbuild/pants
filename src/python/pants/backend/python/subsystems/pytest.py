@@ -1,6 +1,8 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from typing import Tuple
+
 from pants.subsystem.subsystem import Subsystem
 
 
@@ -21,7 +23,7 @@ class PyTest(Subsystem):
              help='Requirements string for the unittest2 library, which some python versions '
                   'may need.')
 
-  def get_requirement_strings(self):
+  def get_requirement_strings(self) -> Tuple[str, ...]:
     """Returns a tuple of requirements-style strings for pytest and related libraries.
 
     Make sure the requirements are satisfied in any environment used for running tests.

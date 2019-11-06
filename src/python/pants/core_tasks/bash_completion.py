@@ -10,7 +10,7 @@ from pants.base.exceptions import TaskError
 from pants.base.generator import Generator
 from pants.goal.goal import Goal
 from pants.help.help_info_extracter import HelpInfoExtracter
-from pants.option.arg_splitter import GLOBAL_SCOPE
+from pants.option.scope import GLOBAL_SCOPE
 from pants.task.console_task import ConsoleTask
 from pants.task.task import TaskBase
 

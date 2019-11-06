@@ -4,9 +4,8 @@
 import unittest
 
 from pants.help.scope_info_iterator import ScopeInfoIterator
-from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.global_options import GlobalOptionsRegistrar
-from pants.option.scope import ScopeInfo
+from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.subsystem.subsystem import Subsystem
 from pants.subsystem.subsystem_client_mixin import SubsystemDependency
 from pants.task.task import Task

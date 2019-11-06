@@ -104,7 +104,6 @@ python_library(
   sources = ['hash_utils.py'],
   dependencies = [
     '3rdparty/python:typing-extensions',
-    'src/python/pants/util:objects',
     'src/python/pants/util:strutil',
   ],
 )

@@ -11,5 +11,6 @@ python_library(
     'src/python/pants/process',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
+    'src/python/pants:version',
   ],
 )
