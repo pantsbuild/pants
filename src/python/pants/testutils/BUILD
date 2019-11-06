@@ -2,22 +2,20 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  name='test_infra',
+  name='testutils_wheel',
   dependencies=[
     ':int-test-for-export',
     ':test_base',
-    'src/python/pants/testinfra/jvm:jar_task_test_base',
-    'src/python/pants/testinfra/jvm:nailgun_task_test_base',
-    'src/python/pants/testinfra/jvm:jvm_tool_task_test_base',
-    'src/python/pants/testinfra/engine:engine_test_base',
-    'src/python/pants/testinfra/subsystem',
+    'src/python/pants/testutils/jvm:jar_task_test_base',
+    'src/python/pants/testutils/jvm:nailgun_task_test_base',
+    'src/python/pants/testutils/jvm:jvm_tool_task_test_base',
+    'src/python/pants/testutils/engine:engine_test_base',
+    'src/python/pants/testutils/subsystem',
   ],
-  # TODO(???): Once we remove `pants_test:testinfra`, reclaim the wheel name
-  #  `pantsbuiuld.pants.testinfra`. We let that keep the ideal name for backwards compatibility.
   provides=pants_setup_py(
-    name='pantsbuild.pants.testinfra.new_namespace',
+    name='pantsbuild.pants.testutils',
     description='Test support for writing pants plugins.',
-    namespace_packages=['pants.testinfra'],
+    namespace_packages=['pants.testutils'],
     additional_classifiers=[
       'Topic :: Software Development :: Testing',
     ]
@@ -39,7 +37,7 @@ python_library(
     'src/python/pants/base:exiter',
     'src/python/pants/fs',
     'src/python/pants/subsystem',
-    'src/python/pants/testinfra/utils:file_test_util',
+    'src/python/pants/testutils/utils:file_test_util',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:osutil',
@@ -76,10 +74,10 @@ python_library(
     'src/python/pants/source',
     'src/python/pants/subsystem',
     'src/python/pants/task',
-    'src/python/pants/testinfra/base:context_utils',
-    'src/python/pants/testinfra/engine:util',
-    'src/python/pants/testinfra/option',
-    'src/python/pants/testinfra/subsystem',
+    'src/python/pants/testutils/base:context_utils',
+    'src/python/pants/testutils/engine:util',
+    'src/python/pants/testutils/option',
+    'src/python/pants/testutils/subsystem',
     'src/python/pants/util:collections',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',

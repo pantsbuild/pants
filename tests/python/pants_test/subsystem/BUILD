@@ -13,6 +13,6 @@ python_library(
   name='subsystem_utils',
   sources=['subsystem_util.py'],
   dependencies=[
-    'src/python/pants/testinfra/subsystem',
+    'src/python/pants/testutils/subsystem',
   ],
 )

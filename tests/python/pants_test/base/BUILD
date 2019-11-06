@@ -49,7 +49,7 @@ python_library(
   name = 'context_utils',
   sources = ['context_utils.py'],
   dependencies = [
-    'src/python/pants/testinfra/base:context_utils',
+    'src/python/pants/testutils/base:context_utils',
   ]
 )
 

@@ -12,7 +12,7 @@ from pants.base.build_environment import get_pants_cachedir
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
 from pants.ivy.bootstrapper import Bootstrapper
-from pants.testinfra.jvm.jvm_task_test_base import JvmTaskTestBase
+from pants.testutils.jvm.jvm_task_test_base import JvmTaskTestBase
 from pants.util.dirutil import safe_mkdir
 
 

@@ -30,10 +30,10 @@ from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source.source_root import SourceRootConfig
 from pants.subsystem.subsystem import Subsystem
 from pants.task.goal_options_mixin import GoalOptionsMixin
-from pants.testinfra.base.context_utils import create_context_from_options
-from pants.testinfra.engine.util import init_native
-from pants.testinfra.option.fakes import create_options_for_optionables
-from pants.testinfra.subsystem import util as subsystem_util
+from pants.testutils.base.context_utils import create_context_from_options
+from pants.testutils.engine.util import init_native
+from pants.testutils.option.fakes import create_options_for_optionables
+from pants.testutils.subsystem import util as subsystem_util
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import (

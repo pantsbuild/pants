@@ -3,6 +3,6 @@
 
 python_library(
   dependencies=[
-    'src/python/pants/testinfra/option'
+    'src/python/pants/testutils/option'
   ],
 )

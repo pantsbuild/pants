@@ -5,7 +5,7 @@ python_library(
   name = 'mock_logger',
   sources = globs('mock_logger.py'),
   dependencies = [
-    'src/python/pants/testinfra/utils:mock_logger',
+    'src/python/pants/testutils/utils:mock_logger',
   ],
 )
 
@@ -15,7 +15,7 @@ python_library(
     'file_test_util.py',
   ],
   dependencies = [
-    'src/python/pants/testinfra/utils:file_test_util',
+    'src/python/pants/testutils/utils:file_test_util',
   ],
 )
 
@@ -25,7 +25,7 @@ python_library(
     'git_util.py',
   ],
   dependencies = [
-    'src/python/pants/testinfra/utils:git_util',
+    'src/python/pants/testutils/utils:git_util',
   ],
 )
 
@@ -35,7 +35,7 @@ python_library(
     'process_test_util.py',
   ],
   dependencies = [
-    'src/python/pants/testinfra/utils:process_test_util',
+    'src/python/pants/testutils/utils:process_test_util',
   ],
 )
 
@@ -45,6 +45,6 @@ python_library(
     'pexrc_util.py',
   ],
   dependencies = [
-    'src/python/pants/testinfra/utils:pexrc_util',
+    'src/python/pants/testutils/utils:pexrc_util',
   ],
 )
