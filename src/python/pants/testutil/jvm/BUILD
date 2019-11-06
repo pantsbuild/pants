@@ -43,8 +43,8 @@ python_library(
   sources=['jvm_task_test_base.py'],
   dependencies=[
     'src/python/pants/backend/jvm/tasks:classpath_products',
-    'src/python/pants/testutils/subsystem',
-    'src/python/pants/testutils:task_test_base',
+    'src/python/pants/testutil/subsystem',
+    'src/python/pants/testutil:task_test_base',
     'src/python/pants/util:dirutil',
   ],
 )

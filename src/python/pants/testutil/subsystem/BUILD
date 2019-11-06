@@ -4,6 +4,6 @@
 python_library(
   dependencies=[
     'src/python/pants/subsystem',
-    'src/python/pants/testutils/option',
+    'src/python/pants/testutil/option',
   ],
 )

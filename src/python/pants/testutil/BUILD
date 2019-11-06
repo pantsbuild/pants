@@ -2,20 +2,20 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  name='testutils_wheel',
+  name='testutil_wheel',
   dependencies=[
     ':int-test-for-export',
     ':test_base',
-    'src/python/pants/testutils/jvm:jar_task_test_base',
-    'src/python/pants/testutils/jvm:nailgun_task_test_base',
-    'src/python/pants/testutils/jvm:jvm_tool_task_test_base',
-    'src/python/pants/testutils/engine:engine_test_base',
-    'src/python/pants/testutils/subsystem',
+    'src/python/pants/testutil/jvm:jar_task_test_base',
+    'src/python/pants/testutil/jvm:nailgun_task_test_base',
+    'src/python/pants/testutil/jvm:jvm_tool_task_test_base',
+    'src/python/pants/testutil/engine:engine_test_base',
+    'src/python/pants/testutil/subsystem',
   ],
   provides=pants_setup_py(
-    name='pantsbuild.pants.testutils',
+    name='pantsbuild.pants.testutil',
     description='Test support for writing pants plugins.',
-    namespace_packages=['pants.testutils'],
+    namespace_packages=['pants.testutil'],
     additional_classifiers=[
       'Topic :: Software Development :: Testing',
     ]
@@ -37,7 +37,7 @@ python_library(
     'src/python/pants/base:exiter',
     'src/python/pants/fs',
     'src/python/pants/subsystem',
-    'src/python/pants/testutils/utils:file_test_util',
+    'src/python/pants/testutil/utils:file_test_util',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:osutil',
@@ -74,10 +74,10 @@ python_library(
     'src/python/pants/source',
     'src/python/pants/subsystem',
     'src/python/pants/task',
-    'src/python/pants/testutils/base:context_utils',
-    'src/python/pants/testutils/engine:util',
-    'src/python/pants/testutils/option',
-    'src/python/pants/testutils/subsystem',
+    'src/python/pants/testutil/base:context_utils',
+    'src/python/pants/testutil/engine:util',
+    'src/python/pants/testutil/option',
+    'src/python/pants/testutil/subsystem',
     'src/python/pants/util:collections',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',

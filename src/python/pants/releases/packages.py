@@ -82,7 +82,7 @@ def core_packages():
   bdist_wheel_flags = ("--py-limited-api", "cp36")
   return {
     Package("pantsbuild.pants", "//src/python/pants:pants-packaged", bdist_wheel_flags=bdist_wheel_flags),
-    Package("pantsbuild.pants.testutils", "//src/python/pants/testutils:testutils_wheel"),
+    Package("pantsbuild.pants.testutil", "//src/python/pants/testutil:testutil_wheel"),
     Package("pantsbuild.pants.testinfra", "//tests/python/pants_test:test_infra"),
   }
 

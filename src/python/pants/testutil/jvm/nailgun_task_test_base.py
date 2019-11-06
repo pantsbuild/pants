@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
-from pants.testutils.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
+from pants.testutil.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 
 
 class NailgunTaskTestBase(JvmToolTaskTestBase):

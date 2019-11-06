@@ -3,7 +3,7 @@
 
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar
-from pants.testutils.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 class EngineTestBase(TestBase):

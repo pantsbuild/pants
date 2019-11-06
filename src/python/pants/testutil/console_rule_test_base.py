@@ -11,7 +11,7 @@ from pants.engine.selectors import Params
 from pants.init.options_initializer import BuildConfigInitializer
 from pants.init.target_roots_calculator import TargetRootsCalculator
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.testutils.test_base import TestBase
+from pants.testutil.test_base import TestBase
 from pants.util.meta import classproperty
 
 

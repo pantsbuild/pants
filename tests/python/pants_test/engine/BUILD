@@ -5,7 +5,7 @@ python_library(
   name = 'util',
   sources = ['util.py'],
   dependencies = [
-    'src/python/pants/testutils/engine:util',
+    'src/python/pants/testutil/engine:util',
   ],
 )
 
@@ -13,7 +13,7 @@ python_library(
   name = 'engine_test_base',
   sources = ['base_engine_test.py'],
   dependencies = [
-    'src/python/pants/testutils/engine:engine_test_base',
+    'src/python/pants/testutil/engine:engine_test_base',
   ]
 )
 

@@ -30,7 +30,7 @@ python_library(
   name = 'int-test-for-export',
   sources = ['pants_run_integration_test.py'],
   dependencies = [
-    'src/python/pants/testutils:int-test-for-export',
+    'src/python/pants/testutil:int-test-for-export',
   ]
 )
 
@@ -38,7 +38,7 @@ target(
   name = 'int-test',
   dependencies=[
     ':int-test-for-export',
-    'src/python/pants/testutils:int-test',
+    'src/python/pants/testutil:int-test',
   ],
 )
 
@@ -46,7 +46,7 @@ python_library(
   name = 'test_base',
   sources = ['test_base.py'],
   dependencies = [
-    'src/python/pants/testutils:test_base',
+    'src/python/pants/testutil:test_base',
   ]
 )
 
@@ -54,7 +54,7 @@ python_library(
   name = 'console_rule_test_base',
   sources = ['console_rule_test_base.py'],
   dependencies = [
-    'src/python/pants/testutils:console_rule_test_base',
+    'src/python/pants/testutil:console_rule_test_base',
   ]
 )
 
@@ -63,7 +63,7 @@ python_library(
   name = 'task_test_base',
   sources = ['task_test_base.py'],
   dependencies = [
-    'src/python/pants/testutils:task_test_base',
+    'src/python/pants/testutil:task_test_base',
   ]
 )
 
@@ -71,7 +71,7 @@ python_library(
   name='interpreter_selection_utils',
   sources=['interpreter_selection_utils.py'],
   dependencies = [
-    'src/python/pants/testutils:interpreter_selection_utils',
+    'src/python/pants/testutil:interpreter_selection_utils',
   ]
 )
 

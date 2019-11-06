@@ -14,7 +14,7 @@ from pants.goal.goal import Goal
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.task.console_task import ConsoleTask
 from pants.task.task import Task
-from pants.testutils.test_base import TestBase
+from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir
 from pants.util.memo import memoized_method
 from pants.util.meta import classproperty

@@ -98,12 +98,12 @@ function pkg_pants_install_test() {
      == "${version}" ]] || die "Installed version of pants does not match requested version!"
 }
 
-function pkg_testutils_install_test() {
+function pkg_testutil_install_test() {
   local version=$1
   shift
   local PIP_ARGS=("$@")
-  pip install "${PIP_ARGS[@]}" "pantsbuild.pants.testutils==${version}" && \
-  python -c "import pants.testutils"
+  pip install "${PIP_ARGS[@]}" "pantsbuild.pants.testutil==${version}" && \
+  python -c "import pants.testutil"
 }
 
 function pkg_testinfra_install_test() {

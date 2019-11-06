@@ -1,4 +1,4 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.testutils.utils.mock_logger import MockLogger as MockLogger  # noqa
+from pants.testutil.utils.mock_logger import MockLogger as MockLogger  # noqa

@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.subsystem.subsystem import Subsystem
-from pants.testutils.option.fakes import create_options_for_optionables
+from pants.testutil.option.fakes import create_options_for_optionables
 
 
 def global_subsystem_instance(subsystem_type, options=None):
