@@ -9,8 +9,8 @@ from pex import pep425tags
 from pants.backend.python.register import build_file_aliases as register_python
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.build_graph.address import Address
+from pants.testutil.subsystem.util import init_subsystem
 from pants.testutil.task_test_base import TaskTestBase
-from pants_test.subsystem import subsystem_util
 
 
 def normalize_platform_tag(platform_tag):
@@ -48,7 +48,7 @@ class PythonTaskTestBase(TaskTestBase):
 
   def setUp(self):
     super().setUp()
-    subsystem_util.init_subsystem(PythonBinary.Defaults)
+    init_subsystem(PythonBinary.Defaults)
 
   def create_python_library(self, relpath, name, source_contents_map=None,
                             dependencies=(), provides=None):
