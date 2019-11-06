@@ -6,6 +6,7 @@ use crate::{
   FallibleExecuteProcessResult, Platform,
 };
 use hashing::EMPTY_DIGEST;
+use spectral::{assert_that, string::StrAssertions};
 use std;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
@@ -669,6 +670,39 @@ fn local_only_scratch_files_materialized() {
       execution_attempts: vec![],
     }
   );
+}
+
+#[test]
+fn timeout() {
+  let result = run_command_locally(ExecuteProcessRequest {
+    argv: vec![find_bash(), "-c".to_owned(), "/bin/sleep 0.5".to_string()],
+    env: BTreeMap::new(),
+    input_files: EMPTY_DIGEST,
+    output_files: BTreeSet::new(),
+    output_directories: BTreeSet::new(),
+    timeout: Duration::from_millis(300),
+    description: "timeout".to_string(),
+    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
+      hashing::EMPTY_DIGEST,
+    jdk_home: None,
+    target_platform: Platform::None,
+    is_nailgunnable: false,
+  })
+  .unwrap();
+
+  assert_eq!(
+    result,
+    FallibleExecuteProcessResult {
+      stdout: as_bytes(""),
+      stderr: as_bytes(""),
+      exit_code: -15,
+      output_directory: EMPTY_DIGEST,
+      execution_attempts: vec![],
+    }
+  );
+  let error_msg = String::from_utf8(result.stdout.to_vec()).unwrap();
+  assert_that(&error_msg).contains("Exceeded timeout");
+  assert_that(&error_msg).contains("timeout");
 }
 
 fn run_command_locally(req: ExecuteProcessRequest) -> Result<FallibleExecuteProcessResult, String> {
