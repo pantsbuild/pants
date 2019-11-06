@@ -7,14 +7,14 @@ import sys
 from dataclasses import dataclass
 
 from pants.base.deprecated import warn_or_error
-from pants.option.arg_splitter import GLOBAL_SCOPE, ArgSplitter
+from pants.option.arg_splitter import ArgSplitter
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_tracker import OptionTracker
 from pants.option.option_util import is_list_option
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.parser import Parser
 from pants.option.parser_hierarchy import ParserHierarchy, all_enclosing_scopes, enclosing_scope
-from pants.option.scope import ScopeInfo
+from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.meta import frozen_after_init
 

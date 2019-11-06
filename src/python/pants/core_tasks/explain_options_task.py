@@ -6,9 +6,9 @@ import json
 from colors import black, blue, cyan, green, magenta, red, white
 from packaging.version import Version
 
-from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.options_fingerprinter import CoercingOptionEncoder
 from pants.option.ranked_value import RankedValue
+from pants.option.scope import GLOBAL_SCOPE
 from pants.task.console_task import ConsoleTask
 from pants.version import PANTS_SEMVER
 

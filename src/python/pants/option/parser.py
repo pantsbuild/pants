@@ -16,7 +16,6 @@ import Levenshtein
 import yaml
 
 from pants.base.deprecated import validate_deprecation_semver, warn_or_error
-from pants.option.arg_splitter import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
 from pants.option.config import Config
 from pants.option.custom_types import (
   DictValueComponent,
@@ -46,7 +45,7 @@ from pants.option.errors import (
 )
 from pants.option.option_util import is_dict_option, is_list_option
 from pants.option.ranked_value import RankedValue
-from pants.option.scope import ScopeInfo
+from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
 from pants.util.meta import frozen_after_init
 
 

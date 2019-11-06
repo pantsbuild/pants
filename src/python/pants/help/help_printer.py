@@ -8,14 +8,13 @@ from pants.goal.goal import Goal
 from pants.help.help_formatter import HelpFormatter
 from pants.help.scope_info_iterator import ScopeInfoIterator
 from pants.option.arg_splitter import (
-  GLOBAL_SCOPE,
   GoalsHelp,
   NoGoalHelp,
   OptionsHelp,
   UnknownGoalHelp,
   VersionHelp,
 )
-from pants.option.scope import ScopeInfo
+from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 
 
 class HelpPrinter:
