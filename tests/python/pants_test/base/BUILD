@@ -49,6 +49,7 @@ python_library(
   name = 'context_utils',
   sources = ['context_utils.py'],
   dependencies = [
+    'src/python/pants/base:deprecated',
     'src/python/pants/testutil/base:context_utils',
   ]
 )

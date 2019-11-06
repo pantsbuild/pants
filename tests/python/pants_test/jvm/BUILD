@@ -23,6 +23,7 @@ python_library(
   name='jvm_tool_task_test_base',
   sources=['jvm_tool_task_test_base.py'],
   dependencies=[
+    'src/python/pants/base:deprecated',
     'src/python/pants/testutil/jvm:jvm_tool_task_test_base',
   ]
 )
@@ -31,6 +32,7 @@ python_library(
   name='nailgun_task_test_base',
   sources=['nailgun_task_test_base.py'],
   dependencies=[
+    'src/python/pants/base:deprecated',
     'src/python/pants/testutil/jvm:nailgun_task_test_base',
   ]
 )
@@ -39,6 +41,7 @@ python_library(
   name='jar_task_test_base',
   sources=['jar_task_test_base.py'],
   dependencies=[
+    'src/python/pants/base:deprecated',
     'src/python/pants/testutil/jvm:jar_task_test_base',
   ]
 )
@@ -47,6 +50,7 @@ python_library(
   name='jvm_task_test_base',
   sources=['jvm_task_test_base.py'],
   dependencies=[
+    'src/python/pants/base:deprecated',
     'src/python/pants/testutil/jvm:jvm_task_test_base',
   ]
 )

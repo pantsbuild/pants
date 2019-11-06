@@ -5,6 +5,7 @@ python_library(
   name = 'mock_logger',
   sources = globs('mock_logger.py'),
   dependencies = [
+    'src/python/pants/base:deprecated',
     'src/python/pants/testutil:mock_logger',
   ],
 )
@@ -15,6 +16,7 @@ python_library(
     'file_test_util.py',
   ],
   dependencies = [
+    'src/python/pants/base:deprecated',
     'src/python/pants/testutil:file_test_util',
   ],
 )
@@ -25,6 +27,7 @@ python_library(
     'git_util.py',
   ],
   dependencies = [
+    'src/python/pants/base:deprecated',
     'src/python/pants/testutil:git_util',
   ],
 )
@@ -35,6 +38,7 @@ python_library(
     'process_test_util.py',
   ],
   dependencies = [
+    'src/python/pants/base:deprecated',
     'src/python/pants/testutil:process_test_util',
   ],
 )
@@ -45,6 +49,7 @@ python_library(
     'pexrc_util.py',
   ],
   dependencies = [
+    'src/python/pants/base:deprecated',
     'src/python/pants/testutil:pexrc_util',
   ],
 )
