@@ -14,7 +14,7 @@ python_library(
   ],
   provides=pants_setup_py(
     name='pantsbuild.pants.testutil',
-    description='Test support for writing pants plugins.',
+    description='Test support for writing Pants plugins.',
     namespace_packages=['pants.testutil'],
     additional_classifiers=[
       'Topic :: Software Development :: Testing',
