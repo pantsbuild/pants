@@ -46,7 +46,7 @@ def all_roots(source_root_config: SourceRootConfig) -> AllSourceRoots:
 
 @console_rule
 def list_roots(console: Console, options: Roots.Options, all_roots: AllSourceRoots) -> Roots:
-  with Roots.line_oriented(options, console) as (print_stdout, print_stderr):
+  with Roots.line_oriented(options, console) as print_stdout:
     for src_root in sorted(all_roots, key=lambda x: x.path):
       all_langs = ','.join(sorted(src_root.langs))
       print_stdout(f"{src_root.path}: {all_langs or '*'}")

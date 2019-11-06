@@ -35,7 +35,7 @@ def file_deps(
     if hasattr(hydrated_target.adaptor, "sources"):
       uniq_set.update(hydrated_target.adaptor.sources.snapshot.files)
 
-  with Filedeps.line_oriented(filedeps_options, console) as (print_stdout, print_stderr):
+  with Filedeps.line_oriented(filedeps_options, console) as print_stdout:
     for f_path in uniq_set:
       print_stdout(f_path)
 
