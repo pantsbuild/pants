@@ -155,14 +155,17 @@ class OptionsTest(TestBase):
                     removal_hint='use a less crufty global option')
     register_global('--global-crufty-boolean', type=bool, removal_version='999.99.9.dev0',
                       removal_hint='say no to crufty global options')
-    register_global('--global-crufty-expired', removal_version='0.0.1.dev0',
-                    removal_hint='use a less crufty global option')
     register_global('--global-delayed-deprecated-option',
                     removal_version='999.99.9.dev0',
                     deprecation_start_version='500.0.0.dev0')
     register_global('--global-delayed-but-already-passed-deprecated-option',
                     removal_version='999.99.9.dev0',
                     deprecation_start_version=_FAKE_CUR_VERSION)
+
+    # Test that an option past the `removal_version` fails at option registration time.
+    with self.assertRaises(CodeRemovedError):
+      register_global('--global-crufty-expired', removal_version='0.0.1.dev0',
+                      removal_hint='use a less crufty global option')
 
     # Mutual Exclusive options
     register_global('--mutex-foo', mutually_exclusive_group='mutex')
@@ -841,22 +844,6 @@ class OptionsTest(TestBase):
         "Error applying type 'SomeEnumOption' to option value 'invalid-value', for option '--some_enum' in scope 'enum-opt'"):
       options = self._parse('./pants enum-opt --some-enum=invalid-value')
       options.for_scope('enum-opt').some_enum
-
-  def test_deprecated_option_past_removal(self):
-    """Ensure that expired options raise CodeRemovedError on attempted use."""
-    # NB: these exceptions are triggered by the `Parser#parse_args()` method, not
-    # `Options#for_scope()`!
-    # Test option past removal from flag
-    with self.assertRaises(CodeRemovedError):
-      self._parse('./pants --global-crufty-expired=way2crufty').for_global_scope()
-
-    # Test option past removal from env
-    with self.assertRaises(CodeRemovedError):
-      self._parse('./pants', env={'PANTS_GLOBAL_CRUFTY_EXPIRED':'way2crufty'}).for_global_scope()
-
-    #Test option past removal from config
-    with self.assertRaises(CodeRemovedError):
-      self._parse('./pants', config={'GLOBAL':{'global_crufty_expired':'way2crufty'}}).for_global_scope()
 
   def assertOptionWarning(self, w, option_string):
     single_warning = assert_single_element(w)

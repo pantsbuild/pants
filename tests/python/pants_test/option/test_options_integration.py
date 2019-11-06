@@ -129,7 +129,6 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
       self.assertIn('dummy-options.normal_option', pants_run.stdout_data)
       self.assertIn('dummy-options.dummy_crufty_deprecated_but_still_functioning',
                     pants_run.stdout_data)
-      self.assertNotIn('dummy-options.dummy_crufty_expired', pants_run.stdout_data)
 
   def test_from_config_invalid_section(self):
     with temporary_dir(root_dir=os.path.abspath('.')) as tempdir:
