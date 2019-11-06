@@ -6,10 +6,14 @@ python_library(
   dependencies=[
     ':int-test-for-export',
     ':test_base',
+    ':file_test_util',
+    'src/python/pants/testutil/base:context_utils',
+    'src/python/pants/testutil/engine:engine_test_base',
+    'src/python/pants/testutil/engine:util',
     'src/python/pants/testutil/jvm:jar_task_test_base',
     'src/python/pants/testutil/jvm:nailgun_task_test_base',
     'src/python/pants/testutil/jvm:jvm_tool_task_test_base',
-    'src/python/pants/testutil/engine:engine_test_base',
+    'src/python/pants/testutil/option',
     'src/python/pants/testutil/subsystem',
   ],
   provides=pants_setup_py(
@@ -30,6 +34,7 @@ python_library(
   dependencies = [
     '//:build_root',
     '//:pants_pex',
+    ':file_test_util',
     '3rdparty/python:ansicolors',
     '3rdparty/python:dataclasses',
     'src/python/pants/base:build_environment',
@@ -37,7 +42,6 @@ python_library(
     'src/python/pants/base:exiter',
     'src/python/pants/fs',
     'src/python/pants/subsystem',
-    'src/python/pants/testutil/utils:file_test_util',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:osutil',
@@ -113,6 +117,46 @@ python_library(
 )
 
 python_library(
+  name='file_test_util',
+  sources=['file_test_util.py'],
+)
+
+python_library(
+  name='git_util',
+  sources=['git_util.py'],
+  dependencies = [
+    'src/python/pants/base:revision',
+    'src/python/pants/scm:git',
+    'src/python/pants/util:contextutil',
+  ],
+)
+
+python_library(
   name='interpreter_selection_utils',
   sources=['interpreter_selection_utils.py'],
+)
+
+python_library(
+  name='mock_logger',
+  sources=['mock_logger.py'],
+  dependencies = [
+    'src/python/pants/reporting',
+  ],
+)
+
+python_library(
+  name='pexrc_util',
+  sources=['pexrc_util.py'],
+  dependencies = [
+    ':git_util',
+  ],
+)
+
+python_library(
+  name='process_test_util',
+  sources=['process_test_util.py'],
+  dependencies = [
+    '3rdparty/python:dataclasses',
+    '3rdparty/python:psutil',
+  ],
 )

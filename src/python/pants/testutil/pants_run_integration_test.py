@@ -22,7 +22,7 @@ from pants.base.build_file import BuildFile
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.fs.archive import ZIP
 from pants.subsystem.subsystem import Subsystem
-from pants.testutil.utils.file_test_util import check_symlinks, contains_exact_files
+from pants.testutil.file_test_util import check_symlinks, contains_exact_files
 from pants.util.contextutil import environment_as, pushd, temporary_dir
 from pants.util.dirutil import fast_relpath, safe_mkdir, safe_mkdir_for, safe_open
 from pants.util.osutil import Pid
