@@ -69,7 +69,7 @@ def create_python_binary(python_binary_adaptor: PythonBinaryAdaptor,
   )
 
   pex = yield Get(Pex, CreatePex, create_requirements_pex)
-  yield CreatedBinary(digest=pex.directory_digest)
+  yield CreatedBinary(digest=pex.directory_digest, binary_name=pex.output_filename)
 
 
 def rules():

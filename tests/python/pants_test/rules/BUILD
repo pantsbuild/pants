@@ -40,6 +40,20 @@ python_tests(
 )
 
 python_tests(
+  name='run',
+  source='test_run.py',
+  dependencies=[
+    'src/python/pants/build_graph',
+    'src/python/pants/engine/legacy:graph',
+    'src/python/pants/engine/legacy:structs',
+    'src/python/pants/rules/core',
+    'tests/python/pants_test:test_base',
+    'tests/python/pants_test:console_rule_test_base',
+    'tests/python/pants_test/engine:util',
+  ]
+)
+
+python_tests(
   name='fmt_integration',
   source='test_fmt_integration.py',
   dependencies=[
