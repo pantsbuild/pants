@@ -20,37 +20,39 @@ class Run(Goal):
   name = 'run'
 
 
+#TODO(gregs) - the `run` rule should really only accept a single target, but we don't have the infrastructure
+# yet to support a console rule that can request one and only one target (rather than BuildFileAddresses plural
+# or Specs plural). 
 @console_rule
 def run(console: Console, workspace: Workspace, runner: InteractiveRunner, addresses: BuildFileAddresses) -> Run:
-  binaries = yield [Get(CreatedBinary, Address, address.to_address()) for address in addresses]
+  bfa = addresses.dependencies[0]
+  target = bfa.to_address()
+  binary = yield Get(CreatedBinary, Address, target)
 
-  exit_codes = []
-  for (binary, bfa) in zip(binaries, addresses):
-    target = bfa.to_address()
-    with temporary_dir(cleanup=False) as tmpdir:
-      dirs_to_materialize = (DirectoryToMaterialize(path=str(tmpdir), directory_digest=binary.digest),)
-      workspace.materialize_directories(dirs_to_materialize)
+  with temporary_dir(cleanup=True) as tmpdir:
+    dirs_to_materialize = (DirectoryToMaterialize(path=str(tmpdir), directory_digest=binary.digest),)
+    workspace.materialize_directories(dirs_to_materialize)
 
-      console.write_stdout(f"Running target: {target}\n")
-      full_path = str(Path(tmpdir, binary.command))
-      run_request = InteractiveProcessRequest(
-        argv=[full_path],
-        run_in_workspace=True,
-      )
+    console.write_stdout(f"Running target: {target}\n")
+    full_path = str(Path(tmpdir, binary.binary_name))
+    run_request = InteractiveProcessRequest(
+      argv=[full_path],
+      run_in_workspace=True,
+    )
 
-      try:
-        result = runner.run_local_interactive_process(run_request)
-        exit_codes.append(result.process_exit_code)
-        if result.process_exit_code == 0:
-          console.write_stdout(f"{target} ran successfully.\n")
-        else:
-          console.write_stderr(f"{target} failed with code {result.process_exit_code}!\n")
+    try:
+      result = runner.run_local_interactive_process(run_request)
+      exit_code = result.process_exit_code
+      if result.process_exit_code == 0:
+        console.write_stdout(f"{target} ran successfully.\n")
+      else:
+        console.write_stderr(f"{target} failed with code {result.process_exit_code}!\n")
 
-      except Exception as e:
-        console.write_stderr(f"Exception when attempting to run {target} : {e}\n")
+    except Exception as e:
+      console.write_stderr(f"Exception when attempting to run {target} : {e}\n")
+      exit_code = -1
 
-  overall_exit_code = 0 if all(code == 0 for code in exit_codes) else -1
-  yield Run(overall_exit_code)
+  yield Run(exit_code)
 
 
 def rules():

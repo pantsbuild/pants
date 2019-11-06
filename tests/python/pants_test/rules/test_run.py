@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.build_graph.address import Address, BuildFileAddress
+from pants.engine.addressable import BuildFileAddresses
 from pants.engine.fs import Digest, FileContent, InputFilesContent, Workspace
 from pants.engine.interactive_runner import InteractiveRunner
 from pants.rules.core import run
@@ -19,38 +20,45 @@ class RunTest(ConsoleRuleTestBase):
     ))
     digest, = self.scheduler.product_request(Digest, [input_files_content])
     return CreatedBinary(
-      command='program.py',
+      binary_name='program.py',
       digest=digest,
     )
 
-  def single_target_run(self, console: MockConsole, program_text: bytes, spec: str):
+  def single_target_run(self, *, console: MockConsole, program_text: bytes, spec: str):
     workspace = Workspace(self.scheduler)
     interactive_runner = InteractiveRunner(self.scheduler)
     address = Address.parse(spec)
     bfa =  BuildFileAddress(
       build_file=None,
       target_name=address.target_name,
-      rel_path='{}/BUILD'.format(address.spec_path),
+      rel_path=f'{address.spec_path}/BUILD'
     )
-    res = run_rule(run.run, console, workspace, interactive_runner, (bfa,), {
+    build_file_addresses = BuildFileAddresses((bfa,))
+    res = run_rule(run.run, console, workspace, interactive_runner, build_file_addresses, {
       (CreatedBinary, Address): lambda _: self.create_mock_binary(program_text)
     })
     return res
 
   def test_normal_run(self) -> None:
-    spec = "some/addr"
     console = MockConsole(use_colors=False)
     program_text = b'#!/usr/bin/python\nprint("hello")'
-    res = self.single_target_run(console, program_text, spec)
+    res = self.single_target_run(
+      console=console,
+      program_text=program_text,
+      spec='some/addr'
+    )
     self.assertEqual(res.exit_code, 0)
     self.assertEquals(console.stdout.getvalue(), "Running target: some/addr:addr\nsome/addr:addr ran successfully.\n")
     self.assertEquals(console.stderr.getvalue(), "")
 
   def test_failed_run(self) -> None:
-    spec = "some/addr"
     console = MockConsole(use_colors=False)
     program_text = b'#!/usr/bin/python\nraise RuntimeError("foo")'
-    res = self.single_target_run(console, program_text, spec)
-    self.assertEqual(res.exit_code, -1)
+    res = self.single_target_run(
+      console=console,
+      program_text=program_text,
+      spec='some/addr'
+    )
+    self.assertEqual(res.exit_code, 1)
     self.assertEquals(console.stdout.getvalue(), "Running target: some/addr:addr\n")
     self.assertEquals(console.stderr.getvalue(), "some/addr:addr failed with code 1!\n")

@@ -28,7 +28,7 @@ class BinaryTarget:
 @dataclass(frozen=True)
 class CreatedBinary:
   digest: Digest
-  command: str
+  binary_name: str
 
 
 @console_rule
