@@ -769,6 +769,7 @@ pub fn sends_headers() {
     store,
     Platform::Linux,
     runtime.clone(),
+    Duration::from_secs(0),
     Duration::from_millis(0),
     Duration::from_secs(0),
   )
@@ -932,6 +933,7 @@ fn ensure_inline_stdio_is_stored() {
     store,
     Platform::Linux,
     runtime.clone(),
+    Duration::from_secs(0),
     Duration::from_millis(0),
     Duration::from_secs(0),
   )
@@ -1027,8 +1029,10 @@ fn successful_execution_after_four_getoperations() {
 
 #[test]
 fn timeout_after_sufficiently_delayed_getoperations() {
-  let request_timeout = Duration::new(4, 0);
-  let delayed_operation_time = Duration::new(5, 0);
+  let request_timeout = Duration::new(1, 0);
+  // The request should timeout after 2 seconds, with 1 second due to the queue_buffer_time and
+  // 1 due to the request_timeout.
+  let delayed_operation_time = Duration::new(2, 500);
 
   let execute_request = ExecuteProcessRequest {
     argv: owned_string_vec(&["/bin/echo", "-n", "foo"]),
@@ -1464,6 +1468,7 @@ fn execute_missing_file_uploads_if_known() {
     store,
     Platform::Linux,
     runtime.clone(),
+    Duration::from_secs(0),
     Duration::from_millis(0),
     Duration::from_secs(0),
   )
@@ -1570,6 +1575,7 @@ fn execute_missing_file_uploads_if_known_status() {
     store,
     Platform::Linux,
     runtime.clone(),
+    Duration::from_secs(0),
     Duration::from_millis(0),
     Duration::from_secs(0),
   )
@@ -1649,6 +1655,7 @@ fn execute_missing_file_errors_if_unknown() {
     store,
     Platform::Linux,
     runtime.clone(),
+    Duration::from_secs(0),
     Duration::from_millis(0),
     Duration::from_secs(0),
   )
@@ -2462,6 +2469,7 @@ fn create_command_runner(
     store,
     Platform::Linux,
     runtime,
+    Duration::from_secs(1), // We use a low queue_buffer_time to ensure that tests do not take too long.
     backoff_incremental_wait,
     backoff_max_wait,
   )

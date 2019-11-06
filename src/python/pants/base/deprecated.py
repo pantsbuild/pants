@@ -135,7 +135,8 @@ def warn_or_error(
   stacklevel: int = 3,
   frame_info: Optional[inspect.FrameInfo] = None,
   context: int = 1,
-  ensure_stderr: bool = False
+  ensure_stderr: bool = False,
+  print_warning: bool = True,
 ) -> None:
   """Check the removal_version against the current pants version.
 
@@ -156,6 +157,9 @@ def warn_or_error(
                   in a warning message.
   :param ensure_stderr: Whether use warnings.warn, or use warnings.showwarning to print
                         directly to stderr.
+  :param print_warning: Whether to print a warning for deprecations *before* their removal.
+                        If this flag is off, an exception will still be raised for options
+                        past their deprecation date.
   :raises DeprecationApplicationError: if the removal_version parameter is invalid.
   :raises CodeRemovedError: if the current version is later than the version marked for removal.
   """
@@ -193,7 +197,7 @@ def warn_or_error(
       warning_msg = warnings.formatwarning(
         msg, DeprecationWarning, filename, line_number, line=context_lines)
       print(warning_msg, file=sys.stderr)
-    else:
+    elif print_warning:
       # This output is filtered by warning filters.
       with _greater_warnings_context(context_lines):
         warnings.warn_explicit(
