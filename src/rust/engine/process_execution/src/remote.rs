@@ -830,6 +830,7 @@ fn maybe_add_workunit(
       time_span,
       span_id: generate_random_64bit_string(),
       parent_id,
+      display_info: None,
     };
     workunit_store.add_workunit(workunit);
   }

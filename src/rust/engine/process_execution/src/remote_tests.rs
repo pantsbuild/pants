@@ -2219,6 +2219,7 @@ fn remote_workunits_are_stored() {
       },
       span_id: String::from("ignore"),
       parent_id: None,
+      display_info: None
     },
     WorkUnit {
       name: String::from("remote execution worker input fetching"),
@@ -2228,6 +2229,7 @@ fn remote_workunits_are_stored() {
       },
       span_id: String::from("ignore"),
       parent_id: None,
+      display_info: None,
     },
     WorkUnit {
       name: String::from("remote execution worker command executing"),
@@ -2237,6 +2239,7 @@ fn remote_workunits_are_stored() {
       },
       span_id: String::from("ignore"),
       parent_id: None,
+      display_info: None,
     },
     WorkUnit {
       name: String::from("remote execution worker output uploading"),
@@ -2246,6 +2249,7 @@ fn remote_workunits_are_stored() {
       },
       span_id: String::from("ignore"),
       parent_id: None,
+      display_info: None,
     }
   };
 

@@ -410,6 +410,10 @@ fn workunits_to_py_tuple_value<'a>(workunits: impl Iterator<Item = &'a WorkUnit>
         workunit_zipkin_trace_info.push(externs::store_utf8("parent_id"));
         workunit_zipkin_trace_info.push(externs::store_utf8(parent_id));
       }
+      if let Some(display_info) = &workunit.display_info {
+        workunit_zipkin_trace_info.push(externs::store_utf8("display_info"));
+        workunit_zipkin_trace_info.push(externs::store_utf8(display_info));
+      }
       externs::store_dict(&workunit_zipkin_trace_info)
     })
     .collect::<Vec<_>>();
@@ -548,6 +552,16 @@ pub extern "C" fn tasks_add_get(tasks_ptr: *mut Tasks, product: TypeId, subject:
 pub extern "C" fn tasks_add_select(tasks_ptr: *mut Tasks, product: TypeId) {
   with_tasks(tasks_ptr, |tasks| {
     tasks.add_select(product);
+  })
+}
+
+#[no_mangle]
+pub extern "C" fn tasks_add_display_info(tasks_ptr: *mut Tasks, name_ptr: *const raw::c_char) {
+  let name: String = unsafe { CStr::from_ptr(name_ptr) }
+    .to_string_lossy()
+    .into_owned();
+  with_tasks(tasks_ptr, |tasks| {
+    tasks.add_display_info(name);
   })
 }
 

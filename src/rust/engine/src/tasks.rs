@@ -93,6 +93,7 @@ pub struct Task {
   pub gets: Vec<Get>,
   pub func: Function,
   pub cacheable: bool,
+  pub display_info: Option<String>,
 }
 
 ///
@@ -188,6 +189,7 @@ impl Tasks {
       clause: Vec::new(),
       gets: Vec::new(),
       func: func,
+      display_info: None,
     });
   }
 
@@ -210,6 +212,14 @@ impl Tasks {
       .expect("Must `begin()` a task creation before adding clauses!")
       .clause
       .push(Select::new(product));
+  }
+
+  pub fn add_display_info(&mut self, display_info: String) {
+    let mut task = self
+      .preparing
+      .as_mut()
+      .expect("Must `begin()` a task creation before adding display info!");
+    task.display_info = Some(display_info);
   }
 
   pub fn task_end(&mut self) {

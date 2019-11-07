@@ -932,6 +932,10 @@ pub struct Task {
 }
 
 impl Task {
+  fn get_display_info(&self) -> Option<&String> {
+    self.task.display_info.as_ref()
+  }
+
   fn gen_get(
     context: &Context,
     params: &Params,
@@ -1213,7 +1217,11 @@ impl Node for NodeKey {
     let node_workunit_params = if handle_workunits {
       let node_name = format!("{}", self);
       let start_time = std::time::SystemTime::now();
-      Some((node_name, start_time, span_id.clone()))
+      let display_info: Option<String> = match self {
+        NodeKey::Task(ref task) => task.get_display_info().map(|s| s.to_owned()),
+        _ => None,
+      };
+      Some((node_name, start_time, span_id.clone(), display_info))
     } else {
       None
     };
@@ -1232,13 +1240,14 @@ impl Node for NodeKey {
       }
     })
     .inspect(move |_: &NodeResult| {
-      if let Some((node_name, start_time, span_id)) = node_workunit_params {
+      if let Some((node_name, start_time, span_id, display_info)) = node_workunit_params {
         let workunit = WorkUnit {
           name: node_name,
           time_span: TimeSpan::since(&start_time),
           span_id,
           // TODO: set parent_id with the proper value, issue #7969
           parent_id: None,
+          display_info,
         };
         context2.session.workunit_store().add_workunit(workunit)
       };
