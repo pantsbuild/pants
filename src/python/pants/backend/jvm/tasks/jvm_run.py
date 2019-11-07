@@ -88,15 +88,15 @@ class JvmRun(JvmTask):
     # python_binary, in which case we have to no-op and let python_run do its thing.
     # TODO(benjy): Some more elegant way to coordinate how tasks claim targets.
     if isinstance(binary, JvmBinary):
-      jvm = JvmPlatform.preferred_jvm_distribution([target.platform])
+      jvm = JvmPlatform.preferred_jvm_distribution([binary.platform])
       executor = CommandLineGrabber(jvm) if self.only_write_cmd_line else None
       self.context.release_lock()
       with self.context.new_workunit(name='run', labels=[WorkUnitLabel.RUN]):
         result = jvm.execute_java(
-          classpath=self.classpath([target]),
+          classpath=self.classpath([binary]),
           main=self.get_options().main or binary.main,
           executor=executor,
-          jvm_options=self.jvm_options + list(target.platform.args) + extra_jvm_options,
+          jvm_options=self.jvm_options + list(binary.platform.args) + extra_jvm_options,
           args=self.args,
           cwd=working_dir,
           synthetic_jar_dir=self.workdir,
