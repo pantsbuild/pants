@@ -8,4 +8,5 @@ python_library(
     '3rdparty/python:pyopenssl',
     'src/python/pants/util:dirutil',
   ],
+  tags = {"partially_type_checked"},
 )
