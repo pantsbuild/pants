@@ -129,6 +129,7 @@ class TestResolveRequirements(TestBase):
 
   def test_interpreter_constraints(self) -> None:
     constraints = PexInterpreterConstraints(
-        constraint_set=frozenset(sorted({"CPython>=2.7,<3", "CPython>=3.6,<4"})))
+        constraint_set=("CPython>=2.7,<3", "CPython>=3.6,<4")
+    )
     pex_info = self.create_pex_and_get_pex_info(interpreter_constraints=constraints)
     self.assertEqual(frozenset(pex_info["interpreter_constraints"]), constraints.constraint_set)
