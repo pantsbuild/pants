@@ -17,6 +17,7 @@ from pants.engine.rules import (
   MissingReturnTypeAnnotation,
   RootRule,
   RuleIndex,
+  UnrecognizedRuleArgument,
   _RuleVisitor,
   console_rule,
   rule,
@@ -104,6 +105,28 @@ class RuleIndexTest(TestBase):
       "'pants_test.engine.test_rules.A'>. Rules either extend Rule or UnionRule, or "
       "are static functions decorated with @rule."""):
       RuleIndex.create([A()])
+
+
+class RuleArgumentAnnotationTest(unittest.TestCase):
+  def test_name_kwarg(self):
+    @rule(name='A named rule')
+    def named_rule(a: int, b: str) -> bool:
+      return False
+    self.assertIsNotNone(named_rule.rule)
+    self.assertEqual(named_rule.rule.name, "A named rule")
+
+  def test_bogus_rule(self):
+    with self.assertRaises(UnrecognizedRuleArgument):
+      @rule(bogus_kwarg='TOTALLY BOGUS!!!!!!')
+      def named_rule(a: int, b: str) -> bool:
+        return False
+
+  def test_console_rule_automatically_gets_name_from_goal(self):
+    @console_rule
+    def some_console_rule(console: Console) -> Example:
+      yield Example(exit_code=0)
+
+    self.assertEqual(some_console_rule.rule.name, "example")
 
 
 class RuleTypeAnnotationTest(unittest.TestCase):
