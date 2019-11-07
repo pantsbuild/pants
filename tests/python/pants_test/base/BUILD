@@ -202,19 +202,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'exception_sink_integration',
-  sources = ['test_exception_sink_integration.py'],
-  dependencies = [
-    'src/python/pants/base:exception_sink',
-    'src/python/pants/util:osutil',
-    'src/python/pants/testutil:int-test',
-    'testprojects/src/python:coordinated_runs_directory',
-    'testprojects:pants_plugins_directory',
-  ],
-  tags = {'platform_specific_behavior', 'integration'},
-)
-
-python_tests(
   name = 'exiter_integration',
   sources = [ 'test_exiter_integration.py' ],
   dependencies = [

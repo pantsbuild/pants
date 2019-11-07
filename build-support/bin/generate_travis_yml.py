@@ -756,6 +756,14 @@ class NoAliasDumper(yaml.SafeDumper):
 
 
 def main() -> None:
+  es_shard = {
+    **osx_shard(),
+    **CACHE_NATIVE_ENGINE,
+    "name": "Test ES",
+    "stage": Stage.bootstrap.value,
+    "script": ["./build-support/bin/ci.py --bootstrap", "./untilfail.py ./pants.pex --cache-ignore test test tests/python/pants_test/base/es:"]
+  }
+  es_shard["env"].append("CACHE_NAME=test_es")
   generated_yaml = yaml.dump({
     # Conditions are documented here: https://docs.travis-ci.com/user/conditions-v1
     "conditions": "v1",
@@ -763,35 +771,36 @@ def main() -> None:
     "stages": Stage.all_entries(),
     "deploy": DEPLOY_SETTINGS,
     "matrix": {"include": [
-      *[bootstrap_linux(v) for v in PythonVersion],
-      *[bootstrap_osx(v) for v in PythonVersion],
-      {**bootstrap_linux(PythonVersion.py36), "stage": Stage.bootstrap_cron.value},
-      {**bootstrap_osx(PythonVersion.py36), "stage": Stage.bootstrap_cron.value},
-      # NB: We move both the unit test and V2 integration test shards up here to ensure that
-      # they are shards #5 and #6. Per the token generator design
-      # https://docs.google.com/document/d/1gL3D1f-AzL_LzRxWLskCpVQ2ZlB_26GTETgXkXsrpDY/edit#heading=h.akhkfdtqfpw,
-      # the RBE token server will only give tokens to job numbers #5 and #6, so we must do this
-      # for the cron jobs to work with remoting.
-      unit_tests(PythonVersion.py37),
-      integration_tests_v2(PythonVersion.py37),
-      *[lint(v) for v in PythonVersion],
-      clippy(),
-      cargo_audit(),
-      unit_tests(PythonVersion.py36),
-      integration_tests_v2(PythonVersion.py36),
-      build_wheels_linux(),
-      build_wheels_osx(),
-      *integration_tests_v1(PythonVersion.py36),
-      *integration_tests_v1(PythonVersion.py36, use_pantsd=True),
-      *integration_tests_v1(PythonVersion.py37),
-      rust_tests_linux(),
-      rust_tests_osx(),
-      *[osx_platform_tests(v) for v in PythonVersion],
-      *[osx_10_12_sanity_check(v) for v in PythonVersion],
-      *[osx_10_13_sanity_check(v) for v in PythonVersion],
-      *[jvm_tests(v) for v in PythonVersion],
-      deploy_stable(),
-      deploy_unstable(),
+      # *[bootstrap_linux(v) for v in PythonVersion],
+      # *[bootstrap_osx(v) for v in PythonVersion],
+      # {**bootstrap_linux(PythonVersion.py36), "stage": Stage.bootstrap_cron.value},
+      # {**bootstrap_osx(PythonVersion.py36), "stage": Stage.bootstrap_cron.value},
+      # # NB: We move both the unit test and V2 integration test shards up here to ensure that
+      # # they are shards #5 and #6. Per the token generator design
+      # # https://docs.google.com/document/d/1gL3D1f-AzL_LzRxWLskCpVQ2ZlB_26GTETgXkXsrpDY/edit#heading=h.akhkfdtqfpw,
+      # # the RBE token server will only give tokens to job numbers #5 and #6, so we must do this
+      # # for the cron jobs to work with remoting.
+      # unit_tests(PythonVersion.py37),
+      # integration_tests_v2(PythonVersion.py37),
+      # *[lint(v) for v in PythonVersion],
+      # clippy(),
+      # cargo_audit(),
+      # unit_tests(PythonVersion.py36),
+      # integration_tests_v2(PythonVersion.py36),
+      # build_wheels_linux(),
+      # build_wheels_osx(),
+      # *integration_tests_v1(PythonVersion.py36),
+      # *integration_tests_v1(PythonVersion.py36, use_pantsd=True),
+      # *integration_tests_v1(PythonVersion.py37),
+      # rust_tests_linux(),
+      # rust_tests_osx(),
+      # *[osx_platform_tests(v) for v in PythonVersion],
+      # *[osx_10_12_sanity_check(v) for v in PythonVersion],
+      # *[osx_10_13_sanity_check(v) for v in PythonVersion],
+      # *[jvm_tests(v) for v in PythonVersion],
+      # deploy_stable(),
+      # deploy_unstable(),
+      es_shard,
     ]},
   }, Dumper=NoAliasDumper)
   print(f"{HEADER}\n\n{generated_yaml}")
