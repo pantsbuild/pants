@@ -212,7 +212,6 @@ python_tests(
     'testprojects:pants_plugins_directory',
   ],
   tags = {'platform_specific_behavior', 'integration'},
-  timeout = 540,
 )
 
 python_tests(
