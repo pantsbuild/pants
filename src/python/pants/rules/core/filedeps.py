@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pathlib import Path
+from typing import Set
 
 from pants.base.build_root import BuildRoot
 from pants.engine.console import Console
@@ -43,16 +44,19 @@ def file_deps(
   absolute = filedeps_options.values.absolute
   globs = filedeps_options.values.globs
 
-  unique_rel_paths = set()
+  unique_rel_paths: Set[str] = set()
 
   for hydrated_target in transitive_hydrated_targets.closure:
+    adaptor = hydrated_target.adaptor
     if hydrated_target.address.rel_path:
       unique_rel_paths.add(hydrated_target.address.rel_path)
-    if hasattr(hydrated_target.adaptor, "sources"):
-      target_sources = hydrated_target.adaptor.sources
-      unique_rel_paths.update(
-        target_sources.snapshot.files if not globs else target_sources.filespec["globs"]
+    if hasattr(adaptor, "sources"):
+      sources_paths = (
+        adaptor.sources.snapshot.files
+        if not globs
+        else adaptor.sources.filespec["globs"]
       )
+      unique_rel_paths.update(sources_paths)
 
   with Filedeps.line_oriented(filedeps_options, console) as print_stdout:
     for rel_path in sorted(unique_rel_paths):

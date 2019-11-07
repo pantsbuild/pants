@@ -6,6 +6,8 @@ python_tests(
   name='filedeps',
   source='test_filedeps.py',
   dependencies=[
+    'src/python/pants/backend/codegen/thrift/java',
+    'src/python/pants/backend/jvm/targets:all',
     'src/python/pants/backend/python/targets',
     'src/python/pants/build_graph',
     'src/python/pants/rules/core',

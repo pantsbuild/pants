@@ -2,9 +2,16 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from typing import List, Optional, Set
+from unittest import skip
 
+from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
+from pants.backend.jvm.targets.java_library import JavaLibrary
+from pants.backend.jvm.targets.jvm_app import JvmApp
+from pants.backend.jvm.targets.jvm_binary import JvmBinary
+from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.rules.core import filedeps
 from pants_test.console_rule_test_base import ConsoleRuleTestBase
@@ -23,6 +30,12 @@ class FileDepsTest(ConsoleRuleTestBase):
     return BuildFileAliases(
       targets={
         'target': Target,
+        'resources': Resources,
+        'java_library': JavaLibrary,
+        'java_thrift_library': JavaThriftLibrary,
+        'jvm_app': JvmApp,
+        'jvm_binary': JvmBinary,
+        'scala_library': ScalaLibrary,
         'python_library': PythonLibrary,
       },
     )
@@ -41,8 +54,11 @@ class FileDepsTest(ConsoleRuleTestBase):
       dependencies=dependencies or []
     )
 
-  def assert_filedeps(self, *, targets: List[str], expected: Set[str]):
-    self.assert_console_output(*expected, args=["--no-filedeps-absolute"] + targets)
+  def assert_filedeps(self, *, targets: List[str], expected: Set[str], globs: bool = False) -> None:
+    args = ["--no-filedeps-absolute"]
+    if globs:
+      args.append("--filedeps-globs")
+    self.assert_console_output(*expected, args=args + targets)
 
   def test_no_target(self) -> None:
     self.assert_filedeps(targets=[], expected=set())
@@ -127,6 +143,115 @@ class FileDepsTest(ConsoleRuleTestBase):
       }
     )
 
-  def test_build_with_file_ext(self):
+  def test_globs(self) -> None:
+    self.create_files("some/target", ["test1.py", "test2.py"])
+    self.add_to_build_file(
+      "some/target", target="target(name='target', sources=globs('test*.py'))"
+    )
+    self.assert_filedeps(
+      targets=["some/target"],
+      expected={"some/target/BUILD", "some/target/test*.py"},
+      globs=True
+    )
+
+  def test_build_with_file_ext(self) -> None:
     self.create_file("some/target/BUILD.ext", contents="target()")
     self.assert_filedeps(targets=["some/target"], expected={"some/target/BUILD.ext"})
+
+  def test_resources(self) -> None:
+    self.create_resources("src/resources", "data", "data.json")
+    self.assert_filedeps(
+      targets=["src/resources:data"], expected={"src/resources/BUILD", "src/resources/data.json"}
+    )
+
+  @skip("V2 does not yet hydrate java_sources for scala_library targets. Once this happens, "
+        "we must teach filedeps.py to check the target_adaptor for java_sources.")
+  def test_scala_with_java_sources(self) -> None:
+    self.create_file("src/java/j.java")
+    self.create_file("src/scala/s.scala")
+    self.add_to_build_file(
+      "src/java", target="java_library(sources=['j.java'], dependencies=['src/scala'])"
+    )
+    self.add_to_build_file(
+      "src/scala", target="scala_library(sources=['s.scala'], java_sources=['src/java'])"
+    )
+    expected = {"src/java/BUILD", "src/java/j.java", "src/scala/BUILD", "src/scala/s.scala"}
+    self.assert_filedeps(targets=["src/java"], expected=expected)
+    self.assert_filedeps(targets=["src/scala"], expected=expected)
+
+  def test_filter_out_synthetic_targets(self) -> None:
+    self.create_library(
+      path="src/thrift/storage",
+      target_type="java_thrift_library",
+      name="storage",
+      sources=["data_types.thrift"],
+    )
+    java_lib = self.create_library(
+      path="src/java/lib",
+      target_type="java_library",
+      name="lib",
+      sources=["lib1.java"],
+      dependencies=["src/thrift/storage"],
+    )
+    self.create_file('.pants.d/gen/thrift/java/storage/Angle.java')
+    synthetic_java_lib = self.make_target(
+      spec='.pants.d/gen/thrift/java/storage',
+      target_type=JavaLibrary,
+      derived_from=self.target('src/thrift/storage'),
+      sources=['Angle.java']
+    )
+    java_lib.inject_dependency(synthetic_java_lib.address)
+    self.assert_filedeps(
+      targets=["src/java/lib"],
+      expected={
+        "src/java/lib/BUILD",
+        "src/java/lib/lib1.java",
+        "src/thrift/storage/BUILD",
+        "src/thrift/storage/data_types.thrift",
+      }
+    )
+
+  @skip("V2 does not yet hydrate bundles or binary attributes for jvm_app. After this is added,"
+        "we must add similar logic to the V1 filedeps goal for jvm_apps.")
+  def test_jvm_app(self) -> None:
+    self.create_library(
+      path="src/thrift/storage",
+      target_type="java_thrift_library",
+      name="storage",
+      sources=["data_types.thrift"],
+    )
+    self.create_library(
+      path="src/java/lib",
+      target_type="java_library",
+      name="lib",
+      sources=["lib1.java"],
+      dependencies=["src/thrift/storage"],
+    )
+    self.create_library(
+      path="src/java/bin",
+      target_type="jvm_binary",
+      name="bin",
+      sources=["main.java"],
+      main="bin.Main",
+      dependencies=["src/java/lib"]
+    )
+    self.create_file("project/config/app.yaml")
+    self.create_library(
+      path="project",
+      target_type="jvm_app",
+      name="app",
+      binary="src/java/bin",
+      bundles=["bundle(fileset=['config/app.yaml'])"]
+    )
+    self.assert_filedeps(
+      targets=["project:app"],
+      expected={
+        "project/BUILD",
+        "project/config/app.yaml",
+        "src/java/bin/BUILD",
+        "src/java/bin/main.java",
+        "src/java/lib/BUILD",
+        "src/java/lib/lib1.java",
+        "src/thrift/storage/BUILD"
+        "src/thrift/storage/data_types.thrift"
+      })
