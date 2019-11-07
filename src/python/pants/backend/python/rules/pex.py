@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import FrozenSet, Iterable, List, Optional, Tuple
+from typing import Iterable, List, Optional, Tuple
 
 from pants.backend.python.rules.download_pex_bin import DownloadedPexBin
 from pants.backend.python.rules.hermetic_pex import HermeticPex
@@ -24,10 +24,12 @@ from pants.engine.selectors import Get
 
 @dataclass(frozen=True)
 class PexRequirements:
-  requirements: FrozenSet[str] = frozenset()
+  requirements: Tuple[str, ...] = ()
 
   @classmethod
-  def create_from_adaptors(cls, adaptors: Tuple[TargetAdaptor, ...], additional_requirements: Iterable[str] = ()) -> 'PexRequirements':
+  def create_from_adaptors(
+    cls, adaptors: Iterable[TargetAdaptor], additional_requirements: Iterable[str] = ()
+  ) -> 'PexRequirements':
     all_target_requirements = set()
     for maybe_python_req_lib in adaptors:
       # This is a python_requirement()-like target.
@@ -38,12 +40,12 @@ class PexRequirements:
         for py_req in maybe_python_req_lib.requirements:
           all_target_requirements.add(str(py_req.requirement))
     all_target_requirements.update(additional_requirements)
-    return PexRequirements(requirements=frozenset(all_target_requirements))
+    return PexRequirements(requirements=tuple(sorted(all_target_requirements)))
 
 
 @dataclass(frozen=True)
 class PexInterpreterConstraints:
-  constraint_set: FrozenSet[str] = frozenset()
+  constraint_set: Tuple[str, ...] = ()
 
   def generate_pex_arg_list(self) -> List[str]:
     args = []
@@ -52,15 +54,15 @@ class PexInterpreterConstraints:
     return args
 
   @classmethod
-  def create_from_adaptors(cls, adaptors: Tuple[PythonTargetAdaptor, ...], python_setup: PythonSetup) -> 'PexInterpreterConstraints':
-    interpreter_constraints = frozenset(
+  def create_from_adaptors(cls, adaptors: Iterable[PythonTargetAdaptor], python_setup: PythonSetup) -> 'PexInterpreterConstraints':
+    interpreter_constraints = {
       constraint
       for target_adaptor in adaptors
       for constraint in python_setup.compatibility_or_constraints(
         getattr(target_adaptor, 'compatibility', None)
       )
-    )
-    return PexInterpreterConstraints(constraint_set=interpreter_constraints)
+    }
+    return PexInterpreterConstraints(constraint_set=tuple(sorted(interpreter_constraints)))
 
 
 @dataclass(frozen=True)
@@ -126,7 +128,7 @@ def create_pex(
           pex_build_environment=pex_build_environment,
           pex_args=argv,
           input_files=merged_digest,
-          description=f"Create a requirements PEX: {', '.join(sorted(request.requirements.requirements))}",
+          description=f"Create a requirements PEX: {', '.join(request.requirements.requirements)}",
           output_files=(request.output_filename,)
         )
     }
