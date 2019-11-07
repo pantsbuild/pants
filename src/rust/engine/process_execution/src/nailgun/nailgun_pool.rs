@@ -106,7 +106,6 @@ impl NailgunPool {
     input_files: Digest,
     workunit_store: WorkUnitStore,
   ) -> BoxFuture<Port, String> {
-
     let processes = self.processes.clone();
 
     let jdk_path = try_future!(startup_options.jdk_home.clone().ok_or_else(|| {
@@ -115,8 +114,10 @@ impl NailgunPool {
         &startup_options
       )
     }));
-    let requested_server_fingerprint =
-        try_future!(NailgunProcessFingerprint::new(nailgun_req_digest, jdk_path.clone()));
+    let requested_server_fingerprint = try_future!(NailgunProcessFingerprint::new(
+      nailgun_req_digest,
+      jdk_path.clone()
+    ));
 
     Self::materialize_workdir_for_server(
       store, workdir_path.clone(), jdk_path, input_files, workunit_store

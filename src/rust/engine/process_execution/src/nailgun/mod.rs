@@ -267,8 +267,8 @@ impl CapturedWorkdir for CommandRunner {
             nailgun_req_digest,
             build_id,
             store,
-            req.input_files.clone(),
-            workunit_store
+            req.input_files,
+            workunit_store,
           )
         }))
       })
