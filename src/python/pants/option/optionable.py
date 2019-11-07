@@ -4,6 +4,7 @@
 import functools
 import re
 from abc import ABC, ABCMeta, abstractmethod
+from typing import Optional
 
 from pants.engine.selectors import Get
 from pants.option.errors import OptionsError
@@ -56,8 +57,8 @@ class Optionable(OptionableFactory, metaclass=ABCMeta):
   """A mixin for classes that can register options on some scope."""
 
   # Subclasses must override.
-  options_scope = None
-  options_scope_category = None
+  options_scope: Optional[str] = None
+  options_scope_category: Optional[str] = None
 
   # Subclasses may override these to specify a deprecated former name for this Optionable's scope.
   # Option values can be read from the deprecated scope, but a deprecation warning will be issued.
@@ -146,4 +147,4 @@ class Optionable(OptionableFactory, metaclass=ABCMeta):
     # subclass anyway.
     cls = type(self)
     if not isinstance(cls.options_scope, str):
-      raise NotImplementedError('{} must set an options_scope class-level property.'.format(cls))
+      raise NotImplementedError(f'{cls} must set an options_scope class-level property.')

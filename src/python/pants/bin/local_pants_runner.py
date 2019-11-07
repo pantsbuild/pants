@@ -18,6 +18,7 @@ from pants.init.logging import setup_logging_from_options
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
 from pants.init.repro import Reproducer
 from pants.init.target_roots_calculator import TargetRootsCalculator
+from pants.option.arg_splitter import UnknownGoalHelp
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.reporting.reporting import Reporting
 from pants.util.contextutil import maybe_profiled
@@ -127,7 +128,6 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
              options_bootstrapper=None):
     """Creates a new LocalPantsRunner instance by parsing options.
 
-    :param Exiter exiter: The Exiter instance to use for this run.
     :param list args: The arguments (e.g. sys.argv) for this run.
     :param dict env: The environment (e.g. os.environ) for this run.
     :param TargetRoots target_roots: The target roots for this run.
@@ -248,7 +248,13 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
 
   def _maybe_run_v1(self):
     v1_goals, ambiguous_goals, _ = self._options.goals_by_version
-    if not v1_goals and (not ambiguous_goals or not self._global_options.v1):
+    if not self._global_options.v1:
+      if v1_goals:
+        HelpPrinter(self._options, UnknownGoalHelp(v1_goals)).print_help()
+        return PANTS_FAILED_EXIT_CODE
+      return PANTS_SUCCEEDED_EXIT_CODE
+
+    if not v1_goals and not ambiguous_goals:
       return PANTS_SUCCEEDED_EXIT_CODE
 
     # Setup and run GoalRunner.
@@ -302,6 +308,8 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
       self._run_tracker.report.bulk_record_workunits(engine_workunits)
 
   def _run(self):
+    engine_result = PANTS_FAILED_EXIT_CODE
+    goal_runner_result = PANTS_FAILED_EXIT_CODE
     try:
       self._maybe_handle_help()
 

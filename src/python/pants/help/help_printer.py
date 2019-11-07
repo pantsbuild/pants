@@ -20,16 +20,13 @@ from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 class HelpPrinter:
   """Prints help to the console."""
 
-  def __init__(self, options):
+  def __init__(self, options, help_request=None):
     self._options = options
+    self._help_request = help_request or self._options.help_request
 
   @property
   def bin_name(self):
     return self._options.for_global_scope().pants_bin_name
-
-  @property
-  def _help_request(self):
-    return self._options.help_request
 
   def print_help(self):
     """Print help to the console.
@@ -57,15 +54,17 @@ class HelpPrinter:
 
   def _print_goals_help(self):
     print(f'\nUse `{self.bin_name} help $goal` to get help for a particular goal.\n')
+    global_options = self._options.for_global_scope()
     goal_descriptions = {}
-    for scope_info in self._options.known_scope_to_info.values():
-      if scope_info.category not in (ScopeInfo.GOAL, ScopeInfo.GOAL_V1):
-        continue
-      description = scope_info.description or "<no description>"
-      goal_descriptions[scope_info.scope] = description
-    goal_descriptions.update({goal.name: goal.description_first_line
-                              for goal in Goal.all()
-                              if goal.description})
+    if global_options.v2:
+      for scope_info in self._options.known_scope_to_info.values():
+        if scope_info.category == ScopeInfo.GOAL:
+          description = scope_info.description or "<no description>"
+          goal_descriptions[scope_info.scope] = description
+    if global_options.v1:
+      goal_descriptions.update({goal.name: goal.description_first_line
+                                for goal in Goal.all()
+                                if goal.description})
 
     max_width = max(len(name) for name in goal_descriptions.keys())
     for name, description in sorted(goal_descriptions.items()):

@@ -7,4 +7,5 @@ python_library(
     '3rdparty/python:dataclasses',
     'src/python/pants/option',
   ],
+  tags = {'partially_type_checked'},
 )
