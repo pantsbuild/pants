@@ -7,6 +7,7 @@ target(
     ':dependencies',
     ':depmap',
     ':export',
+    ':filedeps',
     ':idea_plugin_gen',
   ],
 )
@@ -56,6 +57,18 @@ python_library(
     'src/python/pants/java:executor',
     'src/python/pants/task',
     'src/python/pants/util:memo',
+  ],
+)
+
+python_library(
+  name = 'filedeps',
+  sources = ['filedeps.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/targets:scala',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/build_graph',
+    'src/python/pants/task',
   ],
 )
 

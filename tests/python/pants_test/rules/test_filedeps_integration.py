@@ -11,7 +11,7 @@ class FiledepsIntegrationTest(PantsRunIntegrationTest):
   def assert_filedeps(
     self, *, filedeps_options: Optional[List[str]] = None, expected_entries: List[str]
   ) -> None:
-    args = ['filedeps', '--no-absolute'] + (filedeps_options or []) + [
+    args = ['fast-filedeps', '--no-absolute'] + (filedeps_options or []) + [
       'examples/src/scala/org/pantsbuild/example/hello/exe:exe',
       'examples/src/scala/org/pantsbuild/example/hello/welcome:welcome'
     ]

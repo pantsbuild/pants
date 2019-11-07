@@ -18,7 +18,7 @@ class Filedeps(LineOriented, Goal):
   closure of targets are also included.
   """
 
-  name = 'filedeps'
+  name = 'fast-filedeps'
 
   @classmethod
   def register_options(cls, register):

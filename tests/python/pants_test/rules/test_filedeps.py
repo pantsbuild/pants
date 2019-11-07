@@ -55,9 +55,9 @@ class FileDepsTest(ConsoleRuleTestBase):
     )
 
   def assert_filedeps(self, *, targets: List[str], expected: Set[str], globs: bool = False) -> None:
-    args = ["--no-filedeps-absolute"]
+    args = ["--no-fast-filedeps-absolute"]
     if globs:
-      args.append("--filedeps-globs")
+      args.append("--fast-filedeps-globs")
     self.assert_console_output(*expected, args=args + targets)
 
   def test_no_target(self) -> None:

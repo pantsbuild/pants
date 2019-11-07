@@ -95,6 +95,20 @@ python_tests(
 )
 
 python_tests(
+  name = 'filedeps',
+  sources = ['test_filedeps.py'],
+  dependencies = [
+    'src/python/pants/backend/codegen:plugin',
+    'src/python/pants/backend/jvm:plugin',
+    'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/backend/project_info/tasks:filedeps',
+    'src/python/pants/build_graph',
+    'tests/python/pants_test:test_base',
+    'tests/python/pants_test:task_test_base',
+  ],
+)
+
+python_tests(
   name = 'idea_plugin',
   sources = ['test_idea_plugin.py'],
   dependencies = [
