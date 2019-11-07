@@ -68,9 +68,9 @@ def list_targets(console: Console, list_options: List.Options, specs: Specs) -> 
     collection = yield Get(BuildFileAddresses, Specs, specs)
     print_fn = lambda address: address.spec
 
-  with List.line_oriented(list_options, console) as (print_stdout, print_stderr):
+  with List.line_oriented(list_options, console) as print_stdout:
     if not collection.dependencies:
-      print_stderr('WARNING: No targets were matched in goal `{}`.'.format('list'))
+      console.print_stderr('WARNING: No targets were matched in goal `{}`.'.format('list'))
 
     for item in collection:
       result = print_fn(item)

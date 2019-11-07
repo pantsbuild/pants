@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import FrozenSet, List, Optional, Tuple
+from typing import FrozenSet, Iterable, List, Optional, Tuple
 
 from pants.backend.python.rules.download_pex_bin import DownloadedPexBin
 from pants.backend.python.rules.hermetic_pex import HermeticPex
@@ -24,36 +24,35 @@ from pants.engine.selectors import Get
 
 @dataclass(frozen=True)
 class PexRequirements:
-  requirements: Tuple[str, ...] = ()
+  requirements: FrozenSet[str] = frozenset()
 
   @classmethod
-  def create_from_adaptors(cls, adaptors: Tuple[TargetAdaptor, ...], additional_requirements: Tuple[str, ...] = ()) -> 'PexRequirements':
-    all_target_requirements = []
+  def create_from_adaptors(cls, adaptors: Tuple[TargetAdaptor, ...], additional_requirements: Iterable[str] = ()) -> 'PexRequirements':
+    all_target_requirements = set()
     for maybe_python_req_lib in adaptors:
       # This is a python_requirement()-like target.
       if hasattr(maybe_python_req_lib, 'requirement'):
-        all_target_requirements.append(str(maybe_python_req_lib.requirement))
+        all_target_requirements.add(str(maybe_python_req_lib.requirement))
       # This is a python_requirement_library()-like target.
       if hasattr(maybe_python_req_lib, 'requirements'):
         for py_req in maybe_python_req_lib.requirements:
-          all_target_requirements.append(str(py_req.requirement))
-
-      all_target_requirements.extend(additional_requirements)
-    return PexRequirements(requirements=tuple(sorted(all_target_requirements)))
+          all_target_requirements.add(str(py_req.requirement))
+    all_target_requirements.update(additional_requirements)
+    return PexRequirements(requirements=frozenset(all_target_requirements))
 
 
 @dataclass(frozen=True)
-class PexInterpreterContraints:
+class PexInterpreterConstraints:
   constraint_set: FrozenSet[str] = frozenset()
 
   def generate_pex_arg_list(self) -> List[str]:
     args = []
-    for constraint in self.constraint_set:
+    for constraint in sorted(self.constraint_set):
       args.extend(["--interpreter-constraint", constraint])
     return args
 
   @classmethod
-  def create_from_adaptors(cls, adaptors: Tuple[PythonTargetAdaptor, ...], python_setup: PythonSetup) -> 'PexInterpreterContraints':
+  def create_from_adaptors(cls, adaptors: Tuple[PythonTargetAdaptor, ...], python_setup: PythonSetup) -> 'PexInterpreterConstraints':
     interpreter_constraints = frozenset(
       constraint
       for target_adaptor in adaptors
@@ -61,7 +60,7 @@ class PexInterpreterContraints:
         getattr(target_adaptor, 'compatibility', None)
       )
     )
-    return PexInterpreterContraints(constraint_set=interpreter_constraints)
+    return PexInterpreterConstraints(constraint_set=interpreter_constraints)
 
 
 @dataclass(frozen=True)
@@ -69,7 +68,7 @@ class CreatePex:
   """Represents a generic request to create a PEX from its inputs."""
   output_filename: str
   requirements: PexRequirements = PexRequirements()
-  interpreter_constraints: PexInterpreterContraints = PexInterpreterContraints()
+  interpreter_constraints: PexInterpreterConstraints = PexInterpreterConstraints()
   entry_point: Optional[str] = None
   input_files_digest: Optional[Digest] = None
 
@@ -127,7 +126,7 @@ def create_pex(
           pex_build_environment=pex_build_environment,
           pex_args=argv,
           input_files=merged_digest,
-          description=f"Create a requirements PEX: {', '.join(request.requirements.requirements)}",
+          description=f"Create a requirements PEX: {', '.join(sorted(request.requirements.requirements))}",
           output_files=(request.output_filename,)
         )
     }

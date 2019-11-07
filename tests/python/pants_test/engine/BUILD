@@ -5,17 +5,7 @@ python_library(
   name = 'util',
   sources = ['util.py'],
   dependencies = [
-    '3rdparty/python:ansicolors',
-    'src/python/pants/binaries',
-    'src/python/pants/engine:addressable',
-    'src/python/pants/engine:native',
-    'src/python/pants/engine:parser',
-    'src/python/pants/engine:rules',
-    'src/python/pants/engine:scheduler',
-    'src/python/pants/engine:struct',
-    'src/python/pants/util:objects',
-    'tests/python/pants_test/option/util',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil/engine:util',
   ],
 )
 
@@ -23,9 +13,7 @@ python_library(
   name = 'engine_test_base',
   sources = ['base_engine_test.py'],
   dependencies = [
-    'src/python/pants/goal',
-    'src/python/pants/goal:task_registrar',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil/engine:engine_test_base',
   ]
 )
 
@@ -228,6 +216,5 @@ python_tests(
   sources=['test_objects.py'],
   dependencies=[
     'src/python/pants/engine:objects',
-    'tests/python/pants_test:test_base',
   ],
 )

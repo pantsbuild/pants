@@ -8,12 +8,7 @@ from collections import namedtuple
 
 from twitter.common.collections import OrderedSet
 
-from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
-
-
-# TODO: Switch all clients to reference pants.option.scope directly.
-GLOBAL_SCOPE = GLOBAL_SCOPE
-GLOBAL_SCOPE_CONFIG_SECTION = GLOBAL_SCOPE_CONFIG_SECTION
+from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 
 
 class ArgSplitterError(Exception):

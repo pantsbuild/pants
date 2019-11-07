@@ -409,17 +409,7 @@ impl MultiPlatformExecuteProcess {
     value: &Value,
     target_platform: Platform,
   ) -> Result<ExecuteProcessRequest, String> {
-    let mut env: BTreeMap<String, String> = BTreeMap::new();
-    let env_var_parts = externs::project_multi_strs(&value, "env");
-    if env_var_parts.len() % 2 != 0 {
-      return Err("Error parsing env: odd number of parts".to_owned());
-    }
-    for i in 0..(env_var_parts.len() / 2) {
-      env.insert(
-        env_var_parts[2 * i].clone(),
-        env_var_parts[2 * i + 1].clone(),
-      );
-    }
+    let env = externs::project_tuple_encoded_map(&value, "env")?;
     let digest = lift_digest(&externs::project_ignoring_type(&value, "input_files"))
       .map_err(|err| format!("Error parsing digest {}", err))?;
 
@@ -453,6 +443,8 @@ impl MultiPlatformExecuteProcess {
       }
     };
 
+    let is_nailgunnable = externs::project_bool(&value, "is_nailgunnable");
+
     let unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule =
       lift_digest(&externs::project_ignoring_type(
         &value,
@@ -472,6 +464,7 @@ impl MultiPlatformExecuteProcess {
         unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule,
       jdk_home: jdk_home,
       target_platform: target_platform,
+      is_nailgunnable: is_nailgunnable,
     })
   }
   fn lift(value: &Value) -> Result<MultiPlatformExecuteProcess, String> {
@@ -1291,8 +1284,16 @@ impl NodeError for Failure {
     Failure::Invalidated
   }
 
-  fn cyclic() -> Failure {
-    throw("Dep graph contained a cycle.")
+  fn cyclic(mut path: Vec<String>) -> Failure {
+    let path_len = path.len();
+    if path_len > 1 {
+      path[0] += " <-";
+      path[path_len - 1] += " <-"
+    }
+    throw(&format!(
+      "Dep graph contained a cycle:\n  {}",
+      path.join("\n  ")
+    ))
   }
 }
 

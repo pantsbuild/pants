@@ -3,9 +3,9 @@
 
 import re
 
-from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.config import Config
 from pants.option.parser import Parser
+from pants.option.scope import GLOBAL_SCOPE
 
 
 class InvalidScopeError(Exception):

@@ -14,11 +14,10 @@ from pants.base.build_environment import (
   get_pants_configdir,
   pants_version,
 )
-from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.custom_types import dir_option, file_option
 from pants.option.errors import OptionsError
 from pants.option.optionable import Optionable
-from pants.option.scope import ScopeInfo
+from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
 from pants.util.collections import Enum
 
@@ -61,6 +60,7 @@ class ExecutionOptions:
   remote_oauth_bearer_token_path: Any
   remote_execution_extra_platform_properties: Any
   remote_execution_headers: Any
+  process_execution_local_enable_nailgun: bool
 
   @classmethod
   def from_bootstrap_options(cls, bootstrap_options):
@@ -85,6 +85,7 @@ class ExecutionOptions:
       remote_oauth_bearer_token_path=bootstrap_options.remote_oauth_bearer_token_path,
       remote_execution_extra_platform_properties=bootstrap_options.remote_execution_extra_platform_properties,
       remote_execution_headers=bootstrap_options.remote_execution_headers,
+      process_execution_local_enable_nailgun=bootstrap_options.process_execution_local_enable_nailgun,
     )
 
 
@@ -109,6 +110,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_oauth_bearer_token_path=None,
     remote_execution_extra_platform_properties=[],
     remote_execution_headers={},
+    process_execution_local_enable_nailgun=False,
   )
 
 
@@ -166,6 +168,9 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                   'etc. For example, the setup script we distribute at https://www.pantsbuild.org/install.html#recommended-installation '
                   'uses this value to determine which Python version to run with. You may find the '
                   'version of the pants instance you are running using -v, -V, or --version.')
+    register('--pants-bin-name', advanced=True, default='./pants',
+             help='The name of the script or binary used to invoke pants. '
+                  'Useful when printing help messages.')
 
     register('--plugins', advanced=True, type=list, help='Load these plugins.')
     register('--plugin-cache-dir', advanced=True,
@@ -340,7 +345,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--watchman-supportdir', advanced=True, default='bin/watchman',
              help='Find watchman binaries under this dir. Used as part of the path to lookup '
                   'the binary with --binaries-baseurls and --pants-bootstrapdir.')
-    register('--watchman-startup-timeout', type=float, advanced=True, default=30.0,
+    register('--watchman-startup-timeout', type=float, advanced=True, default=60.0,
              help='The watchman socket timeout (in seconds) for the initial `watch-project` command. '
                   'This may need to be set higher for larger repos due to watchman startup cost.')
     register('--watchman-socket-timeout', type=float, advanced=True, default=0.1,
@@ -435,6 +440,9 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              advanced=True)
     register('--process-execution-use-local-cache', type=bool, default=True, advanced=True,
              help='Whether to keep process executions in a local cache persisted to disk.')
+    register('--process-execution-local-enable-nailgun', type=bool, default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_enable_nailgun,
+             help='Whether or not to use nailgun to run the requests that are marked as nailgunnable.',
+             advanced=True)
 
   @classmethod
   def register_options(cls, register):

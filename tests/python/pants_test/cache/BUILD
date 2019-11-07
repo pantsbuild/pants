@@ -35,6 +35,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/task',
     'tests/python/pants_test:test_base',
+    'tests/python/pants_test/option/util',
     'tests/python/pants_test/testutils:mock_logger',
   ]
 )

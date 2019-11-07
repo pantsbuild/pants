@@ -14,6 +14,7 @@ from pants.util.meta import classproperty
 
 
 @dataclass(frozen=True)
+# type: ignore # tracked by https://github.com/python/mypy/issues/5374, which they put as high priority.
 class Goal(metaclass=ABCMeta):
   """The named product of a `@console_rule`.
 
@@ -109,42 +110,63 @@ class _GoalOptions(object):
   """A marker trait for the anonymous inner `Goal.Options` classes for `Goal`s."""
 
 
-class LineOriented:
-  """A mixin for Goal that adds Options to support the `line_oriented` context manager."""
+class Outputting:
+  """A mixin for Goal that adds options to support output-related context managers.
+
+  Allows output to go to a file or to stdout.
+
+  Useful for goals whose purpose is to emit output to the end user (as distinct from incidental logging to stderr).
+  """
 
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--sep', default='\\n', metavar='<separator>',
-             help='String to use to separate result lines.')
     register('--output-file', metavar='<path>',
-             help='Write line-oriented output to this file instead.')
+             help='Output to this file.  If unspecified, outputs to stdout.')
 
   @classmethod
   @contextmanager
-  def line_oriented(cls, line_oriented_options, console):
-    """Given Goal.Options and a Console, yields functions for writing to stdout and stderr, respectively.
+  def output(cls, options, console):
+    """Given Goal.Options and a Console, yields a function for writing data to stdout, or a file.
 
-    The passed options instance will generally be the `Goal.Options` of a `LineOriented` `Goal`.
+    The passed options instance will generally be the `Goal.Options` of an `Outputting` `Goal`.
     """
-    if type(line_oriented_options) != cls.Options:
-      raise AssertionError(
-          'Expected Options for `{}`, got: {}'.format(cls.__name__, line_oriented_options))
+    with cls.output_sink(options, console) as output_sink:
+      yield lambda msg: output_sink.write(msg)
 
-    output_file = line_oriented_options.values.output_file
-    sep = line_oriented_options.values.sep.encode().decode('unicode_escape')
-
-    if output_file:
-      stdout_file = open(output_file, 'w')
-      print_stdout = lambda msg: print(msg, file=stdout_file, end=sep)
+  @classmethod
+  @contextmanager
+  def output_sink(cls, options, console):
+    if type(options) != cls.Options:
+      raise AssertionError('Expected Options for `{}`, got: {}'.format(cls.__name__, options))
+    stdout_file = None
+    if options.values.output_file:
+      stdout_file = open(options.values.output_file, 'w')
+      output_sink = stdout_file
     else:
-      print_stdout = lambda msg: console.print_stdout(msg, end=sep)
-
-    print_stderr = lambda msg: console.print_stderr(msg)
-
+      output_sink = console.stdout
     try:
-      yield print_stdout, print_stderr
+      yield output_sink
     finally:
-      if output_file:
+      output_sink.flush()
+      if stdout_file:
         stdout_file.close()
-      console.flush()
+
+
+class LineOriented(Outputting):
+  @classmethod
+  def register_options(cls, register):
+    super().register_options(register)
+    register('--sep', default='\\n', metavar='<separator>',
+             help='String to use to separate lines in line-oriented output.')
+
+  @classmethod
+  @contextmanager
+  def line_oriented(cls, options, console):
+    """Given Goal.Options and a Console, yields a function for printing lines to stdout or a file.
+
+    The passed options instance will generally be the `Goal.Options` of an `Outputting` `Goal`.
+    """
+    sep = options.values.sep.encode().decode('unicode_escape')
+    with cls.output_sink(options, console) as output_sink:
+      yield lambda msg: print(msg, file=output_sink, end=sep)

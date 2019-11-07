@@ -14,7 +14,6 @@ from typing import Any, Optional, Type, Union
 from twitter.common.collections import OrderedSet
 from typing_extensions import Protocol
 
-from pants.util.objects import DatatypeMixin
 from pants.util.strutil import ensure_binary
 
 
@@ -136,13 +135,6 @@ class CoercingEncoder(json.JSONEncoder):
                         .format(cls=type(self).__name__, val=o))
       # Set order is arbitrary in python 3.6 and 3.7, so we need to keep this sorted() call.
       return sorted(self.default(i) for i in o)
-    if isinstance(o, DatatypeMixin):
-      # datatype objects will intentionally raise in the __iter__ method, but the Iterable abstract
-      # base class will match any class with any superclass that has the attribute __iter__ in the
-      # __dict__ (see https://docs.python.org/2/library/abc.html), so we need to check for it
-      # specially here.
-      # TODO: determine if the __repr__ should be some abstractmethod on DatatypeMixin!
-      return self.default(repr(o))
     if isinstance(o, Iterable) and not isinstance(o, (bytes, list, str)):
       return list(self.default(i) for i in o)
     logger.debug("Our custom json encoder {} is trying to hash a primitive type, but has gone through"

@@ -9,7 +9,8 @@ python_library(
     'src/python/pants/backend/python/targets',
     'src/python/pants/build_graph',
     'src/python/pants/subsystem',
-    'tests/python/pants_test:task_test_base'
+    'tests/python/pants_test/subsystem:subsystem_utils',
+    'tests/python/pants_test:task_test_base',
   ]
 )
 

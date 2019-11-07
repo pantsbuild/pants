@@ -28,7 +28,8 @@ class FileContent:
     )
 
 
-FilesContent = Collection.of(FileContent)
+class FilesContent(Collection[FileContent]):
+  pass
 
 
 class InputFilesContent(FilesContent):
@@ -170,7 +171,8 @@ class DirectoryToMaterialize:
   directory_digest: Digest
 
 
-DirectoriesToMaterialize = Collection.of(DirectoryToMaterialize)
+class DirectoriesToMaterialize(Collection[DirectoryToMaterialize]):
+  pass
 
 
 @dataclass(frozen=True)
@@ -179,7 +181,8 @@ class MaterializeDirectoryResult:
   output_paths: Tuple[str, ...]
 
 
-MaterializeDirectoriesResult = Collection.of(MaterializeDirectoryResult)
+class MaterializeDirectoriesResult(Collection[MaterializeDirectoryResult]):
+  pass
 
 
 @dataclass(frozen=True)
@@ -194,7 +197,8 @@ class Workspace:
   _scheduler: Any
 
   def materialize_directories(self, directories_to_materialize: Tuple[DirectoryToMaterialize, ...]) -> MaterializeDirectoriesResult:
-    return self._scheduler.materialize_directories(directories_to_materialize)
+    result: MaterializeDirectoriesResult = self._scheduler.materialize_directories(directories_to_materialize)
+    return result
 
 
 # TODO: don't recreate this in python, get this from fs::EMPTY_DIGEST somehow.

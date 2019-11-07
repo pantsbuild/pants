@@ -30,8 +30,12 @@ use hex;
 
 use digest::{Digest as DigestTrait, FixedOutput};
 use serde::ser::{Serialize, SerializeStruct, Serializer};
+use serde::{Deserialize, Deserializer};
 use sha2::Sha256;
 
+use serde::de::{MapAccess, Visitor};
+use serde::export::fmt::Error;
+use serde::export::Formatter;
 use std::fmt;
 use std::io::{self, Write};
 
@@ -106,6 +110,37 @@ impl Serialize for Fingerprint {
   }
 }
 
+impl<'de> Deserialize<'de> for Fingerprint {
+  fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+  where
+    D: Deserializer<'de>,
+  {
+    struct FingerprintVisitor;
+
+    impl<'de> Visitor<'de> for FingerprintVisitor {
+      type Value = Fingerprint;
+
+      fn expecting(&self, formatter: &mut Formatter) -> Result<(), Error> {
+        formatter.write_str("struct Fingerprint")
+      }
+
+      fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+      where
+        E: serde::de::Error,
+      {
+        Fingerprint::from_hex_string(v).map_err(|err| {
+          serde::de::Error::invalid_value(
+            serde::de::Unexpected::Str(&format!("{:?}: {}", v, err)),
+            &format!("A hex representation of a {} byte value", FINGERPRINT_SIZE).as_str(),
+          )
+        })
+      }
+    }
+
+    deserializer.deserialize_string(FingerprintVisitor)
+  }
+}
+
 ///
 /// A Digest is a fingerprint, as well as the size in bytes of the plaintext for which that is the
 /// fingerprint.
@@ -125,6 +160,74 @@ impl Serialize for Digest {
     obj.serialize_field("fingerprint", &self.0)?;
     obj.serialize_field("size_bytes", &self.1)?;
     obj.end()
+  }
+}
+
+#[derive(Deserialize)]
+#[serde(field_identifier, rename_all = "snake_case")]
+enum Field {
+  Fingerprint,
+  SizeBytes,
+}
+
+impl<'de> Deserialize<'de> for Digest {
+  fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+  where
+    D: Deserializer<'de>,
+  {
+    struct DigestVisitor;
+
+    impl<'de> Visitor<'de> for DigestVisitor {
+      type Value = Digest;
+
+      fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("struct digest")
+      }
+
+      fn visit_map<V>(self, mut map: V) -> Result<Digest, V::Error>
+      where
+        V: MapAccess<'de>,
+      {
+        use serde::de;
+
+        let mut fingerprint = None;
+        let mut size_bytes = None;
+        while let Some(key) = map.next_key()? {
+          match key {
+            Field::Fingerprint => {
+              if fingerprint.is_some() {
+                return Err(de::Error::duplicate_field("fingerprint"));
+              }
+              fingerprint = Some(map.next_value()?);
+            }
+            Field::SizeBytes => {
+              if size_bytes.is_some() {
+                return Err(de::Error::duplicate_field("size_bytes"));
+              }
+              size_bytes = Some(map.next_value()?);
+            }
+          }
+        }
+        let fingerprint = fingerprint.ok_or_else(|| de::Error::missing_field("fingerprint"))?;
+        let size_bytes = size_bytes.ok_or_else(|| de::Error::missing_field("size_bytes"))?;
+        Ok(Digest(fingerprint, size_bytes))
+      }
+    }
+
+    const FIELDS: &[&str] = &["fingerprint", "size_bytes"];
+    deserializer.deserialize_struct("digest", FIELDS, DigestVisitor)
+  }
+}
+
+impl Digest {
+  pub fn of_bytes(bytes: &[u8]) -> Self {
+    let mut hasher = Sha256::default();
+    hasher.input(bytes);
+
+    Digest(
+      Fingerprint::from_bytes_unsafe(&hasher.fixed_result()),
+      bytes.len(),
+    )
   }
 }
 
@@ -175,151 +278,10 @@ impl<W: Write> Write for WriterHasher<W> {
 }
 
 #[cfg(test)]
-mod fingerprint_tests {
-  use self::serde_test::{assert_ser_tokens, Token};
-  use super::Fingerprint;
-  use serde_test;
-
-  #[test]
-  fn from_bytes_unsafe() {
-    assert_eq!(
-      Fingerprint::from_bytes_unsafe(&[
-        0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab,
-        0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab,
-        0xab, 0xab,
-      ],),
-      Fingerprint([0xab; 32])
-    );
-  }
-
-  #[test]
-  fn from_hex_string() {
-    assert_eq!(
-      Fingerprint::from_hex_string(
-        "0123456789abcdefFEDCBA98765432100000000000000000ffFFfFfFFfFfFFff",
-      )
-      .unwrap(),
-      Fingerprint([
-        0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32,
-        0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-        0xff, 0xff,
-      ],)
-    )
-  }
-
-  #[test]
-  fn from_hex_string_not_long_enough() {
-    Fingerprint::from_hex_string("abcd").expect_err("Want err");
-  }
-
-  #[test]
-  fn from_hex_string_too_long() {
-    Fingerprint::from_hex_string(
-      "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0",
-    )
-    .expect_err("Want err");
-  }
-
-  #[test]
-  fn from_hex_string_invalid_chars() {
-    Fingerprint::from_hex_string(
-      "Q123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF",
-    )
-    .expect_err("Want err");
-  }
-
-  #[test]
-  fn to_hex() {
-    assert_eq!(
-      Fingerprint([
-        0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32,
-        0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-        0xff, 0xff,
-      ],)
-      .to_hex(),
-      "0123456789abcdeffedcba98765432100000000000000000ffffffffffffffff".to_lowercase()
-    )
-  }
-
-  #[test]
-  fn display() {
-    let hex = "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF";
-    assert_eq!(
-      Fingerprint::from_hex_string(hex).unwrap().to_hex(),
-      hex.to_lowercase()
-    )
-  }
-
-  #[test]
-  fn serialize_to_str() {
-    let fingerprint = Fingerprint([
-      0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32,
-      0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-      0xff, 0xff,
-    ]);
-    assert_ser_tokens(
-      &fingerprint,
-      &[Token::Str(
-        "0123456789abcdeffedcba98765432100000000000000000ffffffffffffffff",
-      )],
-    );
-  }
-}
+mod fingerprint_tests;
 
 #[cfg(test)]
-mod digest_tests {
-  use self::serde_test::{assert_ser_tokens, Token};
-  use super::Digest;
-  use super::Fingerprint;
-  use serde_test;
-
-  #[test]
-  fn serialize_to_str() {
-    let digest = Digest(
-      Fingerprint::from_hex_string(
-        "0123456789abcdeffedcba98765432100000000000000000ffffffffffffffff",
-      )
-      .unwrap(),
-      1,
-    );
-    assert_ser_tokens(
-      &digest,
-      &[
-        Token::Struct {
-          name: "digest",
-          len: 2,
-        },
-        Token::Str("fingerprint"),
-        Token::Str("0123456789abcdeffedcba98765432100000000000000000ffffffffffffffff"),
-        Token::Str("size_bytes"),
-        Token::U64(1),
-        Token::StructEnd,
-      ],
-    );
-  }
-}
+mod digest_tests;
 
 #[cfg(test)]
-mod hasher_tests {
-  use std;
-
-  #[test]
-  fn hashes() {
-    let mut src = "meep".as_bytes();
-
-    let dst = Vec::with_capacity(10);
-    let mut hasher = super::WriterHasher::new(dst);
-    assert_eq!(std::io::copy(&mut src, &mut hasher).unwrap(), 4);
-    let want = (
-      super::Digest(
-        super::Fingerprint::from_hex_string(
-          "23e92dfba8fb0c93cfba31ad2962b4e35a47054296d1d375d7f7e13e0185de7a",
-        )
-        .unwrap(),
-        4,
-      ),
-      "meep".as_bytes().to_vec(),
-    );
-    assert_eq!(hasher.finish(), want);
-  }
-}
+mod hasher_tests;

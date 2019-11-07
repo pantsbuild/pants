@@ -175,6 +175,15 @@ fn main() {
             .required(true)
             .help("The name of the platform that this request's output is compatible with. Options are 'linux', 'darwin', or 'none' (which indicates either)")
       )
+      .arg(
+          Arg::with_name("use-nailgun")
+              .long("use-nailgun")
+              .takes_value(true)
+              .required(false)
+              .default_value("false")
+              .help("Whether or not to enable running the process through a Nailgun server.\
+                        This will likely start a new Nailgun server as a side effect.")
+      )
     .setting(AppSettings::TrailingVarArg)
     .arg(
       Arg::with_name("argv")
@@ -305,6 +314,8 @@ fn main() {
     Digest(fingerprint, length)
   };
 
+  let is_nailgunnable: bool = args.value_of("use-nailgun").unwrap().parse().unwrap();
+
   let request = process_execution::ExecuteProcessRequest {
     argv,
     env,
@@ -318,6 +329,7 @@ fn main() {
     jdk_home: args.value_of("jdk").map(PathBuf::from),
     target_platform: Platform::try_from(&args.value_of("target-platform").unwrap().to_string())
       .expect("invalid value for `target-platform"),
+    is_nailgunnable,
   };
 
   let runner: Box<dyn process_execution::CommandRunner> = match server_arg {
@@ -349,6 +361,7 @@ fn main() {
           store.clone(),
           Platform::Linux,
           executor.clone(),
+          std::time::Duration::from_secs(45),
           std::time::Duration::from_millis(500),
           std::time::Duration::from_secs(5),
         )

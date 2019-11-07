@@ -1,8 +1,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.parser_hierarchy import InvalidScopeError, all_enclosing_scopes, enclosing_scope
+from pants.option.scope import GLOBAL_SCOPE
 from pants_test.test_base import TestBase
 
 

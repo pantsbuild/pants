@@ -52,6 +52,7 @@ use logging::{Destination, Logger};
 use rule_graph::{GraphMaker, RuleGraph};
 use std::any::Any;
 use std::borrow::Borrow;
+use std::collections::HashSet;
 use std::ffi::CStr;
 use std::fs::File;
 use std::io;
@@ -60,6 +61,11 @@ use std::os::raw;
 use std::panic;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
+use tempfile::TempDir;
+use workunit_store::WorkUnit;
+
+#[cfg(test)]
+mod tests;
 
 // TODO: Consider renaming and making generic for collections of PyResults.
 #[repr(C)]
@@ -176,31 +182,7 @@ pub struct RawResult {
 #[no_mangle]
 pub extern "C" fn scheduler_create(
   tasks_ptr: *mut Tasks,
-  construct_directory_digest: Function,
-  construct_snapshot: Function,
-  construct_file_content: Function,
-  construct_files_content: Function,
-  construct_process_result: Function,
-  construct_materialize_directory_result: Function,
-  construct_materialize_directories_results: Function,
-  type_address: TypeId,
-  type_path_globs: TypeId,
-  type_directory_digest: TypeId,
-  type_snapshot: TypeId,
-  type_merge_directories_request: TypeId,
-  type_directory_with_prefix_to_strip: TypeId,
-  type_directory_with_prefix_to_add: TypeId,
-  type_files_content: TypeId,
-  type_input_files_content: TypeId,
-  type_dir: TypeId,
-  type_file: TypeId,
-  type_link: TypeId,
-  type_multi_platform_process_request: TypeId,
-  type_process_result: TypeId,
-  type_generator: TypeId,
-  type_url_to_fetch: TypeId,
-  type_string: TypeId,
-  type_bytes: TypeId,
+  types: Types,
   build_root_buf: Buffer,
   local_store_dir_buf: Buffer,
   ignore_patterns_buf: BufferBuffer,
@@ -225,34 +207,11 @@ pub extern "C" fn scheduler_create(
   process_execution_speculation_strategy_buf: Buffer,
   process_execution_use_local_cache: bool,
   remote_execution_headers_buf: BufferBuffer,
+  process_execution_local_enable_nailgun: bool,
 ) -> RawResult {
   match make_core(
     tasks_ptr,
-    construct_directory_digest,
-    construct_snapshot,
-    construct_file_content,
-    construct_files_content,
-    construct_process_result,
-    construct_materialize_directory_result,
-    construct_materialize_directories_results,
-    type_address,
-    type_path_globs,
-    type_directory_digest,
-    type_snapshot,
-    type_merge_directories_request,
-    type_directory_with_prefix_to_strip,
-    type_directory_with_prefix_to_add,
-    type_files_content,
-    type_input_files_content,
-    type_dir,
-    type_file,
-    type_link,
-    type_multi_platform_process_request,
-    type_process_result,
-    type_generator,
-    type_url_to_fetch,
-    type_string,
-    type_bytes,
+    types,
     build_root_buf,
     local_store_dir_buf,
     ignore_patterns_buf,
@@ -277,6 +236,7 @@ pub extern "C" fn scheduler_create(
     process_execution_speculation_strategy_buf,
     process_execution_use_local_cache,
     remote_execution_headers_buf,
+    process_execution_local_enable_nailgun,
   ) {
     Ok(core) => RawResult {
       is_throw: false,
@@ -293,31 +253,7 @@ pub extern "C" fn scheduler_create(
 
 fn make_core(
   tasks_ptr: *mut Tasks,
-  construct_directory_digest: Function,
-  construct_snapshot: Function,
-  construct_file_content: Function,
-  construct_files_content: Function,
-  construct_process_result: Function,
-  construct_materialize_directory_result: Function,
-  construct_materialize_directories_results: Function,
-  type_address: TypeId,
-  type_path_globs: TypeId,
-  type_directory_digest: TypeId,
-  type_snapshot: TypeId,
-  type_merge_directories_request: TypeId,
-  type_directory_with_prefix_to_strip: TypeId,
-  type_directory_with_prefix_to_add: TypeId,
-  type_files_content: TypeId,
-  type_input_files_content: TypeId,
-  type_dir: TypeId,
-  type_file: TypeId,
-  type_link: TypeId,
-  type_multi_platform_process_request: TypeId,
-  type_process_result: TypeId,
-  type_generator: TypeId,
-  type_url_to_fetch: TypeId,
-  type_string: TypeId,
-  type_bytes: TypeId,
+  types: Types,
   build_root_buf: Buffer,
   local_store_dir_buf: Buffer,
   ignore_patterns_buf: BufferBuffer,
@@ -342,38 +278,12 @@ fn make_core(
   process_execution_speculation_strategy_buf: Buffer,
   process_execution_use_local_cache: bool,
   remote_execution_headers_buf: BufferBuffer,
+  process_execution_local_enable_nailgun: bool,
 ) -> Result<Core, String> {
   let root_type_ids = root_type_ids.to_vec();
   let ignore_patterns = ignore_patterns_buf
     .to_strings()
     .map_err(|err| format!("Failed to decode ignore patterns as UTF8: {:?}", err))?;
-  let types = Types {
-    construct_directory_digest: construct_directory_digest,
-    construct_snapshot: construct_snapshot,
-    construct_file_content: construct_file_content,
-    construct_files_content: construct_files_content,
-    construct_process_result: construct_process_result,
-    construct_materialize_directories_results,
-    construct_materialize_directory_result,
-    address: type_address,
-    path_globs: type_path_globs,
-    directory_digest: type_directory_digest,
-    snapshot: type_snapshot,
-    directories_to_merge: type_merge_directories_request,
-    directory_with_prefix_to_strip: type_directory_with_prefix_to_strip,
-    directory_with_prefix_to_add: type_directory_with_prefix_to_add,
-    files_content: type_files_content,
-    input_files_content: type_input_files_content,
-    dir: type_dir,
-    file: type_file,
-    link: type_link,
-    multi_platform_process_request: type_multi_platform_process_request,
-    process_result: type_process_result,
-    generator: type_generator,
-    url_to_fetch: type_url_to_fetch,
-    string: type_string,
-    bytes: type_bytes,
-  };
   #[allow(clippy::redundant_closure)] // I couldn't find an easy way to remove this closure.
   let mut tasks = with_tasks(tasks_ptr, |tasks| tasks.clone());
   tasks.intrinsics_set(&types);
@@ -476,7 +386,37 @@ fn make_core(
     process_execution_speculation_strategy,
     process_execution_use_local_cache,
     remote_execution_headers,
+    process_execution_local_enable_nailgun,
   )
+}
+
+fn workunits_to_py_tuple_value(workunits: &HashSet<WorkUnit>) -> Value {
+  let workunit_values = workunits
+    .iter()
+    .map(|workunit: &WorkUnit| {
+      let mut workunit_zipkin_trace_info = vec![
+        externs::store_utf8("name"),
+        externs::store_utf8(&workunit.name),
+        externs::store_utf8("start_secs"),
+        externs::store_u64(workunit.time_span.start.secs),
+        externs::store_utf8("start_nanos"),
+        externs::store_u64(u64::from(workunit.time_span.start.nanos)),
+        externs::store_utf8("duration_secs"),
+        externs::store_u64(workunit.time_span.duration.secs),
+        externs::store_utf8("duration_nanos"),
+        externs::store_u64(u64::from(workunit.time_span.duration.nanos)),
+        externs::store_utf8("span_id"),
+        externs::store_utf8(&workunit.span_id),
+      ];
+      if let Some(parent_id) = &workunit.parent_id {
+        workunit_zipkin_trace_info.push(externs::store_utf8("parent_id"));
+        workunit_zipkin_trace_info.push(externs::store_utf8(parent_id));
+      }
+      externs::store_dict(&workunit_zipkin_trace_info)
+    })
+    .collect::<Vec<_>>();
+
+  externs::store_tuple(&workunit_values)
 }
 
 ///
@@ -496,35 +436,11 @@ pub extern "C" fn scheduler_metrics(
         .flat_map(|(metric, value)| vec![externs::store_utf8(metric), externs::store_i64(value)])
         .collect::<Vec<_>>();
       if session.should_record_zipkin_spans() {
-        let workunits = session
-          .workunit_store()
-          .get_workunits()
-          .lock()
-          .iter()
-          .map(|workunit| {
-            let mut workunit_zipkin_trace_info = vec![
-              externs::store_utf8("name"),
-              externs::store_utf8(&workunit.name),
-              externs::store_utf8("start_secs"),
-              externs::store_u64(workunit.time_span.start.secs),
-              externs::store_utf8("start_nanos"),
-              externs::store_u64(u64::from(workunit.time_span.start.nanos)),
-              externs::store_utf8("duration_secs"),
-              externs::store_u64(workunit.time_span.duration.secs),
-              externs::store_utf8("duration_nanos"),
-              externs::store_u64(u64::from(workunit.time_span.duration.nanos)),
-              externs::store_utf8("span_id"),
-              externs::store_utf8(&workunit.span_id),
-            ];
-            if let Some(parent_id) = &workunit.parent_id {
-              workunit_zipkin_trace_info.push(externs::store_utf8("parent_id"));
-              workunit_zipkin_trace_info.push(externs::store_utf8(parent_id));
-            }
-            externs::store_dict(&workunit_zipkin_trace_info)
-          })
-          .collect::<Vec<_>>();
+        let workunits = session.workunit_store().get_workunits();
+
+        let value = workunits_to_py_tuple_value(&workunits.lock());
         values.push(externs::store_utf8("engine_workunits"));
-        values.push(externs::store_tuple(&workunits));
+        values.push(value);
       };
       externs::store_dict(&values).into()
     })
@@ -836,26 +752,6 @@ pub extern "C" fn set_panic_handler() {
   }));
 }
 
-#[cfg(test)]
-#[test]
-fn test_panic_string() {
-  let a: &str = "a str panic payload";
-  assert_eq!(
-    generate_panic_string(&a as &(dyn Any + Send)),
-    "panic at 'a str panic payload'"
-  );
-
-  let b: String = "a String panic payload".to_string();
-  assert_eq!(
-    generate_panic_string(&b as &(dyn Any + Send)),
-    "panic at 'a String panic payload'"
-  );
-
-  let c: u32 = 18;
-  let output = generate_panic_string(&c as &(dyn Any + Send));
-  assert!(output.contains("Non-string panic payload at"));
-}
-
 #[no_mangle]
 pub extern "C" fn garbage_collect_store(scheduler_ptr: *mut Scheduler) {
   with_scheduler(scheduler_ptr, |scheduler| {
@@ -990,6 +886,58 @@ pub extern "C" fn merge_directories(
       .map(|dir| nodes::Snapshot::store_directory(&scheduler.core, &dir))
       .into()
   })
+}
+
+#[no_mangle]
+pub extern "C" fn run_local_interactive_process(
+  scheduler_ptr: *mut Scheduler,
+  request: Handle,
+) -> PyResult {
+  use std::process;
+
+  with_scheduler(scheduler_ptr, |scheduler| {
+    let types = &scheduler.core.types;
+    let construct_interactive_process_result = types.construct_interactive_process_result;
+
+    let value: Value = request.into();
+
+    let argv: Vec<String> = externs::project_multi_strs(&value, "argv");
+    if argv.is_empty() {
+      return Err("Empty argv list not permitted".to_string());
+    }
+
+    let mut command = process::Command::new(argv[0].clone());
+    for arg in argv[1..].iter() {
+      command.arg(arg);
+    }
+
+    let env = externs::project_tuple_encoded_map(&value, "env")?;
+    for (key, value) in env.iter() {
+      command.env(key, value);
+    }
+
+    let run_in_workspace = externs::project_bool(&value, "run_in_workspace");
+    let maybe_tempdir = if run_in_workspace {
+      None
+    } else {
+      Some(TempDir::new().map_err(|err| format!("Error creating tempdir: {}", err))?)
+    };
+
+    if let Some(ref tempdir) = maybe_tempdir {
+      command.current_dir(tempdir.path());
+    }
+
+    let mut subprocess = command.spawn().map_err(|e| e.to_string())?;
+    let exit_status = subprocess.wait().map_err(|e| e.to_string())?;
+    let code = exit_status.code().unwrap_or(-1);
+
+    let output: Result<Value, String> = Ok(externs::unsafe_call(
+      &construct_interactive_process_result,
+      &[externs::store_i64(i64::from(code))],
+    ));
+    output
+  })
+  .into()
 }
 
 #[no_mangle]

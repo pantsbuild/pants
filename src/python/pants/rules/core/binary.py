@@ -28,11 +28,12 @@ class BinaryTarget:
 @dataclass(frozen=True)
 class CreatedBinary:
   digest: Digest
+  binary_name: str
 
 
 @console_rule
 def create_binary(addresses: BuildFileAddresses, console: Console, workspace: Workspace, options: Binary.Options) -> Binary:
-  with Binary.line_oriented(options, console) as (print_stdout, print_stderr):
+  with Binary.line_oriented(options, console) as print_stdout:
     print_stdout("Generating binaries in `dist/`")
     binaries = yield [Get(CreatedBinary, Address, address.to_address()) for address in addresses]
     dirs_to_materialize = tuple(

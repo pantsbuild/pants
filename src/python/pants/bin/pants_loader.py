@@ -32,6 +32,9 @@ class PantsLoader:
     # TODO: Eric-Arellano has emailed the author to see if he is willing to accept a PR fixing the
     # deprecation warnings and to release the fix. If he says yes, remove this once fixed.
     warnings.filterwarnings('ignore', category=DeprecationWarning, module="ansicolors")
+    # Silence this ubiquitous warning. Several of our 3rd party deps incur this.
+    warnings.filterwarnings('ignore', category=DeprecationWarning,
+        message="Using or importing the ABCs from 'collections' instead of from 'collections.abc' is deprecated")
 
   @classmethod
   def ensure_locale(cls):

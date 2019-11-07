@@ -7,9 +7,8 @@ from typing import Any, Optional
 
 from twitter.common.collections import OrderedSet
 
-from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.optionable import OptionableFactory
-from pants.option.scope import ScopeInfo
+from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 
 
 class SubsystemClientError(Exception): pass

@@ -5,6 +5,7 @@ python_library(
       'src/python/pants/build_graph',
       'src/python/pants/engine:goal',
       'src/python/pants/engine:rules',
+      'src/python/pants/engine:interactive_runner',
       'src/python/pants/engine:selectors',
       'src/python/pants/engine:addressable',
       'src/python/pants/engine:console',
@@ -19,8 +20,10 @@ python_tests(
   name = "tests",
   dependencies = [
     ':core',
+    'tests/python/pants_test:test_base',
     'tests/python/pants_test:console_rule_test_base',
-    'tests/python/pants_test/engine:util'
+    'tests/python/pants_test/engine:util',
+    'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )
 

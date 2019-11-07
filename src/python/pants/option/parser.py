@@ -16,7 +16,6 @@ import Levenshtein
 import yaml
 
 from pants.base.deprecated import validate_deprecation_semver, warn_or_error
-from pants.option.arg_splitter import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
 from pants.option.config import Config
 from pants.option.custom_types import (
   DictValueComponent,
@@ -46,7 +45,7 @@ from pants.option.errors import (
 )
 from pants.option.option_util import is_dict_option, is_list_option
 from pants.option.ranked_value import RankedValue
-from pants.option.scope import ScopeInfo
+from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
 from pants.util.meta import frozen_after_init
 
 
@@ -172,7 +171,7 @@ class Parser:
       """
       self.flag_value_map = self._create_flag_value_map(flags_in_scope)
       self.namespace = namespace
-      self.get_all_scoped_flag_names = get_all_scoped_flag_names
+      self.get_all_scoped_flag_names = get_all_scoped_flag_names  # type: ignore
       self.levenshtein_max_distance = levenshtein_max_distance
 
     @staticmethod
@@ -430,6 +429,10 @@ class Parser:
     if self._frozen:
       raise FrozenRegistration(self.scope, args[0])
 
+    if args:
+      dest = self.parse_dest(*args, **kwargs)
+      self._check_deprecated(dest, kwargs, print_warning=False)
+    
     # Prevent further registration in enclosing scopes.
     ancestor = self._parent_parser
     while ancestor:
@@ -458,7 +461,7 @@ class Parser:
         raise OptionAlreadyRegistered(self.scope, arg)
     self._known_args.update(args)
 
-  def _check_deprecated(self, dest, kwargs):
+  def _check_deprecated(self, dest, kwargs, print_warning=True):
     """Checks option for deprecation and issues a warning/error if necessary."""
     removal_version = kwargs.get('removal_version', None)
     if removal_version is not None:
@@ -467,7 +470,9 @@ class Parser:
         deprecated_entity_description="option '{}' in {}".format(dest, self._scope_str()),
         deprecation_start_version=kwargs.get('deprecation_start_version', None),
         hint=kwargs.get('removal_hint', None),
-        stacklevel=9999)  # Out of range stacklevel to suppress printing src line.
+        stacklevel=9999,  # Out of range stacklevel to suppress printing src line.
+        print_warning=print_warning,
+      )
 
   _allowed_registration_kwargs = {
     'type', 'member_type', 'choices', 'dest', 'default', 'implicit_value', 'metavar',

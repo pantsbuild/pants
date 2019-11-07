@@ -8,25 +8,25 @@ from pants.goal.goal import Goal
 from pants.help.help_formatter import HelpFormatter
 from pants.help.scope_info_iterator import ScopeInfoIterator
 from pants.option.arg_splitter import (
-  GLOBAL_SCOPE,
   GoalsHelp,
   NoGoalHelp,
   OptionsHelp,
   UnknownGoalHelp,
   VersionHelp,
 )
-from pants.option.scope import ScopeInfo
+from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 
 
 class HelpPrinter:
   """Prints help to the console."""
 
-  def __init__(self, options):
+  def __init__(self, options, help_request=None):
     self._options = options
+    self._help_request = help_request or self._options.help_request
 
   @property
-  def _help_request(self):
-    return self._options.help_request
+  def bin_name(self):
+    return self._options.for_global_scope().pants_bin_name
 
   def print_help(self):
     """Print help to the console.
@@ -34,8 +34,8 @@ class HelpPrinter:
     :return: 0 on success, 1 on failure
     """
     def print_hint():
-      print('Use `pants goals` to list goals.')
-      print('Use `pants help` to get help.')
+      print(f'Use `{self.bin_name} goals` to list goals.')
+      print(f'Use `{self.bin_name} help` to get help.')
     if isinstance(self._help_request, VersionHelp):
       print(pants_version())
     elif isinstance(self._help_request, OptionsHelp):
@@ -53,16 +53,18 @@ class HelpPrinter:
     return 0
 
   def _print_goals_help(self):
-    print('\nUse `pants help $goal` to get help for a particular goal.\n')
+    print(f'\nUse `{self.bin_name} help $goal` to get help for a particular goal.\n')
+    global_options = self._options.for_global_scope()
     goal_descriptions = {}
-    for scope_info in self._options.known_scope_to_info.values():
-      if scope_info.category not in (ScopeInfo.GOAL, ScopeInfo.GOAL_V1):
-        continue
-      description = scope_info.description or "<no description>"
-      goal_descriptions[scope_info.scope] = description
-    goal_descriptions.update({goal.name: goal.description_first_line
-                              for goal in Goal.all()
-                              if goal.description})
+    if global_options.v2:
+      for scope_info in self._options.known_scope_to_info.values():
+        if scope_info.category == ScopeInfo.GOAL:
+          description = scope_info.description or "<no description>"
+          goal_descriptions[scope_info.scope] = description
+    if global_options.v1:
+      goal_descriptions.update({goal.name: goal.description_first_line
+                                for goal in Goal.all()
+                                if goal.description})
 
     max_width = max(len(name) for name in goal_descriptions.keys())
     for name, description in sorted(goal_descriptions.items()):
@@ -93,12 +95,12 @@ class HelpPrinter:
     else:
       print(pants_release())
       print('\nUsage:')
-      print('  ./pants [option ...] [goal ...] [target...]  Attempt the specified goals.')
-      print('  ./pants help                                 Get help.')
-      print('  ./pants help [goal]                          Get help for a goal.')
-      print('  ./pants help-advanced [goal]                 Get help for a goal\'s advanced options.')
-      print('  ./pants help-all                             Get help for all goals.')
-      print('  ./pants goals                                List all installed goals.')
+      print(f'  {self.bin_name} [option ...] [goal ...] [target...]  Attempt the specified goals.')
+      print(f'  {self.bin_name} help                                 Get help.')
+      print(f'  {self.bin_name} help [goal]                          Get help for a goal.')
+      print(f'  {self.bin_name} help-advanced [goal]                 Get help for a goal\'s advanced options.')
+      print(f'  {self.bin_name} help-all                             Get help for all goals.')
+      print(f'  {self.bin_name} goals                                List all installed goals.')
       print('')
       print('  [target] accepts two special forms:')
       print('    dir:  to include all targets in the specified directory.')

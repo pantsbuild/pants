@@ -10,7 +10,7 @@ import sys
 import threading
 import traceback
 from contextlib import contextmanager
-from typing import Callable
+from typing import Callable, Iterator, Optional
 
 import setproctitle
 
@@ -48,6 +48,7 @@ class SignalHandler:
   def __init__(self):
     self._ignore_sigint_lock = threading.Lock()
     self._threads_ignoring_sigint = 0
+    self._ignoring_sigint_v2_engine = False
 
   def _check_sigint_gate_is_correct(self):
     assert self._threads_ignoring_sigint >= 0, \
@@ -57,8 +58,13 @@ class SignalHandler:
     with self._ignore_sigint_lock:
       self._check_sigint_gate_is_correct()
       threads_ignoring_sigint = self._threads_ignoring_sigint
-    if threads_ignoring_sigint == 0:
+      ignoring_sigint_v2_engine = self._ignoring_sigint_v2_engine
+    if threads_ignoring_sigint == 0 and not ignoring_sigint_v2_engine:
       self.handle_sigint(signum, _frame)
+
+  def _toggle_ignoring_sigint_v2_engine(self, toggle: bool):
+    with self._ignore_sigint_lock:
+      self._ignoring_sigint_v2_engine = toggle
 
   @contextmanager
   def _ignoring_sigint(self):
@@ -106,7 +112,7 @@ class ExceptionSink:
   _log_dir = None
   # We need an exiter in order to know what to do after we log a fatal exception or handle a
   # catchable signal.
-  _exiter = None
+  _exiter: Optional[Exiter] = None
   # Where to log stacktraces to in a SIGUSR2 handler.
   _interactive_output_stream = None
   # Whether to print a stacktrace in any fatal error message printed to the terminal.
@@ -114,7 +120,7 @@ class ExceptionSink:
   # An instance of `SignalHandler` which is invoked to handle a static set of specific
   # nonfatal signals (these signal handlers are allowed to make pants exit, but unlike SIGSEGV they
   # don't need to exit immediately).
-  _signal_handler = None
+  _signal_handler: Optional[SignalHandler] = None
 
   # These persistent open file descriptors are kept so the signal handler can do almost no work
   # (and lets faulthandler figure out signal safety).
@@ -177,16 +183,16 @@ class ExceptionSink:
 
   class AccessGlobalExiterMixin:
     @property
-    def _exiter(self) -> Exiter:
+    def _exiter(self) -> Optional[Exiter]:
       return ExceptionSink.get_global_exiter()
 
   @classmethod
-  def get_global_exiter(cls) -> Exiter:
+  def get_global_exiter(cls) -> Optional[Exiter]:
     return cls._exiter
 
   @classmethod
   @contextmanager
-  def exiter_as(cls, new_exiter_fun: Callable[[Exiter], Exiter]) -> None:
+  def exiter_as(cls, new_exiter_fun: Callable[[Optional[Exiter]], Exiter]) -> Iterator[None]:
     """Temporarily override the global exiter.
 
     NB: We don't want to try/finally here, because we want exceptions to propagate
@@ -201,7 +207,7 @@ class ExceptionSink:
 
   @classmethod
   @contextmanager
-  def exiter_as_until_exception(cls, new_exiter_fun: Callable[[Exiter], Exiter]) -> None:
+  def exiter_as_until_exception(cls, new_exiter_fun: Callable[[Optional[Exiter]], Exiter]) -> Iterator[None]:
     """Temporarily override the global exiter, except this will unset it when an exception happens."""
     previous_exiter = cls._exiter
     new_exiter = new_exiter_fun(previous_exiter)
@@ -212,7 +218,7 @@ class ExceptionSink:
       cls._reset_exiter(previous_exiter)
 
   @classmethod
-  def _reset_exiter(cls, exiter: Exiter) -> None:
+  def _reset_exiter(cls, exiter: Optional[Exiter]) -> None:
     """
     Class state:
     - Overwrites `cls._exiter`.
@@ -371,8 +377,8 @@ class ExceptionSink:
 
     NB: This method calls signal.signal(), which will crash if not called from the main thread!
     """
+    previous_signal_handler = cls.reset_signal_handler(new_signal_handler)
     try:
-      previous_signal_handler = cls.reset_signal_handler(new_signal_handler)
       yield
     finally:
       cls.reset_signal_handler(previous_signal_handler)
@@ -391,6 +397,11 @@ class ExceptionSink:
     """
     with cls._signal_handler._ignoring_sigint():
       yield
+
+  @classmethod
+  def toggle_ignoring_sigint_v2_engine(cls, toggle: bool) -> None:
+    assert cls._signal_handler is not None
+    cls._signal_handler._toggle_ignoring_sigint_v2_engine(toggle)
 
   @classmethod
   def _iso_timestamp_for_now(cls):

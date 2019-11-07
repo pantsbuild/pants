@@ -35,6 +35,7 @@ python_library(
     'src/python/pants/util:dirutil',
     ':project_tree',
   ],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -72,6 +73,7 @@ python_library(
     ':build_environment',
     ':exiter',
   ],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -104,9 +106,9 @@ python_library(
   sources = ['hash_utils.py'],
   dependencies = [
     '3rdparty/python:typing-extensions',
-    'src/python/pants/util:objects',
     'src/python/pants/util:strutil',
   ],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -136,7 +138,8 @@ python_library(
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':hash_utils',
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
