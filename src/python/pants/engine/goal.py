@@ -14,6 +14,7 @@ from pants.util.meta import classproperty
 
 
 @dataclass(frozen=True)
+# type: ignore # tracked by https://github.com/python/mypy/issues/5374, which they put as high priority.
 class Goal(metaclass=ABCMeta):
   """The named product of a `@console_rule`.
 
