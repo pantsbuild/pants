@@ -3,7 +3,7 @@
 
 from pathlib import Path
 
-from pants.base.build_environment import get_buildroot
+from pants.base.build_root import BuildRoot
 from pants.engine.console import Console
 from pants.engine.goal import Goal, LineOriented
 from pants.engine.legacy.graph import TransitiveHydratedTargets
@@ -36,6 +36,7 @@ class Filedeps(LineOriented, Goal):
 def file_deps(
   console: Console,
   filedeps_options: Filedeps.Options,
+  build_root: BuildRoot,
   transitive_hydrated_targets: TransitiveHydratedTargets
 ) -> Filedeps:
 
@@ -43,7 +44,6 @@ def file_deps(
   globs = filedeps_options.values.globs
 
   unique_rel_paths = set()
-  build_root = get_buildroot()
 
   for hydrated_target in transitive_hydrated_targets.closure:
     if hydrated_target.address.rel_path:
@@ -56,7 +56,7 @@ def file_deps(
 
   with Filedeps.line_oriented(filedeps_options, console) as print_stdout:
     for rel_path in sorted(unique_rel_paths):
-      final_path = str(Path(build_root, rel_path)) if absolute else rel_path
+      final_path = str(Path(build_root.path, rel_path)) if absolute else rel_path
       print_stdout(final_path)
 
   return Filedeps(exit_code=0)
