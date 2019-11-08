@@ -9,7 +9,7 @@ python_tests(
   dependencies=[
     'src/python/pants/backend/graph_info/tasks',
     'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/backend/python/targets:python',
+    'src/python/pants/backend/python/targets',
     'src/python/pants/base:build_environment',
     'src/python/pants/testutil:task_test_base',
   ]
@@ -34,7 +34,7 @@ python_tests(
     'src/python/pants/java/jar',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/backend/python/targets:python',
+    'src/python/pants/backend/python/targets',
     'src/python/pants/build_graph',
     'src/python/pants/testutil:task_test_base',
   ]
@@ -45,7 +45,7 @@ python_tests(
   sources = ['test_filemap.py'],
   dependencies = [
     'src/python/pants/backend/graph_info/tasks',
-    'src/python/pants/backend/python/targets:python',
+    'src/python/pants/backend/python/targets',
     'src/python/pants/build_graph',
     'src/python/pants/testutil:task_test_base',
   ],
@@ -58,7 +58,7 @@ python_tests(
     'src/python/pants/backend/docgen/targets',
     'src/python/pants/backend/graph_info/tasks',
     'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/backend/python/targets:python',
+    'src/python/pants/backend/python/targets',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
     'src/python/pants/testutil:task_test_base',
@@ -74,7 +74,7 @@ python_tests(
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/build_graph',
-    'src/python/pants/backend/python/targets:python',
+    'src/python/pants/backend/python/targets',
     'src/python/pants/testutil/subsystem',
     'src/python/pants/testutil:console_rule_test_base',
   ],
@@ -85,7 +85,7 @@ python_tests(
   sources = ['test_minimal_cover.py'],
   dependencies = [
     'src/python/pants/backend/graph_info/tasks',
-    'src/python/pants/backend/python/targets:python',
+    'src/python/pants/backend/python/targets',
     'src/python/pants/build_graph',
     'src/python/pants/testutil:task_test_base',
   ],
@@ -116,7 +116,7 @@ python_tests(
   sources = ['test_sort_targets.py'],
   dependencies = [
     'src/python/pants/backend/graph_info/tasks',
-    'src/python/pants/backend/python/targets:python',
+    'src/python/pants/backend/python/targets',
     'src/python/pants/build_graph',
     'src/python/pants/testutil:task_test_base',
   ],

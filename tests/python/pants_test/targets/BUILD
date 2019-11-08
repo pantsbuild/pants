@@ -54,7 +54,7 @@ python_tests(
   sources = ['test_python_binary.py'],
   dependencies = [
     ':base',
-    'src/python/pants/backend/python/targets:python',
+    'src/python/pants/backend/python/targets',
     'src/python/pants/build_graph',
   ]
 )
@@ -78,7 +78,7 @@ python_tests(
   dependencies = [
     'src/python/pants/backend/jvm:artifact',
     'src/python/pants/backend/jvm:repository',
-    'src/python/pants/backend/python/targets:python',
+    'src/python/pants/backend/python/targets',
     'src/python/pants/backend/python:python_artifact',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',

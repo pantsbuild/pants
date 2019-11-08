@@ -17,7 +17,7 @@ python_tests(
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/project_info/tasks:dependencies',
-    'src/python/pants/backend/python/targets:python',
+    'src/python/pants/backend/python/targets',
     'src/python/pants/backend/python:python_requirement',
     'src/python/pants/build_graph',
     'src/python/pants/testutil:task_test_base',
