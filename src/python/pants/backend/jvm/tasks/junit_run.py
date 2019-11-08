@@ -350,10 +350,12 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     if result == 0:
       return TestResult.successful
 
+    # NB: If the TestRegistry fails to find the owning target of a failed test, the target key in
+    # this dictionary will be None: helper methods in this block account for that.
     target_to_failed_test = parse_failed_targets(test_registry, output_dir, parse_error_handler)
 
     def sort_owning_target(t):
-      return t.address.spec if t else None
+      return t.address.spec if t else ''
 
     failed_targets = sorted(target_to_failed_test, key=sort_owning_target)
     error_message_lines = []
