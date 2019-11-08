@@ -7,7 +7,7 @@ python_tests(
   dependencies=[
     'src/python/pants/backend/python:python_requirement',
     'src/python/pants/backend/python:plugin',
-    'src/python/pants/backend/python/targets:python',
+    'src/python/pants/backend/python/targets',
     'src/python/pants/base:build_environment',
     'src/python/pants/testutil:test_base',
   ]
@@ -17,7 +17,7 @@ python_tests(
   name='python_requirement_list',
   sources=['test_python_requirement_list.py'],
   dependencies=[
-    'src/python/pants/backend/python/targets:python',
+    'src/python/pants/backend/python/targets',
     'src/python/pants/backend/python:python_requirement',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
