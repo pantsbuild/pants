@@ -4,8 +4,7 @@
 target(
   name = 'test_deps',
   dependencies = [
-    '3rdparty/python:mock',
-    'tests/python/pants_test:test_base'
+    'src/python/pants/testutil:test_base'
   ]
 )
 
@@ -16,7 +15,6 @@ python_tests(
   dependencies = [
     ':test_deps',
     'src/python/pants/pantsd:process_manager',
-    'src/python/pants/util:process_handler',
   ]
 )
 
@@ -45,7 +43,6 @@ python_tests(
   sources = ['test_pailgun_server.py'],
   coverage = ['pants.pantsd.pailgun_server'],
   dependencies = [
-    '3rdparty/python:future',
     ':test_deps',
     'src/python/pants/pantsd:pailgun_server'
   ]
@@ -71,8 +68,8 @@ python_library(
     '3rdparty/python:ansicolors',
     'src/python/pants/pantsd:process_manager',
     'src/python/pants/util:collections',
-    'tests/python/pants_test/testutils:process_test_util',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:process_test_util',
+    'src/python/pants/testutil:int-test',
   ],
 )
 
@@ -80,11 +77,15 @@ python_tests(
   name = 'pantsd_integration',
   sources = ['test_pantsd_integration.py'],
   dependencies = [
-    '3rdparty/python:future',
     ':pantsd_integration_test_base',
-    'tests/python/pants_test:int-test',
-    'tests/python/pants_test/testutils:process_test_util',
-    'tests/python/pants_test/testutils:py2_compat',
+    'examples/src/java/org/pantsbuild/example:hello_directory',
+    'examples/src/python/example:hello_directory',
+    'examples/src/scala/org/pantsbuild/example:hello_directory',
+    'testprojects/src/java/org/pantsbuild/testproject:bundle_directory',
+    'testprojects/src/python:bad_requirements_directory',
+    'testprojects/src/python:coordinated_runs_directory',
+    'testprojects/src/python:nested_runs_directory',
+    'testprojects/src/python:print_env_directory',
   ],
   tags = {'integration'},
   timeout = 900
@@ -96,7 +97,7 @@ python_tests(
   coverage = ['pants.pantsd.watchman_launcher'],
   dependencies = [
     'tests/python/pants_test/pantsd:test_deps',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil/subsystem',
     'src/python/pants/pantsd:watchman_launcher'
   ]
 )

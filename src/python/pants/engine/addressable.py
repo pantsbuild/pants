@@ -1,29 +1,37 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import inspect
-from builtins import object
+from collections.abc import MutableMapping, MutableSequence
+from dataclasses import dataclass
 from functools import update_wrapper
 
-from future.utils import string_types
-
+from pants.base.specs import Spec
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.objects import Collection, Resolvable, Serializable
-from pants.util.collections_abc_backport import MutableMapping, MutableSequence
 from pants.util.objects import TypeConstraintError
 
 
-Addresses = Collection.of(Address)
+class Addresses(Collection[Address]):
+  pass
 
 
-class BuildFileAddresses(Collection.of(BuildFileAddress)):
+@dataclass(frozen=True)
+class ProvenancedBuildFileAddress:
+  """A BuildFileAddress along with the cmd-line spec it was generated from."""
+  build_file_address: BuildFileAddress
+  provenance: Spec
+
+
+class BuildFileAddresses(Collection[BuildFileAddress]):
   @property
   def addresses(self):
     """Converts the BuildFileAddress objects in this collection to Address objects."""
     return [bfa.to_address() for bfa in self]
+
+
+class ProvenancedBuildFileAddresses(Collection[ProvenancedBuildFileAddress]):
+  pass
 
 
 class NotSerializableError(TypeError):
@@ -38,7 +46,7 @@ class AddressableTypeValidationError(TypeConstraintError):
   """Indicates a value provided to an `AddressableDescriptor` failed to satisfy a type constraint."""
 
 
-class AddressableDescriptor(object):
+class AddressableDescriptor:
   """A data descriptor for fields containing one or more addressable items.
 
   An addressable descriptor has lifecycle expectations tightly coupled with the contract of
@@ -74,7 +82,7 @@ class AddressableDescriptor(object):
 
      >>> class Thing(Struct):
      ...   def __init__(self, thing):
-     ...     super(Thing, self).__init__()
+     ...     super().__init__()
      ...     self.thing = thing
      ...   @property
      ...   def parent(self):
@@ -154,7 +162,7 @@ class AddressableDescriptor(object):
     if value is None:
       return None
 
-    if isinstance(value, (string_types, Address, Resolvable)):
+    if isinstance(value, (str, Address, Resolvable)):
       return value
 
     # Support untyped dicts that we deserialize on-demand here into the required type.
@@ -209,7 +217,7 @@ def _addressable_wrapper(addressable_descriptor, type_constraint):
     #
     # class Thing(Struct):
     #   def __init__(self, thing):
-    #      super(Thing, self).__init__()
+    #      super().__init__()
     #      self.thing = thing
     #
     #   @property

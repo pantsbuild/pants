@@ -1,23 +1,16 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import inspect
 from abc import abstractmethod
-from builtins import object
 from collections import defaultdict
 
-import six
-
 from pants.base.build_file_target_factory import BuildFileTargetFactory
-from pants.base.deprecated import deprecated_conditional
 from pants.build_graph.target import Target
 from pants.util.memo import memoized_property
 
 
-class TargetMacro(object):
+class TargetMacro:
   """A specialized context aware object factory responsible for instantiating a set of target types.
 
   The macro acts to expand arguments to its alias in a BUILD file into one or more target
@@ -39,15 +32,8 @@ class TargetMacro(object):
       :rtype: :class:`TargetMacro.Factory`
       """
       if not target_types:
-        raise ValueError('The given `context_aware_object_factory` {} must expand at least 1 '
-                         'produced type; none were registered'.format(context_aware_object_factory))
-      deprecated_conditional(
-        lambda: len(target_types) > 1,
-        '1.12.0.dev0',
-        'TargetMacro.Factory instances that construct more than one type are no longer supported. '
-        'Consider using a `context_aware_object_factory, which can construct any number of '
-        'different objects.'
-      )
+        raise ValueError('The given `context_aware_object_factory` {} must expand 1 produced '
+                         'type; none were registered'.format(context_aware_object_factory))
 
       class Factory(cls):
         @property
@@ -92,7 +78,7 @@ class TargetMacro(object):
     """Expands the given BUILD file arguments in to one or more target addressable instances."""
 
 
-class BuildFileAliases(object):
+class BuildFileAliases:
   """A structure containing sets of symbols to be exposed in BUILD files.
 
   There are three types of symbols that can be directly exposed:
@@ -119,7 +105,7 @@ class BuildFileAliases(object):
 
   @classmethod
   def _validate_alias(cls, category, alias, obj):
-    if not isinstance(alias, six.string_types):
+    if not isinstance(alias, str):
       raise TypeError('Aliases must be strings, given {category} entry {alias!r} of type {typ} as '
                       'the alias of {obj}'
                       .format(category=category, alias=alias, typ=type(alias).__name__, obj=obj))

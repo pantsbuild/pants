@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
-from pants_test.testutils.py2_compat import assertRegex
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
 
 
 class PythonReplIntegrationTest(PantsRunIntegrationTest):
@@ -14,8 +10,8 @@ class PythonReplIntegrationTest(PantsRunIntegrationTest):
   def test_run_repl(self):
     # Run a repl on a library target. Avoid some known-to-choke-on interpreters.
     command = ['repl',
-               'testprojects/src/python/interpreter_selection:echo_interpreter_version_lib',
                '--python-setup-interpreter-constraints=CPython>=2.7,<3',
+               'testprojects/src/python/interpreter_selection:echo_interpreter_version_lib',
                '--quiet']
     program = 'from interpreter_selection.echo_interpreter_version import say_hello; say_hello()'
     pants_run = self.run_pants(command=command, stdin_data=program)
@@ -26,20 +22,20 @@ class PythonReplIntegrationTest(PantsRunIntegrationTest):
   def test_run_repl_with_2(self):
     # Run a Python 2 repl on a Python 2/3 library target.
     command = ['repl',
-               'testprojects/src/python/interpreter_selection:echo_interpreter_version_lib',
                '--python-setup-interpreter-constraints=["CPython<3"]',
+               'testprojects/src/python/interpreter_selection:echo_interpreter_version_lib',
                '--quiet']
     program = 'from interpreter_selection.echo_interpreter_version import say_hello; say_hello()'
     pants_run = self.run_pants(command=command, stdin_data=program)
-    assertRegex(self, pants_run.stdout_data, r'2\.\d\.\d')
+    self.assertRegex(pants_run.stdout_data, r'2\.\d\.\d')
 
   @ensure_daemon
   def test_run_repl_with_3(self):
     # Run a Python 3 repl on a Python 2/3 library target. Avoid some known-to-choke-on interpreters.
     command = ['repl',
-               'testprojects/src/python/interpreter_selection:echo_interpreter_version_lib',
                '--python-setup-interpreter-constraints=["CPython>=3.3"]',
+               'testprojects/src/python/interpreter_selection:echo_interpreter_version_lib',
                '--quiet']
     program = 'from interpreter_selection.echo_interpreter_version import say_hello; say_hello()'
     pants_run = self.run_pants(command=command, stdin_data=program)
-    assertRegex(self, pants_run.stdout_data, r'3\.\d\.\d')
+    self.assertRegex(pants_run.stdout_data, r'3\.\d\.\d')

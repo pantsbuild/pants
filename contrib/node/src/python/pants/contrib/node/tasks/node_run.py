@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
@@ -17,7 +14,7 @@ class NodeRun(NodeTask):
 
   @classmethod
   def register_options(cls, register):
-    super(NodeRun, cls).register_options(register)
+    super().register_options(register)
     register('--script-name', default='start',
              help='The script name to run.')
 

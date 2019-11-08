@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import os
@@ -36,7 +33,7 @@ class AntlrPyGen(SimpleCodegenTask, NailgunTask):
 
   @classmethod
   def register_options(cls, register):
-    super(AntlrPyGen, cls).register_options(register)
+    super().register_options(register)
     # The ANTLR compiler.
     cls.register_jvm_tool(register, 'antlr3',
                           classpath=[JarDependency(org='org.antlr', name='antlr', rev=_ANTLR3_REV)],
@@ -47,7 +44,7 @@ class AntlrPyGen(SimpleCodegenTask, NailgunTask):
 
   def find_sources(self, target, target_dir):
     # Ignore .tokens files.
-    sources = super(AntlrPyGen, self).find_sources(target, target_dir)
+    sources = super().find_sources(target, target_dir)
     return [source for source in sources if source.endswith('.py')]
 
   def is_gentarget(self, target):
@@ -61,7 +58,7 @@ class AntlrPyGen(SimpleCodegenTask, NailgunTask):
 
   @property
   def _copy_target_attributes(self):
-    return super(AntlrPyGen, self)._copy_target_attributes + ['compatibility']
+    return super()._copy_target_attributes + ['compatibility']
 
   @memoized_method
   def _deps(self):

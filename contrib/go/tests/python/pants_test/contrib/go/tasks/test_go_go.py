@@ -1,14 +1,10 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import open
 
+from pants.testutil.task_test_base import TaskTestBase
 from pants.util.contextutil import temporary_file
-from pants_test.task_test_base import TaskTestBase
 
 from pants.contrib.go.targets.go_binary import GoBinary
 from pants.contrib.go.tasks.go_go import GoEnv, GoGo, GoInteropTask

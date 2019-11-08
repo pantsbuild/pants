@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import open, str
 
 from pex.interpreter import PythonInterpreter
 
@@ -16,8 +12,8 @@ from pants.backend.python.tasks.gather_sources import GatherSources
 from pants.build_graph.files import Files
 from pants.build_graph.resources import Resources
 from pants.source.source_root import SourceRootConfig
+from pants.testutil.task_test_base import TaskTestBase
 from pants.util.contextutil import temporary_dir
-from pants_test.task_test_base import TaskTestBase
 
 
 class GatherSourcesTest(TaskTestBase):
@@ -26,7 +22,7 @@ class GatherSourcesTest(TaskTestBase):
     return GatherSources
 
   def setUp(self):
-    super(GatherSourcesTest, self).setUp()
+    super().setUp()
 
     self.filemap = {
       'src/python/one/foo.py': 'foo_py_content',

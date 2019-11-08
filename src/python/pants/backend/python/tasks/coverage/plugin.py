@@ -14,6 +14,11 @@ from coverage.parser import PythonParser
 from coverage.python import PythonFileReporter
 
 
+# NB: This file must keep Python 2 support because it is a resource that may be run with Python 2.
+
+
+
+
 class SimpleFileTracer(FileTracer):
   def __init__(self, filename):
     super(SimpleFileTracer, self).__init__()
@@ -58,14 +63,21 @@ class ChrootRemappingPlugin(CoveragePlugin):
     self._target_bases = set(self._src_to_target_base.values())
 
   def find_executable_files(self, top):
+    # coverage uses this to associate files with this plugin.
+    # We only want to be associated with the sources we know about.
     if top.startswith(self._src_chroot_path):
-      for root, dirs, files in os.walk(top):
-        for f in files:
-          if f.endswith('.py'):
-            yield os.path.join(root, f)
+      for dirname, _, filenames in os.walk(top):
+        reldir = os.path.relpath(dirname, self._src_chroot_path)
+        for filename in filenames:
+          if os.path.join(reldir, filename) in self._src_to_target_base:
+            yield os.path.join(dirname, filename)
 
   def file_tracer(self, filename):
-    # Don't trace third party libraries or the standard lib, just user code in the src chroot.
+    # Note that coverage will only call this on files that we yielded from find_executable_files(),
+    # so they should all pass this check anyway, but it doesn't hurt to check again.
+    # Note also that you cannot exclude .py files from tracing or reporting by returning None here.
+    # All that does is register this plugin's disinterest in the file, but coverage will still
+    # trace and report it using the standard tracer and reporter.
     if filename.startswith(self._src_chroot_path):
       src = os.path.relpath(filename, self._src_chroot_path)
       if src in self._src_to_target_base:

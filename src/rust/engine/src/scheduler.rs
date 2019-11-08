@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::{HashMap, HashSet};
+use std::convert::TryInto;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::{mpsc, Arc};
@@ -10,14 +11,15 @@ use std::time::Duration;
 use futures::future::{self, Future};
 
 use crate::context::{Context, Core};
-use crate::core::{Failure, Params, TypeConstraint, Value};
-use crate::nodes::{NodeKey, Select, Tracer, TryInto, Visualizer};
-use crate::selectors;
+use crate::core::{Failure, Params, TypeId, Value};
+use crate::nodes::{NodeKey, Select, Tracer, Visualizer};
 use graph::{EntryId, Graph, InvalidationResult, NodeContext};
 use indexmap::IndexMap;
 use log::{debug, info, warn};
+use logging::logger::LOGGER;
 use parking_lot::Mutex;
 use ui::EngineDisplay;
+use workunit_store::WorkUnitStore;
 
 ///
 /// A Session represents a related series of requests (generally: one run of the pants CLI) on an
@@ -26,32 +28,71 @@ use ui::EngineDisplay;
 /// Both Scheduler and Session are exposed to python and expected to be used by multiple threads, so
 /// they use internal mutability in order to avoid exposing locks to callers.
 ///
-pub struct Session {
+struct InnerSession {
   // The total size of the graph at Session-creation time.
   preceding_graph_size: usize,
   // The set of roots that have been requested within this session.
   roots: Mutex<HashSet<Root>>,
   // If enabled, the display that will render the progress of the V2 engine.
-  display: Option<Mutex<EngineDisplay>>,
+  display: Option<Arc<Mutex<EngineDisplay>>>,
+  // If enabled, Zipkin spans for v2 engine will be collected.
+  should_record_zipkin_spans: bool,
+  // A place to store info about workunits in rust part
+  workunit_store: WorkUnitStore,
+  build_id: String,
 }
 
+#[derive(Clone)]
+pub struct Session(Arc<InnerSession>);
+
 impl Session {
-  pub fn new(scheduler: &Scheduler, should_render_ui: bool, ui_worker_count: usize) -> Session {
-    Session {
+  pub fn new(
+    scheduler: &Scheduler,
+    should_record_zipkin_spans: bool,
+    should_render_ui: bool,
+    ui_worker_count: usize,
+    build_id: String,
+  ) -> Session {
+    let inner_session = InnerSession {
       preceding_graph_size: scheduler.core.graph.len(),
       roots: Mutex::new(HashSet::new()),
-      display: EngineDisplay::create(ui_worker_count, should_render_ui).map(Mutex::new),
-    }
+      display: EngineDisplay::create(ui_worker_count, should_render_ui)
+        .map(|x| Arc::new(Mutex::new(x))),
+      should_record_zipkin_spans: should_record_zipkin_spans,
+      workunit_store: WorkUnitStore::new(),
+      build_id: build_id,
+    };
+    Session(Arc::new(inner_session))
   }
 
   fn extend(&self, new_roots: &[Root]) {
-    let mut roots = self.roots.lock();
+    let mut roots = self.0.roots.lock();
     roots.extend(new_roots.iter().cloned());
   }
 
   fn root_nodes(&self) -> Vec<NodeKey> {
-    let roots = self.roots.lock();
+    let roots = self.0.roots.lock();
     roots.iter().map(|r| r.clone().into()).collect()
+  }
+
+  pub fn preceding_graph_size(&self) -> usize {
+    self.0.preceding_graph_size
+  }
+
+  fn maybe_display(&self) -> Option<&Arc<Mutex<EngineDisplay>>> {
+    self.0.display.as_ref()
+  }
+
+  pub fn should_record_zipkin_spans(&self) -> bool {
+    self.0.should_record_zipkin_spans
+  }
+
+  pub fn workunit_store(&self) -> WorkUnitStore {
+    self.0.workunit_store.clone()
+  }
+
+  pub fn build_id(&self) -> &str {
+    &self.0.build_id
   }
 }
 
@@ -107,12 +148,12 @@ impl Scheduler {
     &self,
     request: &mut ExecutionRequest,
     params: Params,
-    product: TypeConstraint,
+    product: TypeId,
   ) -> Result<(), String> {
     let edges = self
       .core
       .rule_graph
-      .find_root_edges(params.type_ids(), &selectors::Select::new(product))?;
+      .find_root_edges(params.type_ids(), product)?;
     request
       .roots
       .push(Select::new_from_edges(params, product, &edges));
@@ -168,7 +209,10 @@ impl Scheduler {
         .graph
         .reachable_digest_count(&session.root_nodes()) as i64,
     );
-    m.insert("preceding_graph_size", session.preceding_graph_size as i64);
+    m.insert(
+      "preceding_graph_size",
+      session.preceding_graph_size() as i64,
+    );
     m.insert("resulting_graph_size", self.core.graph.len() as i64);
     m
   }
@@ -189,7 +233,7 @@ impl Scheduler {
     roots: Vec<Root>,
     count: usize,
   ) {
-    let executor = context.core.runtime.get().executor();
+    let core = context.core.clone();
     // Attempt all roots in parallel, failing fast to retry for `Invalidated`.
     let roots_res = future::join_all(
       roots
@@ -225,7 +269,7 @@ impl Scheduler {
 
     // If the join failed (due to `Invalidated`, since that is the only error we propagate), retry
     // the entire set of roots.
-    executor.spawn(roots_res.then(move |res| {
+    core.executor.spawn_and_ignore(roots_res.then(move |res| {
       if let Ok(res) = res {
         sender.send(res).map_err(|_| ())
       } else {
@@ -248,6 +292,7 @@ impl Scheduler {
     // individual Future in the join was (eventually) mapped into success.
     let context = RootContext {
       core: self.core.clone(),
+      session: session.clone(),
     };
     let (sender, receiver) = mpsc::channel();
 
@@ -256,67 +301,92 @@ impl Scheduler {
       .roots
       .clone()
       .into_iter()
-      .map(|s| s.into())
+      .map(NodeKey::from)
       .collect();
-
-    // Lock the display for the remainder of the execution, and grab a reference to it.
-    let mut maybe_display = match &session.display {
-      &Some(ref d) => Some(d.lock()),
-      &None => None,
-    };
 
     // This map keeps the k most relevant jobs in assigned possitions.
     // Keys are positions in the display (display workers) and the values are the actual jobs to print.
     let mut tasks_to_display = IndexMap::new();
 
-    if let Some(ref mut display) = maybe_display {
-      display.start();
-    };
+    match session.maybe_display() {
+      Some(display) => {
+        {
+          let mut display = display.lock();
+          display.start();
+        }
+        let unique_handle = LOGGER.register_engine_display(display.clone());
 
-    let results = loop {
-      if let Ok(res) = receiver.recv_timeout(Duration::from_millis(100)) {
-        break res;
-      } else if let Some(ref mut display) = maybe_display {
-        Scheduler::display_ongoing_tasks(&self.core.graph, &roots, display, &mut tasks_to_display);
+        let results = loop {
+          if let Ok(res) = receiver.recv_timeout(Duration::from_millis(100)) {
+            break res;
+          } else {
+            Scheduler::display_ongoing_tasks(
+              &self.core.graph,
+              &roots,
+              display,
+              &mut tasks_to_display,
+            );
+          }
+        };
+        LOGGER.deregister_engine_display(unique_handle);
+        {
+          let mut display = display.lock();
+          display.finish();
+        }
+        results
       }
-    };
-    if let Some(ref mut display) = maybe_display {
-      display.finish();
-    };
-
-    results
+      None => loop {
+        if let Ok(res) = receiver.recv_timeout(Duration::from_millis(100)) {
+          break res;
+        }
+      },
+    }
   }
 
   fn display_ongoing_tasks(
     graph: &Graph<NodeKey>,
     roots: &[NodeKey],
-    display: &mut EngineDisplay,
+    display: &Mutex<EngineDisplay>,
     tasks_to_display: &mut IndexMap<String, Duration>,
   ) {
     // Update the graph. To do that, we iterate over heavy hitters.
-    let heavy_hitters = graph.heavy_hitters(&roots, display.worker_count());
+
+    let worker_count = {
+      let d = display.lock();
+      d.worker_count()
+    };
+    let heavy_hitters = graph.heavy_hitters(&roots, worker_count);
+
     // Insert every one in the set of tasks to display.
     // For tasks already here, the durations are overwritten.
     tasks_to_display.extend(heavy_hitters.clone().into_iter());
+
     // And remove the tasks that no longer should be there.
     for (task, _) in tasks_to_display.clone().into_iter() {
       if !heavy_hitters.contains_key(&task) {
         tasks_to_display.swap_remove(&task);
       }
     }
-    let display_worker_count = display.worker_count();
-    let ongoing_tasks = tasks_to_display;
-    for (i, id) in ongoing_tasks.iter().enumerate() {
+
+    for (i, id) in tasks_to_display.iter().enumerate() {
       // TODO Maybe we want to print something else besides the ID here.
-      display.update(i.to_string(), format!("{:?}", id));
+      let mut d = display.lock();
+      d.update(i.to_string(), format!("{:?}", id));
     }
+
     // If the number of ongoing tasks is less than the number of workers,
     // fill the rest of the workers with empty string.
     // TODO(yic): further improve the UI. https://github.com/pantsbuild/pants/issues/6666
-    for i in ongoing_tasks.len()..display_worker_count {
-      display.update(i.to_string(), "".to_string());
+    let worker_count = {
+      let d = display.lock();
+      d.worker_count()
+    };
+
+    let mut d = display.lock();
+    for i in tasks_to_display.len()..worker_count {
+      d.update(i.to_string(), "".to_string());
     }
-    display.render();
+    d.render();
   }
 }
 
@@ -343,13 +413,14 @@ pub type RootResult = Result<Value, Failure>;
 #[derive(Clone)]
 struct RootContext {
   core: Arc<Core>,
+  session: Session,
 }
 
 impl NodeContext for RootContext {
   type Node = NodeKey;
 
   fn clone_for(&self, entry_id: EntryId) -> Context {
-    Context::new(entry_id, self.core.clone())
+    Context::new(entry_id, self.core.clone(), self.session.clone())
   }
 
   fn graph(&self) -> &Graph<NodeKey> {
@@ -360,6 +431,6 @@ impl NodeContext for RootContext {
   where
     F: Future<Item = (), Error = ()> + Send + 'static,
   {
-    self.core.runtime.get().executor().spawn(future);
+    self.core.executor.spawn_and_ignore(future);
   }
 }

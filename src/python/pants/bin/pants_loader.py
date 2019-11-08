@@ -1,18 +1,14 @@
-# coding=utf-8
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import importlib
 import locale
 import os
 import warnings
-from builtins import object
 from textwrap import dedent
 
 
-class PantsLoader(object):
+class PantsLoader:
   """Loads and executes entrypoints."""
 
   ENTRYPOINT_ENV_VAR = 'PANTS_ENTRYPOINT'
@@ -30,15 +26,15 @@ class PantsLoader(object):
     # The "default" action displays a warning for a particular file and line number exactly once.
     # See https://docs.python.org/3/library/warnings.html#the-warnings-filter for the complete list.
     #
-    # However, we do turn off deprecation warnings for libraries that Pants uses for which we do not have a fixed
-    # upstream version, typically because the library is no longer maintained.
+    # However, we do turn off deprecation warnings for libraries that Pants uses for which we do
+    # not have a fixed upstream version, typically because the library is no longer maintained.
     warnings.simplefilter('default', category=DeprecationWarning)
-    # TODO: Future has a pending PR to fix deprecation warnings at https://github.com/PythonCharmers/python-future/pull/421.
-    # Remove this filter once that gets merged.
-    warnings.filterwarnings('ignore', category=DeprecationWarning, module="future")
-    # TODO: Eric-Arellano has emailed the author to see if he is willing to accept a PR fixing the deprecation warnings
-    # and to release the fix. If he says yes, remove this once fixed.
+    # TODO: Eric-Arellano has emailed the author to see if he is willing to accept a PR fixing the
+    # deprecation warnings and to release the fix. If he says yes, remove this once fixed.
     warnings.filterwarnings('ignore', category=DeprecationWarning, module="ansicolors")
+    # Silence this ubiquitous warning. Several of our 3rd party deps incur this.
+    warnings.filterwarnings('ignore', category=DeprecationWarning,
+        message="Using or importing the ABCs from 'collections' instead of from 'collections.abc' is deprecated")
 
   @classmethod
   def ensure_locale(cls):
@@ -47,7 +43,7 @@ class PantsLoader(object):
     # libraries called by Pants may fail with more obscure errors.
     encoding = locale.getpreferredencoding()
     if encoding.lower() != 'utf-8' and os.environ.get(cls.ENCODING_IGNORE_ENV_VAR, None) is None:
-      raise cls.InvalidLocaleError(dedent("""\
+      raise cls.InvalidLocaleError(dedent("""
         Your system's preferred encoding is `{}`, but Pants requires `UTF-8`.
         Specifically, Python's `locale.getpreferredencoding()` must resolve to `UTF-8`.
 

@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import codecs
 import os
@@ -12,8 +9,8 @@ from contextlib import contextmanager
 from unittest import skipIf
 
 from pants.base.build_environment import get_buildroot
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants_test.backend.jvm.tasks.missing_jvm_check import is_missing_jvm
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class JunitRunIntegrationTest(PantsRunIntegrationTest):

@@ -6,6 +6,7 @@ python_library(
   name = 'plugin',
   sources = ['__init__.py', 'register.py'],
   dependencies = [
+    'src/python/pants/backend/project_info/rules',
     'src/python/pants/backend/project_info/tasks:all',
     'src/python/pants/goal:task_registrar',
   ],

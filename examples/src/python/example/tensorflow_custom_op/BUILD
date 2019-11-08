@@ -8,7 +8,6 @@
 python_library(
   sources=['zero_out_custom_op.py'],
   dependencies=[
-    '3rdparty/python:future',
     'examples/3rdparty/python:tensorflow',
     ':tensorflow-zero-out-op-wrapper',
   ],
@@ -33,7 +32,6 @@ python_dist(
 
 ctypes_compatible_cpp_library(
   name='tensorflow-zero-out-op',
-  compiler_option_sets={'glibcxx_use_old_abi'},
   dependencies=[
     'examples/3rdparty/python:tensorflow-framework',
   ],

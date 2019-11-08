@@ -1,17 +1,16 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import unittest
 
-from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
-                                                                    PinnedJarArtifactSet)
+from pants.backend.jvm.subsystems.jar_dependency_management import (
+  JarDependencyManagement,
+  PinnedJarArtifactSet,
+)
 from pants.java.jar.jar_dependency_utils import M2Coordinate
 from pants.subsystem.subsystem import Subsystem
-from pants_test.subsystem.subsystem_util import global_subsystem_instance
-from pants_test.test_base import TestBase
+from pants.testutil.subsystem.util import global_subsystem_instance
+from pants.testutil.test_base import TestBase
 
 
 class JarDependencyManagementTest(TestBase):

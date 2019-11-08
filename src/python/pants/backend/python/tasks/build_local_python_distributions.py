@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import glob
 import os
@@ -16,8 +13,10 @@ from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.native.tasks.link_shared_libraries import SharedLibrary
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.subsystems.pex_build_util import is_local_python_dist
-from pants.backend.python.subsystems.python_native_code import (BuildSetupRequiresPex,
-                                                                PythonNativeCode)
+from pants.backend.python.subsystems.python_native_code import (
+  BuildSetupRequiresPex,
+  PythonNativeCode,
+)
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError
@@ -63,11 +62,11 @@ class BuildLocalPythonDistributions(Task):
 
   @classmethod
   def implementation_version(cls):
-    return super(BuildLocalPythonDistributions, cls).implementation_version() + [('BuildLocalPythonDistributions', 3)]
+    return super().implementation_version() + [('BuildLocalPythonDistributions', 3)]
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(BuildLocalPythonDistributions, cls).subsystem_dependencies() + (
+    return super().subsystem_dependencies() + (
       BuildSetupRequiresPex.scoped(cls),
       PythonNativeCode.scoped(cls),
     )
@@ -94,9 +93,10 @@ class BuildLocalPythonDistributions(Task):
     reqs_to_resolve = set()
 
     for setup_req_lib_addr in dist_target.setup_requires:
-      for req_lib in self.context.build_graph.resolve(setup_req_lib_addr):
-        for req in req_lib.requirements:
-          reqs_to_resolve.add(req)
+      for maybe_req_lib in self.context.build_graph.resolve(setup_req_lib_addr):
+        if isinstance(maybe_req_lib, PythonRequirementLibrary):
+          for req in maybe_req_lib.requirements:
+            reqs_to_resolve.add(req)
 
     if not reqs_to_resolve:
       return None
@@ -125,7 +125,7 @@ class BuildLocalPythonDistributions(Task):
         local_wheel_products = self.context.products.get('local_wheels')
         for vt in invalidation_check.all_vts:
           dist = self._get_whl_from_dir(vt.results_dir)
-          req_lib_addr = Address.parse('{}__req_lib'.format(vt.target.address.spec))
+          req_lib_addr = Address.parse(f'{vt.target.address.spec}__req_lib')
           self._inject_synthetic_dist_requirements(dist, req_lib_addr)
           # Make any target that depends on the dist depend on the synthetic req_lib,
           # for downstream consumption.
@@ -211,11 +211,11 @@ class BuildLocalPythonDistributions(Task):
 
     setup_reqs_pex_path = os.path.join(
       setup_requires_dir,
-      'setup-requires-{}.pex'.format(versioned_target_fingerprint))
+      f'setup-requires-{versioned_target_fingerprint}.pex')
     setup_requires_pex = self._build_setup_requires_pex_settings.bootstrap(
       interpreter, setup_reqs_pex_path, extra_reqs=setup_reqs_to_resolve)
     self.context.log.debug('Using pex file as setup.py interpreter: {}'
-                           .format(setup_requires_pex))
+                           .format(setup_requires_pex.path()))
 
     self._create_dist(
       dist_target,
@@ -235,7 +235,7 @@ class BuildLocalPythonDistributions(Task):
 
     NB: adds a '+' before the fingerprint to the build tag!
     """
-    egg_info_snapshot_tag_args = ['egg_info', '--tag-build=+{}'.format(snapshot_fingerprint)]
+    egg_info_snapshot_tag_args = ['egg_info', f'--tag-build=+{snapshot_fingerprint}']
     bdist_whl_args = ['bdist_wheel']
     if is_platform_specific:
       platform_args = ['--plat-name', pep425tags.get_platform()]
@@ -281,6 +281,7 @@ class BuildLocalPythonDistributions(Task):
                     interpreter=setup_requires_pex.path(),
                     command=setup_py_snapshot_version_argv))
 
+  # TODO: convert this into a SimpleCodegenTask, which does the exact same thing as this method!
   def _inject_synthetic_dist_requirements(self, dist, req_lib_addr):
     """Inject a synthetic requirements library that references a local wheel.
 

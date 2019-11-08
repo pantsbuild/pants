@@ -1,15 +1,11 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import json
 import os
-from builtins import open
 
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import temporary_dir
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class TestJvmDependencyUsageIntegration(PantsRunIntegrationTest):
@@ -77,6 +73,14 @@ class TestJvmDependencyUsageIntegration(PantsRunIntegrationTest):
 
   def test_no_summary_works(self):
     target = 'testprojects/src/java/org/pantsbuild/testproject/unicode/main'
+    with self.temporary_cachedir() as cachedir, \
+      self.temporary_workdir() as workdir:
+      for compiler in ['rsc']:
+        self._run_dep_usage(workdir, target, clean_all=True, cachedir=cachedir,
+          extra_args=['--no-dep-usage-jvm-summary', '--jvm-platform-compiler={}'.format(compiler)])
+
+  def test_dep_usage_target_with_no_deps(self):
+    target = 'testprojects/src/java/org/pantsbuild/testproject/nocache'
     with self.temporary_cachedir() as cachedir, \
       self.temporary_workdir() as workdir:
       self._run_dep_usage(workdir, target, clean_all=True, cachedir=cachedir,

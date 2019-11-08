@@ -1,25 +1,22 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import copy
 import re
 import sys
-from builtins import object, open, str
-
-from twitter.common.collections import OrderedSet
+from dataclasses import dataclass
 
 from pants.base.deprecated import warn_or_error
-from pants.option.arg_splitter import GLOBAL_SCOPE, ArgSplitter
+from pants.option.arg_splitter import ArgSplitter
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_tracker import OptionTracker
 from pants.option.option_util import is_list_option
 from pants.option.option_value_container import OptionValueContainer
+from pants.option.parser import Parser
 from pants.option.parser_hierarchy import ParserHierarchy, all_enclosing_scopes, enclosing_scope
-from pants.option.scope import ScopeInfo
-from pants.util.memo import memoized_method
+from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
+from pants.util.memo import memoized_method, memoized_property
+from pants.util.meta import frozen_after_init
 
 
 def make_flag_regex(long_name, short_name=None):
@@ -33,7 +30,7 @@ def make_flag_regex(long_name, short_name=None):
   return re.compile(rx_str)
 
 
-class Options(object):
+class Options:
   """The outward-facing API for interacting with options.
 
   Supports option registration and fetching option values.
@@ -81,6 +78,9 @@ class Options(object):
   class FrozenOptionsError(Exception):
     """Options are frozen and can't be mutated."""
 
+  class DuplicateScopeError(Exception):
+    """More than one registration occurred for the same scope."""
+
   @classmethod
   def complete_scopes(cls, scope_infos):
     """Expand a set of scopes to include all enclosing scopes.
@@ -90,13 +90,17 @@ class Options(object):
     Also adds any deprecated scopes.
     """
     ret = {GlobalOptionsRegistrar.get_scope_info()}
-    original_scopes = set()
+    original_scopes = dict()
     for si in scope_infos:
       ret.add(si)
-      original_scopes.add(si.scope)
+      if si.scope in original_scopes:
+        raise cls.DuplicateScopeError('Scope `{}` claimed by {}, was also claimed by {}.'.format(
+            si.scope, si, original_scopes[si.scope]
+          ))
+      original_scopes[si.scope] = si
       if si.deprecated_scope:
         ret.add(ScopeInfo(si.deprecated_scope, si.category, si.optionable_cls))
-        original_scopes.add(si.deprecated_scope)
+        original_scopes[si.deprecated_scope] = si
 
     # TODO: Once scope name validation is enforced (so there can be no dots in scope name
     # components) we can replace this line with `for si in scope_infos:`, because it will
@@ -196,20 +200,28 @@ class Options(object):
     """
     return self._goals
 
-  # TODO: Replace this with a formal way of registering v2-only goals.
-  # See https://github.com/pantsbuild/pants/issues/6651
-  @property
-  def goals_and_possible_v2_goals(self):
-    """Goals, including any unrecognised scopes which may be v2-only goals.
+  @memoized_property
+  def goals_by_version(self):
+    """Goals organized into three tuples by whether they are v1, ambiguous, or v2 goals (respectively).
 
-    Experimental API which shouldn't be relied on outside of Pants itself.
+    It's possible for a goal to be implemented with both v1 and v2, in which case a consumer
+    should use the `--v1` and `--v2` global flags to disambiguate.
     """
-    if self._unknown_scopes:
-      r = OrderedSet(self.goals)
-      r.update(self._unknown_scopes)
-      return r
-    else:
-      return self.goals
+    v1, ambiguous, v2 = [], [], []
+    for goal in self._goals:
+      goal_dot = '{}.'.format(goal)
+      scope_categories = {s.category
+                          for s in self.known_scope_to_info.values()
+                          if s.scope == goal or s.scope.startswith(goal_dot)}
+      is_v1 = ScopeInfo.TASK in scope_categories
+      is_v2 = ScopeInfo.GOAL in scope_categories
+      if is_v1 and is_v2:
+        ambiguous.append(goal)
+      elif is_v1:
+        v1.append(goal)
+      else:
+        v2.append(goal)
+    return tuple(v1), tuple(ambiguous), tuple(v2)
 
   @property
   def known_scope_to_info(self):
@@ -354,6 +366,71 @@ class Options(object):
             hint='Use scope {} instead (options: {})'.format(scope, ', '.join(explicit_keys))
           )
 
+  @frozen_after_init
+  @dataclass(unsafe_hash=True)
+  class _ScopedFlagNameForFuzzyMatching:
+    """Specify how a registered option would look like on the command line.
+
+    This information enables fuzzy matching to suggest correct option names when a user specifies an
+    unregistered option on the command line.
+
+    :param scope: the 'scope' component of a command-line flag.
+    :param arg: the unscoped flag name as it would appear on the command line.
+    :param normalized_arg: the fully-scoped option name, without any leading dashes.
+    :param scoped_arg: the fully-scoped option as it would appear on the command line.
+    """
+    scope: str
+    arg: str
+    normalized_arg: str
+    scoped_arg: str
+
+    def __init__(self, scope: str, arg: str) -> None:
+      self.scope = scope
+      self.arg = arg
+      self.normalized_arg = re.sub('^-+', '', arg)
+      if scope == GLOBAL_SCOPE:
+        self.scoped_arg = arg
+      else:
+        dashed_scope = scope.replace('.', '-')
+        self.scoped_arg = f'--{dashed_scope}-{self.normalized_arg}'
+
+    @property
+    def normalized_scoped_arg(self):
+      return re.sub(r'^-+', '', self.scoped_arg)
+
+  @memoized_property
+  def _all_scoped_flag_names_for_fuzzy_matching(self):
+    """A list of all registered flags in all their registered scopes.
+
+    This list is used for fuzzy matching against unrecognized option names across registered
+    scopes on the command line.
+    """
+    all_scoped_flag_names = []
+    def register_all_scoped_names(parser):
+      scope = parser.scope
+      known_args = parser.known_args
+      for arg in known_args:
+        scoped_flag = self._ScopedFlagNameForFuzzyMatching(
+          scope=scope,
+          arg=arg,
+        )
+        all_scoped_flag_names.append(scoped_flag)
+    self.walk_parsers(register_all_scoped_names)
+    return sorted(all_scoped_flag_names, key=lambda flag_info: flag_info.scoped_arg)
+
+  def _make_parse_args_request(self, flags_in_scope, namespace):
+    levenshtein_max_distance = (
+      self._bootstrap_option_values.option_name_check_distance
+      if self._bootstrap_option_values
+      else 0
+    )
+    return Parser.ParseArgsRequest(
+      flags_in_scope=flags_in_scope,
+      namespace=namespace,
+      get_all_scoped_flag_names=lambda: self._all_scoped_flag_names_for_fuzzy_matching,
+      levenshtein_max_distance=levenshtein_max_distance,
+    )
+
   # TODO: Eagerly precompute backing data for this?
   @memoized_method
   def for_scope(self, scope, inherit_from_enclosing_scope=True):
@@ -373,7 +450,8 @@ class Options(object):
 
     # Now add our values.
     flags_in_scope = self._scope_to_flags.get(scope, [])
-    self._parser_hierarchy.get_parser_by_scope(scope).parse_args(flags_in_scope, values)
+    parse_args_request = self._make_parse_args_request(flags_in_scope, values)
+    self._parser_hierarchy.get_parser_by_scope(scope).parse_args(parse_args_request)
 
     # Check for any deprecation conditions, which are evaluated using `self._flag_matchers`.
     if inherit_from_enclosing_scope:

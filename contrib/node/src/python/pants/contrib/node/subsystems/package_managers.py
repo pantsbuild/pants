@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import logging
-from builtins import object
 
 from pants.contrib.node.subsystems.command import command_gen
 
@@ -19,7 +15,7 @@ VALID_PACKAGE_MANAGERS = [PACKAGE_MANAGER_NPM, PACKAGE_MANAGER_YARNPKG, PACKAGE_
 
 
 # TODO: Change to enum type when migrated to Python 3.4+
-class PackageInstallationTypeOption(object):
+class PackageInstallationTypeOption:
   PROD = 'prod'
   DEV = 'dev'
   PEER = 'peer'
@@ -28,12 +24,12 @@ class PackageInstallationTypeOption(object):
   NO_SAVE = 'not saved'
 
 
-class PackageInstallationVersionOption(object):
+class PackageInstallationVersionOption:
   EXACT = 'exact'
   TILDE = 'tilde'
 
 
-class PackageManager(object):
+class PackageManager:
   """Defines node package manager functionalities."""
 
   def __init__(self, name, tool_installations):
@@ -152,7 +148,7 @@ class PackageManager(object):
 class PackageManagerYarnpkg(PackageManager):
 
   def __init__(self, tool_installation):
-    super(PackageManagerYarnpkg, self).__init__(PACKAGE_MANAGER_YARNPKG, tool_installation)
+    super().__init__(PACKAGE_MANAGER_YARNPKG, tool_installation)
 
   def _get_run_script_args(self):
     return ['run']
@@ -198,7 +194,7 @@ class PackageManagerYarnpkg(PackageManager):
 class PackageManagerNpm(PackageManager):
 
   def __init__(self, tool_installation):
-    super(PackageManagerNpm, self).__init__(PACKAGE_MANAGER_NPM, tool_installation)
+    super().__init__(PACKAGE_MANAGER_NPM, tool_installation)
 
   def _get_run_script_args(self):
     return ['run-script']

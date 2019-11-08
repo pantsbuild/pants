@@ -1,14 +1,11 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import open
 from textwrap import dedent
 
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
+from pants.backend.jvm.subsystems.scoverage_platform import ScoveragePlatform
 from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.scalafmt import ScalaFmtCheckFormat, ScalaFmtFormat
@@ -16,24 +13,25 @@ from pants.base.exceptions import TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.resources import Resources
 from pants.source.source_root import SourceRootConfig
+from pants.testutil.jvm.nailgun_task_test_base import NailgunTaskTestBase
+from pants.testutil.subsystem.util import init_subsystem
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import fast_relpath
-from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
-from pants_test.subsystem.subsystem_util import init_subsystem
 
 
 class ScalaFmtTestBase(NailgunTaskTestBase):
   @classmethod
   def alias_groups(cls):
-    return super(ScalaFmtTestBase, cls).alias_groups().merge(
+    return super().alias_groups().merge(
       BuildFileAliases(targets={'java_tests': JUnitTests,
                                 'junit_tests': JUnitTests,
                                 'scala_library': ScalaLibrary}))
 
   def setUp(self):
-    super(ScalaFmtTestBase, self).setUp()
+    super().setUp()
 
     init_subsystem(ScalaPlatform)
+    init_subsystem(ScoveragePlatform)
     init_subsystem(SourceRootConfig)
 
     self.configuration = self.create_file(

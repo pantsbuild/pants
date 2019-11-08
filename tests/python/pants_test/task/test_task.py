@@ -1,25 +1,20 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import open, str
-
-from future.utils import PY2
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.files import Files
+from pants.build_graph.target_filter_subsystem import TargetFilter
 from pants.cache.cache_setup import CacheSetup
-from pants.option.arg_splitter import GLOBAL_SCOPE
+from pants.option.scope import GLOBAL_SCOPE
 from pants.subsystem.subsystem import Subsystem
 from pants.subsystem.subsystem_client_mixin import SubsystemDependency
 from pants.task.task import Task
+from pants.testutil.task_test_base import TaskTestBase
 from pants.util.dirutil import safe_rmtree
-from pants_test.task_test_base import TaskTestBase
 
 
 class DummyTask(Task):
@@ -66,7 +61,7 @@ class FakeTask(Task):
 
   @classmethod
   def implementation_version(cls):
-    return super(FakeTask, cls).implementation_version() + cls._impls
+    return super().implementation_version() + cls._impls
 
   @classmethod
   def supports_passthru_args(cls):
@@ -78,7 +73,7 @@ class FakeTask(Task):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(FakeTask, cls).subsystem_dependencies() + cls._deps
+    return super().subsystem_dependencies() + cls._deps
 
   def execute(self): pass
 
@@ -92,7 +87,7 @@ class OtherFakeTask(FakeTask):
 
   @classmethod
   def implementation_version(cls):
-    return super(OtherFakeTask, cls).implementation_version() + cls._other_impls
+    return super().implementation_version() + cls._other_impls
 
   options_scope = 'other-fake-task'
 
@@ -102,7 +97,7 @@ class FakeSubsystem(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(FakeSubsystem, cls).register_options(register)
+    super().register_options(register)
     register('--fake-option', type=bool)
 
 
@@ -111,7 +106,7 @@ class SubsystemWithDependencies(Subsystem):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(SubsystemWithDependencies, cls).subsystem_dependencies() + (FakeSubsystem,)
+    return super().subsystem_dependencies() + (FakeSubsystem,)
 
 
 class AnotherFakeTask(Task):
@@ -123,7 +118,7 @@ class AnotherFakeTask(Task):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(AnotherFakeTask, cls).subsystem_dependencies() + (FakeSubsystem.scoped(cls),)
+    return super().subsystem_dependencies() + (FakeSubsystem.scoped(cls),)
 
   def execute(self): pass
 
@@ -141,12 +136,17 @@ class TaskWithTransitiveSubsystemDependencies(Task):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(TaskWithTransitiveSubsystemDependencies, cls).subsystem_dependencies() + (
+    return super().subsystem_dependencies() + (
       SubsystemWithDependencies,
     )
 
   def execute(self):
     pass
+
+
+class TaskWithTargetFiltering(DummyTask):
+  options_scope = 'task-with-target-filtering'
+  target_filtering_enabled = True
 
 
 class TaskTest(TaskTestBase):
@@ -226,14 +226,12 @@ files(
     if scope is None:
       scope = cls.options_scope
     subclass_name = 'test_{0}_{1}_{2}'.format(cls.__name__, scope, name)
-    if PY2:
-      subclass_name = subclass_name.encode('utf-8')
     kwargs['options_scope'] = scope
     return type(subclass_name, (cls,), kwargs)
 
   def _instantiate_synthesized_type(self, task_type, **kwargs):
     """Generate a new instance of the synthesized type `task_type`."""
-    ctx = super(TaskTestBase, self).context(for_task_types=[task_type], **kwargs)
+    ctx = super().context(for_task_types=[task_type], **kwargs)
     return task_type(ctx, self.test_workdir)
 
   def _task_type_to_fp(self, task_type, **kwargs):
@@ -543,20 +541,20 @@ files(
     versioned_fake = self._synth_fp(_impls=[('asdf', 0)])
     base_version_other_fake = self._synth_fp(
       cls=OtherFakeTask,
-       _impls=[('asdf', 0)],
+      _impls=[('asdf', 0)],
       _other_impls=[],
     )
     self.assertNotEqual(base_version_other_fake, versioned_fake)
     extended_version_other_fake = self._synth_fp(
       cls=OtherFakeTask,
-       _impls=[('asdf', 0)],
+      _impls=[('asdf', 0)],
       _other_impls=[('xxx', 0)],
     )
     self.assertNotEqual(extended_version_other_fake, base_version_other_fake)
 
     extended_version_copy = self._synth_fp(
       cls=OtherFakeTask,
-       _impls=[('asdf', 1)],
+      _impls=[('asdf', 1)],
       _other_impls=[('xxx', 0)],
     )
     self.assertNotEqual(extended_version_copy, extended_version_other_fake)
@@ -608,6 +606,34 @@ files(
     task_opt_true_fp = self._synth_fp(cls=AnotherFakeTask, options_fingerprintable=cur_option_spec)
     self.assertNotEqual(task_opt_true_fp, task_opt_false_fp)
 
+  def assert_passthru_args(self, expected=None, passthrough_args=(), passthrough_args_option=()):
+    aft_type = self.synthesize_task_subtype(AnotherFakeTask, 'aft')
+    context = self.context(
+      for_task_types=[aft_type],
+      options={aft_type.options_scope: {'passthrough_args': passthrough_args_option}},
+      passthru_args=passthrough_args
+    )
+    aft = aft_type(context=context, workdir=self.test_workdir)
+    self.assertEqual(expected, aft.get_passthru_args())
+
+  def test_passthru_args_empty(self):
+    self.assert_passthru_args(expected=[])
+
+  def test_passthru_args_non_empty(self):
+    self.assert_passthru_args(expected=['a', 'b'], passthrough_args=['a', 'b'])
+
+  def test_passthru_args_option(self):
+    self.assert_passthru_args(expected=['c', 'd'], passthrough_args_option=['c', 'd'])
+
+  def test_passthru_args_mixed(self):
+    self.assert_passthru_args(expected=['c', 'd', 'a', 'b'],
+                              passthrough_args=['a', 'b'],
+                              passthrough_args_option=['c', 'd'])
+
+  def test_passthru_args_option_shlex_ignored(self):
+    self.assert_passthru_args(expected=['a b'], passthrough_args=['a b'])
+    self.assert_passthru_args(expected=['c "d e"'], passthrough_args_option=['c "d e"'])
+
   def test_fingerprint_passthru_args(self):
     """Passthrough arguments should affect fingerprints iff the task
     supports passthrough args."""
@@ -650,3 +676,9 @@ files(
     fp3 = self._synth_fp(cls=TaskWithTransitiveSubsystemDependencies,
                          options_fingerprintable=option_spec)
     self.assertNotEqual(fp1, fp3)
+
+  def test_target_filtering_enabled(self):
+    self.assertNotIn(TargetFilter.scoped(DummyTask),
+                     DummyTask.subsystem_dependencies())
+    self.assertIn(TargetFilter.scoped(TaskWithTargetFiltering),
+                  TaskWithTargetFiltering.subsystem_dependencies())

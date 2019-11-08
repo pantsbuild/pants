@@ -1,10 +1,6 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from builtins import object
 
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.base.payload import Payload
@@ -13,12 +9,12 @@ from pants.base.payload_field import PrimitiveField, PrimitivesSetField
 from pants.contrib.scalajs.subsystems.scala_js_platform import ScalaJSPlatform
 
 
-class ScalaJSTarget(object):
+class ScalaJSTarget:
   """A mixin for ScalaJS targets to injects scala-js deps and request ScalaJS compilation."""
 
   @classmethod
   def subsystems(cls):
-    return super(ScalaJSTarget, cls).subsystems() + (JvmPlatform, ScalaJSPlatform)
+    return super().subsystems() + (JvmPlatform, ScalaJSPlatform)
 
   def __init__(self, address=None, payload=None, **kwargs):
     self.address = address  # Set in case a TargetDefinitionException is thrown early
@@ -27,11 +23,11 @@ class ScalaJSTarget(object):
       'platform': PrimitiveField(None),
       'compiler_option_sets': PrimitivesSetField(None)
     })
-    super(ScalaJSTarget, self).__init__(address=address, payload=payload, **kwargs)
+    super().__init__(address=address, payload=payload, **kwargs)
 
   @classmethod
   def compute_dependency_specs(cls, kwargs=None, payload=None):
-    for spec in super(ScalaJSTarget, cls).compute_dependency_specs(kwargs, payload):
+    for spec in super().compute_dependency_specs(kwargs, payload):
       yield spec
     for spec in ScalaJSPlatform.global_instance().injectables_specs_for_key('runtime'):
       yield spec

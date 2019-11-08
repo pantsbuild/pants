@@ -1,22 +1,18 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
+import subprocess
 import unittest
-from builtins import open
 from contextlib import contextmanager
 from textwrap import dedent
 from unittest import skipIf
 
 from pants.scm.git import Git
 from pants.scm.scm import Scm
+from pants.testutil.git_util import MIN_REQUIRED_GIT_VERSION, git_version
 from pants.util.contextutil import environment_as, pushd, temporary_dir
 from pants.util.dirutil import chmod_plus_x, safe_mkdir, safe_mkdtemp, safe_open, safe_rmtree, touch
-from pants.util.process_handler import subprocess
-from pants_test.testutils.git_util import MIN_REQUIRED_GIT_VERSION, git_version
 
 
 @skipIf(git_version() < MIN_REQUIRED_GIT_VERSION,
@@ -70,7 +66,7 @@ class GitTest(unittest.TestCase):
       subprocess.check_call(['git', 'branch', '--set-upstream-to', 'depot/master'])
 
       with safe_open(self.readme_file, 'wb') as readme:
-        readme.write('Hello World.\u2764'.encode('utf-8'))
+        readme.write('Hello World.\u2764'.encode())
       subprocess.check_call(['git', 'commit', '-am', 'Update README.'])
 
       self.current_rev = subprocess.check_output(['git', 'rev-parse', 'HEAD']).strip()
@@ -118,7 +114,7 @@ class GitTest(unittest.TestCase):
     for dirname in 'dir', './dir':
       results = reader.listdir(dirname)
       self.assertEqual([b'f',
-                         'not-absolute\u2764'.encode('utf-8'),
+                         'not-absolute\u2764'.encode(),
                          b'relative-dotdot',
                          b'relative-nonexistent',
                          b'relative-symlink'],
@@ -126,7 +122,7 @@ class GitTest(unittest.TestCase):
 
     results = reader.listdir('link-to-dir')
     self.assertEqual([b'f',
-                       'not-absolute\u2764'.encode('utf-8'),
+                       'not-absolute\u2764'.encode(),
                        b'relative-dotdot',
                        b'relative-nonexistent',
                        b'relative-symlink'],
@@ -180,7 +176,7 @@ class GitTest(unittest.TestCase):
     current_reader = self.git.repo_reader(self.current_rev)
 
     with current_reader.open('README') as f:
-      self.assertEqual('Hello World.\u2764'.encode('utf-8'), f.read())
+      self.assertEqual('Hello World.\u2764'.encode(), f.read())
 
     with current_reader.open('link-to-dir/f') as f:
       self.assertEqual(b'file in subdir', f.read())
@@ -209,7 +205,7 @@ class GitTest(unittest.TestCase):
         pass
 
     with current_reader.open('dir/relative-dotdot') as f:
-      self.assertEqual('Hello World.\u2764'.encode('utf-8'), f.read())
+      self.assertEqual('Hello World.\u2764'.encode(), f.read())
 
   def test_integration(self):
     self.assertEqual(set(), self.git.changed_files())

@@ -1,20 +1,16 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import re
 import shutil
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 
 from pants.base.build_environment import get_buildroot
 from pants.util.dirutil import safe_mkdir
-from pants.util.meta import AbstractClass
 
 
-class NodeResolverBase(AbstractClass):
+class NodeResolverBase(ABC):
 
   file_regex = re.compile('^file:(.*)$')
 

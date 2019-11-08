@@ -1,14 +1,12 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import json
 from collections import defaultdict
 
 from pants.base.specs import DescendantAddresses
 from pants.task.console_task import ConsoleTask
+from pants.util.meta import classproperty
 
 
 class ReverseDepmap(ConsoleTask):
@@ -16,20 +14,24 @@ class ReverseDepmap(ConsoleTask):
 
   @classmethod
   def register_options(cls, register):
-    super(ReverseDepmap, cls).register_options(register)
-    register('--transitive', type=bool,
-             help='List transitive dependees.')
+    super().register_options(register)
     register('--closed', type=bool,
              help='Include the input targets in the output along with the dependees.')
     # TODO: consider refactoring out common output format methods into MultiFormatConsoleTask.
     register('--output-format', default='text', choices=['text', 'json'],
              help='Output format of results.')
+    register('--transitive', type=bool, default=False,
+             help='Whether to include only the first level of dependendees.')
 
   def __init__(self, *args, **kwargs):
-    super(ReverseDepmap, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
 
-    self._transitive = self.get_options().transitive
     self._closed = self.get_options().closed
+
+  @classproperty
+  def _register_console_transitivity_option(cls):
+    """This class does not use the targets provided as input!"""
+    return False
 
   def console_output(self, _):
     dependees_by_target = defaultdict(set)
@@ -57,7 +59,7 @@ class ReverseDepmap(ConsoleTask):
       if self._closed:
         # N.B. Sorting is necessary because `roots` is a set, and in Python 3 sets
         # are no longer consistently sorted (even though dictionaries are in 3.6+).
-        # Without this sort, the output of `./pants3 dependees` will vary every run.
+        # Without this sort, the output of `./pants dependees` will vary every run.
         for root in sorted(roots):
           yield root.address.spec
 
@@ -73,7 +75,7 @@ class ReverseDepmap(ConsoleTask):
       for target in check:
         dependents.update(dependees_by_target[target])
       check = dependents - known_dependents
-      if not check or not self._transitive:
+      if not check or not self.act_transitively:
         return dependents - set(roots)
       known_dependents = dependents
 

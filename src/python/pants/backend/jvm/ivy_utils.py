@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import json
 import logging
@@ -11,16 +8,15 @@ import pkgutil
 import threading
 import xml.etree.ElementTree as ET
 from abc import abstractmethod
-from builtins import object, open, str
-from collections import defaultdict, namedtuple
+from collections import OrderedDict, defaultdict, namedtuple
 from functools import total_ordering
 
-import six
-from future.utils import PY3
 from twitter.common.collections import OrderedSet
 
-from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
-                                                                    PinnedJarArtifactSet)
+from pants.backend.jvm.subsystems.jar_dependency_management import (
+  JarDependencyManagement,
+  PinnedJarArtifactSet,
+)
 from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrary
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.base.generator import Generator, TemplateData
@@ -31,12 +27,11 @@ from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency import JarDependency
 from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
 from pants.java.util import execute_runner
-from pants.util.collections_abc_backport import OrderedDict
 from pants.util.dirutil import safe_concurrent_creation, safe_mkdir, safe_open
 from pants.util.fileutil import atomic_copy, safe_hardlink_or_copy
 
 
-class IvyResolutionStep(object):
+class IvyResolutionStep:
   """Ivy specific class for describing steps of performing resolution."""
   # NB(nh): This class is the base class for the ivy resolve and fetch steps.
   # It also specifies the abstract methods that define the components of resolution steps.
@@ -270,7 +265,7 @@ class IvyResolveStep(IvyResolutionStep):
                           hash_name, self.pinned_artifacts)
 
 
-class FrozenResolution(object):
+class FrozenResolution:
   """Contains the abstracted results of a resolve.
 
   With this we can do a simple fetch.
@@ -371,12 +366,11 @@ class FrozenResolution(object):
       ])
 
     with safe_concurrent_creation(filename) as tmp_filename:
-      mode = 'w' if PY3 else 'wb'
-      with open(tmp_filename, mode) as f:
+      with open(tmp_filename, 'w') as f:
         json.dump(res, f)
 
 
-class IvyResolveResult(object):
+class IvyResolveResult:
   """The result of an Ivy resolution.
 
   The result data includes the list of resolved artifacts, the relationships between those artifacts
@@ -488,7 +482,7 @@ class IvyFetchResolveResult(IvyResolveResult):
 
   def __init__(self, resolved_artifact_paths, hardlink_map, resolve_hash_name, reports_by_conf,
                frozen_resolutions):
-    super(IvyFetchResolveResult, self).__init__(resolved_artifact_paths, hardlink_map,
+    super().__init__(resolved_artifact_paths, hardlink_map,
                                                 resolve_hash_name, reports_by_conf)
     self._frozen_resolutions = frozen_resolutions
 
@@ -517,7 +511,7 @@ class IvyResolveMappingError(Exception):
 
 
 @total_ordering
-class IvyModuleRef(object):
+class IvyModuleRef:
   """
   :API: public
   """
@@ -537,7 +531,7 @@ class IvyModuleRef(object):
   def __eq__(self, other):
     return isinstance(other, IvyModuleRef) and self._id == other._id
 
-  # TODO(python3port): Return NotImplemented if other does not have attributes
+  # TODO(#6071): Return NotImplemented if other does not have attributes
   def __lt__(self, other):
     # We can't just re-use __repr__ or __str_ because we want to order rev last
     return ((self.org, self.name, self.classifier or '', self.ext, self.rev) <
@@ -574,7 +568,7 @@ class IvyModuleRef(object):
                         ext=self.ext)
 
 
-class IvyInfo(object):
+class IvyInfo:
   """
   :API: public
   """
@@ -686,7 +680,7 @@ class IvyInfo(object):
     return 'IvyInfo(conf={}, refs={})'.format(self._conf, self.modules_by_ref.keys())
 
 
-class IvyUtils(object):
+class IvyUtils:
   """Useful methods related to interaction with ivy.
 
   :API: public
@@ -855,7 +849,7 @@ class IvyUtils(object):
         hardlink_map[path] = path
 
     # Create hardlinks for paths in the ivy cache dir.
-    for path, hardlink in six.iteritems(hardlink_map):
+    for path, hardlink in hardlink_map.items():
       if path == hardlink:
         # Skip paths that aren't going to be hardlinked.
         continue
@@ -1018,7 +1012,7 @@ class IvyUtils(object):
 
   @classmethod
   def _write_ivy_xml_file(cls, ivyxml, template_data, template_relpath):
-    template_text = pkgutil.get_data(__name__, template_relpath).decode('utf-8')
+    template_text = pkgutil.get_data(__name__, template_relpath).decode()
     generator = Generator(template_text, lib=template_data)
     with safe_open(ivyxml, 'w') as output:
       generator.write(output)

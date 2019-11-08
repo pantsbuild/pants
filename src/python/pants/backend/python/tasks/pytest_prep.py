@@ -1,11 +1,6 @@
-# coding=utf-8
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-import os
-from builtins import object
 
 import pkg_resources
 from pex.interpreter import PythonInterpreter
@@ -16,15 +11,34 @@ from pex.pex_info import PexInfo
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.python_execution_task_base import PythonExecutionTaskBase
+from pants.util.memo import memoized_classproperty
 
 
 class PytestPrep(PythonExecutionTaskBase):
-  """Prepares a PEX binary for the current test context with `py.test` as its entry-point."""
+  """Prepares a PEX binary for the current test context with `pytest` as its entry-point."""
 
-  class PytestBinary(object):
-    """A `py.test` PEX binary with an embedded default (empty) `pytest.ini` config file."""
+  class PytestBinary:
+    """A `pytest` PEX binary with an embedded default (empty) `pytest.ini` config file."""
 
-    _COVERAGE_PLUGIN_MODULE_NAME = '__{}__'.format(__name__.replace('.', '_'))
+    @staticmethod
+    def make_plugin_name(name):
+      return '__{}_{}_plugin__'.format(__name__.replace('.', '_'), name)
+
+    @memoized_classproperty
+    def coverage_plugin_module(cls):
+      """Return the name of the coverage plugin module embedded in this pytest binary.
+
+      :rtype: str
+      """
+      return cls.make_plugin_name('coverage')
+
+    @memoized_classproperty
+    def pytest_plugin_module(cls):
+      """Return the name of the pytest plugin module embedded in this pytest binary.
+
+      :rtype: str
+      """
+      return cls.make_plugin_name('pytest')
 
     def __init__(self, interpreter, pex):
       # Here we hack around `coverage.cmdline` nuking the 0th element of `sys.path` (our root pex)
@@ -33,8 +47,9 @@ class PytestPrep(PythonExecutionTaskBase):
       pex_path = pex.path()
       pex_info = PexInfo.from_pex(pex_path)
       pex_info.merge_pex_path(pex_path)  # We're now on the sys.path twice.
-      PEXBuilder(pex_path, interpreter=interpreter, pex_info=pex_info).freeze()
+      PEXBuilder(pex_path, interpreter=interpreter, pex_info=pex_info).freeze(bytecode_compile=False)
       self._pex = PEX(pex=pex_path, interpreter=interpreter)
+      self._interpreter = interpreter
 
     @property
     def pex(self):
@@ -45,24 +60,16 @@ class PytestPrep(PythonExecutionTaskBase):
       return self._pex
 
     @property
-    def config_path(self):
-      """Return the absolute path of the `pytest.ini` config file in this py.test binary.
+    def interpreter(self):
+      """Return the interpreter used to build this PEX.
 
-      :rtype: str
+      :rtype: :class:`pex.interpreter.PythonInterpreter`
       """
-      return os.path.join(self._pex.path(), 'pytest.ini')
-
-    @classmethod
-    def coverage_plugin_module(cls):
-      """Return the name of the coverage plugin module embedded in this py.test binary.
-
-      :rtype: str
-      """
-      return cls._COVERAGE_PLUGIN_MODULE_NAME
+      return self._interpreter
 
   @classmethod
   def implementation_version(cls):
-    return super(PytestPrep, cls).implementation_version() + [('PytestPrep', 2)]
+    return super().implementation_version() + [('PytestPrep', 2)]
 
   @classmethod
   def product_types(cls):
@@ -70,15 +77,19 @@ class PytestPrep(PythonExecutionTaskBase):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(PytestPrep, cls).subsystem_dependencies() + (PyTest,)
+    return super().subsystem_dependencies() + (PyTest,)
+
+  @classmethod
+  def _module_resource(cls, module_name, resource_relpath):
+    return cls.ExtraFile(path=f'{module_name}.py',
+                         content=pkg_resources.resource_string(__name__, resource_relpath))
+
+  def extra_files(self):
+    yield self._module_resource(self.PytestBinary.pytest_plugin_module, 'pytest/plugin.py')
+    yield self._module_resource(self.PytestBinary.coverage_plugin_module, 'coverage/plugin.py')
 
   def extra_requirements(self):
     return PyTest.global_instance().get_requirement_strings()
-
-  def extra_files(self):
-    yield self.ExtraFile.empty('pytest.ini')
-    yield self.ExtraFile(path='{}.py'.format(self.PytestBinary.coverage_plugin_module()),
-                         content=pkg_resources.resource_string(__name__, 'coverage/plugin.py'))
 
   def execute(self):
     if not self.context.targets(lambda t: isinstance(t, PythonTests)):

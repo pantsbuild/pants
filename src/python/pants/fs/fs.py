@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import hashlib
 import os
@@ -41,7 +38,7 @@ def safe_filename(name, extension=None, digest=None, max_length=_MAX_FILENAME_LE
     return filename
   else:
     digest = digest or hashlib.sha1()
-    digest.update(filename.encode('utf-8'))
+    digest.update(filename.encode())
     hexdigest = digest.hexdigest()[:16]
 
     # Prefix and suffix length: max length less 2 periods, the extension length, and the digest length.
@@ -55,6 +52,14 @@ def safe_filename(name, extension=None, digest=None, max_length=_MAX_FILENAME_LE
       raise ValueError('Digest {} failed to produce a filename <= {} '
                        'characters for {} - got {}'.format(digest, max_length, filename, safe_name))
     return safe_name
+
+
+def safe_filename_from_path(path, **kwargs):
+  """As for `safe_filename`, but takes a path.
+
+  First converts it into a name by replacing separator characters, and then calls safe_filename.
+  """
+  return safe_filename(path.strip(os.path.sep).replace(os.path.sep, '.'), **kwargs)
 
 
 def expand_path(path):

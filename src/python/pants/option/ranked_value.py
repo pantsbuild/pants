@@ -1,13 +1,8 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
 
-from builtins import object
-
-
-class RankedValue(object):
+class RankedValue:
   """An option value, together with a rank inferred from its source.
 
   Allows us to control which source wins: e.g., a command-line flag overrides an environment
@@ -89,7 +84,8 @@ class RankedValue(object):
     return sorted(cls._RANK_NAMES.values(), key=cls.get_rank_value)
 
   @classmethod
-  def prioritized_iter(cls, flag_val, env_val, config_val, config_default_val, hardcoded_val, default):
+  def prioritized_iter(cls, flag_val, env_val, config_val, config_default_val,
+                       hardcoded_val, default):
     """Yield the non-None values from highest-ranked to lowest, wrapped in RankedValue instances."""
     if flag_val is not None:
       yield RankedValue(cls.FLAG, flag_val)

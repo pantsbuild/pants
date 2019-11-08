@@ -1,19 +1,14 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from builtins import object, range, zip
-from collections import deque
+from collections import Counter, deque
 from contextlib import contextmanager
 from multiprocessing.pool import ThreadPool
+from urllib.parse import urlparse
 
 import requests
-from future.moves.urllib.parse import urlparse
 
 from pants.cache.artifact_cache import ArtifactCacheError
-from pants.util.collections_abc_backport import Counter
 from pants.util.contextutil import Timer
 from pants.util.memo import memoized_method
 
@@ -23,7 +18,7 @@ class InvalidRESTfulCacheProtoError(ArtifactCacheError):
   pass
 
 
-class Pinger(object):
+class Pinger:
   # Signifies that a netloc is unreachable.
   UNREACHABLE = 999999
 
@@ -72,7 +67,7 @@ class Pinger(object):
     return list(zip(urls, rt_secs))
 
 
-class BestUrlSelector(object):
+class BestUrlSelector:
   SUPPORTED_PROTOCOLS = ('http', 'https')
   MAX_FAILURES = 3
 

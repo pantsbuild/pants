@@ -1,36 +1,32 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from builtins import str
-
-from twitter.common.collections import OrderedDict
+from collections import OrderedDict
 
 from pants.backend.native.targets.native_artifact import NativeArtifact
 from pants.backend.native.targets.native_library import CLibrary, CppLibrary
 from pants.backend.native.tasks.c_compile import CCompile
 from pants.backend.native.tasks.cpp_compile import CppCompile
 from pants.backend.native.tasks.link_shared_libraries import LinkSharedLibraries
+from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.util.meta import classproperty
-from pants_test.backend.python.tasks.python_task_test_base import check_wheel_platform_matches_host
-from pants_test.backend.python.tasks.util.build_local_dists_test_base import \
-  BuildLocalPythonDistributionsTestBase
+from pants_test.backend.python.tasks.util.build_local_dists_test_base import (
+  BuildLocalPythonDistributionsTestBase,
+)
 
 
 class TestBuildLocalDistsWithCtypesNativeSources(BuildLocalPythonDistributionsTestBase):
 
   @classproperty
-  def _run_before_task_types(cls):
+  def run_before_task_types(cls):
     return [
       CCompile,
       CppCompile,
       LinkSharedLibraries,
-    ] + super(TestBuildLocalDistsWithCtypesNativeSources, cls)._run_before_task_types
+    ] + super().run_before_task_types
 
-  _dist_specs = OrderedDict([
+  dist_specs = OrderedDict([
 
     ('src/python/plat_specific_c_dist:ctypes_c_library', {
       'key': 'ctypes_c_library',
@@ -106,23 +102,52 @@ setup(
 
   def test_ctypes_c_dist(self):
     platform_specific_dist = self.target_dict['platform_specific_ctypes_c_dist']
-    context, synthetic_target, snapshot_version = self._create_distribution_synthetic_target(
-      platform_specific_dist, extra_targets=[self.target_dict['ctypes_c_library']])
-    self.assertEqual(['platform_specific_ctypes_c_dist==0.0.0+{}'.format(snapshot_version)],
-                      [str(x.requirement) for x in synthetic_target.requirements.value])
-    local_wheel_products = context.products.get('local_wheels')
-    local_wheel = self._retrieve_single_product_at_target_base(
-      local_wheel_products, platform_specific_dist)
-    self.assertTrue(check_wheel_platform_matches_host(local_wheel))
+    self._assert_dist_and_wheel_identity(
+      expected_name='platform_specific_ctypes_c_dist',
+      expected_version='0.0.0',
+      expected_platform=self.ExpectedPlatformType.current,
+      dist_target=platform_specific_dist,
+      extra_targets=[self.target_dict['ctypes_c_library']],
+    )
 
   def test_ctypes_cpp_dist(self):
     platform_specific_dist = self.target_dict['platform_specific_ctypes_cpp_dist']
-    context, synthetic_target, snapshot_version = self._create_distribution_synthetic_target(
-      platform_specific_dist, extra_targets=[self.target_dict['ctypes_cpp_library']])
-    self.assertEqual(['platform_specific_ctypes_cpp_dist==0.0.0+{}'.format(snapshot_version)],
-                      [str(x.requirement) for x in synthetic_target.requirements.value])
+    self._assert_dist_and_wheel_identity(
+      expected_name='platform_specific_ctypes_cpp_dist',
+      expected_version='0.0.0',
+      expected_platform=self.ExpectedPlatformType.current,
+      dist_target=platform_specific_dist,
+      extra_targets=[self.target_dict['ctypes_cpp_library']],
+    )
 
-    local_wheel_products = context.products.get('local_wheels')
-    local_wheel = self._retrieve_single_product_at_target_base(
-      local_wheel_products, platform_specific_dist)
-    self.assertTrue(check_wheel_platform_matches_host(local_wheel))
+  def test_multiplatform_python_setup_resolve_bypasses_python_setup(self):
+    self.set_options_for_scope('python-setup',
+                               platforms=['current', 'linux-x86_64', 'macosx_10_14_x86_64'])
+    platform_specific_dist = self.target_dict['platform_specific_ctypes_cpp_dist']
+    self._assert_dist_and_wheel_identity(
+      expected_name='platform_specific_ctypes_cpp_dist',
+      expected_version='0.0.0',
+      expected_platform=self.ExpectedPlatformType.current,
+      dist_target=platform_specific_dist,
+      extra_targets=[self.target_dict['ctypes_cpp_library']],
+    )
+
+  def test_resolve_for_native_sources_allows_current_platform_only(self):
+    platform_specific_dist = self.target_dict['platform_specific_ctypes_cpp_dist']
+    compatible_python_binary_target = self.make_target(
+      spec='src/python/plat_specific:bin',
+      target_type=PythonBinary,
+      dependencies=[platform_specific_dist],
+      entry_point='this-will-not-run',
+      platforms=['current'],
+    )
+    self._assert_dist_and_wheel_identity(
+      expected_name='platform_specific_ctypes_cpp_dist',
+      expected_version='0.0.0',
+      expected_platform=self.ExpectedPlatformType.current,
+      dist_target=platform_specific_dist,
+      extra_targets=[
+        self.target_dict['ctypes_cpp_library'],
+        compatible_python_binary_target,
+      ],
+    )

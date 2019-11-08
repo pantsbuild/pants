@@ -1,13 +1,10 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
+from pathlib import Path
 
-import os
-
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
 from pants.util.contextutil import temporary_dir
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
 
 
 class SchedulerIntegrationTest(PantsRunIntegrationTest):
@@ -18,12 +15,13 @@ class SchedulerIntegrationTest(PantsRunIntegrationTest):
     # results.
     with temporary_dir() as destdir:
       args = [
-          '--native-engine-visualize-to={}'.format(destdir),
+          f'--native-engine-visualize-to={destdir}',
           'list',
           'examples/src/scala/org/pantsbuild/example/hello/welcome',
         ]
       self.assert_success(self.run_pants(args))
-      self.assertTrue(len(os.listdir(destdir)) > 0)
+      destdir_files = list(Path(destdir).iterdir())
+      self.assertTrue(len(destdir_files) > 0)
 
   @ensure_daemon
   def test_graceful_termination(self):
@@ -35,5 +33,8 @@ class SchedulerIntegrationTest(PantsRunIntegrationTest):
     ]
     pants_result = self.run_pants(args)
     self.assert_failure(pants_result)
-    self.assertEqual(pants_result.stdout_data, 'examples/src/scala/org/pantsbuild/example/hello/welcome:welcome\n')
+    self.assertEqual(
+      pants_result.stdout_data,
+      'examples/src/scala/org/pantsbuild/example/hello/welcome:welcome\n'
+    )
     self.assertEqual(pants_result.returncode, 42)

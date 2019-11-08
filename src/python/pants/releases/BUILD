@@ -5,8 +5,8 @@ python_binary(
   name = 'reversion',
   source = 'reversion.py',
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
   ],
 )
 

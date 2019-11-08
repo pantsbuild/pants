@@ -1,19 +1,15 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import json
 import os
-from builtins import object, str
 from collections import defaultdict
 
-import six
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.resolve_subsystem import JvmResolveSubsystem
+from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.backend.jvm.targets.jvm_app import JvmApp
@@ -60,15 +56,15 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
   #
   # Note format changes in src/docs/export.md and update the Changelog section.
   #
-  DEFAULT_EXPORT_VERSION = '1.0.10'
+  DEFAULT_EXPORT_VERSION = '1.0.11'
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(ExportTask, cls).subsystem_dependencies() + (
-      DistributionLocator, JvmPlatform, PythonInterpreterCache
+    return super().subsystem_dependencies() + (
+      DistributionLocator, JvmPlatform, PythonInterpreterCache, ScalaPlatform
     )
 
-  class SourceRootTypes(object):
+  class SourceRootTypes:
     """Defines SourceRoot Types Constants"""
     SOURCE = 'SOURCE'  # Source Target
     TEST = 'TEST'  # Test Target
@@ -102,7 +98,7 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
 
   @classmethod
   def register_options(cls, register):
-    super(ExportTask, cls).register_options(register)
+    super().register_options(register)
     register('--libraries', default=True, type=bool,
              help='Causes libraries to be output.')
     register('--libraries-sources', type=bool,
@@ -118,7 +114,7 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(ExportTask, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     if options.libraries or options.libraries_sources or options.libraries_javadocs:
       round_manager.optional_data('java')
       round_manager.optional_data('scala')
@@ -287,6 +283,15 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
     for target in targets:
       process_target(target)
 
+    scala_platform = ScalaPlatform.global_instance()
+    scala_platform_map = {
+      'scala_version': scala_platform.version,
+      'compiler_classpath': [
+        cp_entry.path
+        for cp_entry in scala_platform.compiler_classpath_entries(self.context.products)
+      ],
+    }
+
     jvm_platforms_map = {
       'default_platform' : JvmPlatform.global_instance().default_platform.name,
       'platforms': {
@@ -301,6 +306,7 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
       'version': self.DEFAULT_EXPORT_VERSION,
       'targets': targets_map,
       'jvm_platforms': jvm_platforms_map,
+      'scala_platform': scala_platform_map,
       # `jvm_distributions` are static distribution settings from config,
       # `preferred_jvm_distributions` are distributions that pants actually uses for the
       # given platform setting.
@@ -340,7 +346,7 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
       default_interpreter = min(python_interpreter_targets_mapping.keys())
 
       interpreters_info = {}
-      for interpreter, targets in six.iteritems(python_interpreter_targets_mapping):
+      for interpreter, targets in python_interpreter_targets_mapping.items():
         req_libs = [target for target in Target.closure_for_targets(targets)
                     if has_python_requirements(target)]
         chroot = self.resolve_requirements(interpreter, req_libs)
@@ -375,7 +381,7 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
 
   @memoized_property
   def target_aliases_map(self):
-    registered_aliases = self.context.build_file_parser.registered_aliases()
+    registered_aliases = self.context.build_configuration.registered_aliases()
     mapping = {}
     for alias, target_types in registered_aliases.target_types_by_alias.items():
       # If a target class is registered under multiple aliases returns the last one.
@@ -408,7 +414,7 @@ class Export(ExportTask, ConsoleTask):
   """
 
   def __init__(self, *args, **kwargs):
-    super(ExportTask, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
 
   def console_output(self, targets, classpath_products=None):
     graph_info = self.generate_targets_map(targets, classpath_products=classpath_products)

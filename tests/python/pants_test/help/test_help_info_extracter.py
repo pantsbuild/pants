@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import unittest
 
@@ -98,18 +95,6 @@ class HelpInfoExtracterTest(unittest.TestCase):
     self.assertEqual('999.99.9', ohi.removal_version)
     self.assertEqual('do not use this', ohi.removal_hint)
     self.assertIsNotNone(ohi.deprecated_message)
-
-  def test_fromfile(self):
-    ohi = HelpInfoExtracter('').get_option_help_info([], {})
-    self.assertFalse(ohi.fromfile)
-
-    kwargs = {'fromfile': False}
-    ohi = HelpInfoExtracter('').get_option_help_info([], kwargs)
-    self.assertFalse(ohi.fromfile)
-
-    kwargs = {'fromfile': True}
-    ohi = HelpInfoExtracter('').get_option_help_info([], kwargs)
-    self.assertTrue(ohi.fromfile)
 
   def test_grouping(self):
     def do_test(kwargs, expected_basic=False, expected_recursive=False, expected_advanced=False):

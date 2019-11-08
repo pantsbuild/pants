@@ -1,30 +1,28 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import re
 import unittest
-from builtins import object, str
 from collections import defaultdict
 
-from future.utils import PY3
+from pants.backend.jvm.tasks.jvm_compile.execution_graph import (
+  ExecutionFailure,
+  ExecutionGraph,
+  Job,
+  JobExistsError,
+  NoRootJobError,
+  UnknownJobError,
+)
 
-from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailure, ExecutionGraph,
-                                                                 Job, JobExistsError,
-                                                                 NoRootJobError, UnknownJobError)
-from pants_test.testutils.py2_compat import assertRegex
 
-
-class ImmediatelyExecutingPool(object):
+class ImmediatelyExecutingPool:
   num_workers = 1
 
   def submit_async_work(self, work):
     work.func(*work.args_tuples[0])
 
 
-class PrintLogger(object):
+class PrintLogger:
 
   def error(self, msg):
     print(msg)
@@ -33,7 +31,7 @@ class PrintLogger(object):
     print(msg)
 
 
-class CapturingLogger(object):
+class CapturingLogger:
 
   log_entries = defaultdict(list)
 
@@ -204,7 +202,7 @@ class ExecutionGraphTest(unittest.TestCase):
       ExecutionGraph([self.job("A", passing_fn, []),
                       self.job("B", passing_fn, ["Z"])], False)
 
-    self.assertEqual("Unexecutable graph: Undefined dependencies " + ("'Z'" if PY3 else "u'Z'"),
+    self.assertEqual("Unexecutable graph: Undefined dependencies 'Z'",
                      str(cm.exception))
 
   def test_on_success_callback_raises_error(self):
@@ -228,7 +226,7 @@ class ExecutionGraphTest(unittest.TestCase):
       ExecutionGraph([self.job("Same", passing_fn, []),
                       self.job("Same", passing_fn, [])], False)
 
-    self.assertEqual("Unexecutable graph: Job already scheduled " + ("'Same'" if PY3 else "u'Same'"),
+    self.assertEqual("Unexecutable graph: Job already scheduled 'Same'",
                      str(cm.exception))
 
   def test_priorities_for_chain_of_jobs(self):
@@ -314,10 +312,11 @@ class ExecutionGraphTest(unittest.TestCase):
     with self.assertRaises(ExecutionFailure):
       graph.execute(ImmediatelyExecutingPool(), capturing_logger)
     error_logs = capturing_logger.log_entries['error']
-    self.assertEqual(2, len(error_logs), msg='Wanted one error log, got: {}'.format(error_logs))
-    self.assertEqual("A failed: I'm an error", error_logs[0])
+    self.assertEqual(2, len(error_logs), msg=f'Wanted one error log, got: {error_logs}')
+    regex = re.compile("A failed: I'm an error.*")
+    self.assertRegex(error_logs[0], regex)
     regex = re.compile(
-      "Traceback:.*in raising_wrapper.*raise Exception\\(\"I'm an error\"\\)",
+      "Traceback:.*in raising_wrapper.*raise Exception\\(\"I'm an error.*\"\\)",
       re.DOTALL,
     )
-    assertRegex(self, error_logs[1], regex)
+    self.assertRegex(error_logs[1], regex)

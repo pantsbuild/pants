@@ -1,14 +1,12 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import re
 import time
-from builtins import open
+from dataclasses import dataclass
 from textwrap import dedent
+from typing import Any
 
 from twitter.common.dirutil.fileset import Fileset
 
@@ -16,12 +14,15 @@ from pants.backend.codegen.antlr.java.antlr_java_gen import AntlrJavaGen
 from pants.backend.codegen.antlr.java.java_antlr_library import JavaAntlrLibrary
 from pants.base.exceptions import TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.testutil.jvm.nailgun_task_test_base import NailgunTaskTestBase
 from pants.util.dirutil import safe_mkdtemp
-from pants.util.objects import datatype
-from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 
 
-class DummyVersionedTarget(datatype(['target', 'results_dir'])):
+@dataclass(frozen=True)
+class DummyVersionedTarget:
+  target: Any
+  results_dir: Any
+
   @property
   def current_results_dir(self):
     return self.results_dir
@@ -34,7 +35,7 @@ class AntlrJavaGenTest(NailgunTaskTestBase):
 
   @classmethod
   def alias_groups(cls):
-    return super(AntlrJavaGenTest, cls).alias_groups().merge(BuildFileAliases(
+    return super().alias_groups().merge(BuildFileAliases(
       targets={
         'java_antlr_library': JavaAntlrLibrary,
       },
@@ -52,7 +53,7 @@ class AntlrJavaGenTest(NailgunTaskTestBase):
   BUILDFILE = '{srcroot}/{dir}/BUILD'.format(**PARTS)
 
   def setUp(self):
-    super(AntlrJavaGenTest, self).setUp()
+    super().setUp()
 
     for ver in self.VERSIONS:
       self.create_file(

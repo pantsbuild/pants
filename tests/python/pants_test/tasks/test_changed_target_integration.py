@@ -1,18 +1,15 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 from contextlib import contextmanager
 from textwrap import dedent
 
 from pants.base.build_environment import get_buildroot
+from pants.testutil.git_util import initialize_repo
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_open
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
-from pants_test.testutils.git_util import initialize_repo
 
 
 class ChangedTargetGoalsIntegrationTest(PantsRunIntegrationTest):
@@ -57,7 +54,7 @@ class ChangedTargetGoalsIntegrationTest(PantsRunIntegrationTest):
 
         test_build_file = os.path.join(worktree, 'tests/java/org/pantsbuild/BUILD')
         with safe_open(test_build_file, 'w') as fp:
-          fp.write(dedent("""
+          fp.write(dedent(f"""
           jar_library(name='junit', jars=[jar('junit', 'junit', '4.12')])
 
           junit_tests(
@@ -65,10 +62,10 @@ class ChangedTargetGoalsIntegrationTest(PantsRunIntegrationTest):
             sources=['ClassTest.java'],
             dependencies=[
               ':junit',
-              '{}'
+              '{os.path.relpath(os.path.dirname(src_build_file), get_buildroot())}'
             ]
           )
-          """).format(os.path.relpath(os.path.dirname(src_build_file), get_buildroot())))
+          """))
 
         git.add(test_file, test_build_file)
         git.commit('Introduce ClassTest.')
@@ -78,7 +75,7 @@ class ChangedTargetGoalsIntegrationTest(PantsRunIntegrationTest):
   _PACKAGE_PATH_PREFIX = os.sep + os.path.join('classes', 'org', 'pantsbuild')
 
   def find_classfile(self, workdir, filename):
-    for root, dirs, files in os.walk(os.path.join(workdir, 'compile', 'zinc')):
+    for root, dirs, files in os.walk(os.path.join(workdir, 'compile', 'rsc')):
       for f in files:
         candidate = os.path.join(root, f)
         if candidate.endswith(os.path.join(self._PACKAGE_PATH_PREFIX, filename)):

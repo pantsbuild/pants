@@ -1,14 +1,10 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import hashlib
 import logging
 import os
 import shutil
-from builtins import map, object, open
 
 from pants.base.build_environment import get_buildroot
 from pants.ivy.ivy import Ivy
@@ -21,7 +17,7 @@ from pants.util.dirutil import safe_delete, touch
 logger = logging.getLogger(__name__)
 
 
-class Bootstrapper(object):
+class Bootstrapper:
   """Bootstraps a working ivy resolver.
 
   By default a working resolver will be bootstrapped from maven central and it will use standard
@@ -110,8 +106,8 @@ class Bootstrapper(object):
       with open(self._version_or_ivyxml, 'rb') as fp:
         digest.update(fp.read())
     else:
-      digest.update(self._version_or_ivyxml.encode('utf-8'))
-    classpath = os.path.join(ivy_bootstrap_dir, '{}.classpath'.format(digest.hexdigest()))
+      digest.update(self._version_or_ivyxml.encode())
+    classpath = os.path.join(ivy_bootstrap_dir, f'{digest.hexdigest()}')
 
     if not os.path.exists(classpath):
       ivy = self._bootstrap_ivy(os.path.join(ivy_bootstrap_dir, 'bootstrap.jar'))

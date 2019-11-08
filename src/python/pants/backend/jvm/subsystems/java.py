@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.subsystems.zinc_language_mixin import ZincLanguageMixin
@@ -25,7 +22,7 @@ class Java(JvmToolMixin, ZincLanguageMixin, InjectablesMixin, Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(Java, cls).register_options(register)
+    super().register_options(register)
     # This target, if specified, serves as both a tool (for compiling java code) and a
     # dependency (for javac plugins).  See below for the different methods for accessing
     # classpath entries (in the former case) or target specs (in the latter case).
@@ -75,7 +72,7 @@ class Java(JvmToolMixin, ZincLanguageMixin, InjectablesMixin, Subsystem):
     return cls.global_instance().javac_classpath(products)
 
   def __init__(self, *args, **kwargs):
-    super(Java, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     opts = self.get_options()
     # TODO: These checks are a continuation of the hack that allows tests to pass without
     # caring about this subsystem.

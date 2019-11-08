@@ -1,12 +1,5 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from builtins import object
-
-from future.utils import PY2
 
 from pants.option.optionable import Optionable
 from pants.option.scope import ScopeInfo
@@ -19,7 +12,7 @@ class GoalOptionsRegistrar(Optionable):
   at once and/or setting them per-task. E.g., turning all linters on or off, or
   turning individual linters on or off selectively.
   """
-  options_scope_category = ScopeInfo.GOAL
+  options_scope_category = ScopeInfo.GOAL_V1
 
   @classmethod
   def registrar_for_scope(cls, goal):
@@ -29,12 +22,10 @@ class GoalOptionsRegistrar(Optionable):
     code from knowing which goal(s) the task is to be registered in.
     """
     type_name = '{}_{}'.format(cls.__name__, goal)
-    if PY2:
-      type_name = type_name.encode('utf-8')
     return type(type_name, (cls, ), {'options_scope': goal})
 
 
-class GoalOptionsMixin(object):
+class GoalOptionsMixin:
   """A mixin for tasks that inherit options registered at the goal level."""
   # Subclasses must set this to the appropriate subclass of GoalOptionsRegistrar.
   goal_options_registrar_cls = None

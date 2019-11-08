@@ -1,15 +1,21 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class BuildGraphIntegrationTest(PantsRunIntegrationTest):
+
+  @classmethod
+  def use_pantsd_env_var(cls):
+    """
+    Some of the tests here expect to read the standard error after an intentional failure.
+    However, when pantsd is enabled, these errors are logged to logs/exceptions.<pid>.log
+    So stderr appears empty. (see #7320)
+    """
+    return False
 
   def test_cycle(self):
     prefix = 'testprojects/src/java/org/pantsbuild/testproject'

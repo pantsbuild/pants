@@ -1,37 +1,35 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import multiprocessing
 import os
+import sys
 import time
-from builtins import object, open, str, zip
-from types import GeneratorType
+import traceback
+from dataclasses import dataclass
+from textwrap import dedent
+from typing import Any
 
-from pants.base.project_tree import Dir, File, Link
-from pants.build_graph.address import Address
-from pants.engine.fs import (Digest, DirectoryToMaterialize, FileContent, FilesContent,
-                             MergedDirectories, PathGlobs, PathGlobsAndRoot, Snapshot, UrlToFetch)
-from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
-from pants.engine.native import Function, TypeConstraint, TypeId
+from pants.base.exception_sink import ExceptionSink
+from pants.base.exiter import PANTS_FAILED_EXIT_CODE
+from pants.engine.fs import Digest, DirectoryToMaterialize, PathGlobsAndRoot
+from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveProcessResult
+from pants.engine.native import Function, TypeId
 from pants.engine.nodes import Return, Throw
 from pants.engine.objects import Collection
-from pants.engine.rules import RuleIndex, SingletonRule, TaskRule
-from pants.engine.selectors import Params, Select, constraint_for
-from pants.rules.core.exceptions import GracefulTerminationException
+from pants.engine.rules import RuleIndex, TaskRule
+from pants.engine.selectors import Params
 from pants.util.contextutil import temporary_file_path
 from pants.util.dirutil import check_no_overlapping_paths
-from pants.util.objects import datatype
 from pants.util.strutil import pluralize
 
 
 logger = logging.getLogger(__name__)
 
 
-class ExecutionRequest(datatype(['roots', 'native'])):
+@dataclass(frozen=True)
+class ExecutionRequest:
   """Holds the roots for an execution, which might have been requested by a user.
 
   To create an ExecutionRequest, see `SchedulerSession.execution_request`.
@@ -39,22 +37,27 @@ class ExecutionRequest(datatype(['roots', 'native'])):
   :param roots: Roots for this request.
   :type roots: list of tuples of subject and product.
   """
+  roots: Any
+  native: Any
 
 
 class ExecutionError(Exception):
   def __init__(self, message, wrapped_exceptions=None):
-    super(ExecutionError, self).__init__(message)
+    super().__init__(message)
     self.wrapped_exceptions = wrapped_exceptions or ()
 
+  def end_user_messages(self):
+    return [str(exc) for exc in self.wrapped_exceptions]
 
-class Scheduler(object):
+
+class Scheduler:
   def __init__(
     self,
     native,
     project_tree,
-    work_dir,
     local_store_dir,
     rules,
+    union_rules,
     execution_options,
     include_trace_on_error=True,
     validate=True,
@@ -66,21 +69,19 @@ class Scheduler(object):
     :param work_dir: The pants work dir.
     :param local_store_dir: The directory to use for storing the engine's LMDB store in.
     :param rules: A set of Rules which is used to compute values in the graph.
+    :param union_rules: A dict mapping union base types to member types so that rules can be written
+                        against abstract union types without knowledge of downstream rulesets.
     :param execution_options: Execution options for (remote) processes.
     :param include_trace_on_error: Include the trace through the graph upon encountering errors.
     :type include_trace_on_error: bool
     :param validate: True to assert that the ruleset is valid.
     """
-
-    if execution_options.remote_execution_server and not execution_options.remote_store_server:
-      raise ValueError("Cannot set remote execution server without setting remote store server")
-
     self._native = native
     self.include_trace_on_error = include_trace_on_error
     self._visualize_to_dir = visualize_to_dir
     # Validate and register all provided and intrinsic tasks.
-    rule_index = RuleIndex.create(list(rules))
-    self._root_subject_types = [r.output_constraint for r in rule_index.roots]
+    rule_index = RuleIndex.create(list(rules), union_rules)
+    self._root_subject_types = [r.output_type for r in rule_index.roots]
 
     # Create the native Scheduler and Session.
     # TODO: This `_tasks` reference could be a local variable, since it is not used
@@ -92,30 +93,10 @@ class Scheduler(object):
       tasks=self._tasks,
       root_subject_types=self._root_subject_types,
       build_root=project_tree.build_root,
-      work_dir=work_dir,
       local_store_dir=local_store_dir,
       ignore_patterns=project_tree.ignore_patterns,
       execution_options=execution_options,
-      construct_directory_digest=Digest,
-      construct_snapshot=Snapshot,
-      construct_file_content=FileContent,
-      construct_files_content=FilesContent,
-      construct_process_result=FallibleExecuteProcessResult,
-      constraint_address=constraint_for(Address),
-      constraint_path_globs=constraint_for(PathGlobs),
-      constraint_directory_digest=constraint_for(Digest),
-      constraint_snapshot=constraint_for(Snapshot),
-      constraint_merge_snapshots_request=constraint_for(MergedDirectories),
-      constraint_files_content=constraint_for(FilesContent),
-      constraint_dir=constraint_for(Dir),
-      constraint_file=constraint_for(File),
-      constraint_link=constraint_for(Link),
-      constraint_process_request=constraint_for(ExecuteProcessRequest),
-      constraint_process_result=constraint_for(FallibleExecuteProcessResult),
-      constraint_generator=constraint_for(GeneratorType),
-      constraint_url_to_fetch=constraint_for(UrlToFetch),
     )
-
 
     # If configured, visualize the rule graph before asserting that it is valid.
     if self._visualize_to_dir is not None:
@@ -130,7 +111,7 @@ class Scheduler(object):
 
   def graph_trace(self, execution_request):
     with temporary_file_path() as path:
-      self._native.lib.graph_trace(self._scheduler, execution_request, path.encode('utf-8'))
+      self._native.lib.graph_trace(self._scheduler, execution_request, path.encode())
       with open(path, 'r') as fd:
         for line in fd.readlines():
           yield line.rstrip()
@@ -156,14 +137,11 @@ class Scheduler(object):
   def _to_key(self, obj):
     return self._native.context.to_key(obj)
 
-  def _from_id(self, cdata):
-    return self._native.context.from_id(cdata)
-
   def _from_key(self, cdata):
     return self._native.context.from_key(cdata)
 
-  def _to_constraint(self, type_or_constraint):
-    return TypeConstraint(self._to_key(constraint_for(type_or_constraint)))
+  def _to_type(self, type_obj):
+    return TypeId(self._to_id(type_obj))
 
   def _to_ids_buf(self, types):
     return self._native.to_ids_buf(types)
@@ -174,59 +152,48 @@ class Scheduler(object):
   def _register_rules(self, rule_index):
     """Record the given RuleIndex on `self._tasks`."""
     registered = set()
-    for product_type, rules in rule_index.rules.items():
-      # TODO: The rules map has heterogeneous keys, so we normalize them to type constraints
-      # and dedupe them before registering to the native engine:
-      #   see: https://github.com/pantsbuild/pants/issues/4005
-      output_constraint = self._to_constraint(product_type)
+    for output_type, rules in rule_index.rules.items():
       for rule in rules:
-        key = (output_constraint, rule)
+        key = (output_type, rule)
         if key in registered:
           continue
         registered.add(key)
 
-        if type(rule) is SingletonRule:
-          self._register_singleton(output_constraint, rule)
-        elif type(rule) is TaskRule:
-          self._register_task(output_constraint, rule)
+        if type(rule) is TaskRule:
+          self._register_task(output_type, rule, rule_index.union_rules)
         else:
           raise ValueError('Unexpected Rule type: {}'.format(rule))
 
-  def _register_singleton(self, output_constraint, rule):
-    """Register the given SingletonRule.
-
-    A SingletonRule installed for a type will be the only provider for that type.
-    """
-    self._native.lib.tasks_singleton_add(self._tasks,
-                                         self._to_value(rule.value),
-                                         output_constraint)
-
-  def _register_task(self, output_constraint, rule):
+  def _register_task(self, output_type, rule, union_rules):
     """Register the given TaskRule with the native scheduler."""
     func = Function(self._to_key(rule.func))
-    self._native.lib.tasks_task_begin(self._tasks, func, output_constraint, rule.cacheable)
+    self._native.lib.tasks_task_begin(self._tasks, func, self._to_type(output_type), rule.cacheable)
     for selector in rule.input_selectors:
-      selector_type = type(selector)
-      product_constraint = self._to_constraint(selector.product)
-      if selector_type is Select:
-        self._native.lib.tasks_add_select(self._tasks, product_constraint)
+      self._native.lib.tasks_add_select(self._tasks, self._to_type(selector))
+
+    def add_get_edge(product, subject):
+      self._native.lib.tasks_add_get(self._tasks, self._to_type(product), self._to_type(subject))
+
+    for the_get in rule.input_gets:
+      if getattr(the_get.subject_declared_type, '_is_union', False):
+        # If the registered subject type is a union, add Get edges to all registered union members.
+        for union_member in union_rules.get(the_get.subject_declared_type, []):
+          add_get_edge(the_get.product, union_member)
       else:
-        raise ValueError('Unrecognized Selector type: {}'.format(selector))
-    for get in rule.input_gets:
-      self._native.lib.tasks_add_get(self._tasks,
-                                     self._to_constraint(get.product),
-                                     TypeId(self._to_id(get.subject)))
+        # Otherwise, the Get subject is a "concrete" type, so add a single Get edge.
+        add_get_edge(the_get.product, the_get.subject_declared_type)
+
     self._native.lib.tasks_task_end(self._tasks)
 
   def visualize_graph_to_file(self, session, filename):
-    res = self._native.lib.graph_visualize(self._scheduler, session, filename.encode('utf-8'))
+    res = self._native.lib.graph_visualize(self._scheduler, session, filename.encode())
     self._raise_or_return(res)
 
   def visualize_rule_graph_to_file(self, filename):
     self._native.lib.rule_graph_visualize(
       self._scheduler,
       self._root_type_ids(),
-      filename.encode('utf-8'))
+      filename.encode())
 
   def rule_graph_visualization(self):
     with temporary_file_path() as path:
@@ -238,13 +205,13 @@ class Scheduler(object):
   def rule_subgraph_visualization(self, root_subject_type, product_type):
     root_type_id = TypeId(self._to_id(root_subject_type))
 
-    product_type_id = TypeConstraint(self._to_key(constraint_for(product_type)))
+    product_type_id = TypeId(self._to_id(product_type))
     with temporary_file_path() as path:
       self._native.lib.rule_subgraph_visualize(
         self._scheduler,
         root_type_id,
         product_type_id,
-        path.encode('utf-8'))
+        path.encode())
       with open(path, 'r') as fd:
         for line in fd.readlines():
           yield line.rstrip()
@@ -271,7 +238,7 @@ class Scheduler(object):
     res = self._native.lib.execution_add_root_select(self._scheduler,
                                                      execution_request,
                                                      self._to_vals_buf(params),
-                                                     self._to_constraint(product))
+                                                     self._to_type(product))
     self._raise_or_return(res)
 
   def visualize_to_dir(self):
@@ -287,61 +254,33 @@ class Scheduler(object):
 
   def _run_and_return_roots(self, session, execution_request):
     raw_roots = self._native.lib.scheduler_execute(self._scheduler, session, execution_request)
+    remaining_runtime_exceptions_to_capture = list(self._native.consume_cffi_extern_method_runtime_exceptions())
     try:
       roots = []
       for raw_root in self._native.unpack(raw_roots.nodes_ptr, raw_roots.nodes_len):
+        # Check if there were any uncaught exceptions within rules that were executed.
+        remaining_runtime_exceptions_to_capture.extend(self._native.consume_cffi_extern_method_runtime_exceptions())
+
         if raw_root.is_throw:
           state = Throw(self._from_value(raw_root.handle))
+        elif raw_root.handle == self._native.ffi.NULL:
+          # NB: We expect all NULL handles to correspond to uncaught exceptions which are collected
+          # in `self._native._peek_cffi_extern_method_runtime_exceptions()`!
+          if not remaining_runtime_exceptions_to_capture:
+            raise ExecutionError('Internal logic error in scheduler: expected more elements in '
+                                 '`self._native._peek_cffi_extern_method_runtime_exceptions()`.')
+          matching_runtime_exception = remaining_runtime_exceptions_to_capture.pop(0)
+          state = Throw(matching_runtime_exception)
         else:
           state = Return(self._from_value(raw_root.handle))
         roots.append(state)
     finally:
       self._native.lib.nodes_destroy(raw_roots)
+
+    if remaining_runtime_exceptions_to_capture:
+      raise ExecutionError('Internal logic error in scheduler: expected elements in '
+                           '`self._native._peek_cffi_extern_method_runtime_exceptions()`.')
     return roots
-
-  def capture_snapshots(self, path_globs_and_roots):
-    """Synchronously captures Snapshots for each matching PathGlobs rooted at a its root directory.
-
-    This is a blocking operation, and should be avoided where possible.
-
-    :param path_globs_and_roots tuple<PathGlobsAndRoot>: The PathGlobs to capture, and the root
-           directory relative to which each should be captured.
-    :returns: A tuple of Snapshots.
-    """
-    result = self._native.lib.capture_snapshots(
-      self._scheduler,
-      self._to_value(_PathGlobsAndRootCollection(path_globs_and_roots)),
-    )
-    return self._raise_or_return(result)
-
-  def merge_directories(self, directory_digests):
-    """Merges any number of directories.
-
-    :param directory_digests: Tuple of DirectoryDigests.
-    :return: A Digest.
-    """
-    result = self._native.lib.merge_directories(
-      self._scheduler,
-      self._to_value(_DirectoryDigests(directory_digests)),
-    )
-    return self._raise_or_return(result)
-
-  def materialize_directories(self, directories_paths_and_digests):
-    """Creates the specified directories on the file system.
-
-    :param directories_paths_and_digests tuple<DirectoryToMaterialize>: Tuple of the path and
-           digest of the directories to materialize.
-    :returns: Nothing or an error.
-    """
-    # Ensure there isn't more than one of the same directory paths and paths do not have the same prefix.
-    dir_list = [dpad.path for dpad in directories_paths_and_digests]
-    check_no_overlapping_paths(dir_list)
-
-    result = self._native.lib.materialize_directories(
-      self._scheduler,
-      self._to_value(_DirectoriesToMaterialize(directories_paths_and_digests)),
-    )
-    return self._raise_or_return(result)
 
   def lease_files_in_graph(self):
     self._native.lib.lease_files_in_graph(self._scheduler)
@@ -349,21 +288,26 @@ class Scheduler(object):
   def garbage_collect_store(self):
     self._native.lib.garbage_collect_store(self._scheduler)
 
-  def new_session(self, v2_ui=False):
+  def new_session(self, zipkin_trace_v2, build_id, v2_ui=False):
     """Creates a new SchedulerSession for this Scheduler."""
-    return SchedulerSession(self, self._native.new_session(self._scheduler, v2_ui, multiprocessing.cpu_count()))
+    return SchedulerSession(self, self._native.new_session(
+      self._scheduler, zipkin_trace_v2, v2_ui, multiprocessing.cpu_count(), build_id)
+    )
 
 
-_PathGlobsAndRootCollection = Collection.of(PathGlobsAndRoot)
+class _PathGlobsAndRootCollection(Collection[PathGlobsAndRoot]):
+  pass
 
 
-_DirectoryDigests = Collection.of(Digest)
+class _DirectoryDigests(Collection[Digest]):
+  pass
 
 
-_DirectoriesToMaterialize = Collection.of(DirectoryToMaterialize)
+class _DirectoriesToMaterialize(Collection[DirectoryToMaterialize]):
+  pass
 
 
-class SchedulerSession(object):
+class SchedulerSession:
   """A handle to a shared underlying Scheduler and a unique Session.
 
   Generally a Session corresponds to a single run of pants: some metrics are specific to
@@ -439,6 +383,10 @@ class SchedulerSession(object):
     """Returns metrics for this SchedulerSession as a dict of metric name to metric value."""
     return self._scheduler._metrics(self._session)
 
+  @staticmethod
+  def engine_workunits(metrics):
+    return metrics.get("engine_workunits")
+
   def with_fork_context(self, func):
     return self._scheduler.with_fork_context(func)
 
@@ -456,6 +404,8 @@ class SchedulerSession(object):
     start_time = time.time()
     roots = list(zip(execution_request.roots,
                      self._scheduler._run_and_return_roots(self._session, execution_request.native)))
+
+    ExceptionSink.toggle_ignoring_sigint_v2_engine(False)
 
     self._maybe_visualize()
 
@@ -488,9 +438,9 @@ class SchedulerSession(object):
 
   def run_console_rule(self, product, subject):
     """
-    :param product: product type for the request.
+    :param product: A Goal subtype.
     :param subject: subject for the request.
-    :param v2_ui: whether to render the v2 engine UI
+    :returns: An exit_code for the given Goal.
     """
     request = self.execution_request([product], [subject])
     returns, throws = self.execute(request)
@@ -498,9 +448,10 @@ class SchedulerSession(object):
     if throws:
       _, state = throws[0]
       exc = state.exc
-      if isinstance(exc, GracefulTerminationException):
-        raise exc
       self._trace_on_error([exc], request)
+      return PANTS_FAILED_EXIT_CODE
+    _, state = returns[0]
+    return state.value.exit_code
 
   def product_request(self, product, subjects):
     """Executes a request for a single product for some subjects, and returns the products.
@@ -509,7 +460,52 @@ class SchedulerSession(object):
     :param list subjects: A list of subjects or Params instances for the request.
     :returns: A list of the requested products, with length match len(subjects).
     """
-    request = self.execution_request([product], subjects)
+    request = None
+    raised_exception = None
+    try:
+      request = self.execution_request([product], subjects)
+    except:                     # noqa: T803
+      # If there are any exceptions during CFFI extern method calls, we want to return an error with
+      # them and whatever failure results from it. This typically results from unhashable types.
+      if self._scheduler._native._peek_cffi_extern_method_runtime_exceptions():
+        raised_exception = sys.exc_info()[0:3]
+      else:
+        # Otherwise, this is likely an exception coming from somewhere else, and we don't want to
+        # swallow that, so re-raise.
+        raise
+
+    # We still want to raise whenever there are any exceptions in any CFFI extern methods, even if
+    # that didn't lead to an exception in generating the execution request for some reason, so we
+    # check the extern exceptions list again.
+    internal_errors = self._scheduler._native.consume_cffi_extern_method_runtime_exceptions()
+    if internal_errors:
+      error_tracebacks = [
+        ''.join(
+          traceback.format_exception(etype=error_info.exc_type,
+                                     value=error_info.exc_value,
+                                     tb=error_info.traceback))
+        for error_info in internal_errors
+      ]
+
+      raised_exception_message = None
+      if raised_exception:
+        exc_type, exc_value, tb = raised_exception
+        raised_exception_message = dedent("""\
+          The engine execution request raised this error, which is probably due to the errors in the
+          CFFI extern methods listed above, as CFFI externs return None upon error:
+          {}
+        """).format(''.join(traceback.format_exception(etype=exc_type, value=exc_value, tb=tb)))
+
+      raise ExecutionError(dedent("""\
+        {error_description} raised in CFFI extern methods:
+        {joined_tracebacks}{raised_exception_message}
+        """).format(
+          error_description=pluralize(len(internal_errors), 'Exception'),
+          joined_tracebacks='\n+++++++++\n'.join(formatted_tb for formatted_tb in error_tracebacks),
+          raised_exception_message=(
+            '\n\n{}'.format(raised_exception_message) if raised_exception_message else '')
+        ))
+
     returns, throws = self.execute(request)
 
     # Throw handling.
@@ -530,19 +526,51 @@ class SchedulerSession(object):
            directory relative to which each should be captured.
     :returns: A tuple of Snapshots.
     """
-    return self._scheduler.capture_snapshots(path_globs_and_roots)
+    result = self._scheduler._native.lib.capture_snapshots(
+      self._scheduler._scheduler,
+      self._session,
+      self._scheduler._to_value(_PathGlobsAndRootCollection(path_globs_and_roots)),
+    )
+    return self._scheduler._raise_or_return(result)
 
   def merge_directories(self, directory_digests):
-    return self._scheduler.merge_directories(directory_digests)
+    """Merges any number of directories.
+
+    :param directory_digests: Tuple of DirectoryDigests.
+    :return: A Digest.
+    """
+    result = self._scheduler._native.lib.merge_directories(
+      self._scheduler._scheduler,
+      self._session,
+      self._scheduler._to_value(_DirectoryDigests(directory_digests)),
+    )
+    return self._scheduler._raise_or_return(result)
+
+  def run_local_interactive_process(self, request: InteractiveProcessRequest) -> InteractiveProcessResult:
+    sched_pointer = self._scheduler._scheduler
+
+    result  = self._scheduler._native.lib.run_local_interactive_process(
+      sched_pointer,
+      self._scheduler._to_value(request)
+    )
+    return self._scheduler._raise_or_return(result)
 
   def materialize_directories(self, directories_paths_and_digests):
     """Creates the specified directories on the file system.
-
     :param directories_paths_and_digests tuple<DirectoryToMaterialize>: Tuple of the path and
            digest of the directories to materialize.
     :returns: Nothing or an error.
     """
-    return self._scheduler.materialize_directories(directories_paths_and_digests)
+    # Ensure there isn't more than one of the same directory paths and paths do not have the same prefix.
+    dir_list = [dpad.path for dpad in directories_paths_and_digests]
+    check_no_overlapping_paths(dir_list)
+
+    result = self._scheduler._native.lib.materialize_directories(
+      self._scheduler._scheduler,
+      self._session,
+      self._scheduler._to_value(_DirectoriesToMaterialize(directories_paths_and_digests)),
+    )
+    return self._scheduler._raise_or_return(result)
 
   def lease_files_in_graph(self):
     self._scheduler.lease_files_in_graph()

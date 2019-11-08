@@ -1,11 +1,8 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import open
+from pathlib import Path
 
 from twitter.common.collections import OrderedSet
 
@@ -16,11 +13,6 @@ from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.subsystem.subsystem import Subsystem
 from pants.version import PANTS_SEMVER, VERSION
-
-
-def _read_contents(path):
-  with open(os.path.join(get_buildroot(), path), 'r') as fp:
-    return fp.read()
 
 
 def pants_setup_py(name, description, additional_classifiers=None, **kwargs):
@@ -35,8 +27,8 @@ def pants_setup_py(name, description, additional_classifiers=None, **kwargs):
   :returns: A setup_py suitable for building and publishing pants components.
   """
   if not name.startswith('pantsbuild.pants'):
-    raise ValueError("Pants distribution package names must start with 'pantsbuild.pants', "
-                     "given {}".format(name))
+    raise ValueError(
+      f"Pants distribution package names must start with 'pantsbuild.pants', given {name}")
 
   standard_classifiers = [
       'Intended Audience :: Developers',
@@ -56,8 +48,13 @@ def pants_setup_py(name, description, additional_classifiers=None, **kwargs):
       name=name,
       version=VERSION,
       description=description,
-      long_description=(_read_contents('src/python/pants/ABOUT.rst') + notes),
+      long_description=Path('src/python/pants/ABOUT.rst').read_text() + notes,
       url='https://github.com/pantsbuild/pants',
+      project_urls={
+          'Documentation': 'https://www.pantsbuild.org/',
+          'Source': 'https://github.com/pantsbuild/pants',
+          'Tracker': 'https://github.com/pantsbuild/pants/issues',
+      },
       license='Apache License, Version 2.0',
       zip_safe=True,
       classifiers=list(classifiers),
@@ -76,8 +73,9 @@ def contrib_setup_py(name, description, additional_classifiers=None, **kwargs):
   :returns: A setup_py suitable for building and publishing pants components.
   """
   if not name.startswith('pantsbuild.pants.contrib.'):
-    raise ValueError("Contrib plugin package names must start with 'pantsbuild.pants.contrib.', "
-                     "given {}".format(name))
+    raise ValueError(
+      f"Contrib plugin package names must start with 'pantsbuild.pants.contrib.', given {name}"
+    )
 
   return pants_setup_py(name,
                         description,
@@ -93,7 +91,7 @@ class PantsReleases(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(PantsReleases, cls).register_options(register)
+    super().register_options(register)
     register('--branch-notes', type=dict,
              help='A dict from branch name to release notes rst-file location.')
 
@@ -117,9 +115,9 @@ class PantsReleases(Subsystem):
       # Suffixed `dev` release version in master.
       return 'master'
     else:
-      raise ValueError('Unparseable pants version number: {}'.format(version))
+      raise ValueError(f'Unparseable pants version number: {version}')
 
-  def notes_for_version(self, version):
+  def notes_for_version(self, version) -> str:
     """Given the parsed Version of pants, return its release notes.
 
     TODO: This method should parse out the specific version from the resulting file:
@@ -129,9 +127,10 @@ class PantsReleases(Subsystem):
     branch_notes_file = self._branch_notes.get(branch_name, None)
     if branch_notes_file is None:
       raise ValueError(
-          'Version {} lives in branch {}, which is not configured in {}.'.format(
-            version, branch_name, self._branch_notes))
-    return _read_contents(branch_notes_file)
+        f'Version {version} lives in branch {branch_name}, which is not configured in '
+        f'{self._branch_notes}.'
+      )
+    return Path(branch_notes_file).read_text()
 
 
 class PantsPlugin(PythonLibrary):
@@ -169,32 +168,32 @@ class PantsPlugin(PythonLibrary):
                                 registers the 'register_goals' 'pantsbuild.plugin' entrypoint.
     """
     if not distribution_name.startswith('pantsbuild.pants.'):
-      raise ValueError("Pants plugin package distribution names must start with "
-                       "'pantsbuild.pants.', given {}".format(distribution_name))
+      raise ValueError(
+        "Pants plugin package distribution names must start with 'pantsbuild.pants.', given "
+        f"{distribution_name}"
+      )
 
     if not os.path.exists(os.path.join(get_buildroot(), address.spec_path, 'register.py')):
-      raise TargetDefinitionException(address.spec_path,
-                                      'A PantsPlugin target must have a register.py file in the '
-                                      'same directory.')
+      raise TargetDefinitionException(
+        address.spec_path,
+        'A PantsPlugin target must have a register.py file in the same directory.'
+      )
 
-    setup_py = self.create_setup_py(distribution_name,
-                                    description,
-                                    additional_classifiers=additional_classifiers)
+    setup_py = self.create_setup_py(
+      distribution_name, description, additional_classifiers=additional_classifiers
+    )
 
-    super(PantsPlugin, self).__init__(address,
-                                      payload,
-                                      provides=setup_py,
-                                      **kwargs)
+    super().__init__(address, payload, provides=setup_py, **kwargs)
 
     if build_file_aliases or register_goals or global_subsystems:
       module = os.path.relpath(address.spec_path, self.target_base).replace(os.sep, '.')
       entrypoints = []
       if build_file_aliases:
-        entrypoints.append('build_file_aliases = {}.register:build_file_aliases'.format(module))
+        entrypoints.append(f'build_file_aliases = {module}.register:build_file_aliases')
       if register_goals:
-        entrypoints.append('register_goals = {}.register:register_goals'.format(module))
+        entrypoints.append(f'register_goals = {module}.register:register_goals')
       if global_subsystems:
-        entrypoints.append('global_subsystems = {}.register:global_subsystems'.format(module))
+        entrypoints.append(f'global_subsystems = {module}.register:global_subsystems')
       entry_points = {'pantsbuild.plugin': entrypoints}
 
       setup_py.setup_py_keywords['entry_points'] = entry_points

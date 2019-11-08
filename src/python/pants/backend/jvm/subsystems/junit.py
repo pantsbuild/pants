@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.subsystems.shader import Shader
@@ -20,11 +17,11 @@ class JUnit(JvmToolMixin, InjectablesMixin, Subsystem):
   RUNNER_MAIN = 'org.pantsbuild.tools.junit.ConsoleRunner'
 
   LIBRARY_JAR = JarDependency(org='junit', name='junit', rev=LIBRARY_REV)
-  _RUNNER_JAR = JarDependency(org='org.pantsbuild', name='junit-runner', rev='1.0.24')
+  _RUNNER_JAR = JarDependency(org='org.pantsbuild', name='junit-runner', rev='1.0.26')
 
   @classmethod
   def register_options(cls, register):
-    super(JUnit, cls).register_options(register)
+    super().register_options(register)
     cls.register_jvm_tool(register,
                           'junit_library',
                           classpath=[

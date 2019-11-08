@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -13,14 +10,14 @@ from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
 from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import BaseZincCompile
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
 from pants.base.build_environment import get_buildroot
-from pants_test.task_test_base import TaskTestBase
+from pants.testutil.jvm.nailgun_task_test_base import NailgunTaskTestBase
 
 
 class DummyJvmCompile(JvmCompile):
   pass
 
 
-class JvmCompileTest(TaskTestBase):
+class JvmCompileTest(NailgunTaskTestBase):
   DEFAULT_CONF = 'default'
 
   @classmethod
@@ -50,7 +47,7 @@ class JvmCompileTest(TaskTestBase):
       resulting_classpath.get_for_target(target))
 
 
-class BaseZincCompileJDKTest(TaskTestBase):
+class BaseZincCompileJDKTest(NailgunTaskTestBase):
   DEFAULT_CONF = 'default'
   old_cwd = os.getcwd()
 
@@ -60,20 +57,24 @@ class BaseZincCompileJDKTest(TaskTestBase):
 
   def setUp(self):
     os.chdir(get_buildroot())
-    super(BaseZincCompileJDKTest, self).setUp()
+    super().setUp()
 
   def tearDown(self):
     os.chdir(self.old_cwd)
-    super(BaseZincCompileJDKTest, self).tearDown()
+    super().tearDown()
 
   def test_subprocess_compile_jdk_being_symlink(self):
     context = self.context(target_roots=[])
-    zinc = Zinc.Factory.global_instance().create(context.products, NailgunTaskBase.SUBPROCESS)
+    zinc = Zinc.Factory.global_instance().create(
+      context.products, NailgunTaskBase.ExecutionStrategy.subprocess
+    )
     self.assertTrue(os.path.islink(zinc.dist.home))
 
   def test_hermetic_jdk_being_underlying_dist(self):
     context = self.context(target_roots=[])
-    zinc = Zinc.Factory.global_instance().create(context.products, NailgunTaskBase.HERMETIC)
+    zinc = Zinc.Factory.global_instance().create(
+      context.products, NailgunTaskBase.ExecutionStrategy.hermetic
+    )
     self.assertFalse(
       os.path.islink(zinc.dist.home),
       "Expected {} to not be a link, it was.".format(zinc.dist.home)

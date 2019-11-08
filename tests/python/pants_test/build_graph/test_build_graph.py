@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import unittest
-from builtins import chr, range
 from collections import defaultdict
 
 from pants.backend.jvm.targets.jar_library import JarLibrary
@@ -14,7 +10,7 @@ from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.target import Target
 from pants.java.jar.jar_dependency import JarDependency
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 # TODO(Eric Ayers) There are many untested methods in BuildGraph left to be tested.

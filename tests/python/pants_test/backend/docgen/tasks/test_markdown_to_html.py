@@ -1,22 +1,18 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import unittest
-from builtins import open
+import unittest.mock
 from textwrap import dedent
 
 import bs4
-import mock
 
 from pants.backend.docgen.register import build_file_aliases
 from pants.backend.docgen.tasks import markdown_to_html_utils
 from pants.backend.docgen.tasks.markdown_to_html import MarkdownToHtml
 from pants.base.exceptions import TaskError
-from pants_test.task_test_base import TaskTestBase
+from pants.testutil.task_test_base import TaskTestBase
 
 
 ABC = """able
@@ -148,7 +144,7 @@ class MarkdownToHtmlTest(TaskTestBase):
     self.set_options(ignore_failure=True)
     bad_rst = self.target(':bad_rst')
     context = self.context(target_roots=[bad_rst])
-    context.log.warn = mock.Mock()
+    context.log.warn = unittest.mock.Mock()
     task = self.create_task(context)
     task.execute()
 

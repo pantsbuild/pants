@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import object
 
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.base.build_environment import pants_version
@@ -14,7 +10,7 @@ from pants.build_graph.address import Address
 from pants.util.meta import classproperty
 
 
-class PantsRequirement(object):
+class PantsRequirement:
   """Exports a `python_requirement_library` pointing at the active pants' corresponding sdist.
 
   This requirement is useful for custom plugin authors who want to build and test their plugin with
@@ -50,14 +46,7 @@ class PantsRequirement(object):
                                       msg='The {} target only works for pantsbuild.pants '
                                           'distributions, given {}'.format(self.alias, dist))
 
-    # Update the environment marker in lockstep with other changes as described in
-    #   https://github.com/pantsbuild/pants/issues/6450
-    env_marker = "python_version>='2.7' and python_version<'3'"
-
-    requirement = PythonRequirement(requirement="{key}=={version} ; {env_marker}"
-                                    .format(key=dist,
-                                            version=pants_version(),
-                                            env_marker=env_marker))
+    requirement = PythonRequirement(requirement="{key}=={version}".format(key=dist, version=pants_version()))
 
     self._parse_context.create_object('python_requirement_library',
                                       name=name,

@@ -1,17 +1,15 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
+import configparser
 import functools
 import os
-from builtins import open
 from contextlib import contextmanager
 from textwrap import dedent
 
 import coverage
 
+from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.gather_sources import GatherSources
 from pants.backend.python.tasks.pytest_prep import PytestPrep
 from pants.backend.python.tasks.pytest_run import PytestResult, PytestRun
@@ -20,12 +18,11 @@ from pants.backend.python.tasks.select_interpreter import SelectInterpreter
 from pants.base.exceptions import ErrorWhileTesting, TaskError
 from pants.build_graph.target import Target
 from pants.source.source_root import SourceRootConfig
+from pants.testutil.subsystem.util import init_subsystem
+from pants.testutil.task_test_base import DeclarativeTaskTestMixin, ensure_cached
 from pants.util.contextutil import pushd, temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdtemp, safe_rmtree
-from pants.util.py2_compat import configparser
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
-from pants_test.subsystem.subsystem_util import init_subsystem
-from pants_test.task_test_base import ensure_cached
 
 
 # NB: Our production code depends on `pytest-cov` which indirectly depends on `coverage`, but in
@@ -38,29 +35,57 @@ from pants_test.task_test_base import ensure_cached
 # `PytestPrep` production requirements here.
 class PytestPrepCoverageVersionPinned(PytestPrep):
   def extra_requirements(self):
-    extra_reqs = list(super(PytestPrepCoverageVersionPinned, self).extra_requirements())
+    extra_reqs = list(super().extra_requirements())
     extra_reqs.append('coverage=={}'.format(coverage.__version__))
     return extra_reqs
 
 
-class PytestTestBase(PythonTaskTestBase):
+class PytestTestBase(PythonTaskTestBase, DeclarativeTaskTestMixin):
   @classmethod
   def task_type(cls):
     return PytestRun
 
+  run_before_task_types = [
+    SelectInterpreter,
+    ResolveRequirements,
+    GatherSources,
+    PytestPrepCoverageVersionPinned,
+  ]
+
   _CONFTEST_CONTENT = '# I am an existing root-level conftest file.'
+
+  _default_test_options = {
+    'colors': False,
+    'level': 'info'  # When debugging a test failure it may be helpful to set this to 'debug'.
+  }
+
+  def _augment_options(self, options):
+    new_options = self._default_test_options.copy()
+    new_options.update(options)
+    return new_options
 
   def run_tests(self, targets, *passthru_args, **options):
     """Run the tests in the specified targets, with the specified PytestRun task options."""
-    context = self._prepare_test_run(targets, *passthru_args, **options)
-    self._do_run_tests(context)
-    return context
+    self.set_options(**self._augment_options(options))
+    with pushd(self.build_root):
+      result = self.invoke_tasks(
+        target_roots=targets,
+        passthru_args=list(passthru_args),
+      )
+      return result.context
 
   def run_failing_tests(self, targets, failed_targets, *passthru_args, **options):
-    context = self._prepare_test_run(targets, *passthru_args, **options)
+    self.set_options(**self._augment_options(options))
     with self.assertRaises(ErrorWhileTesting) as cm:
-      self._do_run_tests(context)
-    self.assertEqual(set(failed_targets), set(cm.exception.failed_targets))
+      with pushd(self.build_root):
+        self.invoke_tasks(
+          target_roots=targets,
+          passthru_args=list(passthru_args),
+        )
+    exc = cm.exception
+    # NB: self.invoke_tasks() will attach the tasks' context to the raised exception as ._context!
+    context = exc._context
+    self.assertEqual(set(failed_targets), set(exc.failed_targets))
     return context
 
   def try_run_tests(self, targets, *passthru_args, **options):
@@ -70,38 +95,54 @@ class PytestTestBase(PythonTaskTestBase):
     except ErrorWhileTesting as e:
       return e.failed_targets
 
-  def _prepare_test_run(self, targets, *passthru_args, **options):
-    test_options = {
-      'colors': False,
-      'level': 'info'  # When debugging a test failure it may be helpful to set this to 'debug'.
-    }
-    test_options.update(options)
-    self.set_options(**test_options)
-
-    # The easiest way to create products required by the PythonTest task is to
-    # execute the relevant tasks.
-    si_task_type = self.synthesize_task_subtype(SelectInterpreter, 'si_scope')
-    rr_task_type = self.synthesize_task_subtype(ResolveRequirements, 'rr_scope')
-    gs_task_type = self.synthesize_task_subtype(GatherSources, 'gs_scope')
-    pp_task_type = self.synthesize_task_subtype(PytestPrepCoverageVersionPinned, 'pp_scope')
-    context = self.context(for_task_types=[si_task_type, rr_task_type, gs_task_type, pp_task_type],
-                           target_roots=targets,
-                           passthru_args=list(passthru_args))
-    si_task_type(context, os.path.join(self.pants_workdir, 'si')).execute()
-    rr_task_type(context, os.path.join(self.pants_workdir, 'rr')).execute()
-    gs_task_type(context, os.path.join(self.pants_workdir, 'gs')).execute()
-    pp_task_type(context, os.path.join(self.pants_workdir, 'pp')).execute()
-    return context
-
-  def _do_run_tests(self, context):
-    pytest_run_task = self.create_task(context)
-    with pushd(self.build_root):
-      pytest_run_task.execute()
-
 
 class PytestTestEmpty(PytestTestBase):
   def test_empty(self):
     self.run_tests(targets=[])
+
+
+class PytestTestConftest(PytestTestBase):
+
+  def setUp(self):
+    super().setUp()
+
+    self.create_file('src/python/base/__init__.py')
+    self.create_file('src/python/base/conftest.py', contents=dedent("""
+    import pytest
+    
+    APPS = ['base']
+    INDEX = {}
+    
+    def pytest_configure(config):
+      INDEX.update((app, len(app)) for app in APPS)
+    """))
+    self.add_to_build_file('src/python/base', target='python_library(sources=globs("*.py"))\n')
+
+    self.create_file('src/python/base/app/__init__.py')
+    self.create_file('src/python/base/app/conftest.py', contents=dedent("""
+    from base.conftest import APPS
+    
+    APPS.append('app')
+    """))
+    self.add_to_build_file('src/python/base/app',
+                           target='python_library(dependencies=["src/python/base"])\n')
+
+    self.create_file('src/python/base/app/conftest_test.py', contents=dedent("""
+    from base.conftest import INDEX
+    
+    def test_conftest_interaction():
+      assert {'base': 4, 'app': 3} == INDEX
+    """))
+    self.add_to_build_file('src/python/base/app',
+                           target='python_tests(name="tests", dependencies=[":app"])\n')
+
+    self.app_tests = self.target('src/python/base/app:tests')
+
+  def test_conftests_discovery_no_coverage(self):
+    self.run_tests([self.app_tests], '-vs', '--trace-config')
+
+  def test_conftests_discovery_with_coverage(self):
+    self.run_tests([self.app_tests], '-vs', '--trace-config', coverage='auto')
 
 
 class PytestTestFailedPexRun(PytestTestBase):
@@ -121,7 +162,7 @@ class PytestTestFailedPexRun(PytestTestBase):
     return cls.AlwaysFailingPexRunPytestRun
 
   def setUp(self):
-    super(PytestTestFailedPexRun, self).setUp()
+    super().setUp()
     self.create_file(
       'tests/test_green.py',
       dedent("""
@@ -137,12 +178,10 @@ class PytestTestFailedPexRun(PytestTestBase):
     self.addCleanup(self.AlwaysFailingPexRunPytestRun.set_up())
 
   def do_test_failed_pex_run(self):
-    with self.assertRaises(TaskError) as cm:
-      self.run_tests(targets=[self.tests])
-
     # We expect a `TaskError` as opposed to an `ErrorWhileTesting` since execution fails outside
     # the actual test run.
-    self.assertEqual(TaskError, type(cm.exception))
+    with self.assertRaises(TaskError):
+      self.run_tests(targets=[self.tests])
 
   def test_failed_pex_run(self):
     self.do_test_failed_pex_run()
@@ -167,7 +206,7 @@ class PytestTestFailedPexRun(PytestTestBase):
 
 class PytestTest(PytestTestBase):
   def setUp(self):
-    super(PytestTest, self).setUp()
+    super().setUp()
 
     self.set_options_for_scope('cache.{}'.format(self.options_scope),
                                read_from=None,
@@ -232,13 +271,7 @@ class PytestTest(PytestTestBase):
 
     self.add_to_build_file(
       'tests',
-      '''python_tests(
-  name = "sleep_no_timeout",
-  sources = ["test_core_sleep.py"],
-  dependencies = ["lib:core"],
-  coverage = ["core"],
-  timeout = 0,
-)
+      '''
 
 python_tests(
   name = "sleep_timeout",
@@ -275,6 +308,18 @@ python_tests(
   sources = ["test_core_green.py", "test_core_red.py"],
   dependencies = ["lib:core"],
   coverage = ["core"],
+)
+
+python_tests(
+  name = "py23-tests",
+  sources = ["py23_test_source.py"],
+  compatibility = ['CPython>=2.7,<4'],
+)
+
+python_tests(
+  name = "py3-and-more-tests",
+  sources = ["py3_and_more_test_source.py"],
+  compatibility = ['CPython>=3.6'],
 )
 '''
     )
@@ -340,8 +385,10 @@ python_tests(
       'tests/test_core_sleep.py',
       dedent("""
           import core
+          import time
 
           def test_three():
+            time.sleep(10)
             assert 1 == core.one()
         """))
 
@@ -361,6 +408,9 @@ python_tests(
         assert(False)
         """))
 
+    self.create_file('tests/py23_test_source.py', '')
+    self.create_file('tests/py3_and_more_test_source.py', '')
+
     self.create_file('tests/conftest.py', self._CONFTEST_CONTENT)
 
     self.app = self.target('tests:app')
@@ -369,13 +419,15 @@ python_tests(
     self.green3 = self.target('tests:green3')
     self.red = self.target('tests:red')
     self.red_in_class = self.target('tests:red_in_class')
-    self.sleep_no_timeout = self.target('tests:sleep_no_timeout')
     self.sleep_timeout = self.target('tests:sleep_timeout')
     self.error = self.target('tests:error')
     self.failure_outside_function = self.target('tests:failure_outside_function')
     self.green_with_conftest = self.target('tests:green-with-conftest')
     self.all = self.target('tests:all')
     self.all_with_cov = self.target('tests:all-with-coverage')
+
+    self.py23 = self.target('tests:py23-tests')
+    self.py3_and_more = self.target('tests:py3-and-more-tests')
 
   @ensure_cached(PytestRun, expected_num_artifacts=0)
   def test_error(self):
@@ -390,6 +442,10 @@ python_tests(
                            failed_targets=[self.red, self.failure_outside_function])
 
   @ensure_cached(PytestRun, expected_num_artifacts=1)
+  def test_succeeds_for_intersecting_unique_constraints(self):
+    self.run_tests(targets=[self.py23, self.py3_and_more])
+
+  @ensure_cached(PytestRun, expected_num_artifacts=1)
   def test_green(self):
     self.run_tests(targets=[self.green])
 
@@ -400,6 +456,15 @@ python_tests(
   @ensure_cached(PytestRun, expected_num_artifacts=3)
   def test_cache_greens_slow(self):
     self.run_tests(targets=[self.green, self.green2, self.green3], fast=False)
+
+  def test_timeout_slow(self):
+    # Confirm that if we run fast=False with timeouts, the correct test is blamed.
+    self.run_failing_tests(
+        targets=[self.green, self.sleep_timeout],
+        failed_targets=[self.sleep_timeout],
+        fast=False,
+        timeout_default=3,
+      )
 
   @ensure_cached(PytestRun, expected_num_artifacts=1)
   def test_out_of_band_deselect_fast_success(self):
@@ -486,13 +551,16 @@ python_tests(
       covered_src_root_relpath = os.path.relpath(covered_path, src_root_abspath)
       chroot_path = os.path.join(src_chroot_path, covered_src_root_relpath)
 
-      cp = configparser.SafeConfigParser()
+      cp = configparser.ConfigParser()
       src_to_target_base = {src: tgt.target_base
                             for tgt in context.targets()
                             for src in tgt.sources_relative_to_source_root()}
 
+      # Note that we use this config only for loading data in tests, so we don't care about
+      # srcs_to_omit, which only applies at the `run` stage of coverage.
       PytestRun._add_plugin_config(cp,
                                    src_chroot_path=src_chroot_path,
+                                   srcs_to_omit=[],
                                    src_to_target_base=src_to_target_base)
       with temporary_file(binary_mode=False) as fp:
         cp.write(fp)
@@ -508,9 +576,13 @@ python_tests(
                         targets,
                         failed_targets=None,
                         expect_coverage=True,
-                        covered_path=None):
+                        covered_path=None,
+                        include_test_sources=False):
     self.assertFalse(os.path.isfile(self.coverage_data_file()))
-    simple_coverage_kwargs = {'coverage': 'auto'}
+    simple_coverage_kwargs = {
+      'coverage': 'auto',
+      'coverage_include_test_sources': include_test_sources
+    }
     if failed_targets:
       context = self.run_failing_tests(targets=targets,
                                        failed_targets=failed_targets,
@@ -585,6 +657,81 @@ python_tests(
     self.assertEqual([1, 2], all_statements)
     self.assertEqual([], not_run_statements)
 
+  def test_coverage_omit_test_sources(self):
+    init_subsystem(Target.Arguments)
+    init_subsystem(SourceRootConfig)
+
+    self.add_to_build_file('src/python/util', 'python_library()\n')
+
+    self.create_file(
+      'src/python/util/math.py',
+      dedent("""
+          from util import THE_LONELIEST_NUMBER  # line 1
+          def one():                             # line 2
+            return THE_LONELIEST_NUMBER          # line 3
+        """).strip())
+
+    self.create_file(
+      'src/python/util/__init__.py',
+      dedent("""
+          THE_LONELIEST_NUMBER = 1  # line 1
+        """).strip())
+
+    self.add_to_build_file('src/python/util',
+                           'python_tests(name="tests", dependencies = [":util"])\n')
+
+    self.create_file(
+      'src/python/util/math_test.py',
+      dedent("""
+          import unittest                                            # line 1
+
+          from util import math                                      # line 3
+
+          class MathTestInSameDirectoryAsSource(unittest.TestCase):  # line 5
+            def test_one(self):                                      # line 6
+              self.assertEqual(1, math.one())                        # line 7
+        """).strip())
+
+    test = self.target('src/python/util:tests')
+
+    src_path = os.path.join(self.build_root, 'src/python/util/math.py')
+    init_path = os.path.join(self.build_root, 'src/python/util/__init__.py')
+    test_path = os.path.join(self.build_root, 'src/python/util/math_test.py')
+
+    # First run omitting the test file.
+    self.assertFalse(os.path.isfile(self.coverage_data_file()))
+    coverage_kwargs = {'coverage': 'auto'}
+    context = self.run_tests(targets=[test], **coverage_kwargs)
+    all_statements, not_run_statements = self.load_coverage_data_for(context, src_path)
+    self.assertEqual([1, 2, 3], all_statements)
+    self.assertEqual([], not_run_statements)
+    all_statements, not_run_statements = self.load_coverage_data_for(context, init_path)
+    self.assertEqual([1], all_statements)
+    self.assertEqual([], not_run_statements)
+    all_statements, not_run_statements = self.load_coverage_data_for(context, test_path)
+    self.assertEqual([1, 3, 5, 6, 7], all_statements)
+    # "not run" means "not traced".
+    self.assertEqual([1, 3, 5, 6, 7], not_run_statements)
+    # TODO: Switch this test to read coverage data from an XML report instead of
+    # directly from the analysis. That way we see what the users sees, instead of the
+    # slightly confusing raw analysis.
+
+    os.unlink(self.coverage_data_file())
+
+    # Now run again, including the test file.
+    self.assertFalse(os.path.isfile(self.coverage_data_file()))
+    coverage_kwargs = {'coverage': 'auto', 'coverage_include_test_sources': True}
+    context = self.run_tests(targets=[test], **coverage_kwargs)
+    all_statements, not_run_statements = self.load_coverage_data_for(context, src_path)
+    self.assertEqual([1, 2, 3], all_statements)
+    self.assertEqual([], not_run_statements)
+    all_statements, not_run_statements = self.load_coverage_data_for(context, init_path)
+    self.assertEqual([1], all_statements)
+    self.assertEqual([], not_run_statements)
+    all_statements, not_run_statements = self.load_coverage_data_for(context, test_path)
+    self.assertEqual([1, 3, 5, 6, 7], all_statements)
+    self.assertEqual([], not_run_statements)
+
   @ensure_cached(PytestRun, expected_num_artifacts=1)
   def test_coverage_auto_option_no_explicit_coverage_idiosyncratic_layout(self):
     # The all target has no coverage attribute and the code under test does not follow the
@@ -617,7 +764,8 @@ python_tests(
     test = self.target('test/python/util_tests')
     covered_path = os.path.join(self.build_root, 'src/python/util/math.py')
     all_statements, not_run_statements = self.run_coverage_auto(targets=[test],
-                                                                covered_path=covered_path)
+                                                                covered_path=covered_path,
+                                                                include_test_sources=True)
     self.assertEqual([1, 2], all_statements)
     self.assertEqual([1, 2], not_run_statements)
 
@@ -744,40 +892,40 @@ python_tests(
             import os
             import pytest
             import unittest
-  
-  
+
+
             class PassthruTest(unittest.TestCase):
               def touch(self, path):
                 with open(path, 'wb') as fp:
                   fp.close()
-                  
+
               def mark_test_run(self):
                 caller_frame_record = inspect.stack()[1]
-                
+
                 # For the slot breakdown of a frame record tuple, see:
                 #   https://docs.python.org/2/library/inspect.html#the-interpreter-stack
                 _, _, _, caller_func_name, _, _ = caller_frame_record
-                
+
                 marker_file = os.path.join({marker_dir!r}, caller_func_name)
                 self.touch(marker_file)
-  
+
               def test_one(self):
                 self.mark_test_run()
-  
+
               @pytest.mark.purple
               def test_two(self):
                 self.mark_test_run()
-  
+
               def test_three(self):
                 self.mark_test_run()
-                
+
               @pytest.mark.red
               def test_four(self):
                 self.mark_test_run()
-              
+
               @pytest.mark.green
               def test_five(self):
-                self.mark_test_run()                
+                self.mark_test_run()
           """.format(marker_dir=marker_dir)))
 
       def assert_mark(exists, name):
@@ -809,7 +957,7 @@ python_tests(
 
   def test_passthrough_added_after_options(self):
     with self.marking_tests() as (target, assert_test_run, assert_test_not_run):
-      self.run_tests([target], '-m', 'purple or red', options=['-k', 'two'])
+      self.run_tests([target], '-m', 'purple or red', '-k', 'two')
       assert_test_not_run('test_one')
       assert_test_run('test_two')
       assert_test_not_run('test_three')
@@ -818,9 +966,26 @@ python_tests(
 
   def test_options_shlexed(self):
     with self.marking_tests() as (target, assert_test_run, assert_test_not_run):
-      self.run_tests([target], options=["-m 'purple or red'"])
+      self.run_tests([target], "-m", "purple or red")
       assert_test_not_run('test_one')
       assert_test_run('test_two')
       assert_test_not_run('test_three')
       assert_test_run('test_four')
       assert_test_not_run('test_five')
+
+  @contextmanager
+  def run_with_junit_xml_dir(self, targets):
+    with temporary_dir() as dist:
+      junit_xml_dir = os.path.join(dist, 'test-results')
+      self.run_tests(targets, junit_xml_dir=junit_xml_dir)
+      assert os.path.exists(junit_xml_dir)
+      yield os.listdir(junit_xml_dir)
+
+  def test_junit_xml_dir(self):
+    with self.run_with_junit_xml_dir([self.green]) as junit_xml_files:
+      assert ['TEST-{}.xml'.format(self.green.id)] == junit_xml_files
+
+  def test_issue_7749(self):
+    empty_test_target = self.make_target(spec='empty', target_type=PythonTests)
+    with self.run_with_junit_xml_dir([empty_test_target]) as junit_xml_files:
+      assert [] == junit_xml_files

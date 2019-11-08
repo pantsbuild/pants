@@ -1,37 +1,31 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import os
 import re
-from abc import abstractmethod
+from abc import ABCMeta, abstractmethod
+from dataclasses import dataclass
+from typing import Tuple
 
-from future.utils import text_type
 from twitter.common.dirutil.fileset import fnmatch_translate_extended
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.task.task import Task
-from pants.util.meta import AbstractClass, classproperty
-from pants.util.objects import datatype
+from pants.util.meta import classproperty
 
 
 logger = logging.getLogger(__name__)
 
 
-class UnpackedArchives(datatype([('found_files', tuple), ('rel_unpack_dir', text_type)])):
-
-  def __new__(cls, found_files, rel_unpack_dir):
-    return super(UnpackedArchives, cls).__new__(
-      cls,
-      tuple(found_files),
-      text_type(rel_unpack_dir))
+@dataclass(frozen=True)
+class UnpackedArchives:
+  found_files: Tuple
+  rel_unpack_dir: str
 
 
-class UnpackRemoteSourcesBase(Task, AbstractClass):
+class UnpackRemoteSourcesBase(Task, metaclass=ABCMeta):
 
   @property
   def cache_target_dirs(cls):
@@ -42,15 +36,15 @@ class UnpackRemoteSourcesBase(Task, AbstractClass):
     return [UnpackedArchives]
 
   @classproperty
+  @abstractmethod
   def source_target_constraint(cls):
     """Return a type constraint which is evaluated to determine "source" targets for this task.
 
     :return: :class:`pants.util.objects.TypeConstraint`
     """
-    raise NotImplementedError()
 
   @abstractmethod
-  def unpack_target(unpackable_target, unpack_dir):
+  def unpack_target(self, unpackable_target, unpack_dir):
     """Unpack the remote resources indicated by `unpackable_target` into `unpack_dir`."""
 
   @property
@@ -79,6 +73,16 @@ class UnpackRemoteSourcesBase(Task, AbstractClass):
 
   @classmethod
   def compile_patterns(cls, patterns, field_name="Unknown", spec="Unknown"):
+    logger.debug(f'patterns before removing trailing stars: {patterns}')
+    # NB: `fnmatch_translate_extended()` will convert a '*' at the end into '([^/]+)' for some
+    # reason -- it should be '('[^/]*)'. This should be fixed upstream in general, but in the case
+    # where the star is at the end we can use this heuristic for now.
+    patterns.extend(
+      re.sub(r'\*$', '', p)
+      for p in patterns
+      if isinstance(p, str) and re.match(r'.*\*$', p)
+    )
+    logger.debug(f'patterns with any trailing stars have a version with a star removed: {patterns}')
     compiled_patterns = []
     for p in patterns:
       try:
@@ -100,12 +104,12 @@ class UnpackRemoteSourcesBase(Task, AbstractClass):
                                             field_name='include_patterns',
                                             spec=spec)
     logger.debug('include_patterns: {}'
-                 .format(p.pattern for p in include_patterns))
+                 .format(list(p.pattern for p in include_patterns)))
     exclude_patterns = cls.compile_patterns(excludes or [],
                                             field_name='exclude_patterns',
                                             spec=spec)
     logger.debug('exclude_patterns: {}'
-                 .format(p.pattern for p in exclude_patterns))
+                 .format(list(p.pattern for p in exclude_patterns)))
     return lambda f: cls._file_filter(f, include_patterns, exclude_patterns)
 
   @classmethod
@@ -143,7 +147,7 @@ class UnpackRemoteSourcesBase(Task, AbstractClass):
     found_files, rel_unpack_dir = self._traverse_unpacked_dir(unpack_dir)
     self.context.log.debug('target: {}, rel_unpack_dir: {}, found_files: {}'
                            .format(target, rel_unpack_dir, found_files))
-    self._unpacked_sources_product[target] = UnpackedArchives(found_files, rel_unpack_dir)
+    self._unpacked_sources_product[target] = UnpackedArchives(tuple(found_files), rel_unpack_dir)
 
   class MissingUnpackedDirsError(Exception):
     """Raised if a directory that is expected to be unpacked doesn't exist."""

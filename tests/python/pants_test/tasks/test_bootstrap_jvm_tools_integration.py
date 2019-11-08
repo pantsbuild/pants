@@ -1,11 +1,8 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest, ensure_resolver
 from pants.util.contextutil import temporary_dir
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_resolver
 
 
 class BootstrapJvmToolsIntegrationTest(PantsRunIntegrationTest):
@@ -15,8 +12,8 @@ class BootstrapJvmToolsIntegrationTest(PantsRunIntegrationTest):
     with temporary_dir() as artifact_cache:
       bootstrap_args = [
         'bootstrap.bootstrap-jvm-tools',
-        "--cache-write-to=['{}']".format(artifact_cache),
-        "--cache-read-from=['{}']".format(artifact_cache)
+        f"--cache-write-to=['{artifact_cache}']",
+        f"--cache-read-from=['{artifact_cache}']"
       ]
 
       # Scala compilation should bootstrap and shade zinc.

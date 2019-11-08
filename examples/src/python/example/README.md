@@ -394,7 +394,7 @@ Pants runs Python tests with `pytest`. You can pass CLI options to `pytest` with
 you could run:
 
     :::bash
-    $ ./pants test.pytest --options='-k foo' examples/tests/python/example_test/hello/greet
+    $ ./pants test.pytest --options='-k req' examples/tests/python/example_test/hello/greet
     ...
                      ============== test session starts ===============
                      platform linux2 -- Python 2.7.12, pytest-3.0.7, py-1.4.32, pluggy-0.4.0

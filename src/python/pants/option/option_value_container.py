@@ -1,16 +1,12 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import copy
-from builtins import object
 
 from pants.option.ranked_value import RankedValue
 
 
-class OptionValueContainer(object):
+class OptionValueContainer:
   """A container for option values.
 
   Implements "value ranking":
@@ -124,7 +120,7 @@ class OptionValueContainer(object):
   # Support attribute setting, e.g., opts.foo = 42.
   def __setattr__(self, key, value):
     if key == '_value_map':
-      return super(OptionValueContainer, self).__setattr__(key, value)
+      return super().__setattr__(key, value)
     self._set(key, value)
 
   # Support attribute getting, e.g., foo = opts.foo.

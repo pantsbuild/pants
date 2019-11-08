@@ -2,7 +2,7 @@
 
 ## Problem
 
-You're create a `jvm_app` target definition for [[bundling|pants('src/docs/common_tasks:bundle')]] a Scala or Java project and you want to include assets such as config files or shell scripts in the bundle.
+You have created a `jvm_app` target definition for [[bundling|pants('src/docs/common_tasks:bundle')]] a Scala or Java project and you want to include assets such as config files or shell scripts in the bundle.
 
 ## Solution
 

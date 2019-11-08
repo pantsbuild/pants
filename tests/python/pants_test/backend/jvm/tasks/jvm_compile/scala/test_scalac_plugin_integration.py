@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test import BaseCompileIT
 
@@ -20,17 +17,18 @@ class ScalacPluginIntegrationTest(BaseCompileIT):
 
   # Note that in the terminology of this test, "global" means specified via options for
   # all targets, and "local" means specified on an individual target.
-  def _do_test_global(self, args):
+  def _do_test_global(self, args, extra_config={}, expected_args=None):
     config = {
       'scala': {
         'scalac_plugins': ['simple_scalac_plugin'],
         'scalac_plugin_args': {
           'simple_scalac_plugin': args
         },
-      }
+      },
+      **extra_config
     }
     # Must compile the plugin explicitly, since there's no dep.
-    self._do_test(args, config, 'global')
+    self._do_test((expected_args or args), config, 'global')
 
   def _do_test_local_with_global_args(self, args):
     config = {
@@ -77,3 +75,22 @@ class ScalacPluginIntegrationTest(BaseCompileIT):
       }
     }
     self._do_test(['args', 'from', 'target', 'local'], config, 'local')
+
+  def test_compiler_option_sets_enabled_scalac_plugins(self):
+    self._do_test_global(
+      args=[],
+      extra_config={
+        'compile.rsc': {
+          'compiler_option_sets_enabled_args': {
+            'option-set-requiring-scalac-plugin': [
+              '-S-P:simple_scalac_plugin:abc',
+              '-S-P:simple_scalac_plugin:def',
+            ],
+          },
+          'compiler_option_sets_enabled_scalac_plugins': {
+            'option-set-requiring-scalac-plugin': ['simple_scalac_plugin'],
+          },
+        }
+      },
+      expected_args=['abc', 'def'],
+    )

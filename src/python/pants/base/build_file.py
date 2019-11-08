@@ -1,18 +1,17 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import os
 import re
+from abc import ABC
+from typing import Dict, Tuple
 
 from pathspec import PathSpec
 from twitter.common.collections import OrderedSet
 
+from pants.base.project_tree import ProjectTree
 from pants.util.dirutil import fast_relpath
-from pants.util.meta import AbstractClass
 
 
 logger = logging.getLogger(__name__)
@@ -20,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 # Note: Significant effort has been made to keep the types BuildFile, BuildGraph, Address, and
 # Target separated appropriately.  Don't add references to those other types to this module.
-class BuildFile(AbstractClass):
+class BuildFile(ABC):
 
   class BuildFileError(Exception):
     """Base class for all exceptions raised in BuildFile to make exception handling easier"""
@@ -34,14 +33,14 @@ class BuildFile(AbstractClass):
   _BUILD_FILE_PREFIX = 'BUILD'
   _PATTERN = re.compile(r'^{prefix}(\.[a-zA-Z0-9_-]+)?$'.format(prefix=_BUILD_FILE_PREFIX))
 
-  _cache = {}
+  _cache: Dict[Tuple[ProjectTree, str], 'BuildFile'] = {}
 
   @staticmethod
-  def clear_cache():
+  def clear_cache() -> None:
     BuildFile._cache = {}
 
   @staticmethod
-  def _cached(project_tree, relpath):
+  def _cached(project_tree: ProjectTree, relpath: str) -> 'BuildFile':
     cache_key = (project_tree, relpath)
     if cache_key not in BuildFile._cache:
       BuildFile._cache[cache_key] = BuildFile(project_tree, relpath)
@@ -52,10 +51,9 @@ class BuildFile(AbstractClass):
     return BuildFile._PATTERN.match(name)
 
   @staticmethod
-  def scan_build_files(project_tree, base_relpath, build_ignore_patterns=None):
+  def scan_build_files(project_tree: ProjectTree, base_relpath, build_ignore_patterns=None):
     """Looks for all BUILD files
     :param project_tree: Project tree to scan in.
-    :type project_tree: :class:`pants.base.project_tree.ProjectTree`
     :param base_relpath: Directory under root_dir to scan.
     :param build_ignore_patterns: .gitignore like patterns to exclude from BUILD files scan.
     :type build_ignore_patterns: pathspec.pathspec.PathSpec
@@ -92,12 +90,11 @@ class BuildFile(AbstractClass):
     return OrderedSet(sorted((BuildFile._cached(project_tree, relpath) for relpath in build_files_without_ignores),
                              key=lambda build_file: build_file.full_path))
 
-  def __init__(self, project_tree, relpath):
+  def __init__(self, project_tree: ProjectTree, relpath: str):
     """Creates a BuildFile object representing the BUILD file family at the specified path.
 
     :param project_tree: Project tree the BUILD file exist in.
-    :type project_tree: :class:`pants.base.project_tree.ProjectTree`
-    :param string relpath: The path relative to root_dir where the BUILD file is located.
+    :param relpath: The path relative to root_dir where the BUILD file is located.
     :raises IOError: if the root_dir path is not absolute.
     :raises MissingBuildFileError: if the path does not house a BUILD file.
     """

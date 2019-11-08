@@ -1,14 +1,11 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
 from pants.backend.jvm.tasks.jvmdoc_gen import Jvmdoc, JvmdocGen
 from pants.base.exceptions import TaskError
-from pants_test.jvm.jvm_task_test_base import JvmTaskTestBase
+from pants.testutil.jvm.jvm_task_test_base import JvmTaskTestBase
 
 
 dummydoc = Jvmdoc(tool_name='dummydoc', product_type='dummydoc')
@@ -36,7 +33,7 @@ class JvmdocGenTest(JvmTaskTestBase):
     return DummyJvmdocGen
 
   def setUp(self):
-    super(JvmdocGenTest, self).setUp()
+    super().setUp()
 
     self.t1 = self.make_target('t1')
     context = self.context(target_roots=[self.t1])

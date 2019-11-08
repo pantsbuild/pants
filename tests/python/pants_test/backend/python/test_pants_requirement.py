@@ -1,15 +1,12 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.register import build_file_aliases
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.base.build_environment import pants_version
 from pants.build_graph.address_lookup_error import AddressLookupError
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 class PantsRequirementTest(TestBase):
@@ -30,15 +27,6 @@ class PantsRequirementTest(TestBase):
 
     self.assertEqual([key(expected)],
                      [key(pr) for pr in python_requirement_library.payload.requirements])
-
-    req = list(python_requirement_library.payload.requirements)[0]
-    self.assertIsNotNone(req.requirement.marker)
-
-    def evaluate_version(version):
-      return req.requirement.marker.evaluate({'python_version': version})
-
-    self.assertTrue(evaluate_version('2.7'))
-    self.assertFalse(all(evaluate_version(v) for v in ('2.6', '3.4', '3.5', '3.6', '3.7')))
 
   def test_default_name(self):
     self.add_to_build_file('3rdparty/python/pants', 'pants_requirement()')

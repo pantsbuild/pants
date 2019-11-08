@@ -1,17 +1,14 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 from textwrap import dedent
 
 from pants.backend.codegen.ragel.java.java_ragel_library import JavaRagelLibrary
 from pants.backend.codegen.ragel.java.ragel_gen import RagelGen, calculate_genfile
+from pants.testutil.task_test_base import TaskTestBase
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_mkdtemp
-from pants_test.task_test_base import TaskTestBase
 
 
 ragel_file_contents = dedent("""

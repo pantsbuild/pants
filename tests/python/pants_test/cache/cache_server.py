@@ -1,20 +1,16 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import http.server
 import os
 import re
 import socketserver
-from builtins import object, open
 from contextlib import contextmanager
 from multiprocessing import Process, Queue
 
+from pants.testutil.file_test_util import exact_files
 from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import safe_mkdir
-from pants_test.testutils.file_test_util import exact_files
 
 
 # NB: All API methods should follow redirects, so we always inject one redirect for all handler
@@ -96,7 +92,7 @@ class FailRESTHandler(http.server.SimpleHTTPRequestHandler):
     return self._return_failed()
 
 
-class TestCacheServer(object):
+class TestCacheServer:
   """A wrapper class that represents the underlying REST server.
 
   To create a TestCacheServer, use the `cache_server` factory function.

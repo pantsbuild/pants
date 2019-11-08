@@ -1,25 +1,21 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import object, zip
+import subprocess
 from contextlib import contextmanager
 
 from pants.base.build_environment import get_buildroot
-from pants.util.process_handler import subprocess
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class Bundles(object):
+class Bundles:
   """Container class to hold test bundle specifications."""
 
   phrase_path = 'testprojects/src/java/org/pantsbuild/testproject/phrases'
   bundle_dir_prefix = 'testprojects.src.java.org.pantsbuild.testproject.phrases'
 
-  class Bundle(object):
+  class Bundle:
 
     def __init__(self, spec, text):
       self.spec = spec
@@ -85,7 +81,7 @@ class ExcludeTargetRegexpIntegrationTest(PantsRunIntegrationTest):
                                       stdout=subprocess.PIPE,
                                       cwd=path)
           java_retcode = java_run.wait()
-          java_out = java_run.stdout.read().decode('utf-8')
+          java_out = java_run.stdout.read().decode()
           self.assertEqual(java_retcode, 0)
           self.assertTrue(expected in java_out, "Expected '{output}' from {jar}, not '{stdout}'."
                                                 .format(output=expected, jar=jar, stdout=java_out))

@@ -1,27 +1,30 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import fnmatch
 import os
-from builtins import object
 from collections import defaultdict
+from dataclasses import dataclass
+from typing import Optional
 
 from twitter.common.collections import OrderedSet
 
 from pants.util.dirutil import safe_walk
-from pants.util.objects import datatype
+from pants.util.meta import frozen_after_init
 from pants.util.xml_parser import XmlParser
 
 
-class Test(datatype(['classname', 'methodname'])):
+@frozen_after_init
+@dataclass(unsafe_hash=True, order=True)
+class Test:
   """Describes a junit-style test or collection of tests."""
+  classname: str
+  methodname: Optional[str]
 
-  def __new__(cls, classname, methodname=None):
+  def __init__(self, classname: str, methodname: Optional[str] = None) -> None:
+    self.classname = classname
     # We deliberately normalize an empty methodname ('') to None.
-    return super(Test, cls).__new__(cls, classname, methodname or None)
+    self.methodname = methodname or None
 
   def enclosing(self):
     """Return a test representing all the tests in this test's enclosing class.
@@ -44,7 +47,7 @@ class Test(datatype(['classname', 'methodname'])):
       return '{}#{}'.format(self.classname, self.methodname)
 
 
-class RegistryOfTests(object):
+class RegistryOfTests:
   """A registry of tests and the targets that own them."""
 
   def __init__(self, mapping_or_seq):
@@ -68,6 +71,36 @@ class RegistryOfTests(object):
     """
     return len(self._test_to_target) == 0
 
+  def match_test_spec(self, possible_test_specs):
+    """
+    This matches the user specified test spec with what tests Pants knows.
+
+    Each non fully qualified test spec may get matched with multiple targets.
+
+    :param possible_test_specs: an iterable of user specified test spec
+    :return: dict test_spec -> target
+    """
+    # dict of non fully qualified classname to a list of fully qualified test specs
+    cn_to_specs = defaultdict(list)
+    for test_spec in self._test_to_target.keys():
+      fqcn = test_spec.classname
+      cn_to_specs[test_spec.classname].append(test_spec)
+
+      non_fqcn = fqcn.split('.')[-1]
+      cn_to_specs[non_fqcn].append(test_spec)
+
+    matched_spec_to_target = {}
+    unknown_tests = []
+    for possible_test_spec in possible_test_specs:
+      if possible_test_spec.classname in cn_to_specs:
+        for full_spec in cn_to_specs[possible_test_spec.classname]:
+          new_fully_qualified_test_spec = Test(full_spec.classname, possible_test_spec.methodname)
+          matched_spec_to_target[new_fully_qualified_test_spec] = self._test_to_target[full_spec]
+      else:
+        unknown_tests.append(possible_test_spec)
+
+    return matched_spec_to_target, unknown_tests
+
   def get_owning_target(self, test):
     """Return the target that owns the given test.
 
@@ -88,6 +121,7 @@ class RegistryOfTests(object):
     :return: An index of tests by shared properties.
     :rtype: dict from tuple of properties to a tuple of :class:`Test`.
     """
+
     def combined_indexer(tgt):
       return tuple(indexer(tgt) for indexer in indexers)
 
@@ -101,7 +135,7 @@ class ParseError(Exception):
   """Indicates an error parsing a junit xml report file."""
 
   def __init__(self, xml_path, cause):
-    super(ParseError, self).__init__('Error parsing test result file {}: {}'
+    super().__init__('Error parsing test result file {}: {}'
                                      .format(xml_path, cause))
     self._xml_path = xml_path
     self._cause = cause

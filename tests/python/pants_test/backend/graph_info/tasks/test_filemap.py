@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 from textwrap import dedent
@@ -10,7 +7,7 @@ from textwrap import dedent
 from pants.backend.graph_info.tasks.filemap import Filemap
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants_test.task_test_base import ConsoleTaskTestBase
+from pants.testutil.task_test_base import ConsoleTaskTestBase
 
 
 class FilemapTest(ConsoleTaskTestBase):
@@ -27,7 +24,7 @@ class FilemapTest(ConsoleTaskTestBase):
     return Filemap
 
   def setUp(self):
-    super(FilemapTest, self).setUp()
+    super().setUp()
 
     def add_to_build_file(path, name, *files):
       for f in files:

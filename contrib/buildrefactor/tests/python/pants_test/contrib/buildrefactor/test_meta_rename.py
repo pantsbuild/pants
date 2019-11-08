@@ -1,15 +1,12 @@
-# coding=utf-8
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.testutil.task_test_base import TaskTestBase
 from pants_test.contrib.buildrefactor.buildozer_util import prepare_dependencies
-from pants_test.task_test_base import TaskTestBase
 
 from pants.contrib.buildrefactor.meta_rename import MetaRename
 
@@ -26,7 +23,7 @@ class MetaRenameTest(TaskTestBase):
     return BuildFileAliases(targets={ 'java_library': JavaLibrary })
 
   def setUp(self):
-    super(MetaRenameTest, self).setUp()
+    super().setUp()
 
     self.new_name = 'goo'
     self.spec_path = 'a'

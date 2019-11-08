@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
-cd ${REPO_ROOT}
+cd "${REPO_ROOT}" || exit 1
 
+# shellcheck source=build-support/common.sh
 source build-support/common.sh
 
 function usage() {
@@ -33,4 +34,8 @@ do
   esac
 done
 
-./pants -q --changed-parent=master fmt.isort -- ${isort_args[@]}
+# If changes were made or issues found, output with leading whitespace trimmed.
+output="$(./pants --changed-parent="$(git_merge_base)" fmt.isort -- "${isort_args[@]}")"
+echo "${output}" | grep -Eo '(ERROR).*$' && exit 1
+echo "${output}" | grep -Eo '(Fixing).*$'
+exit 0

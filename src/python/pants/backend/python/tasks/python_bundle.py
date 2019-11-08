@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -27,13 +24,13 @@ class PythonBundle(BundleMixin, Task):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(PythonBundle, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data(cls._PEX_ARCHIVES)
 
   @staticmethod
   def _get_archive_path(vt, archive_format):
     ext = archive.archive_extensions.get(archive_format, archive_format)
-    filename = '{}.{}'.format(vt.target.id, ext)
+    filename = f'{vt.target.id}.{ext}'
     return os.path.join(vt.results_dir, filename) if archive_format else ''
 
   @property
@@ -41,7 +38,7 @@ class PythonBundle(BundleMixin, Task):
     return True
 
   def __init__(self, *args, **kwargs):
-    super(PythonBundle, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._outdir = self.get_options().pants_distdir
 
   def execute(self):

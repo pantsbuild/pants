@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -34,7 +31,7 @@ class LibcDev(Subsystem):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(LibcDev, cls).subsystem_dependencies() + (ParseSearchDirs.scoped(cls),)
+    return super().subsystem_dependencies() + (ParseSearchDirs.scoped(cls),)
 
   @memoized_property
   def _parse_search_dirs(self):
@@ -42,7 +39,7 @@ class LibcDev(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(LibcDev, cls).register_options(register)
+    super().register_options(register)
 
     register('--enable-libc-search', type=bool, default=False, fingerprint=True, advanced=True,
              help="Whether to search for the host's libc installation. Set to False if the host "
@@ -76,10 +73,10 @@ class LibcDev(Subsystem):
 
     if not libc_crti_object_file:
       raise self.HostLibcDevResolutionError(
-        "Could not locate {fname} in library search dirs {dirs} from compiler: {compiler!r}. "
-        "You may need to install a libc dev package for the current system. "
-        "For many operating systems, this package is named 'libc-dev' or 'libc6-dev'."
-        .format(fname=self._LIBC_INIT_OBJECT_FILE, dirs=library_dirs, compiler=compiler_exe))
+        f"Could not locate {self._LIBC_INIT_OBJECT_FILE} in library search dirs {library_dirs} from "
+        f"compiler: {compiler_exe!r}. You may need to install a libc dev package for the current "
+        "system. For many operating systems, this package is named 'libc-dev' or 'libc6-dev'."
+      )
 
     return HostLibcDev(crti_object=libc_crti_object_file,
                        fingerprint=hash_file(libc_crti_object_file))
@@ -94,8 +91,9 @@ class LibcDev(Subsystem):
         return HostLibcDev(crti_object=maybe_libc_crti,
                            fingerprint=hash_file(maybe_libc_crti))
       raise self.HostLibcDevResolutionError(
-        "Could not locate {} in directory {} provided by the --libc-dir option."
-        .format(self._LIBC_INIT_OBJECT_FILE, libc_dir_option))
+        f"Could not locate {self._LIBC_INIT_OBJECT_FILE} in directory {libc_dir_option} provided "
+        "by the --libc-dir option."
+      )
 
     return self._get_host_libc_from_host_compiler()
 

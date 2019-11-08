@@ -1,13 +1,10 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.jvm.tasks.benchmark_run import BenchmarkRun
 from pants.base.exceptions import TaskError
 from pants.build_graph.target import Target
-from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
+from pants.testutil.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 
 
 class BenchmarkRunTest(JvmToolTaskTestBase):

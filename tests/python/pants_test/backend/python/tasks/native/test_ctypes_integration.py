@@ -1,24 +1,22 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import glob
 import os
 import re
+import subprocess
 from functools import wraps
+from unittest import skip
 from zipfile import ZipFile
 
 from pants.backend.native.config.environment import Platform
 from pants.backend.native.subsystems.native_build_step import ToolchainVariant
 from pants.option.scope import GLOBAL_SCOPE_CONFIG_SECTION
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import is_executable, read_file, safe_file_dump
-from pants.util.process_handler import subprocess
 from pants_test.backend.python.tasks.python_task_test_base import name_and_platform
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 def invoke_pex_for_output(pex_file_to_run):
@@ -28,12 +26,21 @@ def invoke_pex_for_output(pex_file_to_run):
 def _toolchain_variants(func):
   @wraps(func)
   def wrapper(*args, **kwargs):
-    for variant in ToolchainVariant.iterate_enum_variants():
+    for variant in ToolchainVariant.all_values():
       func(*args, toolchain_variant=variant, **kwargs)
   return wrapper
 
 
 class CTypesIntegrationTest(PantsRunIntegrationTest):
+
+  @classmethod
+  def use_pantsd_env_var(cls):
+    """
+    Some of the tests here expect to read the standard error after an intentional failure.
+    However, when pantsd is enabled, these errors are logged to logs/exceptions.<pid>.log
+    So stderr appears empty. (see #7320)
+    """
+    return False
 
   _binary_target_dir = 'testprojects/src/python/python_distribution/ctypes'
   _binary_target = '{}:bin'.format(_binary_target_dir)
@@ -66,9 +73,9 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
       # for both C and C++ compilation.
       # TODO(#6866): don't parse info logs for testing! There is a TODO in test_cpp_compile.py
       # in the native backend testing to traverse the PATH to find the selected compiler.
-      compiler_names_to_check = toolchain_variant.resolve_for_enum_variant({
-        'gnu': ['gcc', 'g++'],
-        'llvm': ['clang', 'clang++'],
+      compiler_names_to_check = toolchain_variant.match({
+        ToolchainVariant.gnu: ['gcc', 'g++'],
+        ToolchainVariant.llvm: ['clang', 'clang++'],
       })
       for compiler_name in compiler_names_to_check:
         self.assertIn("selected compiler exe name: '{}'".format(compiler_name),
@@ -76,9 +83,9 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
 
       # All of our toolchains currently use the C++ compiler's filename as argv[0] for the linker,
       # so there is only one name to check.
-      linker_names_to_check = toolchain_variant.resolve_for_enum_variant({
-        'gnu': ['g++'],
-        'llvm': ['clang++'],
+      linker_names_to_check = toolchain_variant.match({
+        ToolchainVariant.gnu: ['g++'],
+        ToolchainVariant.llvm: ['clang++'],
       })
       for linker_name in linker_names_to_check:
         self.assertIn("selected linker exe name: '{}'".format(linker_name),
@@ -96,9 +103,9 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
 
       dist_name, dist_version, wheel_platform = name_and_platform(wheel_dist)
       self.assertEqual(dist_name, 'ctypes_test')
-      contains_current_platform = Platform.create().resolve_for_enum_variant({
-        'darwin': wheel_platform.startswith('macosx'),
-        'linux': wheel_platform.startswith('linux'),
+      contains_current_platform = Platform.current.match({
+        Platform.darwin: wheel_platform.startswith('macosx'),
+        Platform.linux: wheel_platform.startswith('linux'),
       })
       self.assertTrue(contains_current_platform)
 
@@ -119,14 +126,15 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
     # TODO: consider making this mock_buildroot/run_pants_with_workdir into a
     # PantsRunIntegrationTest method!
     with self.mock_buildroot(
-        dirs_to_copy=[self._binary_interop_target_dir]) as buildroot, buildroot.pushd():
+        dirs_to_copy=[self._binary_interop_target_dir]
+    ) as buildroot, buildroot.pushd():
 
       # Replace strict_deps=False with nothing so we can override it (because target values for this
       # option take precedence over subsystem options).
-      orig_wrapped_math_build = read_file(self._wrapped_math_build_file, binary_mode=False)
+      orig_wrapped_math_build = read_file(self._wrapped_math_build_file)
       without_strict_deps_wrapped_math_build = re.sub(
         'strict_deps=False,', '', orig_wrapped_math_build)
-      safe_file_dump(self._wrapped_math_build_file, without_strict_deps_wrapped_math_build, mode='w')
+      safe_file_dump(self._wrapped_math_build_file, without_strict_deps_wrapped_math_build)
 
       # This should fail because it does not turn on strict_deps for a target which requires it.
       pants_binary_strict_deps_failure = self.run_pants_with_workdir(
@@ -142,22 +150,18 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
           },
         },
         workdir=os.path.join(buildroot.new_buildroot, '.pants.d'),
-        build_root=buildroot.new_buildroot)
+      )
       self.assert_failure(pants_binary_strict_deps_failure)
-      self.assertIn(toolchain_variant.resolve_for_enum_variant({
-        'gnu': "fatal error: some_math.h: No such file or directory",
-        'llvm': "fatal error: 'some_math.h' file not found",
-      }),
-                    pants_binary_strict_deps_failure.stdout_data)
+      self.assertIn(toolchain_variant.match({
+        ToolchainVariant.gnu: "fatal error: some_math.h: No such file or directory",
+        ToolchainVariant.llvm: "fatal error: 'some_math.h' file not found"
+      }), pants_binary_strict_deps_failure.stdout_data)
 
     # TODO(#6848): we need to provide the libstdc++.so.6.dylib which comes with gcc on osx in the
     # DYLD_LIBRARY_PATH during the 'run' goal somehow.
-    attempt_pants_run = Platform.create().resolve_for_enum_variant({
-      'darwin': toolchain_variant.resolve_for_enum_variant({
-        'gnu': False,
-        'llvm': True,
-      }),
-      'linux': True,
+    attempt_pants_run = Platform.current.match({
+      Platform.darwin: toolchain_variant == ToolchainVariant.llvm,
+      Platform.linux: True,
     })
     if attempt_pants_run:
       pants_run_interop = self.run_pants(['-q', 'run', self._binary_target_with_interop], config={
@@ -171,6 +175,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
       self.assert_success(pants_run_interop)
       self.assertEqual('x=3, f(x)=299\n', pants_run_interop.stdout_data)
 
+  @skip('See https://github.com/pantsbuild/pants/issues/8316 and https://github.com/pantsbuild/pants/issues/7762')
   @_toolchain_variants
   def test_ctypes_third_party_integration(self, toolchain_variant):
     pants_binary = self.run_pants(['binary', self._binary_target_with_third_party], config={
@@ -182,9 +187,9 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
 
     # TODO(#6848): this fails when run with gcc on osx as it requires gcc's libstdc++.so.6.dylib to
     # be available on the runtime library path.
-    attempt_pants_run = Platform.create().resolve_for_enum_variant({
-      'darwin': toolchain_variant != 'gnu',
-      'linux': True,
+    attempt_pants_run = Platform.current.match({
+      Platform.darwin: toolchain_variant == ToolchainVariant.llvm,
+      Platform.linux: True,
     })
     if attempt_pants_run:
       pants_run = self.run_pants(['-q', 'run', self._binary_target_with_third_party], config={
@@ -213,7 +218,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
         'toolchain_variant': 'llvm',
       },
       'python-setup': {
-        'platforms': ['current', 'this-platform-does_not-exist']
+        'platforms': ['current', 'this_platform_does_not_exist']
       },
     })
     self.assert_success(pants_run)
@@ -226,6 +231,15 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
     This target uses the ndebug and asdf option sets.
     If either of these are not present (disabled), this test will fail.
     """
+    # TODO(#6848): this fails when run with gcc on osx as it requires gcc's libstdc++.so.6.dylib to
+    # be available on the runtime library path.
+    attempt_pants_run = Platform.current.match({
+      Platform.darwin: toolchain_variant == ToolchainVariant.llvm,
+      Platform.linux: True,
+    })
+    if not attempt_pants_run:
+      return
+
     command = [
       'run',
       self._binary_target_with_compiler_option_sets

@@ -1,10 +1,6 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-import os
 import signal
 
 from pants.backend.python.targets.python_binary import PythonBinary
@@ -20,7 +16,7 @@ class PythonRun(PythonExecutionTaskBase):
 
   @classmethod
   def register_options(cls, register):
-    super(PythonRun, cls).register_options(register)
+    super().register_options(register)
     register('--args', type=list, help='Run with these extra args to main().')
 
   @classmethod
@@ -40,16 +36,18 @@ class PythonRun(PythonExecutionTaskBase):
         args.extend(safe_shlex_split(arg))
       args += self.get_passthru_args()
 
+      env = self.prepare_pex_env()
+
       self.context.release_lock()
       cmdline = ' '.join(pex.cmdline(args))
       with self.context.new_workunit(name='run',
                                      cmd=cmdline,
                                      labels=[WorkUnitLabel.TOOL, WorkUnitLabel.RUN]):
-        po = pex.run(blocking=False, args=args, env=os.environ.copy())
+        po = pex.run(blocking=False, args=args, env=env)
         try:
           result = po.wait()
           if result != 0:
-            msg = '{cmdline} ... exited non-zero ({code})'.format(cmdline=cmdline, code=result)
+            msg = f'{cmdline} ... exited non-zero ({result})'
             raise TaskError(msg, exit_code=result)
         except KeyboardInterrupt:
           # The process may still have exited, even if we were interrupted.

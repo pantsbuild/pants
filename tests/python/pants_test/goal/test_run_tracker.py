@@ -1,24 +1,20 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import http.server
 import json
 import threading
-from builtins import open
-
-from future.moves.urllib.parse import parse_qs
+from urllib.parse import parse_qs
 
 from pants.auth.cookies import Cookies
 from pants.goal.run_tracker import RunTracker
+from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_file_path
-from pants_test.test_base import TestBase
+from pants.version import VERSION
 
 
 class RunTrackerTest(TestBase):
-  def test_upload_stats(self):
+  def assert_upload_stats(self, *, response_code) -> None:
     stats = {'stats': {'foo': 'bar', 'baz': 42}}
 
     class Handler(http.server.BaseHTTPRequestHandler):
@@ -31,12 +27,23 @@ class RunTrackerTest(TestBase):
             handler.end_headers()
           else:
             self.assertEqual('/upload', handler.path)
-            self.assertEqual('application/x-www-form-urlencoded', handler.headers['Content-type'])
+            stats_version = handler.headers['X-Pants-Stats-Version']
+            self.assertIn(stats_version, {"1", "2"})
+            self.assertEqual(handler.headers['User-Agent'], f"pants/v{VERSION}")
             length = int(handler.headers['Content-Length'])
-            post_data = parse_qs(handler.rfile.read(length).decode('utf-8'))
-            decoded_post_data = {k: json.loads(v[0]) for k, v in post_data.items()}
-            self.assertEqual(stats, decoded_post_data)
-            handler.send_response(200)
+            content = handler.rfile.read(length).decode()
+            if stats_version == "2":
+              self.assertEqual('application/json', handler.headers['Content-type'])
+              decoded_post_data = json.loads(content)
+              self.assertEqual(len(decoded_post_data), 1)
+              builds = decoded_post_data['builds']
+              self.assertEqual(len(builds), 1)
+              received_stats = builds[0]
+            else:
+              self.assertEqual('application/x-www-form-urlencoded', handler.headers['Content-type'])
+              received_stats = {k: json.loads(v[0]) for k, v in parse_qs(content).items()}
+            self.assertEqual(stats, received_stats)
+            handler.send_response(response_code)
             handler.end_headers()
         except Exception:
           handler.send_response(400)  # Ensure the main thread knows the test failed.
@@ -47,19 +54,39 @@ class RunTrackerTest(TestBase):
     host, port = server.server_address
 
     def mk_url(path):
-      return 'http://{}:{}{}'.format(host, port, path)
+      return f'http://{host}:{port}{path}'
 
     server_thread = threading.Thread(target=server.serve_forever)
     server_thread.daemon = True
     server_thread.start()
 
     self.context(for_subsystems=[Cookies])
-    self.assertTrue(RunTracker.post_stats(mk_url('/upload'), stats))
-    self.assertTrue(RunTracker.post_stats(mk_url('/redirect307'), stats))
-    self.assertFalse(RunTracker.post_stats(mk_url('/redirect302'), stats))
-
+    self.assertTrue(RunTracker.post_stats(mk_url('/upload'), stats, stats_version=1))
+    self.assertTrue(RunTracker.post_stats(mk_url('/upload'), stats, stats_version=2))
+    self.assertTrue(RunTracker.post_stats(mk_url('/redirect307'), stats, stats_version=1))
+    self.assertFalse(RunTracker.post_stats(mk_url('/redirect302'), stats, stats_version=2))
     server.shutdown()
     server.server_close()
+
+  def test_upload_stats(self):
+    self.assert_upload_stats(response_code=200)
+    self.assert_upload_stats(response_code=201)
+    self.assert_upload_stats(response_code=204)
+
+  def test_invalid_stats_version(self):
+    stats = {'stats': {'foo': 'bar', 'baz': 42}}
+    url = 'http://example.com/upload/'
+    with self.assertRaises(ValueError):
+      RunTracker.post_stats(url, stats, stats_version=0)
+    
+    with self.assertRaises(ValueError):
+      RunTracker.post_stats(url, stats, stats_version=None)
+
+    with self.assertRaises(ValueError):
+      RunTracker.post_stats(url, stats, stats_version=9)
+
+    with self.assertRaises(ValueError):
+      RunTracker.post_stats(url, stats, stats_version="not a number")
 
   def test_write_stats_to_json_file(self):
     # Set up
@@ -67,7 +94,7 @@ class RunTrackerTest(TestBase):
 
     # Execute & verify
     with temporary_file_path() as file_name:
-      self.assertTrue(RunTracker.write_stats_to_json(file_name, stats))
+      RunTracker.write_stats_to_json(file_name, stats)
       with open(file_name, 'r') as f:
         result = json.load(f)
         self.assertEqual(stats, result)

@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 
@@ -22,11 +19,16 @@ class JVM(Subsystem):
 
   # Broken out here instead of being inlined in the registration stanza,
   # because various tests may need to access these.
-  options_default = ['-Xmx256m']
+  options_default = [
+    '-Xmx256m',
+    # Always bump MaxFDLimit - this means that Java will listen to the environmental FD limit,
+    # rather than imposing its own. This should just be what the JVM does by default. Boo.
+    '-XX:-MaxFDLimit',
+  ]
 
   @classmethod
   def register_options(cls, register):
-    super(JVM, cls).register_options(register)
+    super().register_options(register)
     # TODO(benjy): Options to specify the JVM version?
     register('--options', type=list, metavar='<option>...',
              default=cls.options_default,

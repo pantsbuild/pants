@@ -1,22 +1,36 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import hashlib
 import json
-from builtins import bytes, object, open, str
+import logging
+import typing
+from collections import OrderedDict
+from collections.abc import Iterable, Mapping, Set
+from enum import Enum
+from pathlib import Path
+from typing import Any, Optional, Type, Union
 
-from future.utils import PY3
 from twitter.common.collections import OrderedSet
+from typing_extensions import Protocol
 
-from pants.base.deprecated import deprecated
-from pants.util.collections_abc_backport import Iterable, Mapping, OrderedDict, Set
 from pants.util.strutil import ensure_binary
 
 
-def hash_all(strs, digest=None):
+logger = logging.getLogger(__name__)
+
+
+class Digest(Protocol):
+  """A post-hoc type stub for hashlib digest objects."""
+
+  def update(self, data: bytes) -> None:
+    ...
+
+  def hexdigest(self) -> str:
+    ...
+
+
+def hash_all(strs: typing.Iterable[Union[bytes, str]], digest: Optional[Digest] = None) -> str:
   """Returns a hash of the concatenation of all the strings in strs.
 
   If a hashlib message digest is not supplied a new sha1 message digest is used.
@@ -25,10 +39,10 @@ def hash_all(strs, digest=None):
   for s in strs:
     s = ensure_binary(s)
     digest.update(s)
-  return digest.hexdigest() if PY3 else digest.hexdigest().decode('utf-8')
+  return digest.hexdigest()
 
 
-def hash_file(path, digest=None):
+def hash_file(path: Union[str, Path], digest: Optional[Digest] = None) -> str:
   """Hashes the contents of the file at the given path and returns the hash digest in hex form.
 
   If a hashlib message digest is not supplied a new sha1 message digest is used.
@@ -39,13 +53,33 @@ def hash_file(path, digest=None):
     while s:
       digest.update(s)
       s = fd.read(8192)
-  return digest.hexdigest() if PY3 else digest.hexdigest().decode('utf-8')
+  return digest.hexdigest()
+
+
+def hash_dir(path: Path, *, digest: Optional[Digest] = None) -> str:
+  """Hashes the recursive contents under the given directory path.
+
+  If a hashlib message digest is not supplied a new sha1 message digest is used.
+  """
+  if not isinstance(path, Path):
+    raise TypeError(f'Expected path to be a pathlib.Path, given a: {type(path)}')
+
+  if not path.is_dir():
+    raise ValueError(f'Expected path to de a directory, given: {path}')
+
+  digest = digest or hashlib.sha1()
+  root = path.resolve()
+  for pth in sorted(p for p in root.rglob('*')):
+    digest.update(bytes(pth.relative_to(root)))
+    if not pth.is_dir():
+      hash_file(pth, digest=digest)
+  return digest.hexdigest()
 
 
 class CoercingEncoder(json.JSONEncoder):
   """An encoder which performs coercions in order to serialize many otherwise illegal objects.
 
-  The python documentation (https://docs.python.org/2/library/json.html#json.dumps) states that
+  The python documentation (https://docs.python.org/3/library/json.html#json.dumps) states that
   dict keys are coerced to strings in json.dumps, but this appears to be incorrect -- it throws a
   TypeError on things we might to throw at it, like a set, or a dict with tuple keys.
   """
@@ -56,13 +90,25 @@ class CoercingEncoder(json.JSONEncoder):
     if isinstance(key_obj, bytes):
       # Bytes often occur as dict keys in python 2 code, but in python 3, trying to encode bytes
       # keys raises a TypeError. We explicitly check for that here and convert to str.
-      return self.default(key_obj.decode('utf-8'))
+      return self.default(key_obj.decode())
     elif isinstance(key_obj, str):
       return self.default(key_obj)
     else:
       return self.encode(key_obj)
 
+  def _is_natively_encodable(self, o):
+    return isinstance(o, (type(None), bool, int, list, str, bytes, float))
+
   def default(self, o):
+    if self._is_natively_encodable(o):
+      # isinstance() checks are expensive, particularly for abstract base classes such as Mapping:
+      # https://stackoverflow.com/questions/42378726/why-is-checking-isinstancesomething-mapping-so-slow
+      # This means that, if we let natively encodable types all through, we incur a performance hit, since
+      # we call this function very often.
+      # TODO(#7658) Figure out why we call this function so often.
+      return o
+    if isinstance(o, Enum):
+      return o.value
     if isinstance(o, Mapping):
       # Preserve order to avoid collisions for OrderedDict inputs to json.dumps(). We don't do this
       # for general mappings because dicts have an arbitrary key ordering in some versions of python
@@ -81,7 +127,7 @@ class CoercingEncoder(json.JSONEncoder):
       return OrderedDict(
         (self._maybe_encode_dict_key(k), self.default(v))
         for k, v in ordered_kv_pairs)
-    elif isinstance(o, Set):
+    if isinstance(o, Set):
       # We disallow OrderedSet (although it is not a stdlib collection) for the same reasons as
       # OrderedDict above.
       if isinstance(o, OrderedSet):
@@ -89,33 +135,21 @@ class CoercingEncoder(json.JSONEncoder):
                         .format(cls=type(self).__name__, val=o))
       # Set order is arbitrary in python 3.6 and 3.7, so we need to keep this sorted() call.
       return sorted(self.default(i) for i in o)
-    elif isinstance(o, Iterable) and not isinstance(o, (bytes, list, str)):
+    if isinstance(o, Iterable) and not isinstance(o, (bytes, list, str)):
       return list(self.default(i) for i in o)
+    logger.debug("Our custom json encoder {} is trying to hash a primitive type, but has gone through"
+                 "checking every other registered type class before. These checks are expensive,"
+                 "so you should consider registering the type {} within"
+                 "this function ({}.default)".format(type(self).__name__, type(o), type(self).__name__))
     return o
 
   def encode(self, o):
-    return super(CoercingEncoder, self).encode(self.default(o))
+    return super().encode(self.default(o))
 
 
-@deprecated(
-  '1.16.0.dev1',
-  'Please use pants.base.hash_utils.stable_json_sha1 instead.')
-def stable_json_hash(obj, digest=None, encoder=None):
-  """Hashes `obj` stably; ie repeated calls with the same inputs will produce the same hash.
-
-  :param obj: An object that can be rendered to json using the given `encoder`.
-  :param digest: An optional `hashlib` compatible message digest. Defaults to `hashlib.sha1`.
-  :param encoder: An optional custom json encoder.
-  :type encoder: :class:`json.JSONEncoder`
-  :returns: A stable hash of the given `obj`.
-  :rtype: str
-
-  :API: public
-  """
-  return json_hash(obj, digest=digest, encoder=encoder)
-
-
-def json_hash(obj, digest=None, encoder=None):
+def json_hash(
+  obj: Any, digest: Optional[Digest] = None, encoder: Optional[Type[json.JSONEncoder]] = None
+) -> str:
   """Hashes `obj` by dumping to JSON.
 
   :param obj: An object that can be rendered to json using the given `encoder`.
@@ -128,11 +162,11 @@ def json_hash(obj, digest=None, encoder=None):
   :API: public
   """
   json_str = json.dumps(obj, ensure_ascii=True, allow_nan=False, sort_keys=True, cls=encoder)
-  return hash_all(json_str, digest=digest)
+  return hash_all([json_str], digest=digest)
 
 
 # TODO(#6513): something like python 3's @lru_cache decorator could be useful here!
-def stable_json_sha1(obj, digest=None):
+def stable_json_sha1(obj: Any, digest: Optional[Digest] = None) -> str:
   """Hashes `obj` stably; ie repeated calls with the same inputs will produce the same hash.
 
   :param obj: An object that can be rendered to json using a :class:`CoercingEncoder`.
@@ -145,7 +179,7 @@ def stable_json_sha1(obj, digest=None):
   return json_hash(obj, digest=digest, encoder=CoercingEncoder)
 
 
-class Sharder(object):
+class Sharder:
   """Assigns strings to shards pseudo-randomly, but stably."""
 
   class InvalidShardSpec(Exception):

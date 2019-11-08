@@ -3,14 +3,16 @@
 
 python_library(
   dependencies=[
-    '3rdparty/python:future',
     ':plugins',
+    '3rdparty/python:dataclasses',
     '3rdparty/python:pex',
     '3rdparty/python:setuptools',
     '3rdparty/python:wheel',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/python/subsystems',
     'src/python/pants/base:build_environment',
+    'src/python/pants/base:build_root',
+    'src/python/pants/base:exception_sink',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:target_roots',
     'src/python/pants/binaries',
@@ -26,6 +28,7 @@ python_library(
     'src/python/pants/engine:mapper',
     'src/python/pants/engine:native',
     'src/python/pants/engine:parser',
+    'src/python/pants/engine:platform',
     'src/python/pants/engine:scheduler',
     'src/python/pants/goal',
     'src/python/pants/goal:run_tracker',

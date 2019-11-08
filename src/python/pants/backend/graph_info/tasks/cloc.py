@@ -1,13 +1,7 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import open
-
-from future.utils import text_type
 
 from pants.backend.graph_info.subsystems.cloc_binary import ClocBinary
 from pants.base.workunit import WorkUnitLabel
@@ -22,21 +16,15 @@ class CountLinesOfCode(ConsoleTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(CountLinesOfCode, cls).subsystem_dependencies() + (ClocBinary,)
+    return super().subsystem_dependencies() + (ClocBinary,)
 
   @classmethod
   def register_options(cls, register):
-    super(CountLinesOfCode, cls).register_options(register)
-    register('--transitive', type=bool, fingerprint=True, default=True,
-             help='Operate on the transitive dependencies of the specified targets.  '
-                  'Unset to operate only on the specified targets.')
+    super().register_options(register)
     register('--ignored', type=bool, fingerprint=True,
              help='Show information about files ignored by cloc.')
 
   def console_output(self, targets):
-    if not self.get_options().transitive:
-      targets = self.context.target_roots
-
     input_snapshots = tuple(
       target.sources_snapshot(scheduler=self.context._scheduler) for target in targets
     )
@@ -52,7 +40,7 @@ class CountLinesOfCode(ConsoleTask):
       list_file_snapshot = self.context._scheduler.capture_snapshots((
         PathGlobsAndRoot(
           PathGlobs(('input_files_list',)),
-          text_type(tmpdir),
+          tmpdir,
         ),
       ))[0]
 
@@ -80,14 +68,14 @@ class CountLinesOfCode(ConsoleTask):
       output_files=('ignored', 'report'),
       description='cloc',
     )
-    exec_result = self.context.execute_process_synchronously_without_raising(req, 'cloc', (WorkUnitLabel.TOOL,))
+    exec_result = self.context.execute_process_synchronously_or_raise(req, 'cloc', (WorkUnitLabel.TOOL,))
 
     files_content_tuple = self.context._scheduler.product_request(
       FilesContent,
       [exec_result.output_directory_digest]
     )[0].dependencies
 
-    files_content = {fc.path: fc.content.decode('utf-8') for fc in files_content_tuple}
+    files_content = {fc.path: fc.content.decode() for fc in files_content_tuple}
     for line in files_content['report'].split('\n'):
       yield line
 

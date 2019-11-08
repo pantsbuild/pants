@@ -1,20 +1,16 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import tempfile
 import unittest
-from builtins import open
 
 from pants.backend.jvm.subsystems.shader import RelocateRule, Shader, Shading
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
+from pants.testutil.subsystem.util import init_subsystem
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import safe_delete
-from pants_test.subsystem.subsystem_util import init_subsystem
 
 
 class ShaderTest(unittest.TestCase):

@@ -1,14 +1,15 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import unittest
-from builtins import object
 
-from pants.engine.addressable import (MutationError, NotSerializableError, addressable,
-                                      addressable_dict, addressable_list)
+from pants.engine.addressable import (
+  MutationError,
+  NotSerializableError,
+  addressable,
+  addressable_dict,
+  addressable_list,
+)
 from pants.engine.objects import Resolvable, Serializable
 from pants.util.objects import Exactly, TypeConstraintError
 
@@ -44,9 +45,9 @@ class CountingResolvable(Resolvable):
 
 class AddressableDescriptorTest(unittest.TestCase):
   def test_inappropriate_application(self):
-    class NotSerializable(object):
+    class NotSerializable:
       def __init__(self, count):
-        super(NotSerializable, self).__init__()
+        super().__init__()
         self.count = count
 
       @addressable(Exactly(int))

@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import re
-from builtins import object, open, str
 from subprocess import PIPE, Popen
 from textwrap import dedent
 
@@ -14,13 +10,13 @@ from pants.fs.archive import ZIP
 from pants.util.contextutil import temporary_dir
 
 
-class JvmPlatformIntegrationMixin(object):
+class JvmPlatformIntegrationMixin:
   """Mixin providing lots of JvmPlatform-related integration tests to java compilers (eg, zinc)."""
 
   def get_pants_compile_args(self):
     """List of arguments to pants that determine what compiler to use.
 
-    The compiling task must be the last argument (eg, compile.zinc).
+    The compiling task must be the last argument (eg, compile.rsc).
     """
     raise NotImplementedError
 
@@ -39,7 +35,7 @@ class JvmPlatformIntegrationMixin(object):
     p = Popen(['file', path], stdout=PIPE, stderr=PIPE)
     out, err = p.communicate()
     self.assertEqual(0, p.returncode, 'Failed to run file on {}.'.format(path))
-    match = re.search(r'version (\d+[.]\d+)', out.decode('utf-8'))
+    match = re.search(r'version (\d+[.]\d+)', out.decode())
     self.assertTrue(match is not None, 'Could not determine version for {}'.format(path))
     return version_map[match.group(1)]
 
@@ -64,7 +60,7 @@ class JvmPlatformIntegrationMixin(object):
     if ':' in jar_name:
       jar_name = jar_name[jar_name.find(':') + 1:]
     with temporary_dir() as cache_dir:
-      config = {'cache.compile.zinc': {'write_to': [cache_dir]}}
+      config = {'cache.compile.rsc': {'write_to': [cache_dir]}}
       with self.temporary_workdir() as workdir:
         pants_run = self.run_pants_with_workdir(
           ['binary'] + self.get_pants_compile_args()

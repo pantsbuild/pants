@@ -1,11 +1,8 @@
-# coding=utf-8
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 from pants.base.payload import Payload
-from pants.base.payload_field import PrimitiveField, PrimitivesSetField
+from pants.base.payload_field import PrimitiveField
 from pants.build_graph.target import Target
 
 
@@ -33,7 +30,9 @@ class PackagedNativeLibrary(Target):
     :param list native_lib_names: Strings containing the libraries to add to the linker command
                                   line. These libraries become `-l<name>` arguments, so they must
                                   exist and be named `lib<name>.so` (or `lib<name>.dylib` depending
-                                  on the platform) or the linker will exit with an error.
+                                  on the platform) or the linker will exit with an error. This field
+                                  may also be a dict mapping the OS name ('darwin' or 'linux') to a
+                                  list of such strings.
     """
     if not payload:
       payload = Payload()
@@ -41,9 +40,9 @@ class PackagedNativeLibrary(Target):
       'sources': self.create_sources_field(sources, address.spec_path, key_arg='sources'),
       'include_relpath': PrimitiveField(include_relpath),
       'lib_relpath': PrimitiveField(lib_relpath),
-      'native_lib_names': PrimitivesSetField(native_lib_names),
+      'native_lib_names': PrimitiveField(native_lib_names),
     })
-    super(PackagedNativeLibrary, self).__init__(address=address, payload=payload, **kwargs)
+    super().__init__(address=address, payload=payload, **kwargs)
 
   @property
   def include_relpath(self):

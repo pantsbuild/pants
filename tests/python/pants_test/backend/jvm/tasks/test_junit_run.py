@@ -1,15 +1,13 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import open, range
+import subprocess
 from contextlib import contextmanager
 from textwrap import dedent
 
 from pants.backend.jvm.subsystems.junit import JUnit
+from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.backend.jvm.tasks.coverage.cobertura import Cobertura
@@ -26,12 +24,11 @@ from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
+from pants.testutil.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
+from pants.testutil.subsystem.util import global_subsystem_instance, init_subsystem
+from pants.testutil.task_test_base import ensure_cached
 from pants.util.contextutil import environment_as, temporary_dir
-from pants.util.dirutil import safe_file_dump, touch
-from pants.util.process_handler import subprocess
-from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
-from pants_test.subsystem.subsystem_util import global_subsystem_instance, init_subsystem
-from pants_test.task_test_base import ensure_cached
+from pants.util.dirutil import touch
 
 
 class JUnitRunnerTest(JvmToolTaskTestBase):
@@ -42,7 +39,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
 
   @classmethod
   def alias_groups(cls):
-    return super(JUnitRunnerTest, cls).alias_groups().merge(BuildFileAliases(
+    return super().alias_groups().merge(BuildFileAliases(
       targets={
         'files': Files,
         'junit_tests': JUnitTests,
@@ -51,7 +48,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     ))
 
   def setUp(self):
-    super(JUnitRunnerTest, self).setUp()
+    super().setUp()
     init_subsystem(JUnit)
 
   @ensure_cached(JUnitRun, expected_num_artifacts=1)
@@ -209,19 +206,6 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     self.populate_runtime_classpath(context=context)
     self.execute(context)
 
-  def test_request_classes_by_source(self):
-    """`classes_by_source` is expensive to compute: confirm that it is only computed when needed."""
-
-    # Class names (with and without a method name) should not trigger.
-    self.assertFalse(JUnitRun.request_classes_by_source(['com.goo.ber']))
-    self.assertFalse(JUnitRun.request_classes_by_source(['com.goo.ber#method']))
-
-    # Existing files (with and without the method name) should trigger.
-    srcfile = os.path.join(self.test_workdir, 'this.is.a.source.file.scala')
-    safe_file_dump(srcfile, 'content!', mode='w')
-    self.assertTrue(JUnitRun.request_classes_by_source([srcfile]))
-    self.assertTrue(JUnitRun.request_classes_by_source(['{}#method'.format(srcfile)]))
-
   @ensure_cached(JUnitRun, expected_num_artifacts=1)
   def test_junit_runner_extra_jvm_options(self):
     self.make_target(
@@ -230,6 +214,34 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
       sources=['FooTest.java'],
       extra_jvm_options=['-Dexample.property=1'],
     )
+    self._execute_junit_runner([('FooTest.java', dedent("""
+        package org.pantsbuild.foo;
+        import org.junit.Test;
+        import static org.junit.Assert.assertTrue;
+        public class FooTest {
+          @Test
+          public void testFoo() {
+            String exampleProperty = System.getProperty("example.property");
+            assertTrue(exampleProperty != null && exampleProperty.equals("1"));
+          }
+        }
+      """))], target_name='tests/java/org/pantsbuild/foo:foo_test')
+
+  @ensure_cached(JUnitRun, expected_num_artifacts=1)
+  def test_junit_runner_platform_args(self):
+    self.make_target(
+      spec='tests/java/org/pantsbuild/foo:foo_test',
+      target_type=JUnitTests,
+      sources=['FooTest.java'],
+      test_platform='java8-extra',
+      #extra_jvm_options=['-Dexample.property=1'],
+    )
+    self.set_options_for_scope(JvmPlatform.options_scope,
+      platforms={
+        'java8-extra': {
+          'source': '8',
+          'target': '8',
+          'args': ['-Dexample.property=1'] },})
     self._execute_junit_runner([('FooTest.java', dedent("""
         package org.pantsbuild.foo;
         import org.junit.Test;

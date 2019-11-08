@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.base.exceptions import TargetDefinitionException
@@ -30,7 +27,7 @@ class PythonAWSLambda(Target):
       'binary': PrimitiveField(binary),
       'handler': PrimitiveField(handler),
     })
-    super(PythonAWSLambda, self).__init__(payload=payload, **kwargs)
+    super().__init__(payload=payload, **kwargs)
 
   @classmethod
   def alias(cls):
@@ -38,7 +35,7 @@ class PythonAWSLambda(Target):
 
   @classmethod
   def compute_dependency_specs(cls, kwargs=None, payload=None):
-    for spec in super(PythonAWSLambda, cls).compute_dependency_specs(kwargs, payload):
+    for spec in super().compute_dependency_specs(kwargs, payload):
       yield spec
     target_representation = kwargs or payload.as_dict()
     binary = target_representation.get('binary')
@@ -50,12 +47,12 @@ class PythonAWSLambda(Target):
     """Returns the binary that builds the pex for this lambda."""
     dependencies = self.dependencies
     if len(dependencies) != 1:
-      raise TargetDefinitionException(self, 'An app must define exactly one binary '
-                                            'dependency, have: {}'.format(dependencies))
+      raise TargetDefinitionException(self, f'An app must define exactly one binary '
+                                            'dependency, have: {dependencies}')
     binary = dependencies[0]
     if not isinstance(binary, PythonBinary):
-      raise TargetDefinitionException(self, 'Expected binary dependency to be a python_binary '
-                                            'target, found {}'.format(binary))
+      raise TargetDefinitionException(self, f'Expected binary dependency to be a python_binary '
+                                            'target, found {binary}')
     return binary
 
   @property

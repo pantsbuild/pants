@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import unittest
 
@@ -12,7 +9,7 @@ from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.base.build_environment import get_buildroot
 from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency import JarDependency
-from pants_test.subsystem.subsystem_util import init_subsystem
+from pants.testutil.subsystem.util import init_subsystem
 
 
 class JarDependencyTest(unittest.TestCase):

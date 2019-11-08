@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -10,7 +7,6 @@ from pants.backend.native.config.environment import CCompiler, CppCompiler, Plat
 from pants.backend.native.subsystems.utils.archive_file_mapper import ArchiveFileMapper
 from pants.binaries.binary_tool import NativeTool
 from pants.engine.rules import rule
-from pants.engine.selectors import Select
 from pants.util.memo import memoized_method, memoized_property
 
 
@@ -29,7 +25,7 @@ class GCC(NativeTool):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(GCC, cls).subsystem_dependencies() + (ArchiveFileMapper.scoped(cls),)
+    return super().subsystem_dependencies() + (ArchiveFileMapper.scoped(cls),)
 
   @memoized_property
   def _file_mapper(self):
@@ -44,9 +40,9 @@ class GCC(NativeTool):
 
   @memoized_method
   def _common_lib_dirs(self, platform):
-    lib64_tuples = platform.resolve_for_enum_variant({
-      'darwin': [],
-      'linux': [('lib64',)],
+    lib64_tuples = platform.match({
+      Platform.darwin: [],
+      Platform.linux: [('lib64',)]
     })
     return self._filemap(lib64_tuples + [
       ('lib',),
@@ -65,7 +61,7 @@ class GCC(NativeTool):
     return CCompiler(
       path_entries=self.path_entries,
       exe_filename='gcc',
-      library_dirs=self._common_lib_dirs(platform),
+      runtime_library_dirs=self._common_lib_dirs(platform),
       include_dirs=self._common_include_dirs,
       extra_args=[])
 
@@ -83,7 +79,7 @@ class GCC(NativeTool):
       # c++config.h, which is why we bypass self._filemap() here.
       [self.select(), 'include/c++', self.version(), '*/bits/c++config.h'])
     # Get the directory that makes `#include <bits/c++config.h>` work.
-    plat_cpp_header_dir =  os.path.dirname(os.path.dirname(cpp_config_header_path))
+    plat_cpp_header_dir = os.path.dirname(os.path.dirname(cpp_config_header_path))
 
     return most_cpp_include_dirs + [plat_cpp_header_dir]
 
@@ -91,18 +87,18 @@ class GCC(NativeTool):
     return CppCompiler(
       path_entries=self.path_entries,
       exe_filename='g++',
-      library_dirs=self._common_lib_dirs(platform),
+      runtime_library_dirs=self._common_lib_dirs(platform),
       include_dirs=(self._common_include_dirs + self._cpp_include_dirs),
       extra_args=[])
 
 
-@rule(CCompiler, [Select(GCC), Select(Platform)])
-def get_gcc(gcc, platform):
+@rule
+def get_gcc(gcc: GCC, platform: Platform) -> CCompiler:
   return gcc.c_compiler(platform)
 
 
-@rule(CppCompiler, [Select(GCC), Select(Platform)])
-def get_gplusplus(gcc, platform):
+@rule
+def get_gplusplus(gcc: GCC, platform: Platform) -> CppCompiler:
   return gcc.cpp_compiler(platform)
 
 

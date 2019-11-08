@@ -1,16 +1,13 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import functools
 import logging
 import os
 import signal
+import subprocess
 import time
 import traceback
-from builtins import object, str
 from contextlib import contextmanager
 
 import psutil
@@ -20,7 +17,6 @@ from pants.process.lock import OwnerPrintingInterProcessFileLock
 from pants.process.subprocess import Subprocess
 from pants.util.dirutil import read_file, rm_rf, safe_file_dump, safe_mkdir
 from pants.util.memo import memoized_property
-from pants.util.process_handler import subprocess
 
 
 logger = logging.getLogger(__name__)
@@ -37,7 +33,7 @@ def swallow_psutil_exceptions():
     pass
 
 
-class ProcessGroup(object):
+class ProcessGroup:
   """Wraps a logical group of processes and provides convenient access to ProcessManager objects."""
 
   def __init__(self, name, metadata_base_dir=None):
@@ -69,7 +65,7 @@ class ProcessGroup(object):
       yield self._instance_from_process(item)
 
 
-class ProcessMetadataManager(object):
+class ProcessMetadataManager:
   """"Manages contextual, on-disk process metadata."""
 
   class MetadataError(Exception): pass
@@ -83,7 +79,7 @@ class ProcessMetadataManager(object):
     """
     :param str metadata_base_dir: The base directory for process metadata.
     """
-    super(ProcessMetadataManager, self).__init__()
+    super().__init__()
 
     self._metadata_base_dir = (
       metadata_base_dir or
@@ -177,7 +173,7 @@ class ProcessMetadataManager(object):
     """
     file_path = self._metadata_file_path(name, metadata_key)
     try:
-      metadata = read_file(file_path, binary_mode=False).strip()
+      metadata = read_file(file_path).strip()
       return self._maybe_cast(metadata, caster)
     except (IOError, OSError):
       return None
@@ -191,7 +187,7 @@ class ProcessMetadataManager(object):
     """
     self._maybe_init_metadata_dir_by_name(name)
     file_path = self._metadata_file_path(name, metadata_key)
-    safe_file_dump(file_path, metadata_value, mode='w')
+    safe_file_dump(file_path, metadata_value)
 
   def await_metadata_by_name(self, name, metadata_key, timeout, caster=None):
     """Block up to a timeout for process metadata to arrive on disk.
@@ -247,7 +243,7 @@ class ProcessManager(ProcessMetadataManager):
     :param type socket_type: The type to be used for socket type casting (e.g. int).
     :param str metadata_base_dir: The overridden base directory for process metadata.
     """
-    super(ProcessManager, self).__init__(metadata_base_dir)
+    super().__init__(metadata_base_dir)
     self._name = name.lower().strip()
     self._pid = pid
     self._socket = socket
@@ -321,7 +317,7 @@ class ProcessManager(ProcessMetadataManager):
       kwargs.setdefault('stderr', subprocess.STDOUT)
 
     try:
-      return subprocess.check_output(command, **kwargs).decode('utf-8').strip()
+      return subprocess.check_output(command, **kwargs).decode().strip()
     except (OSError, subprocess.CalledProcessError) as e:
       subprocess_output = getattr(e, 'output', '').strip()
       raise cls.ExecutionError(str(e), subprocess_output)
@@ -404,7 +400,7 @@ class ProcessManager(ProcessMetadataManager):
     if not force and self.is_alive():
       raise ProcessMetadataManager.MetadataError('cannot purge metadata for a running process!')
 
-    super(ProcessManager, self).purge_metadata_by_name(self._name)
+    super().purge_metadata_by_name(self._name)
 
   def _kill(self, kill_sig):
     """Send a signal to the current process."""
@@ -515,6 +511,7 @@ class ProcessManager(ProcessMetadataManager):
     self.pre_fork(**pre_fork_opts or {})
     pid = os.fork()
     if pid == 0:
+      # fork's child execution
       try:
         os.setsid()
         os.chdir(self._buildroot)
@@ -524,6 +521,7 @@ class ProcessManager(ProcessMetadataManager):
       finally:
         os._exit(0)
     else:
+      # fork's parent execution
       try:
         self.post_fork_parent(**post_fork_parent_opts or {})
       except Exception:

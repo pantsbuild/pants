@@ -1,17 +1,13 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import object
 from collections import defaultdict
 from netrc import NetrcParseError
 from netrc import netrc as NetrcDb
 
 
-class Netrc(object):
+class Netrc:
   """Fetches username and password from ~/.netrc for logged in user."""
 
   class NetrcError(Exception):
@@ -48,4 +44,4 @@ class Netrc(object):
         if len(self._login) == 0:
           raise self.NetrcError('Found no usable authentication blocks in ~/.netrc')
       except NetrcParseError as e:
-        raise self.NetrcError('Problem parsing ~/.netrc: {}'.format(e))
+        raise self.NetrcError(f'Problem parsing ~/.netrc: {e!r}')

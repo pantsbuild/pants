@@ -5,8 +5,9 @@ python_tests(
   name='scalajs_repl_integration',
   sources=['test_scalajs_repl_integration.py'],
   dependencies=[
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
+    'contrib/scalajs:examples_directory',
   ],
   tags={'integration'},
-  timeout=180,
+  timeout=270,
 )

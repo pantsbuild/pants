@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -10,10 +7,13 @@ from pex.interpreter import PythonInterpreter
 from pex.pex_builder import PEXBuilder
 from pex.pex_info import PexInfo
 
-from pants.backend.python.subsystems.pex_build_util import (PexBuilderWrapper,
-                                                            has_python_requirements,
-                                                            has_python_sources, has_resources,
-                                                            is_python_target)
+from pants.backend.python.subsystems.pex_build_util import (
+  PexBuilderWrapper,
+  has_python_requirements,
+  has_python_sources,
+  has_resources,
+  is_python_target,
+)
 from pants.backend.python.subsystems.python_native_code import PythonNativeCode
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
@@ -31,8 +31,17 @@ class PythonBinaryCreate(Task):
   """Create an executable .pex file."""
 
   @classmethod
+  def register_options(cls, register):
+    super().register_options(register)
+    register('--include-run-information', type=bool, default=False,
+             help="Include run information in the PEX's PEX-INFO for information like the timestamp the PEX was "
+                  "created and the command line used to create it. This information may be helpful to you, but means "
+                  "that the generated PEX will not be reproducible; that is, future runs of `./pants binary` will not "
+                  "create the same byte-for-byte identical .pex files.")
+
+  @classmethod
   def subsystem_dependencies(cls):
-    return super(PythonBinaryCreate, cls).subsystem_dependencies() + (
+    return super().subsystem_dependencies() + (
       PexBuilderWrapper.Factory,
       PythonNativeCode.scoped(cls),
     )
@@ -47,7 +56,7 @@ class PythonBinaryCreate(Task):
 
   @classmethod
   def implementation_version(cls):
-    return super(PythonBinaryCreate, cls).implementation_version() + [('PythonBinaryCreate', 2)]
+    return super().implementation_version() + [('PythonBinaryCreate', 2)]
 
   @property
   def cache_target_dirs(self):
@@ -65,7 +74,7 @@ class PythonBinaryCreate(Task):
     return isinstance(target, PythonBinary)
 
   def __init__(self, *args, **kwargs):
-    super(PythonBinaryCreate, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._distdir = self.get_options().pants_distdir
 
   def execute(self):
@@ -76,20 +85,20 @@ class PythonBinaryCreate(Task):
     for binary in binaries:
       name = binary.name
       if name in names:
-        raise TaskError('Cannot build two binaries with the same name in a single invocation. '
-                        '{} and {} both have the name {}.'.format(binary, names[name], name))
+        raise TaskError(f'Cannot build two binaries with the same name in a single invocation. '
+                        '{binary} and {names[name]} both have the name {name}.')
       names[name] = binary
 
     with self.invalidated(binaries, invalidate_dependents=True) as invalidation_check:
       python_deployable_archive = self.context.products.get('deployable_archives')
       python_pex_product = self.context.products.get('pex_archives')
       for vt in invalidation_check.all_vts:
-        pex_path = os.path.join(vt.results_dir, '{}.pex'.format(vt.target.name))
+        pex_path = os.path.join(vt.results_dir, f'{vt.target.name}.pex')
         if not vt.valid:
-          self.context.log.debug('cache for {} is invalid, rebuilding'.format(vt.target))
+          self.context.log.debug(f'cache for {vt.target} is invalid, rebuilding')
           self._create_binary(vt.target, vt.results_dir)
         else:
-          self.context.log.debug('using cache for {}'.format(vt.target))
+          self.context.log.debug(f'using cache for {vt.target}')
 
         basename = os.path.basename(pex_path)
         python_pex_product.add(vt.target, os.path.dirname(pex_path)).append(basename)
@@ -111,9 +120,10 @@ class PythonBinaryCreate(Task):
     interpreter = self.context.products.get_data(PythonInterpreter)
     with temporary_dir() as tmpdir:
       # Create the pex_info for the binary.
-      run_info_dict = self.context.run_tracker.run_info.get_as_dict()
       build_properties = PexInfo.make_build_properties()
-      build_properties.update(run_info_dict)
+      if self.get_options().include_run_information:
+        run_info_dict = self.context.run_tracker.run_info.get_as_dict()
+        build_properties.update(run_info_dict)
       pex_info = binary_tgt.pexinfo.copy()
       pex_info.build_properties = build_properties
 
@@ -126,7 +136,7 @@ class PythonBinaryCreate(Task):
           .format(binary_tgt.name, binary_tgt.shebang))
         pex_builder.set_shebang(binary_tgt.shebang)
       else:
-        self.context.log.debug('No customized shebang found for {}'.format(binary_tgt.name))
+        self.context.log.debug(f'No customized shebang found for {binary_tgt.name}')
 
       # Find which targets provide sources and which specify requirements.
       source_tgts = []
@@ -140,8 +150,11 @@ class PythonBinaryCreate(Task):
         if is_python_target(tgt):
           constraint_tgts.append(tgt)
 
-      # Add target's interpreter compatibility constraints to pex info.
-      pex_builder.add_interpreter_constraints_from(constraint_tgts)
+      # Add interpreter compatibility constraints to pex info. Note that we only add the constraints for the final
+      # binary target itself, not its dependencies. The upstream interpreter selection tasks will already validate that
+      # there are no compatibility conflicts among the dependencies and target. If the binary target does not have
+      # `compatibility` in its BUILD entry, the global --python-setup-interpreter-constraints will be used.
+      pex_builder.add_interpreter_constraints_from([binary_tgt])
 
       # Dump everything into the builder's chroot.
       for tgt in source_tgts:
@@ -153,6 +166,6 @@ class PythonBinaryCreate(Task):
       pex_builder.add_requirement_libs_from(req_tgts, platforms=binary_tgt.platforms)
 
       # Build the .pex file.
-      pex_path = os.path.join(results_dir, '{}.pex'.format(binary_tgt.name))
+      pex_path = os.path.join(results_dir, f'{binary_tgt.name}.pex')
       pex_builder.build(pex_path)
       return pex_path

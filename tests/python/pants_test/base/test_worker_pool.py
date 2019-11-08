@@ -1,19 +1,15 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import threading
 import unittest
-from builtins import object
 
 from pants.base.worker_pool import Work, WorkerPool
 from pants.base.workunit import WorkUnit
 from pants.util.contextutil import temporary_dir
 
 
-class FakeRunTracker(object):
+class FakeRunTracker:
   def register_thread(self, one):
     pass
 
@@ -28,7 +24,7 @@ class WorkerPoolTest(unittest.TestCase):
     condition.acquire()
     with self.assertRaises(KeyboardInterrupt):
       with temporary_dir() as rundir:
-        pool = WorkerPool(WorkUnit(rundir, None, "work"), FakeRunTracker(), 1)
+        pool = WorkerPool(WorkUnit(rundir, None, "work"), FakeRunTracker(), 1, "test")
         try:
           pool.submit_async_work(Work(keyboard_interrupt_raiser, [()]))
           condition.wait(2)

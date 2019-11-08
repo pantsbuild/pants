@@ -1,13 +1,7 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from builtins import object, str
 from collections import namedtuple
-
-from future.types import newstr
 
 from pants.base import deprecated
 from pants.option.option_util import is_list_option
@@ -15,7 +9,7 @@ from pants.option.option_util import is_list_option
 
 class OptionHelpInfo(namedtuple('_OptionHelpInfo',
     ['registering_class', 'display_args', 'scoped_cmd_line_args', 'unscoped_cmd_line_args',
-     'typ', 'fromfile', 'default', 'help', 'deprecated_message', 'removal_version',
+     'typ', 'default', 'help', 'deprecated_message', 'removal_version',
      'removal_hint', 'choices'])):
   """A container for help information for a single option.
 
@@ -27,7 +21,6 @@ class OptionHelpInfo(namedtuple('_OptionHelpInfo',
   unscoped_cmd_line_args: The unscoped raw flag names allowed on the cmd line in this option's
                           scope context (e.g., [--baz, --no-baz, --qux])
   typ: The type of the option.
-  fromfile: `True` if the option supports @fromfile value loading.
   default: The value of this option if no flags are specified (derived from config and env vars).
   help: The help message registered for this option.
   deprecated_message: If deprecated: A message explaining that this option is deprecated at
@@ -51,7 +44,7 @@ class OptionScopeHelpInfo(namedtuple('_OptionScopeHelpInfo',
   pass
 
 
-class HelpInfoExtracter(object):
+class HelpInfoExtracter:
   """Extracts information useful for displaying help from option registration args."""
 
   @classmethod
@@ -95,11 +88,7 @@ class HelpInfoExtracter(object):
       if typ == list:
         typ = kwargs.get('member_type', str)
 
-      if typ == dict:
-        metavar = '"{\'key1\':val1,\'key2\':val2,...}"'
-      else:
-        type_name = typ.__name__ if typ != newstr else 'str'  # TODO(python3port): drop special case once Py2 removed
-        metavar = '<{}>'.format(type_name)
+      metavar = f'<{typ.__name__}>' if typ != dict else '"{\'key1\':val1,\'key2\':val2,...}"'
 
     return metavar
 
@@ -176,14 +165,13 @@ class HelpInfoExtracter(object):
       deprecated_message = 'DEPRECATED. {} removed in version: {}'.format(deprecated_tense,
                                                                           removal_version)
     removal_hint = kwargs.get('removal_hint')
-    choices = ', '.join(kwargs.get('choices')) if kwargs.get('choices') else None
+    choices = ', '.join(str(choice) for choice in kwargs.get('choices', [])) or None
 
     ret = OptionHelpInfo(registering_class=kwargs.get('registering_class', type(None)),
                          display_args=display_args,
                          scoped_cmd_line_args=scoped_cmd_line_args,
                          unscoped_cmd_line_args=unscoped_cmd_line_args,
                          typ=typ,
-                         fromfile=kwargs.get('fromfile', False),
                          default=default,
                          help=help_msg,
                          deprecated_message=deprecated_message,

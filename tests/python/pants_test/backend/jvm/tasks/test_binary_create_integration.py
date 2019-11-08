@@ -1,15 +1,12 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
+import subprocess
 
 from pants.base.build_environment import get_buildroot
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import open_zip, temporary_dir
-from pants.util.process_handler import subprocess
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class BinaryCreateIntegrationTest(PantsRunIntegrationTest):
@@ -75,7 +72,7 @@ class BinaryCreateIntegrationTest(PantsRunIntegrationTest):
       jar = "dist/manifest-with-agent.jar"
       with open_zip(jar, mode='r') as j:
         with j.open("META-INF/MANIFEST.MF") as jar_entry:
-          normalized_lines = (line.decode('utf-8').strip() for line in jar_entry.readlines() if line.strip())
+          normalized_lines = (line.decode().strip() for line in jar_entry.readlines() if line.strip())
           entries = {tuple(line.split(": ", 2)) for line in normalized_lines}
           self.assertIn(('Agent-Class', 'org.pantsbuild.testproject.manifest.Agent'), entries)
 
@@ -85,7 +82,7 @@ class BinaryCreateIntegrationTest(PantsRunIntegrationTest):
         jar_filename = os.path.join(distdir, '{}.jar'.format(name))
         command = [
           '--pants-distdir={}'.format(distdir),
-          '--no-compile-zinc-capture-classpath',
+          '--no-compile-rsc-capture-classpath',
           'binary',
           'testprojects/src/java/org/pantsbuild/testproject/deployexcludes:{}'.format(name),
         ]
@@ -128,8 +125,8 @@ class BinaryCreateIntegrationTest(PantsRunIntegrationTest):
                                stderr=subprocess.PIPE,
                                cwd=cwd)
     stdout, stderr = process.communicate()
-    stdout = stdout.decode('utf-8')
-    stderr = stderr.decode('utf-8')
+    stdout = stdout.decode()
+    stderr = stderr.decode()
 
     self.assertEqual(expected_returncode, process.returncode,
                       ('Expected exit code {} from command `{}` but got {}:\n'

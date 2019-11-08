@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import zipfile
@@ -14,8 +11,8 @@ from pants.backend.jvm.tasks.ivy_imports import IvyImports
 from pants.backend.jvm.tasks.jar_import_products import JarImportProducts
 from pants.java.jar.jar_dependency import JarDependency
 from pants.java.jar.jar_dependency_utils import M2Coordinate
+from pants.testutil.jvm.nailgun_task_test_base import NailgunTaskTestBase
 from pants.util.contextutil import open_zip, temporary_dir
-from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 
 
 class IvyImportsTest(NailgunTaskTestBase):
@@ -52,7 +49,6 @@ class IvyImportsTest(NailgunTaskTestBase):
                                     libraries=[jar_library.address.spec],
                                     include_patterns=['a/b/c/*.proto'])
 
-      self.set_options(execution_strategy='subprocess')
       ivy_imports_task = self.execute(self.context(target_roots=[foo_target]))
 
       # Make sure the product is properly populated

@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
@@ -21,7 +18,7 @@ class CppBinary(CppTarget):
     """
     payload = payload or Payload()
     payload.add_field('libraries', PrimitiveField(libraries))
-    super(CppBinary, self).__init__(payload=payload, **kwargs)
+    super().__init__(payload=payload, **kwargs)
 
   @property
   def libraries(self):

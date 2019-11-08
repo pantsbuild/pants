@@ -1,14 +1,9 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import unittest
-from builtins import object, str
-
-from mock import Mock
+from unittest.mock import Mock
 
 from pants.backend.jvm.artifact import Artifact
 from pants.backend.jvm.repository import Repository
@@ -20,12 +15,12 @@ from pants.base.exceptions import TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
 from pants.scm.scm import Scm
+from pants.testutil.jvm.nailgun_task_test_base import NailgunTaskTestBase
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_walk
-from pants_test.task_test_base import TaskTestBase
 
 
-class JarPublishTest(TaskTestBase):
+class JarPublishTest(NailgunTaskTestBase):
 
   @classmethod
   def task_type(cls):
@@ -267,7 +262,7 @@ class JarPublishTest(TaskTestBase):
         task.check_targets(task.exported_targets())
 
 
-class FailNTimes(object):
+class FailNTimes:
 
   def __init__(self, tries, exc_type, success=None):
     self.tries = tries
@@ -293,7 +288,7 @@ class FailNTimesTest(unittest.TestCase):
     foo.bar()
 
 
-class JarPublishAuthTest(TaskTestBase):
+class JarPublishAuthTest(NailgunTaskTestBase):
   """Tests for backend jvm JarPublish class"""
 
   def _default_jvm_opts(self):
@@ -305,7 +300,7 @@ class JarPublishAuthTest(TaskTestBase):
     return JarPublish
 
   def setUp(self):
-    super(JarPublishAuthTest, self).setUp()
+    super().setUp()
 
     self.set_options(
       jvm_options=['-Dfoo=bar'],

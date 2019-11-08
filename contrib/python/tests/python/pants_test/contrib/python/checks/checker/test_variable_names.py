@@ -1,16 +1,11 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 from pants_test.contrib.python.checks.checker.plugin_test_base import CheckstylePluginTestBase
 
-from pants.contrib.python.checks.checker.variable_names import (PEP8VariableNames,
-                                                                allow_underscores, is_builtin_name,
-                                                                is_lower_snake, is_reserved_name,
-                                                                is_reserved_with_trailing_underscore,
-                                                                is_upper_camel)
+from pants.contrib.python.checks.checker.variable_names import (
+  PEP8VariableNames, allow_underscores, is_builtin_name, is_lower_snake, is_reserved_name,
+  is_reserved_with_trailing_underscore, is_upper_camel)
 
 
 class PEP8VariableNamesTest(CheckstylePluginTestBase):

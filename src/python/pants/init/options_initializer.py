@@ -1,12 +1,10 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import logging
+import os
+import re
 import sys
-from builtins import object
 
 import pkg_resources
 
@@ -18,12 +16,13 @@ from pants.init.global_subsystems import GlobalSubsystems
 from pants.init.plugin_resolver import PluginResolver
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.subsystem.subsystem import Subsystem
+from pants.util.dirutil import fast_relpath_optional
 
 
 logger = logging.getLogger(__name__)
 
 
-class BuildConfigInitializer(object):
+class BuildConfigInitializer:
   """Initializes a BuildConfiguration object.
 
   This class uses a class-level cache for the internally generated `BuildConfiguration` object,
@@ -71,7 +70,7 @@ class BuildConfigInitializer(object):
     )
 
 
-class OptionsInitializer(object):
+class OptionsInitializer:
   """Initializes options."""
 
   @staticmethod
@@ -98,14 +97,60 @@ class OptionsInitializer(object):
                          for si in optionable.known_scope_infos()]
     return options_bootstrapper.get_full_options(known_scope_infos)
 
+  @staticmethod
+  def compute_pants_ignore(buildroot, global_options):
+    """Computes the merged value of the `--pants-ignore` flag.
+
+    This inherently includes the workdir and distdir locations if they are located under the
+    buildroot.
+    """
+    pants_ignore = list(global_options.pants_ignore)
+
+    def add_ignore(absolute_path):
+      # To ensure that the path is ignored regardless of whether it is a symlink or a directory, we
+      # strip trailing slashes (which would signal that we wanted to ignore only directories).
+      maybe_rel_path = fast_relpath_optional(absolute_path, buildroot)
+      # Exclude temp workdir from <pants_ignore>.
+      # temp workdir is /path/to/<pants_workdir>/tmp/tmp<process_id>.pants.d
+      if maybe_rel_path and not re.search("tmp/tmp(.+).pants.d", maybe_rel_path):
+        rel_path = maybe_rel_path.rstrip(os.path.sep)
+        pants_ignore.append(f'/{rel_path}')
+
+    add_ignore(global_options.pants_workdir)
+    add_ignore(global_options.pants_distdir)
+    return pants_ignore
+
+  @staticmethod
+  def compute_pantsd_invalidation_globs(buildroot, bootstrap_options):
+    """Computes the merged value of the `--pantsd-invalidation-globs` option.
+
+    Combines --pythonpath and --pants-config-files files that are in {buildroot} dir
+    with those invalidation_globs provided by users.
+    """
+    invalidation_globs = []
+    globs = bootstrap_options.pythonpath + \
+      bootstrap_options.pants_config_files + \
+      bootstrap_options.pantsd_invalidation_globs
+
+    for glob in globs:
+      glob_relpath = os.path.relpath(glob, buildroot)
+      if glob_relpath and (not glob_relpath.startswith("../")):
+        invalidation_globs.extend([glob_relpath, glob_relpath + '/**'])
+      else:
+        logging.getLogger(__name__).warning(
+          f"Changes to {glob}, outside of the buildroot, will not be invalidated."
+        )
+
+    return invalidation_globs
+
   @classmethod
   def create(cls, options_bootstrapper, build_configuration, init_subsystems=True):
     global_bootstrap_options = options_bootstrapper.get_bootstrap_options().for_global_scope()
 
     if global_bootstrap_options.pants_version != pants_version():
       raise BuildConfigurationError(
-        'Version mismatch: Requested version was {}, our version is {}.'
-        .format(global_bootstrap_options.pants_version, pants_version())
+        f'Version mismatch: Requested version was {global_bootstrap_options.pants_version}, '
+        f'our version is {pants_version()}.'
       )
 
     # Parse and register options.

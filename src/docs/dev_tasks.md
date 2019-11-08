@@ -118,7 +118,7 @@ versions are set with the class method implementation_version.
     Class FooTask(Task):
       @classmethod
       def implementation_version(cls):
-        return super(FooTask, cls).implementation_version() + [('FooTask', 1)]
+        return super().implementation_version() + [('FooTask', 1)]
 
 We store both a version number and the name of the class in order to disambiguate changes in
 different classes that have the same implementation version set.
@@ -143,7 +143,7 @@ Option values are available via `self.get_options()`:
 
 Every task has an options *scope*: If the task is registered as `my-task` in goal `my-goal`, then its
 scope is `my-goal.my-task`, unless goal and task are the same string, in which case the scope is simply
-that string. For example, the `ZincCompile` task has scope `compile.zinc`, and the `filemap`
+that string. For example, the `ZincCompile` task has scope `compile.rsc`, and the `filemap`
 task has the scope `filemap`.
 
 The scope is used to set options values. E.g., the value of `self.get_options().my_option` for a

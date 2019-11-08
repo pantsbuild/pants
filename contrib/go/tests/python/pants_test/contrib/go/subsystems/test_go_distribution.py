@@ -1,17 +1,12 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
+import subprocess
 import unittest
-from builtins import str
 
+from pants.testutil.subsystem.util import global_subsystem_instance
 from pants.util.contextutil import environment_as
-from pants.util.process_handler import subprocess
-from pants_test.subsystem.subsystem_util import global_subsystem_instance
-from pants_test.testutils.py2_compat import assertRegex
 
 from pants.contrib.go.subsystems.go_distribution import GoDistribution
 
@@ -32,7 +27,7 @@ class GoDistributionTest(unittest.TestCase):
   def test_bootstrap(self):
     go_distribution = self.distribution()
     go_cmd = go_distribution.create_go_cmd(cmd='env', args=['GOROOT'])
-    output = go_cmd.check_output().decode('utf-8').strip()
+    output = go_cmd.check_output().decode().strip()
     self.assertEqual(go_distribution.goroot, output)
 
   def assert_no_gopath(self):
@@ -48,17 +43,17 @@ class GoDistributionTest(unittest.TestCase):
     cmd = [os.path.join(go_distribution.goroot, 'bin', 'go'), 'env', 'GOPATH']
     env = os.environ.copy()
     env.update(go_env)
-    default_gopath = subprocess.check_output(cmd, env=env).decode('utf-8').strip()
+    default_gopath = subprocess.check_output(cmd, env=env).decode().strip()
 
     go_cmd = go_distribution.create_go_cmd(cmd='env', args=['GOPATH'])
 
     self.assertEqual(go_env, go_cmd.env)
     self.assertEqual('go', os.path.basename(go_cmd.cmdline[0]))
     self.assertEqual(['env', 'GOPATH'], go_cmd.cmdline[1:])
-    self.assertEqual(default_gopath, go_cmd.check_output().decode('utf-8').strip())
+    self.assertEqual(default_gopath, go_cmd.check_output().decode().strip())
 
     regex = GoDistributionTest._generate_go_command_regex(gopath=default_gopath, final_value='GOPATH')
-    assertRegex(self, str(go_cmd), regex)
+    self.assertRegex(str(go_cmd), regex)
 
   def test_go_command_no_gopath(self):
     self.assert_no_gopath()
@@ -80,4 +75,4 @@ class GoDistributionTest(unittest.TestCase):
     self.assertEqual(['env', 'GOROOT'], go_cmd.cmdline[1:])
 
     regex = GoDistributionTest._generate_go_command_regex(gopath='/tmp/fred', final_value='GOROOT')
-    assertRegex(self, str(go_cmd), regex)
+    self.assertRegex(str(go_cmd), regex)

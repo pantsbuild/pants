@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from textwrap import dedent
 
@@ -11,7 +8,7 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.java.jar.jar_dependency import JarDependency
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 class UnpackedJarsTest(TestBase):
@@ -42,6 +39,7 @@ class UnpackedJarsTest(TestBase):
 
   def test_bad_libraries_ref(self):
     self.make_target(':right-type', JarLibrary, jars=[JarDependency('foo', 'bar', '123')])
+    # Making a target which is not a jar library, which causes an error.
     self.make_target(':wrong-type', UnpackedJars, libraries=[':right-type'])
     target = self.make_target(':foo', UnpackedJars, libraries=[':wrong-type'])
     with self.assertRaises(ImportJarsMixin.WrongTargetTypeError):
@@ -85,6 +83,6 @@ class UnpackedJarsTest(TestBase):
     unpacked_jar_deps = unpacked_lib.all_imported_jar_deps
 
     self.assertEqual(3, len(unpacked_jar_deps))
-    assert_dep(lib1.jar_dependencies[0], 'testOrg1', 'testName1', '123')
-    assert_dep(lib2.jar_dependencies[0], 'testOrg2', 'testName2', '456')
-    assert_dep(lib2.jar_dependencies[1], 'testOrg3', 'testName3', '789')
+    assert_dep(unpacked_jar_deps[0], 'testOrg1', 'testName1', '123')
+    assert_dep(unpacked_jar_deps[1], 'testOrg2', 'testName2', '456')
+    assert_dep(unpacked_jar_deps[2], 'testOrg3', 'testName3', '789')

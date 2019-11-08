@@ -1,14 +1,9 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import json
 import os
-from builtins import open
 
-from future.utils import PY3
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.subsystem.subsystem import Subsystem
@@ -28,7 +23,7 @@ class NpmResolver(Subsystem, NodeResolverBase):
 
   @classmethod
   def register_options(cls, register):
-    super(NpmResolver, cls).register_options(register)
+    super().register_options(register)
     register(
       '--install-optional', type=bool, default=False, fingerprint=True,
       help='If enabled, install optional dependencies.')
@@ -122,8 +117,7 @@ class NpmResolver(Subsystem, NodeResolverBase):
           if self._get_target_from_package_name(target, package_name, file_path) is None:
             raise TaskError('Local dependency in package.json not found in the build graph. '
                             'Check your BUILD file for missing dependencies. ["{}": {}]'.format(package_name, file_path))
-        mode = 'w' if PY3 else 'wb'
-        with open(package_json, mode) as package_json_file:
+        with open(package_json, 'w') as package_json_file:
           json.dump(json_data, package_json_file, indent=2, separators=(',', ': '))
         result, command = node_task.install_module(
           target=target, install_optional=install_optional,
@@ -219,6 +213,5 @@ class NpmResolver(Subsystem, NodeResolverBase):
       'Adding {} to package.json for {}'.format(dependencies, package['name']))
     package['dependencies'] = dependencies
 
-    mode = 'w' if PY3 else 'wb'
-    with open(package_json_path, mode) as fp:
+    with open(package_json_path, 'w') as fp:
       json.dump(package, fp, indent=2)

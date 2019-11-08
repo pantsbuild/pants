@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -11,8 +8,12 @@ from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 from twitter.common.collections import OrderedSet
 
-from pants.backend.python.subsystems.pex_build_util import (PexBuilderWrapper, has_python_sources,
-                                                            has_resources, is_python_target)
+from pants.backend.python.subsystems.pex_build_util import (
+  PexBuilderWrapper,
+  has_python_sources,
+  has_resources,
+  is_python_target,
+)
 from pants.base.exceptions import TaskError
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.task.task import Task
@@ -31,11 +32,11 @@ class GatherSources(Task):
 
   @classmethod
   def implementation_version(cls):
-    return super(GatherSources, cls).implementation_version() + [('GatherSources', 5)]
+    return super().implementation_version() + [('GatherSources', 5)]
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(GatherSources, cls).subsystem_dependencies() + (PexBuilderWrapper.Factory,)
+    return super().subsystem_dependencies() + (PexBuilderWrapper.Factory,)
 
   @classmethod
   def product_types(cls):

@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import BaseZincCompile
 from pants.util.memo import memoized_method
@@ -15,13 +12,16 @@ class ScalaJSZincCompile(BaseZincCompile):
 
   _name = 'scala-js'
   _file_suffix = '.scala'
-  compiler_name = 'zinc'
+  # TODO: Although this task does not extend rsc, it's currently necessary to claim to in order
+  # to not be skipped by the JvmPlatform setting. When the deprecation of the concrete instance of
+  # `ZincCompile` completes, we can merge a few classes.
+  compiler_name = 'rsc'
 
   scalac_plugins = ['scalajs']
 
   @classmethod
   def register_options(cls, register):
-    super(ScalaJSZincCompile, cls).register_options(register)
+    super().register_options(register)
     # TODO: revisit after https://rbcommons.com/s/twitter/r/3225/
     cls.register_jvm_tool(register, 'scala-js-compiler')
 

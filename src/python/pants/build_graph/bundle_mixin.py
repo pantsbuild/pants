@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os.path
 
@@ -20,7 +17,7 @@ class BundleMixin(TaskBase):
   @classmethod
   def register_options(cls, register):
     """Register options common to all bundle tasks."""
-    super(BundleMixin, cls).register_options(register)
+    super().register_options(register)
     register('--archive', choices=list(archive.TYPE_NAMES),
              fingerprint=True,
              help='Create an archive of this type from the bundle. '

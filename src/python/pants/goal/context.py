@@ -1,31 +1,29 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import sys
-from builtins import filter, object
 from collections import defaultdict
 from contextlib import contextmanager
 
-from future.utils import PY3
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.worker_pool import SubprocPool
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.build_graph.target import Target
-from pants.engine.isolated_process import (FallibleExecuteProcessResult,
-                                           fallible_to_exec_result_or_raise)
+from pants.engine.isolated_process import (
+  FallibleExecuteProcessResult,
+  ProductDescription,
+  fallible_to_exec_result_or_raise,
+)
 from pants.goal.products import Products
 from pants.goal.workspace import ScmWorkspace
 from pants.process.lock import OwnerPrintingInterProcessFileLock
 from pants.source.source_root import SourceRootConfig
 
 
-class Context(object):
+class Context:
   """Contains the context for a single run of pants.
 
   Task implementations can access configuration data from pants.ini and any flags they have exposed
@@ -41,11 +39,20 @@ class Context(object):
   # repository of attributes?
   def __init__(self, options, run_tracker, target_roots,
                requested_goals=None, target_base=None, build_graph=None,
-               build_file_parser=None, address_mapper=None, console_outstream=None, scm=None,
+               build_file_parser=None, build_configuration=None,
+               address_mapper=None, console_outstream=None, scm=None,
                workspace=None, invalidation_report=None, scheduler=None):
     self._options = options
+
+    # We register a callback that will cause build graph edits to invalidate our caches, and we hold
+    # a handle directly to the callback function to ensure that it is not GC'd until the context is.
     self.build_graph = build_graph
-    self.build_file_parser = build_file_parser
+    self._clear_target_cache_handle = self._clear_target_cache
+    self._targets_cache = dict()
+    self.build_graph.add_invalidation_callback(self._clear_target_cache_handle)
+
+    self._build_file_parser = build_file_parser
+    self.build_configuration = build_configuration
     self.address_mapper = address_mapper
     self.run_tracker = run_tracker
     self._log = run_tracker.logger
@@ -56,7 +63,7 @@ class Context(object):
     self._lock = OwnerPrintingInterProcessFileLock(os.path.join(self._buildroot, '.pants.workdir.file_lock'))
     self._java_sysprops = None  # Computed lazily.
     self.requested_goals = requested_goals or []
-    self._console_outstream = console_outstream or (sys.stdout.buffer if PY3 else sys.stdout)
+    self._console_outstream = console_outstream or sys.stdout.buffer
     self._scm = scm or get_scm()
     self._workspace = workspace or (ScmWorkspace(self._scm) if self._scm else None)
     self._replace_targets(target_roots)
@@ -141,7 +148,6 @@ class Context(object):
     """A contextmanager that sets metrics in the context of a (v1) engine execution."""
     self._set_target_root_count_in_runtracker()
     yield
-    self.run_tracker.pantsd_stats.set_scheduler_metrics(self._scheduler.metrics())
     self._set_affected_target_count_in_runtracker()
 
   def _set_target_root_count_in_runtracker(self):
@@ -257,6 +263,14 @@ class Context(object):
     # only 1 remaining known use case in the Foursquare codebase that will be able to go away with
     # the post RoundEngine engine - kill the method at that time.
     self._target_roots = list(target_roots)
+    self._clear_target_cache()
+
+  def _clear_target_cache(self):
+    """A callback for cases where the graph or target roots have been mutated.
+
+    See BuildGraph.add_invalidation_callback.
+    """
+    self._targets_cache.clear()
 
   def add_new_target(self, address, target_type, target_base=None, dependencies=None,
                      derived_from=None, **kwargs):
@@ -267,6 +281,7 @@ class Context(object):
 
     :API: public
     """
+    self._clear_target_cache()
     rel_target_base = target_base or address.spec_path
     abs_target_base = os.path.join(get_buildroot(), rel_target_base)
     if not os.path.exists(abs_target_base):
@@ -305,21 +320,28 @@ class Context(object):
                           `False` or preorder by default.
     :returns: A list of matching targets.
     """
-    target_set = self._collect_targets(self.target_roots, **kwargs)
+    targets_cache_key = tuple(sorted(kwargs))
+    targets = self._targets_cache.get(targets_cache_key)
+    if targets is None:
+      self._targets_cache[targets_cache_key] = targets = self._unfiltered_targets(**kwargs)
+    return list(filter(predicate, targets))
+
+  def _unfiltered_targets(self, **kwargs):
+    def _collect_targets(root_targets, **kwargs):
+      return Target.closure_for_targets(
+        target_roots=root_targets,
+        **kwargs
+      )
+
+    target_set = _collect_targets(self.target_roots, **kwargs)
 
     synthetics = OrderedSet()
     for synthetic_address in self.build_graph.synthetic_addresses:
       if self.build_graph.get_concrete_derived_from(synthetic_address) in target_set:
         synthetics.add(self.build_graph.get_target(synthetic_address))
-    target_set.update(self._collect_targets(synthetics, **kwargs))
+    target_set.update(_collect_targets(synthetics, **kwargs))
 
-    return list(filter(predicate, target_set))
-
-  def _collect_targets(self, root_targets, **kwargs):
-    return Target.closure_for_targets(
-      target_roots=root_targets,
-      **kwargs
-    )
+    return target_set
 
   def dependents(self, on_predicate=None, from_predicate=None):
     """Returns  a map from targets that satisfy the from_predicate to targets they depend on that
@@ -388,5 +410,5 @@ class Context(object):
     fallible_result = self.execute_process_synchronously_without_raising(execute_process_request, name, labels)
     return fallible_to_exec_result_or_raise(
       fallible_result,
-      execute_process_request
+      ProductDescription(execute_process_request.description)
     )

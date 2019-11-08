@@ -1,12 +1,9 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.parser_hierarchy import InvalidScopeError, all_enclosing_scopes, enclosing_scope
-from pants_test.test_base import TestBase
+from pants.option.scope import GLOBAL_SCOPE
+from pants.testutil.test_base import TestBase
 
 
 class TestEnclosingScopeTraversal(TestBase):

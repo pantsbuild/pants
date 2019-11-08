@@ -1,21 +1,16 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from builtins import str
-
-from future.utils import string_types
+from abc import ABCMeta, abstractmethod
 
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.target import Target
 from pants.util.memo import memoized_property
-from pants.util.meta import AbstractClass, classproperty
+from pants.util.meta import classproperty
 from pants.util.objects import TypeConstraintError
 
 
-class ImportRemoteSourcesMixin(Target, AbstractClass):
+class ImportRemoteSourcesMixin(Target, metaclass=ABCMeta):
   """A Target Mixin to be used when a target declares another target type to be imported."""
 
   class ExpectedAddressError(AddressLookupError):
@@ -28,39 +23,31 @@ class ImportRemoteSourcesMixin(Target, AbstractClass):
     """Thrown if the wrong type of target is encountered."""
 
   @classproperty
+  @abstractmethod
   def expected_target_constraint(cls):
     """
     :returns: A type constraint which is used to validate the targets containing remote sources,
               specified `imported_target_kwargs_field` in a BUILD file.
     :rtype: TypeConstraint
     """
-    # TODO: make a utility in pants.util.meta to register these standard `NotImplementedError`s!
-    raise NotImplementedError(
-      'subclasses of ImportRemoteSourcesMixin must implement an '
-      '`expected_target_constraint` classproperty'
-    )
 
   @classproperty
+  @abstractmethod
   def imported_target_kwargs_field(cls):
     """
     :returns: string representing the keyword argument of an uninitialized target representing
               source target specs to be imported.
+    :rtype: str
     """
-    raise NotImplementedError(
-      'subclasses of ImportRemoteSourcesMixin must implement an '
-      '`imported_target_kwargs_field` classproperty'
-    )
 
   @classproperty
+  @abstractmethod
   def imported_target_payload_field(cls):
     """
     :returns: string representing the payload field of an already-initialized target containing
               source target specs to be imported.
+    :rtype: str
     """
-    raise NotImplementedError(
-      'subclasses of ImportRemoteSourcesMixin must implement an '
-      '`imported_target_payload_field` classproperty'
-    )
 
   @classmethod
   def imported_target_specs(cls, kwargs=None, payload=None):
@@ -81,7 +68,7 @@ class ImportRemoteSourcesMixin(Target, AbstractClass):
 
     specs = []
     for item in target_representation.get(field, ()):
-      if not isinstance(item, string_types):
+      if not isinstance(item, str):
         raise cls.ExpectedAddressError(
           'expected imports to contain string addresses, got {obj} (type: {found_class}) instead.'
           .format(obj=item, found_class=type(item).__name__)
@@ -116,7 +103,7 @@ class ImportRemoteSourcesMixin(Target, AbstractClass):
   @classmethod
   def compute_dependency_specs(cls, kwargs=None, payload=None):
     """Tack imported_target_specs onto the traversable_specs generator for this target."""
-    for spec in super(ImportRemoteSourcesMixin, cls).compute_dependency_specs(kwargs, payload):
+    for spec in super().compute_dependency_specs(kwargs, payload):
       yield spec
 
     imported_target_specs = cls.imported_target_specs(kwargs=kwargs, payload=payload)

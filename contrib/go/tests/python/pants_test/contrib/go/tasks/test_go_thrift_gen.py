@@ -1,12 +1,9 @@
-# coding=utf-8
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 from pants.backend.codegen.thrift.lib.thrift import Thrift
 from pants.base.exceptions import TaskError
-from pants_test.task_test_base import TaskTestBase
+from pants.testutil.task_test_base import TaskTestBase
 
 from pants.contrib.go.tasks.go_thrift_gen import GoThriftGen
 

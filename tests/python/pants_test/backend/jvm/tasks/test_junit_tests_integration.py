@@ -1,13 +1,10 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
 from pants.base.build_environment import get_buildroot
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class JunitTestsIntegrationTest(PantsRunIntegrationTest):
@@ -51,30 +48,6 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
           'testprojects/tests/scala/org/pantsbuild/testproject/empty'],
           workdir)
       self.assert_failure(pants_run)
-
-  def test_junit_test_with_test_option_with_relpath(self):
-    with self.temporary_workdir() as workdir:
-      pants_run = self.run_pants_with_workdir(
-          ['test.junit',
-           '--test=examples/tests/java/org/pantsbuild/example/hello/greet/GreetingTest.java',
-           'examples/tests/java/org/pantsbuild/example/hello/greet',
-           'examples/tests/scala/org/pantsbuild/example/hello/welcome'],
-          workdir)
-      self.assert_success(pants_run)
-      self._assert_output_for_class(workdir=workdir,
-                                    classname='org.pantsbuild.example.hello.greet.GreetingTest')
-
-  def test_junit_test_with_test_option_with_dot_slash_relpath(self):
-    with self.temporary_workdir() as workdir:
-      pants_run = self.run_pants_with_workdir(
-          ['test.junit',
-           '--test=./examples/tests/java/org/pantsbuild/example/hello/greet/GreetingTest.java',
-           'examples/tests/java/org/pantsbuild/example/hello/greet',
-           'examples/tests/scala/org/pantsbuild/example/hello/welcome'],
-          workdir)
-      self.assert_success(pants_run)
-      self._assert_output_for_class(workdir=workdir,
-                                    classname='org.pantsbuild.example.hello.greet.GreetingTest')
 
   def test_junit_test_with_test_option_with_classname(self):
     with self.temporary_workdir() as workdir:
@@ -123,7 +96,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
         'testprojects/src/java/org/pantsbuild/testproject/junit/earlyexit:tests'])
     self.assert_failure(pants_run)
     self.assertIn('java.lang.UnknownError: Abnormal VM exit - test crashed.', pants_run.stdout_data)
-    self.assertIn('Tests run: 0,  Failures: 1', pants_run.stdout_data)
+    self.assertIn('Tests run: 1,  Failures: 1', pants_run.stdout_data)
     self.assertIn('FATAL: VM exiting unexpectedly.', pants_run.stdout_data)
 
   def test_junit_test_target_cwd(self):

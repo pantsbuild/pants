@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import logging
 import time
-from builtins import range
 
 
 logger = logging.getLogger(__name__)
@@ -29,6 +25,6 @@ def retry_on_exception(func, max_retries, exception_types, backoff_func=lambda n
     try:
       return func()
     except exception_types as e:
-      logger.debug('encountered exception on retry #{}: {!r}'.format(i, e))
+      logger.debug(f'encountered exception on retry #{i}: {e!r}')
       if i == max_retries - 1:
         raise

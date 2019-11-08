@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import unittest
 
@@ -13,7 +10,7 @@ from pants.base.payload_field import FingerprintedField
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.java.jar.exclude import Exclude
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 class JarRulesTest(unittest.TestCase):
@@ -26,9 +23,9 @@ class JarRulesTest(unittest.TestCase):
     self.assertEqual('Skip(apply_pattern=foo)', repr(skip_rule))
 
   def test_invalid_apply_pattern(self):
-    with self.assertRaisesRegexp(ValueError, r'The supplied apply_pattern is not a string'):
+    with self.assertRaisesRegexp(ValueError, r'The supplied apply_pattern is not a str'):
       Skip(None)
-    with self.assertRaisesRegexp(ValueError, r'The supplied apply_pattern is not a string'):
+    with self.assertRaisesRegexp(ValueError, r'The supplied apply_pattern is not a str'):
       Duplicate(None, Duplicate.SKIP)
     with self.assertRaisesRegexp(ValueError, r'The supplied apply_pattern: \) is not a valid'):
       Skip(r')')
@@ -125,7 +122,7 @@ class JvmBinaryTest(TestBase):
       'jvm_binary(name = "foo", main = "com.example.Foo", source = ["foo.py"])',
     )
     with self.assertRaisesRegexp(AddressLookupError,
-                                 r'Invalid target.*foo.*source must be a string'):
+                                 r'Invalid target.*foo.*source must be a str'):
       self.target(':foo')
 
   def test_bad_sources_declaration(self):

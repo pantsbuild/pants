@@ -1,20 +1,12 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import inspect
-import sys
-from abc import abstractmethod, abstractproperty
-from builtins import object
+import typing
+from abc import ABC, abstractmethod
 from collections import namedtuple
-
-from future.utils import PY2
-
-from pants.util.memo import memoized_classmethod
-from pants.util.meta import AbstractClass
-from pants.util.objects import Exactly, TypedCollection, datatype
+from collections.abc import Iterable
+from typing import Generic, Iterator, TypeVar
 
 
 class SerializationError(Exception):
@@ -22,10 +14,11 @@ class SerializationError(Exception):
 
 
 # TODO: Likely no longer necessary, due to the laziness of the product graph.
-class Resolvable(AbstractClass):
+class Resolvable(ABC):
   """Represents a resolvable object."""
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def address(self):
     """Return the opaque address descriptor that this resolvable resolves."""
 
@@ -39,7 +32,7 @@ def _unpickle_serializable(serializable_class, kwargs):
   return serializable_class(**kwargs)
 
 
-class Locatable(AbstractClass):
+class Locatable(ABC):
   """Marks a class whose constructor should receive its spec_path relative to the build root.
 
   Locatable objects will be passed a `spec_path` constructor kwarg that indicates where they
@@ -64,7 +57,7 @@ class SerializablePickle(namedtuple('CustomPickle', ['unpickle_func', 'args'])):
                args=(type(serializable_instance), serializable_instance._asdict()))
 
 
-class Serializable(AbstractClass):
+class Serializable(ABC):
   """Marks a class that can be serialized into and reconstituted from python builtin values.
 
   Also provides support for the pickling protocol out of the box.
@@ -118,7 +111,7 @@ class Serializable(AbstractClass):
     return SerializablePickle.create(self)
 
 
-class SerializableFactory(AbstractClass):
+class SerializableFactory(ABC):
   """Creates :class:`Serializable` objects."""
 
   @abstractmethod
@@ -139,11 +132,11 @@ class ValidationError(Exception):
                               that led to this validation error.
     :param string message: A message describing the invalid Struct field.
     """
-    super(ValidationError, self).__init__('Failed to validate {id}: {msg}'
+    super().__init__('Failed to validate {id}: {msg}'
                                           .format(id=identifier, msg=message))
 
 
-class Validatable(AbstractClass):
+class Validatable(ABC):
   """Marks a class whose instances should validated post-construction."""
 
   @abstractmethod
@@ -154,36 +147,23 @@ class Validatable(AbstractClass):
     """
 
 
-class Collection(object):
+_C = TypeVar("_C")
+
+
+class Collection(Generic[_C], Iterable):
   """Constructs classes representing collections of objects of a particular type.
 
   The produced class will expose its values under a field named dependencies - this is a stable API
   which may be consumed e.g. over FFI from the engine.
 
   Python consumers of a Collection should prefer to use its standard iteration API.
-
-  Note that elements of a Collection are type-checked upon construction.
   """
 
-  @memoized_classmethod
-  def of(cls, *element_types):
-    union = '|'.join(element_type.__name__ for element_type in element_types)
-    type_name = '{}.of({})'.format(cls.__name__, union)
-    if PY2:
-      type_name = type_name.encode('utf-8')
-    type_checked_collection_class = datatype([
-      # Create a datatype with a single field 'dependencies' which is type-checked on construction
-      # to be a collection containing elements of only the exact `element_types` specified.
-      ('dependencies', TypedCollection(Exactly(*element_types)))
-    ], superclass_name=cls.__name__)
-    supertypes = (cls, type_checked_collection_class)
-    properties = {'element_types': element_types}
-    collection_of_type = type(type_name, supertypes, properties)
+  def __init__(self, dependencies: typing.Iterable[_C]) -> None:
+    self.dependencies = tuple(dependencies)
 
-    # Expose the custom class type at the module level to be pickle compatible.
-    setattr(sys.modules[cls.__module__], type_name, collection_of_type)
-
-    return collection_of_type
-
-  def __iter__(self):
+  def __iter__(self) -> Iterator[_C]:
     return iter(self.dependencies)
+
+  def __bool__(self) -> bool:
+    return bool(self.dependencies)

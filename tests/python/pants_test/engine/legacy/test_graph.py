@@ -1,17 +1,13 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import functools
 import os
-from builtins import str
 
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
 from pants.build_graph.files import Files
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 # Macro that adds the specified tag.
@@ -27,7 +23,7 @@ class GraphTest(TestBase):
 
   @classmethod
   def alias_groups(cls):
-    return super(GraphTest, cls).alias_groups().merge(
+    return super().alias_groups().merge(
       BuildFileAliases(targets={
           'files': Files,
           'tagged_files': TargetMacro.Factory.wrap(functools.partial(macro, Files, cls._TAG), Files),

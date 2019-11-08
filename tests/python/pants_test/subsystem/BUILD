@@ -4,7 +4,6 @@
 python_tests(
   sources=['test_subsystem.py'],
   dependencies=[
-    '3rdparty/python:future',
     'src/python/pants/option',
     'src/python/pants/subsystem',
   ],
@@ -15,8 +14,6 @@ python_library(
   sources=['subsystem_util.py'],
   dependencies=[
     'src/python/pants/base:deprecated',
-    'src/python/pants/build_graph',
-    'src/python/pants/subsystem',
-    'tests/python/pants_test/option/util',
+    'src/python/pants/testutil/subsystem',
   ],
 )

@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import re
-from builtins import open, range
 from contextlib import contextmanager
 from textwrap import dedent
 
@@ -16,16 +12,16 @@ from pants.backend.jvm.targets.java_agent import JavaAgent
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.jar_task import JarBuilderTask, JarTask
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.testutil.jvm.jar_task_test_base import JarTaskTestBase
 from pants.util.contextutil import open_zip, temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir, safe_mkdtemp, safe_open, safe_rmtree
-from pants_test.jvm.jar_task_test_base import JarTaskTestBase
 
 
 class BaseJarTaskTest(JarTaskTestBase):
 
   @classmethod
   def alias_groups(cls):
-    return super(BaseJarTaskTest, cls).alias_groups().merge(BuildFileAliases(
+    return super().alias_groups().merge(BuildFileAliases(
       targets={
         'java_agent': JavaAgent,
         'jvm_binary': JvmBinary,
@@ -33,13 +29,13 @@ class BaseJarTaskTest(JarTaskTestBase):
     ))
 
   def setUp(self):
-    super(BaseJarTaskTest, self).setUp()
+    super().setUp()
 
     self.workdir = safe_mkdtemp()
     self.jar_task = self.prepare_execute(self.context())
 
   def tearDown(self):
-    super(BaseJarTaskTest, self).tearDown()
+    super().tearDown()
 
     if self.workdir:
       safe_rmtree(self.workdir)
@@ -59,7 +55,6 @@ class JarTaskTest(BaseJarTaskTest):
   MAX_SUBPROC_ARGS = 50
 
   class TestJarTask(JarTask):
-
     def execute(self):
       pass
 
@@ -68,7 +63,7 @@ class JarTaskTest(BaseJarTaskTest):
     return cls.TestJarTask
 
   def setUp(self):
-    super(JarTaskTest, self).setUp()
+    super().setUp()
     self.set_options(max_subprocess_args=self.MAX_SUBPROC_ARGS)
     self.jar_task = self.prepare_execute(self.context())
 
@@ -176,7 +171,7 @@ class JarTaskTest(BaseJarTaskTest):
       return ('Manifest-Version: 1.0\r\n' +
               'Class-Path: {}\r\n' +
               'Created-By: org.pantsbuild.tools.jar.JarBuilder\r\n\r\n').format(
-                ' '.join(maybe_list(classpath))).encode('utf-8')
+                ' '.join(maybe_list(classpath))).encode()
 
     def assert_classpath(classpath):
       with self.jarfile() as existing_jarfile:
@@ -234,7 +229,6 @@ class JarTaskTest(BaseJarTaskTest):
 class JarBuilderTest(BaseJarTaskTest):
 
   class TestJarBuilderTask(JarBuilderTask):
-
     def execute(self):
       pass
 
@@ -243,7 +237,7 @@ class JarBuilderTest(BaseJarTaskTest):
     return cls.TestJarBuilderTask
 
   def setUp(self):
-    super(JarBuilderTest, self).setUp()
+    super().setUp()
     self.set_options(max_subprocess_args=100)
 
   def test_agent_manifest(self):
@@ -271,7 +265,7 @@ class JarBuilderTest(BaseJarTaskTest):
         self.assert_listing(jar, 'FakeAgent.class')
         self.assertEqual(b'0xCAFEBABE', jar.read('FakeAgent.class'))
 
-        manifest = jar.read('META-INF/MANIFEST.MF').decode('utf-8').strip()
+        manifest = jar.read('META-INF/MANIFEST.MF').decode().strip()
         all_entries = dict(tuple(re.split(r'\s*:\s*', line, 1)) for line in manifest.splitlines())
         expected_entries = {
             'Agent-Class': 'fred',
@@ -306,7 +300,7 @@ class JarBuilderTest(BaseJarTaskTest):
           jar_builder.add_target(binary_target)
 
       with open_zip(existing_jarfile) as jar:
-        manifest = jar.read('META-INF/MANIFEST.MF').decode('utf-8').strip()
+        manifest = jar.read('META-INF/MANIFEST.MF').decode().strip()
         all_entries = dict(tuple(re.split(r'\s*:\s*', line, 1)) for line in manifest.splitlines())
         expected_entries = {
           'Foo': 'foo-value',

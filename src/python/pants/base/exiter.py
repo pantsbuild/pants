@@ -1,14 +1,9 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import logging
 import sys
-from builtins import object
-
-from future.utils import PY3
+import traceback
 
 from pants.util.strutil import ensure_binary
 
@@ -16,16 +11,20 @@ from pants.util.strutil import ensure_binary
 logger = logging.getLogger(__name__)
 
 
-class Exiter(object):
-  """A class that provides standard runtime exit and global exception handling behavior.
+# Centralize integer return codes for the pants process. We just use a single bit for now.
+# TODO: make these into an enum!
+PANTS_SUCCEEDED_EXIT_CODE = 0
+PANTS_FAILED_EXIT_CODE = 1
 
-  The expected method call order of this class is as follows:
+ExitCode = int
 
-   1) Call Exiter.set_except_hook() to set sys.excepthook to the internal exception hook. This
-      should happen as early as possible to ensure any/all exceptions are handled by the hook.
-   2) Call Exiter.apply_options() to set traceback printing behavior via an Options object.
-   3) Perform other operations as normal.
-   4) Call Exiter.exit(), Exiter.exit_and_fail() or exiter_inst() when you wish to exit the runtime.
+
+class Exiter:
+  """A class that provides standard runtime exit behavior.
+
+  `pants.base.exception_sink.ExceptionSink` handles exceptions and fatal signals, delegating to an
+  Exiter instance which can be set process-globally with ExceptionSink.reset_exiter(). Call
+  .exit() or .exit_and_fail() on an Exiter instance when you wish to exit the runtime.
   """
 
   def __init__(self, exiter=sys.exit):
@@ -43,18 +42,18 @@ class Exiter(object):
     """Map class calls to self.exit() to support sys.exit() fungibility."""
     return self.exit(*args, **kwargs)
 
-  def exit(self, result=0, msg=None, out=None):
+  def exit(self, result=PANTS_SUCCEEDED_EXIT_CODE, msg=None, out=None):
     """Exits the runtime.
 
-    :param result: The exit status. Typically a 0 indicating success or a 1 indicating failure, but
-                   can be a string as well. (Optional)
+    :param result: The exit status. Typically either PANTS_SUCCEEDED_EXIT_CODE or
+                   PANTS_FAILED_EXIT_CODE, but can be a string as well. (Optional)
     :param msg: A string message to print to stderr or another custom file desciptor before exiting.
                 (Optional)
     :param out: The file descriptor to emit `msg` to. (Optional)
     """
     if msg:
       out = out or sys.stderr
-      if PY3 and hasattr(out, 'buffer'):
+      if hasattr(out, 'buffer'):
         out = out.buffer
 
       msg = ensure_binary(msg)
@@ -68,12 +67,21 @@ class Exiter(object):
       except Exception as e:
         # If the file is already closed, or any other error occurs, just log it and continue to
         # exit.
+        if msg:
+          logger.warning("Encountered error when trying to log this message: {}, \n "
+                         "exception: {} \n out: {}".format(msg, e, out))
+          # In pantsd, this won't go anywhere, because there's really nowhere for us to log if we
+          # can't log :(
+          # Not in pantsd, this will end up in sys.stderr.
+          traceback.print_stack()
         logger.exception(e)
     self._exit(result)
 
-  def exit_and_fail(self, msg=None):
-    """Exits the runtime with an exit code of 1, indicating failure.
+  def exit_and_fail(self, msg=None, out=None):
+    """Exits the runtime with a nonzero exit code, indicating failure.
 
-    :param str msg: A string message to print to stderr before exiting. (Optional)
+    :param msg: A string message to print to stderr or another custom file desciptor before exiting.
+                (Optional)
+    :param out: The file descriptor to emit `msg` to. (Optional)
     """
-    self.exit(result=1, msg=msg)
+    self.exit(result=PANTS_FAILED_EXIT_CODE, msg=msg, out=out)

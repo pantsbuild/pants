@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import atexit
 import errno
@@ -12,15 +9,30 @@ import stat
 import tempfile
 import threading
 import uuid
-from builtins import open
 from collections import defaultdict
 from contextlib import contextmanager
+from typing import (
+  Any,
+  Callable,
+  DefaultDict,
+  FrozenSet,
+  Iterable,
+  Iterator,
+  List,
+  Optional,
+  Sequence,
+  Set,
+  Tuple,
+  Union,
+  overload,
+)
 
-from pants.base.deprecated import deprecated_conditional
+from typing_extensions import Literal
+
 from pants.util.strutil import ensure_text
 
 
-def longest_dir_prefix(path, prefixes):
+def longest_dir_prefix(path: str, prefixes: Sequence[str]) -> Optional[str]:
   """Given a list of prefixes, return the one that is the longest prefix to the given path.
 
   Returns None if there are no matches.
@@ -33,7 +45,7 @@ def longest_dir_prefix(path, prefixes):
   return longest_prefix
 
 
-def fast_relpath(path, start):
+def fast_relpath(path: str, start: str) -> str:
   """A prefix-based relpath, with no normalization or support for returning `..`."""
   relpath = fast_relpath_optional(path, start)
   if relpath is None:
@@ -41,7 +53,7 @@ def fast_relpath(path, start):
   return relpath
 
 
-def fast_relpath_optional(path, start):
+def fast_relpath_optional(path: str, start: str) -> Optional[str]:
   """A prefix-based relpath, with no normalization or support for returning `..`.
 
   Returns None if `start` is not a directory-aware prefix of `path`.
@@ -59,9 +71,10 @@ def fast_relpath_optional(path, start):
     # The prefix matches, and the entries are either identical, or the suffix indicates that
     # the prefix is a directory.
     return path[pref_end+1:]
+  return None
 
 
-def safe_mkdir(directory, clean=False):
+def safe_mkdir(directory: str, clean: bool = False) -> None:
   """Ensure a directory is present.
 
   If it's not there, create it.  If it is, no-op. If clean is True, ensure the dir is empty.
@@ -77,7 +90,7 @@ def safe_mkdir(directory, clean=False):
       raise
 
 
-def safe_mkdir_for(path, clean=False):
+def safe_mkdir_for(path: str, clean: bool = False) -> None:
   """Ensure that the parent directory for a file is present.
 
   If it's not there, create it. If it is, no-op.
@@ -85,15 +98,13 @@ def safe_mkdir_for(path, clean=False):
   safe_mkdir(os.path.dirname(path), clean=clean)
 
 
-def safe_mkdir_for_all(paths):
+def safe_mkdir_for_all(paths: Sequence[str]) -> None:
   """Make directories which would contain all of the passed paths.
 
   This avoids attempting to re-make the same directories, which may be noticeably expensive if many
   paths mostly fall in the same set of directories.
-
-  :param list of str paths: The paths for which containing directories should be created.
   """
-  created_dirs = set()
+  created_dirs: Set[str] = set()
   for path in paths:
     dir_to_make = os.path.dirname(path)
     if dir_to_make not in created_dirs:
@@ -101,10 +112,9 @@ def safe_mkdir_for_all(paths):
       created_dirs.add(dir_to_make)
 
 
-# TODO(#6742): payload should be Union[str, bytes] in type hint syntax, but from
-# https://pythonhosted.org/an_example_pypi_project/sphinx.html#full-code-example it doesn't appear
-# that is possible to represent in docstring type syntax.
-def safe_file_dump(filename, payload='', binary_mode=None, mode=None):
+def safe_file_dump(
+  filename: str, payload: Union[bytes, str] = '', mode: str = 'w', makedirs: bool = False
+) -> None:
   """Write a string to a file.
 
   This method is "safe" to the extent that `safe_open` is "safe". See the explanation on the method
@@ -113,81 +123,77 @@ def safe_file_dump(filename, payload='', binary_mode=None, mode=None):
   When `payload` is an empty string (the default), this method can be used as a concise way to
   create an empty file along with its containing directory (or truncate it if it already exists).
 
-  :param string filename: The filename of the file to write to.
-  :param string payload: The string to write to the file.
-  :param bool binary_mode: Write to file as bytes or unicode. Mutually exclusive with mode.
-  :param string mode: A mode argument for the python `open` builtin. Mutually exclusive with
-    binary_mode.
+  :param filename: The filename of the file to write to.
+  :param payload: The string to write to the file.
+  :param mode: A mode argument for the python `open` builtin which should be a write mode variant.
+               Defaults to 'w'.
+  :param makedirs: Whether to make all parent directories of this file before making it.
   """
-  deprecated_conditional(
-    lambda: binary_mode is not None,
-    removal_version='1.16.0.dev2',
-    entity_description='The binary_mode argument in safe_file_dump()',
-    hint_message='Use the mode argument instead!')
-  if binary_mode is not None and mode is not None:
-    raise AssertionError('Only one of `binary_mode` and `mode` may be specified.')
-
-  deprecated_conditional(
-    lambda: mode is None,
-    removal_version='1.16.0.dev2',
-    entity_description='Not specifying mode explicitly in safe_file_dump()',
-    hint_message="Function will default to unicode ('w') when pants migrates to python 3!")
-  if mode is None:
-    if binary_mode is False:
-      mode = 'w'
-    else:
-      mode = 'wb'
-
+  if makedirs:
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
   with safe_open(filename, mode=mode) as f:
     f.write(payload)
 
 
-def maybe_read_file(filename, binary_mode=None):
+@overload
+def maybe_read_file(filename: str) -> Optional[str]: ...
+
+
+@overload
+def maybe_read_file(filename: str, binary_mode: Literal[False]) -> Optional[str]: ...
+
+
+@overload
+def maybe_read_file(filename: str, binary_mode: Literal[True]) -> Optional[bytes]: ...
+
+
+@overload
+def maybe_read_file(filename: str, binary_mode: bool) -> Optional[Union[bytes, str]]: ...
+
+
+def maybe_read_file(filename: str, binary_mode: bool = False) -> Optional[Union[bytes, str]]:
   """Read and return the contents of a file in a single file.read().
 
-  :param string filename: The filename of the file to read.
-  :param bool binary_mode: Read from file as bytes or unicode.
-  :returns: The contents of the file, or opening the file fails for any reason
-  :rtype: string
+  :param filename: The filename of the file to read.
+  :param binary_mode: Read from file as bytes or unicode.
+  :returns: The contents of the file, or None if opening the file fails for any reason
   """
-  # TODO(#7121): Default binary_mode=False after the python 3 switchover!
-  deprecated_conditional(
-    lambda: binary_mode is None,
-    removal_version='1.16.0.dev2',
-    entity_description='Not specifying binary_mode explicitly in maybe_read_file()',
-    hint_message='Function will default to unicode when pants migrates to python 3!')
-  if binary_mode is None:
-    binary_mode = True
-
   try:
     return read_file(filename, binary_mode=binary_mode)
   except IOError:
     return None
 
 
-def read_file(filename, binary_mode=None):
+@overload
+def read_file(filename: str) -> str: ...
+
+
+@overload
+def read_file(filename: str, binary_mode: Literal[False]) -> str: ...
+
+
+@overload
+def read_file(filename: str, binary_mode: Literal[True]) -> bytes: ...
+
+
+@overload
+def read_file(filename: str, binary_mode: bool) -> Union[str, bytes]: ...
+
+
+def read_file(filename: str, binary_mode: bool = False) -> Union[bytes, str]:
   """Read and return the contents of a file in a single file.read().
 
-  :param string filename: The filename of the file to read.
-  :param bool binary_mode: Read from file as bytes or unicode.
+  :param filename: The filename of the file to read.
+  :param binary_mode: Read from file as bytes or unicode.
   :returns: The contents of the file.
-  :rtype: string
   """
-  # TODO(#7121): Default binary_mode=False after the python 3 switchover!
-  deprecated_conditional(
-    lambda: binary_mode is None,
-    removal_version='1.16.0.dev2',
-    entity_description='Not specifying binary_mode explicitly in read_file()',
-    hint_message='Function will default to unicode when pants migrates to python 3!')
-  if binary_mode is None:
-    binary_mode = True
-
   mode = 'rb' if binary_mode else 'r'
   with open(filename, mode) as f:
-    return f.read()
+    content: Union[bytes, str] = f.read()
+    return content
 
 
-def safe_walk(path, **kwargs):
+def safe_walk(path: Union[bytes, str], **kwargs: Any) -> Iterator[Tuple[str, List[str], List[str]]]:
   """Just like os.walk, but ensures that the returned values are unicode objects.
 
     This isn't strictly safe, in that it is possible that some paths
@@ -212,7 +218,9 @@ class ExistingDirError(ValueError):
   """Indicates a copy operation would over-write a directory with a file."""
 
 
-def mergetree(src, dst, symlinks=False, ignore=None, file_filter=None):
+def mergetree(
+  src: str, dst: str, symlinks: bool = False, ignore=None, file_filter=None
+) -> None:
   """Just like `shutil.copytree`, except the `dst` dir may exist.
 
   The `src` directory will be walked and its contents copied into `dst`. If `dst` already exists the
@@ -225,7 +233,7 @@ def mergetree(src, dst, symlinks=False, ignore=None, file_filter=None):
     file_filter = lambda _: True
 
   for src_path, dirnames, filenames in safe_walk(src, topdown=True, followlinks=True):
-    ignorenames = ()
+    ignorenames: FrozenSet[str] = frozenset()
     if ignore:
       to_ignore = ignore(src_path, dirnames + filenames)
       if to_ignore:
@@ -282,32 +290,31 @@ def mergetree(src, dst, symlinks=False, ignore=None, file_filter=None):
         shutil.copy2(src_filename, dst_filename)
 
 
-_MKDTEMP_CLEANER = None
-_MKDTEMP_DIRS = defaultdict(set)
+_MkdtempCleanerType = Callable[[], None]
+_MKDTEMP_CLEANER: Optional[_MkdtempCleanerType] = None
+_MKDTEMP_DIRS: DefaultDict[int, Set[str]] = defaultdict(set)
 _MKDTEMP_LOCK = threading.RLock()
 
 
-def _mkdtemp_atexit_cleaner():
+def _mkdtemp_atexit_cleaner() -> None:
   for td in _MKDTEMP_DIRS.pop(os.getpid(), []):
     safe_rmtree(td)
 
 
-def _mkdtemp_unregister_cleaner():
+def _mkdtemp_unregister_cleaner() -> None:
   global _MKDTEMP_CLEANER
   _MKDTEMP_CLEANER = None
 
 
-def _mkdtemp_register_cleaner(cleaner):
+def _mkdtemp_register_cleaner(cleaner: _MkdtempCleanerType) -> None:
   global _MKDTEMP_CLEANER
-  if not cleaner:
-    return
   assert callable(cleaner)
   if _MKDTEMP_CLEANER is None:
     atexit.register(cleaner)
     _MKDTEMP_CLEANER = cleaner
 
 
-def safe_mkdtemp(cleaner=_mkdtemp_atexit_cleaner, **kw):
+def safe_mkdtemp(cleaner: _MkdtempCleanerType = _mkdtemp_atexit_cleaner, **kw: Any) -> str:
   """Create a temporary directory that is cleaned up on process exit.
 
   Arguments are as to tempfile.mkdtemp.
@@ -319,7 +326,7 @@ def safe_mkdtemp(cleaner=_mkdtemp_atexit_cleaner, **kw):
     return register_rmtree(tempfile.mkdtemp(**kw), cleaner=cleaner)
 
 
-def register_rmtree(directory, cleaner=_mkdtemp_atexit_cleaner):
+def register_rmtree(directory: str, cleaner: _MkdtempCleanerType = _mkdtemp_atexit_cleaner) -> str:
   """Register an existing directory to be cleaned up at process exit."""
   with _MKDTEMP_LOCK:
     _mkdtemp_register_cleaner(cleaner)
@@ -327,7 +334,7 @@ def register_rmtree(directory, cleaner=_mkdtemp_atexit_cleaner):
   return directory
 
 
-def safe_rmtree(directory):
+def safe_rmtree(directory: str) -> None:
   """Delete a directory if it's present. If it's not present, no-op.
 
   Note that if the directory argument is a symlink, only the symlink will
@@ -350,7 +357,7 @@ def safe_open(filename, *args, **kwargs):
   return open(filename, *args, **kwargs)
 
 
-def safe_delete(filename):
+def safe_delete(filename: str) -> None:
   """Delete a file safely. If it's not present, no-op."""
   try:
     os.unlink(filename)
@@ -359,7 +366,7 @@ def safe_delete(filename):
       raise
 
 
-def safe_concurrent_rename(src, dst):
+def safe_concurrent_rename(src: str, dst: str) -> None:
   """Rename src to dst, ignoring errors due to dst already existing.
 
   Useful when concurrent processes may attempt to create dst, and it doesn't matter who wins.
@@ -377,13 +384,14 @@ def safe_concurrent_rename(src, dst):
       raise
 
 
-def safe_rm_oldest_items_in_dir(root_dir, num_of_items_to_keep, excludes=frozenset()):
+def safe_rm_oldest_items_in_dir(
+  root_dir: str, num_of_items_to_keep: int, excludes: Iterable[str] = frozenset()
+) -> None:
   """
   Keep `num_of_items_to_keep` newly modified items besides `excludes` in `root_dir` then remove the rest.
   :param root_dir: the folder to examine
   :param num_of_items_to_keep: number of files/folders/symlinks to keep after the cleanup
   :param excludes: absolute paths excluded from removal (must be prefixed with `root_dir`)
-  :return: none
   """
   if os.path.isdir(root_dir):
     found_files = []
@@ -397,7 +405,7 @@ def safe_rm_oldest_items_in_dir(root_dir, num_of_items_to_keep, excludes=frozens
 
 
 @contextmanager
-def safe_concurrent_creation(target_path):
+def safe_concurrent_creation(target_path: str) -> Iterator[str]:
   """A contextmanager that yields a temporary path and renames it to a final target path when the
   contextmanager exits.
 
@@ -418,7 +426,7 @@ def safe_concurrent_creation(target_path):
       safe_concurrent_rename(tmp_path, target_path)
 
 
-def chmod_plus_x(path):
+def chmod_plus_x(path: str) -> None:
   """Equivalent of unix `chmod a+x path`"""
   path_mode = os.stat(path).st_mode
   path_mode &= int('777', 8)
@@ -431,7 +439,7 @@ def chmod_plus_x(path):
   os.chmod(path, path_mode)
 
 
-def absolute_symlink(source_path, target_path):
+def absolute_symlink(source_path: str, target_path: str) -> None:
   """Create a symlink at target pointing to source using the absolute path.
 
   :param source_path: Absolute path to source file
@@ -459,7 +467,7 @@ def absolute_symlink(source_path, target_path):
       raise
 
 
-def relative_symlink(source_path, link_path):
+def relative_symlink(source_path: str, link_path: str) -> None:
   """Create a symlink at link_path pointing to relative source
 
   :param source_path: Absolute path to source file
@@ -489,7 +497,7 @@ def relative_symlink(source_path, link_path):
       raise
 
 
-def relativize_path(path, rootdir):
+def relativize_path(path: str, rootdir: str) -> str:
   """
 
   :API: public
@@ -507,11 +515,11 @@ def relativize_path(path, rootdir):
 # prepended to most components in the classpath (some from ivy, the rest from the build),
 # in some runs the classpath gets too big and exceeds ARG_MAX.
 # We prevent this by using paths relative to the current working directory.
-def relativize_paths(paths, rootdir):
+def relativize_paths(paths: Sequence[str], rootdir: str) -> List[str]:
   return [relativize_path(path, rootdir) for path in paths]
 
 
-def touch(path, times=None):
+def touch(path: str, times: Optional[Union[int, Tuple[int, int]]] = None):
   """Equivalent of unix `touch path`.
 
     :API: public
@@ -520,19 +528,17 @@ def touch(path, times=None):
     :times Either a tuple of (atime, mtime) or else a single time to use for both.  If not
            specified both atime and mtime are updated to the current time.
   """
-  if times:
-    if len(times) > 2:
-      raise ValueError('times must either be a tuple of (atime, mtime) or else a single time value '
-                       'to use for both.')
-
-    if len(times) == 1:
-      times = (times, times)
-
+  if isinstance(times, tuple) and len(times) > 2:
+    raise ValueError(
+      "`times` must either be a tuple of (atime, mtime) or else a single time to use for both."
+    )
+  if isinstance(times, int):
+    times = (times, times)
   with safe_open(path, 'a'):
     os.utime(path, times)
 
 
-def recursive_dirname(f):
+def recursive_dirname(f: str) -> Iterator[str]:
   """Given a relative path like 'a/b/c/d', yield all ascending path components like:
 
         'a/b/c/d'
@@ -549,7 +555,7 @@ def recursive_dirname(f):
   yield ''
 
 
-def get_basedir(path):
+def get_basedir(path: str) -> str:
   """Returns the base directory of a path.
 
   Examples:
@@ -560,10 +566,10 @@ def get_basedir(path):
   return path[:path.index(os.sep)] if os.sep in path else path
 
 
-def rm_rf(name):
+def rm_rf(name: str) -> None:
   """Remove a file or a directory similarly to running `rm -rf <name>` in a UNIX shell.
 
-  :param str name: the name of the file or directory to remove.
+  :param name: the name of the file or directory to remove.
   :raises: OSError on error.
   """
   if not os.path.exists(name):
@@ -581,18 +587,13 @@ def rm_rf(name):
       raise
 
 
-def is_executable(path):
-  """Returns whether a path names an existing executable file."""
-  return os.path.isfile(path) and os.access(path, os.X_OK)
-
-
-def split_basename_and_dirname(path):
+def split_basename_and_dirname(path: str) -> Tuple[str, str]:
   if not os.path.isfile(path):
     raise ValueError("{} does not exist or is not a regular file.".format(path))
-  return (os.path.dirname(path), os.path.basename(path))
+  return os.path.dirname(path), os.path.basename(path)
 
 
-def check_no_overlapping_paths(paths):
+def check_no_overlapping_paths(paths: Sequence[str]) -> None:
   """Given a list of paths, ensure that all are unique and do not have the same prefix."""
   for path in paths:
     list_copy_without_path = list(paths)
@@ -604,12 +605,17 @@ def check_no_overlapping_paths(paths):
         raise ValueError('{} and {} have the same prefix. All paths must be unique and cannot overlap.'.format(path, p))
 
 
-def is_readable_dir(path):
+def is_executable(path: str) -> bool:
+  """Returns whether a path names an existing executable file."""
+  return os.path.isfile(path) and os.access(path, os.X_OK)
+
+
+def is_readable_dir(path: str) -> bool:
   """Returns whether a path names an existing directory we can list and read files from."""
   return os.path.isdir(path) and os.access(path, os.R_OK) and os.access(path, os.X_OK)
 
 
-def is_writable_dir(path):
+def is_writable_dir(path: str) -> bool:
   """Returns whether a path names an existing directory that we can create and modify files in.
 
   We call is_readable_dir(), so this definition of "writable" is a superset of that.

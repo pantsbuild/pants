@@ -1,20 +1,16 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import open
 
 from pants.base.payload import Payload
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
 from pants.cache.cache_setup import CacheFactory, CacheSetup
 from pants.task.task import Task
+from pants.testutil.task_test_base import TaskTestBase
 from pants.util.contextutil import open_tar, temporary_dir
 from pants.util.dirutil import safe_open
-from pants_test.task_test_base import TaskTestBase
 
 
 SYMLINK_NAME = 'link'
@@ -27,7 +23,7 @@ class DummyCacheLibrary(Target):
     payload = Payload()
     payload.add_fields({'sources': self.create_sources_field(sources=sources,
                                                              sources_rel_path=address.spec_path)})
-    super(DummyCacheLibrary, self).__init__(address=address, payload=payload, *args, **kwargs)
+    super().__init__(address=address, payload=payload, *args, **kwargs)
 
 
 class DummyCacheTask(Task):

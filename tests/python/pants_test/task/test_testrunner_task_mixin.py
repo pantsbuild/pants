@@ -1,28 +1,24 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import collections
 import os
-from builtins import next, object, open
+import subprocess
 from contextlib import contextmanager
 from unittest import TestCase
+from unittest.mock import Mock, patch
 from xml.etree.ElementTree import ParseError
-
-from mock import Mock, patch
 
 from pants.base.exceptions import ErrorWhileTesting
 from pants.task.task import TaskBase
 from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
+from pants.testutil.task_test_base import TaskTestBase
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_open
-from pants.util.process_handler import ProcessHandler, subprocess
-from pants_test.task_test_base import TaskTestBase
+from pants.util.process_handler import ProcessHandler
 
 
-class DummyTestTarget(object):
+class DummyTestTarget:
   def __init__(self, name, timeout=None):
     self.name = name
     self.timeout = timeout
@@ -41,7 +37,7 @@ class TestRunnerTaskMixinTest(TaskTestBase):
 
       def _execute(self, all_targets):
         self.call_list.append(['_execute', all_targets])
-        self._spawn_and_wait()
+        self.spawn_and_wait(all_targets)
 
       def _spawn(self, *args, **kwargs):
         self.call_list.append(['_spawn', args, kwargs])
@@ -147,7 +143,7 @@ class TestRunnerTaskMixinSimpleTimeoutTest(TaskTestBase):
       waited_for = None
 
       def _execute(self, all_targets):
-        self._spawn_and_wait()
+        self.spawn_and_wait(all_targets)
 
       def _spawn(self, *args, **kwargs):
         timeouts = self.get_options().timeouts
@@ -236,7 +232,7 @@ class TestRunnerTaskMixinGracefulTimeoutTest(TaskTestBase):
 
       def _execute(self, all_targets):
         self.call_list.append(['_execute', all_targets])
-        self._spawn_and_wait()
+        self.spawn_and_wait(all_targets)
 
       def _spawn(self, *args, **kwargs):
         self.call_list.append(['_spawn', args, kwargs])
@@ -321,8 +317,8 @@ class TestRunnerTaskMixinMultipleTargets(TaskTestBase):
     class TestRunnerTaskMixinMultipleTargetsTask(TestRunnerTaskMixin, TaskBase):
       wait_time = None
 
-      def _execute(self, all_targets):
-        self._spawn_and_wait()
+      def _execute(self, _all_targets):
+        self.spawn_and_wait(self.current_targets)
 
       def _spawn(self, *args, **kwargs):
         terminate_wait = self.get_options().timeout_terminate_wait
@@ -350,9 +346,6 @@ class TestRunnerTaskMixinMultipleTargets(TaskTestBase):
 
       def _validate_target(self, target):
         pass
-
-      def _get_test_targets_for_spawn(self):
-        return self.current_targets
 
     return TestRunnerTaskMixinMultipleTargetsTask
 
@@ -384,7 +377,7 @@ class TestRunnerTaskMixinXmlParsing(TestRunnerTaskMixin, TestCase):
   def _raise_handler(e):
     raise e
 
-  class CollectHandler(object):
+  class CollectHandler:
     def __init__(self):
       self._errors = []
 

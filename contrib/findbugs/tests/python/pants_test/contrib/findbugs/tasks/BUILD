@@ -5,9 +5,9 @@ python_tests(
   sources=['test_findbugs.py'],
   dependencies=[
     'contrib/findbugs/src/python/pants/contrib/findbugs/tasks',
-    'tests/python/pants_test/jvm:nailgun_task_test_base',
-    'tests/python/pants_test/option/util',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil/jvm:nailgun_task_test_base',
+    'src/python/pants/testutil/option',
+    'src/python/pants/testutil:test_base',
   ]
 )
 
@@ -15,8 +15,9 @@ python_tests(
   name='integration',
   sources=['test_findbugs_integration.py'],
   dependencies=[
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
+    'contrib/findbugs:java_tests_directory',
   ],
   tags={'integration'},
-  timeout=300,
+  timeout=520,
 )

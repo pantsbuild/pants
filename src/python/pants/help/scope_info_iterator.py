@@ -1,19 +1,14 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
 
-from builtins import object
-
-from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.parser_hierarchy import enclosing_scope
-from pants.option.scope import ScopeInfo
+from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
 
 
-class ScopeInfoIterator(object):
+class ScopeInfoIterator:
   """Provides relevant ScopeInfo instances in a useful order."""
 
   def __init__(self, scope_to_info):

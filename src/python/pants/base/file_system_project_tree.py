@@ -1,23 +1,11 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import open
 from glob import glob1
 
 from pants.base.project_tree import Dir, File, Link, ProjectTree
 from pants.util.dirutil import fast_relpath, safe_walk
-
-
-# Use the built-in version of scandir/walk if possible, otherwise
-# use the scandir module version
-try:
-  from os import scandir
-except ImportError:
-  from scandir import scandir
 
 
 class FileSystemProjectTree(ProjectTree):
@@ -37,7 +25,7 @@ class FileSystemProjectTree(ProjectTree):
       raise ValueError('scandir for non-canonical path "{}" not supported in {}.'.format(
         relpath, self))
 
-    for entry in scandir(abspath):
+    for entry in os.scandir(abspath):
       # NB: We don't use `DirEntry.stat`, as the scandir docs indicate that that always requires
       # an additional syscall on Unixes.
       entry_path = os.path.normpath(os.path.join(relpath, entry.name))

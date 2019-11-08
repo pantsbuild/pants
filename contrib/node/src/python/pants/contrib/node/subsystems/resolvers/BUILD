@@ -12,7 +12,6 @@ python_library(
   name='npm_resolver',
   sources=['npm_resolver.py'],
   dependencies=[
-    '3rdparty/python:future',
     ':node_resolver_base',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
@@ -28,7 +27,6 @@ python_library(
   sources=['node_preinstalled_module_resolver.py'],
   dependencies=[
     ':node_resolver_base',
-    '3rdparty/python:six',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/fs',
@@ -46,6 +44,5 @@ python_library(
   dependencies=[
     'src/python/pants/base:build_environment',
     'src/python/pants/util:dirutil',
-    'src/python/pants/util:meta',
   ]
 )

@@ -1,10 +1,8 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import inspect
+from typing import Dict, Tuple
 
 from pants.option.optionable import Optionable
 from pants.option.scope import ScopeInfo
@@ -41,9 +39,10 @@ class Subsystem(SubsystemClientMixin, Optionable):
 
   class UninitializedSubsystemError(SubsystemError):
     def __init__(self, class_name, scope):
-      super(Subsystem.UninitializedSubsystemError, self).__init__(
-        'Subsystem "{}" not initialized for scope "{}". '
-        'Is subsystem missing from subsystem_dependencies() in a task? '.format(class_name, scope))
+      super().__init__(
+        f'Subsystem "{class_name}" not initialized for scope "{scope}". Is subsystem missing'
+        'from subsystem_dependencies() in a task? '
+      )
 
   @classmethod
   def is_subsystem_type(cls, obj):
@@ -64,7 +63,7 @@ class Subsystem(SubsystemClientMixin, Optionable):
   def get_scope_info(cls, subscope=None):
     cls.validate_scope_name_component(cls.options_scope)
     if subscope is None:
-      return super(Subsystem, cls).get_scope_info()
+      return super().get_scope_info()
     else:
       return ScopeInfo(cls.subscope(subscope), ScopeInfo.SUBSYSTEM, cls)
 
@@ -81,29 +80,26 @@ class Subsystem(SubsystemClientMixin, Optionable):
     return cls._options is not None
 
   # A cache of (cls, scope) -> the instance of cls tied to that scope.
-  _scoped_instances = {}
+  _scoped_instances: Dict[Tuple["Subsystem", str], "Subsystem"] = {}
 
   @classmethod
-  def global_instance(cls):
+  def global_instance(cls) -> "Subsystem":
     """Returns the global instance of this subsystem.
 
     :API: public
 
     :returns: The global subsystem instance.
-    :rtype: :class:`pants.subsystem.subsystem.Subsystem`
     """
-    return cls._instance_for_scope(cls.options_scope)
+    return cls._instance_for_scope(cls.options_scope)  # type: ignore
 
   @classmethod
-  def scoped_instance(cls, optionable):
+  def scoped_instance(cls, optionable: Optionable) -> "Subsystem":
     """Returns an instance of this subsystem for exclusive use by the given `optionable`.
 
     :API: public
 
     :param optionable: An optionable type or instance to scope this subsystem under.
-    :type: :class:`pants.option.optionable.Optionable`
     :returns: The scoped subsystem instance.
-    :rtype: :class:`pants.subsystem.subsystem.Subsystem`
     """
     if not isinstance(optionable, Optionable) and not issubclass(optionable, Optionable):
       raise TypeError('Can only scope an instance against an Optionable, given {} of type {}.'
@@ -111,7 +107,7 @@ class Subsystem(SubsystemClientMixin, Optionable):
     return cls._instance_for_scope(cls.subscope(optionable.options_scope))
 
   @classmethod
-  def _instance_for_scope(cls, scope):
+  def _instance_for_scope(cls, scope: str) -> "Subsystem":
     if cls._options is None:
       raise cls.UninitializedSubsystemError(cls.__name__, scope)
     key = (cls, scope)
@@ -129,7 +125,7 @@ class Subsystem(SubsystemClientMixin, Optionable):
       cls._options = None
     cls._scoped_instances = {}
 
-  def __init__(self, scope, scoped_options):
+  def __init__(self, scope: str, scoped_options) -> None:
     """Note: A subsystem has no access to options in scopes other than its own.
 
     TODO: We'd like that to be true of Tasks some day. Subsystems will help with that.
@@ -139,13 +135,16 @@ class Subsystem(SubsystemClientMixin, Optionable):
 
     :API: public
     """
-    super(Subsystem, self).__init__()
+    super().__init__()
     self._scope = scope
     self._scoped_options = scoped_options
     self._fingerprint = None
 
+  # It's safe to override the signature from Optionable because we validate
+  # that every Optionable has `options_scope` defined as a `str` in the __init__. This code is
+  # complex, though, and may be worth refactoring.
   @property
-  def options_scope(self):
+  def options_scope(self) -> str:  # type: ignore
     return self._scope
 
   @property

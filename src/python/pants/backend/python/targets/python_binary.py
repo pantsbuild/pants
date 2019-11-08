@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 
-from future.utils import string_types
 from pex.pex_info import PexInfo
 from twitter.common.collections import maybe_list
 
@@ -14,6 +10,7 @@ from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
+from pants.subsystem.subsystem import Subsystem
 
 
 class PythonBinary(PythonTarget):
@@ -31,6 +28,26 @@ class PythonBinary(PythonTarget):
   def alias(cls):
     return 'python_binary'
 
+  class Defaults(Subsystem):
+
+    options_scope = 'python-binary'
+
+    @classmethod
+    def register_options(cls, register):
+      super(PythonBinary.Defaults, cls).register_options(register)
+      register('--pex-emit-warnings', advanced=True, type=bool, default=True, fingerprint=True,
+               help='Whether built pex binaries should emit pex warnings at runtime by default. '
+                    'Can be over-ridden by specifying the `emit_warnings` parameter of individual '
+                    '`{}` targets'.format(PythonBinary.alias()))
+
+    @classmethod
+    def should_emit_warnings(cls, override=None):
+      return override if override is not None else cls.global_instance().options.pex_emit_warnings
+
+  @classmethod
+  def subsystems(cls):
+    return super().subsystems() + (cls.Defaults,)
+
   # TODO(wickman) Consider splitting pex options out into a separate PexInfo builder that can be
   # attached to the binary target.  Ideally the PythonBinary target is agnostic about pex mechanics
   def __init__(self,
@@ -43,6 +60,7 @@ class PythonBinary(PythonTarget):
                indices=None,              # pex option
                ignore_errors=False,       # pex option
                shebang=None,              # pex option
+               emit_warnings=None,        # pex option
                platforms=(),
                **kwargs):
     """
@@ -60,14 +78,13 @@ class PythonBinary(PythonTarget):
     :param repositories: a list of repositories to query for dependencies.
     :param indices: a list of indices to use for packages.
     :param ignore_errors: should we ignore inability to resolve dependencies?
+    :param str shebang: Use this shebang for the generated pex.
+    :param bool emit_warnings: Whether or not to emit pex warnings.
     :param platforms: extra platforms to target when building this binary. If this is, e.g.,
       ``['current', 'linux-x86_64', 'macosx-10.4-x86_64']``, then when building the pex, then
       for any platform-dependent modules, Pants will include ``egg``\\s for Linux (64-bit Intel),
       Mac OS X (version 10.4 or newer), and the current platform (whatever is being used when
       making the PEX).
-    :param compatibility: either a string or list of strings that represents
-      interpreter compatibility for this target, using the Requirement-style format,
-      e.g. ``'CPython>=3', or just ['>=2.7','<3']`` for requirements agnostic to interpreter class.
     """
 
     if inherit_path is False:
@@ -84,21 +101,22 @@ class PythonBinary(PythonTarget):
       'ignore_errors': PrimitiveField(bool(ignore_errors)),
       'platforms': PrimitiveField(tuple(maybe_list(platforms or []))),
       'shebang': PrimitiveField(shebang),
+      'emit_warnings': PrimitiveField(self.Defaults.should_emit_warnings(emit_warnings)),
     })
 
-    super(PythonBinary, self).__init__(sources=sources, payload=payload, **kwargs)
+    super().__init__(sources=sources, payload=payload, **kwargs)
 
     if (not sources or not sources.files) and entry_point is None:
       raise TargetDefinitionException(self,
           'A python binary target must specify either a single source or entry_point.')
 
-    if not isinstance(platforms, (list, tuple)) and not isinstance(platforms, string_types):
-      raise TargetDefinitionException(self, 'platforms must be a list, tuple or string.')
+    if not isinstance(platforms, (list, tuple)) and not isinstance(platforms, str):
+      raise TargetDefinitionException(self, 'platforms must be a list, tuple or str.')
 
     if sources and sources.files and entry_point:
       entry_point_module = entry_point.split(':', 1)[0]
       entry_source = list(self.sources_relative_to_source_root())[0]
-      source_entry_point = self._translate_to_entry_point(entry_source)
+      source_entry_point = self.translate_source_path_to_py_module_specifier(entry_source)
       if entry_point_module != source_entry_point:
         raise TargetDefinitionException(self,
             'Specified both source and entry_point but they do not agree: {} vs {}'.format(
@@ -118,7 +136,8 @@ class PythonBinary(PythonTarget):
   def indices(self):
     return self.payload.indices
 
-  def _translate_to_entry_point(self, source):
+  @classmethod
+  def translate_source_path_to_py_module_specifier(self, source: str) -> str:
     source_base, _ = os.path.splitext(source)
     return source_base.replace(os.path.sep, '.')
 
@@ -129,14 +148,14 @@ class PythonBinary(PythonTarget):
     elif self.payload.sources.source_paths:
       assert len(self.payload.sources.source_paths) == 1
       entry_source = list(self.sources_relative_to_source_root())[0]
-      return self._translate_to_entry_point(entry_source)
+      return self.translate_source_path_to_py_module_specifier(entry_source)
     else:
       return None
 
   @property
   def shebang(self):
     return self.payload.shebang
-    
+
   @property
   def pexinfo(self):
     info = PexInfo.default()
@@ -149,4 +168,5 @@ class PythonBinary(PythonTarget):
     info.inherit_path = self.payload.inherit_path
     info.entry_point = self.entry_point
     info.ignore_errors = self.payload.ignore_errors
+    info.emit_warnings = self.payload.emit_warnings
     return info

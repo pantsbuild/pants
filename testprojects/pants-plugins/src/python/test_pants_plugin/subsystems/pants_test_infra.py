@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.build_graph.target import Target
@@ -14,7 +11,7 @@ class PantsTestInfra(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(PantsTestInfra, cls).register_options(register)
+    super().register_options(register)
     register('--pants-requirement-target', advanced=True, fingerprint=True,
              help='Address for a python target providing the pants sdist.',
              type=str, default=None)

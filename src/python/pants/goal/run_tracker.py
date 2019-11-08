@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import ast
 import copy
@@ -13,14 +10,14 @@ import sys
 import threading
 import time
 import uuid
-from builtins import open
+from collections import OrderedDict
 from contextlib import contextmanager
+from typing import Dict
 
 import requests
-from future.utils import PY2, PY3
 
-from pants.auth.cookies import Cookies
-from pants.base.build_environment import get_pants_cachedir
+from pants.auth.basic_auth import BasicAuth
+from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.run_info import RunInfo
 from pants.base.worker_pool import SubprocPool, WorkerPool
 from pants.base.workunit import WorkUnit, WorkUnitLabel
@@ -28,10 +25,25 @@ from pants.goal.aggregated_timings import AggregatedTimings
 from pants.goal.artifact_cache_stats import ArtifactCacheStats
 from pants.goal.pantsd_stats import PantsDaemonStats
 from pants.option.config import Config
+from pants.option.options_fingerprinter import CoercingOptionEncoder
+from pants.reporting.json_reporter import JsonReporter
 from pants.reporting.report import Report
-from pants.stats.statsdb import StatsDBFactory
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import relative_symlink, safe_file_dump
+from pants.version import VERSION
+
+
+class RunTrackerOptionEncoder(CoercingOptionEncoder):
+  """Use the json encoder we use for making options hashable to support datatypes.
+
+  This encoder also explicitly allows OrderedDict inputs, as we accept more than just option values
+  when encoding stats to json.
+  """
+
+  def default(self, o):
+    if isinstance(o, OrderedDict):
+      return o
+    return super().default(o)
 
 
 class RunTracker(Subsystem):
@@ -61,16 +73,14 @@ class RunTracker(Subsystem):
 
   # The name of the tracking root for the background worker threads.
   BACKGROUND_ROOT_NAME = 'background'
+  SUPPORTED_STATS_VERSIONS = [1, 2]
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(RunTracker, cls).subsystem_dependencies() + (StatsDBFactory, Cookies)
+    return super().subsystem_dependencies() + (BasicAuth,)
 
   @classmethod
   def register_options(cls, register):
-    register('--stats-upload-url', advanced=True, default=None,
-             removal_version='1.13.0.dev2', removal_hint='Use --stats-upload-urls instead.',
-             help='Upload stats to this URL on run completion.')
     register('--stats-upload-urls', advanced=True, type=dict, default={},
              help='Upload stats to these URLs on run completion.  Value is a map from URL to the '
                   'name of the auth provider the user must auth against in order to upload stats '
@@ -78,6 +88,8 @@ class RunTracker(Subsystem):
                   'auth provider name is only used to provide a more helpful error message.')
     register('--stats-upload-timeout', advanced=True, type=int, default=2,
              help='Wait at most this many seconds for the stats upload to complete.')
+    register('--stats-version', advanced=True, type=int, default=1, choices=cls.SUPPORTED_STATS_VERSIONS,
+             help='Format of stats JSON for uploads and local json file.')
     register('--num-foreground-workers', advanced=True, type=int,
              default=multiprocessing.cpu_count(),
              help='Number of threads for foreground work.')
@@ -96,10 +108,18 @@ class RunTracker(Subsystem):
     """
     :API: public
     """
-    super(RunTracker, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._run_timestamp = time.time()
     self._cmd_line = ' '.join(['pants'] + sys.argv[1:])
     self._sorted_goal_infos = tuple()
+    self._v2_console_rule_names = tuple()
+
+    self.run_uuid = uuid.uuid4().hex
+    # Select a globally unique ID for the run, that sorts by time.
+    millis = int((self._run_timestamp * 1000) % 1000)
+    # run_uuid is used as a part of run_id and also as a trace_id for Zipkin tracing
+    str_time = time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime(self._run_timestamp))
+    self.run_id = f'pants_run_{str_time}_{millis}_{self.run_uuid}'
 
     # Initialized in `initialize()`.
     self.run_info_dir = None
@@ -111,6 +131,7 @@ class RunTracker(Subsystem):
 
     # Initialized in `start()`.
     self.report = None
+    self.json_reporter = None
     self._main_root_workunit = None
     self._all_options = None
 
@@ -158,8 +179,13 @@ class RunTracker(Subsystem):
     # }
     self._target_to_data = {}
 
+    self._end_memoized_result = None
+
   def set_sorted_goal_infos(self, sorted_goal_infos):
     self._sorted_goal_infos = sorted_goal_infos
+
+  def set_v2_console_rule_names(self, v2_console_rule_names):
+    self._v2_console_rule_names = v2_console_rule_names
 
   def register_thread(self, parent_workunit):
     """Register the parent workunit for all work in the calling thread.
@@ -168,9 +194,15 @@ class RunTracker(Subsystem):
     """
     self._threadlocal.current_workunit = parent_workunit
 
-  def is_under_main_root(self, workunit):
-    """Is the workunit running under the main thread's root."""
-    return workunit.root() == self._main_root_workunit
+  def is_under_background_root(self, workunit):
+    """Is the workunit running under the background thread's root."""
+    return workunit.is_background(self._background_root_workunit)
+
+  def is_main_root_workunit(self, workunit):
+    return workunit is self._main_root_workunit
+
+  def is_background_root_workunit(self, workunit):
+    return workunit is self._background_root_workunit
 
   def initialize(self, all_options):
     """Create run_info and relevant directories, and return the run id.
@@ -182,18 +214,10 @@ class RunTracker(Subsystem):
 
     # Initialize the run.
 
-    # Select a globally unique ID for the run, that sorts by time.
-    millis = int((self._run_timestamp * 1000) % 1000)
-    run_id = 'pants_run_{}_{}_{}'.format(
-      time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime(self._run_timestamp)),
-      millis,
-      uuid.uuid4().hex
-    )
-
     info_dir = os.path.join(self.get_options().pants_workdir, self.options_scope)
-    self.run_info_dir = os.path.join(info_dir, run_id)
+    self.run_info_dir = os.path.join(info_dir, self.run_id)
     self.run_info = RunInfo(os.path.join(self.run_info_dir, 'info'))
-    self.run_info.add_basic_info(run_id, self._run_timestamp)
+    self.run_info.add_basic_info(self.run_id, self._run_timestamp)
     self.run_info.add_info('cmd_line', self._cmd_line)
 
     # Create a 'latest' symlink, after we add_infos, so we're guaranteed that the file exists.
@@ -217,7 +241,7 @@ class RunTracker(Subsystem):
 
     self._all_options = all_options
 
-    return run_id
+    return (self.run_id, self.run_uuid)
 
   def start(self, report, run_start_time=None):
     """Start tracking this pants run using the given Report.
@@ -232,6 +256,13 @@ class RunTracker(Subsystem):
       raise AssertionError('RunTracker.initialize must be called before RunTracker.start.')
 
     self.report = report
+
+    # Set up the JsonReporter for V2 stats.
+    if self._stats_version == 2:
+      json_reporter_settings = JsonReporter.Settings(log_level=Report.INFO)
+      self.json_reporter = JsonReporter(self, json_reporter_settings)
+      report.add_reporter('json', self.json_reporter)
+
     self.report.open()
 
     # And create the workunit.
@@ -245,7 +276,7 @@ class RunTracker(Subsystem):
     # Log reporting details.
     url = self.run_info.get_info('report_url')
     if url:
-      self.log(Report.INFO, 'See a report at: {}'.format(url))
+      self.log(Report.INFO, f'See a report at: {url}')
     else:
       self.log(Report.INFO, '(To run a reporting server: ./pants server)')
 
@@ -322,28 +353,48 @@ class RunTracker(Subsystem):
       workunit.set_outcome(outcome)
       self.end_workunit(workunit)
 
+  @property
+  def _stats_version(self) -> int:
+    return self.get_options().stats_version
+
   def log(self, level, *msg_elements):
     """Log a message against the current workunit."""
     self.report.log(self._threadlocal.current_workunit, level, *msg_elements)
 
   @classmethod
-  def post_stats(cls, stats_url, stats, timeout=2, auth_provider=None):
+  def _get_headers(cls, stats_version: int) -> Dict[str, str]:
+    return {'User-Agent': f"pants/v{VERSION}",
+            'X-Pants-Stats-Version': str(stats_version),
+            }
+
+  @classmethod
+  def post_stats(cls, stats_url, stats, timeout=2, auth_provider=None, stats_version=1):
     """POST stats to the given url.
 
     :return: True if upload was successful, False otherwise.
     """
     def error(msg):
       # Report aleady closed, so just print error.
-      print('WARNING: Failed to upload stats to {}. due to {}'.format(stats_url, msg),
-            file=sys.stderr)
+      print(f'WARNING: Failed to upload stats to {stats_url} due to {msg}', file=sys.stderr)
       return False
 
-    # TODO(benjy): The upload protocol currently requires separate top-level params, with JSON
-    # values.  Probably better for there to be one top-level JSON value, namely json.dumps(stats).
-    # But this will first require changing the upload receiver at every shop that uses this.
-    params = {k: json.dumps(v) for (k, v) in stats.items()}
-    cookies = Cookies.global_instance()
-    auth_provider = auth_provider or '<provider>'
+    if stats_version not in cls.SUPPORTED_STATS_VERSIONS:
+      raise ValueError("Invalid stats version")
+    
+
+    auth_data = BasicAuth.global_instance().get_auth_for_provider(auth_provider)
+    headers = cls._get_headers(stats_version=stats_version)
+    headers.update(auth_data.headers)
+
+    if stats_version == 2:
+      params = cls._json_dump_options({'builds': [stats]})
+      headers['Content-Type'] = 'application/json'
+    else:
+      # TODO(benjy): The upload protocol currently requires separate top-level params, with JSON
+      # values.  Probably better for there to be one top-level JSON value, namely json.dumps(stats).
+      # But this will first require changing the upload receiver at every shop that uses this.
+      params = {k: cls._json_dump_options(v) for (k, v) in stats.items()}
+
 
     # We can't simply let requests handle redirects, as we only allow them for specific codes:
     # 307 and 308 indicate that the redirected request must use the same method, POST in this case.
@@ -354,92 +405,94 @@ class RunTracker(Subsystem):
     def do_post(url, num_redirects_allowed):
       if num_redirects_allowed < 0:
         return error('too many redirects.')
-      r = requests.post(url, data=params, timeout=timeout,
-                        cookies=cookies.get_cookie_jar(), allow_redirects=False)
-      if r.status_code in {307, 308}:
-        return do_post(r.headers['location'], num_redirects_allowed - 1)
-      elif r.status_code != 200:
-        error('HTTP error code: {}. Reason: {}.'.format(r.status_code, r.reason))
-        if 300 <= r.status_code < 400 or r.status_code == 401:
-          print('Use `path/to/pants login --to={}` to authenticate against the stats '
-                'upload service.'.format(auth_provider), file=sys.stderr)
+      res = requests.post(url, data=params, timeout=timeout,
+                          headers=headers, allow_redirects=False, **auth_data.request_args)
+      if res.status_code in {307, 308}:
+        return do_post(res.headers['location'], num_redirects_allowed - 1)
+      elif 300 <= res.status_code < 400 or res.status_code == 401:
+        error(f'HTTP error code: {res.status_code}. Reason: {res.reason}.')
+        print(f'Use `path/to/pants login --to={auth_provider}` to authenticate '
+                'against the stats upload service.', file=sys.stderr)
+        return False
+      elif not res.ok:
+        error(f'HTTP error code: {res.status_code}. Reason: {res.reason}.')
         return False
       return True
 
     try:
       return do_post(stats_url, num_redirects_allowed=6)
     except Exception as e:  # Broad catch - we don't want to fail the build over upload errors.
-      return error('Error: {}'.format(e))
+      return error(f'Error: {e!r}')
+
+  @classmethod
+  def _json_dump_options(cls, stats):
+    return json.dumps(stats, cls=RunTrackerOptionEncoder)
 
   @classmethod
   def write_stats_to_json(cls, file_name, stats):
-    """Write stats to a local json file.
-
-    :return: True if successfully written, False otherwise.
-    """
-    params = json.dumps(stats)
-    if PY2:
-      params = params.decode('utf-8')
+    """Write stats to a local json file."""
+    params = cls._json_dump_options(stats)
     try:
-      with open(file_name, 'w') as f:
-        f.write(params)
-    except Exception as e:  # Broad catch - we don't want to fail in stats related failure.
-      print('WARNING: Failed to write stats to {} due to Error: {}'.format(file_name, e),
+      safe_file_dump(file_name, params, mode='w')
+    except Exception as e: # Broad catch - we don't want to fail in stats related failure.
+      print(f'WARNING: Failed to write stats to {file_name} due to Error: {e!r}',
             file=sys.stderr)
-      return False
-    return True
 
-  def store_stats(self):
-    """Store stats about this run in local and optionally remote stats dbs."""
+  def run_information(self):
+    """Basic information about this run."""
     run_information = self.run_info.get_as_dict()
     target_data = run_information.get('target_data', None)
     if target_data:
       run_information['target_data'] = ast.literal_eval(target_data)
+    return run_information
 
+  def _stats(self):
     stats = {
-      'run_info': run_information,
-      'cumulative_timings': self.cumulative_timings.get_all(),
-      'self_timings': self.self_timings.get_all(),
-      'critical_path_timings': self.get_critical_path_timings().get_all(),
+      'run_info': self.run_information(),
       'artifact_cache_stats': self.artifact_cache_stats.get_all(),
       'pantsd_stats': self.pantsd_stats.get_all(),
-      'outcomes': self.outcomes,
+      'cumulative_timings': self.cumulative_timings.get_all(),
       'recorded_options': self._get_options_to_record(),
     }
+    if self._stats_version == 2:
+      stats['workunits'] = self.json_reporter.results
+    else:
+      stats.update({
+        'self_timings': self.self_timings.get_all(),
+        'critical_path_timings': self.get_critical_path_timings().get_all(),        
+        'outcomes': self.outcomes,
+      })
+    return stats
 
-    # Dump individual stat file.
-    # TODO(benjy): Do we really need these, once the statsdb is mature?
-    stats_file = os.path.join(get_pants_cachedir(), 'stats',
-                              '{}.json'.format(self.run_info.get_info('id')))
-    mode = 'w' if PY3 else 'wb'
-    safe_file_dump(stats_file, json.dumps(stats), mode=mode)
+  def store_stats(self):
+    """Store stats about this run in local and optionally remote stats dbs."""
+    stats = self._stats()
 
-    # Add to local stats db.
-    StatsDBFactory.global_instance().get_db().insert_stats(stats)
-
-    # Upload to remote stats db.
-    stats_upload_urls = copy.copy(self.get_options().stats_upload_urls)
-    deprecated_stats_url = self.get_options().stats_upload_url
-    if deprecated_stats_url:
-      stats_upload_urls[deprecated_stats_url] = None
-    timeout = self.get_options().stats_upload_timeout
-    for stats_url, auth_provider in stats_upload_urls.items():
-      self.post_stats(stats_url, stats, timeout=timeout, auth_provider=auth_provider)
-
-    # Write stats to local json file.
+    # Write stats to user-defined json file.
     stats_json_file_name = self.get_options().stats_local_json_file
     if stats_json_file_name:
       self.write_stats_to_json(stats_json_file_name, stats)
 
+    # Upload to remote stats db.
+    stats_upload_urls = copy.copy(self.get_options().stats_upload_urls)
+    timeout = self.get_options().stats_upload_timeout
+    for stats_url, auth_provider in stats_upload_urls.items():
+      self.post_stats(stats_url, stats, timeout=timeout, auth_provider=auth_provider, stats_version=self._stats_version)
+
   _log_levels = [Report.ERROR, Report.ERROR, Report.WARN, Report.INFO, Report.INFO]
+
+  def has_ended(self):
+    return self._end_memoized_result is not None
 
   def end(self):
     """This pants run is over, so stop tracking it.
 
     Note: If end() has been called once, subsequent calls are no-ops.
 
-    :return: 0 for success, 1 for failure.
+    :return: PANTS_SUCCEEDED_EXIT_CODE or PANTS_FAILED_EXIT_CODE
     """
+    if self._end_memoized_result is not None:
+      return self._end_memoized_result
     if self._background_worker_pool:
       if self._aborted:
         self.log(Report.INFO, "Aborting background workers.")
@@ -468,17 +521,30 @@ class RunTracker(Subsystem):
       # If the goal is clean-all then the run info dir no longer exists, so ignore that error.
       self.run_info.add_info('outcome', outcome_str, ignore_errors=True)
 
+    if self._sorted_goal_infos and self.run_info.get_info("computed_goals") is None:
+      self.run_info.add_info(
+        "computed_goals",
+        self._v2_console_rule_names + tuple(goal.goal.name for goal in self._sorted_goal_infos),
+        stringify=False,
+        # If the goal is clean-all then the run info dir no longer exists, so ignore that error.
+        ignore_errors=True,
+      )
+
     if self._target_to_data:
       self.run_info.add_info('target_data', self._target_to_data)
 
     self.report.close()
     self.store_stats()
 
-    return 1 if outcome in [WorkUnit.FAILURE, WorkUnit.ABORTED] else 0
+    run_failed = outcome in [WorkUnit.FAILURE, WorkUnit.ABORTED]
+    result = PANTS_FAILED_EXIT_CODE if run_failed else PANTS_SUCCEEDED_EXIT_CODE
+    self._end_memoized_result = result
+    return self._end_memoized_result
 
   def end_workunit(self, workunit):
-    self.report.end_workunit(workunit)
     path, duration, self_time, is_tool = workunit.end()
+    self.report.end_workunit(workunit)
+    workunit.cleanup()
 
     # These three operations may not be thread-safe, and workunits may run in separate threads
     # and thus end concurrently, so we want to lock these operations.
@@ -512,7 +578,7 @@ class RunTracker(Subsystem):
       critical_path_timings.add_timing(tracking_label, raw_timings.get(timing_label, 0.0))
 
     def get_label(dep):
-      return "{}:{}".format(RunTracker.DEFAULT_ROOT_NAME, dep)
+      return f"{RunTracker.DEFAULT_ROOT_NAME}:{dep}"
 
     # Add setup workunit to critical_path_timings manually, as its unaccounted for, otherwise.
     add_to_timings(setup_workunit, setup_workunit)
@@ -526,7 +592,8 @@ class RunTracker(Subsystem):
 
   def get_background_root_workunit(self):
     if self._background_root_workunit is None:
-      self._background_root_workunit = WorkUnit(run_info_dir=self.run_info_dir, parent=None,
+      self._background_root_workunit = WorkUnit(run_info_dir=self.run_info_dir,
+                                                parent=self._main_root_workunit,
                                                 name='background', cmd=None)
       self._background_root_workunit.start()
       self.report.start_workunit(self._background_root_workunit)
@@ -536,7 +603,8 @@ class RunTracker(Subsystem):
     if self._background_worker_pool is None:  # Initialize lazily.
       self._background_worker_pool = WorkerPool(parent_workunit=self.get_background_root_workunit(),
                                                 run_tracker=self,
-                                                num_workers=self._num_background_workers)
+                                                num_workers=self._num_background_workers,
+                                                thread_name_prefix="background")
     return self._background_worker_pool
 
   def shutdown_worker_pool(self):
@@ -568,11 +636,8 @@ class RunTracker(Subsystem):
       else:
         return value[option]
     except (Config.ConfigValidationError, AttributeError) as e:
-      raise ValueError("Couldn't find option scope {}{} for recording ({})".format(
-        scope,
-        "" if option is None else " option {}".format(option),
-        e
-      ))
+      option_str = "" if option is None else f" option {option}"
+      raise ValueError(f"Couldn't find option scope {scope}{option_str} for recording ({e!r})")
 
   @classmethod
   def _create_dict_with_nested_keys_and_val(cls, keys, value):
@@ -668,7 +733,7 @@ class RunTracker(Subsystem):
     self._merge_list_of_keys_into_dict(self._target_to_data, new_key_list, val, 0)
 
 
-class RunTrackerLogger(object):
+class RunTrackerLogger:
   """A logger facade that logs into a run tracker."""
 
   def __init__(self, run_tracker):

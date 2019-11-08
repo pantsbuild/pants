@@ -1,19 +1,16 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
+import unittest.mock
 from contextlib import contextmanager
+from urllib.parse import urlparse
 
-import mock
 import requests
 import responses
-from future.moves.urllib.parse import urlparse
 from requests import RequestException
 
 from pants.cache.pinger import BestUrlSelector, InvalidRESTfulCacheProtoError, Pinger
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 class TestPinger(TestBase):
@@ -48,7 +45,7 @@ class TestPinger(TestBase):
 
   @contextmanager
   def pinger(self, timeout, urls, tries=2):
-    with mock.patch('pants.cache.pinger.Timer.elapsed', new_callable=mock.PropertyMock) as elapsed:
+    with unittest.mock.patch('pants.cache.pinger.Timer.elapsed', new_callable=unittest.mock.PropertyMock) as elapsed:
       times = []
       for url in urls:
         for _ in range(tries):

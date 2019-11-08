@@ -1,22 +1,26 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import hashlib
 import json
 import math
 import re
 import unittest
-from builtins import range, str
 from collections import OrderedDict
+from enum import Enum
+from pathlib import Path
 
-from future.utils import PY3
 from twitter.common.collections import OrderedSet
 
-from pants.base.hash_utils import CoercingEncoder, Sharder, hash_all, hash_file, stable_json_sha1
-from pants.util.contextutil import temporary_file
+from pants.base.hash_utils import (
+  CoercingEncoder,
+  Sharder,
+  hash_all,
+  hash_dir,
+  hash_file,
+  stable_json_sha1,
+)
+from pants.util.contextutil import temporary_dir, temporary_file, temporary_file_path
 
 
 class TestHashUtils(unittest.TestCase):
@@ -35,6 +39,55 @@ class TestHashUtils(unittest.TestCase):
       fd.close()
 
       self.assertEqual(expected_hash.hexdigest(), hash_file(fd.name, digest=hashlib.md5()))
+
+  def test_hash_dir_invalid(self):
+    with temporary_file_path() as path:
+      with self.assertRaises(TypeError):
+        hash_dir(path)
+      with self.assertRaises(ValueError):
+        hash_dir(Path(path))
+
+  def test_hash_dir(self):
+    with temporary_dir() as root:
+      root1_path = Path(root)
+      root1_path.joinpath('a').write_text('jake jones')
+      root1_path.joinpath('b').write_text('jane george')
+      hash1 = hash_dir(root1_path)
+
+    with temporary_dir() as root:
+      root2_path = Path(root)
+      root2_path.joinpath('a').write_text('jake jones')
+      root2_path.joinpath('b').write_text('jane george')
+      hash2 = hash_dir(root2_path)
+
+    self.assertNotEqual(root1_path, root2_path,
+                        "The path of the directory being hashed should not factor into the hash.")
+    self.assertEqual(hash1, hash2)
+
+    with temporary_dir() as root:
+      root_path = Path(root)
+      root_path.joinpath('a1').write_text('jake jones')
+      root_path.joinpath('b').write_text('jane george')
+      hash3 = hash_dir(root_path)
+
+    self.assertNotEqual(hash1, hash3, "File names should be included in the hash.")
+
+    with temporary_dir() as root:
+      root_path = Path(root)
+      root_path.joinpath('a').write_text('jake jones')
+      root_path.joinpath('b').write_text('jane george')
+      root_path.joinpath("c").mkdir()
+      hash4 = hash_dir(root_path)
+
+    self.assertNotEqual(hash1, hash4, "Directory names should be included in the hash.")
+
+    with temporary_dir() as root:
+      root_path = Path(root)
+      root_path.joinpath('a').write_text('jake jones II')
+      root_path.joinpath('b').write_text('jane george')
+      hash5 = hash_dir(root_path)
+
+    self.assertNotEqual(hash1, hash5, "File content should be included in the hash.")
 
   def test_compute_shard(self):
     # Spot-check a couple of values, to make sure compute_shard doesn't do something
@@ -125,8 +178,14 @@ class CoercingJsonEncodingTest(unittest.TestCase):
     self.assertEqual(self._coercing_json_encode({2, 1, 3}), '[1, 2, 3]')
     self.assertEqual(self._coercing_json_encode({'b': 4, 'a': 3}), '{"a": 3, "b": 4}')
     self.assertEqual(self._coercing_json_encode([('b', 4), ('a', 3)]), '[["b", 4], ["a", 3]]')
-    self.assertEqual(self._coercing_json_encode([{'b': 4, 'a': 3}]),
-                     '[{"b": 4, "a": 3}]' if PY3 else '[{"a": 3, "b": 4}]')
+    self.assertEqual(self._coercing_json_encode([{'b': 4, 'a': 3}]), '[{"b": 4, "a": 3}]')
+
+  def test_enum(self) -> None:
+    class Test(Enum):
+      dog = 0
+      cat = 1
+      pig = 2
+    self.assertEqual(self._coercing_json_encode([Test.dog, Test.cat, Test.pig]), '[0, 1, 2]')
 
 
 class JsonHashingTest(unittest.TestCase):

@@ -1,16 +1,15 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
 from pants.backend.native.targets.native_artifact import NativeArtifact
 from pants.backend.native.tasks.cpp_compile import CppCompile
 from pants.backend.native.tasks.link_shared_libraries import LinkSharedLibraries
-from pants_test.backend.native.tasks.native_task_test_base import (NativeCompileTestMixin,
-                                                                   NativeTaskTestBase)
+from pants_test.backend.native.tasks.native_task_test_base import (
+  NativeCompileTestMixin,
+  NativeTaskTestBase,
+)
 
 
 class LinkSharedLibrariesTest(NativeTaskTestBase, NativeCompileTestMixin):

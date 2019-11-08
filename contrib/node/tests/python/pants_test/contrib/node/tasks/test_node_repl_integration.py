@@ -1,12 +1,9 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 from textwrap import dedent
 
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class NodeReplIntegrationTest(PantsRunIntegrationTest):
@@ -57,7 +54,7 @@ class NodeReplIntegrationTest(PantsRunIntegrationTest):
         var calc = new Calculator(0);
         calc.add(1);
         console.log('React: ' + reactElem + ', Calc + 1: ' + calc.number);
-      """).encode('utf-8')
+      """).encode()
     pants_run = self.run_pants(command=command, stdin_data=program)
 
     self.assert_success(pants_run)

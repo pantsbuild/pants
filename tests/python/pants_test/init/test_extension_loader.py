@@ -1,33 +1,39 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import sys
 import types
 import unittest
 import uuid
-from builtins import object
 from contextlib import contextmanager
+from dataclasses import dataclass
+from typing import Any
 
-from future.utils import PY2
-from pkg_resources import (Distribution, EmptyProvider, VersionConflict, WorkingSet, working_set,
-                           yield_lines)
+from pkg_resources import (
+  Distribution,
+  EmptyProvider,
+  VersionConflict,
+  WorkingSet,
+  working_set,
+  yield_lines,
+)
 
 from pants.base.exceptions import BuildConfigurationError
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
 from pants.engine.rules import RootRule, rule
-from pants.engine.selectors import Select
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar
-from pants.init.extension_loader import (PluginLoadOrderError, PluginNotFound, load_backend,
-                                         load_backends_and_plugins, load_plugins)
+from pants.init.extension_loader import (
+  PluginLoadOrderError,
+  PluginNotFound,
+  load_backend,
+  load_backends_and_plugins,
+  load_plugins,
+)
 from pants.subsystem.subsystem import Subsystem
 from pants.task.task import Task
-from pants.util.objects import datatype
 
 
 class MockMetadata(EmptyProvider):
@@ -84,25 +90,27 @@ class DummyTask(Task):
   def execute(self): return 42
 
 
-class RootType(datatype(['value'])):
-  pass
+@dataclass(frozen=True)
+class RootType:
+  value: Any
 
 
-class WrapperType(datatype(['value'])):
-  pass
+@dataclass(frozen=True)
+class WrapperType:
+  value: Any
 
 
-@rule(WrapperType, [Select(RootType)])
-def example_rule(root_type):
+@rule
+def example_rule(root_type: RootType) -> WrapperType:
   yield WrapperType(root_type.value)
 
 
-class PluginProduct(object):
+class PluginProduct:
   pass
 
 
-@rule(PluginProduct, [Select(RootType)])
-def example_plugin_rule(root_type):
+@rule
+def example_plugin_rule(root_type: RootType) -> PluginProduct:
   yield PluginProduct()
 
 
@@ -121,17 +129,13 @@ class LoaderTest(unittest.TestCase):
   def create_register(self, build_file_aliases=None, register_goals=None, global_subsystems=None,
                       rules=None, module_name='register'):
 
-    package_name = '__test_package_{0}'.format(uuid.uuid4().hex)
-    if PY2:
-      package_name = package_name.encode('utf-8')
+    package_name = f'__test_package_{uuid.uuid4().hex}'
     self.assertFalse(package_name in sys.modules)
 
     package_module = types.ModuleType(package_name)
     sys.modules[package_name] = package_module
     try:
-      register_module_fqn = '{0}.{1}'.format(package_name, module_name)
-      if PY2:
-        register_module_fqn = register_module_fqn.encode('utf-8')
+      register_module_fqn = f'{package_name}.{module_name}'
       register_module = types.ModuleType(register_module_fqn)
       setattr(package_module, module_name, register_module)
       sys.modules[register_module_fqn] = register_module
@@ -229,14 +233,10 @@ class LoaderTest(unittest.TestCase):
     :param callable rules: Optional callable for rules entry point
     """
 
-    plugin_pkg = 'demoplugin{0}'.format(uuid.uuid4().hex)
-    if PY2:
-      plugin_pkg = plugin_pkg.encode('utf-8')
+    plugin_pkg = f'demoplugin{uuid.uuid4().hex}'
     pkg = types.ModuleType(plugin_pkg)
     sys.modules[plugin_pkg] = pkg
-    module_name = '{0}.{1}'.format(plugin_pkg, 'demo')
-    if PY2:
-      module_name = module_name.encode('utf-8')
+    module_name = f'{plugin_pkg}.demo'
     plugin = types.ModuleType(module_name)
     setattr(pkg, 'demo', plugin)
     sys.modules[module_name] = plugin
@@ -246,19 +246,19 @@ class LoaderTest(unittest.TestCase):
 
     if reg is not None:
       setattr(plugin, 'foo', reg)
-      entry_lines.append('register_goals = {}:foo\n'.format(module_name))
+      entry_lines.append(f'register_goals = {module_name}:foo\n')
 
     if alias is not None:
       setattr(plugin, 'bar', alias)
-      entry_lines.append('build_file_aliases = {}:bar\n'.format(module_name))
+      entry_lines.append(f'build_file_aliases = {module_name}:bar\n')
 
     if after is not None:
       setattr(plugin, 'baz', after)
-      entry_lines.append('load_after = {}:baz\n'.format(module_name))
+      entry_lines.append(f'load_after = {module_name}:baz\n')
 
     if rules is not None:
       setattr(plugin, 'qux', rules)
-      entry_lines.append('rules = {}:qux\n'.format(module_name))
+      entry_lines.append(f'rules = {module_name}:qux\n')
 
     if entry_lines:
       entry_data = '[pantsbuild.plugin]\n{}\n'.format('\n'.join(entry_lines))

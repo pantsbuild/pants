@@ -1,16 +1,11 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import re
-from builtins import filter, map, object, str
 from collections import defaultdict, namedtuple
 from hashlib import sha1
 
 from colors import red
-from future.utils import PY3
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.exceptions import TaskError
@@ -19,9 +14,10 @@ from pants.build_graph.build_graph import CycleException, sort_targets
 from pants.task.console_task import ConsoleTask
 from pants.task.task import Task
 from pants.util.memo import memoized_property
+from pants.util.meta import classproperty
 
 
-class JvmPlatformAnalysisMixin(object):
+class JvmPlatformAnalysisMixin:
   """Mixin which provides common helper methods to JvmPlatformValidate and JvmPlatformExplain."""
 
   @classmethod
@@ -138,8 +134,8 @@ class JvmPlatformValidate(JvmPlatformAnalysisMixin, Task):
     def compute_fingerprint(self, target):
       hasher = sha1()
       if hasattr(target, 'platform'):
-        hasher.update(str(tuple(target.platform)).encode('utf-8'))
-      return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
+        hasher.update(str(tuple(target.platform)).encode())
+      return hasher.hexdigest()
 
     def __eq__(self, other):
       return type(self) == type(other)
@@ -158,7 +154,7 @@ class JvmPlatformValidate(JvmPlatformAnalysisMixin, Task):
 
   @classmethod
   def register_options(cls, register):
-    super(JvmPlatformValidate, cls).register_options(register)
+    super().register_options(register)
     register('--check', default='fatal', choices=['off', 'warn', 'fatal'], fingerprint=True,
              help='Check to make sure no jvm targets target an earlier jdk than their dependencies')
     register('--children-before-parents', type=bool,
@@ -167,7 +163,7 @@ class JvmPlatformValidate(JvmPlatformAnalysisMixin, Task):
                   'target -> dependees.')
 
   def __init__(self, *args, **kwargs):
-    super(JvmPlatformValidate, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self.check = self.get_options().check
     self.parents_before_children = not self.get_options().children_before_parents
 
@@ -269,9 +265,14 @@ class JvmPlatformExplain(JvmPlatformAnalysisMixin, ConsoleTask):
   Ranges = namedtuple('ranges', ['min_allowed_version', 'max_allowed_version',
                                  'target_dependencies', 'target_dependees'])
 
+  @classproperty
+  def _register_console_transitivity_option(cls):
+    """This class registers its own --transitive option, which acts differently."""
+    return False
+
   @classmethod
   def register_options(cls, register):
-    super(JvmPlatformExplain, cls).register_options(register)
+    super().register_options(register)
     register('--ranges', type=bool, default=True,
              help='For each target, list the minimum and maximum possible jvm target level, based '
                   'on its dependencies and dependees, respectively.')
@@ -289,13 +290,11 @@ class JvmPlatformExplain(JvmPlatformAnalysisMixin, ConsoleTask):
     register('--filter',
              help='Limit jvm platform possibility explanation to targets whose specs match this '
                   'regex pattern.')
-    # Note: We don't use the appropriate target_restriction_mixin, because --transitive
-    # here appears to mean something slightly different than what's implied by that mixin.
-    register('--transitive', type=bool,
+    register('--list-transitive-deps', type=bool,
              help='List transitive dependencies in analysis output.')
 
   def __init__(self, *args, **kwargs):
-    super(JvmPlatformExplain, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._explain_regex = (re.compile(self.get_options().filter) if self.get_options().filter
                            else None)
 
@@ -309,7 +308,7 @@ class JvmPlatformExplain(JvmPlatformAnalysisMixin, ConsoleTask):
 
   @memoized_property
   def dependency_map(self):
-    if not self.get_options().transitive:
+    if not self.get_options().list_transitive_deps:
       return self.jvm_dependency_map
     full_map = self._unfiltered_jvm_dependency_map(fully_transitive=True)
     return {target: deps for target, deps in full_map.items()

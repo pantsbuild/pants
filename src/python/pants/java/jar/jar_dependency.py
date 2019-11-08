@@ -1,13 +1,11 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
+import dataclasses
 import os
-from builtins import object
-
-from future.moves.urllib import parse
+from dataclasses import dataclass
+from typing import Optional, Sequence, Tuple
+from urllib import parse
 
 from pants.base.build_environment import get_buildroot
 from pants.base.hash_utils import stable_json_sha1
@@ -15,10 +13,10 @@ from pants.base.validation import assert_list
 from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency_utils import M2Coordinate
 from pants.util.memo import memoized_method, memoized_property
-from pants.util.objects import datatype
+from pants.util.meta import frozen_after_init
 
 
-class JarDependencyParseContextWrapper(object):
+class JarDependencyParseContextWrapper:
   """A pre-built Maven repository dependency.
 
   Examples:
@@ -70,9 +68,9 @@ class JarDependencyParseContextWrapper(object):
                          excludes, self._parse_context.rel_path)
 
 
-class JarDependency(datatype([
-  'org', 'base_name', 'rev', 'force', 'ext', 'url', 'apidocs',
-  'classifier', 'mutable', 'intransitive', 'excludes', 'base_path'])):
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class JarDependency:
   """A pre-built Maven repository dependency.
 
   This is the developer facing api, compared to the context wrapper class
@@ -86,6 +84,52 @@ class JarDependency(datatype([
 
   :API: public
   """
+  org: str
+  base_name: str
+  rev: Optional[str]
+  force: bool
+  ext: Optional[str]
+  url: Optional[str]
+  apidocs: Optional[str]
+  classifier: Optional[str]
+  mutable: bool
+  intransitive: bool
+  excludes: Tuple[Exclude, ...]
+  base_path: str
+
+  def __init__(
+    self,
+    org: str,
+    name: str,
+    rev: Optional[str] = None,
+    force: bool = False,
+    ext: Optional[str] = None,
+    url: Optional[str] = None,
+    apidocs: Optional[str] = None,
+    classifier: Optional[str] = None,
+    mutable: bool = False,
+    intransitive: bool = False,
+    excludes: Optional[Sequence[Exclude]] = None,
+    base_path: Optional[str] = None,
+  ) -> None:
+    self.org = org
+    self.base_name = name
+    self.rev = rev
+    self.force = force
+    self.ext = ext
+    self.url = url
+    self.apidocs = apidocs
+    self.classifier = classifier
+    self.mutable = mutable
+    self.intransitive = intransitive
+    self.excludes = JarDependency._prepare_excludes(excludes)
+    base_path = base_path or '.'
+    if os.path.isabs(base_path):
+      base_path = os.path.relpath(base_path, get_buildroot())
+    self.base_path = base_path
+
+  def __str__(self):
+    return 'JarDependency({})'.format(self.coordinate)
 
   @staticmethod
   def _prepare_excludes(excludes):
@@ -94,21 +138,6 @@ class JarDependency(datatype([
                              can_be_none=True,
                              key_arg='excludes',
                              allowable=(tuple, list,)))
-
-  def __new__(cls, org, name, rev=None, force=False, ext=None, url=None, apidocs=None,
-              classifier=None, mutable=None, intransitive=False, excludes=None, base_path=None):
-    """
-
-    :param string base_path: base path that's relative to the build root.
-    """
-    excludes = JarDependency._prepare_excludes(excludes)
-    base_path = base_path or '.'
-    if os.path.isabs(base_path):
-      base_path = os.path.relpath(base_path, get_buildroot())
-    return super(JarDependency, cls).__new__(
-        cls, org=org, base_name=name, rev=rev, force=force, ext=ext, url=url, apidocs=apidocs,
-        classifier=classifier, mutable=mutable, intransitive=intransitive, excludes=excludes,
-        base_path=base_path)
 
   @property
   def name(self):
@@ -135,17 +164,13 @@ class JarDependency(datatype([
   def copy(self, **replacements):
     """Returns a clone of this JarDependency with the given replacements kwargs overlaid."""
     cls = type(self)
-    kwargs = self._asdict()
-    for key, val in replacements.items():
-      if key == 'excludes':
-        val = JarDependency._prepare_excludes(val)
-      kwargs[key] = val
+    kwargs = dataclasses.asdict(self)
+    kwargs.update(replacements)
     org = kwargs.pop('org')
     base_name = kwargs.pop('base_name')
+    # NB: This calls __init__() so will set things up properly for us, such as calling
+    # _prepare_excludes.
     return cls(org, base_name, **kwargs)
-
-  def __str__(self):
-    return 'JarDependency({})'.format(self.coordinate)
 
   @memoized_property
   def coordinate(self):

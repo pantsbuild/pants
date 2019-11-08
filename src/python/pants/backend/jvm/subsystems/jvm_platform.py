@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import logging
-from builtins import object, str
 from functools import total_ordering
 
 from pants.base.exceptions import TaskError
@@ -55,17 +51,17 @@ class JvmPlatform(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(JvmPlatform, cls).register_options(register)
+    super().register_options(register)
     register('--platforms', advanced=True, type=dict, default={}, fingerprint=True,
              help='Compile settings that can be referred to by name in jvm_targets.')
     register('--default-platform', advanced=True, type=str, default=None, fingerprint=True,
              help='Name of the default platform to use if none are specified.')
-    register('--compiler', advanced=True, choices=cls._COMPILER_CHOICES, default='zinc', fingerprint=True,
+    register('--compiler', advanced=True, choices=cls._COMPILER_CHOICES, default='rsc', fingerprint=True,
              help='Java compiler implementation to use.')
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(JvmPlatform, cls).subsystem_dependencies() + (DistributionLocator,)
+    return super().subsystem_dependencies() + (DistributionLocator,)
 
   def _parse_platform(self, name, platform):
     return JvmPlatformSettings(platform.get('source', platform.get('target')),
@@ -99,7 +95,7 @@ class JvmPlatform(Subsystem):
 
   @property
   def _fallback_platform(self):
-    logger.warn('No default jvm platform is defined.')
+    logger.warning('No default jvm platform is defined.')
     source_level = JvmPlatform.parse_java_version(DistributionLocator.cached().version)
     target_level = source_level
     platform_name = '(DistributionLocator.cached().version {})'.format(source_level)
@@ -176,7 +172,7 @@ class JvmPlatform(Subsystem):
 
 
 @total_ordering
-class JvmPlatformSettings(object):
+class JvmPlatformSettings:
   """Simple information holder to keep track of common arguments to java compilers."""
 
   class IllegalSourceTargetCombination(TaskError):
@@ -222,7 +218,7 @@ class JvmPlatformSettings(object):
   def __eq__(self, other):
     return tuple(self) == tuple(other)
 
-  # TODO(python3port): decide if this should raise NotImplemented on invalid comparisons
+  # TODO(#6071): decide if this should raise NotImplemented on invalid comparisons
   def __lt__(self, other):
     return tuple(self) < tuple(other)
 

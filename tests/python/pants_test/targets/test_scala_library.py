@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from textwrap import dedent
 
@@ -12,7 +9,7 @@ from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.java.jar.jar_dependency import JarDependency
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 class ScalaLibraryTest(TestBase):
@@ -31,7 +28,7 @@ class ScalaLibraryTest(TestBase):
     )
 
   def setUp(self):
-    super(ScalaLibraryTest, self).setUp()
+    super().setUp()
     self.context(options={
       'scala': {
         'version': '2.11'

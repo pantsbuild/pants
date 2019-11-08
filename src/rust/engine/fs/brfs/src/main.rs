@@ -22,11 +22,7 @@
   clippy::too_many_arguments
 )]
 // Default isn't as big a deal as people seem to think it is.
-#![allow(
-  clippy::new_without_default,
-  clippy::new_without_default_derive,
-  clippy::new_ret_no_self
-)]
+#![allow(clippy::new_without_default, clippy::new_ret_no_self)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
@@ -35,10 +31,7 @@ use clap;
 use dirs;
 
 use errno;
-use fs;
 use fuse;
-
-use futures_timer;
 
 use libc;
 
@@ -46,7 +39,6 @@ use serverset;
 
 use time;
 
-use futures::future::Future;
 use hashing::{Digest, Fingerprint};
 use log::{debug, error, warn};
 use parking_lot::Mutex;
@@ -55,6 +47,8 @@ use std::collections::HashMap;
 use std::ffi::{CString, OsStr, OsString};
 use std::path::Path;
 use std::sync::Arc;
+use store::Store;
+use workunit_store::WorkUnitStore;
 
 const TTL: time::Timespec = time::Timespec { sec: 0, nsec: 0 };
 
@@ -130,7 +124,8 @@ enum Node {
 }
 
 struct BuildResultFS {
-  store: fs::Store,
+  runtime: task_executor::Executor,
+  store: Store,
   inode_digest_cache: HashMap<Inode, InodeDetails>,
   digest_inode_cache: HashMap<Digest, (Inode, Inode)>,
   directory_inode_cache: HashMap<Digest, Inode>,
@@ -138,8 +133,9 @@ struct BuildResultFS {
 }
 
 impl BuildResultFS {
-  pub fn new(store: fs::Store) -> BuildResultFS {
+  pub fn new(runtime: task_executor::Executor, store: Store) -> BuildResultFS {
     BuildResultFS {
+      runtime: runtime,
       store: store,
       inode_digest_cache: HashMap::new(),
       digest_inode_cache: HashMap::new(),
@@ -182,8 +178,12 @@ impl BuildResultFS {
           non_executable_inode
         }))
       }
-      Vacant(entry) => match self.store.load_file_bytes_with(digest, |_| ()).wait() {
-        Ok(Some(())) => {
+      Vacant(entry) => match self.runtime.block_on(self.store.load_file_bytes_with(
+        digest,
+        |_| (),
+        WorkUnitStore::new(),
+      )) {
+        Ok(Some(((), _metadata))) => {
           let executable_inode = self.next_inode;
           self.next_inode += 1;
           let non_executable_inode = self.next_inode;
@@ -220,7 +220,10 @@ impl BuildResultFS {
   pub fn inode_for_directory(&mut self, digest: Digest) -> Result<Option<Inode>, String> {
     match self.directory_inode_cache.entry(digest) {
       Occupied(entry) => Ok(Some(*entry.get())),
-      Vacant(entry) => match self.store.load_directory(digest).wait() {
+      Vacant(entry) => match self
+        .runtime
+        .block_on(self.store.load_directory(digest, WorkUnitStore::new()))
+      {
         Ok(Some(_)) => {
           // TODO: Kick off some background futures to pre-load the contents of this Directory into
           // an in-memory cache. Keep a background CPU pool driving those Futures.
@@ -309,10 +312,12 @@ impl BuildResultFS {
           entry_type: EntryType::Directory,
           ..
         }) => {
-          let maybe_directory = self.store.load_directory(digest).wait();
+          let maybe_directory = self
+            .runtime
+            .block_on(self.store.load_directory(digest, WorkUnitStore::new()));
 
           match maybe_directory {
-            Ok(Some(directory)) => {
+            Ok(Some((directory, _metadata))) => {
               let mut entries = vec![
                 ReaddirEntry {
                   inode: inode,
@@ -438,14 +443,17 @@ impl fuse::Filesystem for BuildResultFS {
           .and_then(|cache_entry| {
             let parent_digest = cache_entry.digest;
             self
-              .store
-              .load_directory(parent_digest)
-              .wait()
+              .runtime
+              .block_on(
+                self
+                  .store
+                  .load_directory(parent_digest, WorkUnitStore::new()),
+              )
               .map_err(|err| {
                 error!("Error reading directory {:?}: {}", parent_digest, err);
                 libc::EINVAL
               })?
-              .and_then(|directory| self.node_for_digest(&directory, filename))
+              .and_then(|(directory, _metadata)| self.node_for_digest(&directory, filename))
               .ok_or(libc::ENOENT)
           })
           .and_then(|node| match node {
@@ -528,13 +536,17 @@ impl fuse::Filesystem for BuildResultFS {
         // TODO: Read from a cache of Futures driven from a CPU pool, so we can merge in-flight
         // requests, rather than reading from the store directly here.
         let result: Result<(), ()> = self
-          .store
-          .load_file_bytes_with(digest, move |bytes| {
-            let begin = std::cmp::min(offset as usize, bytes.len());
-            let end = std::cmp::min(offset as usize + size as usize, bytes.len());
-            let mut reply = reply.lock();
-            reply.take().unwrap().data(&bytes.slice(begin, end));
-          })
+          .runtime
+          .block_on(self.store.load_file_bytes_with(
+            digest,
+            move |bytes| {
+              let begin = std::cmp::min(offset as usize, bytes.len());
+              let end = std::cmp::min(offset as usize + size as usize, bytes.len());
+              let mut reply = reply.lock();
+              reply.take().unwrap().data(&bytes.slice(begin, end));
+            },
+            WorkUnitStore::new(),
+          ))
           .map(|v| {
             if v.is_none() {
               let maybe_reply = reply2.lock().take();
@@ -550,8 +562,7 @@ impl fuse::Filesystem for BuildResultFS {
               reply.error(libc::EINVAL);
             }
             Ok(())
-          })
-          .wait();
+          });
         result.expect("Error from read future which should have been handled in the future ");
       }
       _ => reply.error(libc::ENOENT),
@@ -600,17 +611,18 @@ impl fuse::Filesystem for BuildResultFS {
 
 pub fn mount<'a, P: AsRef<Path>>(
   mount_path: P,
-  store: fs::Store,
+  store: Store,
+  runtime: task_executor::Executor,
 ) -> std::io::Result<fuse::BackgroundSession<'a>> {
   // TODO: Work out how to disable caching in the filesystem
   let options = ["-o", "ro", "-o", "fsname=brfs", "-o", "noapplexattr"]
     .iter()
-    .map(|o| o.as_ref())
+    .map(<&str>::as_ref)
     .collect::<Vec<&OsStr>>();
 
   debug!("About to spawn_mount with options {:?}", options);
 
-  let fs = unsafe { fuse::spawn_mount(BuildResultFS::new(store), &mount_path, &options) };
+  let fs = unsafe { fuse::spawn_mount(BuildResultFS::new(runtime, store), &mount_path, &options) };
   // fuse::spawn_mount doesn't always fully initialise the filesystem before returning.
   // Bluntly sleep for a bit here. If this poses a problem, we should maybe start doing some polling
   // stats or something until the filesystem seems to be correct.
@@ -686,15 +698,15 @@ fn main() {
   } else {
     None
   };
+  let runtime = task_executor::Executor::new();
 
-  let pool = Arc::new(fs::ResettablePool::new("brfs-".to_owned()));
   let store = match args.value_of("server-address") {
-    Some(address) => fs::Store::with_remote(
+    Some(address) => Store::with_remote(
+      runtime.clone(),
       &store_path,
-      pool,
-      &[address.to_owned()],
+      vec![address.to_owned()],
       args.value_of("remote-instance-name").map(str::to_owned),
-      &root_ca_certs,
+      root_ca_certs,
       oauth_bearer_token,
       1,
       4 * 1024 * 1024,
@@ -707,13 +719,13 @@ fn main() {
       )
       .expect("Error making BackoffConfig"),
       1,
-      futures_timer::TimerHandle::default(),
+      1,
     ),
-    None => fs::Store::local_only(&store_path, pool),
+    None => Store::local_only(runtime.clone(), &store_path),
   }
   .expect("Error making store");
 
-  let _fs = mount(mount_path, store).expect("Error mounting");
+  let _fs = mount(mount_path, store, runtime).expect("Error mounting");
   loop {
     std::thread::sleep(std::time::Duration::from_secs(1));
   }
@@ -736,315 +748,7 @@ fn unmount(mount_path: &str) -> i32 {
 }
 
 #[cfg(test)]
-mod test {
-  use tempfile;
-  use testutil;
+mod tests;
 
-  use super::mount;
-  use fs;
-  use futures::future::Future;
-  use hashing;
-  use std::sync::Arc;
-  use testutil::{
-    data::{TestData, TestDirectory},
-    file,
-  };
-
-  #[test]
-  fn missing_digest() {
-    let (store_dir, mount_dir) = make_dirs();
-
-    let store = fs::Store::local_only(
-      store_dir.path(),
-      Arc::new(fs::ResettablePool::new("test-pool-".to_string())),
-    )
-    .expect("Error creating local store");
-
-    let _fs = mount(mount_dir.path(), store).expect("Mounting");
-    assert!(!&mount_dir
-      .path()
-      .join("digest")
-      .join(digest_to_filepath(&TestData::roland().digest()))
-      .exists());
-  }
-
-  #[test]
-  fn read_file_by_digest() {
-    let (store_dir, mount_dir) = make_dirs();
-
-    let store = fs::Store::local_only(
-      store_dir.path(),
-      Arc::new(fs::ResettablePool::new("test-pool-".to_string())),
-    )
-    .expect("Error creating local store");
-
-    let test_bytes = TestData::roland();
-
-    store
-      .store_file_bytes(test_bytes.bytes(), false)
-      .wait()
-      .expect("Storing bytes");
-
-    let _fs = mount(mount_dir.path(), store).expect("Mounting");
-    let file_path = mount_dir
-      .path()
-      .join("digest")
-      .join(digest_to_filepath(&test_bytes.digest()));
-    assert_eq!(test_bytes.bytes(), file::contents(&file_path));
-    assert!(file::is_executable(&file_path));
-  }
-
-  #[test]
-  fn list_directory() {
-    let (store_dir, mount_dir) = make_dirs();
-
-    let store = fs::Store::local_only(
-      store_dir.path(),
-      Arc::new(fs::ResettablePool::new("test-pool-".to_string())),
-    )
-    .expect("Error creating local store");
-
-    let test_bytes = TestData::roland();
-    let test_directory = TestDirectory::containing_roland();
-
-    store
-      .store_file_bytes(test_bytes.bytes(), false)
-      .wait()
-      .expect("Storing bytes");
-    store
-      .record_directory(&test_directory.directory(), false)
-      .wait()
-      .expect("Storing directory");
-
-    let _fs = mount(mount_dir.path(), store).expect("Mounting");
-    let virtual_dir = mount_dir
-      .path()
-      .join("directory")
-      .join(digest_to_filepath(&test_directory.digest()));
-    assert_eq!(vec!["roland"], file::list_dir(&virtual_dir));
-  }
-
-  #[test]
-  fn read_file_from_directory() {
-    let (store_dir, mount_dir) = make_dirs();
-
-    let store = fs::Store::local_only(
-      store_dir.path(),
-      Arc::new(fs::ResettablePool::new("test-pool-".to_string())),
-    )
-    .expect("Error creating local store");
-
-    let test_bytes = TestData::roland();
-    let test_directory = TestDirectory::containing_roland();
-
-    store
-      .store_file_bytes(test_bytes.bytes(), false)
-      .wait()
-      .expect("Storing bytes");
-    store
-      .record_directory(&test_directory.directory(), false)
-      .wait()
-      .expect("Storing directory");
-
-    let _fs = mount(mount_dir.path(), store).expect("Mounting");
-    let roland = mount_dir
-      .path()
-      .join("directory")
-      .join(digest_to_filepath(&test_directory.digest()))
-      .join("roland");
-    assert_eq!(test_bytes.bytes(), file::contents(&roland));
-    assert!(!file::is_executable(&roland));
-  }
-
-  #[test]
-  fn list_recursive_directory() {
-    let (store_dir, mount_dir) = make_dirs();
-
-    let store = fs::Store::local_only(
-      store_dir.path(),
-      Arc::new(fs::ResettablePool::new("test-pool-".to_string())),
-    )
-    .expect("Error creating local store");
-
-    let test_bytes = TestData::roland();
-    let treat_bytes = TestData::catnip();
-    let test_directory = TestDirectory::containing_roland();
-    let recursive_directory = TestDirectory::recursive();
-
-    store
-      .store_file_bytes(test_bytes.bytes(), false)
-      .wait()
-      .expect("Storing bytes");
-    store
-      .store_file_bytes(treat_bytes.bytes(), false)
-      .wait()
-      .expect("Storing bytes");
-    store
-      .record_directory(&test_directory.directory(), false)
-      .wait()
-      .expect("Storing directory");
-    store
-      .record_directory(&recursive_directory.directory(), false)
-      .wait()
-      .expect("Storing directory");
-
-    let _fs = mount(mount_dir.path(), store).expect("Mounting");
-    let virtual_dir = mount_dir
-      .path()
-      .join("directory")
-      .join(digest_to_filepath(&recursive_directory.digest()));
-    assert_eq!(vec!["cats", "treats"], file::list_dir(&virtual_dir));
-    assert_eq!(vec!["roland"], file::list_dir(&virtual_dir.join("cats")));
-  }
-
-  #[test]
-  fn read_file_from_recursive_directory() {
-    let (store_dir, mount_dir) = make_dirs();
-
-    let store = fs::Store::local_only(
-      store_dir.path(),
-      Arc::new(fs::ResettablePool::new("test-pool-".to_string())),
-    )
-    .expect("Error creating local store");
-
-    let test_bytes = TestData::roland();
-    let treat_bytes = TestData::catnip();
-    let test_directory = TestDirectory::containing_roland();
-    let recursive_directory = TestDirectory::recursive();
-
-    store
-      .store_file_bytes(test_bytes.bytes(), false)
-      .wait()
-      .expect("Storing bytes");
-    store
-      .store_file_bytes(treat_bytes.bytes(), false)
-      .wait()
-      .expect("Storing bytes");
-    store
-      .record_directory(&test_directory.directory(), false)
-      .wait()
-      .expect("Storing directory");
-    store
-      .record_directory(&recursive_directory.directory(), false)
-      .wait()
-      .expect("Storing directory");
-
-    let _fs = mount(mount_dir.path(), store).expect("Mounting");
-    let virtual_dir = mount_dir
-      .path()
-      .join("directory")
-      .join(digest_to_filepath(&recursive_directory.digest()));
-    let treats = virtual_dir.join("treats");
-    assert_eq!(treat_bytes.bytes(), file::contents(&treats));
-    assert!(!file::is_executable(&treats));
-
-    let roland = virtual_dir.join("cats").join("roland");
-    assert_eq!(test_bytes.bytes(), file::contents(&roland));
-    assert!(!file::is_executable(&roland));
-  }
-
-  #[test]
-  fn files_are_correctly_executable() {
-    let (store_dir, mount_dir) = make_dirs();
-
-    let store = fs::Store::local_only(
-      store_dir.path(),
-      Arc::new(fs::ResettablePool::new("test-pool-".to_string())),
-    )
-    .expect("Error creating local store");
-
-    let treat_bytes = TestData::catnip();
-    let directory = TestDirectory::with_mixed_executable_files();
-
-    store
-      .store_file_bytes(treat_bytes.bytes(), false)
-      .wait()
-      .expect("Storing bytes");
-    store
-      .record_directory(&directory.directory(), false)
-      .wait()
-      .expect("Storing directory");
-
-    let _fs = mount(mount_dir.path(), store).expect("Mounting");
-    let virtual_dir = mount_dir
-      .path()
-      .join("directory")
-      .join(digest_to_filepath(&directory.digest()));
-    assert_eq!(vec!["feed", "food"], file::list_dir(&virtual_dir));
-    assert!(file::is_executable(&virtual_dir.join("feed")));
-    assert!(!file::is_executable(&virtual_dir.join("food")));
-  }
-
-  pub fn digest_to_filepath(digest: &hashing::Digest) -> String {
-    format!("{}-{}", digest.0, digest.1)
-  }
-
-  pub fn make_dirs() -> (tempfile::TempDir, tempfile::TempDir) {
-    let store_dir = tempfile::Builder::new().prefix("store").tempdir().unwrap();
-    let mount_dir = tempfile::Builder::new().prefix("mount").tempdir().unwrap();
-    (store_dir, mount_dir)
-  }
-}
-
-// TODO: Write a bunch more syscall-y tests to test that each syscall for each file/directory type
-// acts as we expect.
 #[cfg(test)]
-mod syscall_tests {
-  use super::mount;
-  use super::test::digest_to_filepath;
-  use crate::test::make_dirs;
-  use fs;
-  use futures::Future;
-  use libc;
-  use std::ffi::CString;
-  use std::path::Path;
-  use std::sync::Arc;
-  use testutil::data::TestData;
-
-  #[test]
-  fn read_file_by_digest_exact_bytes() {
-    let (store_dir, mount_dir) = make_dirs();
-
-    let store = fs::Store::local_only(
-      store_dir.path(),
-      Arc::new(fs::ResettablePool::new("test-pool-".to_string())),
-    )
-    .expect("Error creating local store");
-
-    let test_bytes = TestData::roland();
-
-    store
-      .store_file_bytes(test_bytes.bytes(), false)
-      .wait()
-      .expect("Storing bytes");
-
-    let _fs = mount(mount_dir.path(), store).expect("Mounting");
-
-    let path = mount_dir
-      .path()
-      .join("digest")
-      .join(digest_to_filepath(&test_bytes.digest()));
-
-    let mut buf = make_buffer(test_bytes.len());
-
-    unsafe {
-      let fd = libc::open(path_to_cstring(&path).as_ptr(), 0);
-      assert!(fd > 0, "Bad fd {}", fd);
-      let read_bytes = libc::read(fd, buf.as_mut_ptr() as *mut libc::c_void, buf.len());
-      assert_eq!(test_bytes.len() as isize, read_bytes);
-      assert_eq!(0, libc::close(fd));
-    }
-
-    assert_eq!(test_bytes.string(), String::from_utf8(buf).unwrap());
-  }
-
-  fn path_to_cstring(path: &Path) -> CString {
-    CString::new(path.to_string_lossy().as_bytes().to_owned()).unwrap()
-  }
-
-  fn make_buffer(size: usize) -> Vec<u8> {
-    let mut buf: Vec<u8> = Vec::new();
-    buf.resize(size, 0);
-    buf
-  }
-}
+mod syscall_tests;

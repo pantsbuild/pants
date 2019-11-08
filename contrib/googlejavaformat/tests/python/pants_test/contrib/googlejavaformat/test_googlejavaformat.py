@@ -1,17 +1,13 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from builtins import open
 from textwrap import dedent
 
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.exceptions import TaskError
 from pants.build_graph.register import build_file_aliases as register_core
-from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
+from pants.testutil.jvm.nailgun_task_test_base import NailgunTaskTestBase
 
 from pants.contrib.googlejavaformat.googlejavaformat import (GoogleJavaFormat,
                                                              GoogleJavaFormatCheckFormat)
@@ -40,7 +36,7 @@ class TestBase(NailgunTaskTestBase):
 
   @classmethod
   def alias_groups(cls):
-    return super(TestBase, cls).alias_groups().merge(
+    return super().alias_groups().merge(
       register_core().merge(register_jvm())
     )
 

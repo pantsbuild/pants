@@ -1,19 +1,16 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import os
 import shutil
 from contextlib import closing, contextmanager
+from urllib.parse import urlparse
 
 import requests
 from pants.fs.archive import archiver_for_path
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_dir, temporary_file
-from six.moves.urllib.parse import urlparse
 
 from pants.contrib.go.subsystems.fetch_error import FetchError
 
@@ -28,7 +25,7 @@ class ArchiveRetriever(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(ArchiveRetriever, cls).register_options(register)
+    super().register_options(register)
     register('--buffer-size', metavar='<bytes>', type=int, advanced=True,
              default=10 * 1024,  # 10KB in case jumbo frames are in play.
              help='The number of bytes of archive content to buffer in memory before flushing to '

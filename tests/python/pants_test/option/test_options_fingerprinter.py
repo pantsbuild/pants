@@ -1,25 +1,28 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import range, zip
 
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
-from pants.option.custom_types import (UnsetBool, dict_option, dir_option, file_option, list_option,
-                                       target_option)
+from pants.option.custom_types import (
+  UnsetBool,
+  dict_option,
+  dict_with_files_option,
+  dir_option,
+  file_option,
+  list_option,
+  target_option,
+)
 from pants.option.options_fingerprinter import OptionsFingerprinter
+from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir
-from pants_test.test_base import TestBase
 
 
 class OptionsFingerprinterTest(TestBase):
 
   def setUp(self):
-    super(OptionsFingerprinterTest, self).setUp()
+    super().setUp()
     self.options_fingerprinter = OptionsFingerprinter(self.context().build_graph)
 
   def test_fingerprint_dict(self):
@@ -128,3 +131,23 @@ class OptionsFingerprinterTest(TestBase):
     self.assertNotEqual(dp1, dp3)
     self.assertNotEqual(dp1, dp4)
     self.assertNotEqual(dp2, dp3)
+
+  def test_fingerprint_dict_with_files_order(self):
+    f1, f2 = (self.create_file(f, contents=c) for (f, c) in
+      (('foo/bar.config', 'blah blah blah'),
+      ('foo/bar.config', 'meow meow meow')))
+    fp1 = self.options_fingerprinter.fingerprint(dict_with_files_option, {'properties': f"{f1},{f2}"})
+    fp2 = self.options_fingerprinter.fingerprint(dict_with_files_option, {'properties': f"{f2},{f1}"})
+    self.assertEqual(fp1, fp2)
+
+  def test_fingerprint_dict_with_files_content_change(self):
+    f1, f2 = (self.create_file(f, contents=c) for (f, c) in
+      (('foo/bar.config', 'blah blah blah'),
+      ('foo/bar.config', 'meow meow meow')))
+
+    fp1 = self.options_fingerprinter.fingerprint(dict_with_files_option, {'properties': f"{f1},{f2}"})
+    with open(f1, 'w') as f:
+      f.write('123')
+
+    fp2 = self.options_fingerprinter.fingerprint(dict_with_files_option, {'properties': f"{f1},{f2}"})
+    self.assertNotEqual(fp1, fp2)

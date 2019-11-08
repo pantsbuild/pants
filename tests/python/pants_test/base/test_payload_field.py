@@ -1,19 +1,22 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from hashlib import sha1
 
 from pants.backend.python.python_requirement import PythonRequirement
-from pants.base.payload_field import (ExcludesField, FingerprintedField, FingerprintedMixin,
-                                      JarsField, PrimitiveField, PrimitivesSetField,
-                                      PythonRequirementsField)
+from pants.base.payload_field import (
+  ExcludesField,
+  FingerprintedField,
+  FingerprintedMixin,
+  JarsField,
+  PrimitiveField,
+  PrimitivesSetField,
+  PythonRequirementsField,
+)
 from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency import JarDependency
+from pants.testutil.test_base import TestBase
 from pants.util.strutil import ensure_binary
-from pants_test.test_base import TestBase
 
 
 class PayloadTest(TestBase):

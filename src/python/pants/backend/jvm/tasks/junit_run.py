@@ -1,17 +1,10 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import fnmatch
-import functools
 import itertools
 import os
-import shutil
 import sys
-from abc import abstractmethod
-from builtins import object, range, str
 from contextlib import contextmanager
 
 from twitter.common.collections import OrderedSet
@@ -29,103 +22,18 @@ from pants.backend.jvm.tasks.reports.junit_html_report import JUnitHtmlReport, N
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.base.workunit import WorkUnitLabel
-from pants.build_graph.files import Files
 from pants.build_graph.target import Target
 from pants.build_graph.target_scopes import Scopes
-from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.java.junit.junit_xml_parser import RegistryOfTests, Test, parse_failed_targets
 from pants.process.lock import OwnerPrintingInterProcessFileLock
 from pants.task.testrunner_task_mixin import PartitionedTestRunnerTaskMixin, TestResult
 from pants.util import desktop
 from pants.util.argutil import ensure_arg, remove_arg
-from pants.util.contextutil import environment_as, temporary_dir
-from pants.util.dirutil import safe_delete, safe_mkdir, safe_mkdir_for, safe_rmtree, safe_walk
+from pants.util.contextutil import environment_as
+from pants.util.dirutil import safe_delete, safe_mkdir, safe_rmtree, safe_walk
 from pants.util.memo import memoized_method
-from pants.util.meta import AbstractClass
 from pants.util.strutil import pluralize
-
-
-class _TestSpecification(AbstractClass):
-  """Models the string format used to specify which tests to run."""
-
-  @classmethod
-  def parse(cls, buildroot, test_spec):
-    """Parses a test specification string into an object that can yield corresponding tests.
-
-    Tests can be specified in one of four forms:
-
-    * [classname]
-    * [filename]
-    * [classname]#[methodname]
-    * [filename]#[methodname]
-
-    The first two forms target one or more individual tests contained within a class or file whereas
-    the final two forms specify an individual test method to execute.
-
-    :param string buildroot: The path of the current build root directory.
-    :param string test_spec: A test specification.
-    :returns: A test specification object.
-    :rtype: :class:`_TestSpecification`
-    """
-    components = test_spec.split('#', 2)
-    classname_or_sourcefile = components[0]
-    methodname = components[1] if len(components) == 2 else None
-
-    if os.path.exists(classname_or_sourcefile):
-      sourcefile = os.path.relpath(classname_or_sourcefile, buildroot)
-      return _SourcefileSpec(sourcefile=sourcefile, methodname=methodname)
-    else:
-      return _ClassnameSpec(classname=classname_or_sourcefile, methodname=methodname)
-
-  @abstractmethod
-  def iter_possible_tests(self, context):
-    """Return an iterator over the possible tests this test specification indicates.
-
-    NB: At least one test yielded by the returned iterator will correspond to an available test,
-    but other yielded tests may not exist.
-
-    :param context: The pants execution context.
-    :type context: :class:`pants.goal.context.Context`
-    :returns: An iterator over possible tests.
-    :rtype: iter of :class:`pants.java.junit.junit_xml_parser.Test`
-    """
-
-
-class _SourcefileSpec(_TestSpecification):
-  """Models a test specification in [sourcefile]#[methodname] format."""
-
-  def __init__(self, sourcefile, methodname):
-    self._sourcefile = sourcefile
-    self._methodname = methodname
-
-  def iter_possible_tests(self, context):
-    for classname in self._classnames_from_source_file(context):
-      # Tack the methodname onto all classes in the source file, as we
-      # can't know which method the user intended.
-      yield Test(classname=classname, methodname=self._methodname)
-
-  def _classnames_from_source_file(self, context):
-    source_products = context.products.get_data('classes_by_source').get(self._sourcefile)
-    if not source_products:
-      # It's valid - if questionable - to have a source file with no classes when, for
-      # example, the source file has all its code commented out.
-      context.log.warn('Source file {0} generated no classes'.format(self._sourcefile))
-    else:
-      for _, classes in source_products.rel_paths():
-        for cls in classes:
-          yield ClasspathUtil.classname_for_rel_classfile(cls)
-
-
-class _ClassnameSpec(_TestSpecification):
-  """Models a test specification in [classname]#[methodnme] format."""
-
-  def __init__(self, classname, methodname):
-    self._classname = classname
-    self._methodname = methodname
-
-  def iter_possible_tests(self, context):
-    yield Test(classname=self._classname, methodname=self._methodname)
 
 
 class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
@@ -135,19 +43,22 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
 
   @classmethod
   def implementation_version(cls):
-    return super(JUnitRun, cls).implementation_version() + [('JUnitRun', 3)]
+    return super().implementation_version() + [('JUnitRun', 3)]
 
   _BATCH_ALL = sys.maxsize
 
   @classmethod
   def register_options(cls, register):
-    super(JUnitRun, cls).register_options(register)
+    super().register_options(register)
 
     register('--batch-size', advanced=True, type=int, default=cls._BATCH_ALL, fingerprint=True,
              help='Run at most this many tests in a single test process.')
     register('--test', type=list, fingerprint=True,
-             help='Force running of just these tests.  Tests can be specified using any of: '
-                  '[classname], [classname]#[methodname], [filename] or [filename]#[methodname]')
+             help='Force running of just these tests. Tests can be specified using any of: '
+                  '[classname], [classname]#[methodname], [fully qualified classname], '
+                  '[fully qualified classname]#[methodname]. If classname is not fully qualified, '
+                  'all matching tests will be run. For example, if `foo.bar.TestClass` and '
+                  '`foo.baz.TestClass` exist and `TestClass` is supplied, then both will run.')
     register('--per-test-timer', type=bool, help='Show progress and timer for each test.')
     register('--default-concurrency', advanced=True, fingerprint=True,
              choices=JUnitTests.VALID_CONCURRENCY_OPTS, default=JUnitTests.CONCURRENCY_SERIAL,
@@ -181,6 +92,8 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
              help='Use experimental junit-runner logic for more options for parallelism.')
     register('--html-report', type=bool, fingerprint=True,
              help='If true, generate an html summary report of tests that were run.')
+    register('--html-report-error-on-conflict', type=bool, default=True,
+             help='If true, error when duplicate test cases are found in html results')
     register('--open', type=bool,
              help='Attempt to open the html summary report in a browser (implies --html-report)')
     register('--integrated-security-manager', type=bool, advanced=True, fingerprint=True,
@@ -213,33 +126,20 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(JUnitRun, cls).subsystem_dependencies() + (CodeCoverage, DistributionLocator, JUnit)
-
-  @classmethod
-  def request_classes_by_source(cls, test_specs):
-    """Returns true if the given test specs require the `classes_by_source` product to satisfy."""
-    buildroot = get_buildroot()
-    for test_spec in test_specs:
-      if isinstance(_TestSpecification.parse(buildroot, test_spec), _SourcefileSpec):
-        return True
-    return False
+    return super().subsystem_dependencies() + (CodeCoverage, JUnit)
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(JUnitRun, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
 
     # Compilation and resource preparation must have completed.
     round_manager.require_data('runtime_classpath')
-
-    # If the given test specs require the classes_by_source product, request it.
-    if cls.request_classes_by_source(options.test or ()):
-      round_manager.require_data('classes_by_source')
 
   class OptionError(TaskError):
     """Indicates an invalid combination of options for this task."""
 
   def __init__(self, *args, **kwargs):
-    super(JUnitRun, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
 
     options = self.get_options()
     self._tests_to_run = options.test
@@ -341,7 +241,7 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     return args
 
   def classpath(self, targets, classpath_product=None, **kwargs):
-    return super(JUnitRun, self).classpath(targets,
+    return super().classpath(targets,
                                            classpath_product=classpath_product,
                                            include_scopes=Scopes.JVM_TEST_SCOPES,
                                            **kwargs)
@@ -388,48 +288,16 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     test_registry = RegistryOfTests(tuple(self._calculate_tests_from_targets(targets)))
 
     if targets and self._tests_to_run:
-      # If there are some junit_test targets in the graph, find ones that match the requested
-      # test(s).
-      possible_test_to_target = {}
-      unknown_tests = []
-      for possible_test in self._get_possible_tests_to_run():
-        target = test_registry.get_owning_target(possible_test)
-        if target is None:
-          unknown_tests.append(possible_test)
-        else:
-          possible_test_to_target[possible_test] = target
-
+      matched_spec_to_target, unknown_tests = test_registry.match_test_spec(
+        self._get_possible_tests_to_run())
       if len(unknown_tests) > 0:
         raise TaskError("No target found for test specifier(s):\n\n  '{}'\n\nPlease change "
                         "specifier or bring in the proper target(s)."
                         .format("'\n  '".join(t.render_test_spec() for t in unknown_tests)))
 
-      return RegistryOfTests(possible_test_to_target)
+      return RegistryOfTests(matched_spec_to_target)
     else:
       return test_registry
-
-  @staticmethod
-  def _copy_files(dest_dir, target):
-    if isinstance(target, Files):
-      for source in target.sources_relative_to_buildroot():
-        src = os.path.join(get_buildroot(), source)
-        dest = os.path.join(dest_dir, source)
-        safe_mkdir_for(dest)
-        shutil.copy(src, dest)
-
-  @contextmanager
-  def _chroot(self, targets, workdir):
-    if workdir is not None:
-      yield workdir
-    else:
-      root_dir = os.path.join(self.workdir, '_chroots')
-      safe_mkdir(root_dir)
-      with temporary_dir(root_dir=root_dir) as chroot:
-        self.context.build_graph.walk_transitive_dependency_graph(
-          addresses=[t.address for t in targets],
-          work=functools.partial(self._copy_files, chroot)
-        )
-        yield chroot
 
   @property
   def _batched(self):
@@ -438,7 +306,7 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
   def run_tests(self, fail_fast, test_targets, output_dir, coverage):
     test_registry = self._collect_test_targets(test_targets)
     if test_registry.empty:
-      return TestResult.rc(0)
+      return TestResult.successful
 
     coverage.instrument(output_dir)
 
@@ -495,16 +363,17 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
 
       batch_test_specs = [test.render_test_spec() for test in batch]
       with argfile.safe_args(batch_test_specs, self.get_options()) as batch_tests:
-        with self._chroot(relevant_targets, workdir) as chroot:
+        with self.chroot(relevant_targets, workdir) as chroot:
           self.context.log.debug('CWD = {}'.format(chroot))
           self.context.log.debug('platform = {}'.format(platform))
           with environment_as(**dict(target_env_vars)):
-            subprocess_result = self._spawn_and_wait(
+            subprocess_result = self.spawn_and_wait(
+              relevant_targets,
               executor=SubprocessExecutor(distribution),
               distribution=distribution,
               classpath=complete_classpath,
               main=JUnit.RUNNER_MAIN,
-              jvm_options=self.jvm_options + extra_jvm_options + list(target_jvm_options),
+              jvm_options=self.jvm_options + list(platform.args) + extra_jvm_options + list(target_jvm_options),
               args=args + batch_tests,
               workunit_factory=self.context.new_workunit,
               workunit_name='run',
@@ -528,7 +397,7 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
           break
 
     if result == 0:
-      return TestResult.rc(0)
+      return TestResult.successful
 
     target_to_failed_test = parse_failed_targets(test_registry, output_dir, parse_error_handler)
 
@@ -565,8 +434,8 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       lambda tgt: tgt.concurrency,
       lambda tgt: tgt.threads)
 
-    # N.B. Python 3 does not allow comparisons between None and other types like str. Several
-    # of the properties, which act as dictionary keys, may have None values, whereras another
+    # NB: Python 3 does not allow comparisons between None and other types like str. Several
+    # of the properties, which act as dictionary keys, may have None values, whereas another
     # may have a non-None value for the same property, so comparison when sorting would fail.
     # We provide this custom key function to avoid such invalid comparisons, while still
     # allowing us to use None to represent non-present properties.
@@ -575,8 +444,8 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       return (
         workdir or '',
         platform,
-        extra_jvm_options or [],
-        extra_env_vars or {},
+        extra_jvm_options,  # Will always be a tuple.
+        extra_env_vars,  # Will always be a tuple.
         concurrency or "",
         threads or 0)
 
@@ -586,11 +455,29 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       for i in range(0, len(sorted_tests), stride):
         yield properties, sorted_tests[i:i + stride]
 
+  def _parse(self, test_spec_str):
+    """Parses a test specification string into an object that can yield corresponding tests.
+
+    Tests can be specified in one of four forms:
+
+    * [classname]
+    * [classname]#[methodname]
+    * [fully qualified classname]#[methodname]
+    * [fully qualified classname]#[methodname]
+
+    :param string test_spec: A test specification.
+    :returns: A Test object.
+    :rtype: :class:`Test`
+    """
+    components = test_spec_str.split('#', 2)
+    classname = components[0]
+    methodname = components[1] if len(components) == 2 else None
+
+    return Test(classname=classname, methodname=methodname)
+
   def _get_possible_tests_to_run(self):
-    buildroot = get_buildroot()
-    for test_spec in self._tests_to_run:
-      for test in _TestSpecification.parse(buildroot, test_spec).iter_possible_tests(self.context):
-        yield test
+    for test_spec_str in self._tests_to_run:
+      yield self._parse(test_spec_str)
 
   def _calculate_tests_from_targets(self, targets):
     """
@@ -646,7 +533,7 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
         _, error, _ = sys.exc_info()
         reports.generate(output_dir, exc=error)
 
-  class Reports(object):
+  class Reports:
     def __init__(self, junit_html_report, coverage):
       self._junit_html_report = junit_html_report
       self._coverage = coverage
@@ -681,7 +568,7 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       junit_html_report = JUnitHtmlReport.create(xml_dir=output_dir,
                                                  open_report=self.get_options().open,
                                                  logger=self.context.log,
-                                                 error_on_conflict=True)
+                                                 error_on_conflict=self.get_options().html_report_error_on_conflict)
     else:
       junit_html_report = NoJunitHtmlReport()
 

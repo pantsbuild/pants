@@ -1,15 +1,11 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import re
-from builtins import open
 
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import temporary_dir
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class IvyResolveIntegrationTest(PantsRunIntegrationTest):
@@ -21,7 +17,7 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
     config.update(
       {'resolver': {'resolver': 'ivy'}}
     )
-    return super(IvyResolveIntegrationTest, self).run_pants(
+    return super().run_pants(
       command,
       config,
       stdin_data,
@@ -38,7 +34,7 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
     config.update(
       {'resolver': {'resolver': 'ivy'}}
     )
-    return super(IvyResolveIntegrationTest, self).run_pants_with_workdir(
+    return super().run_pants_with_workdir(
       command,
       workdir,
       config,
@@ -73,7 +69,7 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants([
         'resolve',
         '--resolve-ivy-args=-blablabla',
-        'examples/src/scala::'
+        'examples/src/scala/org/pantsbuild/example/hello::'
     ])
     self.assert_failure(pants_run)
     self.assertIn('Unrecognized option: -blablabla', pants_run.stdout_data)

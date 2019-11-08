@@ -1,19 +1,14 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import logging
 import os
-from builtins import object, str
+import weakref
 from hashlib import sha1
 
-from six import string_types
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
 from pants.base.hash_utils import hash_all
@@ -26,15 +21,15 @@ from pants.build_graph.target_addressable import TargetAddressable
 from pants.build_graph.target_scopes import Scope
 from pants.fs.fs import safe_filename
 from pants.source.payload_fields import SourcesField
-from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetWithSpec
+from pants.source.wrapped_globs import FilesetWithSpec
 from pants.subsystem.subsystem import Subsystem
-from pants.util.memo import memoized_property
+from pants.util.memo import memoized_method, memoized_property
 
 
 logger = logging.getLogger(__name__)
 
 
-class AbstractTarget(object):
+class AbstractTarget:
 
   @classmethod
   def subsystems(cls):
@@ -101,31 +96,24 @@ class Target(AbstractTarget):
                     'in BUILD files that are not yet available in the current version of pants.')
 
     @classmethod
-    def check(cls, target, kwargs, payload):
+    def check(cls, target, kwargs):
       """
       :API: public
       """
-      cls.global_instance().check_unknown(target, kwargs, payload)
+      cls.global_instance().check_unknown(target, kwargs)
 
-    def check_unknown(self, target, kwargs, payload):
+    def check_unknown(self, target, kwargs):
       """
       :API: public
       """
       ignore_params = set((self.get_options().ignored or {}).get(target.type_alias, ()))
+      # The source argument is automatically promoted to the sources argument, and rules should
+      # always use the sources argument; don't error if people used source in their BUILD file.
+      # There doesn't appear to be an easy way to error if a Target subclass explicitly takes
+      # `source` as a named kwarg; it would be nice to error rather than silently swallow the value,
+      # if there were such a way.
+      ignore_params.add('source')
       unknown_args = {arg: value for arg, value in kwargs.items() if arg not in ignore_params}
-      if 'source' in unknown_args and 'sources' in payload.as_dict():
-        unknown_args.pop('source')
-      if 'sources' in unknown_args:
-        if 'sources' in payload.as_dict():
-          deprecated_conditional(
-            lambda: True,
-            '1.11.0.dev0',
-            ('The source argument is deprecated - it gets automatically promoted to sources.'
-             'Target {} should just use a sources argument. No BUILD files need changing. '
-             'The source argument will stop being populated -').format(target.type_alias),
-          )
-          unknown_args.pop('sources')
-          kwargs.pop('sources')
       ignored_args = {arg: value for arg, value in kwargs.items() if arg in ignore_params}
       if ignored_args:
         logger.debug('{target} ignoring the unimplemented arguments: {args}'
@@ -139,9 +127,32 @@ class Target(AbstractTarget):
           args=''.join('\n  {} = {}'.format(key, value) for key, value in unknown_args.items())
         ))
 
+  class TagAssignments(Subsystem):
+    """Tags to add to targets in addition to any defined in their BUILD files."""
+
+    options_scope = 'target-tag-assignments'
+
+    @classmethod
+    def register_options(cls, register):
+      register('--tag-targets-mappings', type=dict, default=None, fingerprint=True,
+               help='Dict with tag assignments for targets. Ex: { "tag1": ["path/to/target:foo"] }')
+
+    @classmethod
+    def tags_for(cls, target_address):
+      return cls.global_instance()._invert_tag_targets_mappings().get(target_address, [])
+
+    @memoized_method
+    def _invert_tag_targets_mappings(self):
+      result = {}
+      for tag, targets in (self.get_options().tag_targets_mappings or {}).items():
+        for target in targets:
+          target_tags = result.setdefault(Address.parse(target).spec, []) 
+          target_tags.append(tag)
+      return result
+
   @classmethod
   def subsystems(cls):
-    return super(Target, cls).subsystems() + (cls.Arguments,)
+    return super().subsystems() + (cls.Arguments, cls.TagAssignments)
 
   @classmethod
   def get_addressable_type(target_cls):
@@ -310,9 +321,9 @@ class Target(AbstractTarget):
     self.payload.freeze()
     self.name = name
     self.address = address
-    self._build_graph = build_graph
+    self._build_graph = weakref.proxy(build_graph)
     self._type_alias = type_alias
-    self._tags = set(tags or [])
+    self._tags = set(tags or []).union(self.TagAssignments.tags_for(address.spec))
     self.description = description
 
     self._cached_fingerprint_map = {}
@@ -322,7 +333,7 @@ class Target(AbstractTarget):
     self._cached_exports_addresses = None
     self._no_cache = no_cache
     if kwargs:
-      self.Arguments.check(self, kwargs, self.payload)
+      self.Arguments.check(self, kwargs)
 
   @property
   def scope(self):
@@ -359,7 +370,7 @@ class Target(AbstractTarget):
     """
     return self._tags
 
-  def assert_list(self, putative_list, expected_type=string_types, key_arg=None):
+  def assert_list(self, putative_list, expected_type=str, key_arg=None):
     """
     :API: public
     """
@@ -450,7 +461,7 @@ class Target(AbstractTarget):
 
       dep_hashes = sorted(list(dep_hash_iter()))
       for dep_hash in dep_hashes:
-        hasher.update(dep_hash.encode('utf-8'))
+        hasher.update(dep_hash.encode())
       target_hash = self.invalidation_hash(fingerprint_strategy)
       if target_hash is None and not dep_hashes:
         return None
@@ -851,13 +862,5 @@ class Target(AbstractTarget):
       key_arg_section = "'{}' to be ".format(key_arg) if key_arg else ""
       raise TargetDefinitionException(self, "Expected {}a glob, an address or a list, but was {}"
                                             .format(key_arg_section, type(sources)))
-    elif not isinstance(sources, EagerFilesetWithSpec):
-      deprecated_conditional(
-        lambda: True,
-        '1.12.0.dev0',
-        ('FilesetWithSpec sources values are deprecated except for EagerFilesetWithSpec values. '
-         'Saw value of type {}').format(type(sources))
-      )
-
 
     return SourcesField(sources=sources)

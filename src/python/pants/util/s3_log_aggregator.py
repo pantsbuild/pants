@@ -1,18 +1,14 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import sys
-from builtins import object, open
 from collections import defaultdict
 
 from s3logparse.s3logparse import parse_log_lines
 
 
-class Measure(object):
+class Measure:
   def __init__(self, init_count=0, init_bytes=0):
     self.count = init_count
     self.bytes = init_bytes
@@ -26,7 +22,7 @@ class Measure(object):
     return self
 
 
-class S3LogAccumulator(object):
+class S3LogAccumulator:
   """Aggregates total downloaded bytes per file from S3 logs.
 
   Helps us track which binaries our S3 bandwidth costs are being spent on.
@@ -92,9 +88,9 @@ class S3LogAccumulator(object):
   def _prettyprint_bytes(x):
     for unit in ['B', 'KB', 'MB', 'GB']:
       if abs(x) < 1024.0:
-        return '{:3.1f}{}'.format(x, unit)
+        return f'{x:3.1f}{unit}'
       x /= 1024.0
-    return '{:.1f}TB'.format(x)
+    return f'{x:.1f}TB'
 
 
 

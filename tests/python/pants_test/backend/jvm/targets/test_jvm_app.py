@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import str
 from textwrap import dedent
 
 from pants.backend.jvm.targets.jvm_app import JvmApp
@@ -15,7 +11,7 @@ from pants.base.parse_context import ParseContext
 from pants.build_graph.address import Address
 from pants.build_graph.app_base import Bundle, DirectoryReMapper
 from pants.source.wrapped_globs import Globs
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 def _bundle(rel_path):

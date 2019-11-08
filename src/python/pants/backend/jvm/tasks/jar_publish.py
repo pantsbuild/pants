@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import functools
 import getpass
@@ -11,11 +8,9 @@ import os
 import pkgutil
 import shutil
 import sys
-from builtins import input, next, object, open, str
-from collections import defaultdict, namedtuple
+from collections import OrderedDict, defaultdict, namedtuple
 from copy import copy
 
-from future.utils import PY3
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.ossrh_publication_metadata import OSSRHPublicationMetadata
@@ -36,7 +31,6 @@ from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy import Ivy
 from pants.task.scm_publish_mixin import Namedver, ScmPublishMixin, Semver
 from pants.task.target_restriction_mixins import HasTransitiveOptionMixin, TransitiveOptionRegistrar
-from pants.util.collections_abc_backport import OrderedDict
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
 from pants.util.strutil import ensure_text
 
@@ -44,7 +38,7 @@ from pants.util.strutil import ensure_text
 _TEMPLATES_RELPATH = os.path.join('templates', 'jar_publish')
 
 
-class PushDb(object):
+class PushDb:
 
   @staticmethod
   def load(path):
@@ -53,7 +47,7 @@ class PushDb(object):
       properties = Properties.load(props)
       return PushDb(properties)
 
-  class Entry(object):
+  class Entry:
 
     def __init__(self, sem_ver, named_ver, named_is_latest, sha, fingerprint):
       """Records the most recent push/release of an artifact.
@@ -147,7 +141,7 @@ class PushDb(object):
       Properties.dump(self._props, props)
 
 
-class PomWriter(object):
+class PomWriter:
   def __init__(self, get_db, tag):
     self._get_db = get_db
     self._tag = tag
@@ -170,7 +164,7 @@ class PomWriter(object):
       target_jar = target_jar.extend(dependencies=list(dependencies.values()))
 
     template_relpath = os.path.join(_TEMPLATES_RELPATH, 'pom.xml.mustache')
-    template_text = pkgutil.get_data(__name__, template_relpath).decode('utf-8')
+    template_text = pkgutil.get_data(__name__, template_relpath).decode()
     generator = Generator(template_text, project=target_jar)
     with safe_open(path, 'w') as output:
       generator.write(output)
@@ -302,7 +296,7 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
 
   @classmethod
   def register_options(cls, register):
-    super(JarPublish, cls).register_options(register)
+    super().register_options(register)
 
     # TODO(John Sirois): Support a preview mode that outputs a file with entries like:
     # artifact id:
@@ -358,7 +352,7 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(JarPublish, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require('jars')
     round_manager.require('javadoc')
     round_manager.require('scaladoc')
@@ -368,7 +362,7 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
     return isinstance(target, ExportableJvmLibrary) and target.provides
 
   def __init__(self, *args, **kwargs):
-    super(JarPublish, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self.cachedir = os.path.join(self.workdir, 'cache')
 
     self._jvm_options = self.get_options().jvm_options
@@ -751,8 +745,7 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
                   coordinate(jar.org, jar.name), oldentry.version(), oldentry.sha, changelog)
               # The stdout encoding can be detected as None when running without a tty (common in
               # tests), in which case we want to force encoding with a unicode-supporting codec.
-              # In Py3, sys.stdout is a unicode stream.
-              sys.stdout.write(message) if PY3 else sys.stdout.write(message.encode('utf-8'))
+              sys.stdout.write(message)
           if not self.confirm_push(coordinate(jar.org, jar.name), newentry.version()):
             raise TaskError('User aborted push')
 
@@ -877,25 +870,25 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
 
   def entry_fingerprint(self, target, fingerprint_internal):
     sha = hashlib.sha1()
-    sha.update(target.invalidation_hash().encode('utf-8'))
+    sha.update(target.invalidation_hash().encode())
 
     # TODO(Tejal Desai): pantsbuild/pants/65: Remove java_sources attribute for ScalaLibrary
     if isinstance(target, ScalaLibrary):
       for java_source in sorted(target.java_sources):
-        sha.update(java_source.invalidation_hash().encode('utf-8'))
+        sha.update(java_source.invalidation_hash().encode())
 
     # TODO(John Sirois): handle resources
 
     for jarsig in sorted([jar_coordinate(j) for j in target.jar_dependencies if j.rev]):
-      sha.update(jarsig.encode('utf-8'))
+      sha.update(jarsig.encode())
 
     # TODO(tdesai) Handle resource type in get_db.
     internal_dependencies = sorted(target_internal_dependencies(target), key=lambda t: t.id)
     for internal_target in internal_dependencies:
       fingerprint = fingerprint_internal(internal_target)
-      sha.update(fingerprint.encode('utf-8'))
+      sha.update(fingerprint.encode())
 
-    return sha.hexdigest() if PY3 else sha.hexdigest().decode('utf-8')
+    return sha.hexdigest()
 
   def changelog(self, target, sha):
     # Filter synthetic files.
@@ -914,7 +907,7 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
 
   def generate_ivysettings(self, ivy, publishedjars, publish_local=None):
     template_relpath = os.path.join(_TEMPLATES_RELPATH, 'ivysettings.xml.mustache')
-    template_text = pkgutil.get_data(__name__, template_relpath).decode('utf-8')
+    template_text = pkgutil.get_data(__name__, template_relpath).decode()
 
     published = [TemplateData(org=jar.org, name=jar.name) for jar in publishedjars]
 
@@ -931,7 +924,7 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
 
   def generate_ivy(self, jar, version, publications):
     template_relpath = os.path.join(_TEMPLATES_RELPATH, 'ivy.xml.mustache')
-    template_text = pkgutil.get_data(__name__, template_relpath).decode('utf-8')
+    template_text = pkgutil.get_data(__name__, template_relpath).decode()
 
     pubs = [TemplateData(name=None if p.name == jar.name else p.name,
                          classifier=p.classifier,

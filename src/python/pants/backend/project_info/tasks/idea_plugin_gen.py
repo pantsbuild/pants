@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import json
 import logging
@@ -10,7 +7,7 @@ import os
 import pkgutil
 import re
 import shutil
-from builtins import open
+import subprocess
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.python.targets.python_target import PythonTarget
@@ -21,7 +18,6 @@ from pants.task.console_task import ConsoleTask
 from pants.util import desktop
 from pants.util.contextutil import temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir
-from pants.util.process_handler import subprocess
 
 
 _TEMPLATE_BASEDIR = 'templates/idea'
@@ -58,7 +54,7 @@ class IdeaPluginGen(ConsoleTask):
 
   @classmethod
   def register_options(cls, register):
-    super(IdeaPluginGen, cls).register_options(register)
+    super().register_options(register)
     # TODO: https://github.com/pantsbuild/pants/issues/3198
     # scala/java-language level should use what Pants already knows.
     register('--open', type=bool, default=True,
@@ -79,7 +75,7 @@ class IdeaPluginGen(ConsoleTask):
              help='Sets the java language and jdk used to compile the project\'s java sources.')
 
   def __init__(self, *args, **kwargs):
-    super(IdeaPluginGen, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
 
     self.open = self.get_options().open
 
@@ -110,8 +106,9 @@ class IdeaPluginGen(ConsoleTask):
 
   @classmethod
   def get_project_name(cls, target_specs):
+    escaped_name = re.sub('[^0-9a-zA-Z:_]+', '.', '__'.join(target_specs))
     # take up to PROJECT_NAME_LIMIT chars as project file name due to filesystem constraint.
-    return re.sub('[^0-9a-zA-Z:_]+', '.', '__'.join(target_specs))[:cls.PROJECT_NAME_LIMIT]
+    return escaped_name[:cls.PROJECT_NAME_LIMIT]
 
   # TODO: https://github.com/pantsbuild/pants/issues/3198
   def generate_project(self):
@@ -123,7 +120,7 @@ class IdeaPluginGen(ConsoleTask):
     configured_project = TemplateData(
       root_dir=get_buildroot(),
       outdir=outdir,
-      git_root=scm.worktree,
+      git_root=scm.worktree if scm else None,
       java=TemplateData(
         encoding=self.java_encoding,
         jdk=self.java_jdk,
@@ -131,9 +128,6 @@ class IdeaPluginGen(ConsoleTask):
       ),
       debug_port=self.get_options().debug_port,
     )
-
-    if not self.context.options.target_specs:
-      raise TaskError("No targets specified.")
 
     abs_target_specs = [os.path.join(get_buildroot(), spec) for spec in self.context.options.target_specs]
     configured_workspace = TemplateData(
@@ -148,13 +142,11 @@ class IdeaPluginGen(ConsoleTask):
 
     def gen_file(template_file_name, **mustache_kwargs):
       return self._generate_to_tempfile(
-        Generator(pkgutil.get_data(__name__, template_file_name).decode('utf-8'), **mustache_kwargs)
+        Generator(pkgutil.get_data(__name__, template_file_name).decode(), **mustache_kwargs)
       )
 
     ipr = gen_file(self.project_template, project=configured_project)
     iws = gen_file(self.workspace_template, workspace=configured_workspace)
-
-    self._outstream.write(self.gen_project_workdir.encode('utf-8'))
 
     shutil.move(ipr, self.project_filename)
     shutil.move(iws, self.workspace_filename)
@@ -167,7 +159,10 @@ class IdeaPluginGen(ConsoleTask):
       generator.write(output)
       return output.name
 
-  def execute(self):
+  def console_output(self, _targets):
+    if not self.context.options.target_specs:
+      raise TaskError("No targets specified.")
+
     # Heuristics to guess whether user tries to load a python project,
     # in which case intellij project sdk has to be set up manually.
     jvm_target_num = len([x for x in self.context.target_roots if isinstance(x, JvmTarget)])
@@ -177,6 +172,8 @@ class IdeaPluginGen(ConsoleTask):
                    'select the proper python interpreter as Project SDK in IntelliJ.')
 
     ide_file = self.generate_project()
+    yield self.gen_project_workdir
+
     if ide_file and self.get_options().open:
       open_with = self.get_options().open_with
       if open_with:

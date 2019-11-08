@@ -1,16 +1,15 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from textwrap import dedent
 
 from pants.backend.native.targets.native_library import CLibrary
 from pants.backend.native.tasks.c_compile import CCompile
 from pants.backend.native.tasks.native_compile import ObjectFiles
-from pants_test.backend.native.tasks.native_task_test_base import (NativeCompileTestMixin,
-                                                                   NativeTaskTestBase)
+from pants_test.backend.native.tasks.native_task_test_base import (
+  NativeCompileTestMixin,
+  NativeTaskTestBase,
+)
 
 
 class CCompileTest(NativeTaskTestBase, NativeCompileTestMixin):

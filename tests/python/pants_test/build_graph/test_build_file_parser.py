@@ -1,15 +1,9 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import str
 from collections import namedtuple
 from textwrap import dedent
-
-from future.utils import PY3
 
 from pants.base.build_file import BuildFile
 from pants.base.file_system_project_tree import FileSystemProjectTree
@@ -17,7 +11,7 @@ from pants.build_graph.address import BuildFileAddress
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.build_file_parser import BuildFileParser
 from pants.build_graph.target import Target
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 class ErrorTarget(Target):
@@ -25,8 +19,13 @@ class ErrorTarget(Target):
     assert False, "This fake target should never be initialized in this test!"
 
 
-class BuildFileParserBasicsTest(TestBase):
+class TestWithBuildFileParser(TestBase):
+  def setUp(self):
+    super().setUp()
+    self.build_file_parser = BuildFileParser(self._build_configuration, self.build_root)
 
+
+class BuildFileParserBasicsTest(TestWithBuildFileParser):
   @classmethod
   def alias_groups(cls):
     return BuildFileAliases(targets={'jvm_binary': ErrorTarget,
@@ -99,7 +98,7 @@ class BuildFileParserBasicsTest(TestBase):
       """
     ))
     build_file = self.create_buildfile('BUILD')
-    self.assert_parser_error(build_file, 'invalid character' if PY3 else 'invalid syntax')
+    self.assert_parser_error(build_file, 'invalid character')
 
   def test_unicode_string_in_build_file(self):
     """Demonstrates that a string containing unicode should work in a BUILD file."""
@@ -115,7 +114,7 @@ class BuildFileParserBasicsTest(TestBase):
     self.build_file_parser.parse_build_file(build_file)
 
 
-class BuildFileParserTargetTest(TestBase):
+class BuildFileParserTargetTest(TestWithBuildFileParser):
   @classmethod
   def alias_groups(cls):
     return BuildFileAliases(targets={'fake': ErrorTarget})
@@ -205,8 +204,7 @@ class BuildFileParserTargetTest(TestBase):
         BuildFile.get_build_files_family(FileSystemProjectTree(self.build_root), '.'))
 
 
-class BuildFileParserExposedObjectTest(TestBase):
-
+class BuildFileParserExposedObjectTest(TestWithBuildFileParser):
   @classmethod
   def alias_groups(cls):
     return BuildFileAliases(objects={'fake_object': object()})
@@ -218,7 +216,7 @@ class BuildFileParserExposedObjectTest(TestBase):
     self.assertEqual(len(address_map), 0)
 
 
-class BuildFileParserExposedContextAwareObjectFactoryTest(TestBase):
+class BuildFileParserExposedContextAwareObjectFactoryTest(TestWithBuildFileParser):
 
   Jar = namedtuple('Jar', ['org', 'name', 'rev'])
   Repository = namedtuple('Repository', ['name', 'url', 'push_db_basedir'])

@@ -48,6 +48,7 @@ A target definition in a `BUILD` file looks something like
         ':base'
       ],
       sources=globs('*.java', exclude=[['Base.java']]),
+      tags={'common'},
     )
 
 ### type
@@ -103,6 +104,28 @@ the example target above.
 You can also recursively glob over files in all subdirectories of the BUILD file's directory: `sources=rglobs('*.java')`.
 However this is discouraged as it tends to lead to coarse-grained dependencies, and Pants's
 advantages come into play when you have many fine-grained dependencies.
+
+### tags
+
+Tags are a set of strings used to describe or categorize targets. They can be inspected during a build to allow for features such as filtering task targets (ex. skip linting targets with a particular tag) or focused testing (ex. running only unit tests by excluding targets with a `integration` tag).
+
+Tags can be configured for targets in three ways:
+- Directly in the `BUILD` file (`tags={'common'}` in the example above)
+- In `pants.ini`:
+
+```ini
+[target-tag-assignments]
+tag_targets_mappings: {
+    'tag1': ['path/to/target:', 'path/to/another/target:bar'],
+    'tag2': ['path/to/another/target:bar']
+  }
+```
+
+- In a `JSON` file, [[referenced from the `pants.ini` or command line|pants('src/docs:options')]], for example:
+
+```bash
+./pants list src/python/pants/base:exceptions --target-tag-assignments-tag-targets-mappings=@/path/to/target_tag_definitions.json
+```
 
 `BUILD.*` files
 ---------------

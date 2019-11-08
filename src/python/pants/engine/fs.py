@@ -1,44 +1,47 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-
-from future.utils import binary_type, text_type
+from dataclasses import dataclass
+from typing import Any, Iterable, Optional, Tuple
 
 from pants.engine.objects import Collection
 from pants.engine.rules import RootRule
 from pants.option.custom_types import GlobExpansionConjunction
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.util.dirutil import maybe_read_file, safe_delete, safe_file_dump
-from pants.util.objects import Exactly, datatype
+from pants.util.meta import frozen_after_init
 
 
-class FileContent(datatype([('path', text_type), ('content', binary_type)])):
+@dataclass(frozen=True)
+class FileContent:
   """The content of a file."""
+  path: str
+  content: bytes
+  is_executable: bool
 
   def __repr__(self):
-    return 'FileContent(path={}, content=(len:{}))'.format(self.path, len(self.content))
+    return 'FileContent(path={}, content=(len:{}), is_executable={})'.format(
+      self.path,
+      len(self.content),
+      self.is_executable,
+    )
 
-  def __str__(self):
-    return repr(self)
+
+class FilesContent(Collection[FileContent]):
+  pass
 
 
-class Path(datatype([('path', text_type), 'stat'])):
-  """A filesystem path, holding both its symbolic path name, and underlying canonical Stat.
-
-  Both values are relative to the ProjectTree's buildroot.
+class InputFilesContent(FilesContent):
+  """A newtype wrapper for FilesContent.
+  TODO(7710): This class is currently necessary because the engine
+  otherwise finds a cycle between FilesContent <=> DirectoryDigest.
   """
 
 
-class PathGlobs(datatype([
-    'include',
-    'exclude',
-    ('glob_match_error_behavior', GlobMatchErrorBehavior),
-    ('conjunction', GlobExpansionConjunction),
-])):
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class PathGlobs:
   """A wrapper around sets of filespecs to include and exclude.
 
   The syntax supported is roughly git's glob syntax.
@@ -46,25 +49,26 @@ class PathGlobs(datatype([
   NB: this object is interpreted from within Snapshot::lift_path_globs() -- that method will need to
   be aware of any changes to this object's definition.
   """
+  include: Tuple[str, ...]
+  exclude: Tuple[str, ...]
+  glob_match_error_behavior: GlobMatchErrorBehavior
+  conjunction: GlobExpansionConjunction
 
-  def __new__(cls, include, exclude=(), glob_match_error_behavior=None, conjunction=None):
-    """Given various file patterns create a PathGlobs object (without using filesystem operations).
-
-    :param include: A list of filespecs to include.
-    :param exclude: A list of filespecs to exclude.
-    :param glob_match_error_behavior: The value to pass to GlobMatchErrorBehavior.create()
-    :rtype: :class:`PathGlobs`
-    """
-    return super(PathGlobs, cls).__new__(
-      cls,
-      include=tuple(include),
-      exclude=tuple(exclude),
-      glob_match_error_behavior=GlobMatchErrorBehavior.create(glob_match_error_behavior,
-                                                              none_is_default=True),
-      conjunction=GlobExpansionConjunction.create(conjunction, none_is_default=True))
+  def __init__(
+    self,
+    include: Iterable[str],
+    exclude: Iterable[str] = (),
+    glob_match_error_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.ignore,
+    conjunction: GlobExpansionConjunction = GlobExpansionConjunction.any_match
+  ) -> None:
+    self.include = tuple(include)
+    self.exclude = tuple(exclude)
+    self.glob_match_error_behavior = glob_match_error_behavior
+    self.conjunction = conjunction
 
 
-class Digest(datatype([('fingerprint', text_type), ('serialized_bytes_length', int)])):
+@dataclass(frozen=True)
+class Digest:
   """A Digest is a content-digest fingerprint, and a length of underlying content.
 
   These are used both to reference digests of strings/bytes/content, and as an opaque handle to a
@@ -81,49 +85,39 @@ class Digest(datatype([('fingerprint', text_type), ('serialized_bytes_length', i
   relies on the latter existing. This can be resolved when ordering is removed from Snapshots. See
   https://github.com/pantsbuild/pants/issues/5802
   """
+  fingerprint: str
+  serialized_bytes_length: int
 
   @classmethod
-  def _path(cls, directory):
-    return '{}.digest'.format(directory.rstrip(os.sep))
+  def _path(cls, digested_path):
+    return '{}.digest'.format(digested_path.rstrip(os.sep))
 
   @classmethod
-  def clear(cls, directory):
-    """Clear any existing Digest file adjacent to the given directory."""
-    safe_delete(cls._path(directory))
+  def clear(cls, digested_path):
+    """Clear any existing Digest file adjacent to the given digested_path."""
+    safe_delete(cls._path(digested_path))
 
   @classmethod
-  def load(cls, directory):
-    """Load a Digest from a `.digest` file adjacent to the given directory.
+  def load(cls, digested_path):
+    """Load a Digest from a `.digest` file adjacent to the given digested_path.
 
     :return: A Digest, or None if the Digest did not exist.
     """
-    read_file = maybe_read_file(cls._path(directory), binary_mode=False)
+    read_file = maybe_read_file(cls._path(digested_path))
     if read_file:
       fingerprint, length = read_file.split(':')
       return Digest(fingerprint, int(length))
     else:
       return None
 
-  def dump(self, directory):
-    """Dump this Digest object adjacent to the given directory."""
+  def dump(self, digested_path):
+    """Dump this Digest object adjacent to the given digested_path."""
     payload = '{}:{}'.format(self.fingerprint, self.serialized_bytes_length)
-    safe_file_dump(self._path(directory), payload=payload, mode='w')
-
-  def __repr__(self):
-    return '''Digest(fingerprint={}, serialized_bytes_length={})'''.format(
-      self.fingerprint,
-      self.serialized_bytes_length
-    )
-
-  def __str__(self):
-    return repr(self)
+    safe_file_dump(self._path(digested_path), payload=payload)
 
 
-class PathGlobsAndRoot(datatype([
-    ('path_globs', PathGlobs),
-    ('root', text_type),
-    ('digest_hint', Exactly(Digest, type(None))),
-])):
+@dataclass(frozen=True)
+class PathGlobsAndRoot:
   """A set of PathGlobs to capture relative to some root (which may exist outside of the buildroot).
 
   If the `digest_hint` is set, it must be the Digest that we would expect to get if we were to
@@ -131,38 +125,80 @@ class PathGlobsAndRoot(datatype([
   operations in cases where the expected Digest is known, and the content for the Digest is already
   stored.
   """
+  path_globs: PathGlobs
+  root: str
+  digest_hint: Optional[Digest] = None
 
-  def __new__(cls, path_globs, root, digest_hint=None):
-    return super(PathGlobsAndRoot, cls).__new__(cls, path_globs, root, digest_hint)
 
-
-class Snapshot(datatype([('directory_digest', Digest), ('files', tuple), ('dirs', tuple)])):
+@dataclass(frozen=True)
+class Snapshot:
   """A Snapshot is a collection of file paths and dir paths fingerprinted by their names/content.
 
   Snapshots are used to make it easier to isolate process execution by fixing the contents
   of the files being operated on and easing their movement to and from isolated execution
   sandboxes.
   """
+  directory_digest: Digest
+  files: Tuple[str, ...]
+  dirs: Tuple[str, ...]
 
   @property
   def is_empty(self):
     return self == EMPTY_SNAPSHOT
 
 
-class MergedDirectories(datatype([('directories', tuple)])):
-  pass
+@dataclass(frozen=True)
+class DirectoriesToMerge:
+  directories: Tuple
 
 
-class DirectoryToMaterialize(datatype([('path', text_type), ('directory_digest', Digest)])):
+@dataclass(frozen=True)
+class DirectoryWithPrefixToStrip:
+  directory_digest: Digest
+  prefix: str
+
+
+@dataclass(frozen=True)
+class DirectoryWithPrefixToAdd:
+  directory_digest: Digest
+  prefix: str
+
+
+@dataclass(frozen=True)
+class DirectoryToMaterialize:
   """A request to materialize the contents of a directory digest at the provided path."""
+  path: str
+  directory_digest: Digest
+
+
+class DirectoriesToMaterialize(Collection[DirectoryToMaterialize]):
   pass
 
 
-class UrlToFetch(datatype([('url', text_type), ('digest', Digest)])):
+@dataclass(frozen=True)
+class MaterializeDirectoryResult:
+  """Result of materializing a directory, contains the full output paths."""
+  output_paths: Tuple[str, ...]
+
+
+class MaterializeDirectoriesResult(Collection[MaterializeDirectoryResult]):
   pass
 
 
-FilesContent = Collection.of(FileContent)
+@dataclass(frozen=True)
+class UrlToFetch:
+  url: str
+  digest: Digest
+
+
+@dataclass(frozen=True)
+class Workspace:
+  """Abstract handle for operations that touch the real local filesystem."""
+  _scheduler: Any
+
+  def materialize_directories(self, directories_to_materialize: Tuple[DirectoryToMaterialize, ...]) -> MaterializeDirectoriesResult:
+    result: MaterializeDirectoriesResult = self._scheduler.materialize_directories(directories_to_materialize)
+    return result
 
 
 # TODO: don't recreate this in python, get this from fs::EMPTY_DIGEST somehow.
@@ -170,7 +206,7 @@ _EMPTY_FINGERPRINT = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b78
 
 
 EMPTY_DIRECTORY_DIGEST = Digest(
-  fingerprint=text_type(_EMPTY_FINGERPRINT),
+  fingerprint=_EMPTY_FINGERPRINT,
   serialized_bytes_length=0
 )
 
@@ -184,8 +220,12 @@ EMPTY_SNAPSHOT = Snapshot(
 def create_fs_rules():
   """Creates rules that consume the intrinsic filesystem types."""
   return [
+    RootRule(Workspace),
+    RootRule(InputFilesContent),
     RootRule(Digest),
-    RootRule(MergedDirectories),
+    RootRule(DirectoriesToMerge),
     RootRule(PathGlobs),
+    RootRule(DirectoryWithPrefixToStrip),
+    RootRule(DirectoryWithPrefixToAdd),
     RootRule(UrlToFetch),
   ]

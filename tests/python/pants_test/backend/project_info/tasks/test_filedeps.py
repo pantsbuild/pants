@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 from textwrap import dedent
@@ -12,11 +9,11 @@ from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.project_info.tasks.filedeps import FileDeps
 from pants.build_graph.register import build_file_aliases as register_core
-from pants_test.task_test_base import ConsoleTaskTestBase
-from pants_test.test_base import TestGenerator
+from pants.testutil.task_test_base import ConsoleTaskTestBase
+from pants.testutil.test_base import AbstractTestGenerator
 
 
-class FileDepsTest(ConsoleTaskTestBase, TestGenerator):
+class FileDepsTest(ConsoleTaskTestBase, AbstractTestGenerator):
 
   @classmethod
   def alias_groups(cls):
@@ -30,10 +27,10 @@ class FileDepsTest(ConsoleTaskTestBase, TestGenerator):
     if kwargs['options']['absolute']:
       paths = [os.path.join(self.build_root, path) for path in paths]
 
-    super(FileDepsTest, self).assert_console_output(*paths, **kwargs)
+    super().assert_console_output(*paths, **kwargs)
 
   def setUp(self):
-    super(FileDepsTest, self).setUp()
+    super().setUp()
     self.context(options={
       'scala': {
         'runtime': ['tools:scala-library']

@@ -1,35 +1,55 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import copy
+import inspect
+import json
 import os
 import re
 import traceback
-from builtins import next, object, open
 from collections import defaultdict
+from dataclasses import dataclass
+from enum import Enum
+from typing import Any, Callable, Dict, Iterable
 
-import six
+import Levenshtein
+import yaml
 
-from pants.base.deprecated import validate_removal_semver, warn_or_error
-from pants.option.arg_splitter import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
+from pants.base.deprecated import validate_deprecation_semver, warn_or_error
 from pants.option.config import Config
-from pants.option.custom_types import (DictValueComponent, ListValueComponent, UnsetBool,
-                                       dict_option, dir_option, file_option, list_option,
-                                       target_option)
-from pants.option.errors import (BooleanOptionNameWithNo, FrozenRegistration, ImplicitValIsNone,
-                                 InvalidKwarg, InvalidKwargNonGlobalScope, InvalidMemberType,
-                                 MemberTypeNotAllowed, NoOptionNames, OptionAlreadyRegistered,
-                                 OptionNameDash, OptionNameDoubleDash, ParseError,
-                                 RecursiveSubsystemOption, Shadowing)
+from pants.option.custom_types import (
+  DictValueComponent,
+  ListValueComponent,
+  UnsetBool,
+  dict_option,
+  dir_option,
+  file_option,
+  list_option,
+  target_option,
+)
+from pants.option.errors import (
+  BooleanOptionNameWithNo,
+  FrozenRegistration,
+  ImplicitValIsNone,
+  InvalidKwarg,
+  InvalidKwargNonGlobalScope,
+  InvalidMemberType,
+  MemberTypeNotAllowed,
+  NoOptionNames,
+  OptionAlreadyRegistered,
+  OptionNameDash,
+  OptionNameDoubleDash,
+  ParseError,
+  RecursiveSubsystemOption,
+  Shadowing,
+)
 from pants.option.option_util import is_dict_option, is_list_option
 from pants.option.ranked_value import RankedValue
-from pants.option.scope import ScopeInfo
+from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
+from pants.util.meta import frozen_after_init
 
 
-class Parser(object):
+class Parser:
   """An argument parser in a hierarchy.
 
   Each node in the hierarchy is a 'scope': the root is the global scope, and the parent of
@@ -54,7 +74,7 @@ class Parser(object):
 
   @staticmethod
   def _ensure_bool(s):
-    if isinstance(s, six.string_types):
+    if isinstance(s, str):
       if s.lower() == 'true':
         return True
       elif s.lower() == 'false':
@@ -113,37 +133,84 @@ class Parser(object):
   def scope(self):
     return self._scope
 
+  @property
+  def known_args(self):
+    return self._known_args
+
   def walk(self, callback):
     """Invoke callback on this parser and its descendants, in depth-first order."""
     callback(self)
     for child in self._child_parsers:
       child.walk(callback)
 
-  def _create_flag_value_map(self, flags):
-    """Returns a map of flag -> list of values, based on the given flag strings.
+  @frozen_after_init
+  @dataclass(unsafe_hash=True)
+  class ParseArgsRequest:
+    flag_value_map: Dict
+    namespace: Any
+    get_all_scoped_flag_names: Callable[[], Iterable]
+    levenshtein_max_distance: int
 
-    None signals no value given (e.g., -x, --foo).
-    The value is a list because the user may specify the same flag multiple times, and that's
-    sometimes OK (e.g., when appending to list-valued options).
+    def __init__(
+      self,
+      flags_in_scope: Iterable[str],
+      namespace,
+      get_all_scoped_flag_names: Callable[[], Iterable],
+      levenshtein_max_distance: int
+    ) -> None:
+      """
+      :param flags_in_scope: Iterable of arg strings to parse into flag values.
+      :param namespace: The object to register the flag values on
+      :param get_all_scoped_flag_names: A 0-argument function which returns an iterable of
+                                        all registered option names in all their scopes. This
+                                        is used to create an error message with suggestions
+                                        when raising a `ParseError`.
+      :param levenshtein_max_distance: The maximum Levenshtein edit distance between option names
+                                       to determine similarly named options when an option name
+                                       hasn't been registered.
+      """
+      self.flag_value_map = self._create_flag_value_map(flags_in_scope)
+      self.namespace = namespace
+      self.get_all_scoped_flag_names = get_all_scoped_flag_names  # type: ignore
+      self.levenshtein_max_distance = levenshtein_max_distance
+
+    @staticmethod
+    def _create_flag_value_map(flags):
+      """Returns a map of flag -> list of values, based on the given flag strings.
+
+      None signals no value given (e.g., -x, --foo).
+      The value is a list because the user may specify the same flag multiple times, and that's
+      sometimes OK (e.g., when appending to list-valued options).
+      """
+      flag_value_map = defaultdict(list)
+      for flag in flags:
+        key, has_equals_sign, flag_val = flag.partition('=')
+        if not has_equals_sign:
+          if not flag.startswith('--'):  # '-xfoo' style.
+            key = flag[0:2]
+            flag_val = flag[2:]
+          if not flag_val:
+            # Either a short option with no value or a long option with no equals sign.
+            # Important so we can distinguish between no value ('--foo') and setting to an empty
+            # string ('--foo='), for options with an implicit_value.
+            flag_val = None
+        flag_value_map[key].append(flag_val)
+      return flag_value_map
+
+  def parse_args(self, parse_args_request):
+    """Set values for this parser's options on the namespace object.
+
+    :param Parser.ParseArgsRequest parse_args_request: parameters for parsing this parser's
+                                                       arguments.
+    :returns: The `parse_args_request.namespace` object that the option values are being registered
+              on.
+    :raises: :class:`ParseError` if any flags weren't recognized.
     """
-    flag_value_map = defaultdict(list)
-    for flag in flags:
-      key, has_equals_sign, flag_val = flag.partition('=')
-      if not has_equals_sign:
-        if not flag.startswith('--'):  # '-xfoo' style.
-          key = flag[0:2]
-          flag_val = flag[2:]
-        if not flag_val:
-          # Either a short option with no value or a long option with no equals sign.
-          # Important so we can distinguish between no value ('--foo') and setting to an empty
-          # string ('--foo='), for options with an implicit_value.
-          flag_val = None
-      flag_value_map[key].append(flag_val)
-    return flag_value_map
 
-  def parse_args(self, flags, namespace):
-    """Set values for this parser's options on the namespace object."""
-    flag_value_map = self._create_flag_value_map(flags)
+    flag_value_map = parse_args_request.flag_value_map
+    namespace = parse_args_request.namespace
+    get_all_scoped_flag_names = parse_args_request.get_all_scoped_flag_names
+    levenshtein_max_distance = parse_args_request.levenshtein_max_distance
 
     mutex_map = defaultdict(list)
     for args, kwargs in self._unnormalized_option_registrations_iter():
@@ -219,12 +286,74 @@ class Parser(object):
 
       setattr(namespace, dest, val)
 
-    # See if there are any unconsumed flags remaining.
+    # See if there are any unconsumed flags remaining, and if so, raise a ParseError.
     if flag_value_map:
-      raise ParseError('Unrecognized command line flags on {}: {}'.format(
-        self._scope_str(), ', '.join(flag_value_map.keys())))
+      self._raise_error_for_invalid_flag_names(
+        flag_value_map,
+        all_scoped_flag_names=list(get_all_scoped_flag_names()),
+        levenshtein_max_distance=levenshtein_max_distance)
 
     return namespace
+
+  def _raise_error_for_invalid_flag_names(self, flag_value_map, all_scoped_flag_names,
+                                          levenshtein_max_distance):
+    """Identify similar option names to unconsumed flags and raise a ParseError with those names."""
+    matching_flags = {}
+    for flag_name in flag_value_map.keys():
+      # We will be matching option names without their leading hyphens, in order to capture both
+      # short and long-form options.
+      flag_normalized_unscoped_name = re.sub(r'^-+', '', flag_name)
+      flag_normalized_scoped_name = (
+        '{}-{}'.format(self.scope.replace('.', '-'), flag_normalized_unscoped_name)
+        if self.scope != GLOBAL_SCOPE
+        else flag_normalized_unscoped_name)
+
+      substring_matching_option_names = []
+      levenshtein_matching_option_names = defaultdict(list)
+      for other_scoped_flag in all_scoped_flag_names:
+        other_complete_flag_name = other_scoped_flag.scoped_arg
+        other_normalized_scoped_name = other_scoped_flag.normalized_scoped_arg
+        other_normalized_unscoped_name = other_scoped_flag.normalized_arg
+        if flag_normalized_unscoped_name == other_normalized_unscoped_name:
+          # If the unscoped option name itself matches, but the scope doesn't, display it.
+          substring_matching_option_names.append(other_complete_flag_name)
+        elif other_normalized_scoped_name.startswith(flag_normalized_scoped_name):
+          # If the invalid scoped option name is the beginning of another scoped option name,
+          # display it. This will also suggest long-form options such as --verbose for an attempted
+          # -v (if -v isn't defined as an option).
+          substring_matching_option_names.append(other_complete_flag_name)
+        else:
+          # If an unscoped option name is similar to the unscoped option from the command line
+          # according to --option-name-check-distance, display the matching scoped option name. This
+          # covers misspellings!
+          unscoped_option_levenshtein_distance = Levenshtein.distance(flag_normalized_unscoped_name, other_normalized_unscoped_name)
+          if unscoped_option_levenshtein_distance <= levenshtein_max_distance:
+            # NB: We order the matched flags by Levenshtein distance compared to the entire option string!
+            fully_scoped_levenshtein_distance = Levenshtein.distance(flag_normalized_scoped_name, other_normalized_scoped_name)
+            levenshtein_matching_option_names[fully_scoped_levenshtein_distance].append(other_complete_flag_name)
+
+      # If any option name matched or started with the invalid flag in any scope, put that
+      # first. Then, display the option names matching in order of overall edit distance, in a deterministic way.
+      all_matching_scoped_option_names = substring_matching_option_names + [
+        flag
+        for distance in sorted(levenshtein_matching_option_names.keys())
+        for flag in sorted(levenshtein_matching_option_names[distance])
+      ]
+      if all_matching_scoped_option_names:
+        matching_flags[flag_name] = all_matching_scoped_option_names
+
+    if matching_flags:
+      suggestions_message = ' Suggestions:\n{}'.format('\n'.join(
+        '{}: [{}]'.format(flag_name, ', '.join(matches))
+        for flag_name, matches in matching_flags.items()
+      ))
+    else:
+      suggestions_message = ''
+    raise ParseError(
+      'Unrecognized command line flags on {scope}: {flags}.{suggestions_message}'
+      .format(scope=self._scope_str(),
+              flags=', '.join(flag_value_map.keys()),
+              suggestions_message=suggestions_message))
 
   def option_registrations_iter(self):
     """Returns an iterator over the normalized registration arguments of each option in this parser.
@@ -300,6 +429,10 @@ class Parser(object):
     if self._frozen:
       raise FrozenRegistration(self.scope, args[0])
 
+    if args:
+      dest = self.parse_dest(*args, **kwargs)
+      self._check_deprecated(dest, kwargs, print_warning=False)
+    
     # Prevent further registration in enclosing scopes.
     ancestor = self._parent_parser
     while ancestor:
@@ -328,20 +461,24 @@ class Parser(object):
         raise OptionAlreadyRegistered(self.scope, arg)
     self._known_args.update(args)
 
-  def _check_deprecated(self, dest, kwargs):
+  def _check_deprecated(self, dest, kwargs, print_warning=True):
     """Checks option for deprecation and issues a warning/error if necessary."""
     removal_version = kwargs.get('removal_version', None)
     if removal_version is not None:
-      warn_or_error(removal_version,
-                    "option '{}' in {}".format(dest, self._scope_str()),
-                    kwargs.get('removal_hint', ''),
-                    stacklevel=9999)  # Out of range stacklevel to suppress printing src line.
+      warn_or_error(
+        removal_version=removal_version,
+        deprecated_entity_description="option '{}' in {}".format(dest, self._scope_str()),
+        deprecation_start_version=kwargs.get('deprecation_start_version', None),
+        hint=kwargs.get('removal_hint', None),
+        stacklevel=9999,  # Out of range stacklevel to suppress printing src line.
+        print_warning=print_warning,
+      )
 
   _allowed_registration_kwargs = {
     'type', 'member_type', 'choices', 'dest', 'default', 'implicit_value', 'metavar',
     'help', 'advanced', 'recursive', 'recursive_root', 'registering_class',
-    'fingerprint', 'removal_version', 'removal_hint', 'fromfile', 'mutually_exclusive_group',
-    'daemon'
+    'fingerprint', 'removal_version', 'removal_hint', 'deprecation_start_version', 'fromfile',
+    'mutually_exclusive_group', 'daemon'
   }
 
   # TODO: Remove dict_option from here after deprecation is complete.
@@ -388,7 +525,7 @@ class Parser(object):
 
     removal_version = kwargs.get('removal_version')
     if removal_version is not None:
-      validate_removal_semver(removal_version)
+      validate_deprecation_semver(removal_version, 'removal version')
 
   def _existing_scope(self, arg):
     if arg in self._known_args:
@@ -439,32 +576,46 @@ class Parser(object):
     def to_value_type(val_str):
       if val_str is None:
         return None
-      elif kwargs.get('type') == bool:
+      if kwargs.get('type') == bool:
         return self._ensure_bool(val_str)
-      else:
-        return self._wrap_type(kwargs.get('type', str))(val_str)
+      type_arg = kwargs.get('type', str)
+      try:
+        return self._wrap_type(type_arg)(val_str)
+      except (TypeError, ValueError) as e:
+        raise ParseError(
+          f"Error applying type '{type_arg.__name__}' to option value '{val_str}', for option "
+          f"'--{dest}' in {self._scope_str()}: {e}"
+        )
 
     # Helper function to expand a fromfile=True value string, if needed.
-    def expand(val_str):
-      if kwargs.get('fromfile', False) and val_str and val_str.startswith('@'):
-        if val_str.startswith('@@'):   # Support a literal @ for fromfile values via @@.
-          return val_str[1:]
+    # May return a string or a dict/list decoded from a json/yaml file.
+    def expand(val_or_str):
+      if (kwargs.get('fromfile', True) and val_or_str and
+          isinstance(val_or_str, str) and val_or_str.startswith('@')):
+        if val_or_str.startswith('@@'):   # Support a literal @ for fromfile values via @@.
+          return val_or_str[1:]
         else:
-          fromfile = val_str[1:]
+          fromfile = val_or_str[1:]
           try:
             with open(fromfile, 'r') as fp:
-              return fp.read().strip()
-          except IOError as e:
+              s = fp.read().strip()
+              if fromfile.endswith('.json'):
+                return json.loads(s)
+              elif fromfile.endswith('.yml') or fromfile.endswith('.yaml'):
+                return yaml.safe_load(s)
+              else:
+                return s
+          except (IOError, ValueError, yaml.YAMLError) as e:
             raise self.FromfileError('Failed to read {} in {} from file {}: {}'.format(
                 dest, self._scope_str(), fromfile, e))
       else:
-        return val_str
+        return val_or_str
 
     # Get value from config files, and capture details about its derivation.
     config_details = None
     config_section = GLOBAL_SCOPE_CONFIG_SECTION if self._scope == GLOBAL_SCOPE else self._scope
-    config_default_val_str = expand(self._config.get(Config.DEFAULT_SECTION, dest, default=None))
-    config_val_str = expand(self._config.get(config_section, dest, default=None))
+    config_default_val_or_str = expand(self._config.get(Config.DEFAULT_SECTION, dest, default=None))
+    config_val_or_str = expand(self._config.get(config_section, dest, default=None))
     config_source_file = (self._config.get_source_for_option(config_section, dest) or
         self._config.get_source_for_option(Config.DEFAULT_SECTION, dest))
     if config_source_file is not None:
@@ -487,12 +638,12 @@ class Parser(object):
       sanitized_env_var_scope = self._ENV_SANITIZER_RE.sub('_', self._scope.upper())
       env_vars = ['PANTS_{0}_{1}'.format(sanitized_env_var_scope, udest)]
 
-    env_val_str = None
+    env_val_or_str = None
     env_details = None
     if self._env:
       for env_var in env_vars:
         if env_var in self._env:
-          env_val_str = expand(self._env.get(env_var))
+          env_val_or_str = expand(self._env.get(env_var))
           env_details = 'from env var {}'.format(env_var)
           break
 
@@ -519,8 +670,8 @@ class Parser(object):
     # is idempotent, so this is OK.
 
     values_to_rank = [to_value_type(x) for x in
-                      [flag_val, env_val_str, config_val_str,
-                       config_default_val_str, kwargs.get('default'), None]]
+                      [flag_val, env_val_or_str, config_val_or_str,
+                       config_default_val_or_str, kwargs.get('default'), None]]
     # Note that ranked_vals will always have at least one element, and all elements will be
     # instances of RankedValue (so none will be None, although they may wrap a None value).
     ranked_vals = list(reversed(list(RankedValue.prioritized_iter(*values_to_rank))))
@@ -551,6 +702,11 @@ class Parser(object):
     def check(val):
       if val is not None:
         choices = kwargs.get('choices')
+        if choices is None and 'type' in kwargs:
+          type_arg = kwargs.get('type')
+          if inspect.isclass(type_arg) and issubclass(type_arg, Enum):
+            choices = list(type_arg)
+        # TODO: convert this into an enum() pattern match!
         if choices is not None and val not in choices:
           raise ParseError('`{}` is not an allowed value for option {} in {}. '
                            'Must be one of: {}'.format(val, dest, self._scope_str(), choices))
@@ -567,12 +723,14 @@ class Parser(object):
       merged_rank = ranked_vals[-1].rank
       merged_val = ListValueComponent.merge(
           [rv.value for rv in ranked_vals if rv.value is not None]).val
+      # TODO: run `check()` for all elements of a list option too!!!
       merged_val = [self._convert_member_type(kwargs.get('member_type', str), x)
                     for x in merged_val]
       for val in merged_val:
         check(val)
       ret = RankedValue(merged_rank, merged_val)
     elif is_dict_option(kwargs):
+      # TODO: convert `member_type` for dict values too!
       merged_rank = ranked_vals[-1].rank
       merged_val = DictValueComponent.merge(
           [rv.value for rv in ranked_vals if rv.value is not None]).val

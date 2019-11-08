@@ -1,15 +1,12 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.native.config.environment import Platform
 from pants.backend.native.subsystems.libc_dev import LibcDev
 from pants.backend.native.subsystems.utils.parse_search_dirs import ParseSearchDirs
+from pants.testutil.subsystem.util import global_subsystem_instance, init_subsystems
+from pants.testutil.test_base import TestBase
 from pants_test.backend.native.util.platform_utils import platform_specific
-from pants_test.subsystem.subsystem_util import global_subsystem_instance, init_subsystems
-from pants_test.test_base import TestBase
 
 
 class TestLibcDirectorySearchFailure(TestBase):
@@ -23,7 +20,7 @@ class TestLibcDirectorySearchFailure(TestBase):
     })
 
     self.libc = global_subsystem_instance(LibcDev)
-    self.platform = Platform.create()
+    self.platform = Platform.current
 
   def test_libc_search_failure(self):
     with self.assertRaises(LibcDev.HostLibcDevResolutionError) as cm:
@@ -44,7 +41,7 @@ class TestLibcSearchDisabled(TestBase):
     })
 
     self.libc = global_subsystem_instance(LibcDev)
-    self.platform = Platform.create()
+    self.platform = Platform.current
 
   def test_libc_disabled_search(self):
     self.assertEqual([], self.libc.get_libc_objects())
@@ -61,7 +58,7 @@ class TestLibcCompilerSearchFailure(TestBase):
     })
 
     self.libc = global_subsystem_instance(LibcDev)
-    self.platform = Platform.create()
+    self.platform = Platform.current
 
   @platform_specific('linux')
   def test_libc_compiler_search_failure(self):

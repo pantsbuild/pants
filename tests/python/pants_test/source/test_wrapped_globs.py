@@ -1,10 +1,6 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-import os
 import unittest
 from textwrap import dedent
 
@@ -15,7 +11,7 @@ from pants.build_graph.files import Files
 from pants.build_graph.target import Target
 from pants.engine.fs import EMPTY_SNAPSHOT
 from pants.source.wrapped_globs import EagerFilesetWithSpec, Globs, LazyFilesetWithSpec, RGlobs
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 class DummyTarget(Target):
@@ -24,7 +20,7 @@ class DummyTarget(Target):
     payload.add_fields({
       'sources': self.create_sources_field(sources, address.spec_path, key_arg='sources'),
     })
-    super(DummyTarget, self).__init__(address=address, payload=payload, **kwargs)
+    super().__init__(address=address, payload=payload, **kwargs)
 
 
 class FilesetRelPathWrapperTest(TestBase):
@@ -42,11 +38,11 @@ class FilesetRelPathWrapperTest(TestBase):
     )
 
   def setUp(self):
-    super(FilesetRelPathWrapperTest, self).setUp()
+    super().setUp()
     self.create_file('y/morx.java')
     self.create_file('y/fleem.java')
     self.create_file('z/w/foo.java')
-    os.symlink('../../y', os.path.join(self.build_root, 'z/w/y'))
+    self.create_link('y', 'z/w/y')
 
   def test_no_dir_glob(self):
     self.add_to_build_file('y/BUILD', 'dummy_target(name="y", sources=globs("*"))')

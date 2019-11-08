@@ -1,11 +1,10 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
+import os
 
 
-class ClasspathEntry(object):
+class ClasspathEntry:
   """Represents a java classpath entry.
 
   :API: public
@@ -26,6 +25,12 @@ class ClasspathEntry(object):
     :rtype: string
     """
     return self._path
+
+  def hydrate_missing_directory_digest(self, directory_digest):
+    assert os.path.exists(self.path), f'Classpath entry {self} with digest to be mutated should point to an existing file or directory!'
+    assert self.directory_digest is None or self._directory_digest == directory_digest, f'Classpath entry {self} with digest {self.directory_digest} to be mutated is expected to be None ' \
+                                                                                        f'or the same as the incoming digest {directory_digest}!'
+    self._directory_digest = directory_digest
 
   @property
   def directory_digest(self):
@@ -87,7 +92,7 @@ class ArtifactClasspathEntry(ClasspathEntry):
   """
 
   def __init__(self, path, coordinate, cache_path, directory_digest=None):
-    super(ArtifactClasspathEntry, self).__init__(path, directory_digest)
+    super().__init__(path, directory_digest)
     self._coordinate = coordinate
     self._cache_path = cache_path
 

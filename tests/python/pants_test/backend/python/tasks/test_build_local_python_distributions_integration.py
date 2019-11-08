@@ -1,24 +1,24 @@
-# coding=utf-8
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import glob
 import os
 import re
-from builtins import open
+import subprocess
 
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_dir
-from pants.util.process_handler import subprocess
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
-from pants_test.testutils.py2_compat import assertRegex
 
 
 class BuildLocalPythonDistributionsIntegrationTest(PantsRunIntegrationTest):
+
+  @classmethod
+  def use_pantsd_env_var(cls):
+    """TODO(#7320): See the point about watchman."""
+    return False
+
   hello_install_requires_dir = 'testprojects/src/python/python_distribution/hello_with_install_requires'
-  hello_setup_requires = 'examples/src/python/example/python_distribution/hello/setup_requires'
   py_dist_test = 'testprojects/tests/python/example_test/python_distribution'
 
   def _assert_nation_and_greeting(self, output, punctuation='!'):
@@ -40,12 +40,12 @@ United States
       # Check that the pex was built.
       self.assertTrue(os.path.isfile(pex))
       # Check that the pex runs.
-      output = subprocess.check_output(pex).decode('utf-8')
+      output = subprocess.check_output(pex).decode()
       self._assert_nation_and_greeting(output)
       # Check that we have exactly one wheel output.
       single_wheel_output = assert_single_element(glob.glob(os.path.join(tmp_dir, '*.whl')))
-      assertRegex(self, os.path.basename(single_wheel_output),
-                  r'\A{}'.format(re.escape('hello_with_install_requires-1.0.0+')))
+      self.assertRegex(os.path.basename(single_wheel_output),
+                       r'\A{}'.format(re.escape('hello_with_install_requires-1.0.0+')))
 
   def test_pydist_run(self):
     with temporary_dir() as tmp_dir:

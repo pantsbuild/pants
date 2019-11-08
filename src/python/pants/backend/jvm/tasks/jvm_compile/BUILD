@@ -16,7 +16,6 @@ python_library(
   name = 'compile_context',
   sources = ['compile_context.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/util:contextutil',
   ]
 )
@@ -37,7 +36,6 @@ python_library(
 python_library(
   sources = ['jvm_compile.py'],
   dependencies = [
-    '3rdparty/python:future',
     ':compile_context',
     ':execution_graph',
     ':missing_dependency_finder',
@@ -59,8 +57,11 @@ python_library(
     'src/python/pants/goal:products',
     'src/python/pants/option',
     'src/python/pants/reporting',
+    'src/python/pants/util:collections',
+    'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:fileutil',
+    'src/python/pants/util:memo',
   ],
 )
 
@@ -68,8 +69,8 @@ python_library(
   name = 'execution_graph',
   sources = ['execution_graph.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/base:worker_pool',
+    'src/python/pants/util:contextutil',
   ],
 )
 
@@ -80,7 +81,6 @@ python_library(
     'missing_dependency_finder.py'
   ],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python:ansicolors',
     '3rdparty/python/twitter/commons:twitter.common.collections',
   ],

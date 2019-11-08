@@ -1,19 +1,16 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import map
 from textwrap import dedent
 
 from pex import pep425tags
 
 from pants.backend.python.register import build_file_aliases as register_python
+from pants.backend.python.targets.python_binary import PythonBinary
 from pants.build_graph.address import Address
-from pants_test.backend.python.tasks.interpreter_cache_test_mixin import InterpreterCacheTestMixin
-from pants_test.task_test_base import TaskTestBase
+from pants.testutil.subsystem.util import init_subsystem
+from pants.testutil.task_test_base import TaskTestBase
 
 
 def normalize_platform_tag(platform_tag):
@@ -33,12 +30,11 @@ def name_and_platform(whl):
   return dist, version, normalize_platform_tag(platform_tag)
 
 
-def check_wheel_platform_matches_host(wheel_dist):
-  _, _, wheel_platform = name_and_platform(wheel_dist)
-  return wheel_platform == normalize_platform_tag(pep425tags.get_platform())
+def normalized_current_platform():
+  return normalize_platform_tag(pep425tags.get_platform())
 
 
-class PythonTaskTestBase(InterpreterCacheTestMixin, TaskTestBase):
+class PythonTaskTestBase(TaskTestBase):
   """
   :API: public
   """
@@ -49,6 +45,10 @@ class PythonTaskTestBase(InterpreterCacheTestMixin, TaskTestBase):
     :API: public
     """
     return register_python()
+
+  def setUp(self):
+    super().setUp()
+    init_subsystem(PythonBinary.Defaults)
 
   def create_python_library(self, relpath, name, source_contents_map=None,
                             dependencies=(), provides=None):

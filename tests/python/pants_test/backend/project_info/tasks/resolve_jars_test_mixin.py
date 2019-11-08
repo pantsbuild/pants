@@ -1,17 +1,13 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import object, open
 from textwrap import dedent
 
 from pants.util.contextutil import temporary_dir
 
 
-class ResolveJarsTestMixin(object):
+class ResolveJarsTestMixin:
   """Mixin for evaluating tasks which resolve their own source and javadoc jars (such as Export)."""
 
   def evaluate_subtask(self, targets, workdir, load_extra_confs, extra_args, expected_jars):
@@ -80,10 +76,9 @@ class ResolveJarsTestMixin(object):
 
           targets = ['{0}:{1}'.format(os.path.join(source_dir, 'src'), name) for name in spec_names]
 
-          with temporary_dir() as ivy_temp_dir:
-            extra_args = ['--ivy-cache-dir={}'.format(ivy_temp_dir)]
-            self.evaluate_subtask(targets, workdir, load_all, extra_args=extra_args,
-                                  expected_jars=['org.pantsbuild:synthetic-test-jar:1.2.3'])
+          self.evaluate_subtask(targets, workdir, load_all,
+                                extra_args=[],
+                                expected_jars=['org.pantsbuild:synthetic-test-jar:1.2.3'])
 
   def test_jar_lib_with_url_resolve_default(self):
     self._test_jar_lib_with_url(False)

@@ -3,6 +3,7 @@
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd "$REPO_ROOT" || exit 1
 
+# shellcheck source=build-support/common.sh
 source "${REPO_ROOT}/build-support/common.sh"
 
 function usage() {

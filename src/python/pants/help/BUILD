@@ -3,13 +3,20 @@
 
 python_library(
   dependencies=[
-    'src/python/pants/util:collections_abc_backport',
-    '3rdparty/python:future',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
+    'src/python/pants/goal',
     'src/python/pants/option',
     'src/python/pants/subsystem',
     'src/python/pants/util:memo',
   ]
+)
+
+python_tests(
+  name='integration',
+  dependencies=[
+    'src/python/pants/testutil:int-test',
+  ],
+  tags = {'integration'},
 )

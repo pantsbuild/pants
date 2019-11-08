@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from textwrap import dedent
 
@@ -11,7 +8,7 @@ from twitter.common.dirutil.fileset import Fileset
 from pants.backend.codegen.antlr.python.antlr_py_gen import AntlrPyGen
 from pants.backend.codegen.antlr.python.python_antlr_library import PythonAntlrLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
+from pants.testutil.jvm.nailgun_task_test_base import NailgunTaskTestBase
 
 
 class AntlrPyGenTest(NailgunTaskTestBase):
@@ -21,7 +18,7 @@ class AntlrPyGenTest(NailgunTaskTestBase):
 
   @classmethod
   def alias_groups(cls):
-    return super(AntlrPyGenTest, cls).alias_groups().merge(BuildFileAliases(
+    return super().alias_groups().merge(BuildFileAliases(
       targets={
         'python_antlr_library': PythonAntlrLibrary,
       },

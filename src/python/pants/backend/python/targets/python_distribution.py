@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from twitter.common.collections import maybe_list
 
@@ -50,16 +47,12 @@ class PythonDistribution(PythonTarget):
     payload.add_fields({
       'setup_requires': PrimitiveField(maybe_list(setup_requires or ()))
     })
-    super(PythonDistribution, self).__init__(
+    super().__init__(
       address=address, payload=payload, sources=sources, **kwargs)
 
   @property
   def has_native_sources(self):
     return self.has_sources(extension=tuple(self.native_source_extensions))
-
-  @property
-  def platforms(self):
-    return ['current']
 
   @property
   def setup_requires(self):

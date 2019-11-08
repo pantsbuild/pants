@@ -1,12 +1,10 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
+import subprocess
 
 from pants.base.exceptions import TaskError
 from pants.task.task import Task
-from pants.util.process_handler import subprocess
 
 from pants.contrib.cpp.targets.cpp_binary import CppBinary
 from pants.contrib.cpp.targets.cpp_library import CppLibrary
@@ -29,7 +27,7 @@ class CppTask(Task):
 
   @classmethod
   def register_options(cls, register):
-    super(CppTask, cls).register_options(register)
+    super().register_options(register)
     register('--compiler', advanced=True, fingerprint=True,
              help='Set a specific compiler to use (eg, g++-4.8, clang++)')
 

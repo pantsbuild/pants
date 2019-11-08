@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import threading
-from builtins import bytes, object, open, str
 from io import BytesIO
 
 
@@ -57,7 +53,7 @@ class InMemoryRWBuf(_RWBuf):
   situations that require a real file (e.g., redirecting stdout/stderr of subprocess.Popen())."""
 
   def __init__(self):
-    super(InMemoryRWBuf, self).__init__(BytesIO())
+    super().__init__(BytesIO())
     self._writepos = 0
 
   def do_write(self, s):
@@ -81,7 +77,7 @@ class FileBackedRWBuf(_RWBuf):
     self._io.write(s)
 
 
-class StringWriter(object):
+class StringWriter:
   """A write-only buffer which accepts strings and writes to another buffer which accepts bytes.
 
   Writes strings as utf-8.
@@ -101,7 +97,7 @@ class StringWriter(object):
   def write(self, s):
     if not isinstance(s, str):
       raise ValueError('Expected unicode str, not {}, for argument {}'.format(type(s), s))
-    self.buffer.write(s.encode('utf-8'))
+    self.buffer.write(s.encode())
 
   def flush(self):
     self.buffer.flush()

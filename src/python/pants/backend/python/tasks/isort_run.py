@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import functools
 import logging
@@ -35,7 +32,7 @@ class IsortRun(FmtTaskMixin, Task):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(IsortRun, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data(IsortPrep.tool_instance_cls)
 
   def execute(self):
@@ -52,7 +49,7 @@ class IsortRun(FmtTaskMixin, Task):
         return
 
       isort = self.context.products.get_data(IsortPrep.tool_instance_cls)
-      args = self.get_passthru_args() + sources
+      args = self.get_passthru_args() + ['--filter-files'] + sources
 
       # NB: We execute isort out of process to avoid unwanted side-effects from importing it:
       #   https://github.com/timothycrosley/isort/issues/456
@@ -62,8 +59,10 @@ class IsortRun(FmtTaskMixin, Task):
                                              labels=[WorkUnitLabel.TOOL, WorkUnitLabel.LINT])
         cmdline, exit_code = isort.run(workunit_factory, args)
         if exit_code != 0:
-          raise TaskError('{} ... exited non-zero ({}).'.format(cmdline, exit_code),
-                          exit_code=exit_code)
+          raise TaskError(
+            f"Exited with return code {exit_code} while running `{cmdline}`.",
+            exit_code=exit_code
+          )
 
   def _calculate_isortable_python_sources(self, targets):
     """Generate a set of source files from the given targets."""

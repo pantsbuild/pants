@@ -1,18 +1,18 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import logging
 import socket
+import threading
 import traceback
+from contextlib import contextmanager
+from socketserver import BaseRequestHandler, BaseServer, TCPServer, ThreadingMixIn
 
-from six.moves.socketserver import BaseRequestHandler, BaseServer, TCPServer, ThreadingMixIn
-
+from pants.engine.native import Native
 from pants.java.nailgun_protocol import NailgunProtocol
 from pants.util.contextutil import maybe_profiled
-from pants.util.socket import RecvBufferedSocket, safe_select
+from pants.util.memo import memoized
+from pants.util.socket import RecvBufferedSocket, is_readable
 
 
 class PailgunHandlerBase(BaseRequestHandler):
@@ -48,18 +48,26 @@ class PailgunHandlerBase(BaseRequestHandler):
   def handle_error(self, exc):
     """Main error handler entrypoint for subclasses."""
 
+  @memoized
+  def parsed_request(self):
+    return NailgunProtocol.parse_request(self.request)
+
 
 class PailgunHandler(PailgunHandlerBase):
   """A nailgun protocol handler for use with forking, SocketServer-based servers."""
 
   def _run_pants(self, sock, arguments, environment):
     """Execute a given run with a pants runner."""
+    # For the pants run, we want to log to stderr.
+    # TODO Might be worth to make contextmanagers for this?
+    Native().override_thread_logging_destination_to_just_stderr()
     self.server.runner_factory(sock, arguments, environment).run()
+    Native().override_thread_logging_destination_to_just_pantsd()
 
   def handle(self):
     """Request handler for a single Pailgun request."""
     # Parse the Nailgun request portion.
-    _, _, arguments, environment = NailgunProtocol.parse_request(self.request)
+    _, _, arguments, environment = self.parsed_request()
 
     # N.B. the first and second nailgun request arguments (working_dir and command) are currently
     # ignored in favor of a get_buildroot() call within LocalPantsRunner.run() and an assumption
@@ -71,6 +79,11 @@ class PailgunHandler(PailgunHandlerBase):
 
     self.logger.info('handling pailgun request: `{}`'.format(' '.join(arguments)))
     self.logger.debug('pailgun request environment: %s', environment)
+
+    # We don't support parallel runs in pantsd, and therefore if this pailgun request
+    # triggers any pants command, we want it to not use pantsd at all.
+    # See https://github.com/pantsbuild/pants/issues/7881 for context.
+    environment["PANTS_CONCURRENT"] = "True"
 
     # Execute the requested command with optional daemon-side profiling.
     with maybe_profiled(environment.get('PANTSD_PROFILE')):
@@ -88,6 +101,48 @@ class PailgunHandler(PailgunHandlerBase):
     NailgunProtocol.send_exit_with_code(self.request, failure_code)
 
 
+class ExclusiveRequestTimeout(Exception):
+  """Represents a timeout while waiting for another request to complete."""
+
+
+class PailgunHandleRequestLock:
+  """Convenience lock to implement Lock.acquire(timeout), which is not available in Python 2."""
+  # TODO(#6071): remove and replace for the py3 Lock() when we don't have to support py2 anymore.
+
+  def __init__(self):
+    self.cond = threading.Condition()
+    self.available = True
+
+  def acquire(self, timeout=0.0):
+    """
+    Try to acquire the lock, blocking until the timeout is reached. Will return immediately if the lock is acquired.
+
+    :return True if the lock was aquired, False if the timeout was reached.
+    """
+    self.cond.acquire()
+    if self.available:
+      self.available = False
+      self.cond.release()
+      return True
+    else:
+      self.cond.wait(timeout=timeout)
+      # We have the lock!
+      if not self.available:
+        self.cond.release()
+        return False
+      else:
+        self.available = False
+        self.cond.release()
+        return True
+
+  def release(self):
+    """Release the lock."""
+    self.cond.acquire()
+    self.available = True
+    self.cond.notify()
+    self.cond.release()
+
+
 class PailgunServer(ThreadingMixIn, TCPServer):
   """A pants nailgun server.
 
@@ -99,7 +154,7 @@ class PailgunServer(ThreadingMixIn, TCPServer):
   # Override the ThreadingMixIn default, to minimize the chances of zombie pailgun processes.
   daemon_threads = True
 
-  def __init__(self, server_address, runner_factory, lifecycle_lock,
+  def __init__(self, server_address, runner_factory, lifecycle_lock, request_complete_callback,
                handler_class=None, bind_and_activate=True):
     """Override of TCPServer.__init__().
 
@@ -111,6 +166,7 @@ class PailgunServer(ThreadingMixIn, TCPServer):
                                            execution thread during handling. All pailgun request handling
                                            will take place under care of this lock, which would be shared with
                                            a `PailgunServer`-external lifecycle manager to guard teardown.
+    :param function request_complete_callback: A callback that will be called whenever a pailgun request is completed.
     :param class handler_class: The request handler class to use for each request. (Optional)
     :param bool bind_and_activate: If True, binds and activates networking at __init__ time.
                                    (Optional)
@@ -122,6 +178,9 @@ class PailgunServer(ThreadingMixIn, TCPServer):
     self.lifecycle_lock = lifecycle_lock
     self.allow_reuse_address = True           # Allow quick reuse of TCP_WAIT sockets.
     self.server_port = None                   # Set during server_bind() once the port is bound.
+    self.request_complete_callback = request_complete_callback
+    self.logger = logging.getLogger(__name__)
+    self.free_to_handle_request_lock = PailgunHandleRequestLock()
 
     if bind_and_activate:
       try:
@@ -135,6 +194,20 @@ class PailgunServer(ThreadingMixIn, TCPServer):
     """Override of TCPServer.server_bind() that tracks bind-time assigned random ports."""
     TCPServer.server_bind(self)
     _, self.server_port = self.socket.getsockname()[:2]
+
+  def process_request(self, request, client_address):
+    """Start a new thread to process the request.
+
+    This is lovingly copied and pasted from ThreadingMixIn, with the addition of setting the name
+    of the thread. It's a shame that ThreadingMixIn doesn't provide a customization hook.
+    """
+    t = threading.Thread(
+      target=self.process_request_thread,
+      args=(request, client_address),
+      name="PailgunRequestThread",
+    )
+    t.daemon = self.daemon_threads
+    t.start()
 
   def handle_request(self):
     """Override of TCPServer.handle_request() that provides locking.
@@ -150,8 +223,8 @@ class PailgunServer(ThreadingMixIn, TCPServer):
       timeout = self.timeout
     elif self.timeout is not None:
       timeout = min(timeout, self.timeout)
-    fd_sets = safe_select([self], [], [], timeout)
-    if not fd_sets[0]:
+
+    if not is_readable(self, timeout=timeout):
       self.handle_timeout()
       return
 
@@ -160,16 +233,85 @@ class PailgunServer(ThreadingMixIn, TCPServer):
     with self.lifecycle_lock():
       self._handle_request_noblock()
 
+  def _should_poll_forever(self, timeout):
+    return timeout < 0
+
+  def _should_keep_polling(self, timeout, time_polled):
+    return self._should_poll_forever(timeout) or time_polled < timeout
+
+  def _send_stderr(self, request, message):
+    NailgunProtocol.send_stderr(request, message)
+
+  @contextmanager
+  def ensure_request_is_exclusive(self, environment, request):
+    """
+    Ensure that this is the only pants running.
+
+    We currently don't allow parallel pants runs, so this function blocks a request thread until
+    there are no more requests being handled.
+    """
+    # TODO add `did_poll` to pantsd metrics
+
+    timeout = float(environment['PANTSD_REQUEST_TIMEOUT_LIMIT'])
+
+    @contextmanager
+    def yield_and_release(time_waited):
+      try:
+        self.logger.debug("request lock acquired {}.".format("on the first try" if time_waited == 0 else "in {} seconds".format(time_waited)))
+        yield
+      finally:
+        self.free_to_handle_request_lock.release()
+        self.logger.debug("released request lock.")
+
+    time_polled = 0.0
+    user_notification_interval = 5.0 # Stop polling to notify the user every second.
+    self.logger.debug("request {} is trying to aquire the request lock.".format(request))
+
+    # NB: Optimistically try to acquire the lock without blocking, in case we are the only request being handled.
+    # This could be merged into the `while` loop below, but separating this special case for logging helps.
+    if self.free_to_handle_request_lock.acquire(timeout=0):
+      with yield_and_release(time_polled):
+        yield
+    else:
+      self.logger.debug("request {} didn't aquire the lock on the first try, polling...".format(request))
+      # We have to wait for another request to finish being handled.
+      self._send_stderr(request, "Another pants invocation is running. "
+                                 "Will wait {} for it to finish before giving up.\n".format(
+        "forever" if self._should_poll_forever(timeout)
+                  else "up to {} seconds".format(timeout)
+      ))
+      self._send_stderr(request, "If you don't want to wait for the first run to finish, please "
+                                 "press Ctrl-C and run this command with PANTS_CONCURRENT=True "
+                                 "in the environment.\n")
+      while not self.free_to_handle_request_lock.acquire(timeout=user_notification_interval):
+        time_polled += user_notification_interval
+        if self._should_keep_polling(timeout, time_polled):
+          self._send_stderr(request, "Waiting for invocation to finish (waited for {}s so far)...\n".format(time_polled))
+        else: # We have timed out.
+          raise ExclusiveRequestTimeout("Timed out while waiting for another pants invocation to finish.")
+      with yield_and_release(time_polled):
+        yield
+
   def process_request_thread(self, request, client_address):
     """Override of ThreadingMixIn.process_request_thread() that delegates to the request handler."""
     # Instantiate the request handler.
+    Native().override_thread_logging_destination_to_just_pantsd()
     handler = self.RequestHandlerClass(request, client_address, self)
+
+    _, _, _, environment = handler.parsed_request()
+
     try:
-      # Attempt to handle a request with the handler.
-      handler.handle_request()
+      with self.ensure_request_is_exclusive(environment, request):
+        # Attempt to handle a request with the handler.
+        handler.handle_request()
+        self.request_complete_callback()
+    except BrokenPipeError as e:
+      # The client has closed the connection, most likely from a SIGINT
+      self.logger.error("Request {} abruptly closed with {}, probably because the client crashed or was sent a SIGINT.".format(request, type(e)))
     except Exception as e:
       # If that fails, (synchronously) handle the error with the error handler sans-fork.
       try:
+        self.logger.error("Request {} errored with {}({})".format(request, type(e), e))
         handler.handle_error(e)
       finally:
         # Shutdown the socket since we don't expect a fork() in the exception context.

@@ -1,12 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from builtins import object
-
-from future.utils import PY2
 
 from pants.goal.error import GoalError
 from pants.option.optionable import Optionable
@@ -28,8 +21,6 @@ def _create_stable_task_type(superclass, options_scope):
   """
   subclass_name = '{0}_{1}'.format(superclass.__name__,
                                   options_scope.replace('.', '_').replace('-', '_'))
-  if PY2:
-    subclass_name = subclass_name.encode('utf-8')
   return type(subclass_name, (superclass,), {
     '__doc__': superclass.__doc__,
     '__module__': superclass.__module__,
@@ -38,7 +29,7 @@ def _create_stable_task_type(superclass, options_scope):
   })
 
 
-class Goal(object):
+class Goal:
   """Factory for objects representing goals.
 
   Ensures that we have exactly one instance per goal name.
@@ -157,10 +148,13 @@ class _Goal(object):
     namesake_task = self._task_type_by_name.get(self.name)
     if namesake_task and namesake_task.__doc__:
       # First line of docstring.
-      # TODO: This is repetitive of Optionable.get_description(). We should probably just
-      # make Goal an Optionable, for uniformity.
-      return namesake_task.__doc__.partition('\n')[0].strip()
+      return namesake_task.__doc__
     return ''
+
+  @property
+  def description_first_line(self):
+    # TODO: This is repetitive of Optionable.get_description(), which is used by v2 Goals.
+    return self.description.partition('\n')[0].strip()
 
   def register_options(self, options):
     if self._options_registrar_cls:

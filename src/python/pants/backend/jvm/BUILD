@@ -14,7 +14,6 @@ python_library(
   name='artifact',
   sources=['artifact.py'],
   dependencies=[
-    '3rdparty/python:six',
     ':repository',
     'src/python/pants/base:hash_utils',
     'src/python/pants/base:payload_field',
@@ -45,10 +44,7 @@ python_library(
   name='ivy_utils',
   sources=['ivy_utils.py'],
   dependencies=[
-    'src/python/pants/util:collections_abc_backport',
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python:future',
-    '3rdparty/python:six',
     ':ivy_utils_resources',
     'src/python/pants/backend/jvm/subsystems:jar_dependency_management',
     'src/python/pants/backend/jvm/targets:jvm',
@@ -74,7 +70,6 @@ python_library(
   name='repository',
   sources=['repository.py'],
   dependencies = [
-    '3rdparty/python:future',
   ]
 )
 
@@ -92,7 +87,6 @@ python_library(
   name='ossrh_publication_metadata',
   sources=['ossrh_publication_metadata.py'],
   dependencies=[
-    '3rdparty/python:future',
     ':artifact',
     'src/python/pants/base:validation',
   ],

@@ -1,18 +1,15 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from twitter.common.collections import OrderedSet
 
 from pants.goal.products import UnionProducts
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 class UnionProductsTest(TestBase):
   def setUp(self):
-    super(UnionProductsTest, self).setUp()
+    super().setUp()
     self.products = UnionProducts()
 
   def test_get_for_target(self):

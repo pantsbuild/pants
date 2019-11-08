@@ -1,10 +1,7 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class ScroogeGenTest(PantsRunIntegrationTest):
@@ -71,7 +68,7 @@ class ScroogeGenTest(PantsRunIntegrationTest):
         updated = full_config.get(scope, {})
         updated.update(scoped_cfgs)
         full_config[scope] = updated
-    return super(ScroogeGenTest, self).run_pants(command, full_config, stdin_data, extra_env,
+    return super().run_pants(command, full_config, stdin_data, extra_env,
                                                    **kwargs)
 
   @staticmethod

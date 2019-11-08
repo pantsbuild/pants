@@ -1,15 +1,12 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import json
 import os
+import subprocess
 import unittest
 
-from pants.util.process_handler import subprocess
-from pants_test.subsystem.subsystem_util import global_subsystem_instance
+from pants.testutil.subsystem.util import global_subsystem_instance
 
 from pants.contrib.node.subsystems.node_distribution import NodeDistribution
 
@@ -36,8 +33,9 @@ class NodeDistributionTest(unittest.TestCase):
       if line.endswith(b'Hello World!'):
         break
     else:
-      self.fail('Did not find the expected "Hello World!" in the REPL session '
-                'output:\n{}'.format(out.decode('utf-8')))
+      self.fail(
+        f'Did not find the expected "Hello World!" in the REPL session output:\n{out.decode()}'
+      )
 
   def test_npm(self):
     npm_version_flag = self.distribution.get_package_manager('npm').run_command(

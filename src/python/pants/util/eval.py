@@ -1,34 +1,31 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from builtins import range, str
 from textwrap import dedent
+from typing import Any, Optional, Tuple, Type, Union
 
-from future.utils import string_types
 
-
-def parse_expression(val, acceptable_types, name=None, raise_type=ValueError):
+def parse_expression(
+    val: str,
+    acceptable_types: Union[Type, Tuple[Type, ...]],
+    name: Optional[str] = None,
+    raise_type: Type[BaseException] = ValueError,
+) -> Any:
   """Attempts to parse the given `val` as a python expression of the specified `acceptable_types`.
 
-  :param string val: A string containing a python expression.
+  :param val: A string containing a python expression.
   :param acceptable_types: The acceptable types of the parsed object.
-  :type acceptable_types: type|tuple of types.  The tuple may be nested; ie anything `isinstance`
-                          accepts.
-  :param string name: An optional logical name for the value being parsed; ie if the literal val
+  :param name: An optional logical name for the value being parsed; ie if the literal val
                       represents a person's age, 'age'.
-  :param type raise_type: The type of exception to raise for all failures; ValueError by default.
+  :param raise_type: The type of exception to raise for all failures; ValueError by default.
   :raises: If `val` is not a valid python literal expression or it is but evaluates to an object
            that is not a an instance of one of the `acceptable_types`.
   """
   def format_type(typ):
     return typ.__name__
 
-  if not isinstance(val, string_types):
-    raise raise_type('The raw `val` is not a string.  Given {} of type {}.'
-                     .format(val, format_type(type(val))))
+  if not isinstance(val, str):
+    raise raise_type(f"The raw `val` is not a str.  Given {val} of type {format_type(type(val))}.")
 
   def get_name():
     return repr(name) if name else 'value'

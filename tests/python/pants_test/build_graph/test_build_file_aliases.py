@@ -1,16 +1,14 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import unittest
 
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
-from pants.build_graph.mutable_build_graph import MutableBuildGraph
 from pants.build_graph.target import Target
+from pants.engine.legacy.graph import LegacyBuildGraph
+from pants.testutil.subsystem.util import init_subsystem
 
 
 class BuildFileAliasesTest(unittest.TestCase):
@@ -19,6 +17,7 @@ class BuildFileAliasesTest(unittest.TestCase):
     pass
 
   def setUp(self):
+    init_subsystem(Target.TagAssignments)
     self.target_macro_factory = TargetMacro.Factory.wrap(
       lambda ctx: ctx.create_object(self.BlueTarget,
                                     type_alias='jill',
@@ -77,7 +76,7 @@ class BuildFileAliasesTest(unittest.TestCase):
     with self.assertRaises(TypeError):
       BuildFileAliases(targets={'fred': object()})
 
-    target = Target('fred', Address.parse('a:b'), MutableBuildGraph(address_mapper=None))
+    target = Target('fred', Address.parse('a:b'), LegacyBuildGraph(None, None))
     with self.assertRaises(TypeError):
       BuildFileAliases(targets={'fred': target})
 

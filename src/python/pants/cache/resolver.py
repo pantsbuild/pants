@@ -1,24 +1,19 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import json
 import logging
-from abc import abstractmethod
-from builtins import object, str
+from abc import ABC, abstractmethod
 
 import requests
 
 from pants.base.validation import assert_list
-from pants.util.meta import AbstractClass
 
 
 logger = logging.getLogger(__name__)
 
 
-class Resolver(AbstractClass):
+class Resolver(ABC):
   """An abstract class base for resolving service urls.
 
   :API: public
@@ -54,7 +49,7 @@ class NoopResolver(Resolver):
     return []
 
 
-class ResponseParser(object):
+class ResponseParser:
   """Resolver response parser utility class.
 
   :API: public

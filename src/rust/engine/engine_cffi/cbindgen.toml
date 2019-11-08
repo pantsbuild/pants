@@ -1,0 +1,41 @@
+header = '''
+#ifndef __PANTS_SCHEDULER_CBINDGEN_H__
+#define __PANTS_SCHEDULER_CBINDGEN_H__
+/*
+ * Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
+ * Licensed under the Apache License, Version 2.0 (see LICENSE).
+ */
+
+// Handle is declared as a typedef rather than a wrapper struct because it avoids needing to wrap
+// the inner handle/`void*` in a tuple or datatype at the ffi boundary. For most types that
+// overhead would not be worth worrying about, but Handle is used often enough that it gives a 6%
+// speedup to avoid the wrapping.
+
+typedef void* Handle;
+'''
+trailer = '''
+#endif // __PANTS_SCHEDULER_CBINDGEN_H__
+'''
+include_version = true
+line_length = 100
+language = "C"
+
+[parse]
+parse_deps = true
+# If more deps are added here, make sure to also add them to be rerun-triggers in src/cffi_build.rs.
+# We specify this explicitly because otherwise all transitive deps are parsed, and that takes a
+# very long time.
+#
+# Feel free to add more crates here if you need; basically any type that gets exposed over a C
+# interface needs to be listed here. Please make sure to update build.rs to mark any crates which
+# are added here for change detection.
+#
+# We need to parse the engine crate to codegen PyResult (because externs are both something we use
+# from Python in engine, and something we expose to python in engine_cffi).
+#
+# We need to parse the logging crate to codegen PythonLogLevel and Destination.
+include = ["engine", "logging"]
+
+[export]
+# TODO: wrapped_PyInit_native_engine is declared twice if not excluded here, figure out why.
+exclude = ["Handle", "wrapped_PyInit_native_engine"]

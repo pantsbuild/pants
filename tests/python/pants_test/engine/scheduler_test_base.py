@@ -1,23 +1,19 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import shutil
-from builtins import object
 
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.engine.nodes import Throw
 from pants.engine.scheduler import Scheduler
 from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS
+from pants.testutil.engine.util import init_native
 from pants.util.contextutil import temporary_file_path
 from pants.util.dirutil import safe_mkdtemp, safe_rmtree
-from pants_test.engine.util import init_native
 
 
-class SchedulerTestBase(object):
+class SchedulerTestBase:
   """A mixin for classes (tests, presumably) which need to create temporary schedulers.
 
   TODO: In the medium term, this should be part of pants_test.test_base.TestBase.
@@ -46,6 +42,7 @@ class SchedulerTestBase(object):
 
   def mk_scheduler(self,
                    rules=None,
+                   union_rules=None,
                    project_tree=None,
                    work_dir=None,
                    include_trace_on_error=True):
@@ -56,12 +53,12 @@ class SchedulerTestBase(object):
     local_store_dir = os.path.realpath(safe_mkdtemp())
     scheduler = Scheduler(self._native,
                           project_tree,
-                          work_dir,
                           local_store_dir,
                           rules,
+                          union_rules,
                           DEFAULT_EXECUTION_OPTIONS,
                           include_trace_on_error=include_trace_on_error)
-    return scheduler.new_session()
+    return scheduler.new_session(zipkin_trace_v2=False, build_id="buildid_for_test")
 
   def context_with_scheduler(self, scheduler, *args, **kwargs):
     return self.context(*args, scheduler=scheduler, **kwargs)

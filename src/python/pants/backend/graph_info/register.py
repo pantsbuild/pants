@@ -1,22 +1,17 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.graph_info.tasks.cloc import CountLinesOfCode
 from pants.backend.graph_info.tasks.dependees import ReverseDepmap
 from pants.backend.graph_info.tasks.filemap import Filemap
 from pants.backend.graph_info.tasks.filter import Filter
-from pants.backend.graph_info.tasks.listtargets import ListTargets
 from pants.backend.graph_info.tasks.minimal_cover import MinimalCover
 from pants.backend.graph_info.tasks.paths import Path, Paths
-from pants.backend.graph_info.tasks.sorttargets import SortTargets
+from pants.backend.graph_info.tasks.sort_targets import SortTargets
 from pants.goal.task_registrar import TaskRegistrar as task
 
 
 def register_goals():
-  task(name='list', action=ListTargets).install()
   task(name='path', action=Path).install()
   task(name='paths', action=Paths).install()
   task(name='dependees', action=ReverseDepmap).install()

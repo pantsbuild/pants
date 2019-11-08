@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.docgen.targets.doc import Page, Wiki, WikiArtifact
 from pants.backend.docgen.tasks.generate_pants_reference import GeneratePantsReference

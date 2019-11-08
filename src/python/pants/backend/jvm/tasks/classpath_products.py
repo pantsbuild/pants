@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import re
-from builtins import object
 
 from twitter.common.collections import OrderedSet
 
@@ -39,7 +35,7 @@ class MissingClasspathEntryError(Exception):
   """Indicates an unexpected problem finding a classpath entry."""
 
 
-class ClasspathProducts(object):
+class ClasspathProducts:
   """
   :API: public
   """

@@ -1,23 +1,14 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import sys
-from builtins import object
+from abc import ABC
 from collections import namedtuple
 
 from twitter.common.collections import OrderedSet
 
-from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
-from pants.util.meta import AbstractClass
-
-
-# TODO: Switch all clients to reference pants.option.scope directly.
-GLOBAL_SCOPE = GLOBAL_SCOPE
-GLOBAL_SCOPE_CONFIG_SECTION = GLOBAL_SCOPE_CONFIG_SECTION
+from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 
 
 class ArgSplitterError(Exception):
@@ -38,7 +29,7 @@ class SplitArgs(namedtuple('SplitArgs',
   """
 
 
-class HelpRequest(AbstractClass):
+class HelpRequest(ABC):
   """Represents an implicit or explicit request for help by the user."""
 
 
@@ -49,9 +40,13 @@ class OptionsHelp(HelpRequest):
     :param advanced: Did the user ask for advanced help (e.g., using --help-advanced).
     :param all_scopes: Did the user ask for help for all goals and tasks (e.g., using --help-all).
     """
-    super(OptionsHelp, self).__init__()
+    super().__init__()
     self.advanced = advanced
     self.all_scopes = all_scopes
+
+
+class GoalsHelp(HelpRequest):
+  """The user requested help for installed Goals."""
 
 
 class VersionHelp(HelpRequest):
@@ -62,7 +57,7 @@ class UnknownGoalHelp(HelpRequest):
   """The user specified an unknown goal (or task)."""
 
   def __init__(self, unknown_goals):
-    super(UnknownGoalHelp, self).__init__()
+    super().__init__()
     self.unknown_goals = unknown_goals
 
 
@@ -70,7 +65,7 @@ class NoGoalHelp(HelpRequest):
   """The user specified no goals."""
 
 
-class ArgSplitter(object):
+class ArgSplitter:
   """Splits a command-line into scoped sets of flags, and a set of targets.
 
   Recognizes, e.g.:
@@ -86,7 +81,8 @@ class ArgSplitter(object):
   _HELP_ADVANCED_ARGS = ('--help-advanced', 'help-advanced')
   _HELP_ALL_SCOPES_ARGS = ('--help-all', 'help-all')
   _HELP_VERSION_ARGS = ('-v', '-V', '--version')
-  _HELP_ARGS = _HELP_BASIC_ARGS + _HELP_ADVANCED_ARGS + _HELP_ALL_SCOPES_ARGS + _HELP_VERSION_ARGS
+  _HELP_GOALS_ARGS = ('goals',)
+  _HELP_ARGS = _HELP_BASIC_ARGS + _HELP_ADVANCED_ARGS + _HELP_ALL_SCOPES_ARGS + _HELP_VERSION_ARGS + _HELP_GOALS_ARGS
 
   def __init__(self, known_scope_infos):
     self._known_scope_infos = known_scope_infos
@@ -94,7 +90,7 @@ class ArgSplitter(object):
     # that we heuristically identify target specs based on it containing /, : or being
     # a top-level directory.
     self._known_scopes = ({si.scope for si in known_scope_infos} |
-                          {'help', 'help-advanced', 'help-all'})
+                          {'goals', 'help', 'help-advanced', 'help-all'})
     self._unknown_scopes = []
     self._unconsumed_args = []  # In reverse order, for efficient popping off the end.
     self._help_request = None  # Will be set if we encounter any help flags.
@@ -119,6 +115,8 @@ class ArgSplitter(object):
       return False
     if arg in self._HELP_VERSION_ARGS:
       self._help_request = VersionHelp()
+    elif arg in self._HELP_GOALS_ARGS:
+      self._help_request = GoalsHelp()
     else:
       # First ensure that we have a basic OptionsHelp.
       if not self._help_request:

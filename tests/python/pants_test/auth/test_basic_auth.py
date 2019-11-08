@@ -1,20 +1,16 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import base64
 import os
 import threading
 from contextlib import contextmanager
-
-from future.moves.http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from pants.auth.basic_auth import BasicAuth, BasicAuthCreds, BasicAuthException
 from pants.auth.cookies import Cookies
+from pants.testutil.test_base import TestBase
 from pants.util.contextutil import environment_as, temporary_dir
-from pants_test.test_base import TestBase
 
 
 class RequestHandlerForTest(BaseHTTPRequestHandler):
@@ -44,7 +40,7 @@ def _run_test_server():
 
 class TestBasicAuth(TestBase):
   def setUp(self):
-    super(TestBasicAuth, self).setUp()
+    super().setUp()
     self.port, shutdown_func = _run_test_server()
     self.addCleanup(shutdown_func)
 

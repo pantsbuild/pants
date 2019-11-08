@@ -1,13 +1,9 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import shutil
 import time
-from builtins import open
 from textwrap import dedent
 
 from pants.backend.jvm.ivy_utils import IvyUtils
@@ -16,6 +12,7 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.java.jar.jar_dependency import JarDependency
@@ -28,11 +25,11 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(IvyResolve, cls).subsystem_dependencies() + (JvmResolveSubsystem,)
+    return super().subsystem_dependencies() + (JvmResolveSubsystem,)
 
   @classmethod
   def register_options(cls, register):
-    super(IvyResolve, cls).register_options(register)
+    super().register_options(register)
     register('--override', type=list,
              fingerprint=True,
              help='Specifies a jar dependency override in the form: '
@@ -68,14 +65,14 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(IvyResolve, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     # Codegen may inject extra resolvable deps, so make sure we have a product dependency
     # on relevant codegen tasks, if any.
     round_manager.optional_data('java')
     round_manager.optional_data('scala')
 
   def __init__(self, *args, **kwargs):
-    super(IvyResolve, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
 
     self._outdir = self.get_options().outdir or os.path.join(self.workdir, 'reports')
     self._open = self.get_options().open
@@ -89,6 +86,15 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
     """Resolves the specified confs for the configured targets and returns an iterator over
     tuples of (conf, jar path).
     """
+
+    deprecated_conditional(
+      lambda: JvmResolveSubsystem.global_instance().get_options().resolver == 'ivy',
+      removal_version='1.27.0.dev0',
+      entity_description='Ivy Resolve',
+      hint_message='resolve.ivy as well as --resolver-resolver=ivy will be removed.'
+                   'Please use --resolver-resolver=coursier instead and refer to '
+                   'https://www.pantsbuild.org/jvm_projects.html#coursier for setup.')
+
     if JvmResolveSubsystem.global_instance().get_options().resolver != 'ivy':
       return
 

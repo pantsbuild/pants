@@ -1,0 +1,4 @@
+# This revision reformatted all the python code with Black the first time.
+6c60cf752a6cc150620e8a2437974ae7d16917c5
+# This revision reverted the previous revision as more work and discussions were needed.
+33a6d51db91ea1fe69c39117c8878abcb824cdfb

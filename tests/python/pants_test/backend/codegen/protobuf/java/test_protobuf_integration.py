@@ -1,16 +1,13 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import re
-from builtins import range
+import subprocess
 
 from pants.base.build_environment import get_buildroot
-from pants.util.process_handler import subprocess
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class ProtobufIntegrationTest(PantsRunIntegrationTest):
@@ -35,7 +32,7 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
                                   stdout=subprocess.PIPE,
                                   cwd=out_path)
       java_retcode = java_run.wait()
-      java_out = java_run.stdout.read().decode('utf-8')
+      java_out = java_run.stdout.read().decode()
       self.assertEqual(java_retcode, 0)
       self.assertIn("parsec", java_out)
 
@@ -54,7 +51,7 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
         stdout=subprocess.PIPE,
         cwd=out_path)
       java_retcode = java_run.wait()
-      java_out = java_run.stdout.read().decode('utf-8')
+      java_out = java_run.stdout.read().decode()
       self.assertEqual(java_retcode, 0)
       self.assertIn("very test", java_out)
 
@@ -63,7 +60,7 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
                          '--deployjar',
                          'examples/src/java/org/pantsbuild/example/protobuf/unpacked_jars']
                         ) as pants_run:
-      self.assertEqual(pants_run.returncode, self.PANTS_SUCCESS_CODE,
+      self.assertEqual(pants_run.returncode, PANTS_SUCCEEDED_EXIT_CODE,
                         "goal bundle run expected success, got {0}\n"
                         "got stderr:\n{1}\n"
                         "got stdout:\n{2}\n".format(pants_run.returncode,
@@ -76,7 +73,7 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
               'org.pantsbuild.example.protobuf.unpacked_jars.ExampleProtobufExternalArchive']
       java_run = subprocess.Popen(args, stdout=subprocess.PIPE, cwd=out_path)
       java_retcode = java_run.wait()
-      java_out = java_run.stdout.read().decode('utf-8')
+      java_out = java_run.stdout.read().decode()
       self.assertEqual(java_retcode, 0)
       self.assertIn("Message is: Hello World!", java_out)
 

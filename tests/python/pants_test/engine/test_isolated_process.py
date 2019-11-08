@@ -1,45 +1,49 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import unittest
-from builtins import str
+from dataclasses import dataclass
+from typing import ClassVar, Tuple
 
-from future.utils import text_type
-
-from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, Digest, FileContent, FilesContent, PathGlobs,
-                             Snapshot)
-from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcessResult,
-                                           FallibleExecuteProcessResult, ProcessExecutionFailure)
+from pants.engine.fs import (
+  EMPTY_DIRECTORY_DIGEST,
+  Digest,
+  FileContent,
+  FilesContent,
+  InputFilesContent,
+  PathGlobs,
+  Snapshot,
+)
+from pants.engine.isolated_process import (
+  ExecuteProcessRequest,
+  ExecuteProcessResult,
+  FallibleExecuteProcessResult,
+  ProcessExecutionFailure,
+)
 from pants.engine.rules import RootRule, rule
 from pants.engine.scheduler import ExecutionError
-from pants.engine.selectors import Get, Select
+from pants.engine.selectors import Get
+from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir
-from pants.util.objects import TypeCheckError, datatype
-from pants_test.test_base import TestBase
 
 
-class Concatted(datatype([('value', text_type)])): pass
+@dataclass(frozen=True)
+class Concatted:
+  value: str
 
 
-class BinaryLocation(datatype([('bin_path', text_type)])):
+@dataclass(frozen=True)
+class BinaryLocation:
+  bin_path: str
 
-  def __new__(cls, bin_path):
-    this_object = super(BinaryLocation, cls).__new__(cls, text_type(bin_path))
-
-    bin_path = this_object.bin_path
-
-    if os.path.isfile(bin_path) and os.access(bin_path, os.X_OK):
-      return this_object
-
-    raise cls.make_type_error("path {} does not name an existing executable file."
-                              .format(bin_path))
+  def __post_init__(self):
+    if not os.path.isfile(self.bin_path) or not os.access(self.bin_path, os.X_OK):
+      raise ValueError(f"path {self.bin_path} does not name an existing executable file.")
 
 
-class ShellCat(datatype([('binary_location', BinaryLocation)])):
+@dataclass(frozen=True)
+class ShellCat:
   """Wrapper class to show an example of using an auxiliary class (which wraps
   an executable) to generate an argv instead of doing it all in
   CatExecutionRequest. This can be used to encapsulate operations such as
@@ -47,6 +51,7 @@ class ShellCat(datatype([('binary_location', BinaryLocation)])):
   can reduce boilerplate for generating ExecuteProcessRequest instances if the
   executable is used in different ways across multiple different types of
   process execution requests."""
+  binary_location: BinaryLocation
 
   @property
   def bin_path(self):
@@ -66,11 +71,14 @@ class ShellCat(datatype([('binary_location', BinaryLocation)])):
     return (self.bin_path, "/dev/null") + tuple(cat_file_paths)
 
 
-class CatExecutionRequest(datatype([('shell_cat', ShellCat), ('path_globs', PathGlobs)])): pass
+@dataclass(frozen=True)
+class CatExecutionRequest:
+  shell_cat: ShellCat
+  path_globs: PathGlobs
 
 
-@rule(Concatted, [Select(CatExecutionRequest)])
-def cat_files_process_result_concatted(cat_exe_req):
+@rule
+def cat_files_process_result_concatted(cat_exe_req: CatExecutionRequest) -> Concatted:
   cat_bin = cat_exe_req.shell_cat
   cat_files_snapshot = yield Get(Snapshot, PathGlobs, cat_exe_req.path_globs)
   process_request = ExecuteProcessRequest(
@@ -79,7 +87,7 @@ def cat_files_process_result_concatted(cat_exe_req):
     description='cat some files',
   )
   cat_process_result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, process_request)
-  yield Concatted(cat_process_result.stdout.decode('utf-8'))
+  yield Concatted(cat_process_result.stdout.decode())
 
 
 def create_cat_stdout_rules():
@@ -89,9 +97,10 @@ def create_cat_stdout_rules():
   ]
 
 
-class JavacVersionExecutionRequest(datatype([('binary_location', BinaryLocation)])):
-
-  description = 'obtaining javac version'
+@dataclass(frozen=True)
+class JavacVersionExecutionRequest:
+  binary_location: BinaryLocation
+  description: ClassVar[str] = 'obtaining javac version'
 
   @property
   def bin_path(self):
@@ -101,11 +110,13 @@ class JavacVersionExecutionRequest(datatype([('binary_location', BinaryLocation)
     return (self.bin_path, '-version',)
 
 
-class JavacVersionOutput(datatype([('value', text_type)])): pass
+@dataclass(frozen=True)
+class JavacVersionOutput:
+  value: str
 
 
-@rule(JavacVersionOutput, [Select(JavacVersionExecutionRequest)])
-def get_javac_version_output(javac_version_command):
+@rule
+def get_javac_version_output(javac_version_command: JavacVersionExecutionRequest) -> JavacVersionOutput:
   javac_version_proc_req = ExecuteProcessRequest(
     argv=javac_version_command.gen_argv(),
     description=javac_version_command.description,
@@ -114,10 +125,11 @@ def get_javac_version_output(javac_version_command):
   javac_version_proc_result = yield Get(
     ExecuteProcessResult, ExecuteProcessRequest, javac_version_proc_req)
 
-  yield JavacVersionOutput(text_type(javac_version_proc_result.stderr))
+  yield JavacVersionOutput(javac_version_proc_result.stderr.decode())
 
 
-class JavacSources(datatype([('java_files', tuple)])):
+@dataclass(frozen=True)
+class JavacSources:
   """Wrapper for the paths to include for Java source files.
 
   This shows an example of making a custom type to wrap generic types such as str to add usage
@@ -126,12 +138,13 @@ class JavacSources(datatype([('java_files', tuple)])):
   See CatExecutionRequest and rules above for an example of using PathGlobs
   which does not introduce this additional layer of indirection.
   """
+  java_files: Tuple[str, ...]
 
 
-class JavacCompileRequest(datatype([
-    ('binary_location', BinaryLocation),
-    ('javac_sources', JavacSources),
-])):
+@dataclass(frozen=True)
+class JavacCompileRequest:
+  binary_location: BinaryLocation
+  javac_sources: JavacSources
 
   @property
   def bin_path(self):
@@ -141,11 +154,11 @@ class JavacCompileRequest(datatype([
     return (self.bin_path,) + snapshot.files
 
 
-class JavacCompileResult(datatype([
-  ('stdout', text_type),
-  ('stderr', text_type),
-  ('directory_digest', Digest),
-])): pass
+@dataclass(frozen=True)
+class JavacCompileResult:
+  stdout: str
+  stderr: str
+  directory_digest: Digest
 
 
 # Note that this rule assumes that no additional classes are generated other than one for each
@@ -154,8 +167,8 @@ class JavacCompileResult(datatype([
 # exhaustively correct java compilation.
 # This rule/test should be deleted when we have more real java rules (or anything else which serves
 # as a suitable rule-writing example).
-@rule(JavacCompileResult, [Select(JavacCompileRequest)])
-def javac_compile_process_result(javac_compile_req):
+@rule
+def javac_compile_process_result(javac_compile_req: JavacCompileRequest) -> JavacCompileResult:
   java_files = javac_compile_req.javac_sources.java_files
   for java_file in java_files:
     if not java_file.endswith(".java"):
@@ -170,12 +183,9 @@ def javac_compile_process_result(javac_compile_req):
   )
   javac_proc_result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, process_request)
 
-  stdout = javac_proc_result.stdout
-  stderr = javac_proc_result.stderr
-
   yield JavacCompileResult(
-    text_type(stdout),
-    text_type(stderr),
+    javac_proc_result.stdout.decode(),
+    javac_proc_result.stderr.decode(),
     javac_proc_result.output_directory_digest,
   )
 
@@ -188,66 +198,6 @@ def create_javac_compile_rules():
 
 
 class ExecuteProcessRequestTest(unittest.TestCase):
-  def _default_args_execute_process_request(self, argv=tuple(), env=None):
-    env = env or dict()
-    return ExecuteProcessRequest(
-      argv=argv,
-      description='',
-      env=env,
-      input_files=EMPTY_DIRECTORY_DIGEST,
-      output_files=(),
-    )
-
-  def test_blows_up_on_invalid_args(self):
-    try:
-      self._default_args_execute_process_request()
-    except ValueError:
-      self.assertTrue(False, "should be able to construct without error")
-
-    with self.assertRaises(TypeCheckError):
-      self._default_args_execute_process_request(argv=['1'])
-    with self.assertRaises(TypeCheckError):
-      self._default_args_execute_process_request(argv=('1',), env=['foo', 'bar'])
-
-    with self.assertRaisesRegexp(TypeCheckError, "env"):
-      ExecuteProcessRequest(
-        argv=('1',),
-        env=(),
-        input_files='',
-        output_files=(),
-        output_directories=(),
-        timeout_seconds=0.1,
-        description=''
-      )
-    with self.assertRaisesRegexp(TypeCheckError, "input_files"):
-      ExecuteProcessRequest(argv=('1',),
-        env=dict(),
-        input_files=3,
-        output_files=(),
-        output_directories=(),
-        timeout_seconds=0.1,
-        description=''
-      )
-    with self.assertRaisesRegexp(TypeCheckError, "output_files"):
-      ExecuteProcessRequest(
-        argv=('1',),
-        env=dict(),
-        input_files=EMPTY_DIRECTORY_DIGEST,
-        output_files=("blah"),
-        output_directories=(),
-        timeout_seconds=0.1,
-        description=''
-      )
-    with self.assertRaisesRegexp(TypeCheckError, "timeout"):
-      ExecuteProcessRequest(
-        argv=('1',),
-        env=dict(),
-        input_files=EMPTY_DIRECTORY_DIGEST,
-        output_files=("blah"),
-        output_directories=(),
-        timeout_seconds=None,
-        description=''
-      )
 
   def test_create_from_snapshot_with_env(self):
     req = ExecuteProcessRequest(
@@ -259,11 +209,94 @@ class ExecuteProcessRequestTest(unittest.TestCase):
     self.assertEqual(req.env, ('VAR', 'VAL'))
 
 
+class TestInputFileCreation(TestBase):
+  def test_input_file_creation(self):
+    file_name = 'some.filename'
+    file_contents = b'some file contents'
+
+    input_file = InputFilesContent((FileContent(path=file_name, content=file_contents, is_executable=False),))
+    digest, = self.scheduler.product_request(Digest, [input_file])
+
+    req = ExecuteProcessRequest(
+      argv=('/bin/cat', file_name),
+      input_files=digest,
+      description='cat the contents of this file',
+    )
+
+    result, = self.scheduler.product_request(ExecuteProcessResult, [req])
+    self.assertEqual(result.stdout, file_contents)
+
+  def test_multiple_file_creation(self):
+    input_files_content = InputFilesContent((
+      FileContent(path='a.txt', content=b'hello', is_executable=False),
+      FileContent(path='b.txt', content=b'goodbye', is_executable=False),
+    ))
+
+    digest, = self.scheduler.product_request(Digest, [input_files_content])
+
+    req = ExecuteProcessRequest(
+      argv=('/bin/cat', 'a.txt', 'b.txt'),
+      input_files=digest,
+      description='cat the contents of this file',
+    )
+
+    result, = self.scheduler.product_request(ExecuteProcessResult, [req])
+    self.assertEqual(result.stdout, b'hellogoodbye')
+
+  def test_file_in_directory_creation(self):
+    path = 'somedir/filename'
+    content = b'file contents'
+
+    input_file = InputFilesContent((FileContent(path=path, content=content, is_executable=False),))
+    digest, = self.scheduler.product_request(Digest, [input_file])
+
+    req = ExecuteProcessRequest(
+      argv=('/bin/cat', 'somedir/filename'),
+      input_files=digest,
+      description="Cat a file in a directory to make sure that doesn't break",
+    )
+
+    result, = self.scheduler.product_request(ExecuteProcessResult, [req])
+    self.assertEqual(result.stdout, content)
+
+  def test_not_executable(self):
+    file_name = 'echo.sh'
+    file_contents = b'#!/bin/bash -eu\necho "Hello"\n'
+
+    input_file = InputFilesContent((FileContent(path=file_name, content=file_contents, is_executable=False),))
+    digest, = self.scheduler.product_request(Digest, [input_file])
+
+    req = ExecuteProcessRequest(
+      argv=('./echo.sh',),
+      input_files=digest,
+      description='cat the contents of this file',
+    )
+
+    with self.assertRaisesWithMessageContaining(ExecutionError, "Permission"):
+      self.scheduler.product_request(ExecuteProcessResult, [req])
+
+  def test_executable(self):
+    file_name = 'echo.sh'
+    file_contents = b'#!/bin/bash -eu\necho "Hello"\n'
+
+    input_file = InputFilesContent((FileContent(path=file_name, content=file_contents, is_executable=True),))
+    digest, = self.scheduler.product_request(Digest, [input_file])
+
+    req = ExecuteProcessRequest(
+      argv=('./echo.sh',),
+      input_files=digest,
+      description='cat the contents of this file',
+    )
+
+    result, = self.scheduler.product_request(ExecuteProcessResult, [req])
+    self.assertEqual(result.stdout, b"Hello\n")
+
+
 class IsolatedProcessTest(TestBase, unittest.TestCase):
 
   @classmethod
   def rules(cls):
-    return super(IsolatedProcessTest, cls).rules() + [
+    return super().rules() + [
       RootRule(JavacVersionExecutionRequest),
       get_javac_version_output,
     ] + create_cat_stdout_rules() + create_javac_compile_rules()
@@ -302,7 +335,7 @@ class IsolatedProcessTest(TestBase, unittest.TestCase):
     self.assertEqual(
       execute_process_result.output_directory_digest,
       Digest(
-        fingerprint=text_type("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
+        fingerprint="63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16",
         serialized_bytes_length=80,
       )
     )
@@ -314,7 +347,7 @@ class IsolatedProcessTest(TestBase, unittest.TestCase):
 
     self.assertEqual(
       files_content_result.dependencies,
-      (FileContent("roland", b"European Burmese"),)
+      (FileContent("roland", b"European Burmese", False),)
     )
 
   def test_exercise_python_side_of_timeout_implementation(self):

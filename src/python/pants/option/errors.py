@@ -1,10 +1,7 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from pants.option.arg_splitter import GLOBAL_SCOPE
+from pants.option.scope import GLOBAL_SCOPE
 
 
 class OptionsError(Exception):
@@ -15,7 +12,7 @@ class RegistrationError(OptionsError):
   """An error at option registration time."""
 
   def __init__(self, msg, scope, option):
-    super(RegistrationError, self).__init__(
+    super().__init__(
       '{} [option {} in {}].'.format(msg, option,
       'global scope' if scope == GLOBAL_SCOPE else 'scope {}'.format(scope)))
 
@@ -30,7 +27,7 @@ class ParseError(OptionsError):
 def mk_registration_error(msg):
   class Anon(RegistrationError):
     def __init__(self, scope, option, **msg_format_args):
-      super(Anon, self).__init__(msg.format(**msg_format_args), scope, option)
+      super().__init__(msg.format(**msg_format_args), scope, option)
   return Anon
 
 

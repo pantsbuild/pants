@@ -1,20 +1,16 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import multiprocessing
 import threading
-from builtins import next, object
 from multiprocessing.pool import ThreadPool
 
-from future.moves import _thread
+import _thread
 
 from pants.reporting.report import Report
 
 
-class Work(object):
+class Work:
   """Represents multiple concurrent calls to the same callable."""
 
   def __init__(self, func, args_tuples, workunit_name=None):
@@ -29,19 +25,27 @@ class Work(object):
     self.workunit_name = workunit_name
 
 
-class WorkerPool(object):
+class WorkerPool:
   """A pool of workers.
 
   Workers are threads, and so are subject to GIL constraints. Submitting CPU-bound work
   may not be effective. Use this class primarily for IO-bound work.
   """
 
-  def __init__(self, parent_workunit, run_tracker, num_workers):
+  def __init__(self, parent_workunit, run_tracker, num_workers, thread_name_prefix):
     self._run_tracker = run_tracker
+    self.thread_lock = threading.Lock()
+    self.thread_counter = 0
+    def intitialize():
+      with self.thread_lock:
+        threading.current_thread().name = "{}-{}".format(thread_name_prefix, self.thread_counter)
+        self.thread_counter += 1
+      self._run_tracker.register_thread(parent_workunit)
+
     # All workers accrue work to the same root.
     self._pool = ThreadPool(processes=num_workers,
-                            initializer=self._run_tracker.register_thread,
-                            initargs=(parent_workunit, ))
+                            initializer=intitialize,
+                            )
     # We mustn't shutdown when there are pending workchains, as they may need to submit work
     # in the future, and the pool doesn't know about this yet.
     self._pending_workchains = 0
@@ -170,7 +174,7 @@ class WorkerPool(object):
     self._pool.terminate()
 
 
-class SubprocPool(object):
+class SubprocPool:
   """Singleton for managing multiprocessing.Pool instances
 
   Subprocesses (including multiprocessing.Pool workers) can inherit locks in poorly written

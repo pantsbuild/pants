@@ -1,16 +1,12 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from builtins import str
 
 from pants.engine.selectors import Params
 from pants.init.options_initializer import BuildConfigInitializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.scope import GLOBAL_SCOPE, Scope, ScopedOptions
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 class TestEngineOptionsParsing(TestBase):
@@ -28,7 +24,7 @@ class TestEngineOptionsParsing(TestBase):
 
   def test_options_parse_scoped(self):
     options_bootstrapper = self._ob(
-        args=['./pants', '-ldebug', '--python-setup-wheel-version=3.13.37', 'binary', 'src/python::'],
+        args=['./pants', '-ldebug', 'binary', 'src/python::'],
         env=dict(PANTS_ENABLE_PANTSD='True', PANTS_BINARIES_BASEURLS='["https://bins.com"]'),
       )
 
@@ -43,7 +39,7 @@ class TestEngineOptionsParsing(TestBase):
     self.assertEqual(global_options.options.enable_pantsd, True)
     self.assertEqual(global_options.options.binaries_baseurls, ['https://bins.com'])
 
-    self.assertEqual(python_setup_options.options.wheel_version, '3.13.37')
+    self.assertEqual(python_setup_options.options.platforms, ['current'])
 
   def test_options_parse_memoization(self):
     # Confirm that re-executing with a new-but-identical Options object results in memoization.

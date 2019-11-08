@@ -5,7 +5,9 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd ../../.. && pwd -P)"
 # Exposes:
 # + die: Exit in a failure state and optionally log an error message to the console.
 # + fingerprint_data: Fingerprints the data on stdin.
-source ${REPO_ROOT}/build-support/common.sh
+
+# shellcheck source=build-support/common.sh
+source "${REPO_ROOT}/build-support/common.sh"
 
 KERNEL=$(uname -s | tr '[:upper:]' '[:lower:]')
 case "${KERNEL}" in
@@ -40,19 +42,19 @@ function calculate_current_hash() {
   #
   # Assumes we're in the venv that will be used to build the native engine.
   (
-   cd ${REPO_ROOT}
+   cd "${REPO_ROOT}" || exit 1
    (echo "${MODE_FLAG}"
     echo "${RUST_TOOLCHAIN}"
     uname
     python --version 2>&1
-    git ls-files -c -o --exclude-standard \
+    git ls-files --cached --others --exclude-standard \
      "${NATIVE_ROOT}" \
      "${REPO_ROOT}/rust-toolchain" \
      "${REPO_ROOT}/src/python/pants/engine/native.py" \
      "${REPO_ROOT}/build-support/bin/native" \
      "${REPO_ROOT}/3rdparty/python/requirements.txt" \
    | grep -v -E -e "/BUILD$" -e "/[^/]*\.md$" \
-   | git hash-object -t blob --stdin-paths) | fingerprint_data
+   | git hash-object --stdin-paths) | fingerprint_data
   )
 }
 
@@ -60,16 +62,20 @@ function _build_native_code() {
   # Builds the native code, and echos the path of the built binary.
 
   (
+    # Change into $REPO_ROOT in a subshell. This is necessary so that we're in a child of a
+    # directory containing the rust-toolchain file, so that rustup knows which version of rust we
+    # should be using.
     cd "${REPO_ROOT}"
     "${REPO_ROOT}/build-support/bin/native/cargo" build ${MODE_FLAG} \
-      --manifest-path "${NATIVE_ROOT}/Cargo.toml" -p engine
+      --manifest-path "${NATIVE_ROOT}/Cargo.toml" -p engine_cffi
   ) || die
-  echo "${NATIVE_ROOT}/target/${MODE}/libengine.${LIB_EXTENSION}"
+  echo "${NATIVE_ROOT}/target/${MODE}/libengine_cffi.${LIB_EXTENSION}"
 }
 
 function bootstrap_native_code() {
   # Bootstraps the native code only if needed.
-  local native_engine_version="$(calculate_current_hash)"
+  local native_engine_version
+  native_engine_version="$(calculate_current_hash)"
   local engine_version_hdr="engine_version: ${native_engine_version}"
   local target_binary="${NATIVE_ENGINE_CACHE_DIR}/${native_engine_version}/${NATIVE_ENGINE_BINARY}"
   local target_binary_metadata="${target_binary}.metadata"
@@ -90,7 +96,7 @@ function bootstrap_native_code() {
     target_binary="${NATIVE_ENGINE_CACHE_DIR}/${native_engine_version}/${NATIVE_ENGINE_BINARY}"
     target_binary_metadata="${target_binary}.metadata"
 
-    mkdir -p "$(dirname ${target_binary})"
+    mkdir -p "$(dirname "${target_binary}")"
     cp "${native_binary}" "${target_binary}"
 
     local -r metadata_file=$(mktemp -t pants.native_engine.metadata.XXXXXX)

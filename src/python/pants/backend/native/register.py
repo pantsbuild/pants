@@ -1,18 +1,16 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from pants.backend.native.config.environment import create_native_environment_rules
 from pants.backend.native.subsystems.binaries.binutils import create_binutils_rules
 from pants.backend.native.subsystems.binaries.gcc import create_gcc_rules
 from pants.backend.native.subsystems.binaries.llvm import create_llvm_rules
 from pants.backend.native.subsystems.native_build_settings import NativeBuildSettings
 from pants.backend.native.subsystems.native_toolchain import create_native_toolchain_rules
 from pants.backend.native.subsystems.xcode_cli_tools import create_xcode_cli_tools_rules
-from pants.backend.native.targets.external_native_library import (ConanRequirement,
-                                                                  ExternalNativeLibrary)
+from pants.backend.native.targets.external_native_library import (
+  ConanRequirement,
+  ExternalNativeLibrary,
+)
 from pants.backend.native.targets.native_artifact import NativeArtifact
 from pants.backend.native.targets.native_library import CLibrary, CppLibrary
 from pants.backend.native.targets.packaged_native_library import PackagedNativeLibrary
@@ -56,7 +54,6 @@ def register_goals():
 
 def rules():
   return (
-    create_native_environment_rules() +
     create_native_toolchain_rules() +
     create_xcode_cli_tools_rules() +
     create_binutils_rules() +

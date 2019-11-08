@@ -1,17 +1,14 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import json
 import unittest
 
-from pants_test.subsystem import subsystem_util
+from pants.testutil.subsystem.util import init_subsystem
 
 from pants.contrib.python.checks.checker.common import CheckstylePlugin
-from pants.contrib.python.checks.tasks.checkstyle.plugin_subsystem_base import (PluginSubsystemBase,
-                                                                                default_subsystem_for_plugin)
+from pants.contrib.python.checks.tasks.checkstyle.plugin_subsystem_base import (
+  PluginSubsystemBase, default_subsystem_for_plugin)
 
 
 class Plugin(CheckstylePlugin):
@@ -44,8 +41,7 @@ class PluginSubsystemBaseTest(unittest.TestCase):
     opts = expected.copy()
     opts.update(unexpected)
 
-    subsystem_util.init_subsystem(subsystem_type,
-                                  options={subsystem_type.options_scope: opts})
+    init_subsystem(subsystem_type, options={subsystem_type.options_scope: opts})
 
     subsystem_instance = subsystem_type.global_instance()
     self.assertTrue(subsystem_instance.get_options().skip)

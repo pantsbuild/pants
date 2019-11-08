@@ -1,15 +1,10 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from future.utils import text_type
 
 from pants.engine.fs import Digest, Snapshot
 from pants.source.payload_fields import SourcesField
 from pants.source.wrapped_globs import Globs, LazyFilesetWithSpec
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 class PayloadTest(TestBase):
@@ -82,7 +77,7 @@ class PayloadTest(TestBase):
     self.assertEqual(['foo/foo/a.txt'], list(sf.relative_to_buildroot()))
 
     digest = '56001a7e48555f156420099a99da60a7a83acc90853046709341bf9f00a6f944'
-    want_snapshot = Snapshot(Digest(text_type(digest), 77), ('foo/foo/a.txt',), ())
+    want_snapshot = Snapshot(Digest(digest, 77), ('foo/foo/a.txt',), ())
 
     # We explicitly pass a None scheduler because we expect no scheduler lookups to be required
     # in order to get a Snapshot.

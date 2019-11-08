@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import open, str
 from contextlib import contextmanager
 
 import requests
@@ -13,8 +9,8 @@ import requests
 from pants.cache.artifact import ArtifactError
 from pants.cache.artifact_cache import NonfatalArtifactCacheError, UnreadableArtifact
 from pants.goal.artifact_cache_stats import ArtifactCacheStats
+from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir
-from pants_test.test_base import TestBase
 
 
 class ArtifactCacheStatsTest(TestBase):
@@ -30,7 +26,7 @@ class ArtifactCacheStatsTest(TestBase):
   TEST_SPEC_C = 'src/java/c'
 
   def setUp(self):
-    super(ArtifactCacheStatsTest, self).setUp()
+    super().setUp()
 
     self.target_a = self.make_target(spec=self.TEST_SPEC_A)
     self.target_b = self.make_target(spec=self.TEST_SPEC_B)

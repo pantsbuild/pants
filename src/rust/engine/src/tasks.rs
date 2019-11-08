@@ -1,16 +1,94 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
+use std::fmt;
 
-use crate::core::{Function, Key, TypeConstraint, TypeId, Value, FNV};
-use crate::externs;
-use crate::selectors::{Get, Select};
+use crate::core::{Function, TypeId};
+use crate::selectors::{DependencyKey, Get, Select};
 use crate::types::Types;
+
+use rule_graph;
+
+#[derive(Eq, Hash, PartialEq, Clone, Debug)]
+pub enum Rule {
+  // Intrinsic rules are implemented in rust.
+  Intrinsic(Intrinsic),
+  // Task rules are implemented in python.
+  Task(Task),
+}
+
+impl rule_graph::Rule for Rule {
+  type TypeId = TypeId;
+  type DependencyKey = DependencyKey;
+
+  fn dependency_keys(&self) -> Vec<DependencyKey> {
+    match self {
+      &Rule::Task(Task {
+        ref clause,
+        ref gets,
+        ..
+      }) => clause
+        .iter()
+        .map(|s| DependencyKey::JustSelect(*s))
+        .chain(gets.iter().map(|g| DependencyKey::JustGet(*g)))
+        .collect(),
+      &Rule::Intrinsic(Intrinsic { ref input, .. }) => {
+        vec![DependencyKey::JustSelect(Select::new(*input))]
+      }
+    }
+  }
+
+  fn require_reachable(&self) -> bool {
+    match self {
+      &Rule::Task(_) => true,
+      &Rule::Intrinsic(_) => false,
+    }
+  }
+}
+
+impl fmt::Display for Rule {
+  fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+    match self {
+      &Rule::Task(ref task) => {
+        let product = format!("{}", task.product);
+        let mut clause_portion = task
+          .clause
+          .iter()
+          .map(|c| c.product.to_string())
+          .collect::<Vec<_>>()
+          .join(", ");
+        clause_portion = format!("[{}]", clause_portion);
+        let mut get_portion = task
+          .gets
+          .iter()
+          .map(::std::string::ToString::to_string)
+          .collect::<Vec<_>>()
+          .join(", ");
+        get_portion = if task.gets.is_empty() {
+          "".to_string()
+        } else {
+          format!("[{}], ", get_portion)
+        };
+
+        write!(
+          f,
+          "({}, {}, {}{})",
+          product, clause_portion, get_portion, task.func,
+        )
+      }
+      &Rule::Intrinsic(ref intrinsic) => write!(
+        f,
+        "({}, [{}], <intrinsic>)",
+        intrinsic.product, intrinsic.input,
+      ),
+    }
+  }
+}
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Task {
-  pub product: TypeConstraint,
+  pub product: TypeId,
   pub clause: Vec<Select>,
   pub gets: Vec<Get>,
   pub func: Function,
@@ -18,77 +96,44 @@ pub struct Task {
 }
 
 ///
-/// Registry of native (rust) Intrinsic tasks, user (python) Tasks, and Singletons.
+/// Registry of native (rust) Intrinsic tasks and user (python) Tasks.
 ///
 #[derive(Clone, Debug)]
 pub struct Tasks {
-  // output product type -> Intrinsic providing it
-  intrinsics: HashMap<TypeConstraint, Vec<Intrinsic>, FNV>,
-  // Singleton Values to be returned for a given TypeConstraint.
-  singletons: HashMap<TypeConstraint, (Key, Value), FNV>,
-  // output product type -> list of tasks providing it
-  tasks: HashMap<TypeConstraint, Vec<Task>, FNV>,
+  // output product type -> list of rules providing it
+  rules: HashMap<TypeId, Vec<Rule>>,
   // Used during the construction of the tasks map.
   preparing: Option<Task>,
 }
 
+///
+/// A collection of Rules (TODO: rename to Rules).
 ///
 /// Defines a stateful lifecycle for defining tasks via the C api. Call in order:
 ///   1. task_begin() - once per task
 ///   2. add_*() - zero or more times per task to add input clauses
 ///   3. task_end() - once per task
 ///
-/// Also has a one-shot method for adding Singletons (which have no Selects):
-///   * singleton_add()
-///
 /// (This protocol was original defined in a Builder, but that complicated the C lifecycle.)
 ///
 impl Tasks {
   pub fn new() -> Tasks {
     Tasks {
-      intrinsics: HashMap::default(),
-      singletons: HashMap::default(),
-      tasks: HashMap::default(),
+      rules: HashMap::default(),
       preparing: None,
     }
   }
 
-  pub fn all_product_types(&self) -> HashSet<TypeConstraint> {
-    self
-      .singletons
-      .keys()
-      .chain(self.tasks.keys())
-      .chain(self.intrinsics.keys())
-      .cloned()
-      .collect::<HashSet<_>>()
-  }
-
-  pub fn all_tasks(&self) -> Vec<&Task> {
-    self.tasks.values().flat_map(|tasks| tasks).collect()
-  }
-
-  pub fn singleton_types(&self) -> Vec<TypeId> {
-    self
-      .singletons
-      .values()
-      .map(|&(k, _)| *k.type_id())
-      .collect()
-  }
-
-  pub fn gen_singleton(&self, product: &TypeConstraint) -> Option<&(Key, Value)> {
-    self.singletons.get(product)
-  }
-
-  pub fn gen_intrinsic(&self, product: &TypeConstraint) -> Option<&Vec<Intrinsic>> {
-    self.intrinsics.get(product)
-  }
-
-  pub fn gen_tasks(&self, product: &TypeConstraint) -> Option<&Vec<Task>> {
-    self.tasks.get(product)
+  pub fn as_map(&self) -> &HashMap<TypeId, Vec<Rule>> {
+    &self.rules
   }
 
   pub fn intrinsics_set(&mut self, types: &Types) {
     let intrinsics = vec![
+      Intrinsic {
+        product: types.directory_digest,
+        input: types.input_files_content,
+      },
       Intrinsic {
         product: types.snapshot,
         input: types.path_globs,
@@ -98,45 +143,40 @@ impl Tasks {
         input: types.url_to_fetch,
       },
       Intrinsic {
+        product: types.snapshot,
+        input: types.directory_digest,
+      },
+      Intrinsic {
         product: types.files_content,
         input: types.directory_digest,
       },
       Intrinsic {
         product: types.directory_digest,
-        input: types.merged_directories,
+        input: types.directories_to_merge,
+      },
+      Intrinsic {
+        product: types.directory_digest,
+        input: types.directory_with_prefix_to_strip,
+      },
+      Intrinsic {
+        product: types.directory_digest,
+        input: types.directory_with_prefix_to_add,
       },
       Intrinsic {
         product: types.process_result,
-        input: types.process_request,
+        input: types.multi_platform_process_request,
       },
     ];
 
-    self.intrinsics = vec![].into_iter().collect();
     for intrinsic in intrinsics {
-      self
-        .intrinsics
-        .entry(intrinsic.product)
-        .or_insert_with(Vec::new)
-        .push(intrinsic)
+      self.insert_rule(intrinsic.product, Rule::Intrinsic(intrinsic))
     }
-  }
-
-  pub fn singleton_add(&mut self, value: Value, product: TypeConstraint) {
-    if let Some(&(_, ref existing_value)) = self.singletons.get(&product) {
-      panic!(
-        "More than one Singleton rule was installed for the product {:?}: {:?} vs {:?}",
-        product, existing_value, value,
-      );
-    }
-    self
-      .singletons
-      .insert(product, (externs::key_for(value.clone()), value));
   }
 
   ///
   /// The following methods define the Task registration lifecycle.
   ///
-  pub fn task_begin(&mut self, func: Function, product: TypeConstraint, cacheable: bool) {
+  pub fn task_begin(&mut self, func: Function, product: TypeId, cacheable: bool) {
     assert!(
       self.preparing.is_none(),
       "Must `end()` the previous task creation before beginning a new one!"
@@ -151,7 +191,7 @@ impl Tasks {
     });
   }
 
-  pub fn add_get(&mut self, product: TypeConstraint, subject: TypeId) {
+  pub fn add_get(&mut self, product: TypeId, subject: TypeId) {
     self
       .preparing
       .as_mut()
@@ -163,7 +203,7 @@ impl Tasks {
       });
   }
 
-  pub fn add_select(&mut self, product: TypeConstraint) {
+  pub fn add_select(&mut self, product: TypeId) {
     self
       .preparing
       .as_mut()
@@ -173,27 +213,29 @@ impl Tasks {
   }
 
   pub fn task_end(&mut self) {
-    // Move the task from `preparing` to the Tasks map
-    let mut task = self
+    // Move the task from `preparing` to the Rules map
+    let task = self
       .preparing
       .take()
       .expect("Must `begin()` a task creation before ending it!");
-    let tasks = self.tasks.entry(task.product).or_insert_with(Vec::new);
+    self.insert_rule(task.product, Rule::Task(task))
+  }
+
+  fn insert_rule(&mut self, product: TypeId, rule: Rule) {
+    let rules = self.rules.entry(product).or_insert_with(Vec::new);
     assert!(
-      !tasks.contains(&task),
+      !rules.contains(&rule),
       "{:?} was double-registered for {:?}: {:?}",
-      task,
-      task.product,
-      tasks,
+      rule,
+      product,
+      rules,
     );
-    task.clause.shrink_to_fit();
-    task.gets.shrink_to_fit();
-    tasks.push(task);
+    rules.push(rule);
   }
 }
 
 #[derive(Eq, Hash, PartialEq, Clone, Copy, Debug)]
 pub struct Intrinsic {
-  pub product: TypeConstraint,
-  pub input: TypeConstraint,
+  pub product: TypeId,
+  pub input: TypeId,
 }

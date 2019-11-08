@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from textwrap import dedent
 
@@ -14,7 +11,7 @@ from pants.backend.python.targets.python_requirement_library import PythonRequir
 from pants.base.exceptions import TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
-from pants_test.task_test_base import ConsoleTaskTestBase
+from pants.testutil.task_test_base import ConsoleTaskTestBase
 
 
 # TODO: This test should create some dummy target types, instead of depending on other backends.
@@ -54,7 +51,7 @@ class FilterEmptyTargetsTest(BaseFilterTest):
 class FilterTest(BaseFilterTest):
 
   def setUp(self):
-    super(FilterTest, self).setUp()
+    super().setUp()
 
     requirement_injected = set()
 

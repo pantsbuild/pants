@@ -1,18 +1,15 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import functools
 import re
-from abc import abstractproperty
-from builtins import str
+from abc import ABC, ABCMeta, abstractmethod
+from typing import Optional
 
 from pants.engine.selectors import Get
 from pants.option.errors import OptionsError
 from pants.option.scope import Scope, ScopedOptions, ScopeInfo
-from pants.util.meta import AbstractClass, classproperty
+from pants.util.meta import classproperty
 
 
 def _construct_optionable(optionable_factory):
@@ -21,18 +18,20 @@ def _construct_optionable(optionable_factory):
   yield optionable_factory.optionable_cls(scope, scoped_options.options)
 
 
-class OptionableFactory(AbstractClass):
+class OptionableFactory(ABC):
   """A mixin that provides a method that returns an @rule to construct subclasses of Optionable.
 
   Optionable subclasses constructed in this manner must have a particular constructor shape, which is
   loosely defined by `_construct_optionable` and `OptionableFactory.signature`.
   """
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def optionable_cls(self):
     """The Optionable class that is constructed by this OptionableFactory."""
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def options_scope(self):
     """The scope from which the ScopedOptions for the target Optionable will be parsed."""
 
@@ -49,17 +48,17 @@ class OptionableFactory(AbstractClass):
         output_type=cls.optionable_cls,
         input_selectors=tuple(),
         func=partial_construct_optionable,
-        input_gets=(Get(ScopedOptions, Scope),),
+        input_gets=(Get.create_statically_for_rule_graph(ScopedOptions, Scope),),
         dependency_optionables=(cls.optionable_cls,),
       )
 
 
-class Optionable(OptionableFactory, AbstractClass):
+class Optionable(OptionableFactory, metaclass=ABCMeta):
   """A mixin for classes that can register options on some scope."""
 
   # Subclasses must override.
-  options_scope = None
-  options_scope_category = None
+  options_scope: Optional[str] = None
+  options_scope_category: Optional[str] = None
 
   # Subclasses may override these to specify a deprecated former name for this Optionable's scope.
   # Option values can be read from the deprecated scope, but a deprecation warning will be issued.
@@ -148,4 +147,4 @@ class Optionable(OptionableFactory, AbstractClass):
     # subclass anyway.
     cls = type(self)
     if not isinstance(cls.options_scope, str):
-      raise NotImplementedError('{} must set an options_scope class-level property.'.format(cls))
+      raise NotImplementedError(f'{cls} must set an options_scope class-level property.')

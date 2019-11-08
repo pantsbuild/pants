@@ -1,23 +1,20 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import re
-from abc import abstractmethod
-from builtins import str
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing import Any, Optional, Tuple
 
 from pants.util.collections import assert_single_element
 from pants.util.dirutil import fast_relpath_optional, recursive_dirname
 from pants.util.filtering import create_filters, wrap_filters
 from pants.util.memo import memoized_property
-from pants.util.meta import AbstractClass
-from pants.util.objects import datatype
+from pants.util.meta import frozen_after_init
 
 
-class Spec(AbstractClass):
+class Spec(ABC):
   """Represents address selectors as passed from the command line.
 
   Supports `Single` target addresses as well as `Sibling` (:) and `Descendant` (::) selector forms.
@@ -82,14 +79,17 @@ class Spec(AbstractClass):
     return [os.path.join(spec_dir_path, pat) for pat in address_mapper.build_patterns]
 
 
-class SingleAddress(datatype(['directory', 'name']), Spec):
+@dataclass(frozen=True)
+class SingleAddress(Spec):
   """A Spec for a single address."""
+  directory: Any
+  name: Any
 
-  def __new__(cls, directory, name):
-    if directory is None or name is None:
-      raise ValueError('A SingleAddress must have both a directory and name. Got: '
-                       '{}:{}'.format(directory, name))
-    return super(SingleAddress, cls).__new__(cls, directory, name)
+  def __post_init__(self):
+    if self.directory is None or self.name is None:
+      raise ValueError(
+        f'A SingleAddress must have both a directory and name. Got: {self.directory}:{self.name}'
+      )
 
   def to_spec_string(self):
     return '{}:{}'.format(self.directory, self.name)
@@ -125,8 +125,10 @@ class SingleAddress(datatype(['directory', 'name']), Spec):
     return self.globs_in_single_dir(self.directory, address_mapper)
 
 
-class SiblingAddresses(datatype(['directory']), Spec):
+@dataclass(frozen=True)
+class SiblingAddresses(Spec):
   """A Spec representing all addresses located directly within the given directory."""
+  directory: Any
 
   def to_spec_string(self):
     return '{}:'.format(self.directory)
@@ -141,8 +143,10 @@ class SiblingAddresses(datatype(['directory']), Spec):
     return self.globs_in_single_dir(self.directory, address_mapper)
 
 
-class DescendantAddresses(datatype(['directory']), Spec):
+@dataclass(frozen=True)
+class DescendantAddresses(Spec):
   """A Spec representing all addresses located recursively under the given directory."""
+  directory: Any
 
   def to_spec_string(self):
     return '{}::'.format(self.directory)
@@ -163,8 +167,10 @@ class DescendantAddresses(datatype(['directory']), Spec):
     return [os.path.join(self.directory, '**', pat) for pat in address_mapper.build_patterns]
 
 
-class AscendantAddresses(datatype(['directory']), Spec):
+@dataclass(frozen=True)
+class AscendantAddresses(Spec):
   """A Spec representing all addresses located recursively _above_ the given directory."""
+  directory: Any
 
   def to_spec_string(self):
     return '{}^'.format(self.directory)
@@ -186,7 +192,28 @@ class AscendantAddresses(datatype(['directory']), Spec):
     ]
 
 
-class SpecsMatcher(datatype([('tags', tuple), ('exclude_patterns', tuple)])):
+_specificity = {
+  SingleAddress: 0,
+  SiblingAddresses: 1,
+  AscendantAddresses: 2,
+  DescendantAddresses: 3,
+  type(None): 99
+}
+
+
+def more_specific(spec1: Spec, spec2: Spec) -> Spec:
+  """Returns which of the two specs is more specific.
+
+  This is useful when a target matches multiple specs, and we want to associate it with
+  the "most specific" one, which will make the most intuitive sense to the user.
+  """
+  # Note that if either of spec1 or spec2 is None, the other will be returned.
+  return spec1 if _specificity[type(spec1)] < _specificity[type(spec2)] else spec2
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class SpecsMatcher:
   """Contains filters for the output of a Specs match.
 
   This class is separated out from `Specs` to allow for both stuctural equality of the `tags` and
@@ -194,12 +221,12 @@ class SpecsMatcher(datatype([('tags', tuple), ('exclude_patterns', tuple)])):
   the hash of the class instance in its key, and results in a very large key when used with `Specs`
   directly).
   """
+  tags: Tuple
+  exclude_patterns: Tuple
 
-  def __new__(cls, tags=None, exclude_patterns=tuple()):
-    return super(SpecsMatcher, cls).__new__(
-      cls,
-      tags=tuple(tags or []),
-      exclude_patterns=tuple(exclude_patterns))
+  def __init__(self, tags: Optional[Tuple] = None, exclude_patterns: Tuple = ()) -> None:
+    self.tags = tuple(tags or [])
+    self.exclude_patterns = tuple(exclude_patterns)
 
   @memoized_property
   def _exclude_compiled_regexps(self):
@@ -224,15 +251,18 @@ class SpecsMatcher(datatype([('tags', tuple), ('exclude_patterns', tuple)])):
     return self._target_tag_matches(target) and not self._excluded_by_pattern(address)
 
 
-class Specs(datatype([('dependencies', tuple), ('matcher', SpecsMatcher)])):
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class Specs:
   """A collection of Specs representing Spec subclasses, and a SpecsMatcher to filter results."""
+  dependencies: Tuple
+  matcher: SpecsMatcher
 
-  def __new__(cls, dependencies, tags=None, exclude_patterns=tuple()):
-    return super(Specs, cls).__new__(
-      cls,
-      dependencies=tuple(dependencies),
-      matcher=SpecsMatcher(tags=tags, exclude_patterns=exclude_patterns),
-    )
+  def __init__(
+    self, dependencies: Tuple, tags: Optional[Tuple] = None, exclude_patterns: Tuple = ()
+  ) -> None:
+    self.dependencies = tuple(dependencies)
+    self.matcher = SpecsMatcher(tags=tags, exclude_patterns=exclude_patterns)
 
   def __iter__(self):
     return iter(self.dependencies)

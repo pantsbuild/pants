@@ -1,14 +1,10 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import sys
 from collections import namedtuple
 
 from colors import red
-from six import string_types
 
 from pants.reporting.plaintext_reporter_base import PlainTextReporterBase
 from pants.reporting.report import Report
@@ -39,7 +35,7 @@ class QuietReporter(PlainTextReporterBase):
     """Implementation of Reporter callback."""
     # If the element is a (msg, detail) pair, we ignore the detail. There's no
     # useful way to display it on the console.
-    elements = [e if isinstance(e, string_types) else e[0] for e in msg_elements]
+    elements = [e if isinstance(e, str) else e[0] for e in msg_elements]
     msg = '\n' + ''.join(elements)
     if self.settings.color:
       msg = red(msg)

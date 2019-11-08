@@ -1,22 +1,25 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import json
 import os
 import xml.etree.ElementTree as ET
-from builtins import open, str
 from collections import namedtuple
 from textwrap import dedent
 
-from future.utils import PY3
 from twitter.common.collections import OrderedSet
 
-from pants.backend.jvm.ivy_utils import (FrozenResolution, IvyFetchStep, IvyInfo, IvyModule,
-                                         IvyModuleRef, IvyResolveMappingError, IvyResolveResult,
-                                         IvyResolveStep, IvyUtils)
+from pants.backend.jvm.ivy_utils import (
+  FrozenResolution,
+  IvyFetchStep,
+  IvyInfo,
+  IvyModule,
+  IvyModuleRef,
+  IvyResolveMappingError,
+  IvyResolveResult,
+  IvyResolveStep,
+  IvyUtils,
+)
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.jvm.subsystems.jar_dependency_management import JarDependencyManagement
 from pants.backend.jvm.targets.jar_library import JarLibrary
@@ -26,9 +29,9 @@ from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency import JarDependency
 from pants.java.jar.jar_dependency_utils import M2Coordinate
+from pants.testutil.subsystem.util import init_subsystem
+from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir, temporary_file, temporary_file_path
-from pants_test.subsystem.subsystem_util import init_subsystem
-from pants_test.test_base import TestBase
 
 
 def coord(org, name, classifier=None, rev=None, ext=None):
@@ -54,7 +57,7 @@ class IvyUtilsTestBase(TestBase):
 class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
 
   def setUp(self):
-    super(IvyUtilsGenerateIvyTest, self).setUp()
+    super().setUp()
 
     self.add_to_build_file('src/java/targets',
         dedent("""
@@ -400,8 +403,7 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
 
   def test_missing_ivy_report(self):
     self.set_options_for_scope(IvySubsystem.options_scope,
-                               cache_dir='DOES_NOT_EXIST',
-                               execution_strategy='subprocess')
+                               cache_dir='DOES_NOT_EXIST')
 
     with self.assertRaises(IvyUtils.IvyResolveReportError):
       IvyUtils.parse_xml_report('default', IvyUtils.xml_report_path('INVALID_CACHE_DIR',
@@ -641,8 +643,7 @@ class IvyUtilsResolveStepsTest(TestBase):
 class IvyFrozenResolutionTest(TestBase):
 
   def test_spec_without_a_real_target(self):
-    binary_mode = False if PY3 else True
-    with temporary_file(binary_mode=binary_mode) as resolve_file:
+    with temporary_file(binary_mode=False) as resolve_file:
 
       json.dump(
         {"default":{"coord_to_attrs":{}, "target_to_coords":{"non-existent-target":[]}}},

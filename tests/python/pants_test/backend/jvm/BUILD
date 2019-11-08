@@ -5,7 +5,6 @@ python_tests(
   name = 'jar_dependency_utils',
   sources = ['test_jar_dependency_utils.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/java/jar',
   ]
 )
@@ -14,7 +13,8 @@ python_tests(
   name='integration',
   sources=globs('*_integration.py'),
   dependencies=[
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
+    'examples/tests/java/org/pantsbuild/example:hello_directory',
   ],
   tags={'integration'},
   timeout=300

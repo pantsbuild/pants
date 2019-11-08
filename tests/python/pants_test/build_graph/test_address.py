@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import unittest
@@ -11,8 +8,13 @@ from contextlib import contextmanager
 from pants.base.build_file import BuildFile
 from pants.base.build_root import BuildRoot
 from pants.base.file_system_project_tree import FileSystemProjectTree
-from pants.build_graph.address import (Address, BuildFileAddress, InvalidSpecPath,
-                                       InvalidTargetName, parse_spec)
+from pants.build_graph.address import (
+  Address,
+  BuildFileAddress,
+  InvalidSpecPath,
+  InvalidTargetName,
+  parse_spec,
+)
 from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import touch
 

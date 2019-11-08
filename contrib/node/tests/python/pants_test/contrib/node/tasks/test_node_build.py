@@ -1,17 +1,13 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import shutil
-from builtins import open
 from textwrap import dedent
 
 from pants.base.exceptions import TaskError
+from pants.testutil.task_test_base import TaskTestBase
 from pants.util.dirutil import safe_mkdtemp
-from pants_test.task_test_base import TaskTestBase
 
 from pants.contrib.node.targets.node_module import NodeModule
 from pants.contrib.node.tasks.node_build import NodeBuild as NodeBuildTask

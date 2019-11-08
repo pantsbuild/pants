@@ -1,22 +1,18 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import filter, object
+from collections import OrderedDict
 
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.tasks.classpath_entry import ClasspathEntry
-from pants.util.collections_abc_backport import OrderedDict
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import fast_relpath, safe_walk
 from pants.util.strutil import ensure_text
 
 
-class ClasspathUtil(object):
+class ClasspathUtil:
 
   @classmethod
   def compute_classpath_entries(cls, targets, classpath_products, extra_classpath_tuples, confs):

@@ -1,18 +1,13 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import pkgutil
-from builtins import object
 
 import pystache
-import six
 
 
-class MustacheRenderer(object):
+class MustacheRenderer:
   """Renders text using mustache templates."""
 
   class MustacheError(Exception):
@@ -41,7 +36,6 @@ class MustacheRenderer(object):
 
   @staticmethod
   def parse_template(template_text):
-    template_text = six.text_type(template_text)
     template = pystache.parse(template_text)
     return template
 
@@ -57,7 +51,7 @@ class MustacheRenderer(object):
     self._template_dir = template_dir
     self._package_name = package_name
     if self._package_name is not None:
-      class PartialsLoader(object):
+      class PartialsLoader:
         def get(me, template_name):
           return self._get_template_text_from_package(template_name)
       partials = PartialsLoader()

@@ -1,22 +1,21 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.core_tasks.bash_completion import BashCompletion
 from pants.core_tasks.clean import Clean
 from pants.core_tasks.deferred_sources_mapper import DeferredSourcesMapper
 from pants.core_tasks.explain_options_task import ExplainOptionsTask
-from pants.core_tasks.list_goals import ListGoals
+from pants.core_tasks.generate_pants_ini import GeneratePantsIni
 from pants.core_tasks.login import Login
 from pants.core_tasks.noop import NoopCompile, NoopTest
 from pants.core_tasks.pantsd_kill import PantsDaemonKill
 from pants.core_tasks.reporting_server_kill import ReportingServerKill
 from pants.core_tasks.reporting_server_run import ReportingServerRun
-from pants.core_tasks.roots import ListRoots
-from pants.core_tasks.run_prep_command import (RunBinaryPrepCommand, RunCompilePrepCommand,
-                                               RunTestPrepCommand)
+from pants.core_tasks.run_prep_command import (
+  RunBinaryPrepCommand,
+  RunCompilePrepCommand,
+  RunTestPrepCommand,
+)
 from pants.core_tasks.substitute_aliased_targets import SubstituteAliasedTargets
 from pants.core_tasks.targets_help import TargetsHelp
 from pants.goal.goal import Goal
@@ -37,7 +36,6 @@ def register_goals():
   Goal.register('binary', 'Create a runnable binary.')
   Goal.register('resources', 'Prepare resources.')
   Goal.register('bundle', 'Create a deployable application bundle.')
-  Goal.register('test', 'Run tests.')
   Goal.register('bench', 'Run benchmarks.')
   Goal.register('repl', 'Run a REPL.')
   Goal.register('repl-dirty', 'Run a REPL, skipping compilation.')
@@ -72,9 +70,11 @@ def register_goals():
   task(name='login', action=Login).install()
 
   # Getting help.
-  task(name='goals', action=ListGoals).install()
   task(name='options', action=ExplainOptionsTask).install()
   task(name='targets', action=TargetsHelp).install()
+
+  # Set up pants.ini.
+  task(name="generate-pants-ini", action=GeneratePantsIni).install()
 
   # Stub for other goals to schedule 'compile'. See noop_exec_task.py for why this is useful.
   task(name='compile', action=NoopCompile).install('compile')
@@ -85,10 +85,9 @@ def register_goals():
   task(name='compile-prep-command', action=RunCompilePrepCommand).install('compile', first=True)
 
   # Stub for other goals to schedule 'test'. See noop_exec_task.py for why this is useful.
-  task(name='test', action=NoopTest).install('test')
+  task(name='legacy', action=NoopTest).install('test')
 
   # Workspace information.
-  task(name='roots', action=ListRoots).install()
   task(name='bash-completion', action=BashCompletion).install()
 
   # Handle sources that aren't loose files in the repo.

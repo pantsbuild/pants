@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants_test.contrib.python.checks.checker.plugin_test_base import CheckstylePluginTestBase
 
@@ -17,9 +14,9 @@ class PyCodeStyleCheckerTest(CheckstylePluginTestBase):
     return True
 
   def get_plugin(self, file_content, **options):
-    return super(PyCodeStyleCheckerTest, self).get_plugin(file_content,
-                                                   max_length=options.get('max_length', 10),
-                                                   ignore=options.get('ignore', False))
+    return super().get_plugin(file_content,
+                              max_length=options.get('max_length', 10),
+                              ignore=options.get('ignore', False))
 
   def test_pycodestyle(self):
     self.assertNoNits('')

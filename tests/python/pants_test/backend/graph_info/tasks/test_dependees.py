@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from textwrap import dedent
 
@@ -17,7 +14,7 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.java.jar.jar_dependency import JarDependency
-from pants_test.task_test_base import ConsoleTaskTestBase
+from pants.testutil.task_test_base import ConsoleTaskTestBase
 
 
 class BaseReverseDepmapTest(ConsoleTaskTestBase):
@@ -44,7 +41,7 @@ class BaseReverseDepmapTest(ConsoleTaskTestBase):
     )
 
   def setUp(self):
-    super(ConsoleTaskTestBase, self).setUp()
+    super().setUp()
 
     def add_to_build_file(path, name, alias=False, deps=()):
       self.add_to_build_file(path, dedent("""

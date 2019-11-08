@@ -1,22 +1,17 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import json
 import unittest
-from builtins import object, str
 from textwrap import dedent
 
 from pants.engine import parser
 from pants.engine.objects import Resolvable
 from pants_test.engine.examples import parsers
-from pants_test.testutils.py2_compat import assertRegex
 
 
 # A duck-typed Serializable with an `==` suitable for ease of testing.
-class Bob(object):
+class Bob:
   def __init__(self, **kwargs):
     self._kwargs = kwargs
 
@@ -30,16 +25,13 @@ class Bob(object):
     return isinstance(other, Bob) and self._key() == other._key()
 
 
-class TestTable(parser.SymbolTable):
-  @classmethod
-  def table(cls):
-    return {'bob': Bob}
+EMPTY_TABLE = parser.SymbolTable({})
 
 
-class TestTable2(parser.SymbolTable):
-  @classmethod
-  def table(cls):
-    return {'nancy': Bob}
+TEST_TABLE = parser.SymbolTable({'bob': Bob})
+
+
+TEST_TABLE2 = parser.SymbolTable({'nancy': Bob})
 
 
 def parse(parser, document, **args):
@@ -48,7 +40,7 @@ def parse(parser, document, **args):
 
 class JsonParserTest(unittest.TestCase):
   def parse(self, document, symbol_table=None, **kwargs):
-    symbol_table = symbol_table or parser.EmptyTable()
+    symbol_table = symbol_table or EMPTY_TABLE
     return parse(parsers.JsonParser(symbol_table), document, **kwargs)
 
   def round_trip(self, obj, symbol_table=None):
@@ -88,10 +80,10 @@ class JsonParserTest(unittest.TestCase):
       "hobbies": [1, 2, 3]
     }
     """)
-    results = self.parse(document, symbol_table=TestTable())
+    results = self.parse(document, symbol_table=TEST_TABLE)
     self.assertEqual(1, len(results))
     self.assertEqual([Bob(hobbies=[1, 2, 3])],
-                     self.round_trip(results[0], symbol_table=TestTable()))
+                     self.round_trip(results[0], symbol_table=TEST_TABLE))
     self.assertEqual('bob', results[0]._asdict()['type_alias'])
 
   def test_nested_single(self):
@@ -224,15 +216,15 @@ class JsonParserTest(unittest.TestCase):
     """).strip()
     filepath = '/dev/null'
     with self.assertRaises(parser.ParseError) as exc:
-      parsers.JsonParser(parser.EmptyTable()).parse(filepath, document)
+      parsers.JsonParser(EMPTY_TABLE).parse(filepath, document)
 
     # Strip trailing whitespace from the message since our expected literal below will have
     # trailing ws stripped via editors and code reviews calling for it.
     actual_lines = [line.rstrip() for line in str(exc.exception).splitlines()]
 
     # This message from the json stdlib varies between python releases, so fuzz the match a bit.
-    assertRegex(self, actual_lines[0],
-                             r'Expecting (?:,|\',\'|",") delimiter: line 3 column 12 \(char 67\)')
+    self.assertRegex(actual_lines[0],
+                     r'Expecting (?:,|\',\'|",") delimiter: line 3 column 12 \(char 67\)')
 
     self.assertEqual(dedent("""
       In document at {filepath}:
@@ -323,7 +315,7 @@ class PythonAssignmentsParserTest(unittest.TestCase):
       hobbies=[1, 2, 3]
     )
     """)
-    results = parse(parsers.PythonAssignmentsParser(parser.EmptyTable()), document)
+    results = parse(parsers.PythonAssignmentsParser(EMPTY_TABLE), document)
     self.assertEqual([Bob(name='nancy', hobbies=[1, 2, 3])], results)
 
     # No symbol table was used so no `type_alias` plumbing can be expected.
@@ -335,7 +327,7 @@ class PythonAssignmentsParserTest(unittest.TestCase):
       hobbies=[1, 2, 3]
     )
     """)
-    results = parse(parsers.PythonAssignmentsParser(TestTable2()), document)
+    results = parse(parsers.PythonAssignmentsParser(TEST_TABLE2), document)
     self.assertEqual([Bob(name='bill', hobbies=[1, 2, 3])], results)
     self.assertEqual('nancy', results[0]._asdict()['type_alias'])
 
@@ -348,6 +340,6 @@ class PythonCallbacksParserTest(unittest.TestCase):
       hobbies=[1, 2, 3]
     )
     """)
-    results = parse(parsers.PythonCallbacksParser(TestTable2()), document)
+    results = parse(parsers.PythonCallbacksParser(TEST_TABLE2), document)
     self.assertEqual([Bob(name='bill', hobbies=[1, 2, 3])], results)
     self.assertEqual('nancy', results[0]._asdict()['type_alias'])

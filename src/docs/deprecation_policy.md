@@ -24,7 +24,7 @@ For example, a method `baz` of class `Bar` defined at the top level of module `f
     """
 
 
-    class Bar(object):
+    class Bar:
       """An example public API class.
 
       :API: public

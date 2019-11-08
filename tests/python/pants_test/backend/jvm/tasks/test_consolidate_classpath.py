@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -25,7 +22,7 @@ class TestConsolidateClasspath(JvmBinaryTaskTestBase):
 
   def setUp(self):
     """Prepare targets, context, runtime classpath. """
-    super(TestConsolidateClasspath, self).setUp()
+    super().setUp()
     self.task = self.prepare_execute(self.context())
 
     self.jar_artifact = self.create_artifact(org='org.example', name='foo', rev='1.0.0')
@@ -48,12 +45,12 @@ class TestConsolidateClasspath(JvmBinaryTaskTestBase):
                                           JarDependency(org='org.gnu', name='gary', rev='4.0.0',
                                                         ext='tar.gz')])
 
-    safe_file_dump(os.path.join(self.build_root, 'resources/foo/file'), '// dummy content',  mode='w')
+    safe_file_dump(os.path.join(self.build_root, 'resources/foo/file'), '// dummy content')
     self.resources_target = self.make_target('//resources:foo-resources', Resources,
                                              sources=['foo/file'])
 
     # This is so that payload fingerprint can be computed.
-    safe_file_dump(os.path.join(self.build_root, 'foo/Foo.java'), '// dummy content', mode='w')
+    safe_file_dump(os.path.join(self.build_root, 'foo/Foo.java'), '// dummy content')
     self.java_lib_target = self.make_target('//foo:foo-library', JavaLibrary, sources=['Foo.java'])
 
     self.binary_target = self.make_target(spec='//foo:foo-binary',

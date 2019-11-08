@@ -1,57 +1,34 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import threading
 import time
-from abc import abstractmethod
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing import Any, Dict, Optional, Tuple
 
-from pants.util.meta import AbstractClass
-from pants.util.objects import datatype
-
-
-class PantsServices(datatype([
-  # A tuple of instantiated PantsService instances.
-  ('services', tuple),
-  # A dict of (port_name -> port_info) for named ports hosted by the services.
-  ('port_map', dict),
-  # A lock to guard lifecycle changes for the services. This can be used by individual services
-  # to safeguard daemon-synchronous sections that should be protected from abrupt teardown.
-  # Notably, this lock is currently acquired for an entire pailgun request (by PailgunServer).
-  # NB: This is a `threading.RLock` instance, but the constructor for RLock is an alias for a
-  # native function, rather than an actual type.
-  'lifecycle_lock',
-])):
-  """A registry of PantsServices instances"""
-
-  def __new__(cls, services=None, port_map=None, lifecycle_lock=None):
-    services = services or tuple()
-    port_map = port_map or dict()
-    lifecycle_lock = lifecycle_lock or threading.RLock()
-    return super(PantsServices, cls).__new__(cls, services, port_map, lifecycle_lock)
+from pants.util.meta import frozen_after_init
 
 
-class PantsService(AbstractClass):
+class PantsService(ABC):
   """Pants daemon service base class.
 
   The service lifecycle is made up of states described in the _ServiceState class, and controlled
   by a calling thread that is holding the Service `lifecycle_lock`. Under that lock, a caller
   can signal a service to "pause", "run", or "terminate" (see _ServiceState for more details).
 
-  pantsd pauses all Services before forking a pantsd-runner in order to ensure that no "relevant"
+  pantsd pauses all Services before forking a pantsd in order to ensure that no "relevant"
   locks are held (or awaited: see #6565) by threads that might not survive the fork. While paused,
   a Service must not have any threads running that might interact with any non-private locks.
 
-  After forking, the pantsd-runner (child) process should call `terminate()` to finish shutting down
+  After forking, the pantsd (child) process should call `terminate()` to finish shutting down
   the service, and the parent process should call `resume()` to cause the service to resume running.
   """
 
   class ServiceError(Exception): pass
 
   def __init__(self):
-    super(PantsService, self).__init__()
+    super().__init__()
     self.name = self.__class__.__name__
     self._state = _ServiceState()
 
@@ -209,3 +186,31 @@ class _ServiceState(object):
     """
     with self._lock:
       return self._state == self._TERMINATING
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class PantsServices:
+  """A registry of PantsServices instances"""
+  services: Tuple[PantsService, ...]
+  port_map: Dict
+  lifecycle_lock: Any
+
+  def __init__(
+    self,
+    services: Optional[Tuple[PantsService, ...]] = None,
+    port_map: Optional[Dict] = None,
+    lifecycle_lock: Optional = None
+  ) -> None:
+    """
+    :param port_map: A dict of (port_name -> port_info) for named ports hosted by the services.
+    :param lifecycle_lock: A lock to guard lifecycle changes for the services. This can be used by
+                           individual services to safeguard daemon-synchronous sections that should
+                           be protected from abrupt teardown. Notably, this lock is currently
+                           acquired for an entire pailgun request (by PailgunServer). NB: This is a
+                           `threading.RLock` instance, but the constructor for RLock is an alias for
+                           a native function, rather than an actual type.
+    """
+    self.services = services or tuple()
+    self.port_map = port_map or dict()
+    self.lifecycle_lock = lifecycle_lock or threading.RLock()

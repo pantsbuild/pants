@@ -1,15 +1,11 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
 from pants.backend.native.config.environment import Assembler, Linker
 from pants.binaries.binary_tool import NativeTool
 from pants.engine.rules import rule
-from pants.engine.selectors import Select
 
 
 class Binutils(NativeTool):
@@ -24,26 +20,27 @@ class Binutils(NativeTool):
     return Assembler(
       path_entries=self.path_entries(),
       exe_filename='as',
-      library_dirs=[])
+      runtime_library_dirs=[],
+      extra_args=[])
 
   def linker(self):
     return Linker(
       path_entries=self.path_entries(),
       exe_filename='ld',
-      library_dirs=[],
+      runtime_library_dirs=[],
       linking_library_dirs=[],
       extra_args=[],
       extra_object_files=[],
     )
 
 
-@rule(Assembler, [Select(Binutils)])
-def get_as(binutils):
+@rule
+def get_as(binutils: Binutils) -> Assembler:
   return binutils.assembler()
 
 
-@rule(Linker, [Select(Binutils)])
-def get_ld(binutils):
+@rule
+def get_ld(binutils: Binutils) -> Linker:
   return binutils.linker()
 
 

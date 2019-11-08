@@ -1,20 +1,13 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import inspect
 import re
 import textwrap
-from builtins import object, range
-from collections import namedtuple
-
-from future.utils import PY3
+from collections import OrderedDict, namedtuple
 
 from pants.base.exceptions import TaskError
 from pants.build_graph.target import Target
-from pants.util.collections_abc_backport import OrderedDict
 from pants.util.memo import memoized_method
 
 
@@ -37,7 +30,7 @@ class BuildSymbolInfo(namedtuple('_BuildSymbolInfo',
     return '\n'.join(self.details_lines)
 
 
-class BuildDictionaryInfoExtracter(object):
+class BuildDictionaryInfoExtracter:
   """Extracts help information about the symbols that may be used in BUILD files."""
 
   ADD_DESCR = '<Add description>'
@@ -177,7 +170,7 @@ class BuildDictionaryInfoExtracter(object):
   @classmethod
   def _get_function_args(cls, func):
     arg_descriptions = cls.get_arg_descriptions_from_docstring(func)
-    argspec = inspect.getfullargspec(func) if PY3 else inspect.getargspec(func)
+    argspec = inspect.getfullargspec(func)
     arg_names = argspec.args
     if arg_names and arg_names[0] in {'self', 'cls'}:
       arg_names = arg_names[1:]
@@ -192,8 +185,7 @@ class BuildDictionaryInfoExtracter(object):
       yield FunctionArg('*{}'.format(argspec.varargs), arg_descriptions.pop(argspec.varargs, None),
                         False, None)
 
-    kw = argspec.varkw if PY3 else argspec.keywords
-    if kw:
+    if argspec.varkw:
       # Any remaining arg_descriptions are for kwargs.
       for arg_name, descr in arg_descriptions.items():
         # Get the default value out of the description, if present.

@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import tensorflow as tf
 
@@ -13,6 +10,6 @@ from example.tensorflow_custom_op.zero_out_custom_op import zero_out_module
 class ZeroOutTest(tf.test.TestCase):
 
   def test_zero_out(self):
-    with self.test_session():
+    with self.cached_session():
       result = zero_out_module().zero_out([5, 4, 3, 2, 1])
       self.assertAllEqual(result.eval(), [5, 0, 0, 0, 0])

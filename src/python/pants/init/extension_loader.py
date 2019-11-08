@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import importlib
 import traceback
@@ -67,7 +64,7 @@ def load_plugins(build_configuration, plugins, working_set):
     dist = working_set.find(req)
 
     if not dist:
-      raise PluginNotFound('Could not find plugin: {}'.format(req))
+      raise PluginNotFound(f'Could not find plugin: {req}')
 
     entries = dist.get_entry_map().get('pantsbuild.plugin', {})
 
@@ -76,7 +73,7 @@ def load_plugins(build_configuration, plugins, working_set):
       for dep_name in deps:
         dep = Requirement.parse(dep_name)
         if dep.key not in loaded:
-          raise PluginLoadOrderError('Plugin {0} must be loaded after {1}'.format(plugin, dep))
+          raise PluginLoadOrderError(f'Plugin {plugin} must be loaded after {dep}')
 
     if 'build_file_aliases' in entries:
       aliases = entries['build_file_aliases'].load()()
@@ -107,17 +104,20 @@ def load_build_configuration_from_source(build_configuration, backends=None):
   # pants.build_graph and pants.core_task must always be loaded, and before any other backends.
   # TODO: Consider replacing the "backend" nomenclature here. pants.build_graph and
   # pants.core_tasks aren't really backends.
-  backend_packages = OrderedSet(['pants.build_graph', 'pants.core_tasks'] + (backends or []))
+  backend_packages = OrderedSet([
+      'pants.build_graph',
+      'pants.core_tasks',
+      'pants.rules.core',
+    ] + (backends or []))
   for backend_package in backend_packages:
     load_backend(build_configuration, backend_package)
 
 
-def load_backend(build_configuration, backend_package):
+def load_backend(build_configuration: BuildConfiguration, backend_package: str) -> None:
   """Installs the given backend package into the build configuration.
 
-  :param build_configuration the :class:``pants.build_graph.build_configuration.BuildConfiguration`` to
-    install the backend plugin into.
-  :param string backend_package: the package name containing the backend plugin register module that
+  :param build_configuration: the BuildConfiguration to install the backend plugin into.
+  :param backend_package: the package name containing the backend plugin register module that
     provides the plugin entrypoints.
   :raises: :class:``pants.base.exceptions.BuildConfigurationError`` if there is a problem loading
     the build configuration."""
@@ -126,8 +126,7 @@ def load_backend(build_configuration, backend_package):
     module = importlib.import_module(backend_module)
   except ImportError as e:
     traceback.print_exc()
-    raise BackendConfigurationError('Failed to load the {backend} backend: {error}'
-                                    .format(backend=backend_module, error=e))
+    raise BackendConfigurationError(f'Failed to load the {backend_module} backend: {e!r}')
 
   def invoke_entrypoint(name):
     entrypoint = getattr(module, name, lambda: None)
@@ -136,8 +135,8 @@ def load_backend(build_configuration, backend_package):
     except TypeError as e:
       traceback.print_exc()
       raise BackendConfigurationError(
-          'Entrypoint {entrypoint} in {backend} must be a zero-arg callable: {error}'
-          .format(entrypoint=name, backend=backend_module, error=e))
+        f'Entrypoint {name} in {backend_module} must be a zero-arg callable: {e!r}'
+      )
 
   build_file_aliases = invoke_entrypoint('build_file_aliases')
   if build_file_aliases:

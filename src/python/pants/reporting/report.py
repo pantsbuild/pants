@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import threading
 import time
-from builtins import object
 
 
 class ReportingError(Exception):
@@ -21,7 +17,7 @@ class EmitterThread(threading.Thread):
   """
 
   def __init__(self, report, name):
-    super(EmitterThread, self).__init__(name=name)
+    super().__init__(name=name)
     self._report = report
     # N.B. We must not use the name `self._stop`, as it is already used by Threading.thread
     # and overriding it results in `TypeError: 'Event' object is not callable` when ran with Py3.
@@ -40,7 +36,7 @@ class EmitterThread(threading.Thread):
     self._stopper.set()
 
 
-class Report(object):
+class Report:
   """A report of a pants run."""
 
   # Log levels.
@@ -100,8 +96,15 @@ class Report(object):
   def log(self, workunit, level, *msg_elements):
     """Log a message.
 
-    Each element of msg_elements is either a message string or a (message, detail) pair.
+    Each element of msg_elements is either a message or a (message, detail) pair, i.e. of type
+    Union[str, bytes, Tuple[str, str]].
     """
+    # TODO(6742): Once we have enough MyPy coverage, we can rely on MyPy to catch any issues for us,
+    # rather than this runtime check.
+    # TODO(6071): No longer allow bytes once Py2 is removed.
+    assert all(isinstance(element, (str, bytes, tuple)) for element in msg_elements), \
+      "At least one logged message element is not of type " \
+      "Union[str, bytes, Tuple[str, str]]:\n {}".format(msg_elements)
     with self._lock:
       for reporter in self._reporters.values():
         reporter.handle_log(workunit, level, *msg_elements)
@@ -136,7 +139,12 @@ class Report(object):
       # in Python 2. It is not clear why the dictionary size is changing, and this may
       # be a potential source of issues.
       for label, output in list(workunit.outputs().items()):
-        s = output.read().decode('utf-8')
+        s = output.read().decode()
         if len(s) > 0:
           for reporter in self._reporters.values():
             reporter.handle_output(workunit, label, s)
+
+  def bulk_record_workunits(self, engine_workunits):
+    with self._lock:
+      for reporter in self._reporters.values():
+        reporter.bulk_record_workunits(engine_workunits)

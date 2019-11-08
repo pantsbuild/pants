@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import json
 
@@ -30,7 +27,7 @@ class PluginSubsystemBase(Subsystem):
       option_names.append(Parser.parse_dest(*args, **kwargs))
       register(*args, **kwargs)
 
-    super(PluginSubsystemBase, cls).register_options(recording_register)
+    super().register_options(recording_register)
 
     # All checks have this option.
     recording_register('--skip', type=bool, help='If enabled, skip this style checker.')

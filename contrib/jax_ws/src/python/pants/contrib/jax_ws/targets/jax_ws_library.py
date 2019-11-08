@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.payload import Payload
@@ -27,4 +24,4 @@ class JaxWsLibrary(JvmTarget):
       'xjc_args': PrimitiveField(self.assert_list(xjc_args, key_arg='xjc_args')),
       'extra_args': PrimitiveField(self.assert_list(extra_args, key_arg='extra_args')),
     })
-    super(JaxWsLibrary, self).__init__(payload=payload, **kwargs)
+    super().__init__(payload=payload, **kwargs)

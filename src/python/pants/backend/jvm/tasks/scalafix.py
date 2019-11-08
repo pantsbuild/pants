@@ -1,18 +1,19 @@
-# coding=utf-8
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from abc import abstractproperty
+from abc import abstractmethod
 
+from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.rewrite_base import RewriteBase
 from pants.base.exceptions import TaskError
+from pants.build_graph.build_graph import BuildGraph
+from pants.build_graph.target_scopes import Scopes
 from pants.java.jar.jar_dependency import JarDependency
 from pants.option.custom_types import file_option
 from pants.task.fmt_task_mixin import FmtTaskMixin
 from pants.task.lint_task_mixin import LintTaskMixin
+from pants.util.memo import memoized_property
 
 
 class ScalaFix(RewriteBase):
@@ -22,7 +23,7 @@ class ScalaFix(RewriteBase):
 
   @classmethod
   def register_options(cls, register):
-    super(ScalaFix, cls).register_options(register)
+    super().register_options(register)
     register('--configuration', type=file_option, default=None, fingerprint=True,
              help='The config file to use (in HOCON format).')
     register('--rules', default='ProcedureSyntax', type=str, fingerprint=True,
@@ -35,7 +36,7 @@ class ScalaFix(RewriteBase):
     cls.register_jvm_tool(register,
                           'scalafix',
                           classpath=[
-                            JarDependency(org='ch.epfl.scala', name='scalafix-cli_2.11.12', rev='0.6.0-M16'),
+                            JarDependency(org='ch.epfl.scala', name='scalafix-cli_2.12.8', rev='0.9.4'),
                           ])
     cls.register_jvm_tool(register, 'scalafix-tool-classpath', classpath=[])
 
@@ -49,14 +50,38 @@ class ScalaFix(RewriteBase):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(ScalaFix, cls).prepare(options, round_manager)
-    # Only request a classpath if semantic checks are enabled.
+    super().prepare(options, round_manager)
+    # Only request a classpath and zinc_args if semantic checks are enabled.
     if options.semantic:
+      round_manager.require_data('zinc_args') 
       round_manager.require_data('runtime_classpath')
 
-  def _compute_classpath(self, targets):
-    classpaths = self.context.products.get_data('runtime_classpath')
-    return [entry for _, entry in classpaths.get_for_targets(targets)]
+  @memoized_property
+  def _scalac_args(self):
+    if self.get_options().semantic:
+      targets = self.context.targets()
+      targets_to_zinc_args = self.context.products.get_data('zinc_args')
+      
+      for t in targets:
+        zinc_args = targets_to_zinc_args[t]
+        args = []
+        for arg in zinc_args:
+          arg = arg.strip()
+          if arg.startswith('-S'):
+            args.append(arg[2:])
+        # All targets will get the same scalac args
+        if args:
+          return args
+
+    return []
+
+  @staticmethod
+  def _compute_classpath(runtime_classpath, targets):
+    closure = BuildGraph.closure(targets, bfs=True,
+                                 include_scopes=Scopes.JVM_RUNTIME_SCOPES, respect_intransitive=True)
+    classpath_for_targets = ClasspathUtil.classpath(closure, runtime_classpath)
+
+    return classpath_for_targets
 
   def invoke_tool(self, absolute_root, target_sources):
     args = []
@@ -64,9 +89,9 @@ class ScalaFix(RewriteBase):
     if tool_classpath:
       args.append('--tool-classpath={}'.format(os.pathsep.join(tool_classpath)))
     if self.get_options().semantic:
-      # If semantic checks are enabled, pass the relevant classpath entries for these
-      # targets.
-      classpath = self._compute_classpath({target for target, _ in target_sources})
+      # If semantic checks are enabled, we need the full classpath for these targets.
+      runtime_classpath = self.context.products.get_data('runtime_classpath')
+      classpath = ScalaFix._compute_classpath(runtime_classpath, {target for target, _ in target_sources})
       args.append('--sourceroot={}'.format(absolute_root))
       args.append('--classpath={}'.format(os.pathsep.join(classpath)))
     if self.get_options().configuration:
@@ -75,6 +100,12 @@ class ScalaFix(RewriteBase):
       args.append('--rules={}'.format(self.get_options().rules))
     if self.get_options().level == 'debug':
       args.append('--verbose')
+
+    # This is how you pass a list of strings to a single arg key
+    for a in self._scalac_args:
+      args.append('--scalac-options')
+      args.append(a)
+      
     args.extend(self.additional_args or [])
 
     args.extend(source for _, source in target_sources)
@@ -86,7 +117,8 @@ class ScalaFix(RewriteBase):
                         args=args,
                         workunit_name='scalafix')
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def additional_args(self):
     """Additional arguments to the Scalafix command."""
 

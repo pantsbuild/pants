@@ -1,19 +1,15 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import json
 import os
 import shutil
-from builtins import open
 from contextlib import contextmanager
 from textwrap import dedent
 
 from pants.base.build_environment import get_buildroot
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest, ensure_cached
 from pants.util.contextutil import temporary_dir
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_cached
 
 
 class CheckstyleIntegrationTest(PantsRunIntegrationTest):
@@ -99,6 +95,7 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
       'contrib',
       'pants-plugins',
       'src',
+      'pyproject.toml',
     ))
     with temporary_dir() as temp_root:
       temp_root = os.path.normpath(temp_root)
@@ -127,7 +124,7 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
   def test_config_buildroot_does_not_invalidate_targets(self, cache_args):
     previous_names = set()
     for buildroot in self._temporary_buildroots(['examples']):
-      with self.temporary_workdir() as workdir:
+      with temporary_dir(root_dir=buildroot, prefix='.pants.d', suffix='.pants.d') as workdir:
         tmp = os.path.join(buildroot, 'tmp')
         os.mkdir(tmp)
         config = dedent("""

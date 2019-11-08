@@ -1,65 +1,67 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import unittest
-from builtins import object, str
+from dataclasses import dataclass
 from textwrap import dedent
 
 from pants.engine.rules import RootRule, rule
 from pants.engine.scheduler import ExecutionError
-from pants.engine.selectors import Get, Select
-from pants.util.objects import datatype
+from pants.engine.selectors import Get
+from pants.testutil.engine.util import assert_equal_with_printing, remove_locations_from_traceback
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
-from pants_test.engine.util import assert_equal_with_printing, remove_locations_from_traceback
 
 
-class A(object):
+class A:
   pass
 
 
-class B(object):
+class B:
   pass
 
 
-class C(object):
+class C:
   pass
 
 
-class D(object):
+class D:
   pass
 
 
 def fn_raises(x):
-  raise Exception('An exception for {}'.format(type(x).__name__))
+  raise Exception(f'An exception for {type(x).__name__}')
 
 
-@rule(A, [Select(B)])
-def nested_raise(x):
+@rule
+def nested_raise(x: B) -> A:
   fn_raises(x)
 
 
-class Fib(datatype([('val', int)])): pass
+@dataclass(frozen=True)
+class Fib:
+  val: int
 
 
-@rule(Fib, [Select(int)])
-def fib(n):
+@rule
+def fib(n: int) -> Fib:
   if n < 2:
     yield Fib(n)
   x, y = yield Get(Fib, int(n-2)), Get(Fib, int(n-1))
   yield Fib(x.val + y.val)
 
 
-class MyInt(datatype([('val', int)])): pass
+@dataclass(frozen=True)
+class MyInt:
+  val: int
 
 
-class MyFloat(datatype([('val', float)])): pass
+@dataclass(frozen=True)
+class MyFloat:
+  val: float
 
 
-@rule(MyFloat, [Select(MyInt)])
-def upcast(n):
+@rule
+def upcast(n: MyInt) -> MyFloat:
   yield MyFloat(float(n.val))
 
 
@@ -123,8 +125,8 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
 
     self.assert_equal_with_printing(dedent('''
       1 Exception encountered:
-      Computing Select(<pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, Exactly(A))
-        Computing Task(nested_raise, <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, Exactly(A), true)
+      Computing Select(<pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, A)
+        Computing Task(nested_raise(), <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, A, true)
           Throw(An exception for B)
             Traceback (most recent call last):
               File LOCATION-INFO, in call
@@ -132,7 +134,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
               File LOCATION-INFO, in nested_raise
                 fn_raises(x)
               File LOCATION-INFO, in fn_raises
-                raise Exception('An exception for {}'.format(type(x).__name__))
+                raise Exception(f'An exception for {type(x).__name__}')
             Exception: An exception for B
       ''').lstrip()+'\n',
       remove_locations_from_traceback(str(cm.exception)))
@@ -150,16 +152,16 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
   def test_trace_multi(self):
     # Tests that when multiple distinct failures occur, they are each rendered.
 
-    @rule(D, [Select(B)])
-    def d_from_b_nested_raise(b):
+    @rule
+    def d_from_b_nested_raise(b: B) -> D:
       fn_raises(b)
 
-    @rule(C, [Select(B)])
-    def c_from_b_nested_raise(b):
+    @rule
+    def c_from_b_nested_raise(b: B) -> C:
       fn_raises(b)
 
-    @rule(A, [Select(C), Select(D)])
-    def a_from_c_and_d(c, d):
+    @rule
+    def a_from_c_and_d(c: C, d: D) -> A:
       return A()
 
     rules = [
@@ -175,9 +177,9 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
 
     self.assert_equal_with_printing(dedent('''
       1 Exception encountered:
-      Computing Select(<pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, Exactly(A))
-        Computing Task(a_from_c_and_d, <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, Exactly(A), true)
-          Computing Task(d_from_b_nested_raise, <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =D, true)
+      Computing Select(<pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, A)
+        Computing Task(a_from_c_and_d(), <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, A, true)
+          Computing Task(d_from_b_nested_raise(), <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =D, true)
             Throw(An exception for B)
               Traceback (most recent call last):
                 File LOCATION-INFO, in call
@@ -189,9 +191,9 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
               Exception: An exception for B
 
 
-      Computing Select(<pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, Exactly(A))
-        Computing Task(a_from_c_and_d, <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, Exactly(A), true)
-          Computing Task(c_from_b_nested_raise, <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =C, true)
+      Computing Select(<pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, A)
+        Computing Task(a_from_c_and_d(), <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, A, true)
+          Computing Task(c_from_b_nested_raise(), <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =C, true)
             Throw(An exception for B)
               Traceback (most recent call last):
                 File LOCATION-INFO, in call
@@ -215,7 +217,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
     with self.assertRaises(Exception) as cm:
       list(scheduler.product_request(A, subjects=[(B())]))
 
-    self.assert_equal_with_printing('No installed @rules can satisfy Select(A) for input Params(B).', str(cm.exception))
+    self.assert_equal_with_printing('No installed @rules can compute A for input Params(B).', str(cm.exception))
 
   def test_non_existing_root_fails_differently(self):
     rules = [
@@ -227,7 +229,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
 
     self.assert_equal_with_printing(dedent('''
       Rules with errors: 1
-        (MyFloat, [Select(MyInt)], upcast):
+        (MyFloat, [MyInt], upcast()):
           No rule was available to compute MyInt. Maybe declare it as a RootRule(MyInt)?
         ''').strip(),
       str(cm.exception)

@@ -1,40 +1,37 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import itertools
 import logging
 import os
+import stat
 import sys
-from builtins import filter
-
-from future.utils import iteritems
+from dataclasses import dataclass
+from typing import Tuple
 
 from pants.base.build_environment import get_default_pants_config_file
 from pants.engine.fs import FileContent
-from pants.option.arg_splitter import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
 from pants.option.config import Config
 from pants.option.custom_types import ListValueComponent
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.options import Options
+from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
 from pants.util.dirutil import read_file
 from pants.util.memo import memoized_method, memoized_property
-from pants.util.objects import SubclassesOf, datatype
 from pants.util.strutil import ensure_text
 
 
 logger = logging.getLogger(__name__)
 
 
-class OptionsBootstrapper(datatype([
-  ('env_tuples', tuple),
-  ('bootstrap_args', tuple),
-  ('args', tuple),
-  ('config', SubclassesOf(Config)),
-])):
-  """Holds the result of the first stage of options parsing, and assists with parsing full options."""
+@dataclass(frozen=True)
+class OptionsBootstrapper:
+  """Holds the result of the first stage of options parsing, and assists with parsing full
+  options."""
+  env_tuples: Tuple
+  bootstrap_args: Tuple
+  args: Tuple
+  config: Config
 
   @staticmethod
   def get_config_file_paths(env, args):
@@ -54,7 +51,9 @@ class OptionsBootstrapper(datatype([
     flag = '--pants-config-files='
     evars = ['PANTS_GLOBAL_PANTS_CONFIG_FILES', 'PANTS_PANTS_CONFIG_FILES', 'PANTS_CONFIG_FILES']
 
-    path_list_values = [ListValueComponent.create(get_default_pants_config_file())]
+    path_list_values = []
+    if os.path.isfile(get_default_pants_config_file()):
+      path_list_values.append(ListValueComponent.create(get_default_pants_config_file()))
     for var in evars:
       if var in env:
         path_list_values.append(ListValueComponent.create(env[var]))
@@ -96,14 +95,21 @@ class OptionsBootstrapper(datatype([
     :param env: An environment dictionary, or None to use `os.environ`.
     :param args: An args array, or None to use `sys.argv`.
     """
-    env = os.environ.copy() if env is None else env
+    env = {k: v for k, v in (os.environ if env is None else env).items()
+           if k.startswith('PANTS_')}
     args = tuple(sys.argv if args is None else args)
 
     flags = set()
     short_flags = set()
 
+    # TODO: This codepath probably shouldn't be using FileContent, which is a very v2 engine thing.
     def filecontent_for(path):
-      return FileContent(ensure_text(path), read_file(path, binary_mode=True))
+      is_executable = os.stat(path).st_mode & stat.S_IXUSR == stat.S_IXUSR
+      return FileContent(
+        ensure_text(path),
+        read_file(path, binary_mode=True),
+        is_executable=is_executable,
+      )
 
     def capture_the_flags(*args, **kwargs):
       for arg in args:
@@ -140,7 +146,7 @@ class OptionsBootstrapper(datatype([
     # from (typically pants.ini), then config override, then rcfiles.
     full_configpaths = pre_bootstrap_config.sources()
     if bootstrap_option_values.pantsrc:
-      rcfiles = [os.path.expanduser(rcfile) for rcfile in bootstrap_option_values.pantsrc_files]
+      rcfiles = [os.path.expanduser(str(rcfile)) for rcfile in bootstrap_option_values.pantsrc_files]
       existing_rcfiles = list(filter(os.path.exists, rcfiles))
       full_configpaths.extend(existing_rcfiles)
 
@@ -150,7 +156,7 @@ class OptionsBootstrapper(datatype([
       seed_values=bootstrap_option_values
     )
 
-    env_tuples = tuple(sorted(iteritems(env), key=lambda x: x[0]))
+    env_tuples = tuple(sorted(env.items(), key=lambda x: x[0]))
     return cls(env_tuples=env_tuples, bootstrap_args=bargs, args=args, config=post_bootstrap_config)
 
   @memoized_property

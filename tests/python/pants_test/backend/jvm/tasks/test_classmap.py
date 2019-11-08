@@ -1,17 +1,14 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from contextlib import contextmanager
 
 from pants.backend.jvm.tasks.classmap import ClassmapTask
 from pants.build_graph.target import Target
+from pants.testutil.subsystem.util import init_subsystem
+from pants.testutil.task_test_base import ConsoleTaskTestBase
 from pants.util.contextutil import open_zip
 from pants_test.backend.jvm.tasks.jvm_binary_task_test_base import JvmBinaryTaskTestBase
-from pants_test.subsystem.subsystem_util import init_subsystem
-from pants_test.task_test_base import ConsoleTaskTestBase
 
 
 class ClassmapTaskTest(ConsoleTaskTestBase, JvmBinaryTaskTestBase):
@@ -20,7 +17,7 @@ class ClassmapTaskTest(ConsoleTaskTestBase, JvmBinaryTaskTestBase):
     return ClassmapTask
 
   def setUp(self):
-    super(ClassmapTaskTest, self).setUp()
+    super().setUp()
     init_subsystem(Target.Arguments)
 
     self.add_to_build_file(

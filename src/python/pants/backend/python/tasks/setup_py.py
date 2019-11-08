@@ -1,20 +1,18 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import inspect
 import io
 import itertools
 import os
 import shutil
+import subprocess
 import textwrap
-from abc import abstractmethod
-from builtins import bytes, map, object, str, zip
-from collections import defaultdict
+from abc import ABC, abstractmethod
+from collections import OrderedDict, defaultdict
+from collections.abc import Iterable, Mapping, MutableSequence, Set
 
-from pex.installer import InstallerBase, Packager
+from pex.installer import Packager, WheelInstaller
 from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
@@ -34,12 +32,9 @@ from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import sort_targets
 from pants.build_graph.resources import Resources
 from pants.task.task import Task
-from pants.util.collections_abc_backport import Iterable, Mapping, MutableSequence, OrderedDict, Set
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_concurrent_creation, safe_rmtree, safe_walk
 from pants.util.memo import memoized_property
-from pants.util.meta import AbstractClass
-from pants.util.process_handler import subprocess
 from pants.util.strutil import ensure_binary, ensure_text, safe_shlex_split
 
 
@@ -58,7 +53,10 @@ setup(**{setup_dict})
 # but that embeds u's in the string itself during conversion. For that reason we roll out own
 # literal pretty-printer here.
 #
-# For more information, see http://bugs.python.org/issue13943
+# Note that we must still keep this code, even though Pants only runs with Python 3, because
+# the created product may still be run by Python 2.
+#
+# For more information, see http://bugs.python.org/issue13943.
 def distutils_repr(obj):
   output = io.StringIO()
   linesep = os.linesep
@@ -108,34 +106,18 @@ def distutils_repr(obj):
   return output.getvalue()
 
 
-class SetupPyRunner(InstallerBase):
-  _EXTRAS = ('setuptools', 'wheel')
+class SetupPyRunner(WheelInstaller):
+  # We extend WheelInstaller to make sure `setuptools` and `wheel` are available to setup.py.
 
   def __init__(self, source_dir, setup_command, **kw):
-    self.__setup_command = setup_command
-    super(SetupPyRunner, self).__init__(source_dir, **kw)
+    self._setup_command = setup_command
+    super().__init__(source_dir, **kw)
 
-  def mixins(self):
-    mixins = super(SetupPyRunner, self).mixins().copy()
-    extras = set(self._EXTRAS)
-    for (key, version) in self._interpreter.extras:
-      if key in extras:
-        mixins[key] = '{}=={}'.format(key, version)
-        extras.remove(key)
-        if not extras:
-          break
-    else:
-      # We know Pants sets up python interpreters with setuptools and wheel via the `PythonSetup`
-      # subsystem; so this should never happen
-      raise AssertionError("Expected interpreter {} to have the extras {}"
-                           .format(self._interpreter, self._EXTRAS))
-    return mixins
-
-  def _setup_command(self):
-    return self.__setup_command
+  def setup_command(self):
+    return self._setup_command
 
 
-class TargetAncestorIterator(object):
+class TargetAncestorIterator:
   """Supports iteration of target ancestor lineages."""
 
   def __init__(self, build_graph):
@@ -179,7 +161,7 @@ class TargetAncestorIterator(object):
 # un-exported non-3rdparty interior nodes as needed.  It seems like the latter is preferable since
 # it can be used with a BUILD graph validator requiring completely exported subgraphs to enforce the
 # former as a matter of local repo policy.
-class ExportedTargetDependencyCalculator(AbstractClass):
+class ExportedTargetDependencyCalculator(ABC):
   """Calculates the dependencies of exported targets.
 
   When a target is exported many of its internal transitive library dependencies may be satisfied by
@@ -428,7 +410,7 @@ class SetupPy(Task):
 
   @classmethod
   def register_options(cls, register):
-    super(SetupPy, cls).register_options(register)
+    super().register_options(register)
     register('--run',
              help="The command to run against setup.py.  Don't forget to quote any additional "
                   "parameters.  If no run command is specified, pants will by default generate "
@@ -480,7 +462,7 @@ class SetupPy(Task):
           """).strip().format(declares_namespace_package_code=declares_namespace_package_code))
           fp.close()
           builder.set_executable(filename=fp.name, env_filename='main.py')
-          builder.freeze()
+          builder.freeze(bytecode_compile=False)
     return PEX(pex=chroot, interpreter=interpreter)
 
   def filter_namespace_packages(self, root_target, inits):
@@ -579,7 +561,7 @@ class SetupPy(Task):
     return install_requires
 
   def __init__(self, *args, **kwargs):
-    super(SetupPy, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._root = get_buildroot()
     self._run = self.get_options().run
     self._recursive = self.get_options().recursive

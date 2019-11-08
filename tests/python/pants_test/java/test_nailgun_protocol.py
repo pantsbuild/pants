@@ -1,15 +1,11 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import socket
 import unittest
+import unittest.mock
 
-import mock
-
-from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
+from pants.java.nailgun_protocol import ChunkType, MaybeShutdownSocket, NailgunProtocol
 
 
 class TestChunkType(unittest.TestCase):
@@ -30,7 +26,7 @@ class TestNailgunProtocol(unittest.TestCase):
   EMPTY_PAYLOAD = ''
   TEST_COMMAND = 'test'
   TEST_OUTPUT = 't e s t'
-  TEST_UNICODE_PAYLOAD = u'([\d０-９]{1,4}\s?[年月日])'.encode('utf-8')
+  TEST_UNICODE_PAYLOAD = u'([\d０-９]{1,4}\s?[年月日])'.encode()
   TEST_WORKING_DIR = '/path/to/a/repo'
   TEST_ARGUMENTS = ['t', 'e', 's', 't']
   TEST_ENVIRON = dict(TEST_VAR='success')
@@ -69,7 +65,7 @@ class TestNailgunProtocol(unittest.TestCase):
 
   def test_read_until(self):
     recv_chunks = [b'1', b'234', b'56', b'789', b'0']
-    mock_socket = mock.Mock()
+    mock_socket = unittest.mock.Mock()
     mock_socket.recv.side_effect = recv_chunks
     self.assertEqual(NailgunProtocol._read_until(mock_socket, 10), b'1234567890')
     self.assertEqual(mock_socket.recv.call_count, len(recv_chunks))
@@ -93,7 +89,7 @@ class TestNailgunProtocol(unittest.TestCase):
     for chunk_type, payload in expected_chunks:
       NailgunProtocol.write_chunk(self.server_sock, chunk_type, payload)
 
-    for i, chunk in enumerate(NailgunProtocol.iter_chunks(self.client_sock)):
+    for i, chunk in enumerate(NailgunProtocol.iter_chunks(MaybeShutdownSocket(self.client_sock))):
       self.assertEqual(chunk, expected_chunks[i])
 
   def test_read_and_write_chunk(self):
@@ -233,14 +229,14 @@ class TestNailgunProtocol(unittest.TestCase):
     )
 
   def _make_mock_stream(self, isatty, fileno):
-    mock_stream = mock.Mock()
+    mock_stream = unittest.mock.Mock()
     mock_stream.isatty.return_value = isatty
     mock_stream.fileno.return_value = fileno
     return mock_stream
 
   _fake_ttyname = '/this/is/not/a/real/tty'
 
-  @mock.patch('os.ttyname', autospec=True, spec_set=True)
+  @unittest.mock.patch('os.ttyname', autospec=True, spec_set=True)
   def test_isatty_to_env_with_mock_tty(self, mock_ttyname):
     mock_ttyname.return_value = self._fake_ttyname
     mock_stdin = self._make_mock_stream(True, 0)

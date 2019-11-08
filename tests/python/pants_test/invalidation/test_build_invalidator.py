@@ -1,17 +1,14 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import tempfile
 import unittest
 from contextlib import contextmanager
 
 from pants.invalidation.build_invalidator import BuildInvalidator, CacheKey
+from pants.testutil.subsystem.util import init_subsystem
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_rmtree
-from pants_test.subsystem.subsystem_util import init_subsystem
 
 
 class CacheKeyTest(unittest.TestCase):

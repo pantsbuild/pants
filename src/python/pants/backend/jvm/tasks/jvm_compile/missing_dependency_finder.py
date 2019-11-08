@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import re
-from builtins import object
 from collections import namedtuple
 from difflib import SequenceMatcher
 
@@ -25,7 +21,7 @@ class ClassNotFoundError(namedtuple('CompileError', ['source', 'lineno', 'classn
   pass
 
 
-class CompileErrorExtractor(object):
+class CompileErrorExtractor:
   """
   Extract `ClassNotFoundError`s from pants compile log.
   """
@@ -73,7 +69,7 @@ class CompileErrorExtractor(object):
     return errors
 
 
-class StringSimilarityRanker(object):
+class StringSimilarityRanker:
   """
   Sort strings according to their similarities to a given string.
   """
@@ -89,7 +85,7 @@ class StringSimilarityRanker(object):
       reverse=True)
 
 
-class MissingDependencyFinder(object):
+class MissingDependencyFinder:
   """
   Try to find missing dependencies from target's transitive dependencies.
   """

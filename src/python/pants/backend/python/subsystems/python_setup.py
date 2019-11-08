@@ -1,19 +1,15 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import logging
 import os
+import subprocess
 
 from pex.variables import Variables
-from pkg_resources import Requirement
 
 from pants.option.custom_types import UnsetBool
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
-from pants.util.process_handler import subprocess
 
 
 logger = logging.getLogger(__name__)
@@ -25,18 +21,15 @@ class PythonSetup(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(PythonSetup, cls).register_options(register)
-    register('--interpreter-constraints', advanced=True, default=['CPython>=2.7,<3', 'CPython>=3.6,<4'], type=list,
+    super().register_options(register)
+    register('--interpreter-constraints', advanced=True, fingerprint=True, type=list,
+             default=['CPython>=2.7,<3', 'CPython>=3.6,<4'],
              metavar='<requirement>',
              help="Constrain the selected Python interpreter.  Specify with requirement syntax, "
                   "e.g. 'CPython>=2.7,<3' (A CPython interpreter with version >=2.7 AND version <3)"
                   "or 'PyPy' (A pypy interpreter of any version). Multiple constraint strings will "
                   "be ORed together. These constraints are applied in addition to any "
                   "compatibilities required by the relevant targets.")
-    register('--setuptools-version', advanced=True, default='40.4.3',
-             help='The setuptools version for this python environment.')
-    register('--wheel-version', advanced=True, default='0.31.1',
-             help='The wheel version for this python environment.')
     register('--platforms', advanced=True, type=list, metavar='<platform>', default=['current'],
              fingerprint=True,
              help='A list of platforms to be supported by this python environment. Each platform'
@@ -66,22 +59,6 @@ class PythonSetup(Subsystem):
                   '"<PATH>" (the contents of the PATH env var), '
                   '"<PEXRC>" (paths in the PEX_PYTHON_PATH variable in a pexrc file), '
                   '"<PYENV>" (all python versions under $(pyenv root)/versions).')
-    register('--resolver-blacklist', advanced=True, type=dict, default={},
-             removal_version='1.13.0.dev2',
-             removal_hint='Now unused. Pants, via PEX, handles blacklisting automatically via '
-                          'PEP-508 environment markers anywhere Python requirements are specified '
-                          '(e.g. `requirements.txt` and `python_requirement(...)` in BUILD files): '
-                          'https://www.python.org/dev/peps/pep-0508/#environment-markers',
-             metavar='<blacklist>',
-             help='A blacklist dict (str->str) that maps package name to an interpreter '
-              'constraint. If a package name is in the blacklist and its interpreter '
-              'constraint matches the target interpreter, skip the requirement. This is needed '
-              'to ensure that universal requirement resolves for a target interpreter version do '
-              'not error out on interpreter specific requirements such as backport libs like '
-              '`functools32`. For example, a valid blacklist is {"functools32": "CPython>3"}. '
-              'NOTE: this keyword is a temporary fix and will be reverted per: '
-              'https://github.com/pantsbuild/pants/issues/5696. The long term '
-              'solution is tracked by: https://github.com/pantsbuild/pex/issues/456.')
     register('--resolver-use-manylinux', advanced=True, type=bool, default=True, fingerprint=True,
              help='Whether to consider manylinux wheels when resolving requirements for linux '
                   'platforms.')
@@ -93,14 +70,6 @@ class PythonSetup(Subsystem):
   @memoized_property
   def interpreter_search_paths(self):
     return self.expand_interpreter_search_paths(self.get_options().interpreter_search_paths)
-
-  @property
-  def setuptools_version(self):
-    return self.get_options().setuptools_version
-
-  @property
-  def wheel_version(self):
-    return self.get_options().wheel_version
 
   @property
   def platforms(self):
@@ -143,32 +112,16 @@ class PythonSetup(Subsystem):
   def scratch_dir(self):
     return os.path.join(self.get_options().pants_workdir, *self.options_scope.split('.'))
 
-  def compatibility_or_constraints(self, target):
+  def compatibility_or_constraints(self, compatibility):
     """
-    Return either the compatibility of the given target, or the interpreter constraints.
-    If interpreter constraints are supplied by the CLI flag, return those only.
+    Return either the given compatibility, or the interpreter constraints. If interpreter
+    constraints are supplied by the CLI flag, return those only.
+
+    :param compatibility: Optional[List[str]], e.g. None or ['CPython>3'].
     """
     if self.get_options().is_flagged('interpreter_constraints'):
       return tuple(self.interpreter_constraints)
-    return tuple(target.compatibility or self.interpreter_constraints)
-
-  def setuptools_requirement(self):
-    return self._failsafe_parse('setuptools=={0}'.format(self.setuptools_version))
-
-  def wheel_requirement(self):
-    return self._failsafe_parse('wheel=={0}'.format(self.wheel_version))
-
-  # This is a setuptools <1 and >1 compatible version of Requirement.parse.
-  # For setuptools <1, if you did Requirement.parse('setuptools'), it would
-  # return 'distribute' which of course is not desirable for us.  So they
-  # added a replacement=False keyword arg.  Sadly, they removed this keyword
-  # arg in setuptools >= 1 so we have to simply failover using TypeError as a
-  # catch for 'Invalid Keyword Argument'.
-  def _failsafe_parse(self, requirement):
-    try:
-      return Requirement.parse(requirement, replacement=False)
-    except TypeError:
-      return Requirement.parse(requirement)
+    return tuple(compatibility or self.interpreter_constraints)
 
   @classmethod
   def expand_interpreter_search_paths(cls, interpreter_search_paths, pyenv_root_func=None):
@@ -238,7 +191,7 @@ class PythonSetup(Subsystem):
 
 def get_pyenv_root():
   try:
-    return subprocess.check_output(['pyenv', 'root']).decode('utf-8').strip()
+    return subprocess.check_output(['pyenv', 'root']).decode().strip()
   except (OSError, subprocess.CalledProcessError):
     logger.info('No pyenv binary found. Will not use pyenv interpreters.')
   return None

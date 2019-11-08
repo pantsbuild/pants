@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import uuid
 from contextlib import contextmanager
@@ -10,7 +7,7 @@ from contextlib import contextmanager
 from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
 from pants.backend.codegen.thrift.java.thrift_defaults import ThriftDefaults
 from pants.build_graph.target import Target
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 class TestThriftDefaults(TestBase):

@@ -3,10 +3,10 @@
 
 python_tests(
   dependencies=[
-    '3rdparty/python:future',
     'src/python/pants/java/junit',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:xml_parser',
+    'src/python/pants/testutil:test_base'
   ]
 )

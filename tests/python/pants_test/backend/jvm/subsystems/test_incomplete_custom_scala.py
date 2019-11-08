@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import contextlib
 import os
@@ -11,9 +8,9 @@ import shutil
 from textwrap import dedent
 
 from pants.base.build_environment import get_buildroot
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_file_dump
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class IncompleteCustomScalaIntegrationTest(PantsRunIntegrationTest):
@@ -37,7 +34,7 @@ class IncompleteCustomScalaIntegrationTest(PantsRunIntegrationTest):
   def tmp_scalastyle_config(self):
     with temporary_dir(root_dir=get_buildroot()) as scalastyle_dir:
       path = os.path.join(scalastyle_dir, 'config.xml')
-      safe_file_dump(path, '''<scalastyle/>''', mode='w')
+      safe_file_dump(path, '''<scalastyle/>''')
       yield '--lint-scalastyle-config={}'.format(path)
 
   def pants_run(self, options=None):
@@ -64,21 +61,21 @@ class IncompleteCustomScalaIntegrationTest(PantsRunIntegrationTest):
 
   def test_working_210(self):
     with self.tmp_scalastyle_config() as scalastyle_config_option:
-      pants_run = self.pants_run(options=['--scala-version=2.10', scalastyle_config_option])
+      pants_run = self.pants_run(options=['-ldebug', '--scala-version=2.10', scalastyle_config_option])
       self.assert_success(pants_run)
-      assert re.search('bootstrap-scalastyle_2_10', pants_run.stdout_data), pants_run.stdout_data
+      assert re.search('Bootstrapping scalastyle_2_10', pants_run.stdout_data), pants_run.stdout_data
 
   def test_working_211(self):
     with self.tmp_scalastyle_config() as scalastyle_config_option:
-      pants_run = self.pants_run(options=['--scala-version=2.11', scalastyle_config_option])
+      pants_run = self.pants_run(options=['-ldebug', '--scala-version=2.11', scalastyle_config_option])
       self.assert_success(pants_run)
-      assert re.search('bootstrap-scalastyle_2_11', pants_run.stdout_data), pants_run.stdout_data
+      assert re.search('Bootstrapping scalastyle_2_11', pants_run.stdout_data), pants_run.stdout_data
 
   def test_working_212(self):
     with self.tmp_scalastyle_config() as scalastyle_config_option:
-      pants_run = self.pants_run(options=['--scala-version=2.12', scalastyle_config_option])
+      pants_run = self.pants_run(options=['-ldebug', '--scala-version=2.12', scalastyle_config_option])
       self.assert_success(pants_run)
-      assert re.search('bootstrap-scalastyle_2_12', pants_run.stdout_data), pants_run.stdout_data
+      assert re.search('Bootstrapping scalastyle_2_12', pants_run.stdout_data), pants_run.stdout_data
 
   def test_repl_working_custom_211(self):
     with self.tmp_custom_scala('custom_211_scalatools.build') as scalastyle_config_option:
@@ -103,27 +100,29 @@ class IncompleteCustomScalaIntegrationTest(PantsRunIntegrationTest):
     with self.tmp_custom_scala('custom_211_scalatools.build') as scalastyle_config_option:
       pants_run = self.pants_run(
         options=[
+          '-ldebug',
           '--scala-version=custom',
           '--scala-suffix-version=2.11',
           scalastyle_config_option,
         ]
       )
       self.assert_success(pants_run)
-      assert not re.search('bootstrap-scalastyle_2_10', pants_run.stdout_data)
-      assert not re.search('bootstrap-scalastyle_2_11', pants_run.stdout_data)
+      assert not re.search('Bootstrapping scalastyle_2_10', pants_run.stdout_data)
+      assert not re.search('Bootstrapping scalastyle_2_11', pants_run.stdout_data)
 
   def test_working_custom_212(self):
     with self.tmp_custom_scala('custom_212_scalatools.build') as scalastyle_config_option:
       pants_run = self.pants_run(
         options=[
+          '-ldebug',
           '--scala-version=custom',
           '--scala-suffix-version=2.12',
           scalastyle_config_option,
         ]
       )
       self.assert_success(pants_run)
-      assert not re.search('bootstrap-scalastyle_2_11', pants_run.stdout_data)
-      assert not re.search('bootstrap-scalastyle_2_12', pants_run.stdout_data)
+      assert not re.search('Bootstrapping scalastyle_2_11', pants_run.stdout_data)
+      assert not re.search('Bootstrapping scalastyle_2_12', pants_run.stdout_data)
 
   def test_missing_compiler(self):
     with self.tmp_custom_scala('custom_211_missing_compiler.build') as scalastyle_config_option:

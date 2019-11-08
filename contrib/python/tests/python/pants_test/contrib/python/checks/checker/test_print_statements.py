@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import unittest
 
-from future.utils import PY3
 from pants_test.contrib.python.checks.checker.plugin_test_base import CheckstylePluginTestBase
 
 from pants.contrib.python.checks.checker.print_statements import PrintStatements
@@ -32,8 +28,8 @@ class PrintStatementsTest(CheckstylePluginTestBase):
     """
     self.assertNoNits(statement)
 
-  @unittest.skipIf(PY3, reason='Print statement check disabled on Python 3 because interpreter '
-                               'will already throw a syntax error.')
+  # TODO(#7979): Rework tests so that we can run this with Python 2.
+  @unittest.skip
   def test_print_statement(self):
     statement = """
       print["I do what I want"]

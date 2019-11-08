@@ -22,11 +22,7 @@
   clippy::too_many_arguments
 )]
 // Default isn't as big a deal as people seem to think it is.
-#![allow(
-  clippy::new_without_default,
-  clippy::new_without_default_derive,
-  clippy::new_ret_no_self
-)]
+#![allow(clippy::new_without_default, clippy::new_ret_no_self)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
@@ -38,7 +34,7 @@ mod entry;
 mod node;
 
 pub use crate::entry::Entry;
-use crate::entry::{EntryKey, Generation, RunToken};
+use crate::entry::{Generation, RunToken};
 
 use std::collections::binary_heap::BinaryHeap;
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -52,6 +48,7 @@ use fnv::FnvHasher;
 
 use futures::future::{self, Future};
 use indexmap::IndexSet;
+use log::{debug, trace, warn};
 use parking_lot::Mutex;
 use petgraph::graph::DiGraph;
 use petgraph::visit::EdgeRef;
@@ -62,7 +59,7 @@ use boxfuture::{BoxFuture, Boxable};
 
 type FNV = BuildHasherDefault<FnvHasher>;
 
-type PGraph<N> = DiGraph<Entry<N>, (), u32>;
+type PGraph<N> = DiGraph<Entry<N>, f32, u32>;
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct InvalidationResult {
@@ -70,7 +67,7 @@ pub struct InvalidationResult {
   pub dirtied: usize,
 }
 
-type Nodes<N> = HashMap<EntryKey<N>, EntryId>;
+type Nodes<N> = HashMap<N, EntryId>;
 
 struct InnerGraph<N: Node> {
   nodes: Nodes<N>,
@@ -82,7 +79,7 @@ struct InnerGraph<N: Node> {
 }
 
 impl<N: Node> InnerGraph<N> {
-  fn entry_id(&self, node: &EntryKey<N>) -> Option<&EntryId> {
+  fn entry_id(&self, node: &N) -> Option<&EntryId> {
     self.nodes.get(node)
   }
 
@@ -102,11 +99,11 @@ impl<N: Node> InnerGraph<N> {
       .expect("The unsafe_entry_for_id method should only be used in read-only methods!")
   }
 
-  fn ensure_entry(&mut self, node: EntryKey<N>) -> EntryId {
+  fn ensure_entry(&mut self, node: N) -> EntryId {
     InnerGraph::ensure_entry_internal(&mut self.pg, &mut self.nodes, node)
   }
 
-  fn ensure_entry_internal(pg: &mut PGraph<N>, nodes: &mut Nodes<N>, node: EntryKey<N>) -> EntryId {
+  fn ensure_entry_internal(pg: &mut PGraph<N>, nodes: &mut Nodes<N>, node: N) -> EntryId {
     if let Some(&id) = nodes.get(&node) {
       return id;
     }
@@ -120,7 +117,35 @@ impl<N: Node> InnerGraph<N> {
   ///
   /// Detect whether adding an edge from src to dst would create a cycle.
   ///
-  /// Returns true if a cycle would be created by adding an edge from src->dst.
+  /// Returns a path which would cause the cycle if an edge were added from src to dst, or None if
+  /// no cycle would be created.
+  ///
+  /// This strongly optimizes for the case of no cycles. If cycles are detected, this is very
+  /// expensive to call.
+  ///
+  fn report_cycle(&self, src_id: EntryId, dst_id: EntryId) -> Option<Vec<Entry<N>>> {
+    if src_id == dst_id {
+      let entry = self.entry_for_id(src_id).unwrap();
+      return Some(vec![entry.clone(), entry.clone()]);
+    }
+    if !self.detect_cycle(src_id, dst_id) {
+      return None;
+    }
+    Self::shortest_path(&self.pg, dst_id, src_id).map(|mut path| {
+      path.reverse();
+      path.push(dst_id);
+      path
+        .into_iter()
+        .map(|index| self.entry_for_id(index).unwrap().clone())
+        .collect()
+    })
+  }
+
+  ///
+  /// Detect whether adding an edge from src to dst would create a cycle.
+  ///
+  /// Uses Dijkstra's algorithm, which is significantly cheaper than the Bellman-Ford, but keeps
+  /// less context around paths on the way.
   ///
   fn detect_cycle(&self, src_id: EntryId, dst_id: EntryId) -> bool {
     // Search either forward from the dst, or backward from the src.
@@ -144,7 +169,122 @@ impl<N: Node> InnerGraph<N> {
   }
 
   ///
-  /// Begins a topological Walk from the given roots.
+  /// Compute and return one shortest path from `src` to `dst`.
+  ///
+  /// Uses Bellman-Ford, which is pretty expensive O(VE) as it has to traverse the whole graph and
+  /// keeping a lot of state on the way.
+  ///
+  fn shortest_path(graph: &PGraph<N>, src: EntryId, dst: EntryId) -> Option<Vec<EntryId>> {
+    let (_path_weights, paths) = petgraph::algo::bellman_ford(graph, src)
+      .expect("There should not be any negative edge weights");
+
+    let mut next = dst;
+    let mut path = Vec::new();
+    path.push(next);
+    while let Some(current) = paths[next.index()] {
+      path.push(current);
+      if current == src {
+        return Some(path);
+      }
+      next = current;
+    }
+    None
+  }
+
+  ///
+  /// Compute the critical path for this graph.
+  ///
+  /// The critical path is the longest path. For a directed acyclic graph, it is equivalent to a
+  /// shortest path algorithm.
+  ///
+  /// Modify the graph we have to fit into the expectations of the Bellman-Ford shortest graph
+  /// algorithm and use that to calculate the critical path.
+  ///
+  fn critical_path<F>(&self, roots: &[N], duration: &F) -> (Duration, Vec<Entry<N>>)
+  where
+    F: Fn(&Entry<N>) -> Duration,
+  {
+    fn duration_into_weight(d: Duration) -> f64 {
+      -(d.as_nanos() as f64)
+    }
+
+    // First, let's map nodes to edges
+    let mut graph = self.pg.filter_map(
+      |_node_idx, node_weight| Some(Some(node_weight)),
+      |edge_idx, _edge_weight| {
+        let target_node = self.pg.raw_edges()[edge_idx.index()].target();
+        self
+          .pg
+          .node_weight(target_node)
+          .map(duration)
+          .map(duration_into_weight)
+      },
+    );
+
+    // Add a single source that's a parent to all roots
+    let srcs = roots
+      .iter()
+      .filter_map(|n| self.entry_id(n))
+      .cloned()
+      .collect::<Vec<_>>();
+    let src = graph.add_node(None);
+    for node in srcs {
+      graph.add_edge(
+        src,
+        node,
+        graph
+          .node_weight(node)
+          .map(|maybe_weight| {
+            maybe_weight
+              .map(duration)
+              .map(duration_into_weight)
+              .unwrap_or(0.)
+          })
+          .unwrap(),
+      );
+    }
+
+    let (weights, paths) =
+      petgraph::algo::bellman_ford(&graph, src).expect("The graph must be acyclic");
+    if let Some((index, total_duration)) = weights
+      .iter()
+      // INFINITY is used for missing entries. We don't want for this to interfere with our max_by.
+      // Use NEG_INFINITY instead, which has to be the minimum duration.
+      .map(|weight| {
+        if *weight == std::f64::INFINITY {
+          std::f64::NEG_INFINITY
+        } else {
+          *weight
+        }
+      })
+      .map(|weight| Duration::from_nanos(-weight as u64))
+      .enumerate()
+      .max_by(|(_, left_duration), (_, right_duration)| left_duration.cmp(&right_duration))
+    {
+      let critical_path = {
+        let mut next = paths[index];
+        let mut path = vec![graph
+          .node_weight(petgraph::graph::NodeIndex::new(index))
+          .unwrap()
+          .unwrap()];
+        while next != Some(src) && next != None {
+          if let Some(entry) = graph.node_weight(next.unwrap()).unwrap() {
+            path.push(*entry);
+          }
+          next = paths[next.unwrap().index()];
+        }
+        path.into_iter().rev().cloned().collect()
+      };
+      (total_duration, critical_path)
+    } else {
+      (Duration::from_nanos(0), vec![])
+    }
+  }
+
+  ///
+  /// Begins a Walk from the given roots.
+  /// The Walk will iterate over all nodes that descend from the roots in the direction of
+  /// traversal but won't necessarily be in topological order.
   ///
   fn walk(&self, roots: VecDeque<EntryId>, direction: Direction) -> Walk<'_, N> {
     Walk {
@@ -158,7 +298,7 @@ impl<N: Node> InnerGraph<N> {
   fn clear(&mut self) {
     for eid in self.nodes.values() {
       if let Some(entry) = self.pg.node_weight_mut(*eid) {
-        entry.clear();
+        entry.clear(true);
       }
     }
   }
@@ -175,7 +315,7 @@ impl<N: Node> InnerGraph<N> {
       .nodes
       .iter()
       .filter_map(|(entry, &entry_id)| {
-        if predicate(entry.content()) {
+        if predicate(entry) {
           Some(entry_id)
         } else {
           None
@@ -196,7 +336,7 @@ impl<N: Node> InnerGraph<N> {
     // Clear roots and remove their outbound edges.
     for id in &root_ids {
       if let Some(entry) = self.pg.node_weight_mut(*id) {
-        entry.clear();
+        entry.clear(false);
       }
     }
     self.pg.retain_edges(|pg, edge| {
@@ -240,7 +380,7 @@ impl<N: Node> InnerGraph<N> {
 
     let root_entries = roots
       .iter()
-      .filter_map(|n| self.entry_id(&EntryKey::Valid(n.clone())))
+      .filter_map(|n| self.entry_id(n))
       .cloned()
       .collect();
 
@@ -271,7 +411,7 @@ impl<N: Node> InnerGraph<N> {
   fn trace<T: NodeTracer<N>>(&self, roots: &[N], file_path: &Path) -> Result<(), String> {
     let root_ids: IndexSet<EntryId, FNV> = roots
       .iter()
-      .filter_map(|nk| self.entry_id(&EntryKey::Valid(nk.clone())))
+      .filter_map(|nk| self.entry_id(nk))
       .cloned()
       .collect();
 
@@ -412,7 +552,7 @@ impl<N: Node> InnerGraph<N> {
     queue.extend(
       roots
         .iter()
-        .filter_map(|nk| self.entry_id(&EntryKey::Valid(nk.clone())))
+        .filter_map(|nk| self.entry_id(nk))
         .filter_map(|eid| queue_entry(*eid)),
     );
 
@@ -446,8 +586,7 @@ impl<N: Node> InnerGraph<N> {
   fn reachable_digest_count(&self, roots: &[N]) -> usize {
     let root_ids = roots
       .iter()
-      .cloned()
-      .filter_map(|node| self.entry_id(&EntryKey::Valid(node)))
+      .filter_map(|node| self.entry_id(node))
       .cloned()
       .collect();
     self
@@ -516,16 +655,27 @@ impl<N: Node> Graph<N> {
         let dst_id = {
           // TODO: doing cycle detection under the lock... unfortunate, but probably unavoidable
           // without a much more complicated algorithm.
-          let potential_dst_id = inner.ensure_entry(EntryKey::Valid(dst_node.clone()));
-          if inner.detect_cycle(src_id, potential_dst_id) {
-            // Cyclic dependency: declare a dependency on a copy of the Node that is marked Cyclic.
-            inner.ensure_entry(EntryKey::Cyclic(dst_node))
+          let potential_dst_id = inner.ensure_entry(dst_node.clone());
+          if let Some(cycle_path) = Self::report_cycle(src_id, potential_dst_id, &mut inner) {
+            // Cyclic dependency: render an error.
+            let path_strs = cycle_path
+              .into_iter()
+              .map(|e| e.node().to_string())
+              .collect();
+            return futures::future::err(N::Error::cyclic(path_strs)).to_boxed();
           } else {
             // Valid dependency.
+            trace!(
+              "Adding dependency from {:?} to {:?}",
+              inner.entry_for_id(src_id).unwrap().node(),
+              inner.entry_for_id(potential_dst_id).unwrap().node()
+            );
             potential_dst_id
           }
         };
-        inner.pg.add_edge(src_id, dst_id, ());
+        // All edges get a weight of 1.0 so that we can Bellman-Ford over the graph, treating each
+        // edge as having equal weight.
+        inner.pg.add_edge(src_id, dst_id, 1.0);
         inner
           .entry_for_id(dst_id)
           .cloned()
@@ -541,6 +691,71 @@ impl<N: Node> Graph<N> {
     }
   }
 
+  fn report_cycle(
+    src_id: EntryId,
+    potential_dst_id: EntryId,
+    inner: &mut InnerGraph<N>,
+  ) -> Option<Vec<Entry<N>>> {
+    let mut counter = 0;
+    loop {
+      // Find one cycle if any cycles exist.
+      if let Some(cycle_path) = inner.report_cycle(src_id, potential_dst_id) {
+        // See if the cycle contains any dirty nodes. If there are dirty nodes, we can try clearing
+        // them, and then check if there are still any cycles in the graph.
+        let dirty_nodes: HashSet<_> = cycle_path
+          .iter()
+          .filter(|n| n.may_have_dirty_edges())
+          .map(|n| n.node().clone())
+          .collect();
+        if dirty_nodes.is_empty() {
+          // We detected a cycle with no dirty nodes - there's a cycle and there's nothing we can do
+          // to remove it. We only log at debug because the UI will render the cycle.
+          debug!(
+            "Detected cycle considering adding edge from {:?} to {:?}; existing path: {:?}",
+            inner.entry_for_id(src_id).unwrap(),
+            inner.entry_for_id(potential_dst_id).unwrap(),
+            cycle_path
+          );
+          return Some(cycle_path);
+        }
+        counter += 1;
+        // Obsolete edges from a dirty node may cause fake cycles to be detected if there was a
+        // dirty dep from A to B, and we're trying to add a dep from B to A.
+        // If we detect a cycle that contains dirty nodes (and so potentially obsolete edges),
+        // we repeatedly cycle-detect, clearing (and re-running) and dirty nodes (and their edges)
+        // that we encounter.
+        //
+        // We do this repeatedly, because there may be multiple paths which would cause cycles,
+        // which contain dirty nodes. If we've cleared 10 separate paths which contain dirty nodes,
+        // and are still detecting cycle-causing paths containing dirty nodes, give up. 10 is a very
+        // arbitrary number, which we can increase if we find real graphs in the wild which hit this
+        // limit.
+        if counter > 10 {
+          warn!(
+            "Couldn't remove cycle containing dirty nodes after {} attempts; nodes in cycle: {:?}",
+            counter, cycle_path
+          );
+          return Some(cycle_path);
+        }
+        // Clear the dirty nodes, removing the edges from them, and try again.
+        inner.invalidate_from_roots(|node| dirty_nodes.contains(node));
+      } else {
+        return None;
+      }
+    }
+  }
+
+  ///
+  /// Calculate the critical path for the subset of the graph that descends from these roots,
+  /// assuming this mapping between entries and durations.
+  ///
+  pub fn critical_path<F>(&self, roots: &[N], duration: &F) -> (Duration, Vec<Entry<N>>)
+  where
+    F: Fn(&Entry<N>) -> Duration,
+  {
+    self.inner.lock().critical_path(roots, duration)
+  }
+
   ///
   /// Create the given Node if it does not already exist.
   ///
@@ -553,7 +768,7 @@ impl<N: Node> Graph<N> {
       if inner.draining {
         None
       } else {
-        let id = inner.ensure_entry(EntryKey::Valid(node));
+        let id = inner.ensure_entry(node);
         inner.entry_for_id(id).cloned().map(|entry| (entry, id))
       }
     };
@@ -637,6 +852,24 @@ impl<N: Node> Graph<N> {
   /// reliably the case because Entry happens to require a &mut InnerGraph reference; it would be
   /// great not to violate that in the future.
   ///
+  /// TODO: We don't track which generation actually added which edges, so over time nodes will end
+  /// up with spurious dependencies. This is mostly sound, but may lead to over-invalidation and
+  /// doing more work than is necessary.
+  /// As an example, if generation 0 or X depends on A and B, and generation 1 of X depends on C,
+  /// nothing will prune the dependencies from X onto A and B, so generation 1 of X will have
+  /// dependencies on A, B, and C in the graph, even though running it only depends on C.
+  /// At some point we should address this, but we must be careful with how we do so; anything which
+  /// ties together the generation of a node with specifics of edges would require careful
+  /// consideration of locking (probably it would require merging the EntryState locks and Graph
+  /// locks, or working out something clever).
+  ///
+  /// It would also require careful consideration of nodes in the Running EntryState - these may
+  /// have previous RunToken edges and next RunToken edges which collapse into the same Generation
+  /// edges; when working out whether a dirty node is really clean, care must be taken to avoid
+  /// spurious cycles. Currently we handle this as a special case by, if we detect a cycle that
+  /// contains dirty nodes, clearing those nodes (removing any edges from them). This is a little
+  /// hacky, but will tide us over until we fully solve this problem.
+  ///
   fn complete<C>(
     &self,
     context: &C,
@@ -654,7 +887,7 @@ impl<N: Node> Graph<N> {
         .pg
         .neighbors_directed(entry_id, Direction::Outgoing)
         .filter_map(|dep_id| inner.entry_for_id(dep_id))
-        .map(|entry| entry.generation())
+        .map(Entry::generation)
         .collect();
       (
         inner.entry_for_id(entry_id).cloned(),
@@ -751,8 +984,8 @@ impl<N: Node> Graph<N> {
 }
 
 ///
-/// Represents the state of a particular topological walk through a Graph. Implements Iterator and
-/// has the same lifetime as the Graph itself.
+/// Represents the state of a particular walk through a Graph. Implements Iterator and has the same
+/// lifetime as the Graph itself.
 ///
 struct Walk<'a, N: Node> {
   graph: &'a InnerGraph<N>,
@@ -782,459 +1015,4 @@ impl<'a, N: Node + 'a> Iterator for Walk<'a, N> {
 }
 
 #[cfg(test)]
-mod tests {
-  use parking_lot;
-  use rand;
-
-  use std::cmp;
-  use std::collections::{HashMap, HashSet};
-  use std::sync::{mpsc, Arc};
-  use std::thread;
-  use std::time::Duration;
-
-  use boxfuture::{BoxFuture, Boxable};
-  use futures::future::{self, Future};
-  use hashing::Digest;
-  use parking_lot::Mutex;
-
-  use self::rand::Rng;
-
-  use super::{EntryId, Graph, InvalidationResult, Node, NodeContext, NodeError};
-
-  #[test]
-  fn create() {
-    let graph = Arc::new(Graph::new());
-    let context = TContext::new(0, graph.clone());
-    assert_eq!(
-      graph.create(TNode(2), &context).wait(),
-      Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
-    );
-  }
-
-  #[test]
-  fn invalidate_and_clean() {
-    let graph = Arc::new(Graph::new());
-    let context = TContext::new(0, graph.clone());
-
-    // Create three nodes.
-    assert_eq!(
-      graph.create(TNode(2), &context).wait(),
-      Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
-    );
-    assert_eq!(context.runs(), vec![TNode(2), TNode(1), TNode(0)]);
-
-    // Clear the middle Node, which dirties the upper node.
-    assert_eq!(
-      graph.invalidate_from_roots(|&TNode(n)| n == 1),
-      InvalidationResult {
-        cleared: 1,
-        dirtied: 1
-      }
-    );
-
-    // Confirm that the cleared Node re-runs, and the upper node is cleaned without re-running.
-    assert_eq!(
-      graph.create(TNode(2), &context).wait(),
-      Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
-    );
-    assert_eq!(context.runs(), vec![TNode(2), TNode(1), TNode(0), TNode(1)]);
-  }
-
-  #[test]
-  fn invalidate_and_rerun() {
-    let graph = Arc::new(Graph::new());
-    let context0 = TContext::new(0, graph.clone());
-
-    // Create three nodes.
-    assert_eq!(
-      graph.create(TNode(2), &context0).wait(),
-      Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
-    );
-    assert_eq!(context0.runs(), vec![TNode(2), TNode(1), TNode(0)]);
-
-    // Clear the middle Node, which dirties the upper node.
-    assert_eq!(
-      graph.invalidate_from_roots(|&TNode(n)| n == 1),
-      InvalidationResult {
-        cleared: 1,
-        dirtied: 1
-      }
-    );
-
-    // Request with a new context, which will cause both the middle and upper nodes to rerun since
-    // their input values have changed.
-    let context1 = TContext::new(1, graph.clone());
-    assert_eq!(
-      graph.create(TNode(2), &context1).wait(),
-      Ok(vec![T(0, 0), T(1, 1), T(2, 1)])
-    );
-    assert_eq!(context1.runs(), vec![TNode(1), TNode(2)]);
-  }
-
-  #[test]
-  fn invalidate_with_changed_dependencies() {
-    let graph = Arc::new(Graph::new());
-    let context = TContext::new(0, graph.clone());
-
-    // Create three nodes.
-    assert_eq!(
-      graph.create(TNode(2), &context).wait(),
-      Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
-    );
-
-    // Clear the middle Node, which dirties the upper node.
-    assert_eq!(
-      graph.invalidate_from_roots(|&TNode(n)| n == 1),
-      InvalidationResult {
-        cleared: 1,
-        dirtied: 1
-      }
-    );
-
-    // Request with a new context that truncates execution at the middle Node.
-    let context = TContext::new_with_stop_at(0, TNode(1), graph.clone());
-    assert_eq!(
-      graph.create(TNode(2), &context).wait(),
-      Ok(vec![T(1, 0), T(2, 0)])
-    );
-
-    // Confirm that dirtying the bottom Node does not affect the middle/upper Nodes, which no
-    // longer depend on it.
-    assert_eq!(
-      graph.invalidate_from_roots(|&TNode(n)| n == 0),
-      InvalidationResult {
-        cleared: 1,
-        dirtied: 0,
-      }
-    );
-  }
-
-  #[test]
-  fn invalidate_randomly() {
-    let graph = Arc::new(Graph::new());
-
-    let invalidations = 10;
-    let sleep_per_invalidation = Duration::from_millis(100);
-    let range = 100;
-
-    // Spawn a background thread to randomly invalidate in the relevant range. Hold its handle so
-    // it doesn't detach.
-    let graph2 = graph.clone();
-    let (send, recv) = mpsc::channel();
-    let _join = thread::spawn(move || {
-      let mut rng = rand::thread_rng();
-      let mut invalidations = invalidations;
-      while invalidations > 0 {
-        invalidations -= 1;
-
-        // Invalidate a random node in the graph.
-        let candidate = rng.gen_range(0, range);
-        graph2.invalidate_from_roots(|&TNode(n)| n == candidate);
-
-        thread::sleep(sleep_per_invalidation);
-      }
-      send.send(()).unwrap();
-    });
-
-    // Continuously re-request the root with increasing context values, and assert that Node and
-    // context values are ascending.
-    let mut iterations = 0;
-    let mut max_distinct_context_values = 0;
-    loop {
-      let context = TContext::new(iterations, graph.clone());
-
-      // Compute the root, and validate its output.
-      let node_output = match graph.create(TNode(range), &context).wait() {
-        Ok(output) => output,
-        Err(TError::Invalidated) => {
-          // Some amnount of concurrent invalidation is expected: retry.
-          continue;
-        }
-        Err(e) => panic!(
-          "Did not expect any errors other than Invalidation. Got: {:?}",
-          e
-        ),
-      };
-      max_distinct_context_values = cmp::max(
-        max_distinct_context_values,
-        TNode::validate(&node_output).unwrap(),
-      );
-
-      // Poll the channel to see whether the background thread has exited.
-      if let Ok(_) = recv.try_recv() {
-        break;
-      }
-      iterations += 1;
-    }
-
-    assert!(
-      max_distinct_context_values > 1,
-      "In {} iterations, observed a maximum of {} distinct context values.",
-      iterations,
-      max_distinct_context_values
-    );
-  }
-
-  #[test]
-  fn drain_and_resume() {
-    // Confirms that after draining a Graph that has running work, we are able to resume the work
-    // and have it complete successfully.
-    let graph = Arc::new(Graph::new());
-
-    let delay_before_drain = Duration::from_millis(100);
-    let delay_in_task = delay_before_drain * 10;
-
-    // Create a context that will sleep long enough at TNode(1) to be interrupted before
-    // requesting TNode(0).
-    let context = {
-      let mut delays = HashMap::new();
-      delays.insert(TNode(1), delay_in_task);
-      TContext::new_with_delays(0, delays, graph.clone())
-    };
-
-    // Spawn a background thread that will mark the Graph draining after a short delay.
-    let graph2 = graph.clone();
-    let _join = thread::spawn(move || {
-      thread::sleep(delay_before_drain);
-      graph2
-        .mark_draining(true)
-        .expect("Should not already be draining.");
-    });
-
-    // Request a TNode(1) in the "delayed" context, and expect it to be interrupted by the
-    // drain.
-    assert_eq!(
-      graph.create(TNode(2), &context).wait(),
-      Err(TError::Invalidated),
-    );
-
-    // Unmark the Graph draining, and try again: we expect the `Invalidated` result we saw before
-    // due to the draining to not have been persisted.
-    graph
-      .mark_draining(false)
-      .expect("Should already be draining.");
-    assert_eq!(
-      graph.create(TNode(2), &context).wait(),
-      Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
-    );
-  }
-
-  ///
-  /// A token containing the id of a Node and the id of a Context, respectively. Has a short name
-  /// to minimize the verbosity of tests.
-  ///
-  #[derive(Clone, Debug, Eq, PartialEq)]
-  struct T(usize, usize);
-
-  ///
-  /// A node that builds a Vec of tokens by recursively requesting itself and appending its value
-  /// to the result.
-  ///
-  #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-  struct TNode(usize);
-  impl Node for TNode {
-    type Context = TContext;
-    type Item = Vec<T>;
-    type Error = TError;
-
-    fn run(self, context: TContext) -> BoxFuture<Vec<T>, TError> {
-      context.ran(self.clone());
-      let depth = self.0;
-      let token = T(depth, context.id());
-      if depth > 0 && !context.stop_at(&self) {
-        context.maybe_delay(&self);
-        context
-          .get(TNode(depth - 1))
-          .map(move |mut v| {
-            v.push(token);
-            v
-          })
-          .to_boxed()
-      } else {
-        future::ok(vec![token]).to_boxed()
-      }
-    }
-
-    fn digest(_result: Self::Item) -> Option<Digest> {
-      None
-    }
-
-    fn cacheable(&self) -> bool {
-      true
-    }
-  }
-
-  impl std::fmt::Display for TNode {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
-      write!(f, "{:?}", self)
-    }
-  }
-
-  impl TNode {
-    ///
-    /// Validates the given TNode output. Both node ids and context ids should increase left to
-    /// right: node ids monotonically, and context ids non-monotonically.
-    ///
-    /// Valid:
-    ///   (0,0), (1,1), (2,2), (3,3)
-    ///   (0,0), (1,0), (2,1), (3,1)
-    ///
-    /// Invalid:
-    ///   (0,0), (1,1), (2,1), (3,0)
-    ///   (0,0), (1,0), (2,0), (1,0)
-    ///
-    /// If successful, returns the count of distinct context ids in the path.
-    ///
-    fn validate(output: &Vec<T>) -> Result<usize, String> {
-      let (node_ids, context_ids): (Vec<_>, Vec<_>) = output
-        .iter()
-        .map(|&T(node_id, context_id)| {
-          // We cast to isize to allow comparison to -1.
-          (node_id as isize, context_id)
-        })
-        .unzip();
-      // Confirm monotonically ordered.
-      let mut previous: isize = -1;
-      for node_id in node_ids {
-        if previous + 1 != node_id {
-          return Err(format!(
-            "Node ids in {:?} were not monotonically ordered.",
-            output
-          ));
-        }
-        previous = node_id;
-      }
-      // Confirm ordered (non-monotonically).
-      let mut previous: usize = 0;
-      for &context_id in &context_ids {
-        if previous > context_id {
-          return Err(format!("Context ids in {:?} were not ordered.", output));
-        }
-        previous = context_id;
-      }
-
-      Ok(context_ids.into_iter().collect::<HashSet<_>>().len())
-    }
-  }
-
-  ///
-  /// A context that keeps a record of Nodes that have been run.
-  ///
-  #[derive(Clone)]
-  struct TContext {
-    id: usize,
-    stop_at: Option<TNode>,
-    delays: HashMap<TNode, Duration>,
-    graph: Arc<Graph<TNode>>,
-    runs: Arc<Mutex<Vec<TNode>>>,
-    entry_id: Option<EntryId>,
-  }
-  impl NodeContext for TContext {
-    type Node = TNode;
-    fn clone_for(&self, entry_id: EntryId) -> TContext {
-      TContext {
-        id: self.id,
-        stop_at: self.stop_at.clone(),
-        delays: self.delays.clone(),
-        graph: self.graph.clone(),
-        runs: self.runs.clone(),
-        entry_id: Some(entry_id),
-      }
-    }
-
-    fn graph(&self) -> &Graph<TNode> {
-      &self.graph
-    }
-
-    fn spawn<F>(&self, future: F)
-    where
-      F: Future<Item = (), Error = ()> + Send + 'static,
-    {
-      // Avoids introducing a dependency on a threadpool.
-      thread::spawn(move || {
-        future.wait().unwrap();
-      });
-    }
-  }
-
-  impl TContext {
-    fn new(id: usize, graph: Arc<Graph<TNode>>) -> TContext {
-      TContext {
-        id,
-        stop_at: None,
-        delays: HashMap::default(),
-        graph,
-        runs: Arc::new(Mutex::new(Vec::new())),
-        entry_id: None,
-      }
-    }
-
-    fn new_with_stop_at(id: usize, stop_at: TNode, graph: Arc<Graph<TNode>>) -> TContext {
-      TContext {
-        id,
-        stop_at: Some(stop_at),
-        delays: HashMap::default(),
-        graph,
-        runs: Arc::new(Mutex::new(Vec::new())),
-        entry_id: None,
-      }
-    }
-
-    fn new_with_delays(
-      id: usize,
-      delays: HashMap<TNode, Duration>,
-      graph: Arc<Graph<TNode>>,
-    ) -> TContext {
-      TContext {
-        id,
-        stop_at: None,
-        delays,
-        graph,
-        runs: Arc::new(Mutex::new(Vec::new())),
-        entry_id: None,
-      }
-    }
-
-    fn id(&self) -> usize {
-      self.id
-    }
-
-    fn get(&self, dst: TNode) -> BoxFuture<Vec<T>, TError> {
-      self.graph.get(self.entry_id.unwrap(), self, dst)
-    }
-
-    fn ran(&self, node: TNode) {
-      let mut runs = self.runs.lock();
-      runs.push(node);
-    }
-
-    fn maybe_delay(&self, node: &TNode) {
-      if let Some(delay) = self.delays.get(node) {
-        thread::sleep(*delay);
-      }
-    }
-
-    fn stop_at(&self, node: &TNode) -> bool {
-      Some(node) == self.stop_at.as_ref()
-    }
-
-    fn runs(&self) -> Vec<TNode> {
-      self.runs.lock().clone()
-    }
-  }
-
-  #[derive(Clone, Debug, Eq, PartialEq)]
-  enum TError {
-    Cyclic,
-    Invalidated,
-  }
-  impl NodeError for TError {
-    fn invalidated() -> Self {
-      TError::Invalidated
-    }
-
-    fn cyclic() -> Self {
-      TError::Cyclic
-    }
-  }
-}
+mod tests;

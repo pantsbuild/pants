@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import os
@@ -21,6 +18,7 @@ class FSEventService(PantsService):
 
   ZERO_DEPTH = ['depth', 'eq', 0]
 
+  PANTS_ALL_FILES_SUBSCRIPTION_NAME = 'all_files'
   PANTS_PID_SUBSCRIPTION_NAME = 'pantsd_pid'
 
   def __init__(self, watchman, build_root):
@@ -28,13 +26,13 @@ class FSEventService(PantsService):
     :param Watchman watchman: The Watchman instance as provided by the WatchmanLauncher subsystem.
     :param str build_root: The current build root.
     """
-    super(FSEventService, self).__init__()
+    super().__init__()
     self._logger = logging.getLogger(__name__)
     self._watchman = watchman
     self._build_root = os.path.realpath(build_root)
     self._handlers = {}
 
-  def register_all_files_handler(self, callback, name='all_files'):
+  def register_all_files_handler(self, callback, name):
     """Registers a subscription for all files under a given watch path.
 
     :param func callback: the callback to execute on each filesystem event

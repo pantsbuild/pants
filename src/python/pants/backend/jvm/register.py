@@ -1,16 +1,18 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 from pants.backend.jvm.artifact import Artifact
-from pants.backend.jvm.ossrh_publication_metadata import (Developer, License,
-                                                          OSSRHPublicationMetadata, Scm)
+from pants.backend.jvm.ossrh_publication_metadata import (
+  Developer,
+  License,
+  OSSRHPublicationMetadata,
+  Scm,
+)
 from pants.backend.jvm.repository import Repository as repo
 from pants.backend.jvm.scala_artifact import ScalaArtifact
 from pants.backend.jvm.subsystems.jar_dependency_management import JarDependencyManagementSetup
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
+from pants.backend.jvm.subsystems.scoverage_platform import ScoveragePlatform
 from pants.backend.jvm.subsystems.shader import Shading
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.benchmark import Benchmark
@@ -23,8 +25,10 @@ from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_binary import Duplicate, JarRules, JvmBinary, Skip
 from pants.backend.jvm.targets.jvm_prep_command import JvmPrepCommand
-from pants.backend.jvm.targets.managed_jar_dependencies import (ManagedJarDependencies,
-                                                                ManagedJarLibraries)
+from pants.backend.jvm.targets.managed_jar_dependencies import (
+  ManagedJarDependencies,
+  ManagedJarLibraries,
+)
 from pants.backend.jvm.targets.scala_exclude import ScalaExclude
 from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
@@ -51,7 +55,6 @@ from pants.backend.jvm.tasks.junit_run import JUnitRun
 from pants.backend.jvm.tasks.jvm_compile.javac.javac_compile import JavacCompile
 from pants.backend.jvm.tasks.jvm_compile.jvm_classpath_publisher import RuntimeClasspathPublisher
 from pants.backend.jvm.tasks.jvm_compile.rsc.rsc_compile import RscCompile
-from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import ZincCompile
 from pants.backend.jvm.tasks.jvm_dependency_check import JvmDependencyCheck
 from pants.backend.jvm.tasks.jvm_dependency_usage import JvmDependencyUsage
 from pants.backend.jvm.tasks.jvm_platform_analysis import JvmPlatformExplain, JvmPlatformValidate
@@ -60,9 +63,11 @@ from pants.backend.jvm.tasks.nailgun_task import NailgunKillall
 from pants.backend.jvm.tasks.prepare_resources import PrepareResources
 from pants.backend.jvm.tasks.prepare_services import PrepareServices
 from pants.backend.jvm.tasks.provide_tools_jar import ProvideToolsJar
-from pants.backend.jvm.tasks.run_jvm_prep_command import (RunBinaryJvmPrepCommand,
-                                                          RunCompileJvmPrepCommand,
-                                                          RunTestJvmPrepCommand)
+from pants.backend.jvm.tasks.run_jvm_prep_command import (
+  RunBinaryJvmPrepCommand,
+  RunCompileJvmPrepCommand,
+  RunTestJvmPrepCommand,
+)
 from pants.backend.jvm.tasks.scala_repl import ScalaRepl
 from pants.backend.jvm.tasks.scaladoc_gen import ScaladocGen
 from pants.backend.jvm.tasks.scalafix import ScalaFixCheck, ScalaFixFix
@@ -80,7 +85,7 @@ from pants.java.jar.jar_dependency import JarDependencyParseContextWrapper
 
 class DeprecatedJavaTests(JUnitTests):
   def __init__(self, *args, **kwargs):
-    super(DeprecatedJavaTests, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     warn_or_error('1.4.0.dev0',
                   'java_tests(...) target type',
                   'Use junit_tests(...) instead for target {}.'.format(self.address.spec))
@@ -141,7 +146,7 @@ def build_file_aliases():
 
 
 def global_subsystems():
-  return (ScalaPlatform,)
+  return (ScalaPlatform, ScoveragePlatform, )
 
 
 # TODO https://github.com/pantsbuild/pants/issues/604 register_goals
@@ -162,7 +167,6 @@ def register_goals():
 
   # Compile
   task(name='rsc', action=RscCompile).install('compile')
-  task(name='zinc', action=ZincCompile).install('compile')
   task(name='javac', action=JavacCompile).install('compile')
 
   # Analysis extraction.

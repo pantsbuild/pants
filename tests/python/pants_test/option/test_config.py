@@ -1,14 +1,11 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import textwrap
 import unittest
 
 from pants.option.config import Config
-from pants.util.contextutil import temporary_file
+from pants.util.contextutil import temporary_file, temporary_file_path
 
 
 class ConfigTest(unittest.TestCase):
@@ -53,15 +50,17 @@ class ConfigTest(unittest.TestCase):
       """
     )
 
-    with temporary_file(binary_mode=False) as ini1:
+    with temporary_file(binary_mode=False) as ini1, \
+      temporary_file(binary_mode=False) as ini2, \
+      temporary_file_path() as buildroot:
       ini1.write(self.ini1_content)
       ini1.close()
-
-      with temporary_file(binary_mode=False) as ini2:
-        ini2.write(self.ini2_content)
-        ini2.close()
-        self.config = Config.load(config_paths=[ini1.name, ini2.name])
-        self.assertEqual([ini1.name, ini2.name], self.config.sources())
+      ini2.write(self.ini2_content)
+      ini2.close()
+      self.config = Config.load(
+        config_paths=[ini1.name, ini2.name], seed_values={"buildroot": buildroot}
+      )
+      self.assertEqual([ini1.name, ini2.name], self.config.sources())
 
   def test_getstring(self):
     self.assertEqual('/a/b/42', self.config.get('a', 'path'))

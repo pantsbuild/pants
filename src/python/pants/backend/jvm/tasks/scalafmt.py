@@ -1,10 +1,7 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from abc import abstractproperty
+from abc import abstractmethod
 
 from pants.backend.jvm.tasks.rewrite_base import RewriteBase
 from pants.base.exceptions import TaskError
@@ -23,7 +20,7 @@ class ScalaFmt(RewriteBase):
 
   @classmethod
   def register_options(cls, register):
-    super(ScalaFmt, cls).register_options(register)
+    super().register_options(register)
     register('--configuration', advanced=True, type=file_option, fingerprint=True,
               help='Path to scalafmt config file, if not specified default scalafmt config used')
 
@@ -45,7 +42,7 @@ class ScalaFmt(RewriteBase):
 
   @classmethod
   def implementation_version(cls):
-    return super(ScalaFmt, cls).implementation_version() + [('ScalaFmt', 5)]
+    return super().implementation_version() + [('ScalaFmt', 5)]
 
   def invoke_tool(self, absolute_root, target_sources):
     # If no config file is specified use default scalafmt config.
@@ -61,7 +58,8 @@ class ScalaFmt(RewriteBase):
                         workunit_name='scalafmt',
                         jvm_options=self.get_options().jvm_options)
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def additional_args(self):
     """Returns the arguments used to run Scalafmt command.
 

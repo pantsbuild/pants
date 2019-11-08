@@ -1,25 +1,24 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import contextlib
 import multiprocessing
 import os
 import re
+import subprocess
 from collections import namedtuple
 from multiprocessing.pool import ThreadPool
 
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.base.exceptions import TaskError
 from pants.build_graph.target_scopes import Scopes
-from pants.task.target_restriction_mixins import (HasSkipAndTransitiveOptionsMixin,
-                                                  SkipAndTransitiveOptionsRegistrar)
+from pants.task.target_restriction_mixins import (
+  HasSkipAndTransitiveOptionsMixin,
+  SkipAndTransitiveOptionsRegistrar,
+)
 from pants.util import desktop
 from pants.util.dirutil import safe_mkdir, safe_walk
 from pants.util.memo import memoized_property
-from pants.util.process_handler import subprocess
 
 
 Jvmdoc = namedtuple('Jvmdoc', ['tool_name', 'product_type'])
@@ -40,7 +39,7 @@ class JvmdocGen(SkipAndTransitiveOptionsRegistrar, HasSkipAndTransitiveOptionsMi
 
   @classmethod
   def register_options(cls, register):
-    super(JvmdocGen, cls).register_options(register)
+    super().register_options(register)
     tool_name = cls.jvmdoc().tool_name
 
     register('--include-codegen', type=bool,
@@ -67,7 +66,7 @@ class JvmdocGen(SkipAndTransitiveOptionsRegistrar, HasSkipAndTransitiveOptionsMi
     return [cls.jvmdoc().product_type]
 
   def __init__(self, *args, **kwargs):
-    super(JvmdocGen, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
 
     options = self.get_options()
     self._include_codegen = options.include_codegen
@@ -111,18 +110,25 @@ class JvmdocGen(SkipAndTransitiveOptionsRegistrar, HasSkipAndTransitiveOptionsMi
     if not targets:
       return
 
-    with self.invalidated(targets) as invalidation_check:
-      def find_jvmdoc_targets():
+    with self.invalidated(targets, invalidate_dependents=self.combined) as invalidation_check:
+      def find_invalid_targets():
         invalid_targets = set()
         for vt in invalidation_check.invalid_vts:
           invalid_targets.update(vt.targets)
         return invalid_targets
 
-      jvmdoc_targets = list(find_jvmdoc_targets())
-      if self.combined:
-        self._generate_combined(jvmdoc_targets, create_jvmdoc_command)
-      else:
-        self._generate_individual(jvmdoc_targets, create_jvmdoc_command)
+      invalid_targets = list(find_invalid_targets())
+      if invalid_targets:
+        if self.combined:
+          self._generate_combined(targets, create_jvmdoc_command)
+        else:
+          self._generate_individual(invalid_targets, create_jvmdoc_command)
+
+    if self.open and self.combined:
+      try:
+        desktop.ui_open(os.path.join(self.workdir, 'combined', 'index.html'))
+      except desktop.OpenError as e:
+        raise TaskError(e)
 
     if catalog:
       for target in targets:
@@ -142,11 +148,6 @@ class JvmdocGen(SkipAndTransitiveOptionsRegistrar, HasSkipAndTransitiveOptionsMi
         self.context.log.debug("Running create_jvmdoc in {} with {}".format(gendir, " ".join(command)))
         result, gendir = create_jvmdoc(command, gendir)
         self._handle_create_jvmdoc_result(targets, result, command)
-    if self.open:
-      try:
-        desktop.ui_open(os.path.join(gendir, 'index.html'))
-      except desktop.OpenError as e:
-        raise TaskError(e)
 
   def _generate_individual(self, targets, create_jvmdoc_command):
     jobs = {}

@@ -1,20 +1,23 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
+import datetime
 import os
+import socket
 import struct
-from builtins import bytes, object, str, zip
+import threading
+import time
+from abc import ABC, abstractmethod
+from contextlib import contextmanager
+from dataclasses import dataclass
 
-from pants.util.osutil import IntegerForPid
+from pants.util.osutil import Pid
 
 
 STDIO_DESCRIPTORS = (0, 1, 2)
 
 
-class ChunkType(object):
+class ChunkType:
   """Nailgun protocol chunk types.
 
   N.B. Because we force `__future__.unicode_literals` in sources, string literals are automatically
@@ -49,7 +52,7 @@ class ChunkType(object):
   VALID_TYPES = REQUEST_TYPES + EXECUTION_TYPES
 
 
-class NailgunProtocol(object):
+class NailgunProtocol:
   """A mixin that provides a base implementation of the Nailgun protocol as described on
      http://martiansoftware.com/nailgun/protocol.html.
 
@@ -95,7 +98,7 @@ class NailgunProtocol(object):
   def _decode_unicode_seq(cls, seq):
     for item in seq:
       if isinstance(item, bytes):
-        yield item.decode('utf-8')
+        yield item.decode()
       else:
         yield item
 
@@ -206,15 +209,87 @@ class NailgunProtocol(object):
     if chunk_type not in ChunkType.VALID_TYPES:
       raise cls.ProtocolError('invalid chunk type: {}'.format(chunk_type))
     if not return_bytes:
-      payload = payload.decode('utf-8')
+      payload = payload.decode()
 
     return chunk_type, payload
 
+  class ProcessStreamTimeout(Exception):
+    """Raised after a timeout completes when a timeout is set on the stream during iteration."""
+
   @classmethod
-  def iter_chunks(cls, sock, return_bytes=False):
-    """Generates chunks from a connected socket until an Exit chunk is sent."""
+  @contextmanager
+  def _set_socket_timeout(cls, sock, timeout=None):
+    """Temporarily set a socket timeout in order to respect a timeout provided to .iter_chunks()."""
+    if timeout is not None:
+      prev_timeout = sock.gettimeout()
+    try:
+      if timeout is not None:
+        sock.settimeout(timeout)
+      yield
+    except socket.timeout:
+      raise cls.ProcessStreamTimeout("socket read timed out with timeout {}".format(timeout))
+    finally:
+      if timeout is not None:
+        sock.settimeout(prev_timeout)
+
+  @dataclass(frozen=True)
+  class TimeoutOptions:
+    start_time: float
+    interval: float
+
+  class TimeoutProvider(ABC):
+
+    @abstractmethod
+    def maybe_timeout_options(self):
+      """Called on every stream iteration to obtain a possible specification for a timeout.
+
+      If this method returns non-None, it should return an instance of `cls.TimeoutOptions`, which
+      then initiates a timeout after which the stream will raise `cls.ProcessStreamTimeout`.
+
+      :rtype: :class:`cls.TimeoutOptions`, or None
+      """
+
+  @classmethod
+  def iter_chunks(cls, maybe_shutdown_socket, return_bytes=False, timeout_object=None):
+    """Generates chunks from a connected socket until an Exit chunk is sent or a timeout occurs.
+
+    :param sock: the socket to read from.
+    :param bool return_bytes: If False, decode the payload into a utf-8 string.
+    :param cls.TimeoutProvider timeout_object: If provided, will be checked every iteration for a
+                                               possible timeout.
+    :raises: :class:`cls.ProcessStreamTimeout`
+    """
+    assert(timeout_object is None or isinstance(timeout_object, cls.TimeoutProvider))
+
+    if timeout_object is None:
+      deadline = None
+    else:
+      options = timeout_object.maybe_timeout_options()
+      if options is None:
+        deadline = None
+      else:
+        deadline = options.start_time + options.interval
+
     while 1:
-      chunk_type, payload = cls.read_chunk(sock, return_bytes)
+      if deadline is not None:
+        overtime_seconds = deadline - time.time()
+        if overtime_seconds > 0:
+          original_timestamp = datetime.datetime.fromtimestamp(deadline).isoformat()
+          raise cls.ProcessStreamTimeout(
+            "iterating over bytes from nailgun timed out at {}, overtime seconds: {}"
+            .format(original_timestamp, overtime_seconds))
+
+      with maybe_shutdown_socket.lock:
+        if maybe_shutdown_socket.is_shutdown:
+          break
+        # We poll with low timeouts because we poll under a lock. This allows the DaemonPantsRunner
+        # to shut down the socket, and us to notice, pretty quickly.
+        with cls._set_socket_timeout(maybe_shutdown_socket.socket, timeout=0.01):
+          try:
+            chunk_type, payload = cls.read_chunk(maybe_shutdown_socket.socket, return_bytes)
+          except socket.timeout:
+            # Timeouts are handled by the surrounding loop
+            continue
       yield chunk_type, payload
       if chunk_type == ChunkType.EXIT:
         break
@@ -248,14 +323,14 @@ class NailgunProtocol(object):
   @classmethod
   def send_pid(cls, sock, pid):
     """Send the PID chunk over the specified socket."""
-    assert(isinstance(pid, IntegerForPid) and pid > 0)
+    assert(isinstance(pid, Pid) and pid > 0)
     encoded_int = cls.encode_int(pid)
     cls.write_chunk(sock, ChunkType.PID, encoded_int)
 
   @classmethod
   def send_pgrp(cls, sock, pgrp):
     """Send the PGRP chunk over the specified socket."""
-    assert(isinstance(pgrp, IntegerForPid) and pgrp < 0)
+    assert(isinstance(pgrp, Pid) and pgrp < 0)
     encoded_int = cls.encode_int(pgrp)
     cls.write_chunk(sock, ChunkType.PGRP, encoded_int)
 
@@ -280,7 +355,7 @@ class NailgunProtocol(object):
     The result of this method be used as the value of an environment variable in a subsequent
     NailgunClient execution.
     """
-    return str(obj).encode('utf-8')
+    return str(obj).encode()
 
   @classmethod
   def isatty_to_env(cls, stdin, stdout, stderr):
@@ -321,3 +396,20 @@ class NailgunProtocol(object):
     :returns: A tuple of boolean values indicating ttyname paths or None for (stdin, stdout, stderr).
     """
     return tuple(env.get(cls.TTY_PATH_ENV.format(fd_id)) for fd_id in STDIO_DESCRIPTORS)
+
+
+class MaybeShutdownSocket:
+  """A wrapper around a socket which knows whether it has been shut down.
+
+  Because we may shut down a nailgun socket from one thread, and read from it on another, we use
+  this wrapper so that a shutting-down thread can signal to a reading thread that it should stop
+  reading.
+
+  lock guards access to is_shutdown, shutting down the socket, and any calls which need to guarantee
+  they don't race a shutdown call.
+  """
+
+  def __init__(self, sock):
+    self.socket = sock
+    self.lock = threading.Lock()
+    self.is_shutdown = False

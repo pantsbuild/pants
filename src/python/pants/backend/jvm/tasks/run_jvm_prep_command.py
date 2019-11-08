@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.jvm_prep_command import JvmPrepCommand
@@ -33,7 +30,7 @@ class RunJvmPrepCommandBase(Task):
   classpath_product_only = False
 
   def __init__(self, context, workdir):
-    super(RunJvmPrepCommandBase, self).__init__(context, workdir)
+    super().__init__(context, workdir)
     JvmPrepCommand.add_goal(self.goal)
 
   @classmethod
@@ -43,7 +40,7 @@ class RunJvmPrepCommandBase(Task):
     In this case, there are no special options, but we want to use this opportunity to setup
     goal validation in JvmPrepCommand before the build graph is parsed.
     """
-    super(RunJvmPrepCommandBase, cls).register_options(register)
+    super().register_options(register)
     JvmPrepCommand.add_goal(cls.goal)
 
   @classmethod
@@ -51,7 +48,7 @@ class RunJvmPrepCommandBase(Task):
     """
     :API: public
     """
-    super(RunJvmPrepCommandBase, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data('compile_classpath')
     if not cls.classpath_product_only:
       round_manager.require_data('runtime_classpath')

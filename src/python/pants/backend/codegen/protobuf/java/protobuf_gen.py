@@ -1,28 +1,22 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import open
+import subprocess
+from collections import OrderedDict
 from hashlib import sha1
 
 from twitter.common.collections import OrderedSet
 
 from pants.backend.codegen.protobuf.java.java_protobuf_library import JavaProtobufLibrary
 from pants.backend.codegen.protobuf.subsystems.protoc import Protoc
-from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.jar_import_products import JarImportProducts
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
-from pants.build_graph.address import Address
 from pants.fs.archive import ZIP
 from pants.task.simple_codegen_task import SimpleCodegenTask
-from pants.util.collections_abc_backport import OrderedDict
-from pants.util.process_handler import subprocess
 
 
 class ProtobufGen(SimpleCodegenTask):
@@ -31,11 +25,11 @@ class ProtobufGen(SimpleCodegenTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(ProtobufGen, cls).subsystem_dependencies() + (Protoc.scoped(cls),)
+    return super().subsystem_dependencies() + (Protoc.scoped(cls),)
 
   @classmethod
   def register_options(cls, register):
-    super(ProtobufGen, cls).register_options(register)
+    super().register_options(register)
 
     # The protoc plugin names are used as proxies for the identity of the protoc
     # executable environment here.  Plugin authors must include a version in the name for
@@ -60,14 +54,14 @@ class ProtobufGen(SimpleCodegenTask):
   # TODO https://github.com/pantsbuild/pants/issues/604 prep start
   @classmethod
   def prepare(cls, options, round_manager):
-    super(ProtobufGen, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data(JarImportProducts)
     round_manager.optional_data('deferred_sources')
   # TODO https://github.com/pantsbuild/pants/issues/604 prep finish
 
   def __init__(self, *args, **kwargs):
     """Generates Java files from .proto files using the Google protobuf compiler."""
-    super(ProtobufGen, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self.plugins = self.get_options().protoc_plugins or []
     self._extra_paths = self.get_options().extra_path or []
 
@@ -84,15 +78,6 @@ class ProtobufGen(SimpleCodegenTask):
 
   def synthetic_target_extra_dependencies(self, target, target_workdir):
     deps = OrderedSet()
-    if target.all_imported_jar_deps:
-      # We need to add in the proto imports jars.
-      jars_address = Address(os.path.relpath(target_workdir, get_buildroot()),
-                             target.id + '-rjars')
-      jars_target = self.context.add_new_target(jars_address,
-                                                JarLibrary,
-                                                jars=target.all_imported_jar_deps,
-                                                derived_from=target)
-      deps.update([jars_target])
     deps.update(self.javadeps)
     return deps
 

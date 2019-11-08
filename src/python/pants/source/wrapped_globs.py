@@ -1,25 +1,19 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from abc import abstractmethod, abstractproperty
-from builtins import open
+from abc import ABC, abstractmethod
 from hashlib import sha1
 
-from six import string_types
 from twitter.common.dirutil.fileset import Fileset
 
 from pants.base.build_environment import get_buildroot
 from pants.engine.fs import EMPTY_SNAPSHOT
 from pants.util.dirutil import fast_relpath, fast_relpath_optional
 from pants.util.memo import memoized_property
-from pants.util.meta import AbstractClass
 
 
-class FilesetWithSpec(AbstractClass):
+class FilesetWithSpec(ABC):
   """A set of files that keeps track of how we got it."""
 
   @staticmethod
@@ -60,11 +54,13 @@ class FilesetWithSpec(AbstractClass):
       for exclude_filespec in exclude:
         self._validate_globs_in_filespec(exclude_filespec, rel_root)
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def files(self):
     """Return the concrete set of files matched by this FilesetWithSpec, relative to `self.rel_root`."""
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def files_hash(self):
     """Return a unique hash for this set of files."""
 
@@ -89,7 +85,7 @@ class EagerFilesetWithSpec(FilesetWithSpec):
       what globs or file list it came from. Must be relative to buildroot.
     :param snapshot: A Snapshot of the files, rooted at the buildroot.
     """
-    super(EagerFilesetWithSpec, self).__init__(rel_root, filespec)
+    super().__init__(rel_root, filespec)
     self._include_dirs = include_dirs
     self._snapshot = snapshot
 
@@ -106,7 +102,7 @@ class EagerFilesetWithSpec(FilesetWithSpec):
 
   @property
   def files_hash(self):
-    return self._snapshot.directory_digest.fingerprint.encode('utf-8')
+    return self._snapshot.directory_digest.fingerprint.encode()
 
   @property
   def snapshot(self):
@@ -132,7 +128,7 @@ class LazyFilesetWithSpec(FilesetWithSpec):
     :param files_calculator: A no-arg function that will lazily compute the file paths for
       this filespec.
     """
-    super(LazyFilesetWithSpec, self).__init__(rel_root, filespec)
+    super().__init__(rel_root, filespec)
     self._files_calculator = files_calculator
 
   @memoized_property
@@ -143,7 +139,7 @@ class LazyFilesetWithSpec(FilesetWithSpec):
   def files_hash(self):
     h = sha1()
     for path in sorted(self.files):
-      h.update(path.encode('utf-8'))
+      h.update(path.encode())
       with open(os.path.join(get_buildroot(), self.rel_root, path), 'rb') as f:
         h.update(f.read())
     return h.digest()
@@ -152,14 +148,16 @@ class LazyFilesetWithSpec(FilesetWithSpec):
     return any(path_from_buildroot == path_in_spec for path_in_spec in self.paths_from_buildroot_iter())
 
 
-class FilesetRelPathWrapper(AbstractClass):
+class FilesetRelPathWrapper(ABC):
   KNOWN_PARAMETERS = frozenset({'exclude', 'follow_links'})
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def wrapped_fn(cls):
     """The wrapped file calculation function."""
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def validate_files(cls):
     """True to validate the existence of files returned by wrapped_fn."""
 
@@ -181,7 +179,7 @@ class FilesetRelPathWrapper(AbstractClass):
                     NB: this argument is contained within **kwargs!
     """
     for pattern in patterns:
-      if not isinstance(pattern, string_types):
+      if not isinstance(pattern, str):
         raise ValueError("Expected string patterns for {}: got {}".format(cls.__name__, patterns))
 
     raw_exclude = kwargs.pop('exclude', [])
@@ -234,13 +232,13 @@ class FilesetRelPathWrapper(AbstractClass):
 
   @staticmethod
   def process_raw_exclude(raw_exclude):
-    if isinstance(raw_exclude, string_types):
+    if isinstance(raw_exclude, str):
       raise ValueError("Expected exclude parameter to be a list of globs, lists, or strings,"
                        " but was a string: {}".format(raw_exclude))
 
     # You can't subtract raw strings from globs
     def ensure_string_wrapped_in_list(element):
-      if isinstance(element, string_types):
+      if isinstance(element, str):
         return [element]
       else:
         return element
@@ -336,7 +334,7 @@ class RGlobs(FilesetRelPathWrapper):
 
       rglobs.append(os.path.join(*out))
 
-    return super(RGlobs, cls).to_filespec(rglobs, root=root, exclude=exclude)
+    return super().to_filespec(rglobs, root=root, exclude=exclude)
 
 
 class ZGlobs(FilesetRelPathWrapper):

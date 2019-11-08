@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import object
 from collections import defaultdict
 
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
@@ -17,7 +13,7 @@ from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.coverage.cobertura import Cobertura
 from pants.backend.jvm.tasks.coverage.manager import CodeCoverageSettings
 from pants.java.jar.jar_dependency import JarDependency
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 class attrdict(dict):
@@ -35,7 +31,7 @@ class fake_log(object):
     pass
 
 
-class MockSystemCalls(object):
+class MockSystemCalls:
   def __init__(self):
     self.copy2_calls = defaultdict(list)
     self.copytree_calls = defaultdict(list)
@@ -61,7 +57,7 @@ class TestCobertura(TestBase):
       safe_md=syscalls.safe_md)
 
   def setUp(self):
-    super(TestCobertura, self).setUp()
+    super().setUp()
 
     self.conf = 'default'
     self.factory = Cobertura.Factory("test_scope", [])

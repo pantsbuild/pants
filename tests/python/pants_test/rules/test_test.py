@@ -1,34 +1,41 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
+import logging
+from textwrap import dedent
 
-from builtins import str
-
-from pants.backend.python.rules.python_test_runner import PyTestResult
+from pants.base.specs import DescendantAddresses, SingleAddress
 from pants.build_graph.address import Address, BuildFileAddress
+from pants.engine.build_files import AddressProvenanceMap
 from pants.engine.legacy.graph import HydratedTarget
-from pants.engine.legacy.structs import PythonTestsAdaptor
-from pants.rules.core.exceptions import GracefulTerminationException
-from pants.rules.core.test import Status, TestResult, coordinator_of_tests, fast_test
-from pants.util.meta import AbstractClass
-from pants_test.engine.scheduler_test_base import SchedulerTestBase
-from pants_test.engine.util import MockConsole, run_rule
-from pants_test.test_base import TestBase
+from pants.engine.legacy.structs import PythonBinaryAdaptor, PythonTestsAdaptor
+from pants.engine.rules import UnionMembership
+from pants.rules.core.core_test_model import TestTarget
+from pants.rules.core.test import (
+  AddressAndTestResult,
+  Status,
+  TestResult,
+  coordinator_of_tests,
+  fast_test,
+)
+from pants.testutil.engine.util import MockConsole, run_rule
+from pants.testutil.test_base import TestBase
 
 
-class TestTest(TestBase, SchedulerTestBase, AbstractClass):
-  def single_target_test(self, result, expected_console_output):
-    console = MockConsole()
+class TestTest(TestBase):
+  def single_target_test(self, result, expected_console_output, success=True):
+    console = MockConsole(use_colors=False)
 
-    run_rule(fast_test, console, (self.make_build_target_address("some/target"),), {
-      (TestResult, Address): lambda _: result,
+    addr = self.make_build_target_address("some/target")
+    res = run_rule(fast_test, console, (addr,), {
+      (AddressAndTestResult, Address): lambda _: AddressAndTestResult(addr, result),
     })
 
     self.assertEquals(console.stdout.getvalue(), expected_console_output)
+    self.assertEquals(0 if success else 1, res.exit_code)
 
-  def make_build_target_address(self, spec):
+  @staticmethod
+  def make_build_target_address(spec):
     address = Address.parse(spec)
     return BuildFileAddress(
       build_file=None,
@@ -38,83 +45,148 @@ class TestTest(TestBase, SchedulerTestBase, AbstractClass):
 
   def test_outputs_success(self):
     self.single_target_test(
-      TestResult(status=Status.SUCCESS, stdout='Here is some output from a test'),
-      """Here is some output from a test
+      result=TestResult(status=Status.SUCCESS, stdout='Here is some output from a test', stderr=''),
+      expected_console_output=dedent("""\
+        some/target stdout:
+        Here is some output from a test
 
-some/target                                                                     .....   SUCCESS
-"""
+        some/target                                                                     .....   SUCCESS
+      """),
     )
 
   def test_output_failure(self):
-    with self.assertRaises(GracefulTerminationException) as cm:
-      self.single_target_test(
-        TestResult(status=Status.FAILURE, stdout='Here is some output from a test'),
-        """Here is some output from a test
-
-some/target                                                                     .....   FAILURE
-"""
-      )
-    self.assertEqual(1, cm.exception.exit_code)
-
-  def test_output_no_trailing_newline(self):
     self.single_target_test(
-      TestResult(status=Status.SUCCESS, stdout='Here is some output from a test'),
-      """Here is some output from a test
+      result=TestResult(status=Status.FAILURE, stdout='Here is some output from a test', stderr=''),
+      expected_console_output=dedent("""\
+        some/target stdout:
+        Here is some output from a test
 
-some/target                                                                     .....   SUCCESS
-"""
-    )
-
-  def test_output_trailing_newline(self):
-    self.single_target_test(
-      TestResult(status=Status.SUCCESS, stdout='Here is some output from a test\n'),
-      """Here is some output from a test
-
-some/target                                                                     .....   SUCCESS
-"""
+        some/target                                                                     .....   FAILURE
+        """),
+      success=False,
     )
 
   def test_output_mixed(self):
-    console = MockConsole()
+    console = MockConsole(use_colors=False)
     target1 = self.make_build_target_address("testprojects/tests/python/pants/passes")
     target2 = self.make_build_target_address("testprojects/tests/python/pants/fails")
 
     def make_result(target):
       if target == target1:
-        return TestResult(status=Status.SUCCESS, stdout='I passed')
+        tr = TestResult(status=Status.SUCCESS, stdout='I passed\n', stderr='')
       elif target == target2:
-        return TestResult(status=Status.FAILURE, stdout='I failed')
+        tr = TestResult(status=Status.FAILURE, stdout='I failed\n', stderr='')
       else:
         raise Exception("Unrecognised target")
+      return AddressAndTestResult(target, tr)
 
-    with self.assertRaises(GracefulTerminationException) as cm:
-      run_rule(fast_test, console, (target1, target2), {
-        (TestResult, Address): make_result,
-      })
-
-    self.assertEqual(1, cm.exception.exit_code)
-    self.assertEquals(console.stdout.getvalue(), """I passed
-I failed
-
-testprojects/tests/python/pants/passes                                          .....   SUCCESS
-testprojects/tests/python/pants/fails                                           .....   FAILURE
-""")
-
-  def test_coordinator_python_test(self):
-    target_adaptor = PythonTestsAdaptor(type_alias='python_tests')
-
-    result = run_rule(coordinator_of_tests, HydratedTarget(Address.parse("some/target"), target_adaptor, ()), {
-      (PyTestResult, HydratedTarget): lambda _: PyTestResult(status=Status.FAILURE, stdout='foo'),
+    res = run_rule(fast_test, console, (target1, target2), {
+      (AddressAndTestResult, Address): make_result,
     })
 
-    self.assertEqual(result, TestResult(status=Status.FAILURE, stdout='foo'))
+    self.assertEqual(1, res.exit_code)
+    self.assertEquals(console.stdout.getvalue(), dedent("""\
+      testprojects/tests/python/pants/passes stdout:
+      I passed
 
-  def test_coordinator_unknown_test(self):
-    target_adaptor = PythonTestsAdaptor(type_alias='unknown_tests')
+      testprojects/tests/python/pants/fails stdout:
+      I failed
 
-    with self.assertRaises(Exception) as cm:
-      run_rule(coordinator_of_tests, HydratedTarget(Address.parse("some/target"), target_adaptor, ()), {
-        (PyTestResult, HydratedTarget): lambda _: PyTestResult(status=Status.FAILURE, stdout='foo'),
-      })
 
-    self.assertEqual(str(cm.exception), "Didn't know how to run tests for type unknown_tests")
+      testprojects/tests/python/pants/passes                                          .....   SUCCESS
+      testprojects/tests/python/pants/fails                                           .....   FAILURE
+      """))
+
+  def test_stderr(self):
+    self.single_target_test(
+      result=TestResult(status=Status.FAILURE, stdout='', stderr='Failure running the tests!'),
+      expected_console_output=dedent("""\
+        some/target stderr:
+        Failure running the tests!
+
+        some/target                                                                     .....   FAILURE
+        """),
+      success=False,
+    )
+
+  def test_coordinator_python_test(self):
+    addr = Address.parse("some/target")
+    target_adaptor = PythonTestsAdaptor(type_alias='python_tests')
+    with self.captured_logging(logging.INFO):
+      result = run_rule(
+        coordinator_of_tests,
+        HydratedTarget(addr, target_adaptor, ()),
+        UnionMembership(union_rules={TestTarget: [PythonTestsAdaptor]}),
+        AddressProvenanceMap(bfaddr_to_spec={}),
+        {
+          (TestResult, PythonTestsAdaptor):
+            lambda _: TestResult(status=Status.FAILURE, stdout='foo', stderr=''),
+        })
+
+    self.assertEqual(
+      result,
+      AddressAndTestResult(addr, TestResult(status=Status.FAILURE, stdout='foo', stderr=''))
+    )
+
+  def test_globbed_test_target(self):
+    bfaddr = BuildFileAddress(None, 'tests', 'some/dir')
+    target_adaptor = PythonTestsAdaptor(type_alias='python_tests')
+    with self.captured_logging(logging.INFO):
+      result = run_rule(
+        coordinator_of_tests,
+        HydratedTarget(bfaddr.to_address(), target_adaptor, ()),
+        UnionMembership(union_rules={TestTarget: [PythonTestsAdaptor]}),
+        AddressProvenanceMap(bfaddr_to_spec={
+          bfaddr: DescendantAddresses(directory='some/dir')
+        }),
+        {
+          (TestResult, PythonTestsAdaptor):
+            lambda _: TestResult(status=Status.SUCCESS, stdout='foo', stderr=''),
+        })
+
+      self.assertEqual(
+        result,
+        AddressAndTestResult(bfaddr.to_address(),
+                             TestResult(status=Status.SUCCESS, stdout='foo', stderr=''))
+      )
+
+  def test_globbed_non_test_target(self):
+    bfaddr = BuildFileAddress(None, 'bin', 'some/dir')
+    target_adaptor = PythonBinaryAdaptor(type_alias='python_binary')
+    with self.captured_logging(logging.INFO):
+      result = run_rule(
+        coordinator_of_tests,
+        HydratedTarget(bfaddr.to_address(), target_adaptor, ()),
+        UnionMembership(union_rules={TestTarget: [PythonTestsAdaptor]}),
+        AddressProvenanceMap(bfaddr_to_spec={
+          bfaddr: DescendantAddresses(directory='some/dir')
+        }),
+        {
+          (TestResult, PythonTestsAdaptor):
+            lambda _: TestResult(status=Status.SUCCESS, stdout='foo', stderr=''),
+        })
+
+      self.assertEqual(
+        result,
+        AddressAndTestResult(bfaddr.to_address(), None)
+      )
+
+  def test_single_non_test_target(self):
+    bfaddr = BuildFileAddress(None, 'bin', 'some/dir')
+    target_adaptor = PythonBinaryAdaptor(type_alias='python_binary')
+    with self.captured_logging(logging.INFO):
+      # Note that this is not the same error message the end user will see, as we're resolving
+      # union Get requests in run_rule, not the real engine.  But this test still asserts that
+      # we error when we expect to error.
+      with self.assertRaisesRegex(AssertionError, r'Rule requested: .* which cannot be satisfied.'):
+        run_rule(
+          coordinator_of_tests,
+          HydratedTarget(bfaddr.to_address(), target_adaptor, ()),
+          UnionMembership(union_rules={TestTarget: [PythonTestsAdaptor]}),
+          AddressProvenanceMap(bfaddr_to_spec={
+            bfaddr: SingleAddress(directory='some/dir', name='bin')
+          }),
+          {
+            (TestResult, TestTarget):
+              lambda _: TestResult(status=Status.SUCCESS, stdout='foo', stderr=''),
+          })

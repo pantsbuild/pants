@@ -5,7 +5,6 @@ python_library(
   name = 'resolve_jars_test_mixin',
   sources = ['resolve_jars_test_mixin.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/util:contextutil',
   ],
 )
@@ -21,7 +20,7 @@ python_tests(
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/python:python_requirement',
     'src/python/pants/build_graph',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/testutil:task_test_base',
   ]
 )
 
@@ -33,8 +32,11 @@ python_tests(
     'src/python/pants/backend/jvm:plugin',
     'src/python/pants/backend/project_info/tasks:depmap',
     'src/python/pants/backend/python:plugin',
+    'src/python/pants/backend/python/targets',
     'src/python/pants/build_graph',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/subsystem',
+    'src/python/pants/testutil/subsystem',
+    'src/python/pants/testutil:task_test_base',
   ]
 )
 
@@ -46,6 +48,7 @@ python_tests(
     'src/python/pants/backend/jvm/subsystems:junit',
     'src/python/pants/backend/jvm/subsystems:jvm_platform',
     'src/python/pants/backend/jvm/subsystems:scala_platform',
+    'src/python/pants/backend/jvm/subsystems:scoverage_platform',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
@@ -60,9 +63,8 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:osutil',
-    'tests/python/pants_test/subsystem:subsystem_utils',
-    'tests/python/pants_test:task_test_base',
-    'tests/python/pants_test/backend/python/tasks:interpreter_cache_test_mixin',
+    'src/python/pants/testutil/subsystem',
+    'src/python/pants/testutil:task_test_base',
   ]
 )
 
@@ -70,20 +72,26 @@ python_tests(
   name = 'export_integration',
   sources = ['test_export_integration.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    ':resolve_jars_test_mixin',
+    'examples/src/java/org/pantsbuild/example:hello_directory',
+    'examples/src/scala/org/pantsbuild/example:scala_with_java_sources_directory',
+    'examples/tests/java/org/pantsbuild/example:usethrift_directory',
     'src/python/pants/base:build_environment',
     'src/python/pants/build_graph',
     'src/python/pants/ivy',
     'src/python/pants/java/distribution',
     'src/python/pants/util:contextutil',
-    'src/python/pants/util:process_handler',
-    'tests/python/pants_test/subsystem:subsystem_utils',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil/subsystem',
+    'src/python/pants/testutil:int-test',
+    'testprojects/maven_layout:provided_patching_directory',
+    'testprojects/src/java/org/pantsbuild/testproject:exclude_directory',
+    'testprojects/src/scala/org/pantsbuild/testproject:unicode_directory',
+    'testprojects/tests/java/org/pantsbuild/testproject:ivyclassifier_directory',
+    'testprojects/tests/java/org/pantsbuild/testproject:testjvms_directory',
+    ':resolve_jars_test_mixin',
   ],
   tags = {'integration'},
-  timeout = 120,
+  timeout = 630,
 )
 
 python_tests(
@@ -95,7 +103,16 @@ python_tests(
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/project_info/tasks:filedeps',
     'src/python/pants/build_graph',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/testutil:test_base',
+    'src/python/pants/testutil:task_test_base',
+  ],
+)
+
+python_tests(
+  name = 'idea_plugin',
+  sources = ['test_idea_plugin.py'],
+  dependencies = [
+    'src/python/pants/backend/project_info/tasks:idea_plugin_gen',
   ],
 )
 
@@ -103,9 +120,10 @@ python_tests(
   name = 'idea_plugin_integration',
   sources = ['test_idea_plugin_integration.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/backend/project_info/tasks:idea_plugin_gen',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
+    'examples/src/scala/org/pantsbuild/example:hello_directory',
+    'testprojects/src/python:antlr_directory',
   ],
   tags = {'integration'},
 )

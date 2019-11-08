@@ -1,20 +1,15 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
 
-from builtins import object
-
-
-class PantsDaemonStats(object):
+class PantsDaemonStats:
   """Tracks various stats about the daemon."""
 
   def __init__(self):
     self.scheduler_metrics = {}
 
   def set_scheduler_metrics(self, scheduler_metrics):
-    self.scheduler_metrics = scheduler_metrics
+    self.scheduler_metrics = {key: value for (key, value) in scheduler_metrics.items() if key != "engine_workunits"}
 
   def set_target_root_size(self, size):
     self.scheduler_metrics['target_root_size'] = size

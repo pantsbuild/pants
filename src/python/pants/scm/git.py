@@ -1,33 +1,28 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import binascii
 import io
 import logging
 import os
+import subprocess
 import traceback
-from builtins import bytes, object, open
 from contextlib import contextmanager
 
 from pants.scm.scm import Scm
 from pants.util.contextutil import pushd
 from pants.util.memo import memoized_method
-from pants.util.process_handler import subprocess
-from pants.util.strutil import ensure_binary, ensure_text
+from pants.util.strutil import ensure_text
 
 
 # 40 is Linux's hard-coded limit for total symlinks followed when resolving a path.
 MAX_SYMLINKS_IN_REALPATH = 40
 GIT_HASH_LENGTH = 20
-# Precompute these because ensure_binary is slow and we'll need them a lot
-SLASH = ensure_binary('/')
-NUL = ensure_binary('\0')
-SPACE = ensure_binary(' ')
-NEWLINE = ensure_binary('\n')
-EMPTY_STRING = ensure_binary("")
+
+NUL = b'\0'
+SPACE = b' '
+NEWLINE = b'\n'
+EMPTY_STRING = b""
 
 
 logger = logging.getLogger(__name__)
@@ -51,9 +46,9 @@ class Git(Scm):
     try:
       if subdir:
         with pushd(subdir):
-          process, out = cls._invoke(cmd)
+          process, out = cls._invoke(cmd, stderr=subprocess.DEVNULL)
       else:
-        process, out = cls._invoke(cmd)
+        process, out = cls._invoke(cmd, stderr=subprocess.DEVNULL)
       cls._check_result(cmd, process.returncode, raise_type=Scm.ScmException)
     except Scm.ScmException:
       return None
@@ -73,21 +68,25 @@ class Git(Scm):
     return cls(binary=binary, worktree=dest)
 
   @classmethod
-  def _invoke(cls, cmd):
+  def _invoke(cls, cmd, stderr=None):
     """Invoke the given command, and return a tuple of process and raw binary output.
 
-    stderr flows to wherever its currently mapped for the parent process - generally to
-    the terminal where the user can see the error.
+    If stderr is defined as None, it will flow to wherever it is currently mapped
+    for the parent process, generally to the terminal where the user can see the error
+    (cf. https://docs.python.org/3.7/library/subprocess.html#subprocess.Popen ). In
+    some cases we want to treat it specially, which is why it is exposed
+    in the signature of _invoke.
 
     :param list cmd: The command in the form of a list of strings
     :returns: The completed process object and its standard output.
     :raises: Scm.LocalException if there was a problem exec'ing the command at all.
     """
     try:
-      process = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+      process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=stderr)
     except OSError as e:
       # Binary DNE or is not executable
-      raise cls.LocalException('Failed to execute command {}: {}'.format(' '.join(cmd), e))
+      cmd_str = ' '.join(cmd)
+      raise cls.LocalException(f'Failed to execute command {cmd_str}: {e!r}')
     out, _ = process.communicate()
     return process, out
 
@@ -98,7 +97,8 @@ class Git(Scm):
   @classmethod
   def _check_result(cls, cmd, result, failure_msg=None, raise_type=Scm.ScmException):
     if result != 0:
-      raise raise_type(failure_msg or '{} failed with exit code {}'.format(' '.join(cmd), result))
+      cmd_str = ' '.join(cmd)
+      raise raise_type(failure_msg or f'{cmd_str} failed with exit code {result}')
 
   def __init__(self, binary='git', gitdir=None, worktree=None, remote=None, branch=None):
     """Creates a git scm proxy that assumes the git repository is in the cwd by default.
@@ -109,7 +109,7 @@ class Git(Scm):
     remote:    The default remote to use.
     branch:    The default remote branch to use.
     """
-    super(Scm, self).__init__()
+    super().__init__()
 
     self._gitcmd = binary
     self._worktree = os.path.realpath(worktree or os.getcwd())
@@ -140,8 +140,8 @@ class Git(Scm):
 
     origins = list(origin_urls())
     if len(origins) != 1:
-      raise Scm.LocalException("Unable to find remote named 'origin' that accepts pushes "
-                               "amongst:\n{}".format(git_output))
+      raise Scm.LocalException(f"Unable to find remote named 'origin' that accepts pushes "
+                               "amongst:\n{git_output}")
     return origins[0]
 
   @property
@@ -270,8 +270,8 @@ class Git(Scm):
                                    raise_type=Scm.LocalException)
         return value.strip()
 
-      self._remote = self._remote or get_local_config('branch.{}.remote'.format(branch))
-      self._branch = self._branch or get_local_config('branch.{}.merge'.format(branch))
+      self._remote = self._remote or get_local_config(f'branch.{branch}.remote')
+      self._branch = self._branch or get_local_config(f'branch.{branch}.merge')
     return self._remote, self._branch
 
   def _check_call(self, args, failure_msg=None, raise_type=None):
@@ -299,7 +299,7 @@ class Git(Scm):
     return GitRepositoryReader(self, rev)
 
 
-class GitRepositoryReader(object):
+class GitRepositoryReader:
   """
   Allows reading from files and directory information from an arbitrary git
   commit. This is useful for pants-aware git sparse checkouts.
@@ -327,7 +327,7 @@ class GitRepositoryReader(object):
       self.rev = rev
 
     def __str__(self):
-      return "MissingFileException({}, {})".format(self.relpath, self.rev)
+      return f"MissingFileException({self.relpath}, {self.rev})"
 
   class IsDirException(Exception):
 
@@ -336,7 +336,7 @@ class GitRepositoryReader(object):
       self.rev = rev
 
     def __str__(self):
-      return "IsDirException({}, {})".format(self.relpath, self.rev)
+      return f"IsDirException({self.relpath}, {self.rev})"
 
   class NotADirException(Exception):
 
@@ -345,7 +345,7 @@ class GitRepositoryReader(object):
       self.rev = rev
 
     def __str__(self):
-      return "NotADirException({}, {})".format(self.relpath, self.rev)
+      return f"NotADirException({self.relpath}, {self.rev})"
 
   class SymlinkLoopException(Exception):
 
@@ -354,7 +354,7 @@ class GitRepositoryReader(object):
       self.rev = rev
 
     def __str__(self):
-      return "SymlinkLoop({}, {})".format(self.relpath, self.rev)
+      return f"SymlinkLoop({self.relpath}, {self.rev})"
 
   class ExternalSymlinkException(Exception):
 
@@ -363,7 +363,7 @@ class GitRepositoryReader(object):
       self.rev = rev
 
     def __str__(self):
-      return "ExternalSymlink({}, {})".format(self.relpath, self.rev)
+      return f"ExternalSymlink({self.relpath}, {self.rev})"
 
   class GitDiedException(Exception):
     pass
@@ -417,19 +417,19 @@ class GitRepositoryReader(object):
       return None
     return path_so_far
 
-  class Symlink(object):
+  class Symlink:
 
     def __init__(self, name, sha):
       self.name = name
       self.sha = sha
 
-  class Dir(object):
+  class Dir:
 
     def __init__(self, name, sha):
       self.name = name
       self.sha = sha
 
-  class File(object):
+  class File:
 
     def __init__(self, name, sha):
       self.name = name
@@ -506,7 +506,7 @@ class GitRepositoryReader(object):
       path_so_far += component
 
       try:
-        obj = parent_tree[component.encode('utf-8')]
+        obj = parent_tree[component.encode()]
       except KeyError:
         raise self.MissingFileException(self.rev, relpath)
 
@@ -533,7 +533,7 @@ class GitRepositoryReader(object):
           # Is absolute, thus likely points outside the repo.
           raise self.ExternalSymlinkException(self.rev, relpath)
 
-        link_to = os.path.normpath(os.path.join(parent_path, path_data.decode('utf-8')))
+        link_to = os.path.normpath(os.path.join(parent_path, path_data.decode()))
         if link_to.startswith('../') or link_to[0] == '/':
           # Points outside the repo.
           raise self.ExternalSymlinkException(self.rev, relpath)
@@ -608,7 +608,7 @@ class GitRepositoryReader(object):
       rev = ensure_text(rev)
       relpath = ensure_text(relpath)
       relpath = self._fixup_dot_relative(relpath)
-      spec = '{}:{}\n'.format(rev, relpath).encode('utf-8')
+      spec = f'{rev}:{relpath}\n'.encode()
 
     self._maybe_start_cat_file_process()
     self._cat_file_process.stdin.write(spec)
@@ -617,7 +617,7 @@ class GitRepositoryReader(object):
     while not header:
       header = self._cat_file_process.stdout.readline()
       if self._cat_file_process.poll() is not None:
-        raise self.GitDiedException("Git cat-file died while trying to read '{}'.".format(spec))
+        raise self.GitDiedException(f"Git cat-file died while trying to read '{spec}'.")
 
     header = header.rstrip()
     parts = header.rsplit(SPACE, 2)

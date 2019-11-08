@@ -1,16 +1,12 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import time
-from builtins import range
 
 from pants.java.jar.manifest import Manifest
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import open_zip
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class ExportClasspathIntegrationTest(PantsRunIntegrationTest):
@@ -40,7 +36,7 @@ class ExportClasspathIntegrationTest(PantsRunIntegrationTest):
 
     with open_zip(manifest_jar_path) as synthetic_jar:
       self.assertListEqual([Manifest.PATH], synthetic_jar.namelist())
-      oneline_classpath = synthetic_jar.read(Manifest.PATH).decode('utf-8').replace('\n', '').replace(' ', '')
+      oneline_classpath = synthetic_jar.read(Manifest.PATH).decode().replace('\n', '').replace(' ', '')
       self.assertNotIn('sbt-interface', oneline_classpath)
       self.assertIn('foo', oneline_classpath)
       self.assertIn('baz', oneline_classpath)

@@ -1,14 +1,11 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.codegen.wire.java.register import build_file_aliases as register_codegen
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.build_graph.register import build_file_aliases as register_core
 from pants.java.jar.jar_dependency import JarDependency
-from pants_test.task_test_base import TaskTestBase
+from pants.testutil.task_test_base import TaskTestBase
 
 from pants.contrib.thrifty.java_thrifty_gen import JavaThriftyGen
 from pants.contrib.thrifty.java_thrifty_library import JavaThriftyLibrary

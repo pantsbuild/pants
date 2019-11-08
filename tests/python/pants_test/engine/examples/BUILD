@@ -10,8 +10,6 @@ python_library(
   name='parsers',
   sources=['parsers.py'],
   dependencies=[
-    '3rdparty/python:future',
-    '3rdparty/python:six',
     'src/python/pants/build_graph',
     'src/python/pants/engine:objects',
     'src/python/pants/engine:parser',

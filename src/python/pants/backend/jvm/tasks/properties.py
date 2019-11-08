@@ -1,18 +1,11 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import re
-from builtins import next, object, open, str
-
-import six
-
-from pants.util.collections_abc_backport import OrderedDict
+from collections import OrderedDict
 
 
-class Properties(object):
+class Properties:
   """A Python reader for java.util.Properties formatted data.
 
   Based on:
@@ -30,17 +23,17 @@ class Properties(object):
 
     :API: public
 
-    :param (string | open stream) data: An open stream or a string.
+    :param (str | open stream) data: An open stream or a string.
     :returns: A dict of parsed property data.
     :rtype: dict
     """
 
     if hasattr(data, 'read') and callable(data.read):
       contents = data.read()
-    elif isinstance(data, six.string_types):
+    elif isinstance(data, str):
       contents = data
     else:
-      raise TypeError('Can only process data from a string or a readable object, given: %s' % data)
+      raise TypeError(f"Can only process data from a str or a readable object, given: {data}")
 
     return Properties._parse(contents.splitlines())
 
@@ -112,7 +105,7 @@ class Properties(object):
 
     if hasattr(output, 'write') and callable(output.write):
       write(output)
-    elif isinstance(output, six.string_types):
+    elif isinstance(output, str):
       with open(output, 'w+') as out:
         write(out)
     else:

@@ -1,15 +1,12 @@
-# coding=utf-8
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
 from pants.backend.codegen.grpcio.python.grpcio_prep import GrpcioPrep
 from pants.backend.codegen.grpcio.python.grpcio_run import GrpcioRun
 from pants.backend.python.targets.python_library import PythonLibrary
-from pants_test.task_test_base import TaskTestBase
+from pants.testutil.task_test_base import TaskTestBase
 
 
 class GrpcioTestBase(TaskTestBase):

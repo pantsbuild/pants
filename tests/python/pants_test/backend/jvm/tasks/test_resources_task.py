@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import range, str
 
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.resources_task import ResourcesTask
@@ -14,8 +10,8 @@ from pants.base.hash_utils import stable_json_sha1
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 from pants.build_graph.target import Target
+from pants.testutil.task_test_base import TaskTestBase
 from pants.util.dirutil import touch
-from pants_test.task_test_base import TaskTestBase
 
 
 class ResourcesTaskTestBase(TaskTestBase):
@@ -59,14 +55,15 @@ class ResourcesTaskTestBase(TaskTestBase):
     classpath_products = task.context.products.get_data('runtime_classpath')
 
     expected_confs = expected_confs or ('default',)
-    products = classpath_products.get_for_target(target)
+    products = classpath_products.get_classpath_entries_for_targets([target])
     self.assertEqual(len(expected_confs), len(products))
 
     confs = []
     chroots = set()
-    for conf, chroot in products:
+    for conf, entry in products:
+      self.assertTrue(entry.directory_digest is not None)
       confs.append(conf)
-      chroots.add(chroot)
+      chroots.add(entry.path)
     self.assertEqual(sorted(expected_confs), sorted(confs))
     self.assertEqual(1, len(chroots))
     chroot = chroots.pop()

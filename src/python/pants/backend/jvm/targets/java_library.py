@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrary
 from pants.backend.jvm.targets.junit_tests import JUnitTests
@@ -25,10 +22,10 @@ class JavaLibrary(ExportableJvmLibrary):
 
   @classmethod
   def subsystems(cls):
-    return super(JavaLibrary, cls).subsystems()
+    return super().subsystems()
 
   def __init__(self, address=None, **kwargs):
-    super(JavaLibrary, self).__init__(address=address, **kwargs)
+    super().__init__(address=address, **kwargs)
     if 'scalac_plugins' in kwargs:
       raise self.IllegalArgument(address.spec,
                                  'java_library does not support the scalac_plugins argument.')

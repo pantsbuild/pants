@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitivesSetField
@@ -34,7 +31,7 @@ class GoProtobufLibrary(Target):
     payload.add_field('protoc_plugins',
                       PrimitivesSetField(protoc_plugins or []))
 
-    super(GoProtobufLibrary, self).__init__(payload=payload, address=address, **kwargs)
+    super().__init__(payload=payload, address=address, **kwargs)
 
   @classmethod
   def alias(cls):
@@ -59,7 +56,7 @@ class GoProtobufGenLibrary(GoTarget):
                                            sources_rel_path=address.spec_path,
                                            key_arg='sources'),
     })
-    super(GoProtobufGenLibrary, self).__init__(address=address, payload=payload, **kwargs)
+    super().__init__(address=address, payload=payload, **kwargs)
 
   @property
   def import_path(self):

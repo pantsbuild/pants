@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 
@@ -20,7 +17,7 @@ class ReportingServerRun(QuietTaskMixin, Task):
 
   @classmethod
   def register_options(cls, register):
-    super(ReportingServerRun, cls).register_options(register)
+    super().register_options(register)
     register('--port', type=int, default=0,
              help='Serve on this port. Leave unset to choose a free port '
                   'automatically (recommended if using pants concurrently in '
@@ -54,8 +51,7 @@ class ReportingServerRun(QuietTaskMixin, Task):
       manager.daemonize()
       manager.await_socket(10)
 
-      logger.info('Launched server with pid {pid} at http://localhost:{port}'
-                  .format(pid=manager.pid, port=manager.socket))
-      logger.info('To kill, run `./pants killserver`')
+      logger.info(f'Launched server with pid {manager.pid} at http://localhost:{manager.socket}')
+      logger.info(f'To kill, run `{self.get_options().pants_bin_name} killserver`')
 
     self._maybe_open(manager.socket)

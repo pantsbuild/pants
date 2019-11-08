@@ -1,13 +1,10 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.graph_info.tasks.target_filter_task_mixin import TargetFilterTaskMixin
 from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
 from pants.build_graph.target import Target
-from pants_test.task_test_base import TaskTestBase
+from pants.testutil.task_test_base import TaskTestBase
 
 
 class TargetFilterTaskMixinTest(TaskTestBase):
@@ -39,7 +36,7 @@ class TargetFilterTaskMixinTest(TaskTestBase):
                             context_aware_object_factories={'blue': lambda ctx: None})
 
   def setUp(self):
-    super(TargetFilterTaskMixinTest, self).setUp()
+    super().setUp()
     self.task = self.create_task(self.context())
 
   def test_simple_alias(self):

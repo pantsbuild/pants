@@ -1,16 +1,19 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from builtins import str
+import os
 
 from pants.binaries.binary_tool import BinaryToolBase
-from pants.binaries.binary_util import (BinaryToolFetcher, BinaryToolUrlGenerator, BinaryUtil,
-                                        HostPlatform)
+from pants.binaries.binary_util import (
+  BinaryToolFetcher,
+  BinaryToolUrlGenerator,
+  BinaryUtil,
+  HostPlatform,
+)
 from pants.option.scope import GLOBAL_SCOPE
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
+from pants.util.contextutil import temporary_dir
+from pants.util.dirutil import safe_file_dump
 
 
 class DefaultVersion(BinaryToolBase):
@@ -76,12 +79,13 @@ class CustomUrls(BinaryToolBase):
 class BinaryToolBaseTest(TestBase):
 
   def setUp(self):
-    super(BinaryToolBaseTest, self).setUp()
+    super().setUp()
     self._context = self.context(
       for_subsystems=[DefaultVersion, AnotherTool, ReplacingLegacyOptionsTool, CustomUrls],
       options={
         GLOBAL_SCOPE: {
           'binaries_baseurls': ['https://binaries.example.org'],
+          'pants_bootstrapdir': str(temporary_dir()),
         },
         'another-tool': {
           'version': '0.0.2',
@@ -144,3 +148,24 @@ class BinaryToolBaseTest(TestBase):
     self.assertIn(
       "Failed to fetch binary from https://custom-url.example.org/files/custom_urls_tool-v2.3-zzz-alternate:",
       err_msg)
+
+  def test_hackily_snapshot(self):
+    with temporary_dir() as temp_dir:
+      safe_file_dump(
+          os.path.join(temp_dir, 'bin', DefaultVersion.name, DefaultVersion.default_version, DefaultVersion.name),
+          'content!',
+        )
+      context = self.context(
+        for_subsystems=[DefaultVersion],
+        options={
+          GLOBAL_SCOPE: {
+            'binaries_baseurls': ['file:///{}'.format(temp_dir)],
+          },
+        })
+      self.maxDiff = None
+      default_version_tool = DefaultVersion.global_instance()
+      _, snapshot = default_version_tool.hackily_snapshot(context)
+      self.assertEqual(
+          '51a98706ab7458069aabe01856cb352ca97686e3edd3bf9ebd3205c2b38b2974',
+          snapshot.directory_digest.fingerprint
+        )

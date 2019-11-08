@@ -1,23 +1,20 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
 
-from future.utils import binary_type, text_type
+from collections.abc import MutableMapping, MutableSequence
 
 from pants.engine.addressable import addressable, addressable_list
 from pants.engine.objects import Serializable, SerializableFactory, Validatable, ValidationError
-from pants.util.collections_abc_backport import MutableMapping, MutableSequence
 from pants.util.objects import SubclassesOf, SuperclassesOf
 
 
 def _normalize_utf8_keys(kwargs):
   """When kwargs are passed literally in a source file, their keys are ascii: normalize."""
-  if any(type(key) is binary_type for key in kwargs.keys()):
+  if any(type(key) is bytes for key in kwargs.keys()):
     # This is to preserve the original dict type for kwargs.
     dict_type = type(kwargs)
-    return dict_type([(text_type(k), v) for k, v in kwargs.items()])
+    return dict_type([(str(k), v) for k, v in kwargs.items()])
   return kwargs
 
 
@@ -261,6 +258,8 @@ class Struct(Serializable, SerializableFactory, Validatable):
         return tuple(sorted((k, hashable(v)) for k, v in value.items()))
       elif isinstance(value, list):
         return tuple(hashable(v) for v in value)
+      elif isinstance(value, set):
+        return tuple(sorted(hashable(v) for v in value))
       else:
         return value
     return tuple(sorted((k, hashable(v)) for k, v in self._kwargs.items()
@@ -295,7 +294,7 @@ class StructWithDeps(Struct):
     :param list dependencies: The direct dependencies of this struct.
     """
     # TODO: enforce the type of variants using the Addressable framework.
-    super(StructWithDeps, self).__init__(**kwargs)
+    super().__init__(**kwargs)
     self.dependencies = dependencies
 
   @addressable_list(SubclassesOf(Struct))

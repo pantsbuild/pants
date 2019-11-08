@@ -1,14 +1,12 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
+from unittest.mock import Mock, patch
 
-from mock import Mock, patch
 from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants_test.task_test_base import TaskTestBase
+from pants.testutil.task_test_base import TaskTestBase
 
 from pants.contrib.scrooge.tasks.thrift_linter import ThriftLinter
 

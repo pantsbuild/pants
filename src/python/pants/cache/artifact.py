@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import shutil
@@ -15,7 +12,7 @@ class ArtifactError(Exception):
   pass
 
 
-class Artifact(object):
+class Artifact:
   """Represents a set of files in an artifact."""
 
   def __init__(self, artifact_root):
@@ -49,7 +46,7 @@ class DirectoryArtifact(Artifact):
   """An artifact stored as loose files under a directory."""
 
   def __init__(self, artifact_root, directory):
-    super(DirectoryArtifact, self).__init__(artifact_root)
+    super().__init__(artifact_root)
     self._directory = directory
 
   def exists(self):
@@ -85,7 +82,7 @@ class TarballArtifact(Artifact):
   # TODO: Expose `dereference` for tasks.
   # https://github.com/pantsbuild/pants/issues/3961
   def __init__(self, artifact_root, tarfile_, compression=9, dereference=True):
-    super(TarballArtifact, self).__init__(artifact_root)
+    super().__init__(artifact_root)
     self._tarfile = tarfile_
     self._compression = compression
     self._dereference = dereference
@@ -111,7 +108,6 @@ class TarballArtifact(Artifact):
     # Note(yic): unlike the python implementation before, now we do not update self._relpath
     # after the extraction.
     try:
-      self.NATIVE_BINARY.decompress_tarball(self._tarfile.encode('utf-8'),
-                                            self._artifact_root.encode('utf-8'))
+      self.NATIVE_BINARY.decompress_tarball(self._tarfile.encode(), self._artifact_root.encode())
     except Exception as e:
       raise ArtifactError("Extracting artifact failed:\n{}".format(e))

@@ -1,15 +1,10 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import json
 import os
 import shutil
-from builtins import open
 
-from future.utils import PY3
 from pants.build_graph.injectables_mixin import InjectablesMixin
 from pants.option.custom_types import target_option
 from pants.subsystem.subsystem import Subsystem
@@ -25,7 +20,7 @@ class ScalaJSPlatform(InjectablesMixin, Subsystem, NodeResolverBase):
 
   @classmethod
   def register_options(cls, register):
-    super(ScalaJSPlatform, cls).register_options(register)
+    super().register_options(register)
     # TODO: revisit after https://rbcommons.com/s/twitter/r/3225/
     register('--runtime', advanced=True, type=list, member_type=target_option,
              default=['//:scala-js-library'],
@@ -33,7 +28,7 @@ class ScalaJSPlatform(InjectablesMixin, Subsystem, NodeResolverBase):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(ScalaJSPlatform, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data('scala_js_binaries')
 
   def resolve_target(self, node_task, target, results_dir, node_paths):
@@ -54,8 +49,7 @@ class ScalaJSPlatform(InjectablesMixin, Subsystem, NodeResolverBase):
       'version': '0.0.0',
       'main': main,
     }
-    mode = 'w' if PY3 else 'wb'
-    with open(os.path.join(results_dir, 'package.json'), mode) as fp:
+    with open(os.path.join(results_dir, 'package.json'), 'w') as fp:
       json.dump(package, fp, indent=2)
 
   @property

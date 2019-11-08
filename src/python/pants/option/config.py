@@ -1,34 +1,30 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
+import configparser
 import getpass
 import io
 import itertools
 import os
-from builtins import open
+from abc import ABC
 from contextlib import contextmanager
+from dataclasses import dataclass
 from hashlib import sha1
+from typing import ClassVar, Tuple
 
-import six
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot, get_pants_cachedir, get_pants_configdir
 from pants.util.eval import parse_expression
-from pants.util.meta import AbstractClass
-from pants.util.objects import datatype
-from pants.util.py2_compat import configparser
 
 
-class Config(AbstractClass):
+class Config(ABC):
   """Encapsulates ini-style config file loading and access.
 
   Supports recursive variable substitution using standard python format strings. E.g.,
   %(var_name)s will be replaced with the value of var_name.
   """
-  DEFAULT_SECTION = configparser.DEFAULTSECT
+  DEFAULT_SECTION: ClassVar[str] = configparser.DEFAULTSECT
 
   class ConfigError(Exception):
     pass
@@ -56,7 +52,7 @@ class Config(AbstractClass):
       with io.BytesIO(file_content.content) as fh:
         yield fh
 
-    return cls._meta_load(opener, file_contents, seed_values)
+    return cls._meta_load(opener, file_contents, seed_values=seed_values)
 
   @classmethod
   def load(cls, config_paths, seed_values=None):
@@ -77,27 +73,27 @@ class Config(AbstractClass):
       with open(f, 'rb') as fh:
         yield fh
 
-    return cls._meta_load(opener, config_paths, seed_values)
+    return cls._meta_load(opener, config_paths, seed_values=seed_values)
 
   @classmethod
-  def _meta_load(cls, open_ctx, config_items, seed_values=None):
+  def _meta_load(cls, open_ctx, config_items, *, seed_values=None):
     if not config_items:
       return _EmptyConfig()
 
     single_file_configs = []
     for config_item in config_items:
-      parser = cls._create_parser(seed_values)
+      parser = cls._create_parser(seed_values=seed_values)
       with open_ctx(config_item) as ini:
         content = ini.read()
         content_digest = sha1(content).hexdigest()
-        parser.read_string(content.decode('utf-8'))
+        parser.read_string(content.decode())
       config_path = config_item.path if hasattr(config_item, 'path') else config_item
       single_file_configs.append(_SingleFileConfig(config_path, content_digest, parser))
 
     return _ChainedConfig(tuple(reversed(single_file_configs)))
 
   @classmethod
-  def _create_parser(cls, seed_values=None):
+  def _create_parser(cls, *, seed_values=None):
     """Creates a config parser that supports %([key-name])s value substitution.
 
     A handful of seed values will be set to act as if specified in the loaded config file's DEFAULT
@@ -108,7 +104,9 @@ class Config(AbstractClass):
                         pants_supportdir and pants_distdir.
     """
     seed_values = seed_values or {}
-    buildroot = seed_values.get('buildroot', get_buildroot())
+    buildroot = seed_values.get('buildroot')
+    if buildroot is None:
+      buildroot = get_buildroot()
 
     all_seed_values = {
       'buildroot': buildroot,
@@ -127,7 +125,7 @@ class Config(AbstractClass):
 
     return configparser.ConfigParser(all_seed_values)
 
-  def get(self, section, option, type_=six.string_types, default=None):
+  def get(self, section, option, type_=str, default=None):
     """Retrieves option from the specified section (or 'DEFAULT') and attempts to parse it as type.
 
     If the specified section does not exist or is missing a definition for the option, the value is
@@ -141,10 +139,7 @@ class Config(AbstractClass):
       return default
 
     raw_value = self.get_value(section, option)
-    # We jump through some hoops here to deal with the fact that `six.string_types` is a tuple of
-    # types.
-    if (type_ == six.string_types or
-        (isinstance(type_, type) and issubclass(type_, six.string_types))):
+    if type_ == str or issubclass(type_, str):
       return raw_value
 
     key = '{}.{}'.format(section, option)
@@ -187,7 +182,8 @@ class Config(AbstractClass):
     raise NotImplementedError
 
 
-class _EmptyConfig(datatype([]), Config):
+@dataclass(frozen=True)
+class _EmptyConfig(Config):
   """A dummy config with no data at all."""
 
   def sources(self):
@@ -257,12 +253,14 @@ class _SingleFileConfig(Config):
     return hash(self.content_digest)
 
 
-class _ChainedConfig(datatype(['chained_configs']), Config):
+@dataclass(frozen=True)
+class _ChainedConfig(Config):
   """Config read from multiple sources.
 
-  :param configs: A tuple of Config instances to chain.
-                  Later instances take precedence over earlier ones.
+  :param chained_configs: A tuple of Config instances to chain. Later instances take precedence
+                          over earlier ones.
   """
+  chained_configs: Tuple[Config, ...]
 
   @property
   def _configs(self):

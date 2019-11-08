@@ -1,17 +1,14 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
-from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
+from pants.testutil.jvm.nailgun_task_test_base import NailgunTaskTestBase
 
 
-class JvmBinaryTaskTestBase(JvmToolTaskTestBase):
+class JvmBinaryTaskTestBase(NailgunTaskTestBase):
   """
   :API: public
   """

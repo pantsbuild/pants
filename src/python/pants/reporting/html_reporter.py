@@ -1,20 +1,14 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import html
 import os
 import re
 import time
 import uuid
-from builtins import open, range, str
 from collections import defaultdict, namedtuple
+from itertools import zip_longest
 from textwrap import dedent
-
-from future.moves.itertools import zip_longest
-from six import string_types
 
 from pants.base.build_environment import get_buildroot
 from pants.base.mustache import MustacheRenderer
@@ -48,7 +42,7 @@ class HtmlReporter(Reporter):
   Settings = namedtuple('Settings', Reporter.Settings._fields + ('html_dir', 'template_dir'))
 
   def __init__(self, run_tracker, settings):
-    super(HtmlReporter, self).__init__(run_tracker, settings)
+    super().__init__(run_tracker, settings)
      # The main report, and associated tool outputs, go under this dir.
     self._html_dir = settings.html_dir
 
@@ -165,7 +159,9 @@ class HtmlReporter(Reporter):
     s = self._start_workunit_fmt_string.format(
       indent=len(workunit.ancestors()) * 10,
       id=workunit.id,
-      parent_id=workunit.parent.id if workunit.parent else '',
+      parent_id=workunit.parent.id if workunit.parent
+      and not self.run_tracker.is_background_root_workunit(workunit)
+      else '',
       workunit=workunit,
       icon_caret='down' if initially_open else 'right',
       display_class='' if initially_open else 'nodisplay',
@@ -227,7 +223,7 @@ class HtmlReporter(Reporter):
     timing = '{:.3f}'.format(duration)
     unaccounted_time = ''
     # Background work may be idle a lot, no point in reporting that as unaccounted.
-    if self.is_under_main_root(workunit):
+    if not self.is_under_background_root(workunit):
       unaccounted_time_secs = workunit.unaccounted_time()
       if unaccounted_time_secs >= 1 and unaccounted_time_secs > 0.05 * duration:
         unaccounted_time = '{:.3f}'.format(unaccounted_time_secs)
@@ -281,7 +277,7 @@ class HtmlReporter(Reporter):
     # Update the artifact cache stats.
     def render_cache_stats(artifact_cache_stats):
       def fix_detail_id(e, _id):
-        return e if isinstance(e, string_types) else e + (_id, )
+        return e if isinstance(e, str) else e + (_id, )
 
       msg_elements = []
       for cache_name, stat in artifact_cache_stats.stats_per_cache.items():
@@ -379,7 +375,7 @@ class HtmlReporter(Reporter):
       # preserved through refreshes. For example, when looking at the artifact cache stats,
       # if "hits" are open and "misses" are closed, we want to remember that even after
       # the cache stats are updated and the message re-rendered.
-      if isinstance(element, string_types):
+      if isinstance(element, str):
         element = [element]
 
       # zip_longest assumes None for missing values, so this generator will pick the default for those.

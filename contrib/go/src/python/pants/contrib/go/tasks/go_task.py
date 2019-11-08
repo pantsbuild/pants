@@ -1,18 +1,14 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import json
 import re
-from builtins import object, str
+import subprocess
 from collections import namedtuple
 
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.task.task import Task
 from pants.util.memo import memoized_method, memoized_property
-from pants.util.process_handler import subprocess
 from twitter.common.collections.orderedset import OrderedSet
 
 from pants.contrib.go.subsystems.go_distribution import GoDistribution
@@ -27,7 +23,7 @@ class GoTask(Task):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(GoTask, cls).subsystem_dependencies() + (GoDistribution.scoped(cls),)
+    return super().subsystem_dependencies() + (GoDistribution.scoped(cls),)
 
   @staticmethod
   def is_binary(target):
@@ -44,6 +40,10 @@ class GoTask(Task):
   @staticmethod
   def is_local_src(target):
     return isinstance(target, GoLocalSource)
+
+  @classmethod
+  def is_test_target(cls, target):
+    return cls.is_local_src(target) and target.has_tests
 
   @staticmethod
   def is_go(target):
@@ -73,10 +73,10 @@ class GoTask(Task):
                                     goarch=self._lookup_go_env_var('GOARCH'))
 
   def _lookup_go_env_var(self, var):
-    return self.go_dist.create_go_cmd('env', args=[var]).check_output().decode('utf-8').strip()
+    return self.go_dist.create_go_cmd('env', args=[var]).check_output().decode().strip()
 
 
-class ImportOracle(object):
+class ImportOracle:
   """Answers questions about Go imports."""
 
   class ListDepsError(Exception):
@@ -93,7 +93,7 @@ class ImportOracle(object):
     :rtype: frozenset of string
     """
     out = self._go_dist.create_go_cmd('list', args=['std']).check_output()
-    return frozenset(out.decode('utf-8').strip().split())
+    return frozenset(out.decode().strip().split())
 
   # This simple regex mirrors the behavior of the relevant go code in practice (see
   # repoRootForImportDynamic and surrounding code in
@@ -154,7 +154,7 @@ class ImportOracle(object):
       if returncode != 0:
         raise self.ListDepsError('Problem listing imports for {}: {} failed with exit code {}'
                                  .format(pkg, go_cmd, returncode))
-      data = json.loads(out.decode('utf-8'))
+      data = json.loads(out.decode())
 
       # XTestImports are for black box tests.  These test files live inside the package dir but
       # declare a different package and thus can only access the public members of the package's

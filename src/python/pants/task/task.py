@@ -1,25 +1,23 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import sys
-from abc import abstractmethod
-from builtins import filter, map, object, str, zip
+from abc import ABCMeta, abstractmethod
 from contextlib import contextmanager
 from hashlib import sha1
 from itertools import repeat
 
-from future.utils import PY3
-
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work
+from pants.build_graph.target_filter_subsystem import TargetFilter
 from pants.cache.artifact_cache import UnreadableArtifact, call_insert, call_use_cached_files
 from pants.cache.cache_setup import CacheSetup
-from pants.invalidation.build_invalidator import (BuildInvalidator, CacheKeyGenerator,
-                                                  UncacheableCacheKeyGenerator)
+from pants.invalidation.build_invalidator import (
+  BuildInvalidator,
+  CacheKeyGenerator,
+  UncacheableCacheKeyGenerator,
+)
 from pants.invalidation.cache_manager import InvalidationCacheManager, InvalidationCheck
 from pants.option.optionable import Optionable
 from pants.option.options_fingerprinter import OptionsFingerprinter
@@ -29,10 +27,10 @@ from pants.source.source_root import SourceRootConfig
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
 from pants.util.dirutil import safe_mkdir, safe_rm_oldest_items_in_dir
 from pants.util.memo import memoized_method, memoized_property
-from pants.util.meta import AbstractClass
+from pants.util.meta import classproperty
 
 
-class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
+class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
   """Defines a lifecycle that prepares a task for execution and provides the base machinery
   needed to execute it.
 
@@ -77,7 +75,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
   @classmethod
   @memoized_method
   def implementation_version_slug(cls):
-    return sha1(cls.implementation_version_str().encode('utf-8')).hexdigest()[:12]
+    return sha1(cls.implementation_version_str().encode()).hexdigest()[:12]
 
   @classmethod
   def stable_name(cls):
@@ -95,8 +93,9 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return (super(TaskBase, cls).subsystem_dependencies() +
-            (CacheSetup.scoped(cls), BuildInvalidator.Factory, SourceRootConfig))
+    return (super().subsystem_dependencies() +
+            (CacheSetup.scoped(cls), BuildInvalidator.Factory, SourceRootConfig) +
+            ((TargetFilter.scoped(cls),) if cls.target_filtering_enabled else tuple()))
 
   @classmethod
   def product_types(cls):
@@ -117,6 +116,18 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     :API: public
     """
     return False
+
+  @classmethod
+  def register_options(cls, register):
+    super().register_options(register)
+    if cls.supports_passthru_args():
+      register('--passthrough-args',
+               type=list,
+               advanced=True,
+               fingerprint=True,
+               help='Pass these options as pass-through args; ie: as if by appending '
+                    '`-- <passthrough arg> ...` to the command line. Any passthrough args actually'
+                    'supplied on the command line will be used as well.')
 
   @classmethod
   def _scoped_options(cls, options):
@@ -161,7 +172,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
     class MyTask(Task):
       def __init__(self, *args, **kwargs):
-        super(MyTask, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         ...
 
     This allows us to change Task.__init__()'s arguments without
@@ -170,7 +181,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
     :API: public
     """
-    super(TaskBase, self).__init__()
+    super().__init__()
     self.context = context
     self._workdir = workdir
 
@@ -196,9 +207,12 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     :API: public
     """
     if not self.supports_passthru_args():
-      raise TaskError('{0} Does not support passthru args.'.format(self.stable_name()))
-    else:
-      return self.context.options.passthru_args_for_scope(self.options_scope)
+      raise TaskError('{} Does not support passthru args.'.format(self.stable_name()))
+
+    passthru_args = []
+    passthru_args.extend(self.get_options().get('passthrough_args', default=()))
+    passthru_args.extend(self.context.options.passthru_args_for_scope(self.options_scope))
+    return passthru_args
 
   @property
   def skip_execution(self):
@@ -222,6 +236,17 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     """
     return True
 
+  @classproperty
+  def target_filtering_enabled(cls):
+    """Whether this task should apply configured filters against targets.
+
+    Tasks can override to enable target filtering (e.g. based on tags) and must
+    access targets via get_targets()
+
+    :API: public
+    """
+    return False
+
   def get_targets(self, predicate=None):
     """Returns the candidate targets this task should act on.
 
@@ -237,8 +262,24 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
     :API: public
     """
-    return (self.context.targets(predicate) if self.act_transitively
-            else list(filter(predicate, self.context.target_roots)))
+    initial_targets = (self.context.targets(predicate) if self.act_transitively
+                       else list(filter(predicate, self.context.target_roots)))
+
+    if not self.target_filtering_enabled:
+      return initial_targets
+    else:
+      return self._filter_targets(initial_targets)
+
+  def _filter_targets(self, targets):
+    included_targets = TargetFilter.scoped_instance(self).apply(targets)
+    excluded_targets = set(targets).difference(included_targets)
+
+    if excluded_targets:
+      self.context.log.info("{} target(s) excluded".format(len(excluded_targets)))
+      for target in excluded_targets:
+        self.context.log.debug("{} excluded".format(target.address.spec))
+
+    return included_targets
 
   @memoized_property
   def workdir(self):
@@ -267,15 +308,15 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
   def _options_fingerprint(self, scope):
     options_hasher = sha1()
-    options_hasher.update(scope.encode('utf-8'))
+    options_hasher.update(scope.encode())
     options_fp = OptionsFingerprinter.combined_options_fingerprint_for_scope(
       scope,
       self.context.options,
       build_graph=self.context.build_graph,
       include_passthru=self.supports_passthru_args(),
     )
-    options_hasher.update(options_fp.encode('utf-8'))
-    return options_hasher.hexdigest() if PY3 else options_hasher.hexdigest().decode('utf-8')
+    options_hasher.update(options_fp.encode())
+    return options_hasher.hexdigest()
 
   @memoized_property
   def fingerprint(self):
@@ -288,12 +329,12 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     A task's fingerprint is only valid after the task has been fully initialized.
     """
     hasher = sha1()
-    hasher.update(self.stable_name().encode('utf-8'))
-    hasher.update(self._options_fingerprint(self.options_scope).encode('utf-8'))
-    hasher.update(self.implementation_version_str().encode('utf-8'))
+    hasher.update(self.stable_name().encode())
+    hasher.update(self._options_fingerprint(self.options_scope).encode())
+    hasher.update(self.implementation_version_str().encode())
     for dep in self.subsystem_closure_iter():
-      hasher.update(self._options_fingerprint(dep.options_scope).encode('utf-8'))
-    return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
+      hasher.update(self._options_fingerprint(dep.options_scope).encode())
+    return hasher.hexdigest()
 
   def artifact_cache_reads_enabled(self):
     return self._cache_factory.read_cache_available()
@@ -687,7 +728,7 @@ class Task(TaskBase):
 
     :API: public
     """
-    super(Task, self).__init__(context, workdir)
+    super().__init__(context, workdir)
 
   @abstractmethod
   def execute(self):
@@ -697,6 +738,6 @@ class Task(TaskBase):
     """
 
 
-class QuietTaskMixin(object):
+class QuietTaskMixin:
   """A mixin to signal that pants shouldn't print verbose progress information for this task."""
   pass

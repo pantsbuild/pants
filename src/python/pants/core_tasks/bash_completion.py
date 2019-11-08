@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 from collections import defaultdict
@@ -13,7 +10,7 @@ from pants.base.exceptions import TaskError
 from pants.base.generator import Generator
 from pants.goal.goal import Goal
 from pants.help.help_info_extracter import HelpInfoExtracter
-from pants.option.arg_splitter import GLOBAL_SCOPE
+from pants.option.scope import GLOBAL_SCOPE
 from pants.task.console_task import ConsoleTask
 from pants.task.task import TaskBase
 
@@ -89,7 +86,7 @@ class BashCompletion(ConsoleTask):
 
     generator = Generator(
       resource_string(__name__,
-                      os.path.join('templates', 'bash_completion', 'autocomplete.sh.mustache')).decode('utf-8'),
+                      os.path.join('templates', 'bash_completion', 'autocomplete.sh.mustache')).decode(),
       scopes_text=' '.join(sorted(list(cmd_line_scopes))),
       options_text=options_text
     )

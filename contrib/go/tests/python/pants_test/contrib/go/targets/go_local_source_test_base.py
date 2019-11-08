@@ -1,20 +1,16 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from abc import abstractproperty
+from abc import ABC, abstractmethod
 from textwrap import dedent
 
 from pants.build_graph.address_lookup_error import AddressLookupError
-from pants.util.meta import AbstractClass
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 from pants.contrib.go.register import build_file_aliases
 
 
-class GoLocalSourceTestBase(AbstractClass):
+class GoLocalSourceTestBase(ABC):
   # NB: We assume we're mixed into a TestBase - we can't extend that directly or else unittest tries
   # to run our test methods in the subclass (OK), and against us (not OK).
   # NB: We use aliases and BUILD files to test proper registration of anonymous targets and macros.
@@ -23,14 +19,15 @@ class GoLocalSourceTestBase(AbstractClass):
   def setUpClass(cls):
     if not issubclass(cls, TestBase):
       raise TypeError('Subclasses must mix in TestBase')
-    super(GoLocalSourceTestBase, cls).setUpClass()
+    super().setUpClass()
 
   def setUp(self):
-    super(GoLocalSourceTestBase, self).setUp()
+    super().setUp()
     # Force setup of SourceRootConfig subsystem, as go targets do computation on source roots.
     self.context()
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def target_type(self):
     """Subclasses should return a GoLocalSource target subclass."""
 

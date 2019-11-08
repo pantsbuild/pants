@@ -4,10 +4,9 @@
 
 python_tests(
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/backend/codegen/jaxb',
     'src/python/pants/build_graph',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test/jvm:nailgun_task_test_base'
+    'src/python/pants/testutil/jvm:nailgun_task_test_base'
   ],
 )

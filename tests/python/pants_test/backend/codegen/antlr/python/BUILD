@@ -9,8 +9,8 @@ python_tests(
     'src/python/pants/backend/codegen/antlr/python',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
-    'tests/python/pants_test:test_base',
-    'tests/python/pants_test/jvm:nailgun_task_test_base',
+    'src/python/pants/testutil:test_base',
+    'src/python/pants/testutil/jvm:nailgun_task_test_base',
   ]
 )
 
@@ -19,8 +19,10 @@ python_tests(
   name = 'integration',
   sources = globs('*_integration.py'),
   dependencies = [
-    'tests/python/pants_test:int-test',
-    'tests/python/pants_test/backend/python:interpreter_selection_utils',
+    'src/python/pants/testutil:int-test',
+    'tests/python/pants_test:interpreter_selection_utils',
+    'testprojects/src/python:antlr_directory',
+    'testprojects/src/antlr/python:test_directory',
   ],
   tags = {'integration'},
 )

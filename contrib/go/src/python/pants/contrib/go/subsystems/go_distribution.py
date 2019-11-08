@@ -1,19 +1,14 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import str
-from collections import namedtuple
+import subprocess
+from collections import OrderedDict, namedtuple
 
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.binaries.binary_tool import NativeTool
 from pants.binaries.binary_util import BinaryToolUrlGenerator
-from pants.util.collections_abc_backport import OrderedDict
 from pants.util.memo import memoized_property
-from pants.util.process_handler import subprocess
 
 
 class GoReleaseUrlGenerator(BinaryToolUrlGenerator):
@@ -129,7 +124,7 @@ class GoDistribution(NativeTool):
     :returns: A tuple of the exit code and the go command that was run.
     :rtype: (int, :class:`GoDistribution.GoCommand`)
     """
-    go_cmd = self.GoCommand._create(self.goroot, cmd, go_env=self.go_env(gopath=gopath), args=args)
+    go_cmd = self.create_go_cmd(cmd, gopath=gopath, args=args)
     if workunit_factory is None:
       return go_cmd.spawn(**kwargs).wait()
     else:

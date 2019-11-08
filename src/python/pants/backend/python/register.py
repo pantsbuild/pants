@@ -1,14 +1,24 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.python.pants_requirement import PantsRequirement
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.python_requirements import PythonRequirements
-from pants.backend.python.rules import python_test_runner
+from pants.backend.python.rules import (
+  download_pex_bin,
+  inject_init,
+  pex,
+  python_create_binary,
+  python_fmt,
+  python_test_runner,
+)
+from pants.backend.python.subsystems.python_native_code import PythonNativeCode
+from pants.backend.python.subsystems.python_native_code import rules as python_native_code_rules
+from pants.backend.python.subsystems.subprocess_environment import SubprocessEnvironment
+from pants.backend.python.subsystems.subprocess_environment import (
+  rules as subprocess_environment_rules,
+)
 from pants.backend.python.targets.python_app import PythonApp
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_distribution import PythonDistribution
@@ -16,13 +26,15 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.targets.unpacked_whls import UnpackedWheels
-from pants.backend.python.tasks.build_local_python_distributions import \
-  BuildLocalPythonDistributions
+from pants.backend.python.tasks.build_local_python_distributions import (
+  BuildLocalPythonDistributions,
+)
 from pants.backend.python.tasks.gather_sources import GatherSources
 from pants.backend.python.tasks.isort_prep import IsortPrep
 from pants.backend.python.tasks.isort_run import IsortRun
-from pants.backend.python.tasks.local_python_distribution_artifact import \
-  LocalPythonDistributionArtifact
+from pants.backend.python.tasks.local_python_distribution_artifact import (
+  LocalPythonDistributionArtifact,
+)
 from pants.backend.python.tasks.pytest_prep import PytestPrep
 from pants.backend.python.tasks.pytest_run import PytestRun
 from pants.backend.python.tasks.python_binary_create import PythonBinaryCreate
@@ -36,6 +48,10 @@ from pants.backend.python.tasks.unpack_wheels import UnpackWheels
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.resources import Resources
 from pants.goal.task_registrar import TaskRegistrar as task
+
+
+def global_subsystems():
+  return (SubprocessEnvironment, PythonNativeCode)
 
 
 def build_file_aliases():
@@ -81,4 +97,13 @@ def register_goals():
 
 
 def rules():
-  return tuple(python_test_runner.rules())
+  return (
+    download_pex_bin.rules() +
+    inject_init.rules() +
+    python_fmt.rules() +
+    python_test_runner.rules() +
+    python_create_binary.rules() +
+    python_native_code_rules() +
+    pex.rules() +
+    subprocess_environment_rules()
+  )

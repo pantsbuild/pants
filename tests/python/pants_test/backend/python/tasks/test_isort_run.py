@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import open
 from textwrap import dedent
 
 from pytest import fail
@@ -53,7 +49,7 @@ class PythonIsortTest(PythonTaskTestBase):
     return IsortRun
 
   def setUp(self):
-    super(PythonIsortTest, self).setUp()
+    super().setUp()
     self._create_graph()
 
   def _create_graph(self):
@@ -142,3 +138,17 @@ class PythonIsortTest(PythonTaskTestBase):
     with open(path, 'r') as f:
       self.assertEqual(self.BAD_IMPORT_ORDER, f.read(),
                        '{} should not be sorted, but is.'.format(path))
+
+  def test_skip_config(self):
+    self.create_file('src/python/a/.isort.cfg', mode='a', contents='skip=a_1.py')
+    isort_task = self._create_task(target_roots=[self.a_library])
+    isort_task.execute()
+    self.assertNotSorted(os.path.join(self.build_root, 'src/python/a/a_1.py'))
+    self.assertSortedWithConfigA(os.path.join(self.build_root, 'src/python/a/a_2.py'))
+
+  def test_skip_glob_config(self):
+    self.create_file('src/python/a/.isort.cfg', mode='a', contents='skip_glob=src/python/a/*2.py')
+    isort_task = self._create_task(target_roots=[self.a_library])
+    isort_task.execute()
+    self.assertSortedWithConfigA(os.path.join(self.build_root, 'src/python/a/a_1.py'))
+    self.assertNotSorted(os.path.join(self.build_root, 'src/python/a/a_2.py'))

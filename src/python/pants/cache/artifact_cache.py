@@ -1,13 +1,9 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import os
 import sys
-from builtins import object
 
 
 # Note throughout the distinction between the artifact_root (which is where the artifacts are
@@ -25,7 +21,7 @@ class NonfatalArtifactCacheError(Exception):
   pass
 
 
-class UnreadableArtifact(object):
+class UnreadableArtifact:
   """A False-y value to indicate a read-failure (vs a normal cache-miss)
 
   See docstring on `ArtifactCache.use_cached_files` for details.
@@ -39,19 +35,14 @@ class UnreadableArtifact(object):
     self.key = key
     self.err = err
 
-  # For python 3
   def __bool__(self):
     return False
-
-  # For python 2
-  def __nonzero__(self):
-    return self.__bool__()
 
   def __str__(self):
     return "key={} err={}".format(self.key, self.err)
 
 
-class ArtifactCache(object):
+class ArtifactCache:
   """A map from cache key to a set of build artifacts.
 
   The cache key must uniquely identify the inputs (sources, compiler flags etc.) needed to
@@ -164,7 +155,7 @@ def call_use_cached_files(tup):
     sys.stderr.flush()
     return res
   except NonfatalArtifactCacheError as e:
-    logger.warn('Error calling use_cached_files in artifact cache: {0}'.format(e))
+    logger.warning('Error calling use_cached_files in artifact cache: {0}'.format(e))
     return False
 
 
@@ -181,5 +172,5 @@ def call_insert(tup):
     cache, key, files, overwrite = tup
     return cache.insert(key, files, overwrite)
   except NonfatalArtifactCacheError as e:
-    logger.warn('Error while inserting into artifact cache: {0}'.format(e))
+    logger.warning('Error while inserting into artifact cache: {0}'.format(e))
     return False

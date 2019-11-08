@@ -1,12 +1,9 @@
-# coding=utf-8
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import shutil
-from abc import abstractmethod, abstractproperty
+from abc import ABCMeta, abstractmethod
 
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.build_environment import get_buildroot
@@ -15,15 +12,14 @@ from pants.option.custom_types import dir_option
 from pants.process.xargs import Xargs
 from pants.util.dirutil import fast_relpath, safe_mkdir_for_all
 from pants.util.memo import memoized_property
-from pants.util.meta import AbstractClass
 
 
-class RewriteBase(NailgunTask, AbstractClass):
+class RewriteBase(NailgunTask, metaclass=ABCMeta):
   """Abstract base class for JVM-based tools that check/rewrite sources."""
 
   @classmethod
   def register_options(cls, register):
-    super(RewriteBase, cls).register_options(register)
+    super().register_options(register)
     register('--target-types',
              default=cls.target_types(),
              advanced=True, type=list,
@@ -46,7 +42,7 @@ class RewriteBase(NailgunTask, AbstractClass):
   @memoized_property
   def _formatted_target_types(self):
     aliases = set(self.get_options().target_types)
-    registered_aliases = self.context.build_file_parser.registered_aliases()
+    registered_aliases = self.context.build_configuration.registered_aliases()
     return tuple({target_type
                   for alias in aliases
                   for target_type in registered_aliases.target_types_by_alias[alias]})
@@ -105,7 +101,8 @@ class RewriteBase(NailgunTask, AbstractClass):
     Returns the UNIX return code of the tool.
     """
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def sideeffecting(self):
     """True if this command has sideeffects: ie, mutates the working copy."""
 

@@ -1,14 +1,11 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 def single(directory, name=None):
@@ -27,7 +24,7 @@ def sib(directory):
 class CmdLineSpecParserTest(TestBase):
 
   def setUp(self):
-    super(CmdLineSpecParserTest, self).setUp()
+    super().setUp()
     self._spec_parser = CmdLineSpecParser(self.build_root)
 
   def test_normal(self):

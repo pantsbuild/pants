@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import functools
 import os
@@ -23,9 +20,6 @@ from pants.util.memo import memoized_property
 
 class ConanFetch(SimpleCodegenTask):
 
-  deprecated_scope = 'native-third-party-fetch'
-  deprecated_scope_removal_version = '1.16.0.dev0'
-
   gentarget_type = ExternalNativeLibrary
 
   sources_globs = ('include/**/*', 'lib/*',)
@@ -43,18 +37,18 @@ class ConanFetch(SimpleCodegenTask):
 
   @classmethod
   def register_options(cls, register):
-    super(ConanFetch, cls).register_options(register)
+    super().register_options(register)
     register('--conan-remotes', type=dict, default=cls.default_remotes, advanced=True,
              fingerprint=True,
              help='The conan remotes to download conan packages from.')
 
   @classmethod
   def implementation_version(cls):
-    return super(ConanFetch, cls).implementation_version() + [('ConanFetch', 1)]
+    return super().implementation_version() + [('ConanFetch', 1)]
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(ConanFetch, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data(ConanPrep.tool_instance_cls)
 
   class ConanConfigError(TaskError): pass
@@ -100,7 +94,7 @@ class ConanFetch(SimpleCodegenTask):
       with temporary_dir() as remotes_install_dir:
         # Create an artificial conan configuration dir containing just remotes.txt.
         remotes_txt_for_install = os.path.join(remotes_install_dir, 'remotes.txt')
-        safe_file_dump(remotes_txt_for_install, self._remotes_txt_content, mode='w')
+        safe_file_dump(remotes_txt_for_install, self._remotes_txt_content)
         # Configure the desired user home from this artificial config dir.
         argv = ['config', 'install', remotes_install_dir]
         workunit_factory = functools.partial(
@@ -118,20 +112,20 @@ class ConanFetch(SimpleCodegenTask):
             exit_code=exit_code)
       # Generate the sentinel file so that we know the remotes have been successfully configured for
       # this particular task fingerprint in successive pants runs.
-      safe_file_dump(remotes_txt_sentinel, self._remotes_txt_content, mode='w')
+      safe_file_dump(remotes_txt_sentinel, self._remotes_txt_content)
 
     return user_home
 
   @memoized_property
   def _conan_os_name(self):
-    return Platform.create().resolve_for_enum_variant({
-      'darwin': 'Macos',
-      'linux': 'Linux',
+    return Platform.current.match({
+      Platform.darwin: "Macos",
+      Platform.linux: "Linux",
     })
 
   @property
   def _copy_target_attributes(self):
-    basic_attributes = [a for a in super(ConanFetch, self)._copy_target_attributes
+    basic_attributes = [a for a in super()._copy_target_attributes
                         if a != 'provides']
     return basic_attributes + [
       'include_relpath',
@@ -182,7 +176,7 @@ class ConanFetch(SimpleCodegenTask):
 
         # Read the stdout from the read-write buffer, from the beginning of the output, and convert
         # to unicode.
-        conan_install_stdout = workunit.output('stdout').read_from(0).decode('utf-8')
+        conan_install_stdout = workunit.output('stdout').read_from(0).decode()
         pkg_sha = conan_requirement.parse_conan_stdout_for_pkg_sha(conan_install_stdout)
 
       installed_data_dir = os.path.join(

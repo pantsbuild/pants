@@ -1,14 +1,10 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import re
 import time
 import uuid
-from builtins import object, range
 from collections import namedtuple
 
 from pants.util.dirutil import safe_mkdir_for
@@ -16,7 +12,7 @@ from pants.util.memo import memoized_method
 from pants.util.rwbuf import FileBackedRWBuf
 
 
-class WorkUnitLabel(object):
+class WorkUnitLabel:
   """
   :API: public
   """
@@ -57,7 +53,7 @@ class WorkUnitLabel(object):
     return [key for key in dir(cls) if not key.startswith('_') and key.isupper()]
 
 
-class WorkUnit(object):
+class WorkUnit:
   """A hierarchical unit of work, for the purpose of timing and reporting.
 
   A WorkUnit can be subdivided into further WorkUnits. The WorkUnit concept is deliberately
@@ -109,6 +105,12 @@ class WorkUnit(object):
     self.parent = parent
     self.children = []
 
+    # When a workunit is created the zipkin_span parameter is set to None.
+    # The zipkin_span parameter gets value when run_tracker.report.start_workunit(workunit)
+    # is called. The zipkin_span parameter cannot be set when the workunit is created because of
+    # specifics of the py_zipkin API and how info about workunits is recorded.
+    self.zipkin_span = None
+
     self.name = name
     self.labels = set(labels or ())
     self.cmd = cmd
@@ -146,9 +148,13 @@ class WorkUnit(object):
   def end(self):
     """Mark the time at which this workunit ended."""
     self.end_time = time.time()
+
+    return self.path(), self.duration(), self._self_time(), self.has_label(WorkUnitLabel.TOOL)
+
+  def cleanup(self):
+    """Cleanup by closing all output streams."""
     for output in self._outputs.values():
       output.close()
-    return self.path(), self.duration(), self._self_time(), self.has_label(WorkUnitLabel.TOOL)
 
   def outcome(self):
     """Returns the outcome of this workunit.
@@ -239,6 +245,20 @@ class WorkUnit(object):
     while ret.parent is not None:
       ret = ret.parent
     return ret
+
+  def is_background(self, background_root_workunit):
+    """ Returns True if this workunit is a background root workunit or its successor.
+
+    :param WorkUnit background_root_workunit: parent of all background workunits.
+
+    :API: public
+    """
+    curr_workunit = self
+    while curr_workunit is not None:
+      if curr_workunit is background_root_workunit:
+        return True
+      curr_workunit = curr_workunit.parent
+    return False
 
   def ancestors(self):
     """Returns a list consisting of this workunit and those enclosing it, up to the root.

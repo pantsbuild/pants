@@ -1,16 +1,10 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import json
 import os
 import sys
-from builtins import next, object, open, str
 from collections import defaultdict, namedtuple
-
-from future.utils import PY3
 
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
@@ -19,8 +13,10 @@ from pants.build_graph.aliased_target import AliasTarget
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.build_graph.target_scopes import Scopes
+from pants.java.distribution.distribution import DistributionLocator
 from pants.task.task import Task
 from pants.util.fileutil import create_size_estimators
+from pants.util.memo import memoized_property
 
 
 class JvmDependencyUsage(Task):
@@ -45,7 +41,7 @@ class JvmDependencyUsage(Task):
 
   @classmethod
   def register_options(cls, register):
-    super(JvmDependencyUsage, cls).register_options(register)
+    super().register_options(register)
     register('--internal-only', default=False, type=bool, fingerprint=True,
              help='Specifies that only internal dependencies should be included in the graph '
                   'output (no external jars).')
@@ -67,12 +63,15 @@ class JvmDependencyUsage(Task):
                   'doesn\'t depend on 3rdparty libraries versions.')
 
   @classmethod
+  def subsystem_dependencies(cls):
+    return super().subsystem_dependencies() + (DistributionLocator,)
+
+  @classmethod
   def prepare(cls, options, round_manager):
-    super(JvmDependencyUsage, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     if not options.use_cached:
-      round_manager.require_data('classes_by_source')
       round_manager.require_data('runtime_classpath')
-      round_manager.require_data('product_deps_by_src')
+      round_manager.require_data('product_deps_by_target')
     else:
       # We want to have synthetic targets in build graph to deserialize nodes properly.
       round_manager.optional_data('java')
@@ -98,7 +97,7 @@ class JvmDependencyUsage(Task):
 
   @classmethod
   def implementation_version(cls):
-    return super(JvmDependencyUsage, cls).implementation_version() + [('JvmDependencyUsage', 7)]
+    return super().implementation_version() + [('JvmDependencyUsage', 7)]
 
   def _render(self, graph, fh):
     chunks = graph.to_summary() if self.get_options().summary else graph.to_json()
@@ -142,38 +141,33 @@ class JvmDependencyUsage(Task):
         target_to_vts[vts.target] = vts
 
       if not self.get_options().use_cached:
-        node_creator = self.calculating_node_creator(
-          self.context.products.get_data('classes_by_source'),
-          self.context.products.get_data('runtime_classpath'),
-          self.context.products.get_data('product_deps_by_src'),
-          target_to_vts)
+        node_creator = self.calculating_node_creator(target_to_vts)
       else:
         node_creator = self.cached_node_creator(target_to_vts)
 
       return DependencyUsageGraph(self.create_dep_usage_nodes(targets, node_creator),
                                   self.size_estimators[self.get_options().size_estimator])
 
-  def calculating_node_creator(self, classes_by_source, runtime_classpath, product_deps_by_src,
-                               target_to_vts):
+  @memoized_property
+  def _analyzer(self):
+    return JvmDependencyAnalyzer(get_buildroot(),
+                                 DistributionLocator.cached(),
+                                 self.context.products.get_data('runtime_classpath'))
+
+  def calculating_node_creator(self, target_to_vts):
     """Strategy directly computes dependency graph node based on
     `classes_by_source`, `runtime_classpath`, `product_deps_by_src` parameters and
     stores the result to the build cache.
     """
-    analyzer = JvmDependencyAnalyzer(get_buildroot(), runtime_classpath)
     targets = self.context.targets()
-    targets_by_file = analyzer.targets_by_file(targets)
-    transitive_deps_by_target = analyzer.compute_transitive_deps_by_target(targets)
+    targets_by_file = self._analyzer.targets_by_file(targets)
+    transitive_deps_by_target = self._analyzer.compute_transitive_deps_by_target(targets)
+
     def creator(target):
       transitive_deps = set(transitive_deps_by_target.get(target))
-      node = self.create_dep_usage_node(target,
-                                        analyzer,
-                                        product_deps_by_src,
-                                        classes_by_source,
-                                        targets_by_file,
-                                        transitive_deps)
+      node = self.create_dep_usage_node(target, targets_by_file, transitive_deps)
       vt = target_to_vts[target]
-      mode = 'w' if PY3 else 'wb'
-      with open(self.nodes_json(vt.results_dir), mode=mode) as fp:
+      with open(self.nodes_json(vt.results_dir), mode='w') as fp:
         json.dump(node.to_cacheable_dict(), fp, indent=2, sort_keys=True)
       vt.update()
       return node
@@ -188,8 +182,10 @@ class JvmDependencyUsage(Task):
       if vt.valid and os.path.exists(self.nodes_json(vt.results_dir)):
         try:
           with open(self.nodes_json(vt.results_dir), 'r') as fp:
-            return Node.from_cacheable_dict(json.load(fp),
-                                            lambda spec: next(self.context.resolve(spec).__iter__()))
+            return Node.from_cacheable_dict(
+              json.load(fp),
+              lambda spec: next(self.context.resolve(spec).__iter__())
+            )
         except Exception:
           self.context.log.warn("Can't deserialize json for target {}".format(target))
           return Node(target.concrete_derived_from)
@@ -225,18 +221,13 @@ class JvmDependencyUsage(Task):
   def cache_target_dirs(self):
     return True
 
-  def create_dep_usage_node(self,
-                            target,
-                            analyzer,
-                            product_deps_by_src,
-                            classes_by_source,
-                            targets_by_file,
-                            transitive_deps):
-    declared_deps_with_aliases = set(analyzer.resolve_aliases(target))
-    eligible_unused_deps = {d for d, _ in analyzer.resolve_aliases(target, scope=Scopes.DEFAULT)}
+  def create_dep_usage_node(self, target, targets_by_file, transitive_deps):
+    declared_deps_with_aliases = set(self._analyzer.resolve_aliases(target))
+    eligible_unused_deps = {d for d, _ in self._analyzer.resolve_aliases(target,
+                                                                         scope=Scopes.DEFAULT)}
     concrete_target = target.concrete_derived_from
     declared_deps = [resolved for resolved, _ in declared_deps_with_aliases]
-    products_total = analyzer.count_products(target)
+    products_total = self._analyzer.count_products(target)
     node = Node(concrete_target)
     node.add_derivation(target, products_total)
 
@@ -256,24 +247,25 @@ class JvmDependencyUsage(Task):
 
     # Record the used products and undeclared Edges for this target. Note that some of
     # these may be self edges, which are considered later.
-    target_product_deps_by_src = product_deps_by_src.get(target, {})
-    for product_deps in target_product_deps_by_src.values():
-      for product_dep in product_deps:
-        for dep_tgt in targets_by_file.get(product_dep, []):
-          derived_from = dep_tgt.concrete_derived_from
-          if not self._select(derived_from):
-            continue
-          # Create edge only for those direct or transitive dependencies in order to
-          # disqualify irrelevant targets that happen to share some file in sources,
-          # not uncommon when globs especially rglobs is used.
-          if not derived_from in transitive_deps:
-            continue
-          node.add_edge(_construct_edge(dep_tgt, products_used={product_dep}), derived_from)
+    product_deps_by_target = self.context.products.get_data('product_deps_by_target')
+    product_deps_for_target = product_deps_by_target.get(target, [])
+    # product_deps is a list of class files / jars
+    for product_dep in product_deps_for_target:
+      for dep_tgt in targets_by_file.get(product_dep, []):
+        derived_from = dep_tgt.concrete_derived_from
+        if not self._select(derived_from):
+          continue
+        # Create edge only for those direct or transitive dependencies in order to
+        # disqualify irrelevant targets that happen to share some file in sources,
+        # not uncommon when globs especially rglobs is used.
+        if derived_from not in transitive_deps:
+          continue
+        node.add_edge(_construct_edge(dep_tgt, products_used={product_dep}), derived_from)
 
     return node
 
 
-class Node(object):
+class Node:
   def __init__(self, concrete_target):
     self.concrete_target = concrete_target
     self.products_total = 0
@@ -336,7 +328,7 @@ class Node(object):
     return res
 
 
-class Edge(object):
+class Edge:
   """Record a set of used products, and a boolean indicating that a depedency edge was declared."""
 
   def __init__(self, is_declared=False, is_used=False, products_used=None):
@@ -351,7 +343,7 @@ class Edge(object):
     return self
 
 
-class DependencyUsageGraph(object):
+class DependencyUsageGraph:
   def __init__(self, nodes, size_estimator):
     self._nodes = nodes
     self._size_estimator = size_estimator

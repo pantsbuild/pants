@@ -1,15 +1,11 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import shutil
-from builtins import open
 
 from pants.base.build_environment import get_buildroot
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class StrictDepsInvalidationIntegrationTest(PantsRunIntegrationTest):
@@ -25,7 +21,7 @@ class StrictDepsInvalidationIntegrationTest(PantsRunIntegrationTest):
       src_dir = os.path.relpath(os.path.join(tmp_src, os.path.basename(self.TEST_SRC)), get_buildroot())
       shutil.copytree(self.TEST_SRC, src_dir)
       with self.temporary_workdir() as workdir:
-        cmd = ['compile', '{}:{}'.format(src_dir, target_name)]
+        cmd = ['compile', f'{src_dir}:{target_name}']
         cmd.extend(extra_args)
         pants_run = self.run_pants_with_workdir(command=cmd, workdir=workdir)
         self.assert_success(pants_run)

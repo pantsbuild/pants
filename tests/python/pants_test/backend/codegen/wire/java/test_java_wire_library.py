@@ -1,18 +1,15 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 from pants.backend.codegen.wire.java.java_wire_library import JavaWireLibrary
 from pants.base.exceptions import TargetDefinitionException
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 class JavaWireLibraryTest(TestBase):
 
   def setUp(self):
-    super(JavaWireLibraryTest, self).setUp()
+    super().setUp()
 
   def test_fields(self):
     target = self.make_target('//:foo', JavaWireLibrary,

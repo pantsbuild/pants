@@ -1,17 +1,14 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import logging
+from dataclasses import dataclass
+from typing import Dict, Optional, Tuple, Union
 
-from future.utils import binary_type, text_type
-
-from pants.engine.fs import Digest
+from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, Digest
+from pants.engine.platform import PlatformConstraint
 from pants.engine.rules import RootRule, rule
-from pants.engine.selectors import Select
-from pants.util.objects import Exactly, TypeCheckError, datatype
+from pants.util.meta import frozen_after_init
 
 
 logger = logging.getLogger(__name__)
@@ -19,73 +16,106 @@ logger = logging.getLogger(__name__)
 _default_timeout_seconds = 15 * 60
 
 
-class ExecuteProcessRequest(datatype([
-  ('argv', tuple),
-  ('input_files', Digest),
-  ('description', text_type),
-  ('env', tuple),
-  ('output_files', tuple),
-  ('output_directories', tuple),
-  # NB: timeout_seconds covers the whole remote operation including queuing and setup.
-  ('timeout_seconds', Exactly(float, int)),
-  ('jdk_home', Exactly(text_type, type(None))),
-])):
+@dataclass(frozen=True)
+class ProductDescription:
+  value: str
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class ExecuteProcessRequest:
   """Request for execution with args and snapshots to extract."""
 
-  def __new__(
-    cls,
-    argv,
-    input_files,
-    description,
-    env=None,
-    output_files=(),
-    output_directories=(),
-    timeout_seconds=_default_timeout_seconds,
-    jdk_home=None,
-  ):
-    if env is None:
-      env = ()
-    else:
-      if not isinstance(env, dict):
-        raise TypeCheckError(
-          cls.__name__,
-          "arg 'env' was invalid: value {} (with type {}) must be a dict".format(
-            env,
-            type(env)
-          )
-        )
-      env = tuple(item for pair in env.items() for item in pair)
+  # TODO: add a method to hack together a `process_executor` invocation command line which
+  # reproduces this process execution request to make debugging remote executions effortless!
+  argv: Tuple[str, ...]
+  input_files: Digest
+  description: str
+  env: Tuple[str, ...]
+  output_files: Tuple[str, ...]
+  output_directories: Tuple[str, ...]
+  timeout_seconds: Union[int, float]
+  unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: Digest
+  jdk_home: Optional[str]
+  is_nailgunnable: bool
 
-    return super(ExecuteProcessRequest, cls).__new__(
-      cls,
-      argv=argv,
-      env=env,
-      input_files=input_files,
-      description=description,
-      output_files=output_files,
-      output_directories=output_directories,
-      timeout_seconds=timeout_seconds,
-      jdk_home=jdk_home,
+  def __init__(
+    self,
+    argv: Tuple[str, ...],
+    *,
+    input_files: Digest,
+    description: str,
+    env: Optional[Dict[str, str]] = None,
+    output_files: Optional[Tuple[str, ...]] = None,
+    output_directories: Optional[Tuple[str, ...]] = None,
+    timeout_seconds: Union[int, float] = _default_timeout_seconds,
+    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: Digest = EMPTY_DIRECTORY_DIGEST,
+    jdk_home: Optional[str] = None,
+    is_nailgunnable: bool = False,
+  ) -> None:
+    self.argv = argv
+    self.input_files = input_files
+    self.description = description
+    self.env = tuple(item for pair in env.items() for item in pair) if env else ()
+    self.output_files = output_files or ()
+    self.output_directories = output_directories or ()
+    self.timeout_seconds = timeout_seconds
+    self.unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule = unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule
+    self.jdk_home = jdk_home
+    self.is_nailgunnable = is_nailgunnable
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class MultiPlatformExecuteProcessRequest:
+  # args collects a set of tuples representing platform constraints mapped to a req,
+  # just like a dict constructor can.
+  platform_constraints: Tuple[str, ...]
+  execute_process_requests: Tuple[ExecuteProcessRequest, ...]
+
+  def __init__(
+    self, request_dict: Dict[Tuple[PlatformConstraint, PlatformConstraint], ExecuteProcessRequest]
+  ) -> None:
+    if len(request_dict) == 0:
+      raise ValueError("At least one platform constrained ExecuteProcessRequest must be passed.")
+    validated_constraints = tuple(
+      constraint.value
+      for pair in request_dict.keys() for constraint in pair
+      if PlatformConstraint(constraint.value)
     )
+    if len({req.description for req in request_dict.values()}) != 1:
+      raise ValueError(f"The `description` of all execute_process_requests in a {self.__name__} must be identical.")
+
+    self.platform_constraints = validated_constraints
+    self.execute_process_requests = tuple(request_dict.values())
+
+  @property
+  def product_description(self):
+    # we can safely extract the first description because we guarantee that at
+    # least one request exists and that all of their descriptions are the same
+    # in __new__
+    return ProductDescription(self.execute_process_requests[0].description)
 
 
-class ExecuteProcessResult(datatype([('stdout', binary_type),
-                                     ('stderr', binary_type),
-                                     ('output_directory_digest', Digest)
-                                     ])):
+@dataclass(frozen=True)
+class ExecuteProcessResult:
   """Result of successfully executing a process.
 
   Requesting one of these will raise an exception if the exit code is non-zero."""
+  stdout: bytes
+  stderr: bytes
+  output_directory_digest: Digest
 
 
-class FallibleExecuteProcessResult(datatype([('stdout', binary_type),
-                                             ('stderr', binary_type),
-                                             ('exit_code', int),
-                                             ('output_directory_digest', Digest)
-                                             ])):
+@dataclass(frozen=True)
+class FallibleExecuteProcessResult:
   """Result of executing a process.
 
   Requesting one of these will not raise an exception if the exit code is non-zero."""
+  stdout: bytes
+  stderr: bytes
+  exit_code: int
+  output_directory_digest: Digest
 
 
 class ProcessExecutionFailure(Exception):
@@ -108,13 +138,38 @@ stderr:
     self.stderr = stderr
 
     msg = self.MSG_FMT.format(
-      desc=process_description, code=exit_code, stdout=stdout, stderr=stderr)
+      desc=process_description,
+      code=exit_code,
+      stdout=stdout.decode(),
+      stderr=stderr.decode()
+    )
 
-    super(ProcessExecutionFailure, self).__init__(msg)
+    super().__init__(msg)
 
 
-@rule(ExecuteProcessResult, [Select(FallibleExecuteProcessResult), Select(ExecuteProcessRequest)])
-def fallible_to_exec_result_or_raise(fallible_result, request):
+@rule
+def get_multi_platform_request_description(
+  req: MultiPlatformExecuteProcessRequest
+) -> ProductDescription:
+  return req.product_description
+
+
+@rule
+def upcast_execute_process_request(
+  req: ExecuteProcessRequest
+) -> MultiPlatformExecuteProcessRequest:
+  """This rule allows an ExecuteProcessRequest to be run as a
+  platform compatible MultiPlatformExecuteProcessRequest.
+  """
+  return MultiPlatformExecuteProcessRequest(
+    {(PlatformConstraint.none, PlatformConstraint.none): req}
+  )
+
+
+@rule
+def fallible_to_exec_result_or_raise(
+  fallible_result: FallibleExecuteProcessResult, description: ProductDescription
+) -> ExecuteProcessResult:
   """Converts a FallibleExecuteProcessResult to a ExecuteProcessResult or raises an error."""
 
   if fallible_result.exit_code == 0:
@@ -128,7 +183,7 @@ def fallible_to_exec_result_or_raise(fallible_result, request):
       fallible_result.exit_code,
       fallible_result.stdout,
       fallible_result.stderr,
-      request.description
+      description.value
     )
 
 
@@ -136,5 +191,8 @@ def create_process_rules():
   """Creates rules that consume the intrinsic filesystem types."""
   return [
     RootRule(ExecuteProcessRequest),
-    fallible_to_exec_result_or_raise
+    RootRule(MultiPlatformExecuteProcessRequest),
+    upcast_execute_process_request,
+    fallible_to_exec_result_or_raise,
+    get_multi_platform_request_description,
   ]

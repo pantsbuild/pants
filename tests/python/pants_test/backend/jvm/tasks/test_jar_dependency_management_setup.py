@@ -1,23 +1,23 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
 
-from builtins import next, object
-
-from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
-                                                                    JarDependencyManagementSetup)
+from pants.backend.jvm.subsystems.jar_dependency_management import (
+  JarDependencyManagement,
+  JarDependencyManagementSetup,
+)
 from pants.backend.jvm.targets.jar_library import JarLibrary
-from pants.backend.jvm.targets.managed_jar_dependencies import (ManagedJarDependencies,
-                                                                ManagedJarLibraries)
+from pants.backend.jvm.targets.managed_jar_dependencies import (
+  ManagedJarDependencies,
+  ManagedJarLibraries,
+)
 from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
 from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.target import Target
 from pants.java.jar.jar_dependency import JarDependency
 from pants.java.jar.jar_dependency_utils import M2Coordinate
+from pants.testutil.subsystem.util import global_subsystem_instance
 from pants_test.backend.jvm.tasks.jvm_binary_task_test_base import JvmBinaryTaskTestBase
-from pants_test.subsystem.subsystem_util import global_subsystem_instance
 
 
 class TestJarDependencyManagementSetup(JvmBinaryTaskTestBase):
@@ -288,7 +288,7 @@ class TestJarDependencyManagementSetup(JvmBinaryTaskTestBase):
       'jar_library': JarLibrary,
     }
 
-    class FakeContext(object):
+    class FakeContext:
       def create_object(fake, target_type, name, **kwargs):
         return self.make_target(target_type=target_aliases[target_type],
                                 spec='//foo:{}'.format(name), **kwargs)

@@ -1,14 +1,11 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import logging
 import os
+import subprocess
 from collections import namedtuple
 
-from pants.util.process_handler import subprocess
 from pants.util.strutil import create_path_env_var
 
 
@@ -63,7 +60,7 @@ class Command(namedtuple('Command', ['executable', 'args', 'extra_paths'])):
     :raises: :class:`subprocess.CalledProcessError` if the command fails.
     """
     env, kwargs = self._prepare_env(kwargs)
-    return subprocess.check_output(self.cmd, env=env, **kwargs).decode('utf-8')
+    return subprocess.check_output(self.cmd, env=env, **kwargs).decode()
 
   def __str__(self):
     return ' '.join(self.cmd)

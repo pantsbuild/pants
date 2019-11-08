@@ -1,9 +1,10 @@
 python_library(
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python:future',
+    '3rdparty/python:dataclasses',
     'src/python/pants/backend/jvm/subsystems:java',
     'src/python/pants/backend/jvm/subsystems:jvm_platform',
+    'src/python/pants/backend/jvm/subsystems:rsc',
     'src/python/pants/backend/jvm/subsystems:scala_platform',
     'src/python/pants/backend/jvm/subsystems:shader',
     'src/python/pants/backend/jvm/subsystems:zinc',
@@ -17,8 +18,10 @@ python_library(
     'src/python/pants/java/distribution',
     'src/python/pants/java/jar',
     'src/python/pants/option',
+    'src/python/pants/util:collections',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
+    'src/python/pants/util:strutil',
   ],
 )

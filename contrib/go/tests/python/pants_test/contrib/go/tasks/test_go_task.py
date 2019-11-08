@@ -1,10 +1,7 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from pants_test.task_test_base import TaskTestBase
+from pants.testutil.task_test_base import TaskTestBase
 
 from pants.contrib.go.tasks.go_task import GoTask
 
@@ -20,7 +17,7 @@ class ImportOracleTest(TaskTestBase):
     return cls.ImportTask
 
   def setUp(self):
-    super(ImportOracleTest, self).setUp()
+    super().setUp()
     task = self.create_task(self.context())
     self.import_oracle = task.import_oracle
 

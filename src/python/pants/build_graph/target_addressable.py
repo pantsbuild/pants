@@ -1,12 +1,7 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import logging
-
-from six import string_types
 
 from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.addressable import Addressable
@@ -33,7 +28,7 @@ class TargetAddressable(Addressable):
   logger = logging.getLogger(__name__)
 
   def __init__(self, alias, target_type, *args, **kwargs):
-    super(TargetAddressable, self).__init__(alias, target_type)
+    super().__init__(alias, target_type)
     # We assert this here even though the name keyword now defaults to the directory
     # name, as an extra check that this defaulting did in fact happen.
     if 'name' not in kwargs:
@@ -60,7 +55,7 @@ class TargetAddressable(Addressable):
       raise TargetDefinitionException(target=self, msg=msg)
 
     for dep_spec in self.dependency_specs:
-      if not isinstance(dep_spec, string_types):
+      if not isinstance(dep_spec, str):
         msg = ('dependencies passed to Target constructors must be strings.  {dep_spec} is not'
                ' a string.  Target type was: {target_type}.'
                .format(target_type=self.addressed_type, dep_spec=dep_spec))
@@ -84,11 +79,11 @@ class TargetAddressable(Addressable):
     # Addressables today, so we expose exactly the instantiate it expects.  This may need to be
     # fixed up when BuildGraph learns how to deal with other Addressables.
     type_alias = self._kwargs.setdefault('type_alias', self.addressed_alias)
-    target = super(TargetAddressable, self).instantiate(build_graph=build_graph,
+    target = super().instantiate(build_graph=build_graph,
                                                         address=address,
                                                         **self._kwargs)
     if not type_alias:
-      self.logger.warn('%s has no BUILD alias, suggesting a broken macro that does not assign one.',
+      self.logger.warning('%s has no BUILD alias, suggesting a broken macro that does not assign one.',
                        target)
     return target
 

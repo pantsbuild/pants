@@ -5,6 +5,7 @@
 
 package org.pantsbuild.zinc.analysis
 
+import java.nio.file.Path
 import java.io.{File, IOException}
 import java.util.Optional
 
@@ -15,7 +16,6 @@ import sbt.internal.inc.{
   CompanionsStore,
   Locate
 }
-import sbt.util.Logger
 import xsbti.api.Companions
 import xsbti.compile.{
   AnalysisContents,
@@ -65,13 +65,22 @@ class AnalysisMap private[AnalysisMap] (
      * Can remove after the sbt jar output patch lands.
      */
     def definesClass(classpathEntry: File): DefinesClass = {
-      getAnalysis(classpathEntry).map { analysis =>
-        // strongly hold the classNames, and transform them to ensure that they are unlinked from
-        // the remainder of the analysis
-        val classNames = analysis.asInstanceOf[Analysis].relations.srcProd.reverseMap.keys.toList.toSet.map(
-          (f: File) => filePathToClassName(f))
-        new ClassNamesDefinesClass(classNames)
-      }.getOrElse {
+      // If we have analysis with a valid Compilation, use the classnames it refers to.
+      val analysisDefinesClass =
+        for (
+          abstractAnalysis <- getAnalysis(classpathEntry);
+          analysis = abstractAnalysis.asInstanceOf[Analysis];
+          compilation <- analysis.compilations.allCompilations.headOption;
+          singleOutput <- compilation.getOutput.getSingleOutput.asScala;
+          classesDir = singleOutput.toPath
+        ) yield {
+          // strongly hold the classNames, and transform them to ensure that they are unlinked from
+          // the remainder of the analysis
+          val classNames = analysis.relations.srcProd.reverseMap.keys.toList.toSet.map(
+            (f: File) => filePathToClassName(classesDir, f))
+          new ClassNamesDefinesClass(classNames)
+        }
+      analysisDefinesClass.getOrElse {
         // no analysis: return a function that will scan instead
         Locate.definesClass(classpathEntry)
       }
@@ -81,12 +90,8 @@ class AnalysisMap private[AnalysisMap] (
       override def apply(className: String): Boolean = classes(className)
     }
 
-    private def filePathToClassName(file: File): String = {
-      // Extract className from path, for example:
-      //   .../.pants.d/compile/zinc/.../current/classes/org/pantsbuild/example/hello/exe/Exe.class
-      //   => org.pantsbuild.example.hello.exe.Exe
-      file.getAbsolutePath.split("current/classes")(1).drop(1).replace(".class", "").replaceAll("/", ".")
-    }
+    private def filePathToClassName(classesDir: Path, file: File): String =
+      classesDir.relativize(file.toPath).toString.replace(".class", "").replaceAll("/", ".")
 
     /**
      * Gets analysis for a classpath entry (if it exists) by translating its path to a potential

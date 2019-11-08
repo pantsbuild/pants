@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import object
 from collections import namedtuple
 
 from pants.util.dirutil import fast_relpath, longest_dir_prefix
@@ -104,7 +100,7 @@ class InvalidTargetName(ValueError):
   """Indicate an invalid target name for `Address`."""
 
 
-class Address(object):
+class Address:
   """A target address.
 
   An address is a unique name representing a
@@ -273,12 +269,14 @@ class BuildFileAddress(Address):
     """
     rel_path = rel_path or build_file.relpath
     spec_path = os.path.dirname(rel_path)
-    super(BuildFileAddress, self).__init__(spec_path=spec_path,
-                                           target_name=target_name or os.path.basename(spec_path))
+    super().__init__(spec_path=spec_path, target_name=target_name or os.path.basename(spec_path))
     self.rel_path = rel_path
 
   def to_address(self):
     """Convert this BuildFileAddress to an Address."""
+    # This is weird, since BuildFileAddress is a subtype of Address, but the engine's exact
+    # type matching requires a new instance.
+    # TODO: Possibly BuildFileAddress should wrap an Address instead of subclassing it.
     return Address(spec_path=self.spec_path, target_name=self.target_name)
 
   def __repr__(self):

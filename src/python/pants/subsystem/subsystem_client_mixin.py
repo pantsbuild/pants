@@ -1,32 +1,26 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
 
-from builtins import object
+from dataclasses import dataclass
+from typing import Any, Optional
 
 from twitter.common.collections import OrderedSet
 
-from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.optionable import OptionableFactory
-from pants.option.scope import ScopeInfo
-from pants.util.objects import datatype
+from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 
 
 class SubsystemClientError(Exception): pass
 
 
-class SubsystemDependency(datatype([
-  'subsystem_cls',
-  'scope',
-  'removal_version',
-  'removal_hint',
-]), OptionableFactory):
+@dataclass(frozen=True)
+class SubsystemDependency(OptionableFactory):
   """Indicates intent to use an instance of `subsystem_cls` scoped to `scope`."""
-
-  def __new__(cls, subsystem_cls, scope, removal_version=None, removal_hint=None):
-    return super(SubsystemDependency, cls).__new__(cls, subsystem_cls, scope, removal_version, removal_hint)
+  subsystem_cls: Any
+  scope: Any
+  removal_version: Optional[Any] = None
+  removal_hint: Optional[Any] = None
 
   def is_global(self):
     return self.scope == GLOBAL_SCOPE
@@ -49,7 +43,7 @@ class SubsystemDependency(datatype([
       return self.subsystem_cls.subscope(self.scope)
 
 
-class SubsystemClientMixin(object):
+class SubsystemClientMixin:
   """A mixin for declaring dependencies on subsystems.
 
   Must be mixed in to an Optionable.

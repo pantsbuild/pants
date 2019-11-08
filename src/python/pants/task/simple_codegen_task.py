@@ -1,19 +1,14 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import os
 from abc import abstractmethod
-from builtins import zip
+from collections import OrderedDict
 
-from future.utils import text_type
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import deprecated
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.address import Address
@@ -21,7 +16,6 @@ from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.engine.fs import Digest, PathGlobs, PathGlobsAndRoot
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
 from pants.task.task import Task
-from pants.util.collections_abc_backport import OrderedDict
 from pants.util.dirutil import fast_relpath, safe_delete
 
 
@@ -51,7 +45,7 @@ class SimpleCodegenTask(Task):
 
     :API: public
     """
-    super(SimpleCodegenTask, self).__init__(context, workdir)
+    super().__init__(context, workdir)
 
   @classmethod
   def product_types(cls):
@@ -63,7 +57,7 @@ class SimpleCodegenTask(Task):
 
   @classmethod
   def register_options(cls, register):
-    super(SimpleCodegenTask, cls).register_options(register)
+    super().register_options(register)
     register('--allow-empty', type=bool, default=True, fingerprint=True,
              help='Skip targets with no sources defined.',
              advanced=True)
@@ -115,7 +109,7 @@ class SimpleCodegenTask(Task):
 
   @classmethod
   def implementation_version(cls):
-    return super(SimpleCodegenTask, cls).implementation_version() + [('SimpleCodegenTask', 2)]
+    return super().implementation_version() + [('SimpleCodegenTask', 2)]
 
   def synthetic_target_extra_exports(self, target, target_workdir):
     """Gets any extra exports generated synthetic targets should have.
@@ -132,18 +126,6 @@ class SimpleCodegenTask(Task):
     :return: a list of exported targets.
     """
     return []
-
-  @deprecated('1.16.0.dev1', hint_message='Use synthetic_target_type instead!')
-  def synthetic_target_type_by_target(self, target):
-    """The type of target this codegen task generates.
-
-    For example, the target type for JaxbGen would simply be JavaLibrary.
-
-    :API: public
-
-    :return: a type (class) that inherits from Target.
-    """
-    raise NotImplementedError
 
   def synthetic_target_type(self, target):
     """The type of target this codegen task generates.
@@ -303,7 +285,7 @@ class SimpleCodegenTask(Task):
       to_capture.append(
         PathGlobsAndRoot(
           PathGlobs(buildroot_relative_globs, buildroot_relative_excludes),
-          text_type(get_buildroot()),
+          get_buildroot(),
           # The digest is stored adjacent to the hash-versioned `vt.current_results_dir`.
           Digest.load(vt.current_results_dir),
         )
@@ -455,7 +437,7 @@ class SimpleCodegenTask(Task):
       messages.extend(['\t\t{}'.format(source) for source in duped_sources])
     message = '\n'.join(messages)
     if self.get_options().allow_dups:
-      logger.warn(message)
+      logger.warning(message)
     else:
       raise self.DuplicateSourceError(message)
 

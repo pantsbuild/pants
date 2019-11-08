@@ -1,14 +1,10 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import ast
 import logging
 import re
 import sys
-from builtins import object, open, str
 from difflib import unified_diff
 
 from pants.build_graph.address import Address, BuildFileAddress
@@ -20,7 +16,7 @@ logger = logging.getLogger(__name__)
 class BuildTargetParseError(Exception): pass
 
 
-class DependencySpec(object):
+class DependencySpec:
   """A representation of a single dependency spec, including comments around it.
 
   This is a helper class to aid in deduplicating, sorting, forcing, and formatting
@@ -67,7 +63,7 @@ class DependencySpec(object):
     return '\n'.join(self.lines())
 
 
-class BuildFileManipulator(object):
+class BuildFileManipulator:
   """A class to load, represent, and change the dependencies of a given target.
 
   Use BuildFileManipulator.load(...) for construction, rather than constructing it directly.
@@ -130,7 +126,7 @@ class BuildFileManipulator(object):
           if isinstance(keyword.value, ast.Str):
             return keyword.value.s
           else:
-            logger.warn('Saw a non-string-literal name argument to a target while '
+            logger.warning('Saw a non-string-literal name argument to a target while '
                         'looking through {build_file}.  Target type was {target_type}.'
                         'name value was {name_value}'
                         .format(build_file=build_file,
@@ -352,7 +348,7 @@ class BuildFileManipulator(object):
     """Add a dependency to this target.  This will deduplicate existing dependencies."""
     if address in self._dependencies_by_address:
       if self._dependencies_by_address[address].has_comment():
-        logger.warn('BuildFileManipulator would have added {address} as a dependency of '
+        logger.warning('BuildFileManipulator would have added {address} as a dependency of '
                     '{target_address}, but that dependency was already forced with a comment.'
                     .format(address=address.spec, target_address=self.target_address.spec))
         return

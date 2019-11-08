@@ -1,54 +1,58 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from abc import abstractmethod
+import subprocess
+from abc import ABCMeta, abstractmethod
 from collections import defaultdict
+from dataclasses import dataclass
+from typing import Any
 
-from pants.backend.native.config.environment import Executable
 from pants.backend.native.tasks.native_task import NativeTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.util.memo import memoized_method, memoized_property
-from pants.util.meta import AbstractClass, classproperty
-from pants.util.objects import SubclassesOf, datatype
-from pants.util.process_handler import subprocess
+from pants.util.meta import classproperty
 
 
-class NativeCompileRequest(datatype([
-    ('compiler', SubclassesOf(Executable)),
-    # TODO: add type checking for Collection.of(<type>)!
-    'include_dirs',
-    'sources',
-    'compiler_options',
-    'output_dir',
-    'header_file_extensions',
-])): pass
+@dataclass(frozen=True)
+class NativeCompileRequest:
+  compiler: Any
+  include_dirs: Any
+  sources: Any
+  compiler_options: Any
+  output_dir: Any
+  header_file_extensions: Any
 
 
 # TODO(#5950): perform all process execution in the v2 engine!
-class ObjectFiles(datatype(['root_dir', 'filenames'])):
+@dataclass(frozen=True)
+class ObjectFiles:
+  root_dir: Any
+  filenames: Any
 
   def file_paths(self):
     return [os.path.join(self.root_dir, fname) for fname in self.filenames]
 
 
-class NativeCompile(NativeTask, AbstractClass):
+class NativeCompile(NativeTask, metaclass=ABCMeta):
   # `NativeCompile` will use the `source_target_constraint` to determine what targets have "sources"
   # to compile, and the `dependent_target_constraint` to determine which dependent targets to
   # operate on for `strict_deps` calculation.
   # NB: `source_target_constraint` must be overridden.
   source_target_constraint = None
 
-  # `NativeCompile` will use `workunit_label` as the name of the workunit when executing the
-  # compiler process. `workunit_label` must be set to a string.
   @classproperty
+  @abstractmethod
   def workunit_label(cls):
-    raise NotImplementedError('subclasses of NativeCompile must override workunit_label!')
+    """A string describing the work being done during compilation.
+
+    `NativeCompile` will use `workunit_label` as the name of the workunit when executing the
+    compiler process.
+
+    :rtype: str
+    """
 
   @classmethod
   def product_types(cls):
@@ -60,7 +64,7 @@ class NativeCompile(NativeTask, AbstractClass):
 
   @classmethod
   def implementation_version(cls):
-    return super(NativeCompile, cls).implementation_version() + [('NativeCompile', 1)]
+    return super().implementation_version() + [('NativeCompile', 1)]
 
   class NativeCompileError(TaskError):
     """Raised for errors in this class's logic.
@@ -87,7 +91,11 @@ class NativeCompile(NativeTask, AbstractClass):
   def _include_dirs_for_target(self, target):
     return os.path.join(get_buildroot(), target.address.spec_path)
 
-  class NativeSourcesByType(datatype(['rel_root', 'headers', 'sources'])): pass
+  @dataclass(frozen=True)
+  class NativeSourcesByType:
+    rel_root: Any
+    headers: Any
+    sources: Any
 
   def get_sources_headers_for_target(self, target):
     """Return a list of file arguments to provide to the compiler.
@@ -134,11 +142,11 @@ class NativeCompile(NativeTask, AbstractClass):
 
   @abstractmethod
   def get_compiler(self, native_library_target):
-    """An instance of `Executable` which can be invoked to compile files.
+    """An instance of `_CompilerMixin` which can be invoked to compile files.
 
     NB: Subclasses will be queried for the compiler instance once and the result cached.
 
-    :return: :class:`pants.backend.native.config.environment.Executable`
+    :return: :class:`pants.backend.native.config.environment._CompilerMixin`
     """
 
   def _compiler(self, native_library_target):
@@ -163,6 +171,7 @@ class NativeCompile(NativeTask, AbstractClass):
     sources_and_headers = self.get_sources_headers_for_target(target)
     compiler_option_sets = (self._compile_settings.native_build_step
                                 .get_compiler_option_sets_for_target(target))
+    self.context.log.debug('target: {}, compiler_option_sets: {}'.format(target, compiler_option_sets))
 
     compile_request = NativeCompileRequest(
       compiler=self._compiler(target),
@@ -229,7 +238,7 @@ class NativeCompile(NativeTask, AbstractClass):
 
     compiler = compile_request.compiler
     output_dir = compile_request.output_dir
-    env = compiler.as_invocation_environment_dict
+    env = compiler.invocation_environment_dict
 
     with self.context.new_workunit(
         name=self.workunit_label, labels=[WorkUnitLabel.COMPILER]) as workunit:

@@ -5,17 +5,8 @@ python_library(
   name = 'util',
   sources = ['util.py'],
   dependencies = [
-    '3rdparty/python:future',
-    'src/python/pants/binaries',
-    'src/python/pants/engine:addressable',
-    'src/python/pants/engine:native',
-    'src/python/pants/engine:parser',
-    'src/python/pants/engine:rules',
-    'src/python/pants/engine:scheduler',
-    'src/python/pants/engine:struct',
-    'src/python/pants/util:objects',
-    'tests/python/pants_test/option/util',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/base:deprecated',
+    'src/python/pants/testutil/engine:util',
   ],
 )
 
@@ -23,10 +14,8 @@ python_library(
   name = 'engine_test_base',
   sources = ['base_engine_test.py'],
   dependencies = [
-    '3rdparty/python:future',
-    'src/python/pants/goal',
-    'src/python/pants/goal:task_registrar',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/base:deprecated',
+    'src/python/pants/testutil/engine:engine_test_base',
   ]
 )
 
@@ -37,7 +26,7 @@ python_tests(
     ':engine_test_base',
     'src/python/pants/base:exceptions',
     'src/python/pants/engine:legacy_engine',
-    'tests/python/pants_test/base:context_utils',
+    'src/python/pants/testutil/base:context_utils',
   ],
 )
 
@@ -48,7 +37,7 @@ python_tests(
     ':engine_test_base',
     'src/python/pants/engine:legacy_engine',
     'src/python/pants/task',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
   ],
 )
 
@@ -56,7 +45,6 @@ python_tests(
   name='addressable',
   sources=['test_addressable.py'],
   dependencies=[
-    '3rdparty/python:future',
     'src/python/pants/engine:addressable',
     'src/python/pants/util:objects',
   ],
@@ -67,10 +55,9 @@ python_tests(
   sources=['test_fs.py'],
   dependencies=[
     ':scheduler_test_base',
-    '3rdparty/python:future',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:nodes',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
     'tests/python/pants_test/engine/examples:fs_test',
   ]
 )
@@ -79,12 +66,13 @@ python_tests(
   name='isolated_process',
   sources=['test_isolated_process.py'],
   dependencies=[
-    '3rdparty/python:future',
+    '3rdparty/python:dataclasses',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:isolated_process',
     'src/python/pants/engine:rules',
     'src/python/pants/engine:selectors',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/testutil:test_base',
     'tests/python/pants_test/engine/examples:fs_test',
     'tests/python/pants_test/engine/examples:scheduler_inputs',
   ]
@@ -94,7 +82,6 @@ python_tests(
   name='selectors',
   sources=['test_selectors.py'],
   dependencies=[
-    '3rdparty/python:future',
     'src/python/pants/engine:selectors',
   ]
 )
@@ -103,7 +90,6 @@ python_tests(
   name='struct',
   sources=['test_struct.py'],
   dependencies=[
-    '3rdparty/python:future',
     'src/python/pants/base:project_tree',
     'src/python/pants/build_graph',
     'src/python/pants/engine:objects',
@@ -114,8 +100,7 @@ python_tests(
 python_tests(
   sources=['test_engine.py'],
   dependencies=[
-    '3rdparty/python:future',
-    '3rdparty/python:mock',
+    '3rdparty/python:dataclasses',
     ':scheduler_test_base',
     'src/python/pants/base:cmd_line_spec_parser',
     'src/python/pants/build_graph',
@@ -123,7 +108,7 @@ python_tests(
     'src/python/pants/engine:scheduler',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/engine/examples:scheduler_inputs',
-    'tests/python/pants_test/engine:util',
+    'src/python/pants/testutil/engine:util',
   ]
 )
 
@@ -131,7 +116,6 @@ python_tests(
   name='build_files',
   sources=['test_build_files.py'],
   dependencies=[
-    '3rdparty/python:future',
     ':scheduler_test_base',
     'src/python/pants/build_graph',
     'src/python/pants/engine:build_files',
@@ -150,7 +134,6 @@ python_tests(
   name='mapper',
   sources=['test_mapper.py'],
   dependencies=[
-    '3rdparty/python:future',
     ':scheduler_test_base',
     ':util',
     'src/python/pants/build_graph',
@@ -168,9 +151,7 @@ python_tests(
   name='parsers',
   sources=['test_parsers.py'],
   dependencies=[
-    '3rdparty/python:future',
     'tests/python/pants_test/engine/examples:parsers',
-    'tests/python/pants_test/testutils:py2_compat',
     'src/python/pants/engine:objects',
   ]
 )
@@ -180,18 +161,16 @@ python_tests(
   sources=['test_rules.py'],
   coverage=['pants.engine.rules'],
   dependencies=[
-    '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    ':util',
     ':scheduler_test_base',
+    ':util',
     'src/python/pants/engine:build_files',
     'src/python/pants/engine:console',
     'src/python/pants/engine:rules',
     'src/python/pants/engine:selectors',
-    'src/python/pants/util:objects',
     'tests/python/pants_test/engine/examples:parsers',
-    'tests/python/pants_test/subsystem:subsystem_utils',
-    'tests/python/pants_test/testutils:py2_compat',
+    'src/python/pants/testutil/subsystem',
+    'src/python/pants/testutil:test_base',
   ]
 )
 
@@ -200,13 +179,13 @@ python_tests(
   sources=['test_scheduler.py'],
   coverage=['pants.engine.nodes', 'pants.engine.scheduler'],
   dependencies=[
-    '3rdparty/python:future',
+    '3rdparty/python:dataclasses',
     ':util',
     'src/python/pants/base:cmd_line_spec_parser',
     'src/python/pants/build_graph',
     'src/python/pants/engine:scheduler',
     'tests/python/pants_test/engine/examples:scheduler_inputs',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
   ]
 )
 
@@ -215,7 +194,8 @@ python_tests(
   sources=['test_scheduler_integration.py'],
   dependencies=[
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
+    'examples/src/scala/org/pantsbuild/example:hello_directory',
   ],
   tags={'integration'},
 )
@@ -224,7 +204,6 @@ python_library(
   name='scheduler_test_base',
   sources=['scheduler_test_base.py'],
   dependencies=[
-    '3rdparty/python:future',
     ':util',
     'src/python/pants/base:project_tree',
     'src/python/pants/engine:fs',
@@ -239,6 +218,5 @@ python_tests(
   sources=['test_objects.py'],
   dependencies=[
     'src/python/pants/engine:objects',
-    'tests/python/pants_test:test_base',
   ],
 )

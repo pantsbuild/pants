@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.java.jar.exclude import Exclude
@@ -20,5 +17,5 @@ class ScalaExclude(Exclude):
 
   @property
   def name(self):
-    base_name = super(ScalaExclude, self).name
+    base_name = super().name
     return ScalaPlatform.global_instance().suffix_version(base_name)

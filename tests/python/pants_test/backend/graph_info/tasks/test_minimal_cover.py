@@ -1,15 +1,12 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from textwrap import dedent
 
 from pants.backend.graph_info.tasks.minimal_cover import MinimalCover
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants_test.task_test_base import ConsoleTaskTestBase
+from pants.testutil.task_test_base import ConsoleTaskTestBase
 
 
 class BaseMinimalCovertTest(ConsoleTaskTestBase):
@@ -29,7 +26,7 @@ class MinimalCoverTest(BaseMinimalCovertTest):
     return BuildFileAliases(targets={'python_library': PythonLibrary})
 
   def setUp(self):
-    super(MinimalCoverTest, self).setUp()
+    super().setUp()
 
     def add_to_build_file(path, name, *deps):
       all_deps = ["'{0}'".format(dep) for dep in list(deps)]

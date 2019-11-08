@@ -1,12 +1,9 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 from textwrap import dedent
 
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class DependeesIntegrationTest(PantsRunIntegrationTest):
@@ -24,7 +21,7 @@ class DependeesIntegrationTest(PantsRunIntegrationTest):
   def test_dependees_basic(self):
     pants_stdout = self.run_dependees()
     expected = {
-      'examples/src/scala/org/pantsbuild/example:jvm-run-example-lib',
+      'examples/src/scala/org/pantsbuild/example/jvm_run:jvm-run-example-lib',
       'examples/src/scala/org/pantsbuild/example/hello/exe:exe',
       'examples/tests/scala/org/pantsbuild/example/hello/welcome:welcome'
     }
@@ -34,9 +31,9 @@ class DependeesIntegrationTest(PantsRunIntegrationTest):
   def test_dependees_transitive(self):
     pants_stdout = self.run_dependees('--dependees-transitive')
     self.assertEqual(
-      {'examples/src/scala/org/pantsbuild/example:jvm-run-example-lib',
+      {'examples/src/scala/org/pantsbuild/example/jvm_run:jvm-run-example-lib',
        'examples/src/scala/org/pantsbuild/example/hello:hello',
-       'examples/src/scala/org/pantsbuild/example:jvm-run-example',
+       'examples/src/scala/org/pantsbuild/example/jvm_run:jvm-run-example',
        'examples/src/scala/org/pantsbuild/example/hello/exe:exe',
        'examples/tests/scala/org/pantsbuild/example/hello/welcome:welcome'},
       set(pants_stdout.split())
@@ -46,7 +43,7 @@ class DependeesIntegrationTest(PantsRunIntegrationTest):
     pants_stdout = self.run_dependees('--dependees-closed')
     self.assertEqual(
       {'examples/src/scala/org/pantsbuild/example/hello/welcome:welcome',
-       'examples/src/scala/org/pantsbuild/example:jvm-run-example-lib',
+       'examples/src/scala/org/pantsbuild/example/jvm_run:jvm-run-example-lib',
        'examples/src/scala/org/pantsbuild/example/hello/exe:exe',
        'examples/tests/scala/org/pantsbuild/example/hello/welcome:welcome'},
       set(pants_stdout.split())
@@ -59,7 +56,7 @@ class DependeesIntegrationTest(PantsRunIntegrationTest):
       {
           "examples/src/scala/org/pantsbuild/example/hello/welcome:welcome": [
               "examples/src/scala/org/pantsbuild/example/hello/exe:exe",
-              "examples/src/scala/org/pantsbuild/example:jvm-run-example-lib",
+              "examples/src/scala/org/pantsbuild/example/jvm_run:jvm-run-example-lib",
               "examples/tests/scala/org/pantsbuild/example/hello/welcome:welcome"
           ]
       }""").lstrip('\n'),

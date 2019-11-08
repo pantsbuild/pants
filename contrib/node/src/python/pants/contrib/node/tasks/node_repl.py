@@ -1,14 +1,9 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import json
 import os
-from builtins import open
 
-from future.utils import PY3
 from pants.base.exceptions import TaskError
 from pants.task.repl_task_mixin import ReplTaskMixin
 from pants.util.contextutil import pushd, temporary_dir
@@ -25,7 +20,7 @@ class NodeRepl(ReplTaskMixin, NodeTask):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(NodeRepl, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data(NodePaths)
 
   @classmethod
@@ -57,8 +52,7 @@ class NodeRepl(ReplTaskMixin, NodeTask):
           else target.version for target in targets
         }
       }
-      mode = 'w' if PY3 else 'wb'
-      with open(package_json_path, mode) as fp:
+      with open(package_json_path, 'w') as fp:
         json.dump(package, fp, indent=2)
 
       args = self.get_passthru_args()

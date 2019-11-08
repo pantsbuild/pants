@@ -1,23 +1,22 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
+import datetime
 import itertools
 import os
+import re
 import signal
+import sys
 import threading
 import time
 import unittest
-from builtins import open, range, zip
+from textwrap import dedent
 
-from pants.util.contextutil import environment_as, temporary_dir
-from pants.util.dirutil import rm_rf, safe_file_dump, safe_mkdir, touch
-from pants_test.pants_run_integration_test import read_pantsd_log
+from pants.testutil.pants_run_integration_test import read_pantsd_log
+from pants.testutil.process_test_util import no_lingering_process_by_command
+from pants.util.contextutil import environment_as, temporary_dir, temporary_file
+from pants.util.dirutil import rm_rf, safe_file_dump, safe_mkdir, safe_open, touch
 from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
-from pants_test.testutils.process_test_util import no_lingering_process_by_command
-from pants_test.testutils.py2_compat import assertNotRegex, assertRegex
 
 
 def launch_file_toucher(f):
@@ -49,6 +48,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       pantsd_run(['compile', 'examples/src/scala/org/pantsbuild/example/hello/welcome'])
       checker.assert_started()
 
+  @unittest.skip('Flaky as described in: https://github.com/pantsbuild/pants/issues/7573')
   def test_pantsd_run(self):
     extra_config = {
       'GLOBAL': {
@@ -75,13 +75,15 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       checker.assert_running()
 
       # Assert there were no warnings or errors thrown in the pantsd log.
+      full_log = '\n'.join(read_pantsd_log(workdir))
       for line in read_pantsd_log(workdir):
         # Ignore deprecation warning emissions.
         if 'DeprecationWarning' in line:
           continue
 
         # Check if the line begins with W or E to check if it is a warning or error line.
-        assertNotRegex(self, line, r'^[WE].*')
+        self.assertNotRegex(line, r'^[WE].*',
+                       'error message detected in log:\n{}'.format(full_log))
 
   def test_pantsd_broken_pipe(self):
     with self.pantsd_test_context() as (workdir, pantsd_config, checker):
@@ -91,7 +93,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
   def test_pantsd_stacktrace_dump(self):
     with self.pantsd_successful_run_context() as (pantsd_run, checker, workdir, _):
-      pantsd_run(['help'])
+      pantsd_run(['-ldebug', 'help'])
       checker.assert_started()
 
       os.kill(checker.pid, signal.SIGUSR2)
@@ -102,8 +104,8 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       self.assertIn('Current thread 0x', '\n'.join(read_pantsd_log(workdir)))
 
   def test_pantsd_pantsd_runner_doesnt_die_after_failed_run(self):
-    # Check for no stray pantsd-runner prcesses.
-    with no_lingering_process_by_command('pantsd-runner'):
+    # Check for no stray pantsd prcesses.
+    with no_lingering_process_by_command('pantsd'):
       with self.pantsd_test_context() as (workdir, pantsd_config, checker):
         # Run target that throws an exception in pants.
         self.assert_failure(
@@ -188,7 +190,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
     attempts = int(os.environ.get('PANTS_TEST_PANTSD_STRESS_ATTEMPTS', 20))
     cmd = os.environ.get('PANTS_TEST_PANTSD_STRESS_CMD', 'help').split()
 
-    with no_lingering_process_by_command('pantsd-runner'):
+    with no_lingering_process_by_command('pantsd'):
       with self.pantsd_successful_run_context('debug') as (pantsd_run, checker, _, _):
         pantsd_run(cmd)
         checker.assert_started()
@@ -216,11 +218,13 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       checker.assert_started()
 
     for cmd, run in zip(cmds, daemon_runs):
+      print("(cmd, run) = ({}, {}, {})".format(cmd, run.stdout_data, run.stderr_data))
       self.assertNotEqual(run.stdout_data, '', 'Empty stdout for {}'.format(cmd))
 
     for run_pairs in zip(non_daemon_runs, daemon_runs):
       self.assertEqual(*(run.stdout_data for run in run_pairs))
 
+  @unittest.skip('Flaky as described in: https://github.com/pantsbuild/pants/issues/7622')
   def test_pantsd_filesystem_invalidation(self):
     """Runs with pantsd enabled, in a loop, while another thread invalidates files."""
     with self.pantsd_successful_run_context() as (pantsd_run, checker, workdir, _):
@@ -239,6 +243,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       join()
 
   def test_pantsd_client_env_var_is_inherited_by_pantsd_runner_children(self):
+    EXPECTED_KEY = 'TEST_ENV_VAR_FOR_PANTSD_INTEGRATION_TEST'
     EXPECTED_VALUE = '333'
     with self.pantsd_successful_run_context() as (pantsd_run, checker, workdir, _):
       # First, launch the daemon without any local env vars set.
@@ -246,13 +251,19 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       checker.assert_started()
 
       # Then, set an env var on the secondary call.
-      with environment_as(TEST_ENV_VAR_FOR_PANTSD_INTEGRATION_TEST=EXPECTED_VALUE):
+      # We additionally set the `HERMETIC_ENV` env var to allow the integration test harness
+      # to pass this variable through.
+      env = {
+          EXPECTED_KEY: EXPECTED_VALUE,
+          'HERMETIC_ENV': EXPECTED_KEY,
+        }
+      with environment_as(**env):
         result = pantsd_run(
           ['-q',
            'run',
            'testprojects/src/python/print_env',
            '--',
-           'TEST_ENV_VAR_FOR_PANTSD_INTEGRATION_TEST']
+           EXPECTED_KEY]
         )
         checker.assert_running()
 
@@ -278,9 +289,28 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       )
       checker.assert_running()
 
-  def test_pantsd_invalidation_file_tracking(self):
+  def test_pantsd_touching_a_file_does_not_restart_daemon(self):
     test_file = 'testprojects/src/python/print_env/main.py'
     config = {'GLOBAL': {'pantsd_invalidation_globs': '["testprojects/src/python/print_env/*"]'}}
+    with self.pantsd_successful_run_context(extra_config=config) as (
+      pantsd_run, checker, workdir, _
+    ):
+      pantsd_run(['help'])
+      checker.assert_started()
+
+      # Let any fs events quiesce.
+      time.sleep(5)
+
+      checker.assert_running()
+
+      touch(test_file)
+      # Permit ample time for the async file event propagate in CI.
+      time.sleep(10)
+      checker.assert_running()
+
+  def test_pantsd_invalidation_file_tracking(self):
+    test_dir = 'testprojects/src/python/print_env'
+    config = {'GLOBAL': {'pantsd_invalidation_globs': '["%s/*"]' %(test_dir)}}
     with self.pantsd_successful_run_context(extra_config=config) as (
       pantsd_run, checker, workdir, _
     ):
@@ -294,19 +324,37 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         return '\n'.join(read_pantsd_log(workdir))
 
       # Check the logs.
-      assertRegex(
-        self,
-        full_pantsd_log(),
-        r'watching invalidating files:.*{}'.format(test_file)
-      )
+      self.assertRegex(full_pantsd_log(), r'watching invalidating files:.*{}'.format(test_dir))
 
       checker.assert_running()
-      touch(test_file)
-      # Permit ample time for the async file event propagate in CI.
-      time.sleep(10)
-      checker.assert_stopped()
+
+      # Create a new file in test_dir
+      with temporary_file(suffix='.py', binary_mode=False, root_dir=test_dir) as temp_f:
+        temp_f.write("import that\n")
+        temp_f.close()
+
+        time.sleep(10)
+        checker.assert_stopped()
 
       self.assertIn('saw file events covered by invalidation globs', full_pantsd_log())
+
+  def test_pantsd_invalidation_pants_ini_file(self):
+    # Test tmp_pants_ini (--pants-config-files=$tmp_pants_ini)'s removal
+    tmp_pants_ini = os.path.abspath("testprojects/test_pants.ini")
+
+    # Create tmp_pants_ini file
+    with safe_open(tmp_pants_ini, 'w') as f:
+      f.write("[DEFAULT]\n")
+
+    with self.pantsd_successful_run_context() as (pantsd_run, checker, _, _):
+      pantsd_run(['--pants-config-files={}'.format(tmp_pants_ini), 'help'])
+      checker.assert_started()
+      time.sleep(5)
+
+      # Delete tmp_pants_ini
+      os.unlink(tmp_pants_ini)
+      time.sleep(10)
+      checker.assert_stopped()
 
   def test_pantsd_pid_deleted(self):
     with self.pantsd_successful_run_context() as (pantsd_run, checker, workdir, config):
@@ -344,6 +392,39 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       # Remove the pidfile so that the teardown script doesn't try to kill process 9.
       os.unlink(pidpath)
 
+  @unittest.skipIf(sys.version_info[0] == 2,
+                   reason='Increases by ~0.52 under python 2 as described in '
+                          'https://github.com/pantsbuild/pants/issues/7761.')
+  def test_pantsd_memory_usage(self):
+    """Validates that after N runs, memory usage has increased by no more than X percent."""
+    number_of_runs = 10
+    max_memory_increase_fraction = 0.40 # TODO https://github.com/pantsbuild/pants/issues/7647
+    with self.pantsd_successful_run_context() as (pantsd_run, checker, workdir, config):
+      # NB: This doesn't actually run against all testprojects, only those that are in the chroot,
+      # i.e. explicitly declared in this test file's BUILD.
+      cmd = ['list', 'testprojects::']
+      self.assert_success(pantsd_run(cmd))
+      initial_memory_usage = checker.current_memory_usage()
+      for _ in range(number_of_runs):
+        self.assert_success(pantsd_run(cmd))
+        checker.assert_running()
+
+      final_memory_usage = checker.current_memory_usage()
+      self.assertTrue(
+          initial_memory_usage <= final_memory_usage,
+          "Memory usage inverted unexpectedly: {} > {}".format(
+            initial_memory_usage, final_memory_usage
+          )
+        )
+
+      increase_fraction = (float(final_memory_usage) / initial_memory_usage) - 1.0
+      self.assertTrue(
+          increase_fraction <= max_memory_increase_fraction,
+          "Memory usage increased more than expected: {} -> {}: {} actual increase (expected < {})".format(
+            initial_memory_usage, final_memory_usage, increase_fraction, max_memory_increase_fraction
+          )
+        )
+
   def test_pantsd_invalidation_stale_sources(self):
     test_path = 'tests/python/pants_test/daemon_correctness_test_0001'
     test_build_file = os.path.join(test_path, 'BUILD')
@@ -358,23 +439,24 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         pantsd_run(['help'])
         checker.assert_started()
 
-        safe_file_dump(test_build_file, "python_library(sources=globs('some_non_existent_file.py'))", mode='w')
+        safe_file_dump(test_build_file, "python_library(sources=globs('some_non_existent_file.py'))")
         result = pantsd_run(export_cmd)
         checker.assert_running()
-        assertNotRegex(self, result.stdout_data, has_source_root_regex)
+        self.assertNotRegex(result.stdout_data, has_source_root_regex)
 
-        safe_file_dump(test_build_file, "python_library(sources=globs('*.py'))", mode='w')
+        safe_file_dump(test_build_file, "python_library(sources=globs('*.py'))")
         result = pantsd_run(export_cmd)
         checker.assert_running()
-        assertNotRegex(self, result.stdout_data, has_source_root_regex)
+        self.assertNotRegex(result.stdout_data, has_source_root_regex)
 
-        safe_file_dump(test_src_file, 'import this\n', mode='w')
+        safe_file_dump(test_src_file, 'import this\n')
         result = pantsd_run(export_cmd)
         checker.assert_running()
-        assertRegex(self, result.stdout_data, has_source_root_regex)
+        self.assertRegex(result.stdout_data, has_source_root_regex)
     finally:
       rm_rf(test_path)
 
+  @unittest.skip("TODO https://github.com/pantsbuild/pants/issues/7654")
   def test_pantsd_parse_exception_success(self):
     # This test covers the case described in #6426, where a run that is failing fast due to an
     # exception can race other completing work. We expect all runs to fail due to the error
@@ -385,7 +467,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
     try:
       safe_mkdir(test_path, clean=True)
-      safe_file_dump(test_build_file, "{}()".format(invalid_symbol), mode='w')
+      safe_file_dump(test_build_file, "{}()".format(invalid_symbol))
       for _ in range(3):
         with self.pantsd_run_context(success=False) as (pantsd_run, checker, _, _):
           result = pantsd_run(['list', 'testprojects::'])
@@ -394,6 +476,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
     finally:
       rm_rf(test_path)
 
+  @unittest.skip("TODO https://github.com/pantsbuild/pants/issues/7654")
   def test_pantsd_multiple_parallel_runs(self):
     with self.pantsd_test_context() as (workdir, config, checker):
       file_to_make = os.path.join(workdir, 'some_magic_file')
@@ -403,10 +486,8 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         config,
       )
 
-      # Wait for the python run to be running
-      time.sleep(15)
-
       checker.assert_started()
+      checker.assert_pantsd_runner_started(waiter_handle.process.pid)
 
       creator_handle = self.run_pants_with_workdir_without_waiting(
         ['run', 'testprojects/src/python/coordinated_runs:creator', '--', file_to_make],
@@ -417,89 +498,165 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       self.assert_success(creator_handle.join())
       self.assert_success(waiter_handle.join())
 
-  @unittest.skip("Broken: https://github.com/pantsbuild/pants/issues/6778")
-  def test_pantsd_parent_runner_killed(self):
-    with self.pantsd_test_context() as (workdir, config, checker):
-      # Launch a run that will wait for a file to be created (but do not create that file).
-      file_to_make = os.path.join(workdir, 'some_magic_file')
-      waiter_handle = self.run_pants_with_workdir_without_waiting(
-        ['run', 'testprojects/src/python/coordinated_runs:waiter', '--', file_to_make],
-        workdir,
-        config,
-      )
+  def _assert_pantsd_keyboardinterrupt_signal(self, signum, regexps=[], quit_timeout=None):
+    """Send a signal to the thin pailgun client and observe the error messaging.
 
-      # Wait for the python run to be running.
-      time.sleep(5)
-      checker.assert_started()
-
-      # Locate the single "parent" pantsd-runner process, and kill it.
-      pantsd_runner_processes = [p for p in checker.runner_process_context.current_processes()
-                                 if p.ppid() == 1]
-      self.assertEquals(1, len(pantsd_runner_processes))
-      parent_runner_process = pantsd_runner_processes[0]
-      # Send SIGTERM
-      parent_runner_process.terminate()
-      waiter_run = waiter_handle.join()
-
-      # Ensure that we saw the pantsd-runner process's failure in the client's stderr.
-      self.assert_failure(waiter_run)
-      assertRegex(self, waiter_run.stderr_data, """\
-Signal {signum} was raised\\. Exiting with failure\\. \\(backtrace omitted\\)
-""".format(signum=signal.SIGTERM))
-      # NB: testing stderr is an "end-to-end" test, as it requires pants knowing the correct remote
-      # pid and reading those files to print their content to stderr, so we don't necessarily need
-      # to test the log files themselves here.
-
-  def _assert_pantsd_keyboardinterrupt_signal(self, signum):
-    # TODO: This tests that pantsd-runner processes actually die after the thin client receives the
+    :param int signum: The signal to send.
+    :param regexps: Assert that all of these regexps match somewhere in stderr.
+    :type regexps: list of str
+    :param float quit_timeout: The duration of time to wait for the pailgun client to flush all of
+                               its output and die after being killed.
+    """
+    # TODO: This tests that pantsd processes actually die after the thin client receives the
     # specified signal.
     with self.pantsd_test_context() as (workdir, config, checker):
       # Launch a run that will wait for a file to be created (but do not create that file).
       file_to_make = os.path.join(workdir, 'some_magic_file')
-      waiter_handle = self.run_pants_with_workdir_without_waiting(
-        ['run', 'testprojects/src/python/coordinated_runs:waiter', '--', file_to_make],
-        workdir,
-        config,
-      )
 
-      time.sleep(5)
+      if quit_timeout is not None:
+        timeout_args = ['--pantsd-pailgun-quit-timeout={}'.format(quit_timeout)]
+      else:
+        timeout_args = []
+      argv = timeout_args + [
+        'run', 'testprojects/src/python/coordinated_runs:waiter', '--', file_to_make
+      ]
+      waiter_handle = self.run_pants_with_workdir_without_waiting(argv, workdir, config)
+      client_pid = waiter_handle.process.pid
+
       checker.assert_started()
+      checker.assert_pantsd_runner_started(client_pid)
 
-      # Get all the pantsd-runner processes while they're still around.
+      # Get all the pantsd processes while they're still around.
       pantsd_runner_processes = checker.runner_process_context.current_processes()
-      # This should kill the pantsd-runner processes through the RemotePantsRunner SIGINT handler.
-      os.kill(waiter_handle.process.pid, signum)
+      # This should kill the pantsd processes through the RemotePantsRunner signal handler.
+      os.kill(client_pid, signum)
       waiter_run = waiter_handle.join()
       self.assert_failure(waiter_run)
-      self.assertIn('\nInterrupted by user.\n', waiter_run.stderr_data)
 
-      # TODO: SIGTERM should be tested as well, but the expected behavior is a little different --
-      # we should test that the pantsd-runner process exits with failure (if possible -- see the
-      # caveat on psutil below), and then check the remote process's fatal error log to confirm the
-      # remote pantsd-runner receives a SIGTERM and dies.
+      for regexp in regexps:
+        self.assertRegex(waiter_run.stderr_data, regexp)
 
       time.sleep(1)
       for proc in pantsd_runner_processes:
         # TODO: we could be checking the return codes of the subprocesses, but psutil is currently
         # limited on non-Windows hosts -- see https://psutil.readthedocs.io/en/latest/#processes.
-        # The pantsd-runner processes should be dead, and they should have exited with 1.
+        # The pantsd processes should be dead, and they should have exited with 1.
         self.assertFalse(proc.is_running())
 
-  @unittest.skip('TODO: this should be unskipped as part of the work for #6574!')
-  def test_pantsd_control_c(self):
-    self._assert_pantsd_keyboardinterrupt_signal(signal.SIGINT)
+  @unittest.skip('Flaky as described in: https://github.com/pantsbuild/pants/issues/7554')
+  def test_pantsd_sigterm(self):
+    self._assert_pantsd_keyboardinterrupt_signal(
+      signal.SIGTERM,
+      regexps=[
+        '\\[INFO\\] Sending SIGTERM to pantsd with pid [0-9]+, waiting up to 5\\.0 seconds before sending SIGKILL\\.\\.\\.',
+        re.escape("\nSignal {signum} (SIGTERM) was raised. Exiting with failure.\n"
+                  .format(signum=signal.SIGTERM)),
+        """
+Interrupted by user:
+Interrupted by user over pailgun client!
+$"""
+      ])
 
-  @unittest.skip('TODO: this should be unskipped as part of the work for #6574!')
+  @unittest.skip('Flaky as described in: https://github.com/pantsbuild/pants/issues/7572')
   def test_pantsd_sigquit(self):
-    # We convert a local SIGQUIT in the thin client process -> SIGINT on the remote end in
-    # RemotePantsRunner.
-    self._assert_pantsd_keyboardinterrupt_signal(signal.SIGQUIT)
+    self._assert_pantsd_keyboardinterrupt_signal(
+      signal.SIGQUIT,
+      regexps=[
+        '\\[INFO\\] Sending SIGQUIT to pantsd with pid [0-9]+, waiting up to 5\\.0 seconds before sending SIGKILL\\.\\.\\.',
+        re.escape("\nSignal {signum} (SIGQUIT) was raised. Exiting with failure.\n"
+                  .format(signum=signal.SIGQUIT)),
+        """
+Interrupted by user:
+Interrupted by user over pailgun client!
+$"""])
+
+  @unittest.skip('Flaky as described in: https://github.com/pantsbuild/pants/issues/7547')
+  def test_pantsd_sigint(self):
+    self._assert_pantsd_keyboardinterrupt_signal(
+      signal.SIGINT,
+      regexps=["""\
+\\[INFO\\] Sending SIGINT to pantsd with pid [0-9]+, waiting up to 5\\.0 seconds before sending SIGKILL\\.\\.\\.
+Interrupted by user.
+Interrupted by user:
+Interrupted by user over pailgun client!
+$"""])
+
+  @unittest.skip('Flaky as described in: https://github.com/pantsbuild/pants/issues/7457')
+  def test_signal_pailgun_stream_timeout(self):
+    # NB: The actual timestamp has the date and time at sub-second granularity. The date is just
+    # used here since that is known in advance in order to assert that the timestamp is well-formed.
+    today = datetime.date.today().isoformat()
+    self._assert_pantsd_keyboardinterrupt_signal(
+      signal.SIGINT,
+      regexps=["""\
+\\[INFO\\] Sending SIGINT to pantsd with pid [0-9]+, waiting up to 0\\.01 seconds before sending SIGKILL\\.\\.\\.
+Interrupted by user\\.
+[^ ]* \\[WARN\\] timed out when attempting to gracefully shut down the remote client executing \
+"'pantsd.*'"\\. sending SIGKILL to the remote client at pid: [0-9]+\\. message: iterating \
+over bytes from nailgun timed out with timeout interval 0\\.01 starting at {today}T[^\n]+, \
+overtime seconds: [^\n]+
+Interrupted by user:
+Interrupted by user over pailgun client!
+"""
+               .format(today=re.escape(today))],
+      # NB: Make the timeout very small to ensure the warning message will reliably occur in CI!
+      quit_timeout=1e-6)
+
+  def test_sigint_kills_request_waiting_for_lock(self):
+    """
+    Test that, when a pailgun request is blocked waiting for another one to end,
+    sending SIGINT to the blocked run will kill it.
+
+    Regression test for issue: #7920
+    """
+    config = {'GLOBAL': {
+      'pantsd_timeout_when_multiple_invocations': -1,
+      'level': 'debug'
+    }}
+    with self.pantsd_test_context(extra_config=config) as (workdir, config, checker):
+      # Run a repl, so that any other run waiting to acquire the daemon lock waits forever.
+      first_run_handle = self.run_pants_with_workdir_without_waiting(
+        command=['repl', 'examples/src/python/example/hello::'],
+        workdir=workdir,
+        config=config
+      )
+      checker.assert_started()
+      checker.assert_running()
+
+      blocking_run_handle = self.run_pants_with_workdir_without_waiting(
+        command=['goals'],
+        workdir=workdir,
+        config=config
+      )
+
+      # Block until the second request is waiting for the lock.
+      blocked = True
+      while blocked:
+        log = '\n'.join(read_pantsd_log(workdir))
+        if "didn't aquire the lock on the first try, polling." in log:
+          blocked = False
+        # NB: This sleep is totally deterministic, it's just so that we don't spend too many cycles
+        # busy waiting.
+        time.sleep(0.1)
+
+      # Sends SIGINT to the run that is waiting.
+      blocking_run_client_pid = blocking_run_handle.process.pid
+      os.kill(blocking_run_client_pid, signal.SIGINT)
+      blocking_run_handle.join()
+
+      # Check that pantsd is still serving the other request.
+      checker.assert_running()
+
+      # Send exit() to the repl, and exit it.
+      result = first_run_handle.join(stdin_data='exit()')
+      self.assert_success(result)
+      checker.assert_running()
 
   def test_pantsd_environment_scrubbing(self):
     # This pair of JVM options causes the JVM to always crash, so the command will fail if the env
     # isn't stripped.
     with self.pantsd_successful_run_context(
-      extra_config={'compile.zinc': {'jvm_options': ['-Xmx1g']}},
+      extra_config={'compile.rsc': {'jvm_options': ['-Xmx1g']}},
       extra_env={'_JAVA_OPTIONS': '-Xms2g'},
     ) as (pantsd_run, checker, workdir, _):
       pantsd_run(['help'])
@@ -515,3 +672,126 @@ Signal {signum} was raised\\. Exiting with failure\\. \\(backtrace omitted\\)
       result = pantsd_run(['help'])
       checker.assert_started()
       self.assert_success(result)
+
+  def test_daemon_auto_shutdown_after_first_run(self):
+    config = {'GLOBAL': {'shutdown_pantsd_after_run': True}}
+    with self.pantsd_test_context(extra_config=config) as (workdir, config, checker):
+      wait_handle = self.run_pants_with_workdir_without_waiting(
+        ['list'],
+        workdir,
+        config,
+      )
+
+      # TODO(#6574, #7330): We might have a new default timeout after these are resolved.
+      checker.assert_started(timeout=16)
+      pantsd_processes = checker.runner_process_context.current_processes()
+      pants_run = wait_handle.join()
+      self.assert_success(pants_run)
+
+      # Permit enough time for the process to terminate in CI
+      time.sleep(5)
+
+      for process in pantsd_processes:
+        self.assertFalse(process.is_running())
+
+  # This is a regression test for a bug where we would incorrectly detect a cycle if two targets swapped their
+  # dependency relationship (#7404).
+  def test_dependencies_swap(self):
+    template = dedent("""
+        python_library(
+          name = 'A',
+          source = 'A.py',
+          {a_deps}
+        )
+
+        python_library(
+          name = 'B',
+          source = 'B.py',
+          {b_deps}
+        )
+        """)
+    with self.pantsd_successful_run_context() as (pantsd_run, checker, _, _):
+      with temporary_dir('.') as directory:
+        safe_file_dump(os.path.join(directory, 'A.py'), mode='w')
+        safe_file_dump(os.path.join(directory, 'B.py'), mode='w')
+
+        if directory.startswith('./'):
+          directory = directory[2:]
+
+        def list_and_verify():
+          result = pantsd_run(['list', '{}:'.format(directory)])
+          checker.assert_started()
+          self.assert_success(result)
+          expected_targets = {'{}:{}'.format(directory, target) for target in ('A', 'B')}
+          self.assertEqual(expected_targets, set(result.stdout_data.strip().split('\n')))
+
+        with open(os.path.join(directory, 'BUILD'), 'w') as f:
+          f.write(template.format(a_deps='dependencies = [":B"],', b_deps=''))
+        list_and_verify()
+
+        with open(os.path.join(directory, 'BUILD'), 'w') as f:
+          f.write(template.format(a_deps='', b_deps='dependencies = [":A"],'))
+        list_and_verify()
+
+  def test_concurrent_overrides_pantsd(self):
+    """
+    Tests that the --concurrent flag overrides the --enable-pantsd flag,
+    because we don't allow concurrent runs under pantsd.
+    """
+    config = {'GLOBAL': {'concurrent': True, 'enable_pantsd': True}}
+    with self.temporary_workdir() as workdir:
+      pants_run = self.run_pants_with_workdir(['goals'], workdir=workdir, config=config)
+      self.assert_success(pants_run)
+      # TODO migrate to pathlib when we cut 1.18.x
+      pantsd_log_location = os.path.join(workdir, 'pantsd', 'pantsd.log')
+      self.assertFalse(os.path.exists(pantsd_log_location))
+
+  def test_unhandled_exceptions_only_log_exceptions_once(self):
+    """
+    Tests that the unhandled exceptions triggered by LocalPantsRunner instances don't manifest
+    as a PantsRunFinishedWithFailureException.
+
+    That is, that we unset the global Exiter override set by LocalPantsRunner before we try to log the exception.
+
+    This is a regression test for the most glaring case of https://github.com/pantsbuild/pants/issues/7597.
+    """
+    with self.pantsd_run_context(success=False) as (pantsd_run, checker, _, _):
+      result = pantsd_run(['run', 'testprojects/src/python/bad_requirements:use_badreq'])
+      checker.assert_running()
+      self.assert_failure(result)
+      # Assert that the desired exception has been triggered once.
+      self.assertIn(
+        """Exception message: Could not satisfy all requirements for badreq==99.99.99:\n    badreq==99.99.99""",
+        result.stderr_data,
+      )
+      # Assert that it has only been triggered once.
+      self.assertNotIn(
+        'During handling of the above exception, another exception occurred:',
+        result.stderr_data,
+      )
+      self.assertNotIn(
+        'pants.bin.daemon_pants_runner._PantsRunFinishedWithFailureException: Terminated with 1',
+        result.stderr_data,
+      )
+
+  def test_inner_runs_dont_deadlock(self):
+    """
+    Create a pantsd run that calls testprojects/src/python/nested_runs with the appropriate
+    bootstrap options to avoid restarting pantsd.
+
+    Regression test for issue https://github.com/pantsbuild/pants/issues/7881
+    When a run under pantsd calls pants with pantsd inside it, the inner run will time out
+    waiting for the outer run to end.
+
+    NB: testprojects/src/python/nested_runs assumes that the pants.ini file is in ${workdir}/pants.ini
+    """
+    config = {
+      'GLOBAL': {
+        'pantsd_timeout_when_multiple_invocations': 1,
+      }
+    }
+    with self.pantsd_successful_run_context(extra_config=config) as (pantsd_run, checker, workdir, _):
+      result = pantsd_run(['run', 'testprojects/src/python/nested_runs', '--', workdir], expected_runs=2)
+      checker.assert_started()
+      self.assert_success(result)
+      self.assertNotIn("Another pants invocation is running", result.stderr_data)

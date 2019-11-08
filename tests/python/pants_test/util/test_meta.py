@@ -1,20 +1,19 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
+import unittest
+from abc import ABC, abstractmethod
+from dataclasses import FrozenInstanceError, dataclass
 
-from abc import abstractmethod, abstractproperty
-from builtins import object
-
-from pants.util.meta import AbstractClass, Singleton, classproperty, staticproperty
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
+from pants.util.meta import SingletonMetaclass, classproperty, frozen_after_init, staticproperty
 
 
 class AbstractClassTest(TestBase):
   def test_abstract_property(self):
-    class AbstractProperty(AbstractClass):
-      @abstractproperty
+    class AbstractProperty(ABC):
+      @property
+      @abstractmethod
       def property(self):
         pass
 
@@ -22,7 +21,7 @@ class AbstractClassTest(TestBase):
       AbstractProperty()
 
   def test_abstract_method(self):
-    class AbstractMethod(AbstractClass):
+    class AbstractMethod(ABC):
       @abstractmethod
       def method(self):
         pass
@@ -33,13 +32,13 @@ class AbstractClassTest(TestBase):
 
 class SingletonTest(TestBase):
   def test_singleton(self):
-    class One(Singleton):
+    class One(metaclass=SingletonMetaclass):
       pass
 
     self.assertIs(One(), One())
 
 
-class WithProp(object):
+class WithProp:
   _value = 'val0'
 
   @classproperty
@@ -104,7 +103,7 @@ class OverridingMethodDefSuper(WithProp):
 
   @classproperty
   def class_property(cls):
-    return super(OverridingMethodDefSuper, cls).class_property + cls._other_value
+    return super().class_property + cls._other_value
 
 
 class ClassPropertyTest(TestBase):
@@ -151,7 +150,7 @@ class ClassPropertyTest(TestBase):
     self.assertEqual('val0o0', OverridingMethodDefSuper().class_property)
 
   def test_modify_class_value(self):
-    class WithFieldToModify(object):
+    class WithFieldToModify:
       _z = 'z0'
 
       @classproperty
@@ -166,7 +165,7 @@ class ClassPropertyTest(TestBase):
     self.assertEqual('z1', WithFieldToModify.class_property)
 
   def test_set_attr(self):
-    class SetValue(object):
+    class SetValue:
       _x = 'x0'
 
       @staticproperty
@@ -190,7 +189,7 @@ class ClassPropertyTest(TestBase):
     self.assertEqual('s1', SetValue.static_property)
 
   def test_delete_attr(self):
-    class DeleteValue(object):
+    class DeleteValue:
       _y = 'y0'
 
       @classproperty
@@ -211,3 +210,109 @@ class ClassPropertyTest(TestBase):
 
     del DeleteValue.static_property
     self.assertFalse(hasattr(DeleteValue, 'static_property'))
+
+  def test_abstract_classproperty(self):
+    class Abstract(ABC):
+      @classproperty
+      @property
+      @abstractmethod
+      def f(cls):
+        pass
+
+    with self.assertRaisesWithMessage(TypeError, """\
+The classproperty 'f' in type 'Abstract' was an abstractproperty, meaning that type \
+Abstract must override it by setting it as a variable in the class body or defining a method \
+with an @classproperty decorator."""):
+      Abstract.f
+
+    class WithoutOverriding(Abstract):
+      """Show that subclasses failing to override the abstract classproperty will raise."""
+      pass
+
+    with self.assertRaisesWithMessage(TypeError, """\
+The classproperty 'f' in type 'WithoutOverriding' was an abstractproperty, meaning that type \
+WithoutOverriding must override it by setting it as a variable in the class body or defining a method \
+with an @classproperty decorator."""):
+      WithoutOverriding.f
+
+    class Concrete(Abstract):
+      f = 3
+    self.assertEqual(Concrete.f, 3)
+
+    class Concrete2(Abstract):
+      @classproperty
+      def f(cls):
+        return 'hello'
+    self.assertEqual(Concrete2.f, 'hello')
+
+
+class FrozenAfterInitTest(unittest.TestCase):
+
+  def test_no_init(self) -> None:
+    @frozen_after_init
+    class Test:
+      pass
+
+    test = Test()
+    with self.assertRaises(FrozenInstanceError):
+      test.x = 1
+
+  def test_init_still_works(self):
+    @frozen_after_init
+    class Test:
+
+      def __init__(self, x: int) -> None:
+        self.x = x
+        self.y = "abc"
+
+    test = Test(x=0)
+    self.assertEqual(test.x, 0)
+    self.assertEqual(test.y, "abc")
+
+  def test_modify_preexisting_field_after_init(self) -> None:
+    @frozen_after_init
+    class Test:
+
+      def __init__(self, x: int) -> None:
+        self.x = x
+
+    test = Test(x=0)
+    with self.assertRaises(FrozenInstanceError):
+      test.x = 1
+
+  def test_add_new_field_after_init(self) -> None:
+    @frozen_after_init
+    class Test:
+
+      def __init__(self, x: int) -> None:
+        self.x: x
+
+    test = Test(x=0)
+    with self.assertRaises(FrozenInstanceError):
+      test.y = "abc"
+
+  def test_explicitly_call_setattr_after_init(self) -> None:
+    @frozen_after_init
+    class Test:
+
+      def __init__(self, x: int) -> None:
+        self.x: x
+
+    test = Test(x=0)
+    with self.assertRaises(FrozenInstanceError):
+      setattr(test, "x", 1)
+
+  def test_works_with_dataclass(self) -> None:
+    @frozen_after_init
+    @dataclass(frozen=False)
+    class Test:
+      x: int
+      y: str
+
+      def __init__(self, x: int) -> None:
+        self.x = x
+        self.y = "abc"
+
+    test = Test(x=0)
+    with self.assertRaises(FrozenInstanceError):
+      test.x = 1

@@ -1,16 +1,13 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 from contextlib import contextmanager
 
 from pants.backend.python.subsystems.python_setup import PythonSetup
+from pants.testutil.pexrc_util import setup_pexrc_with_pex_python_path
+from pants.testutil.test_base import TestBase
 from pants.util.contextutil import environment_as, temporary_dir
-from pants_test.test_base import TestBase
-from pants_test.testutils.pexrc_util import setup_pexrc_with_pex_python_path
 
 
 @contextmanager

@@ -1,10 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from future.utils import string_types
 
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.exceptions import TargetDefinitionException
@@ -37,7 +32,7 @@ class JavaAgent(JavaLibrary):
       is needed by this agent; `False` by default.
     """
 
-    super(JavaAgent, self).__init__(
+    super().__init__(
         name=name,
         sources=sources,
         provides=None,
@@ -47,11 +42,11 @@ class JavaAgent(JavaLibrary):
     if not (premain or agent_class):
       raise TargetDefinitionException(self, "Must have at least one of 'premain' or 'agent_class' "
                                             "defined.")
-    if premain and not isinstance(premain, string_types):
+    if premain and not isinstance(premain, str):
       raise TargetDefinitionException(self, 'The premain must be a fully qualified class name, '
                                             'given {} of type {}'.format(premain, type(premain)))
 
-    if agent_class and not isinstance(agent_class, string_types):
+    if agent_class and not isinstance(agent_class, str):
       raise TargetDefinitionException(self,
                                       'The agent_class must be a fully qualified class name, given '
                                       '{} of type {}'.format(agent_class, type(agent_class)))

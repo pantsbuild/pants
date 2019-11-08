@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import functools
 import os
@@ -11,8 +8,8 @@ from textwrap import dedent
 
 from pex.pex_info import PexInfo
 
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import open_zip, temporary_dir
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 _LINUX_PLATFORM = "linux-x86_64"
@@ -22,6 +19,12 @@ _OSX_WHEEL_SUBSTRING = "macosx"
 
 
 class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
+
+  @classmethod
+  def use_pantsd_env_var(cls):
+    """TODO(#7320): See the point about watchman."""
+    return False
+
   @staticmethod
   @contextmanager
   def caching_config():
@@ -93,7 +96,7 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
   def test_target_platform_overrides_config(self):
     self.platforms_test_impl(
       target_platforms=[_LINUX_PLATFORM],
-      config_platforms=[_OSX_WHEEL_SUBSTRING],
+      config_platforms=[_OSX_PLATFORM],
       want_present_platforms=[_LINUX_WHEEL_SUBSTRING],
       want_missing_platforms=[_OSX_WHEEL_SUBSTRING],
     )
@@ -101,7 +104,7 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
   def test_target_platform_narrows_config(self):
     self.platforms_test_impl(
       target_platforms=[_LINUX_PLATFORM],
-      config_platforms=[_LINUX_WHEEL_SUBSTRING, _OSX_WHEEL_SUBSTRING],
+      config_platforms=[_LINUX_PLATFORM, _OSX_PLATFORM],
       want_present_platforms=[_LINUX_WHEEL_SUBSTRING],
       want_missing_platforms=[_OSX_WHEEL_SUBSTRING],
     )
@@ -109,7 +112,7 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
   def test_target_platform_expands_config(self):
     self.platforms_test_impl(
       target_platforms=[_LINUX_PLATFORM, _OSX_PLATFORM],
-      config_platforms=[_LINUX_WHEEL_SUBSTRING],
+      config_platforms=[_LINUX_PLATFORM],
       want_present_platforms=[_LINUX_WHEEL_SUBSTRING, _OSX_WHEEL_SUBSTRING],
     )
 
@@ -178,3 +181,19 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
           assertInAny(platform, deps)
         for platform in want_missing_platforms:
           assertNotInAny(platform, deps)
+
+  def test_platforms_with_native_deps(self):
+    result = self.run_pants([
+      'binary',
+      'testprojects/src/python/python_distribution/ctypes:bin',
+      'testprojects/src/python/python_distribution/ctypes:with_platforms',
+    ])
+    self.assert_failure(result)
+    self.assertIn(dedent("""\
+      Pants doesn't currently support cross-compiling native code.
+      The following targets set platforms arguments other than ['current'], which is unsupported for this reason.
+      Please either remove the platforms argument from these targets, or set them to exactly ['current'].
+      Bad targets:
+      testprojects/src/python/python_distribution/ctypes:with_platforms
+    """), result.stderr_data)
+    self.assertNotIn('testprojects/src/python/python_distribution/ctypes:bin', result.stderr_data)

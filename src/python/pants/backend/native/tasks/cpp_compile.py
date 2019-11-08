@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.native.subsystems.native_build_step import CppCompileSettings
 from pants.backend.native.targets.native_library import CppLibrary
@@ -21,11 +18,11 @@ class CppCompile(NativeCompile):
 
   @classmethod
   def implementation_version(cls):
-    return super(CppCompile, cls).implementation_version() + [('CppCompile', 0)]
+    return super().implementation_version() + [('CppCompile', 0)]
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(CppCompile, cls).subsystem_dependencies() + (CppCompileSettings.scoped(cls),)
+    return super().subsystem_dependencies() + (CppCompileSettings.scoped(cls),)
 
   def get_compile_settings(self):
     return CppCompileSettings.scoped_instance(self)

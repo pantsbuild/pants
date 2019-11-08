@@ -15,11 +15,6 @@ import tokenize
 import six
 
 
-# NB: we cannot use `pants.util.collections_abc_backport` because this library
-# must be able to be exported as universal. At the moment, Pants only is released with Py2,
-# so violates this. Even when we add Py3 support, we will want to keep this approach
-# because Pants will eventually drop internal Py2 support, yet this checker library
-# must still be universal.
 try:
   from collections.abc import Sequence
 except ImportError:

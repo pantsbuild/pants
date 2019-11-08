@@ -1,18 +1,14 @@
-# coding=utf-8
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import re
-from builtins import open
 
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.exceptions import TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.testutil.task_test_base import TaskTestBase
 from pants_test.contrib.buildrefactor.buildozer_util import prepare_dependencies
-from pants_test.task_test_base import TaskTestBase
 
 from pants.contrib.buildrefactor.buildozer import Buildozer
 
@@ -29,7 +25,7 @@ class BuildozerTest(TaskTestBase):
     return Buildozer
 
   def setUp(self):
-    super(BuildozerTest, self).setUp()
+    super().setUp()
 
     self.targets = prepare_dependencies(self)
 

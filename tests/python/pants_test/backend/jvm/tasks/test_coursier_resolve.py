@@ -1,40 +1,37 @@
-# coding=utf-8
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import re
-from builtins import str
 from contextlib import contextmanager
+from unittest.mock import MagicMock
 
-from future.utils import PY3
-from mock import MagicMock
-from psutil.tests import safe_rmpath
-
-from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
-                                                                    PinnedJarArtifactSet)
+from pants.backend.jvm.subsystems.jar_dependency_management import (
+  JarDependencyManagement,
+  PinnedJarArtifactSet,
+)
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.managed_jar_dependencies import ManagedJarDependencies
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
-from pants.backend.jvm.tasks.coursier_resolve import (CoursierResolve,
-                                                      CoursierResolveFingerprintStrategy)
+from pants.backend.jvm.tasks.coursier_resolve import (
+  CoursierResolve,
+  CoursierResolveFingerprintStrategy,
+)
 from pants.base.exceptions import TaskError
 from pants.java import util
 from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency import JarDependency
 from pants.task.task import Task
+from pants.testutil.jvm.nailgun_task_test_base import NailgunTaskTestBase
+from pants.testutil.subsystem.util import init_subsystem
+from pants.testutil.task_test_base import TaskTestBase
 from pants.util.contextutil import temporary_dir, temporary_file_path
-from pants.util.dirutil import safe_rmtree
-from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
-from pants_test.subsystem.subsystem_util import init_subsystem
-from pants_test.task_test_base import TaskTestBase
+from pants.util.dirutil import safe_delete, safe_rmtree
 
 
-class CoursierResolveTest(JvmToolTaskTestBase):
+class CoursierResolveTest(NailgunTaskTestBase):
   """Tests for the class CoursierResolve."""
 
   @classmethod
@@ -42,8 +39,7 @@ class CoursierResolveTest(JvmToolTaskTestBase):
     return CoursierResolve
 
   def setUp(self):
-    super(CoursierResolveTest, self).setUp()
-    self.set_options(execution_strategy='subprocess')
+    super().setUp()
     self.set_options_for_scope('cache.{}'.format(self.options_scope),
                                read_from=None,
                                write_to=None)
@@ -68,22 +64,22 @@ class CoursierResolveTest(JvmToolTaskTestBase):
     compile_classpath = self.resolve([jar_lib, scala_lib])
     self.assertEqual(1, len(compile_classpath.get_for_target(jar_lib)))
     self.assertEqual(0, len(compile_classpath.get_for_target(scala_lib)))
-    
+
   def test_resolve_with_remote_url(self):
     dep_with_url = JarDependency('a', 'b', 'c',
                                  url='http://central.maven.org/maven2/junit/junit/4.12/junit-4.12.jar')
     dep_with_url_lib = self.make_target('//:a', JarLibrary, jars=[dep_with_url])
-    
+
     compile_classpath = self.resolve([dep_with_url_lib])
     # Get paths on compile classpath and assert that it starts with '.../coursier/cache/relative'
     paths = [tup[1] for tup in compile_classpath.get_for_target(dep_with_url_lib)]
     self.assertTrue(any(self._cache_dir_regex('relative').search(path) for path in paths), str(paths))
-  
+
   def test_resolve_with_local_url(self):
     with temporary_file_path(suffix='.jar') as url:
       dep_with_url = JarDependency('commons-lang', 'commons-lang', '2.5', url='file://' + url)
       dep_with_url_lib = self.make_target('//:a', JarLibrary, jars=[dep_with_url])
-      
+
       compile_classpath = self.resolve([dep_with_url_lib])
       # Get paths on compile classpath and assert that it starts with '.../coursier/cache/absolute'
       paths = [tup[1] for tup in compile_classpath.get_for_target(dep_with_url_lib)]
@@ -138,8 +134,8 @@ class CoursierResolveTest(JvmToolTaskTestBase):
       self.resolve([lib])
     self.assertEqual(
       "Undefined revs for jars unsupported by Coursier. "
-      "\"jar(org={unicode_literal}'com.google.guava', name={unicode_literal}'guava', "
-      "rev=None, classifier=None, ext={unicode_literal}'jar')\"".format(unicode_literal='' if PY3 else 'u'),
+      "\"jar(org='com.google.guava', name='guava', "
+      "rev=None, classifier=None, ext='jar')\"",
       str(cm.exception))
 
   def test_resolve_multiple_artifacts(self):
@@ -242,12 +238,12 @@ class CoursierResolveTest(JvmToolTaskTestBase):
         #    └─ org.hamcrest:hamcrest-core:1.3
         self.assertEqual(2, len(jar_cp))
 
-
-        # Take a sample jar path, remove it, then call the task again, it should invoke coursier again
+        # Take a sample jar path, remove it, then call the task again, it should invoke
+        # coursier again
         conf, path = jar_cp[0]
 
         # Remove the hard link under .pants.d/
-        safe_rmpath(path)
+        safe_delete(path)
 
         # Remove coursier's cache
         safe_rmtree(couriser_cache_dir)
@@ -312,11 +308,11 @@ class CoursierResolveFingerprintStrategyTest(TaskTestBase):
     return cls.EmptyTask
 
   def setUp(self):
-    super(CoursierResolveFingerprintStrategyTest, self).setUp()
+    super().setUp()
     init_subsystem(JarDependencyManagement)
 
   def tearDown(self):
-    super(CoursierResolveFingerprintStrategyTest, self).tearDown()
+    super().tearDown()
 
   def set_artifact_set_for(self, managed_jar_target, artifact_set):
     JarDependencyManagement.global_instance()._artifact_set_map[

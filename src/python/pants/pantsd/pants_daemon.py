@@ -1,29 +1,26 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import os
 import sys
 import threading
-from builtins import object
 from contextlib import contextmanager
+from dataclasses import dataclass
 
 from setproctitle import setproctitle as set_process_title
 
 from pants.base.build_environment import get_buildroot
-from pants.base.exception_sink import ExceptionSink
+from pants.base.exception_sink import ExceptionSink, SignalHandler
 from pants.base.exiter import Exiter
 from pants.bin.daemon_pants_runner import DaemonPantsRunner
 from pants.engine.native import Native
 from pants.init.engine_initializer import EngineInitializer
-from pants.init.logging import setup_logging
-from pants.init.options_initializer import BuildConfigInitializer
-from pants.option.arg_splitter import GLOBAL_SCOPE
+from pants.init.logging import init_rust_logger, setup_logging
+from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.options_fingerprinter import OptionsFingerprinter
+from pants.option.scope import GLOBAL_SCOPE
 from pants.pantsd.process_manager import FingerprintedProcessManager
 from pants.pantsd.service.fs_event_service import FSEventService
 from pants.pantsd.service.pailgun_service import PailgunService
@@ -31,19 +28,17 @@ from pants.pantsd.service.pants_service import PantsServices
 from pants.pantsd.service.scheduler_service import SchedulerService
 from pants.pantsd.service.store_gc_service import StoreGCService
 from pants.pantsd.watchman_launcher import WatchmanLauncher
-from pants.util.collections import combined_dict
 from pants.util.contextutil import stdio_as
 from pants.util.memo import memoized_property
-from pants.util.objects import datatype
 from pants.util.strutil import ensure_text
 
 
 class _LoggerStream(object):
   """A sys.std{out,err} replacement that pipes output to a logger.
 
-  N.B. `logging.Logger` expects unicode. However, most of our outstream logic, such as in `Exiter.py`,
-  will use `sys.std{out,err}.buffer` and thus a bytes interface when running with Python 3. So, we must provide
-  a `buffer` property, and change the semantics of the buffer to always convert the message to unicode. This
+  N.B. `logging.Logger` expects unicode. However, most of our outstream logic, such as in `exiter.py`,
+  will use `sys.std{out,err}.buffer` and thus a bytes interface. So, we must provide a `buffer`
+  property, and change the semantics of the buffer to always convert the message to unicode. This
   is an unfortunate code smell, as `logging` does not expose a bytes interface so this is
   the best solution we could think of.
   """
@@ -62,6 +57,9 @@ class _LoggerStream(object):
   def write(self, msg):
     msg = ensure_text(msg)
     for line in msg.rstrip().splitlines():
+      # The log only accepts text, and will raise a decoding error if the default encoding is ascii
+      # if provided a bytes input for unicode text.
+      line = ensure_text(line)
       self._logger.log(self._log_level, line.rstrip())
 
   def flush(self):
@@ -78,6 +76,16 @@ class _LoggerStream(object):
     return self
 
 
+class PantsDaemonSignalHandler(SignalHandler):
+
+  def __init__(self, daemon):
+    super().__init__()
+    self._daemon = daemon
+
+  def handle_sigint(self, signum, _frame):
+    self._daemon.terminate(include_watchman=False)
+
+
 class PantsDaemon(FingerprintedProcessManager):
   """A daemon that manages PantsService instances."""
 
@@ -90,14 +98,18 @@ class PantsDaemon(FingerprintedProcessManager):
   class RuntimeFailure(Exception):
     """Represents a pantsd failure at runtime, usually from an underlying service failure."""
 
-  class Handle(datatype([('pid', int), ('port', int)])):
+  @dataclass(frozen=True)
+  class Handle:
     """A handle to a "probably running" pantsd instance.
 
     We attempt to verify that the pantsd instance is still running when we create a Handle, but
     after it has been created it is entirely process that the pantsd instance perishes.
     """
+    pid: int
+    port: int
+    metadata_base_dir: str
 
-  class Factory(object):
+  class Factory:
     @classmethod
     def maybe_launch(cls, options_bootstrapper):
       """Creates and launches a daemon instance if one does not already exist.
@@ -116,8 +128,9 @@ class PantsDaemon(FingerprintedProcessManager):
           # We're already launched.
           return PantsDaemon.Handle(
               stub_pantsd.await_pid(10),
-              stub_pantsd.read_named_socket('pailgun', int)
-            )
+              stub_pantsd.read_named_socket('pailgun', int),
+              stub_pantsd._metadata_base_dir,
+          )
 
     @classmethod
     def restart(cls, options_bootstrapper):
@@ -181,6 +194,7 @@ class PantsDaemon(FingerprintedProcessManager):
 
       :returns: A PantsServices instance.
       """
+      should_shutdown_after_run = bootstrap_options.shutdown_pantsd_after_run
       fs_event_service = FSEventService(
         watchman,
         build_root,
@@ -201,14 +215,15 @@ class PantsDaemon(FingerprintedProcessManager):
         fs_event_service,
         legacy_graph_scheduler,
         build_root,
-        bootstrap_options.pantsd_invalidation_globs,
+        OptionsInitializer.compute_pantsd_invalidation_globs(build_root, bootstrap_options),
         pidfile,
       )
 
       pailgun_service = PailgunService(
         (bootstrap_options.pantsd_pailgun_host, bootstrap_options.pantsd_pailgun_port),
         DaemonPantsRunner,
-        scheduler_service
+        scheduler_service,
+        should_shutdown_after_run,
       )
 
       store_gc_service = StoreGCService(legacy_graph_scheduler.scheduler)
@@ -229,13 +244,14 @@ class PantsDaemon(FingerprintedProcessManager):
     :param string metadata_base_dir: The ProcessManager metadata base dir.
     :param Options bootstrap_options: The bootstrap options, if available.
     """
-    super(PantsDaemon, self).__init__(name='pantsd', metadata_base_dir=metadata_base_dir)
+    super().__init__(name='pantsd', metadata_base_dir=metadata_base_dir)
     self._native = native
     self._build_root = build_root
     self._work_dir = work_dir
     self._log_level = log_level
     self._services = services
     self._bootstrap_options = bootstrap_options
+    self._log_show_rust_3rdparty = bootstrap_options.for_global_scope().log_show_rust_3rdparty if bootstrap_options else True
 
     self._log_dir = os.path.join(work_dir, self.name)
     self._logger = logging.getLogger(__name__)
@@ -263,7 +279,7 @@ class PantsDaemon(FingerprintedProcessManager):
     """Gracefully terminate all services and kill the main PantsDaemon loop."""
     with self._services.lifecycle_lock:
       for service, service_thread in service_thread_map.items():
-        self._logger.info('terminating pantsd service: {}'.format(service))
+        self._logger.info(f'terminating pantsd service: {service}')
         service.terminate()
         service_thread.join(self.JOIN_TIMEOUT_SECONDS)
       self._logger.info('terminating pantsd')
@@ -291,7 +307,7 @@ class PantsDaemon(FingerprintedProcessManager):
       try:
         os.fdopen(fd)
         raise AssertionError(
-            'pantsd logging cannot initialize while stdio is open: {}'.format(fd))
+            f'pantsd logging cannot initialize while stdio is open: {fd}')
       except OSError:
         pass
 
@@ -299,7 +315,9 @@ class PantsDaemon(FingerprintedProcessManager):
     # for further forks.
     with stdio_as(stdin_fd=-1, stdout_fd=-1, stderr_fd=-1):
       # Reinitialize logging for the daemon context.
-      result = setup_logging(self._log_level, log_dir=self._log_dir, log_name=self.LOG_NAME)
+      init_rust_logger(self._log_level, self._log_show_rust_3rdparty)
+      result = setup_logging(self._log_level, log_dir=self._log_dir, log_name=self.LOG_NAME, native=self._native)
+      self._native.override_thread_logging_destination_to_just_pantsd()
 
       # Do a python-level redirect of stdout/stderr, which will not disturb `0,1,2`.
       # TODO: Consider giving these pipes/actual fds, in order to make them "deep" replacements
@@ -308,16 +326,22 @@ class PantsDaemon(FingerprintedProcessManager):
       sys.stderr = _LoggerStream(logging.getLogger(), logging.WARN, result.log_handler)
 
       self._logger.debug('logging initialized')
-      yield result.log_handler.stream
+      yield (result.log_handler.stream, result.log_handler.native_filename)
 
   def _setup_services(self, pants_services):
     for service in pants_services.services:
-      self._logger.info('setting up service {}'.format(service))
+      self._logger.info(f'setting up service {service}')
       service.setup(self._services)
 
   @staticmethod
-  def _make_thread(target):
-    t = threading.Thread(target=target)
+  def _make_thread(service):
+    name = f"{service.__class__.__name__}Thread"
+
+    def target():
+      Native().override_thread_logging_destination_to_just_pantsd()
+      service.run()
+
+    t = threading.Thread(target=target, name=name)
     t.daemon = True
     return t
 
@@ -327,17 +351,17 @@ class PantsDaemon(FingerprintedProcessManager):
       self._logger.critical('no services to run, bailing!')
       return
 
-    service_thread_map = {service: self._make_thread(service.run)
+    service_thread_map = {service: self._make_thread(service)
                           for service in pants_services.services}
 
     # Start services.
     for service, service_thread in service_thread_map.items():
-      self._logger.info('starting service {}'.format(service))
+      self._logger.info(f'starting service {service}')
       try:
         service_thread.start()
       except (RuntimeError, FSEventService.ServiceError):
         self.shutdown(service_thread_map)
-        raise PantsDaemon.StartupFailure('service {} failed to start, shutting down!'.format(service))
+        raise PantsDaemon.StartupFailure(f'service {service} failed to start, shutting down!')
 
     # Once all services are started, write our pid.
     self.write_pid()
@@ -348,7 +372,7 @@ class PantsDaemon(FingerprintedProcessManager):
       for service, service_thread in service_thread_map.items():
         if not service_thread.is_alive():
           self.shutdown(service_thread_map)
-          raise PantsDaemon.RuntimeFailure('service failure for {}, shutting down!'.format(service))
+          raise PantsDaemon.RuntimeFailure(f'service failure for {service}, shutting down!')
         else:
           # Avoid excessive CPU utilization.
           service_thread.join(self.JOIN_TIMEOUT_SECONDS)
@@ -360,15 +384,26 @@ class PantsDaemon(FingerprintedProcessManager):
 
   def run_sync(self):
     """Synchronously run pantsd."""
-    # Switch log output to the daemon's log stream from here forward.
-    self._close_stdio()
-    with self._pantsd_logging() as log_stream:
-      # Register an exiter using os._exit to ensure we only close stdio streams once.
-      ExceptionSink.reset_exiter(Exiter(exiter=os._exit))
+    os.environ.pop('PYTHONPATH')
 
-      # We don't have any stdio streams to log to anymore, but we can get tracebacks of the pantsd
-      # process by tailing the pantsd log and sending it SIGUSR2.
-      ExceptionSink.reset_interactive_output_stream(log_stream)
+    # Switch log output to the daemon's log stream from here forward.
+    # Also, register an exiter using os._exit to ensure we only close stdio streams once.
+    self._close_stdio()
+    with self._pantsd_logging() as (log_stream, log_filename), \
+         ExceptionSink.exiter_as(lambda _: Exiter(exiter=os._exit)):
+
+      # We don't have any stdio streams to log to anymore, so we log to a file.
+      # We don't override the faulthandler destination because the stream we get will proxy things
+      # via the rust logging code, and faulthandler needs to be writing directly to a real file
+      # descriptor. When pantsd logging was originally initialised, we already set up faulthandler
+      # to log to the correct file descriptor, so don't override it.
+      #
+      # We can get tracebacks of the pantsd process by tailing the pantsd log and sending it
+      # SIGUSR2.
+      ExceptionSink.reset_interactive_output_stream(
+        log_stream,
+        override_faulthandler_destination=False,
+      )
 
       # Reset the log location and the backtrace preference from the global bootstrap options.
       global_bootstrap_options = self._bootstrap_options.for_global_scope()
@@ -376,12 +411,10 @@ class PantsDaemon(FingerprintedProcessManager):
         global_bootstrap_options.print_exception_stacktrace)
       ExceptionSink.reset_log_location(global_bootstrap_options.pants_workdir)
 
-      self._logger.info('pantsd starting, log level is {}'.format(self._log_level))
-
       self._native.set_panic_handler()
 
       # Set the process name in ps output to 'pantsd' vs './pants compile src/etc:: -ldebug'.
-      set_process_title('pantsd [{}]'.format(self._build_root))
+      set_process_title(f'pantsd [{self._build_root}]')
 
       # Write service socket information to .pids.
       self._write_named_sockets(self._services.port_map)
@@ -392,11 +425,20 @@ class PantsDaemon(FingerprintedProcessManager):
 
   def post_fork_child(self):
     """Post-fork() child callback for ProcessManager.daemon_spawn()."""
-    entry_point = '{}:launch'.format(__name__)
-    exec_env = combined_dict(os.environ, dict(PANTS_ENTRYPOINT=entry_point))
+    spawn_control_env = dict(PANTS_ENTRYPOINT=f'{__name__}:launch',
+                             # The daemon should run under the same sys.path as us; so we ensure
+                             # this. NB: It will scrub PYTHONPATH once started to avoid infecting
+                             # its own unrelated subprocesses.
+                             PYTHONPATH=os.pathsep.join(sys.path))
+    exec_env = {**os.environ, **spawn_control_env}
+
     # Pass all of sys.argv so that we can proxy arg flags e.g. `-ldebug`.
     cmd = [sys.executable] + sys.argv
-    self._logger.debug('cmd is: PANTS_ENTRYPOINT={} {}'.format(entry_point, ' '.join(cmd)))
+
+    spawn_control_env_vars = ' '.join(f'{k}={v}' for k, v in spawn_control_env.items())
+    cmd_line = ' '.join(cmd)
+    self._logger.debug(f'cmd is: {spawn_control_env_vars} {cmd_line}')
+
     # TODO: Improve error handling on launch failures.
     os.spawnve(os.P_NOWAIT, sys.executable, cmd, env=exec_env)
 
@@ -409,8 +451,7 @@ class PantsDaemon(FingerprintedProcessManager):
     :rtype: bool
     """
     new_fingerprint = self.options_fingerprint
-    self._logger.debug('pantsd: is_alive={} new_fingerprint={} current_fingerprint={}'
-                       .format(self.is_alive(), new_fingerprint, self.fingerprint))
+    self._logger.debug('pantsd: is_alive={self.is_alive()} new_fingerprint={new_fingerprint} current_fingerprint={self.fingerprint}')
     return self.needs_restart(new_fingerprint)
 
   def launch(self):
@@ -428,18 +469,28 @@ class PantsDaemon(FingerprintedProcessManager):
     # Wait up to 60 seconds for pantsd to write its pidfile.
     pantsd_pid = self.await_pid(60)
     listening_port = self.read_named_socket('pailgun', int)
-    self._logger.debug('pantsd is running at pid {}, pailgun port is {}'
-                       .format(self.pid, listening_port))
-    return self.Handle(pantsd_pid, listening_port)
+    self._logger.debug(f'pantsd is running at pid {self.pid}, pailgun port is {listening_port}')
+    return self.Handle(pantsd_pid, listening_port, self._metadata_base_dir)
 
   def terminate(self, include_watchman=True):
     """Terminates pantsd and watchman.
 
     N.B. This should always be called under care of the `lifecycle_lock`.
     """
-    super(PantsDaemon, self).terminate()
+    super().terminate()
     if include_watchman:
       self.watchman_launcher.terminate()
+
+  def needs_restart(self, option_fingerprint):
+    """
+    Overrides ProcessManager.needs_restart, to account for the case where pantsd is running
+    but we want to shutdown after this run.
+    :param option_fingerprint: A fingeprint of the global bootstrap options.
+    :return: True if the daemon needs to restart.
+    """
+    should_shutdown_after_run = self._bootstrap_options.for_global_scope().shutdown_pantsd_after_run
+    return super().needs_restart(option_fingerprint) or \
+           (self.is_alive() and should_shutdown_after_run)
 
 
 def launch():

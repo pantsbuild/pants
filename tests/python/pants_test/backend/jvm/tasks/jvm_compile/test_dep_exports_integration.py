@@ -1,15 +1,12 @@
-# coding=utf-8
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
+import re
 import shutil
-from builtins import open
 
 from pants.base.build_environment import get_buildroot
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class DepExportsIntegrationTest(PantsRunIntegrationTest):
@@ -21,16 +18,6 @@ class DepExportsIntegrationTest(PantsRunIntegrationTest):
   @classmethod
   def hermetic(cls):
     return True
-
-  def test_compilation(self):
-    for lang in self.SRC_TYPES:
-      path = os.path.join(self.SRC_PREFIX, lang, self.SRC_PACKAGE)
-      pants_run = self.run_pants(['list', '{}::'.format(path)])
-      self.assert_success(pants_run)
-      target_list = pants_run.stdout_data.strip().split('\n')
-      for target in target_list:
-        pants_run = self.run_pants(['compile', '--lint-scalafmt-skip', target])
-        self.assert_success(pants_run)
 
   def modify_exports_and_compile(self, target, modify_file):
     with self.temporary_sourcedir() as tmp_src:
@@ -60,9 +47,12 @@ class DepExportsIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(['compile', '--lint-scalafmt-skip',
                                 'testprojects/tests/scala/org/pantsbuild/testproject/non_exports:C'])
     self.assert_failure(pants_run)
-    self.assertIn('FAILURE: Compilation failure: Failed jobs: '
-                  'compile(testprojects/tests/scala/org/pantsbuild/testproject/non_exports:C)',
-                  pants_run.stdout_data)
+    self.assertTrue(
+      re.search(
+        'Compilation failure.*testprojects/tests/scala/org/pantsbuild/testproject/non_exports:C',
+        pants_run.stdout_data
+      )
+    )
 
 
 class DepExportsThriftTargets(PantsRunIntegrationTest):

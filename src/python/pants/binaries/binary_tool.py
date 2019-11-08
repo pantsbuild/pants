@@ -1,14 +1,9 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import logging
 import os
-from builtins import str
-
-from future.utils import text_type
+import threading
 
 from pants.binaries.binary_util import BinaryRequest, BinaryUtil
 from pants.engine.fs import PathGlobs, PathGlobsAndRoot
@@ -50,9 +45,13 @@ class BinaryToolBase(Subsystem):
   # Subclasses may set this to provide extra register() kwargs for the --version option.
   extra_version_option_kwargs = None
 
+  def __init__(self, *args, **kwargs):
+    super().__init__(*args, **kwargs)
+    self._snapshot_lock = threading.Lock()
+
   @classmethod
   def subsystem_dependencies(cls):
-    sub_deps = super(BinaryToolBase, cls).subsystem_dependencies() + (BinaryUtil.Factory,)
+    sub_deps = super().subsystem_dependencies() + (BinaryUtil.Factory,)
 
     # TODO: if we need to do more conditional subsystem dependencies, do it declaratively with a
     # dict class field so that we only try to create or access it if we declared a dependency on it.
@@ -97,7 +96,7 @@ class BinaryToolBase(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(BinaryToolBase, cls).register_options(register)
+    super().register_options(register)
 
     version_registration_kwargs = {
       'type': str,
@@ -146,7 +145,7 @@ class BinaryToolBase(Subsystem):
         if old_opts.get(self.replaces_name) and not old_opts.is_default(self.replaces_name):
           return old_opts.get(self.replaces_name)
       else:
-        logger.warn('Cannot resolve version of {} from deprecated option {} in scope {} without a '
+        logger.warning('Cannot resolve version of {} from deprecated option {} in scope {} without a '
                     'context!'.format(self._get_name(), self.replaces_name, self.replaces_scope))
     return self.get_options().version
 
@@ -179,6 +178,29 @@ class BinaryToolBase(Subsystem):
     binary_request = self._make_binary_request(version)
     return self._binary_util.select(binary_request)
 
+  @memoized_method
+  def _hackily_snapshot_exclusive(self, context):
+    bootstrapdir = self.get_options().pants_bootstrapdir
+    relpath = os.path.relpath(self.select(context), bootstrapdir)
+    snapshot = context._scheduler.capture_snapshots((
+      PathGlobsAndRoot(
+        PathGlobs((relpath,)),
+        bootstrapdir,
+      ),
+    ))[0]
+    return (relpath, snapshot)
+
+  def hackily_snapshot(self, context):
+    """Returns a Snapshot of this tool after downloading it.
+
+    TODO: See https://github.com/pantsbuild/pants/issues/7790, which would make this unnecessary
+    due to the engine's memoization and caching.
+    """
+    # We call a memoized method under a lock in order to avoid doing a bunch of redundant
+    # fetching and snapshotting.
+    with self._snapshot_lock:
+      return self._hackily_snapshot_exclusive(context)
+
 
 class NativeTool(BinaryToolBase):
   """A base class for native-code tools.
@@ -194,17 +216,6 @@ class Script(BinaryToolBase):
   :API: public
   """
   platform_dependent = False
-
-  def hackily_snapshot(self, context):
-    bootstrapdir = self.get_options().pants_bootstrapdir
-    script_relpath = os.path.relpath(self.select(context), bootstrapdir)
-    snapshot = context._scheduler.capture_snapshots((
-      PathGlobsAndRoot(
-        PathGlobs((script_relpath,)),
-        text_type(bootstrapdir),
-      ),
-    ))[0]
-    return (script_relpath, snapshot)
 
 
 class XZ(NativeTool):

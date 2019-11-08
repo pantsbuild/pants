@@ -1,11 +1,8 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 from pants.java.distribution.distribution import DistributionLocator
-from pants_test.subsystem.subsystem_util import init_subsystem
+from pants.testutil.subsystem.util import init_subsystem
 
 
 def is_missing_jvm(version):

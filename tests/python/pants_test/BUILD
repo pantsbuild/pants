@@ -4,43 +4,35 @@
 python_library(
   name='test_infra',
   dependencies=[
-    '3rdparty/python:future',
-    'tests/python/pants_test:int-test-for-export',
-    'tests/python/pants_test:test_base',
+    ':int-test-for-export',
+    ':test_base',
     'tests/python/pants_test/jvm:jar_task_test_base',
     'tests/python/pants_test/jvm:nailgun_task_test_base',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
     'tests/python/pants_test/engine:engine_test_base',
+    'tests/python/pants_test/engine:util',
     'tests/python/pants_test/subsystem:subsystem_utils',
+    'tests/python/pants_test/base:context_utils',
+    'tests/python/pants_test/option/util',
+    'tests/python/pants_test/testutils:file_test_util',
   ],
   provides=pants_setup_py(
     name='pantsbuild.pants.testinfra',
-    description='Test support for writing pants plugins.',
+    description='DEPRECATED: use pantsbuild.pants.testutil instead.\n\n'
+                'Test support for writing Pants plugins.',
     namespace_packages=['pants_test'],
     additional_classifiers=[
       'Topic :: Software Development :: Testing',
-    ]
-  )
+    ],
+  ),
 )
 
 python_library(
   name = 'int-test-for-export',
-  sources = [
-    'pants_run_integration_test.py'
-  ],
+  sources = ['pants_run_integration_test.py'],
   dependencies = [
-    '3rdparty/python:future',
-    '3rdparty/python:ansicolors',
-    'src/python/pants/base:build_environment',
-    'src/python/pants/base:build_file',
-    'src/python/pants/fs',
-    'src/python/pants/subsystem',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:dirutil',
-    'src/python/pants/util:process_handler',
-    'src/python/pants/util:py2_compat',
-    'tests/python/pants_test/testutils:file_test_util',
-    'tests/python/pants_test/testutils:pexrc_util',
+    'src/python/pants/base:deprecated',
+    'src/python/pants/testutil:int-test-for-export',
   ]
 )
 
@@ -48,13 +40,7 @@ target(
   name = 'int-test',
   dependencies=[
     ':int-test-for-export',
-
-    # NB: 'pants_run_integration_test.py' runs ./pants in a subprocess, so test results will depend
-    # on the pants binary and all of its transitive dependencies. Adding the dependencies below is
-    # our best proxy for ensuring that any test target depending on this target will be invalidated
-    # on changes to those undeclared dependencies.
-    'src/python/pants/bin:pants_local_binary',
-    'src/rust/engine',
+    'src/python/pants/testutil:int-test',
   ],
 )
 
@@ -62,33 +48,36 @@ python_library(
   name = 'test_base',
   sources = ['test_base.py'],
   dependencies = [
-    '3rdparty/python:future',
-    'src/python/pants/base:build_root',
-    'src/python/pants/base:cmd_line_spec_parser',
-    'src/python/pants/base:exceptions',
-    'src/python/pants/build_graph',
-    'src/python/pants/init',
-    'src/python/pants/source',
-    'src/python/pants/subsystem',
-    'src/python/pants/task',
-    'src/python/pants/util:dirutil',
-    'src/python/pants/util:memo',
-    'tests/python/pants_test/base:context_utils',
-    'tests/python/pants_test/engine:util',
-    'tests/python/pants_test/option/util',
+    'src/python/pants/base:deprecated',
+    'src/python/pants/testutil:test_base',
   ]
 )
+
+python_library(
+  name = 'console_rule_test_base',
+  sources = ['console_rule_test_base.py'],
+  dependencies = [
+    'src/python/pants/base:deprecated',
+    'src/python/pants/testutil:console_rule_test_base',
+  ]
+)
+
 
 python_library(
   name = 'task_test_base',
   sources = ['task_test_base.py'],
   dependencies = [
-    'src/python/pants/goal:context',
-    'src/python/pants/ivy',
-    'src/python/pants/task',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:process_handler',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/base:deprecated',
+    'src/python/pants/testutil:task_test_base',
+  ]
+)
+
+python_library(
+  name='interpreter_selection_utils',
+  sources=['interpreter_selection_utils.py'],
+  dependencies = [
+    'src/python/pants/base:deprecated',
+    'src/python/pants/testutil:interpreter_selection_utils',
   ]
 )
 
@@ -96,10 +85,10 @@ python_tests(
   name = 'test_maven_layout',
   sources = ['test_maven_layout.py'],
   dependencies = [
-    ':test_base',
     'src/python/pants/backend/jvm/subsystems:junit',
     'src/python/pants/build_graph',
     'src/python/pants/source',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil:test_base',
+    'src/python/pants/testutil/subsystem',
   ]
 )

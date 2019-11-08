@@ -1,11 +1,9 @@
-# coding=utf-8
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import logging
 import os
+import subprocess
 
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
@@ -13,7 +11,6 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.java.distribution.distribution import DistributionLocator
 from pants.task.simple_codegen_task import SimpleCodegenTask
-from pants.util.process_handler import subprocess
 
 from pants.contrib.jax_ws.targets.jax_ws_library import JaxWsLibrary
 
@@ -28,16 +25,16 @@ class JaxWsGen(SimpleCodegenTask, NailgunTask):
 
   @classmethod
   def register_options(cls, register):
-    super(JaxWsGen, cls).register_options(register)
+    super().register_options(register)
     register('--ws-quiet', type=bool, help='Suppress WsImport output')
     register('--ws-verbose', type=bool, help='Make WsImport output verbose')
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(JaxWsGen, cls).subsystem_dependencies() + (DistributionLocator,)
+    return super().subsystem_dependencies() + (DistributionLocator,)
 
   def __init__(self, *args, **kwargs):
-    super(JaxWsGen, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
 
   def synthetic_target_type(self, target):
     return JavaLibrary

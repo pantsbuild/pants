@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.payload import Payload, PayloadFieldAlreadyDefinedError, PayloadFrozenError
@@ -10,7 +7,7 @@ from pants.base.payload_field import PrimitiveField
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.source.wrapped_globs import Globs
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 class PayloadTest(TestBase):
@@ -99,7 +96,7 @@ class PayloadTest(TestBase):
     self.assertEqual(None, payload.get_field_value('bar'))
     self.assertEqual(None, payload.get_field('bar', default='nothing').value)
     self.assertEqual(None, payload.get_field_value('bar', default='nothing'))
-    with self.assertRaises(KeyError):
+    with self.assertRaises(AttributeError):
       self.assertEqual(None, payload.field_doesnt_exist)
     self.assertEqual(None, payload.get_field('field_doesnt_exist'))
     self.assertEqual(None, payload.get_field_value('field_doesnt_exist'))

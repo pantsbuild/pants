@@ -1,17 +1,13 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
-from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.backend.jvm.tasks.jvm_dependency_usage import DependencyUsageGraph, JvmDependencyUsage
+from pants.testutil.task_test_base import TaskTestBase, ensure_cached
 from pants.util.dirutil import safe_mkdir, touch
-from pants_test.task_test_base import TaskTestBase, ensure_cached
 
 
 class TestJvmDependencyUsage(TaskTestBase):
@@ -34,8 +30,8 @@ class TestJvmDependencyUsage(TaskTestBase):
         touch(os.path.join(target_dir, classfile))
       classpath_products.add_for_target(target, [('default', target_dir)])
 
-    product_deps_by_src = context.products.get_data('product_deps_by_src', dict)
-    return self.create_task(context), product_deps_by_src
+    product_deps_by_target = context.products.get_data('product_deps_by_target', dict)
+    return self.create_task(context), product_deps_by_target
 
   def make_java_target(self, *args, **kwargs):
     assert 'target_type' not in kwargs
@@ -52,15 +48,14 @@ class TestJvmDependencyUsage(TaskTestBase):
     t2 = self.make_java_target(spec=':t2', sources=['c.java'], dependencies=[t1])
     t3 = self.make_java_target(spec=':t3', sources=['d.java', 'e.java'], dependencies=[t1])
     self.set_options(size_estimator='filecount')
-    dep_usage, product_deps_by_src = self._setup({
+    dep_usage, product_deps_by_target = self._setup({
         t1: ['a.class', 'b.class'],
         t2: ['c.class'],
         t3: ['d.class', 'e.class'],
       })
-    product_deps_by_src[t1] = {}
-    product_deps_by_src[t2] = {'c.java': ['a.class']}
-    product_deps_by_src[t3] = {'d.java': ['a.class', 'b.class'],
-                               'e.java': ['a.class', 'b.class']}
+    product_deps_by_target[t1] = []
+    product_deps_by_target[t2] = ['a.class']
+    product_deps_by_target[t3] = ['a.class', 'b.class']
 
     graph = self.create_graph(dep_usage, [t1, t2, t3])
 
@@ -87,18 +82,17 @@ class TestJvmDependencyUsage(TaskTestBase):
                                sources=['a.java', 'b.java'],
                                dependencies=[t1, t1_x, t1_y, t1_z])
     self.set_options(size_estimator='nosize')
-    dep_usage, product_deps_by_src = self._setup({
+    dep_usage, product_deps_by_target = self._setup({
         t1_x: ['x1.class'],
         t1_y: ['y1.class'],
         t1_z: ['z1.class', 'z2.class', 'z3.class'],
         t2: ['a.class', 'b.class'],
       })
-    product_deps_by_src[t1] = {}
-    product_deps_by_src[t1_x] = {}
-    product_deps_by_src[t1_y] = {}
-    product_deps_by_src[t1_z] = {}
-    product_deps_by_src[t2] = {'a.java': ['x1.class'],
-                               'b.java': ['z1.class', 'z2.class']}
+    product_deps_by_target[t1] = []
+    product_deps_by_target[t1_x] = []
+    product_deps_by_target[t1_y] = []
+    product_deps_by_target[t1_z] = []
+    product_deps_by_target[t2] = ['x1.class', 'z1.class', 'z2.class']
     graph = self.create_graph(dep_usage, [t1, t1_x, t1_y, t1_z, t2])
 
     self.assertEqual(graph._nodes[t1].products_total, 5)
@@ -114,13 +108,13 @@ class TestJvmDependencyUsage(TaskTestBase):
     nested_alias_b = self.make_target(spec=':nest_alias_b', dependencies=[alias_b])
     c = self.make_java_target(spec=':c', sources=['c.java'], dependencies=[alias_a_b, nested_alias_b])
     self.set_options(strict_deps=False)
-    dep_usage, product_deps_by_src = self._setup({
+    dep_usage, product_deps_by_target = self._setup({
       a: ['a.class'],
       b: ['b.class'],
       c: ['c.class'],
     })
 
-    product_deps_by_src[c] = {'c.java': ['a.class']}
+    product_deps_by_target[c] = ['a.class']
     graph = self.create_graph(dep_usage, [a, b, c, alias_a_b, alias_b, nested_alias_b])
     # both `:a` and `:b` are resolved from target aliases, one is used the other is not.
     self.assertTrue(graph._nodes[c].dep_edges[a].is_declared)
@@ -140,14 +134,14 @@ class TestJvmDependencyUsage(TaskTestBase):
     t3 = self.make_java_target(spec=':t3', sources=['c.java'], dependencies=[t1])
     t4 = self.make_java_target(spec=':t4', sources=['d.java'], dependencies=[t3])
     self.set_options(strict_deps=False)
-    dep_usage, product_deps_by_src = self._setup({
+    dep_usage, product_deps_by_target = self._setup({
         t1: ['a.class'],
         t2: ['a.class', 'b.class'],
         t3: ['c.class'],
         t4: ['d.class'],
     })
-    product_deps_by_src[t3] = {'c.java': ['a.class']}
-    product_deps_by_src[t4] = {'d.java': ['a.class']}
+    product_deps_by_target[t3] = ['a.class']
+    product_deps_by_target[t4] = ['a.class']
     graph = self.create_graph(dep_usage, [t1, t2, t3, t4])
 
     # Not creating edge for t2 even it provides a.class that t4 depends on.
@@ -159,21 +153,12 @@ class TestJvmDependencyUsage(TaskTestBase):
     self.assertTrue(graph._nodes[t4].dep_edges[t3].is_declared)
 
   def create_graph(self, task, targets):
-    classes_by_source = task.context.products.get_data('classes_by_source')
-    runtime_classpath = task.context.products.get_data('runtime_classpath')
-    product_deps_by_src = task.context.products.get_data('product_deps_by_src')
-    analyzer = JvmDependencyAnalyzer('', runtime_classpath)
-    targets_by_file = analyzer.targets_by_file(targets)
-    transitive_deps_by_target = analyzer.compute_transitive_deps_by_target(targets)
+    targets_by_file = task._analyzer.targets_by_file(targets)
+    transitive_deps_by_target = task._analyzer.compute_transitive_deps_by_target(targets)
 
     def node_creator(target):
       transitive_deps = set(transitive_deps_by_target.get(target))
-      return task.create_dep_usage_node(target,
-                                        analyzer,
-                                        product_deps_by_src,
-                                        classes_by_source,
-                                        targets_by_file,
-                                        transitive_deps)
+      return task.create_dep_usage_node(target, targets_by_file, transitive_deps)
 
     return DependencyUsageGraph(task.create_dep_usage_nodes(targets, node_creator),
                                 task.size_estimators[task.get_options().size_estimator])
@@ -185,11 +170,11 @@ class TestJvmDependencyUsage(TaskTestBase):
     t2 = self.make_java_target(spec=':t2', sources=['b.java'], dependencies=[t1])
     self.create_file('b.java')
     self.set_options(size_estimator='filecount')
-    dep_usage, product_deps_by_src = self._setup({
+    dep_usage, product_deps_by_target = self._setup({
         t1: ['a.class'],
         t2: ['b.class'],
       })
-    product_deps_by_src[t1] = {}
-    product_deps_by_src[t2] = {'b.java': ['a.class']}
+    product_deps_by_target[t1] = []
+    product_deps_by_target[t2] = ['a.class']
 
     dep_usage.create_dep_usage_graph([t1, t2])

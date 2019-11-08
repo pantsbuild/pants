@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 from contextlib import closing
@@ -16,10 +13,10 @@ from pants.backend.jvm.tasks.jar_create import JarCreate, is_jvm_library
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
+from pants.testutil.jvm.jar_task_test_base import JarTaskTestBase
+from pants.testutil.subsystem.util import init_subsystem
+from pants.testutil.task_test_base import ensure_cached
 from pants.util.contextutil import open_zip
-from pants_test.jvm.jar_task_test_base import JarTaskTestBase
-from pants_test.subsystem.subsystem_util import init_subsystem
-from pants_test.task_test_base import ensure_cached
 
 
 class JarCreateTestBase(JarTaskTestBase):
@@ -30,7 +27,7 @@ class JarCreateTestBase(JarTaskTestBase):
 
   @classmethod
   def alias_groups(cls):
-    return super(JarCreateTestBase, cls).alias_groups().merge(BuildFileAliases(
+    return super().alias_groups().merge(BuildFileAliases(
       targets={
         'java_library': JavaLibrary,
         'java_thrift_library': JavaThriftLibrary,
@@ -41,7 +38,7 @@ class JarCreateTestBase(JarTaskTestBase):
     ))
 
   def setUp(self):
-    super(JarCreateTestBase, self).setUp()
+    super().setUp()
     self.set_options(compressed=False, pants_bootstrapdir='~/.cache/pants', max_subprocess_args=100)
     init_subsystem(Target.Arguments)
 
@@ -81,7 +78,7 @@ class JarCreateExecuteTest(JarCreateTestBase):
     return self.create_library(path, 'java_thrift_library', name, sources)
 
   def setUp(self):
-    super(JarCreateExecuteTest, self).setUp()
+    super().setUp()
 
     def test_path(path):
       return os.path.join(self.__class__.__name__, path)
@@ -92,7 +89,7 @@ class JarCreateExecuteTest(JarCreateTestBase):
     # then call self.context() again to get hold of a context, which will superfluously (but
     # harmlessly) re-initialize Subsystem.
     # TODO: Fix this hack by separating option setup from context setup in the test sequence.
-    super(JarCreateExecuteTest, self).context()
+    super().context()
 
     self.res = self.create_resources(test_path('src/resources/com/twitter'), 'spam', 'r.txt')
     self.jl = self.java_library(test_path('src/java/com/twitter'), 'foo', ['a.java'],
@@ -112,7 +109,7 @@ class JarCreateExecuteTest(JarCreateTestBase):
     self.empty_sl = self.scala_library(test_path('src/scala/com/foo'), 'foo', ['dupe.scala'])
 
   def context(self, **kwargs):
-    return super(JarCreateExecuteTest, self).context(
+    return super().context(
       target_roots=[self.jl, self.sl, self.binary, self.jtl, self.scala_lib, self.empty_sl],
       **kwargs)
 
@@ -133,7 +130,7 @@ class JarCreateExecuteTest(JarCreateTestBase):
           for content in content_set:
             if not content.endswith('/'):
               with closing(jar.open(content)) as fp:
-                self.assertEqual(os.path.basename(content), fp.read().decode('utf-8'))
+                self.assertEqual(os.path.basename(content), fp.read().decode())
 
   @ensure_cached(JarCreate)
   def test_classfile_jar_contents(self):

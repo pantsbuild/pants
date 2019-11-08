@@ -1,22 +1,17 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import object, str
-
-import mock
+import unittest.mock
 
 from pants.base.specs import SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.address_mapper import AddressMapper
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.nodes import Throw
+from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_file_dump, safe_mkdir
-from pants_test.test_base import TestBase
 
 
 class LegacyAddressMapperTest(TestBase):
@@ -40,15 +35,15 @@ class LegacyAddressMapperTest(TestBase):
     safe_mkdir(dir_b)
     safe_mkdir(dir_a_subdir)
 
-    safe_file_dump(os.path.join(self.build_root, 'BUILD'), 'target(name="a")\ntarget(name="b")', mode='w')
-    safe_file_dump(os.path.join(self.build_root, 'BUILD.other'), 'target(name="c")', mode='w')
+    safe_file_dump(os.path.join(self.build_root, 'BUILD'), 'target(name="a")\ntarget(name="b")')
+    safe_file_dump(os.path.join(self.build_root, 'BUILD.other'), 'target(name="c")')
 
-    safe_file_dump(os.path.join(dir_a, 'BUILD'), 'target(name="a")\ntarget(name="b")', mode='w')
-    safe_file_dump(os.path.join(dir_a, 'BUILD.other'), 'target(name="c")', mode='w')
+    safe_file_dump(os.path.join(dir_a, 'BUILD'), 'target(name="a")\ntarget(name="b")')
+    safe_file_dump(os.path.join(dir_a, 'BUILD.other'), 'target(name="c")')
 
-    safe_file_dump(os.path.join(dir_b, 'BUILD'), 'target(name="a")', mode='w')
+    safe_file_dump(os.path.join(dir_b, 'BUILD'), 'target(name="a")')
 
-    safe_file_dump(os.path.join(dir_a_subdir, 'BUILD'), 'target(name="a")', mode='w')
+    safe_file_dump(os.path.join(dir_a_subdir, 'BUILD'), 'target(name="a")')
 
   def test_is_valid_single_address(self):
     self.create_build_files()
@@ -86,7 +81,7 @@ class LegacyAddressMapperTest(TestBase):
     self.assertEqual(build_files, set())
 
   def test_is_declaring_file(self):
-    scheduler = mock.Mock()
+    scheduler = unittest.mock.Mock()
     mapper = LegacyAddressMapper(scheduler, '')
     self.assertTrue(mapper.is_declaring_file(Address('path', 'name'), 'path/BUILD'))
     self.assertTrue(mapper.is_declaring_file(Address('path', 'name'), 'path/BUILD.suffix'))
@@ -161,7 +156,7 @@ class LegacyAddressMapperTest(TestBase):
 
   def test_other_throw_is_fail(self):
     # scan_addresses() should raise an error if the scheduler returns an error it can't ignore.
-    class ThrowReturningScheduler(object):
+    class ThrowReturningScheduler:
       def execution_request(self, *args):
         pass
 

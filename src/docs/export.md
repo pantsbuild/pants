@@ -101,11 +101,20 @@ The following is an abbreviated export file from a command in the pants repo:
     "python_setup": {
         "interpreters": {
             "CPython-2.7.10": {
-                "binary": "/Users/user/pants/build-support/pants_dev_deps.py2.venv/bin/python2.7",
+                "binary": "/Users/user/pants/build-support/pants_dev_deps.py27.venv/bin/python2.7",
                 "chroot": "/Users/user/pants/.pants.d/python-setup/chroots/e8da2c200f36ca0a1b8a60c12590a59209250b1a"
             }
         },
         "default_interpreter": "CPython-2.7.10"
+    },
+    "scala_platform": {
+        "scala_version": "2.12",
+        "compiler_classpath": [
+          "/Users/dmcclanahan/tools/pants-v4/.pants.d/bootstrap/bootstrap-jvm-tools/a0ebe8e0b001/ivy/jars/org.scala-lang/scala-compiler/jars/scala-compiler-2.12.8.jar",
+          "/Users/dmcclanahan/tools/pants-v4/.pants.d/bootstrap/bootstrap-jvm-tools/a0ebe8e0b001/ivy/jars/org.scala-lang/scala-library/jars/scala-library-2.12.8.jar",
+          "/Users/dmcclanahan/tools/pants-v4/.pants.d/bootstrap/bootstrap-jvm-tools/a0ebe8e0b001/ivy/jars/org.scala-lang/scala-reflect/jars/scala-reflect-2.12.8.jar",
+          "/Users/dmcclanahan/tools/pants-v4/.pants.d/bootstrap/bootstrap-jvm-tools/a0ebe8e0b001/ivy/jars/org.scala-lang.modules/scala-xml_2.12/jars/scala-xml_2.12-1.0.6.jar"
+        ]
     },
     "targets": {
         "examples/tests/java/org/pantsbuild/example/usethrift:usethrift": {
@@ -167,6 +176,10 @@ The following is an abbreviated export file from a command in the pants repo:
 
 
 # Export Format Changes
+
+## 1.0.11
+
+The 'scala_platform' field is added to the top-level keys, containing the 'scala_version' string (without patch version, e.g. "2.12") and the 'compiler_classpath' jars (a list of absolute paths to jar files).
 
 ## 1.0.10
 

@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import open
 
 from pants.fs.archive import archiver_for_path
 from pants.util.contextutil import temporary_dir
@@ -18,7 +14,7 @@ class JavaCompileIntegrationTest(BaseCompileIT):
 
   def test_basic_binary(self):
     with temporary_dir() as cache_dir:
-      config = {'cache.compile.zinc': {'write_to': [cache_dir]}}
+      config = {'cache.compile.rsc': {'write_to': [cache_dir]}}
 
       with self.temporary_workdir() as workdir:
         pants_run = self.run_pants_with_workdir(
@@ -30,7 +26,7 @@ class JavaCompileIntegrationTest(BaseCompileIT):
 
   def test_nocache(self):
     with temporary_dir() as cache_dir:
-      config = {'cache.compile.zinc': {'write_to': [cache_dir]}}
+      config = {'cache.compile.rsc': {'write_to': [cache_dir]}}
 
       self.assert_success(self.run_pants([
         'compile',
@@ -59,7 +55,7 @@ class JavaCompileIntegrationTest(BaseCompileIT):
     # produces two different artifacts.
 
     with temporary_dir() as cache_dir:
-      config = {'cache.compile.zinc': {'write_to': [cache_dir]}}
+      config = {'cache.compile.rsc': {'write_to': [cache_dir]}}
 
       java_6_args = self.create_platform_args(6) + [
         'compile',
@@ -98,7 +94,7 @@ class JavaCompileIntegrationTest(BaseCompileIT):
     # the artifact contains that resource mapping.
 
     with temporary_dir() as cache_dir:
-      config = {'cache.compile.zinc': {'write_to': [cache_dir]}}
+      config = {'cache.compile.rsc': {'write_to': [cache_dir]}}
 
       self.assert_success(self.run_pants([
         'compile',
@@ -167,11 +163,11 @@ class JavaCompileIntegrationTest(BaseCompileIT):
       dotted_path = path_prefix.replace(os.path.sep, '.')
 
       config = {
-          'cache.compile.zinc': {
+          'cache.compile.rsc': {
             'write_to': [cache_dir],
             'read_from': [cache_dir],
           },
-          'compile.zinc': {
+          'compile.rsc': {
             'incremental_caching': True,
           },
       }
@@ -213,7 +209,7 @@ class JavaCompileIntegrationTest(BaseCompileIT):
       with cache_server(cache_root=cachedir) as server:
         target = 'testprojects/tests/java/org/pantsbuild/testproject/matcher'
         config = {
-            'cache.compile.zinc': {
+            'cache.compile.rsc': {
               'write_to': [server.url],
               'read_from': [server.url],
             },
@@ -239,4 +235,4 @@ class JavaCompileIntegrationTest(BaseCompileIT):
 
 
 class JavaCompileIntegrationTestWithZjar(JavaCompileIntegrationTest):
-  _EXTRA_TASK_ARGS = ['--compile-zinc-use-classpath-jars']
+  _EXTRA_TASK_ARGS = ['--compile-rsc-use-classpath-jars']

@@ -1,20 +1,17 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import glob
 import os
-from builtins import open
 from contextlib import contextmanager
 
-from future.utils import PY3
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.ivy_utils import IvyInfo, IvyModule, IvyModuleRef, IvyResolveResult
-from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
-                                                                    PinnedJarArtifactSet)
+from pants.backend.jvm.subsystems.jar_dependency_management import (
+  JarDependencyManagement,
+  PinnedJarArtifactSet,
+)
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
@@ -25,18 +22,18 @@ from pants.ivy.bootstrapper import Bootstrapper
 from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency import JarDependency
 from pants.task.task import Task
+from pants.testutil.jvm.nailgun_task_test_base import NailgunTaskTestBase
+from pants.testutil.subsystem.util import init_subsystem
+from pants.testutil.task_test_base import TaskTestBase, ensure_cached
 from pants.util.contextutil import temporary_dir, temporary_file_path
 from pants.util.dirutil import safe_delete
-from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
-from pants_test.subsystem.subsystem_util import init_subsystem
-from pants_test.task_test_base import TaskTestBase, ensure_cached
 
 
 def strip_workdir(dir, classpath):
   return [(conf, path[len(dir):]) for conf, path in classpath]
 
 
-class IvyResolveTest(JvmToolTaskTestBase):
+class IvyResolveTest(NailgunTaskTestBase):
   """Tests for the class IvyResolve."""
 
   @classmethod
@@ -44,8 +41,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
     return IvyResolve
 
   def setUp(self):
-    super(IvyResolveTest, self).setUp()
-    self.set_options(execution_strategy='subprocess')
+    super().setUp()
     self.set_options_for_scope('cache.{}'.format(self.options_scope),
                                read_from=None,
                                write_to=None)
@@ -256,7 +252,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
       ivy_resolve_workdir = self._find_resolve_workdir(workdir)
       raw_classpath_path = os.path.join(ivy_resolve_workdir, 'classpath.raw')
       with open(raw_classpath_path, 'a') as raw_f:
-        raw_f.write(os.pathsep if PY3 else os.pathsep.decode('utf-8'))
+        raw_f.write(os.pathsep)
         raw_f.write(os.path.join('non-existent-file'))
 
       self.resolve([jar_lib])
@@ -399,7 +395,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
         ivy_resolve_workdir = self._find_resolve_workdir(workdir)
         raw_classpath_path = os.path.join(ivy_resolve_workdir, 'classpath.raw')
         with open(raw_classpath_path, 'a') as raw_f:
-          raw_f.write(os.pathsep if PY3 else os.pathsep.decode('utf-8'))
+          raw_f.write(os.pathsep)
           raw_f.write(os.path.join('non-existent-file'))
 
         self.resolve([jar_lib])
@@ -490,11 +486,11 @@ class IvyResolveFingerprintStrategyTest(TaskTestBase):
     return EmptyTask
 
   def setUp(self):
-    super(IvyResolveFingerprintStrategyTest, self).setUp()
+    super().setUp()
     init_subsystem(JarDependencyManagement)
 
   def tearDown(self):
-    super(IvyResolveFingerprintStrategyTest, self).tearDown()
+    super().tearDown()
 
   def set_artifact_set_for(self, managed_jar_target, artifact_set):
     JarDependencyManagement.global_instance()._artifact_set_map[

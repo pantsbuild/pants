@@ -1,27 +1,29 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import object
+from unittest.mock import Mock
 
-from mock import Mock
-
-from pants.cache.cache_setup import (CacheFactory, CacheSetup, CacheSpec, CacheSpecFormatError,
-                                     EmptyCacheSpecError, InvalidCacheSpecError,
-                                     LocalCacheSpecRequiredError, RemoteCacheSpecRequiredError,
-                                     TooManyCacheSpecsError)
+from pants.cache.cache_setup import (
+  CacheFactory,
+  CacheSetup,
+  CacheSpec,
+  CacheSpecFormatError,
+  EmptyCacheSpecError,
+  InvalidCacheSpecError,
+  LocalCacheSpecRequiredError,
+  RemoteCacheSpecRequiredError,
+  TooManyCacheSpecsError,
+)
 from pants.cache.local_artifact_cache import LocalArtifactCache
 from pants.cache.resolver import Resolver
 from pants.cache.restful_artifact_cache import RESTfulArtifactCache
 from pants.subsystem.subsystem import Subsystem
 from pants.task.task import Task
+from pants.testutil.mock_logger import MockLogger
+from pants.testutil.option.fakes import create_options
+from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir
-from pants_test.option.util.fakes import create_options
-from pants_test.test_base import TestBase
-from pants_test.testutils.mock_logger import MockLogger
 
 
 class DummyTask(Task):
@@ -30,12 +32,12 @@ class DummyTask(Task):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(DummyTask, cls).subsystem_dependencies() + (CacheSetup, )
+    return super().subsystem_dependencies() + (CacheSetup, )
 
   def execute(self): pass
 
 
-class MockPinger(object):
+class MockPinger:
 
   def __init__(self, hosts_to_times):
     self._hosts_to_times = hosts_to_times
@@ -66,7 +68,7 @@ class TestCacheSetup(TestBase):
                      self.pants_workdir)
 
   def setUp(self):
-    super(TestCacheSetup, self).setUp()
+    super().setUp()
 
     self.resolver = Mock(spec=Resolver)
     self.resolver.resolve = Mock(return_value=[self.REMOTE_URI_1, self.REMOTE_URI_2])

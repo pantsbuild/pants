@@ -1,10 +1,6 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from builtins import str
 
 from twitter.common.collections import OrderedSet
 
@@ -25,30 +21,26 @@ class Dependencies(ConsoleTask):
 
   @classmethod
   def register_options(cls, register):
-    super(Dependencies, cls).register_options(register)
+    super().register_options(register)
     register('--internal-only', type=bool,
              help='Specifies that only internal dependencies should be included in the graph '
                   'output (no external jars).')
     register('--external-only', type=bool,
              help='Specifies that only external dependencies should be included in the graph '
                   'output (only external jars).')
-    register('--transitive', default=True, type=bool,
-             help='List transitive dependencies. Disable to only list dependencies defined '
-                  'in target BUILD file(s).')
 
   def __init__(self, *args, **kwargs):
-    super(Dependencies, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
 
     self.is_internal_only = self.get_options().internal_only
     self.is_external_only = self.get_options().external_only
-    self._transitive = self.get_options().transitive
     if self.is_internal_only and self.is_external_only:
       raise TaskError('At most one of --internal-only or --external-only can be selected.')
 
   def console_output(self, unused_method_argument):
     ordered_closure = OrderedSet()
     for target in self.context.target_roots:
-      if self._transitive:
+      if self.act_transitively:
         target.walk(ordered_closure.add)
       else:
         ordered_closure.update(target.dependencies)

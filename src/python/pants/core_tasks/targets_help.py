@@ -1,10 +1,6 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from builtins import next
 
 from colors import blue, cyan, green
 
@@ -17,11 +13,11 @@ class TargetsHelp(ConsoleTask):
 
   @classmethod
   def register_options(cls, register):
-    super(TargetsHelp, cls).register_options(register)
+    super().register_options(register)
     register('--details', help='Show details about this target type.')
 
   def console_output(self, targets):
-    buildfile_aliases = self.context.build_file_parser.registered_aliases()
+    buildfile_aliases = self.context.build_configuration.registered_aliases()
     extracter = BuildDictionaryInfoExtracter(buildfile_aliases)
 
     alias = self.get_options().details

@@ -1,20 +1,13 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from builtins import object
-
-from future.utils import string_types
 
 from pants.backend.jvm.artifact import PublicationMetadata
 from pants.base.validation import assert_list
 
 
 def _validate_maybe_string(name, item):
-  if item and not isinstance(item, string_types):
-    raise ValueError('{} was expected to be of type {} but given {}'.format(name, type(item), item))
+  if item and not isinstance(item, str):
+    raise ValueError(f"{name} was expected to be of type str but given {type(item)}")
   return item
 
 
@@ -24,7 +17,7 @@ def _validate_string(name, item):
   return _validate_maybe_string(name, item)
 
 
-class Scm(object):
+class Scm:
   """Corresponds to the maven POM <scm/> element.
 
   Refer to the schema here: http://maven.apache.org/maven-v4_0_0.xsd
@@ -63,7 +56,7 @@ class Scm(object):
     return Scm(self.connection, self.developer_connection, self.url, tag=tag)
 
 
-class License(object):
+class License:
   """Corresponds to the maven POM <license/> element.
 
   Refer to the schema here: http://maven.apache.org/maven-v4_0_0.xsd
@@ -80,7 +73,7 @@ class License(object):
     self.comments = _validate_maybe_string('comments', comments)
 
 
-class Developer(object):
+class Developer:
   """Corresponds to the maven POM <developer/> element.
 
   Refer to the schema here: http://maven.apache.org/maven-v4_0_0.xsd

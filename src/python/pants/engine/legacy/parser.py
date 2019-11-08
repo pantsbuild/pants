@@ -1,17 +1,10 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import os
 import tokenize
-from builtins import object
-from io import BytesIO, StringIO
-
-import six
-from future.utils import PY3
+from io import StringIO
 
 from pants.base.build_file_target_factory import BuildFileTargetFactory
 from pants.base.parse_context import ParseContext
@@ -46,7 +39,7 @@ class LegacyPythonCallbacksParser(Parser):
       import statements. Valid values: "allow", "warn", "error".
     :type build_file_imports_behavior: string
     """
-    super(LegacyPythonCallbacksParser, self).__init__()
+    super().__init__()
     self._symbols, self._parse_context = self._generate_symbols(symbol_table, aliases)
     self._build_file_imports_behavior = build_file_imports_behavior
 
@@ -91,7 +84,7 @@ class LegacyPythonCallbacksParser(Parser):
         else:
           return self._object_type(*args, **kwargs)
 
-    for alias, symbol in symbol_table.table().items():
+    for alias, symbol in symbol_table.table.items():
       registrar = Registrar(parse_context, alias, symbol)
       symbols[alias] = registrar
       symbols[symbol] = registrar
@@ -111,7 +104,7 @@ class LegacyPythonCallbacksParser(Parser):
     # TODO: Replace builtins for paths with objects that will create wrapped PathGlobs objects.
     # The strategy for https://github.com/pantsbuild/pants/issues/3560 should account for
     # migrating these additional captured arguments to typed Sources.
-    class GlobWrapper(object):
+    class GlobWrapper:
       def __init__(self, parse_context, glob_type):
         self._parse_context = parse_context
         self._glob_type = glob_type
@@ -128,7 +121,7 @@ class LegacyPythonCallbacksParser(Parser):
     return symbols, parse_context
 
   def parse(self, filepath, filecontent):
-    python = filecontent.decode('utf-8') if PY3 else filecontent
+    python = filecontent.decode()
 
     # Mutate the parse context for the new path, then exec, and copy the resulting objects.
     # We execute with a (shallow) clone of the symbols as a defense against accidental
@@ -136,7 +129,7 @@ class LegacyPythonCallbacksParser(Parser):
     # _intentional_ mutation would require a deep clone, which doesn't seem worth the cost at
     # this juncture.
     self._parse_context._storage.clear(os.path.dirname(filepath))
-    six.exec_(python, dict(self._symbols))
+    exec(python, dict(self._symbols))
 
     # Perform this check after successful execution, so we know the python is valid (and should
     # tokenize properly!)
@@ -144,12 +137,12 @@ class LegacyPythonCallbacksParser(Parser):
     # But it's sufficient to tell most users who aren't being actively malicious that they're doing
     # something wrong, and it has a low performance overhead.
     if self._build_file_imports_behavior != 'allow' and 'import' in python:
-      io_wrapped_python = StringIO(python) if PY3 else BytesIO(python)
+      io_wrapped_python = StringIO(python)
       for token in tokenize.generate_tokens(io_wrapped_python.readline):
         if token[1] == 'import':
           line_being_tokenized = token[4]
           if self._build_file_imports_behavior == 'warn':
-            logger.warn('{} tried to import - import statements should be avoided ({})'.format(
+            logger.warning('{} tried to import - import statements should be avoided ({})'.format(
               filepath,
               line_being_tokenized
             ))

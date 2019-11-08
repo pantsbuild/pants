@@ -4,7 +4,6 @@
 python_library(
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python:future',
     '3rdparty/python:setproctitle',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
     'src/python/pants/base:build_environment',
@@ -42,7 +41,6 @@ python_library(
     'src/python/pants/subsystem',
     'src/python/pants/task',
     'src/python/pants/util:contextutil',
-    'src/python/pants/util:collections',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:filtering',
     'src/python/pants/util:memo',
@@ -60,17 +58,37 @@ python_binary(
   dependencies=[
     ':bin',
   ],
+  # We depend on twitter.common libraries that trigger pex warnings for not properly declaring their
+  # dependency on setuptools (for namespace package support).
+  emit_warnings=False,
 )
 
-# This binary is for internal use only.  It adds deps on both internal_backends not meant for
-# publishing in the `pantsbuild.pants` sdist as well as deps on backend plugins published as
-# separate sdists from the core `pantsbuild.pants` sdist that this repo uses.
+# This binary is for internal use only. It adds deps on internal_backends and build-support config
+# files, both of which are not meant for publishing in the `pantsbuild.pants` sdist. It also adds
+# deps on contrib plugins published as separate sdists from the core `pantsbuild.pants` sdist that
+# this repo uses.
 python_binary(
   name='pants_local_binary',
   entry_point='pants.bin.pants_loader:main',
   dependencies=[
     ':bin',
-    'contrib/python/src/python/pants/contrib/python/checks/tasks/checkstyle',
+    '//:build_root',
+    '//:build_tools',
+    '//:pants_ini',
+    '//:3rdparty_directory',
+    '//:pyproject',
+    'build-support/checkstyle',
+    'build-support/eslint',
+    'build-support/ivy',
+    'build-support/mypy',
+    'build-support/pylint',
+    'build-support/regexes',
+    'build-support/scalafmt',
+    'build-support/scalastyle',
+    'contrib:plugins',
     'pants-plugins/src/python/internal_backend:plugins',
   ],
+  # We depend on twitter.common libraries that trigger pex warnings for not properly declaring their
+  # dependency on setuptools (for namespace package support).
+  emit_warnings=False,
 )

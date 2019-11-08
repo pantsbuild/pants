@@ -1,16 +1,14 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
+import dataclasses
 import logging
-from builtins import str, zip
 from collections import defaultdict, deque
 from contextlib import contextmanager
+from dataclasses import dataclass
 from os.path import dirname
+from typing import Any, Tuple
 
-from future.utils import iteritems
 from twitter.common.collections import OrderedSet
 
 from pants.base.exceptions import TargetDefinitionException
@@ -19,29 +17,28 @@ from pants.base.specs import AscendantAddresses, DescendantAddresses, SingleAddr
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.app_base import AppBase, Bundle
+from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.remote_sources import RemoteSources
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
-from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
+from pants.engine.legacy.structs import BundleAdaptor, BundlesField, HydrateableField, SourcesField
 from pants.engine.mapper import AddressMapper
 from pants.engine.objects import Collection
-from pants.engine.parser import SymbolTable, TargetAdaptorContainer
+from pants.engine.parser import HydratedStruct
 from pants.engine.rules import RootRule, rule
-from pants.engine.selectors import Get, Select
+from pants.engine.selectors import Get
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.source.filespec import any_matches_filespec
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
-from pants.util.objects import datatype
 
 
 logger = logging.getLogger(__name__)
 
 
-def target_types_from_symbol_table(symbol_table):
-  """Given a LegacySymbolTable, return the concrete target types constructed for each alias."""
-  aliases = symbol_table.aliases()
+def target_types_from_build_file_aliases(aliases):
+  """Given BuildFileAliases, return the concrete target types constructed for each alias."""
   target_types = dict(aliases.target_types)
   for alias, factory in aliases.target_macro_factories.items():
     target_type, = factory.target_types
@@ -49,11 +46,13 @@ def target_types_from_symbol_table(symbol_table):
   return target_types
 
 
-class _DestWrapper(datatype(['target_types'])):
+@dataclass(frozen=True)
+class _DestWrapper:
   """A wrapper for dest field of RemoteSources target.
 
   This is only used when instantiating RemoteSources target.
   """
+  target_types: Any
 
 
 class LegacyBuildGraph(BuildGraph):
@@ -63,20 +62,19 @@ class LegacyBuildGraph(BuildGraph):
   """
 
   @classmethod
-  def create(cls, scheduler, symbol_table):
-    """Construct a graph given a Scheduler, Engine, and a SymbolTable class."""
-    return cls(scheduler, target_types_from_symbol_table(symbol_table))
+  def create(cls, scheduler, build_file_aliases):
+    """Construct a graph given a Scheduler and BuildFileAliases."""
+    return cls(scheduler, target_types_from_build_file_aliases(build_file_aliases))
 
   def __init__(self, scheduler, target_types):
-    """Construct a graph given a Scheduler, Engine, and a SymbolTable class.
+    """Construct a graph given a Scheduler, and set of target type aliases.
 
     :param scheduler: A Scheduler that is configured to be able to resolve TransitiveHydratedTargets.
-    :param symbol_table: A SymbolTable instance used to instantiate Target objects. Must match
-      the symbol table installed in the scheduler (TODO: see comment in `_instantiate_target`).
+    :param target_types: A dict mapping aliases to target types.
     """
     self._scheduler = scheduler
     self._target_types = target_types
-    super(LegacyBuildGraph, self).__init__()
+    super().__init__()
 
   def clone_new(self):
     """Returns a new BuildGraph instance of the same type and with the same __init__ params."""
@@ -145,13 +143,7 @@ class LegacyBuildGraph(BuildGraph):
     return target
 
   def _instantiate_target(self, target_adaptor):
-    """Given a TargetAdaptor struct previously parsed from a BUILD file, instantiate a Target.
-
-    TODO: This assumes that the SymbolTable used for parsing matches the SymbolTable passed
-    to this graph. Would be good to make that more explicit, but it might be better to nuke
-    the Target subclassing pattern instead, and lean further into the "configuration composition"
-    model explored in the `exp` package.
-    """
+    """Given a TargetAdaptor struct previously parsed from a BUILD file, instantiate a Target."""
     target_cls = self._target_types[target_adaptor.type_alias]
     try:
       # Pop dependencies, which were already consumed during construction.
@@ -187,21 +179,6 @@ class LegacyBuildGraph(BuildGraph):
     kwargs['dest'] = _DestWrapper((self._target_types[kwargs['dest']],))
     return RemoteSources(build_graph=self, **kwargs)
 
-  def inject_synthetic_target(self,
-                              address,
-                              target_type,
-                              dependencies=None,
-                              derived_from=None,
-                              **kwargs):
-    target = target_type(name=address.target_name,
-                         address=address,
-                         build_graph=self,
-                         **kwargs)
-    self.inject_target(target,
-                       dependencies=dependencies,
-                       derived_from=derived_from,
-                       synthetic=True)
-
   def inject_address_closure(self, address):
     self.inject_addresses_closure([address])
 
@@ -210,8 +187,7 @@ class LegacyBuildGraph(BuildGraph):
     if not addresses:
       return
     dependencies = tuple(SingleAddress(a.spec_path, a.target_name) for a in addresses)
-    specs = [Specs(dependencies=tuple(dependencies))]
-    for _ in self._inject_specs(specs):
+    for _ in self._inject_specs(Specs(dependencies=tuple(dependencies))):
       pass
 
   def inject_roots_closure(self, target_roots, fail_fast=None):
@@ -219,9 +195,8 @@ class LegacyBuildGraph(BuildGraph):
       yield address
 
   def inject_specs_closure(self, specs, fail_fast=None):
-    specs = [Specs(dependencies=tuple(specs))]
     # Request loading of these specs.
-    for address in self._inject_specs(specs):
+    for address in self._inject_specs(Specs(dependencies=tuple(specs))):
       yield address
 
   def resolve_address(self, address):
@@ -257,18 +232,18 @@ class LegacyBuildGraph(BuildGraph):
         yielded_addresses.add(address)
         yield address
 
-  def _inject_specs(self, subjects):
-    """Injects targets into the graph for each of the given `Spec` objects.
+  def _inject_specs(self, specs):
+    """Injects targets into the graph for the given `Specs` object.
 
     Yields the resulting addresses.
     """
-    if not subjects:
+    if not specs:
       return
 
-    logger.debug('Injecting specs to %s: %s', self, subjects)
+    logger.debug('Injecting specs to %s: %s', self, specs)
     with self._resolve_context():
       thts, = self._scheduler.product_request(TransitiveHydratedTargets,
-                                              subjects)
+                                              [specs])
 
     self._index(thts.closure)
 
@@ -318,7 +293,7 @@ class _DependentGraph(object):
 
   def _validate(self, all_valid_addresses):
     """Validate that all of the dependencies in the graph exist in the given addresses set."""
-    for dependency, dependents in iteritems(self._dependent_address_map):
+    for dependency, dependents in self._dependent_address_map.items():
       if dependency not in all_valid_addresses:
         raise AddressLookupError(
             'Dependent graph construction failed: {} did not exist. Was depended on by:\n  {}'.format(
@@ -368,12 +343,16 @@ class _DependentGraph(object):
     return result
 
 
-class HydratedTarget(datatype(['address', 'adaptor', 'dependencies'])):
+@dataclass(frozen=True)
+class HydratedTarget:
   """A wrapper for a fully hydrated TargetAdaptor object.
 
   Transitive graph walks collect ordered sets of TransitiveHydratedTargets which involve a huge amount
   of hashing: we implement eq/hash via direct usage of an Address field to speed that up.
   """
+  address: Any
+  adaptor: Any
+  dependencies: Any
 
   @property
   def addresses(self):
@@ -385,31 +364,39 @@ class HydratedTarget(datatype(['address', 'adaptor', 'dependencies'])):
 
 # TODO: add type-checking to datatype fields in this file! Tuple fields such as 'dependencies' need
 # some groundwork to be more ergonomic -- see #6936 for one possible implementation.
-class TransitiveHydratedTarget(datatype([('root', HydratedTarget), 'dependencies'])):
+@dataclass(frozen=True)
+class TransitiveHydratedTarget:
   """A recursive structure wrapping a HydratedTarget root and TransitiveHydratedTarget deps."""
+  root: HydratedTarget
+  dependencies: Any
 
 
-class TransitiveHydratedTargets(datatype(['roots', 'closure'])):
+@dataclass(frozen=True)
+class TransitiveHydratedTargets:
   """A set of HydratedTarget roots, and their transitive, flattened, de-duped closure."""
+  roots: Any
+  closure: Any
 
 
-class HydratedTargets(Collection.of(HydratedTarget)):
+class HydratedTargets(Collection[HydratedTarget]):
   """An intransitive set of HydratedTarget objects."""
 
 
-class OwnersRequest(datatype([
-  ('sources', tuple),
-  ('include_dependees', str),
-])):
-  """A request for the owners (and optionally, transitive dependees) of a set of file paths.
-
-  TODO: `include_dependees` should become an `enum` of the choices from the
-  `--changed-include-dependees` global option.
-  """
+@dataclass(frozen=True)
+class OwnersRequest:
+  """A request for the owners (and optionally, transitive dependees) of a set of file paths."""
+  sources: Tuple
+  # TODO: `include_dependees` should become an `enum` of the choices from the
+  # `--changed-include-dependees` global option.
+  include_dependees: str
 
 
-@rule(BuildFileAddresses, [Select(SymbolTable), Select(AddressMapper), Select(OwnersRequest)])
-def find_owners(symbol_table, address_mapper, owners_request):
+@rule
+def find_owners(
+  build_configuration: BuildConfiguration,
+  address_mapper: AddressMapper,
+  owners_request: OwnersRequest
+) -> BuildFileAddresses:
   sources_set = OrderedSet(owners_request.sources)
   dirs_set = OrderedSet(dirname(source) for source in sources_set)
 
@@ -445,10 +432,11 @@ def find_owners(symbol_table, address_mapper, owners_request):
   else:
     # Otherwise: find dependees.
     all_addresses = yield Get(BuildFileAddresses, Specs((DescendantAddresses(''),)))
-    all_structs = yield [Get(TargetAdaptorContainer, Address, a.to_address()) for a in all_addresses]
+    all_structs = yield [Get(HydratedStruct, Address, a.to_address()) for a in all_addresses]
     all_structs = [s.value for s in all_structs]
 
-    graph = _DependentGraph.from_iterable(target_types_from_symbol_table(symbol_table),
+    bfa = build_configuration.registered_aliases()
+    graph = _DependentGraph.from_iterable(target_types_from_build_file_aliases(bfa),
                                           address_mapper,
                                           all_structs)
     if owners_request.include_dependees == 'direct':
@@ -458,8 +446,10 @@ def find_owners(symbol_table, address_mapper, owners_request):
       yield BuildFileAddresses(tuple(graph.transitive_dependents_of_addresses(direct_owners)))
 
 
-@rule(TransitiveHydratedTargets, [Select(BuildFileAddresses)])
-def transitive_hydrated_targets(build_file_addresses):
+@rule
+def transitive_hydrated_targets(
+  build_file_addresses: BuildFileAddresses
+) -> TransitiveHydratedTargets:
   """Given BuildFileAddresses, kicks off recursion on expansion of TransitiveHydratedTargets.
 
   The TransitiveHydratedTarget struct represents a structure-shared graph, which we walk
@@ -484,38 +474,39 @@ def transitive_hydrated_targets(build_file_addresses):
   yield TransitiveHydratedTargets(tuple(tht.root for tht in transitive_hydrated_targets), closure)
 
 
-@rule(TransitiveHydratedTarget, [Select(HydratedTarget)])
-def transitive_hydrated_target(root):
+@rule
+def transitive_hydrated_target(root: HydratedTarget) -> TransitiveHydratedTarget:
   dependencies = yield [Get(TransitiveHydratedTarget, Address, d) for d in root.dependencies]
   yield TransitiveHydratedTarget(root, dependencies)
 
 
-@rule(HydratedTargets, [Select(BuildFileAddresses)])
-def hydrated_targets(build_file_addresses):
+@rule
+def hydrated_targets(build_file_addresses: BuildFileAddresses) -> HydratedTargets:
   """Requests HydratedTarget instances for BuildFileAddresses."""
   targets = yield [Get(HydratedTarget, Address, a) for a in build_file_addresses.addresses]
   yield HydratedTargets(targets)
 
 
-class HydratedField(datatype(['name', 'value'])):
+@dataclass(frozen=True)
+class HydratedField:
   """A wrapper for a fully constructed replacement kwarg for a HydratedTarget."""
+  name: Any
+  value: Any
 
 
-@rule(HydratedTarget, [Select(TargetAdaptorContainer)])
-def hydrate_target(target_adaptor_container):
-  target_adaptor = target_adaptor_container.value
+@rule
+def hydrate_target(hydrated_struct: HydratedStruct) -> HydratedTarget:
+  target_adaptor = hydrated_struct.value
   """Construct a HydratedTarget from a TargetAdaptor and hydrated versions of its adapted fields."""
   # Hydrate the fields of the adaptor and re-construct it.
-  hydrated_fields = yield [(Get(HydratedField, BundlesField, fa)
-                            if type(fa) is BundlesField
-                            else Get(HydratedField, SourcesField, fa))
+  hydrated_fields = yield [Get(HydratedField, HydrateableField, fa)
                            for fa in target_adaptor.field_adaptors]
   kwargs = target_adaptor.kwargs()
   for field in hydrated_fields:
     kwargs[field.name] = field.value
   yield HydratedTarget(target_adaptor.address,
-                        TargetAdaptor(**kwargs),
-                        tuple(target_adaptor.dependencies))
+                       type(target_adaptor)(**kwargs),
+                       tuple(target_adaptor.dependencies))
 
 
 def _eager_fileset_with_spec(spec_path, filespec, snapshot, include_dirs=False):
@@ -532,13 +523,17 @@ def _eager_fileset_with_spec(spec_path, filespec, snapshot, include_dirs=False):
                               include_dirs=include_dirs)
 
 
-@rule(HydratedField, [Select(SourcesField), Select(GlobMatchErrorBehavior)])
-def hydrate_sources(sources_field, glob_match_error_behavior):
+@rule
+def hydrate_sources(
+  sources_field: SourcesField, glob_match_error_behavior: GlobMatchErrorBehavior
+) -> HydratedField:
   """Given a SourcesField, request a Snapshot for its path_globs and create an EagerFilesetWithSpec.
   """
   # TODO(#5864): merge the target's selection of --glob-expansion-failure (which doesn't exist yet)
   # with the global default!
-  path_globs = sources_field.path_globs.copy(glob_match_error_behavior=glob_match_error_behavior)
+  path_globs = dataclasses.replace(
+    sources_field.path_globs, glob_match_error_behavior=glob_match_error_behavior
+  )
   snapshot = yield Get(Snapshot, PathGlobs, path_globs)
   fileset_with_spec = _eager_fileset_with_spec(
     sources_field.address.spec_path,
@@ -548,11 +543,13 @@ def hydrate_sources(sources_field, glob_match_error_behavior):
   yield HydratedField(sources_field.arg, fileset_with_spec)
 
 
-@rule(HydratedField, [Select(BundlesField), Select(GlobMatchErrorBehavior)])
-def hydrate_bundles(bundles_field, glob_match_error_behavior):
+@rule
+def hydrate_bundles(
+  bundles_field: BundlesField, glob_match_error_behavior: GlobMatchErrorBehavior
+) -> HydratedField:
   """Given a BundlesField, request Snapshots for each of its filesets and create BundleAdaptors."""
   path_globs_with_match_errors = [
-    pg.copy(glob_match_error_behavior=glob_match_error_behavior)
+    dataclasses.replace(pg, glob_match_error_behavior=glob_match_error_behavior)
     for pg in bundles_field.path_globs_list
   ]
   snapshot_list = yield [Get(Snapshot, PathGlobs, pg) for pg in path_globs_with_match_errors]

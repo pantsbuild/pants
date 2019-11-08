@@ -1,14 +1,11 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import itertools
 import logging
-from abc import abstractmethod
-from builtins import filter, object
-from collections import defaultdict, deque
+import weakref
+from abc import ABC, abstractmethod
+from collections import OrderedDict, defaultdict, deque
 
 from twitter.common.collections import OrderedSet
 
@@ -16,14 +13,12 @@ from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.injectables_mixin import InjectablesMixin
 from pants.build_graph.target import Target
-from pants.util.collections_abc_backport import OrderedDict
-from pants.util.meta import AbstractClass
 
 
 logger = logging.getLogger(__name__)
 
 
-class BuildGraph(AbstractClass):
+class BuildGraph(ABC):
   """A directed acyclic graph of Targets and dependencies. Not necessarily connected.
 
   :API: public
@@ -51,7 +46,7 @@ class BuildGraph(AbstractClass):
       super(BuildGraph.ManualSyntheticTargetError, self).__init__(
           'Found a manually-defined target at synthetic address {}'.format(addr.spec))
 
-  class NoDepPredicateWalk(object):
+  class NoDepPredicateWalk:
     """This is a utility class to aid in graph traversals that don't have predicates on dependency edges."""
 
     def __init__(self):
@@ -98,6 +93,7 @@ class BuildGraph(AbstractClass):
     return Target.closure_for_targets(*vargs, **kwargs)
 
   def __init__(self):
+    self._invalidation_callbacks = []
     self.reset()
 
   def __len__(self):
@@ -126,12 +122,29 @@ class BuildGraph(AbstractClass):
 
     :API: public
     """
+    self._invalidated()
     self._target_by_address = OrderedDict()
     self._target_dependencies_by_address = defaultdict(OrderedSet)
     self._target_dependees_by_address = defaultdict(OrderedSet)
     self._derived_from_by_derivative = {}  # Address -> Address.
     self._derivatives_by_derived_from = defaultdict(list)   # Address -> list of Address.
     self.synthetic_addresses = set()
+
+  def add_invalidation_callback(self, callback):
+    """Adds a no-arg function that will be called whenever the graph is changed.
+
+    This interface exists to allow for invalidation of caches as the graph changes (due to injected
+    targets: generally synthetic). We should continue to move away from mutability in order to make
+    this kind of interface unnecessary, but synthetic targets are a fundamental part of the v1 model
+    that can likely only be removed via v2.
+    """
+    self._invalidation_callbacks.append(weakref.ref(callback))
+
+  def _invalidated(self):
+    for callback_ref in self._invalidation_callbacks:
+      callback = callback_ref()
+      if callback is not None:
+        callback()
 
   def contains_address(self, address):
     """
@@ -240,6 +253,7 @@ class BuildGraph(AbstractClass):
     :param bool synthetic: Whether to flag this target as synthetic, even if it isn't derived
       from another target.
     """
+    self._invalidated()
     if self.contains_address(target.address):
       raise ValueError('Attempted to inject synthetic {target} derived from {derived_from}'
                        ' into the BuildGraph with address {address}, but there is already a Target'
@@ -290,6 +304,7 @@ class BuildGraph(AbstractClass):
       is being added.
     :param Address dependency: The dependency to be injected.
     """
+    self._invalidated()
     if dependent not in self._target_by_address:
       raise ValueError('Cannot inject dependency from {dependent} on {dependency} because the'
                        ' dependent is not in the BuildGraph.'
@@ -533,7 +548,6 @@ class BuildGraph(AbstractClass):
           to_walk.append((level + 1, dep_address))
     return ordered_closure
 
-  @abstractmethod
   def inject_synthetic_target(self,
                               address,
                               target_type,
@@ -553,6 +567,14 @@ class BuildGraph(AbstractClass):
       from the `derived_from`.
     :param Target derived_from: The Target this Target will derive from.
     """
+    target = target_type(name=address.target_name,
+                         address=address,
+                         build_graph=self,
+                         **kwargs)
+    self.inject_target(target,
+                       dependencies=dependencies,
+                       derived_from=derived_from,
+                       synthetic=True)
 
   def maybe_inject_address_closure(self, address):
     """If the given address is not already injected to the graph, calls inject_address_closure.
@@ -615,7 +637,7 @@ class CycleException(Exception):
   """
 
   def __init__(self, cycle):
-    super(CycleException, self).__init__('Cycle detected:\n\t{}'.format(
+    super().__init__('Cycle detected:\n\t{}'.format(
         ' ->\n\t'.join(target.address.spec for target in cycle)
     ))
 

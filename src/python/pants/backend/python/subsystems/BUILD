@@ -2,18 +2,31 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  dependencies = [
-    '3rdparty/python:future',
-    '3rdparty/python:pex',
-    '3rdparty/python:setuptools',
+  dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python:dataclasses',
+    '3rdparty/python:pex',
+    'src/python/pants/backend/native/subsystems',
+    'src/python/pants/backend/native/targets',
+    'src/python/pants/backend/python/targets',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
-    'src/python/pants/backend/python/targets',
     'src/python/pants/build_graph',
     'src/python/pants/option',
     'src/python/pants/subsystem',
     'src/python/pants/util:memo',
-    'src/python/pants/util:process_handler',
+  ],
+)
+
+python_tests(
+  name='tests',
+  dependencies=[
+    '3rdparty/python:pex',
+    ':subsystems',
+    'src/python/pants/backend/python/targets',
+    'src/python/pants/build_graph',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/testutil/subsystem',
+    'src/python/pants/testutil:test_base',
   ],
 )

@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import functools
 import os
@@ -38,7 +35,7 @@ class LambdexRun(Task):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(LambdexRun, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data(LambdexPrep.tool_instance_cls)
     round_manager.require('pex_archives')
 
@@ -48,7 +45,7 @@ class LambdexRun(Task):
 
   def execute(self):
     targets = self.get_targets(self._is_python_lambda)
-    with self.invalidated(targets=targets) as invalidation_check:
+    with self.invalidated(targets=targets, invalidate_dependents=True) as invalidation_check:
       python_lambda_product = self.context.products.get_data('python_aws_lambda', dict)
       for vt in invalidation_check.all_vts:
         lambda_path = os.path.join(vt.results_dir, '{}.pex'.format(vt.target.name))

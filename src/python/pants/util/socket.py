@@ -1,14 +1,9 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-import errno
 import io
-import select
+import selectors
 import socket
-from builtins import object
 
 
 def teardown_socket(s):
@@ -21,20 +16,19 @@ def teardown_socket(s):
     s.close()
 
 
-def safe_select(*args, **kwargs):
-  # N.B. This while loop is purely to facilitate SA_RESTART-like behavior for select(), which is
-  # (apparently) not covered by signal.siginterrupt(signal.SIGINT, False) when a timeout is passed.
-  # This helps avoid an unhandled select.error(4, 'Interrupted system call') on SIGINT.
-  # See https://bugs.python.org/issue12224 for more info.
-  while 1:
-    try:
-      return select.select(*args, **kwargs)
-    except (OSError, select.error) as e:
-      if e[0] != errno.EINTR:
-        raise
+def is_readable(fileobj, *, timeout=None):
+  """Check that the file-like resource is readable within the given timeout via polling.
+  :param Union[int, SupportsFileNo] fileobj:
+  :param Optional[int] timeout: (in seconds)
+  :return bool
+  """
+  with selectors.DefaultSelector() as selector:
+    selector.register(fileobj, selectors.EVENT_READ)
+    events = selector.select(timeout=timeout)
+  return bool(events)
 
 
-class RecvBufferedSocket(object):
+class RecvBufferedSocket:
   """A socket wrapper that simplifies recv() buffering."""
 
   def __init__(self, sock, chunk_size=io.DEFAULT_BUFFER_SIZE, select_timeout=None):
@@ -63,11 +57,9 @@ class RecvBufferedSocket(object):
     """Buffers up to _chunk_size bytes when the internal buffer has less than `bufsize` bytes."""
     assert bufsize > 0, 'a positive bufsize is required'
 
-    if len(self._buffer) < bufsize:
-      readable, _, _ = safe_select([self._socket], [], [], self._select_timeout)
-      if readable:
-        recvd = self._socket.recv(max(self._chunk_size, bufsize))
-        self._buffer = self._buffer + recvd
+    if len(self._buffer) < bufsize and is_readable(self._socket, timeout=self._select_timeout):
+      recvd = self._socket.recv(max(self._chunk_size, bufsize))
+      self._buffer = self._buffer + recvd
     return_buf, self._buffer = self._buffer[:bufsize], self._buffer[bufsize:]
     return return_buf
 

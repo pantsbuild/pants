@@ -1,15 +1,9 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-import os.path
-from builtins import range, str
+import unittest.mock
 from hashlib import sha1
-
-import mock
-from future.utils import PY3
+from pathlib import Path
 
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
@@ -19,8 +13,8 @@ from pants.build_graph.address import Address
 from pants.build_graph.target import Target
 from pants.build_graph.target_scopes import Scopes
 from pants.source.wrapped_globs import Globs
-from pants_test.subsystem.subsystem_util import init_subsystem
-from pants_test.test_base import TestBase
+from pants.testutil.subsystem.util import init_subsystem
+from pants.testutil.test_base import TestBase
 
 
 class ImplicitSourcesTestingTarget(Target):
@@ -39,7 +33,7 @@ class SourcesTarget(Target):
                                                            sources_rel_path=address.spec_path,
                                                            key_arg='sources'))
     payload.add_field('exports', PrimitivesSetField(exports or []))
-    super(SourcesTarget, self).__init__(address=address, payload=payload, **kwargs)
+    super().__init__(address=address, payload=payload, **kwargs)
 
   @property
   def export_specs(self):
@@ -110,11 +104,33 @@ class TargetTest(TestBase):
     target = self.make_target('foo:bar', Target, foobar='barfoo')
     self.assertFalse(hasattr(target, 'foobar'))
 
+  def test_tags_applied_from_configured_dict(self):
+    options = {Target.TagAssignments.options_scope: {
+      'tag_targets_mappings': {
+        'special_tag': ['foo:bar', 'path/to/target:foo', 'path/to/target'],
+        'special_tag2': ['path/to/target:target', '//base:foo'],
+        'nonextant_target_tag': ['i/dont/exist'],
+      }
+    }}
+
+    init_subsystem(Target.TagAssignments, options)
+    target1 = self.make_target('foo:bar', Target, tags=['tag1', 'tag2'])
+    target2 = self.make_target('path/to/target:foo', Target, tags=['tag1'])
+    target3 = self.make_target('path/to/target', Target, tags=['tag2'])
+    target4 = self.make_target('//base:foo', Target, tags=['tag3'])
+    target5 = self.make_target('baz:qux', Target, tags=['tag3'])
+
+    self.assertEqual({'tag1', 'tag2', 'special_tag'}, target1.tags)
+    self.assertEqual({'tag1', 'special_tag'}, target2.tags)
+    self.assertEqual({'tag2', 'special_tag', 'special_tag2'}, target3.tags)
+    self.assertEqual({'tag3', 'special_tag2'}, target4.tags)
+    self.assertEqual({'tag3'}, target5.tags)
+
   def test_target_id_long(self):
     long_path = 'dummy'
-    for i in range(1,30):
-      long_path = os.path.join(long_path, 'dummy{}'.format(i))
-    long_target = self.make_target('{}:foo'.format(long_path), Target)
+    for i in range(1, 30):
+      long_path = Path(long_path, f'dummy{i}')
+    long_target = self.make_target(f'{long_path}:foo', Target)
     long_id = long_target.id
     self.assertEqual(len(long_id), 100)
     self.assertTrue(long_id.startswith('dummy.dummy1.'))
@@ -122,9 +138,9 @@ class TargetTest(TestBase):
 
   def test_target_id_short(self):
     short_path = 'dummy'
-    for i in range(1,10):
-      short_path = os.path.join(short_path, 'dummy{}'.format(i))
-    short_target = self.make_target('{}:foo'.format(short_path), Target)
+    for i in range(1, 10):
+      short_path = Path(short_path, f'dummy{i}')
+    short_target = self.make_target(f'{short_path}:foo', Target)
     short_id = short_target.id
     self.assertEqual(short_id,
                      'dummy.dummy1.dummy2.dummy3.dummy4.dummy5.dummy6.dummy7.dummy8.dummy9.foo')
@@ -135,17 +151,16 @@ class TargetTest(TestBase):
     # No key_arg.
     with self.assertRaises(TargetDefinitionException) as cm:
       target.create_sources_field(sources='a-string', sources_rel_path='')
-    self.assertIn("Expected a glob, an address or a list, but was {}"
-                  .format('<class \'str\'>' if PY3 else '<type \'unicode\'>'),
-                  str(cm.exception))
+    self.assertIn("Expected a glob, an address or a list, but was <class 'str'>", str(cm.exception))
 
     # With key_arg.
     with self.assertRaises(TargetDefinitionException) as cm:
       target.create_sources_field(sources='a-string', sources_rel_path='', key_arg='my_cool_field')
-    self.assertIn("Expected 'my_cool_field' to be a glob, an address or a list, but was {}"
-                  .format('<class \'str\'>' if PY3 else '<type \'unicode\'>'),
-                  str(cm.exception))
-    #could also test address case, but looks like nothing really uses it.
+    self.assertIn(
+      "Expected 'my_cool_field' to be a glob, an address or a list, but was <class 'str'>",
+      str(cm.exception)
+    )
+    # could also test address case, but looks like nothing really uses it.
 
   def test_max_recursion(self):
     target_a = self.make_target('a', Target)
@@ -163,21 +178,21 @@ class TargetTest(TestBase):
     hasher = sha1()
     dep_hash = hasher.hexdigest()[:12]
     target_hash = target_a.invalidation_hash()
-    hash_value = '{}.{}'.format(target_hash, dep_hash)
+    hash_value = f'{target_hash}.{dep_hash}'
     self.assertEqual(hash_value, target_a.transitive_invalidation_hash())
 
     hasher = sha1()
-    hasher.update(hash_value.encode('utf-8'))
+    hasher.update(hash_value.encode())
     dep_hash = hasher.hexdigest()[:12]
     target_hash = target_b.invalidation_hash()
-    hash_value = '{}.{}'.format(target_hash, dep_hash)
+    hash_value = f'{target_hash}.{dep_hash}'
     self.assertEqual(hash_value, target_b.transitive_invalidation_hash())
 
     hasher = sha1()
-    hasher.update(hash_value.encode('utf-8'))
+    hasher.update(hash_value.encode())
     dep_hash = hasher.hexdigest()[:12]
     target_hash = target_c.invalidation_hash()
-    hash_value = '{}.{}'.format(target_hash, dep_hash)
+    hash_value = f'{target_hash}.{dep_hash}'
     self.assertEqual(hash_value, target_c.transitive_invalidation_hash())
 
     # Check direct invalidation.
@@ -187,10 +202,10 @@ class TargetTest(TestBase):
 
     fingerprint_strategy = TestFingerprintStrategy()
     hasher = sha1()
-    hasher.update(target_b.invalidation_hash(fingerprint_strategy=fingerprint_strategy).encode('utf-8'))
+    hasher.update(target_b.invalidation_hash(fingerprint_strategy=fingerprint_strategy).encode())
     dep_hash = hasher.hexdigest()[:12]
     target_hash = target_c.invalidation_hash(fingerprint_strategy=fingerprint_strategy)
-    hash_value = '{}.{}'.format(target_hash, dep_hash)
+    hash_value = f'{target_hash}.{dep_hash}'
     self.assertEqual(hash_value, target_c.transitive_invalidation_hash(fingerprint_strategy=fingerprint_strategy))
 
   def test_has_sources(self):
@@ -272,7 +287,7 @@ class TargetTest(TestBase):
 
   def test_strict_dependencies(self):
     self._generate_strict_dependencies()
-    dep_context = mock.Mock()
+    dep_context = unittest.mock.Mock()
     dep_context.types_with_closure = ()
     dep_context.codegen_types = ()
     dep_context.alias_types = (Target,)

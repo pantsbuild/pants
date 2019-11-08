@@ -1,19 +1,16 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import filecmp
 import logging
 import os
 import shutil
 
-from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.binaries.binary_tool import NativeTool
+from pants.binaries.binary_util import BinaryToolUrlGenerator
 from pants.option.custom_types import dir_option, file_option
-from pants.util.dirutil import safe_mkdir, safe_rmtree
+from pants.util.dirutil import is_readable_dir, safe_mkdir, safe_rmtree
 from pants.util.memo import memoized_method, memoized_property
 
 from pants.contrib.node.subsystems.command import command_gen
@@ -29,6 +26,20 @@ from pants.contrib.node.subsystems.yarnpkg_distribution import YarnpkgDistributi
 logger = logging.getLogger(__name__)
 
 
+class NodeReleaseUrlGenerator(BinaryToolUrlGenerator):
+
+  _DIST_URL_FMT = 'https://nodejs.org/dist/{version}/node-{version}-{system_id}.tar.gz'
+
+  _SYSTEM_ID = {
+    'mac': 'darwin-x64',
+    'linux': 'linux-x64',
+  }
+
+  def generate_urls(self, version, host_platform):
+    system_id = self._SYSTEM_ID[host_platform.os_name]
+    return [self._DIST_URL_FMT.format(version=version, system_id=system_id)]
+
+
 class NodeDistribution(NativeTool):
   """Represents a self-bootstrapping Node distribution."""
 
@@ -37,16 +48,19 @@ class NodeDistribution(NativeTool):
   default_version = 'v8.11.3'
   archive_type = 'tgz'
 
+  def get_external_url_generator(self):
+    return NodeReleaseUrlGenerator()
+
   @classmethod
   def subsystem_dependencies(cls):
     # Note that we use a YarnpkgDistribution scoped to the NodeDistribution, which may itself
     # be scoped to a task.
-    return (super(NodeDistribution, cls).subsystem_dependencies() +
+    return (super().subsystem_dependencies() +
             (YarnpkgDistribution.scoped(cls), ))
 
   @classmethod
   def register_options(cls, register):
-    super(NodeDistribution, cls).register_options(register)
+    super().register_options(register)
     register('--package-manager', advanced=True, default='npm', fingerprint=True,
              choices=VALID_PACKAGE_MANAGERS,
              help='Default package manager config for repo. Should be one of {}'.format(
@@ -83,25 +97,6 @@ class NodeDistribution(NativeTool):
       ))
     return package_manager_obj
 
-  @memoized_method
-  def version(self, context=None):
-    # The versions reported by node and embedded in distribution package names are 'vX.Y.Z'.
-    # TODO: After the deprecation cycle is over we'll expect the values of the version option
-    # to already include the 'v' prefix, so there will be no need to normalize, and we can
-    # delete this entire method override.
-    version = super(NodeDistribution, self).version(context)
-    deprecated_conditional(
-      lambda: not version.startswith('v'), entity_description='', removal_version='1.7.0.dev0',
-      hint_message='value of --version in scope {} must be of the form '
-                   'vX.Y.Z'.format(self.options_scope))
-    return version if version.startswith('v') else 'v' + version
-
-  @classmethod
-  def _normalize_version(cls, version):
-    # The versions reported by node and embedded in distribution package names are 'vX.Y.Z' and not
-    # 'X.Y.Z'.
-    return version if version.startswith('v') else 'v' + version
-
   @memoized_property
   def eslint_setupdir(self):
     return self.get_options().eslint_setupdir
@@ -134,6 +129,10 @@ class NodeDistribution(NativeTool):
     # This line depends on repacked node distribution.
     # Should change it from 'node/bin' to 'dist/bin'
     node_bin_path = os.path.join(node_package_path, 'node', 'bin')
+    if not is_readable_dir(node_bin_path):
+      # The binary was pulled from nodejs and not our S3, in which
+      # case it's installed under a different directory.
+      return os.path.join(node_package_path, os.listdir(node_package_path)[0], 'bin')
     return node_bin_path
 
   @memoized_method
@@ -145,6 +144,10 @@ class NodeDistribution(NativeTool):
     """
     yarnpkg_package_path = YarnpkgDistribution.scoped_instance(self).select()
     yarnpkg_bin_path = os.path.join(yarnpkg_package_path, 'dist', 'bin')
+    if not is_readable_dir(yarnpkg_bin_path):
+      # The binary was pulled from yarn's Github release page and not our S3,
+      # in which case it's installed under a different directory.
+      return os.path.join(yarnpkg_package_path, os.listdir(yarnpkg_package_path)[0], 'bin')
     return yarnpkg_bin_path
 
   def node_command(self, args=None, node_paths=None):
@@ -171,7 +174,7 @@ class NodeDistribution(NativeTool):
 
   def eslint_supportdir(self, task_workdir):
     """ Returns the path where the ESLint is bootstrapped.
-    
+
     :param string task_workdir: The task's working directory
     :returns: The path where ESLint is bootstrapped and whether or not it is configured
     :rtype: (string, bool)

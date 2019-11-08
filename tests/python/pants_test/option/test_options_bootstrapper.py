@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import unittest
-from builtins import open
 from textwrap import dedent
 
 from pants.base.build_environment import get_buildroot
@@ -134,6 +130,18 @@ class BootstrapOptionsTest(unittest.TestCase):
     self.assertEqual('/qux/baz', opts.for_scope('foo').bar)
     self.assertEqual('/pear/banana', opts.for_scope('fruit').apple)
 
+  def test_bootstrapped_options_ignore_irrelevant_env(self):
+    included = 'PANTS_SUPPORTDIR'
+    excluded = 'NON_PANTS_ENV'
+    bootstrapper = OptionsBootstrapper.create(
+        env={
+          excluded: 'pear',
+          included: 'banana',
+        }
+      )
+    self.assertIn(included, bootstrapper.env)
+    self.assertNotIn(excluded, bootstrapper.env)
+
   def do_test_create_bootstrapped_multiple_config(self, create_options_bootstrapper):
     # check with multiple config files, the latest values always get taken
     # in this case worker_count will be overwritten, while fruit stays the same
@@ -192,6 +200,24 @@ class BootstrapOptionsTest(unittest.TestCase):
       return OptionsBootstrapper.create(args=['--pants-config-files={}'.format(cp) for cp in config_paths])
 
     self.do_test_create_bootstrapped_multiple_config(create_options_bootstrapper)
+
+  def test_options_pantsrc_files(self):
+    def create_options_bootstrapper(*config_paths):
+      return OptionsBootstrapper.create(args=['--pantsrc-files={}'.format(cp) for cp in config_paths])
+    with temporary_file(binary_mode=False) as fp:
+      fp.write(dedent("""
+      [resolver]
+      resolver: coursier
+      """))
+      fp.close()
+      bootstrapped_options = create_options_bootstrapper(fp.name)
+      opts_single_config = bootstrapped_options.get_full_options(known_scope_infos=[
+        ScopeInfo('', ScopeInfo.GLOBAL),
+        ScopeInfo('resolver', ScopeInfo.TASK),
+      ])
+      opts_single_config.register('', '--pantsrc-files', type=list)
+      opts_single_config.register('resolver', '--resolver')
+      self.assertEqual('coursier', opts_single_config.for_scope('resolver').resolver)
 
   def test_full_options_caching(self):
     with temporary_file_path() as config:

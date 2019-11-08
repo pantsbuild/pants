@@ -1,24 +1,23 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import open, str
 from contextlib import contextmanager
 
 from pants.cache.artifact import TarballArtifact
-from pants.cache.artifact_cache import (NonfatalArtifactCacheError, call_insert,
-                                        call_use_cached_files)
+from pants.cache.artifact_cache import (
+  NonfatalArtifactCacheError,
+  call_insert,
+  call_use_cached_files,
+)
 from pants.cache.local_artifact_cache import LocalArtifactCache, TempLocalArtifactCache
 from pants.cache.pinger import BestUrlSelector, InvalidRESTfulCacheProtoError
 from pants.cache.restful_artifact_cache import RESTfulArtifactCache
 from pants.invalidation.build_invalidator import CacheKey
+from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir, temporary_file, temporary_file_path
 from pants.util.dirutil import safe_mkdir
 from pants_test.cache.cache_server import cache_server
-from pants_test.test_base import TestBase
 
 
 TEST_CONTENT1 = b'muppet'
@@ -54,7 +53,7 @@ class TestArtifactCache(TestBase):
       yield path
 
   def setUp(self):
-    super(TestArtifactCache, self).setUp()
+    super().setUp()
     # Init engine because decompression now goes through native code.
     self._init_engine()
     TarballArtifact.NATIVE_BINARY = self._scheduler._scheduler._native

@@ -4,10 +4,8 @@
 python_library(
   sources=globs('*.py', exclude=[['report.py']]),
   dependencies=[
-    '3rdparty/python:future',
     '3rdparty/python:ansicolors',
     '3rdparty/python:pystache',
-    '3rdparty/python:six',
     '3rdparty/python:py-zipkin',
     '3rdparty/python:requests',
     ':report',
@@ -21,7 +19,6 @@ python_library(
     'src/python/pants/build_graph',
     'src/python/pants/option',
     'src/python/pants/pantsd:process_manager',
-    'src/python/pants/stats',
     'src/python/pants/subsystem',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
@@ -37,6 +34,5 @@ python_library(
   name='report',
   sources=['report.py'],
   dependencies=[
-    '3rdparty/python:future',
   ],
 )

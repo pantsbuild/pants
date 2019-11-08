@@ -1,16 +1,15 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from textwrap import dedent
 
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.project_info.tasks.depmap import Depmap
 from pants.backend.python.register import build_file_aliases as register_python
+from pants.backend.python.targets.python_binary import PythonBinary
 from pants.build_graph.register import build_file_aliases as register_core
-from pants_test.task_test_base import ConsoleTaskTestBase
+from pants.testutil.subsystem.util import init_subsystem
+from pants.testutil.task_test_base import ConsoleTaskTestBase
 
 
 class BaseDepmapTest(ConsoleTaskTestBase):
@@ -25,7 +24,8 @@ class DepmapTest(BaseDepmapTest):
     return register_core().merge(register_jvm()).merge(register_python())
 
   def setUp(self):
-    super(DepmapTest, self).setUp()
+    super().setUp()
+    init_subsystem(PythonBinary.Defaults)
 
     def add_to_build_file(path, name, type, deps=(), **kwargs):
       self.add_to_build_file(path, dedent("""

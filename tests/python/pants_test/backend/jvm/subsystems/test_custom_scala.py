@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from textwrap import dedent
 
@@ -11,8 +8,8 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.scalastyle import Scalastyle
 from pants.java.jar.jar_dependency import JarDependency
-from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
-from pants_test.subsystem.subsystem_util import init_subsystem
+from pants.testutil.jvm.nailgun_task_test_base import NailgunTaskTestBase
+from pants.testutil.subsystem.util import init_subsystem
 
 
 class CustomScalaTest(NailgunTaskTestBase):
@@ -21,7 +18,7 @@ class CustomScalaTest(NailgunTaskTestBase):
     return Scalastyle
 
   def setUp(self):
-    super(CustomScalaTest, self).setUp()
+    super().setUp()
     self.context()  # We don't need the context, but this ensures subsystem option registration.
 
     self.create_file(

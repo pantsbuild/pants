@@ -1,0 +1,36 @@
+# Note that for values that are regexes, how YAML interprets backslashes and other
+# special characters matters. For example, an unquoted string is interpreted as a raw
+# string with no escape characters (so it's particularly useful for expressing regexes).
+# Adding quotes around these may change their meaning, so don't do so without thought.
+path_patterns:
+  java_source:
+    pattern: \.java$
+    content_encoding: utf8
+  scala_source:
+    pattern: \.scala$
+    content_encoding: utf8
+  python_source:
+    pattern: (?<!__init__)\.py$
+    content_encoding: utf8
+
+content_patterns:
+  jvm_header:
+    pattern: |-
+      ^// Copyright 20\d\d Pants project contributors \(see CONTRIBUTORS.md\).
+      // Licensed under the Apache License, Version 2.0 \(see LICENSE\).
+
+  python_header:
+    pattern: |-
+      ^# coding=utf-8
+      # Copyright 20\d\d Pants project contributors \(see CONTRIBUTORS.md\).
+      # Licensed under the Apache License, Version 2.0 \(see LICENSE\).
+
+      from __future__ import absolute_import, division, print_function, unicode_literals
+
+required_matches:
+  java_source:
+    - jvm_header
+  scala_source:
+    - jvm_header
+  python_source:
+    - python_header

@@ -5,7 +5,6 @@ python_library(
   dependencies = [
     ':resources',
     '3rdparty/python:docutils',
-    '3rdparty/python:future',
     '3rdparty/python:Markdown',
     '3rdparty/python:Pygments',
     '3rdparty/python:setuptools',

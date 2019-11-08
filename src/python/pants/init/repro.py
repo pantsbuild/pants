@@ -1,13 +1,9 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import os
 import sys
-from builtins import object
 
 from pants.base.build_environment import get_buildroot
 from pants.subsystem.subsystem import Subsystem
@@ -51,7 +47,7 @@ class Reproducer(Subsystem):
     return Repro(path, buildroot, ignore)
 
 
-class Repro(object):
+class Repro:
   def __init__(self, path, buildroot, ignore):
     """Create a Repro instance.
 
@@ -65,7 +61,7 @@ class Repro(object):
     if not path.endswith('tar.gz') and not path.endswith('.tgz'):
       path += '.tar.gz'
     if os.path.exists(path):
-      raise ReproError('Repro capture file already exists: {}'.format(path))
+      raise ReproError(f'Repro capture file already exists: {path}')
     self._path = path
     self._buildroot = buildroot
     self._ignore = ignore
@@ -73,7 +69,7 @@ class Repro(object):
   def capture(self, run_info_dict):
     # Force the scm discovery logging messages to appear before ours, so the startup delay
     # is properly associated in the user's mind with us and not with scm.
-    logger.info('Capturing repro information to {}'.format(self._path))
+    logger.info(f'Capturing repro information to {self._path}')
     with open_tar(self._path, 'w:gz', dereference=True, compresslevel=6) as tarout:
       for relpath in os.listdir(self._buildroot):
         if relpath not in self._ignore:
@@ -82,13 +78,13 @@ class Repro(object):
       with temporary_file(binary_mode=False) as tmpfile:
         tmpfile.write('# Pants repro captured for the following build:\n')
         for k, v in sorted(run_info_dict.items()):
-          tmpfile.write('#  {}: {}\n'.format(k, v))
+          tmpfile.write(f'#  {k}: {v}\n')
         cmd_line = list(sys.argv)
         # Use 'pants' instead of whatever the full executable path was on the user's system.
         cmd_line[0] = 'pants'
         # Remove any repro-related flags. The repro-ing user won't want to call those.
         cmd_line = [x for x in cmd_line if not x.startswith('--repro-')]
-        tmpfile.write("'" +"' '".join(cmd_line) + "'\n")
+        tmpfile.write("'" + "' '".join(cmd_line) + "'\n")
         tmpfile.flush()
         chmod_plus_x(tmpfile.name)
         tarout.add(tmpfile.name, 'repro.sh')
@@ -96,4 +92,4 @@ class Repro(object):
   def log_location_of_repro_file(self):
     if not self._path:
       return  # No repro requested.
-    logger.info('Captured repro information to {}'.format(self._path))
+    logger.info(f'Captured repro information to {self._path}')

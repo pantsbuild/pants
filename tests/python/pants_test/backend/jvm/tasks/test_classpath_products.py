@@ -1,28 +1,27 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import str
 
 from pants.backend.jvm.artifact import Artifact
 from pants.backend.jvm.repository import Repository
 from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
-from pants.backend.jvm.tasks.classpath_products import (ArtifactClasspathEntry, ClasspathEntry,
-                                                        ClasspathProducts,
-                                                        MissingClasspathEntryError)
+from pants.backend.jvm.tasks.classpath_products import (
+  ArtifactClasspathEntry,
+  ClasspathEntry,
+  ClasspathProducts,
+  MissingClasspathEntryError,
+)
 from pants.base.exceptions import TaskError
 from pants.build_graph.target import Target
 from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
+from pants.testutil.file_test_util import check_file_content, contains_exact_files
+from pants.testutil.subsystem.util import init_subsystem
+from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import relativize_paths
-from pants_test.subsystem.subsystem_util import init_subsystem
-from pants_test.test_base import TestBase
-from pants_test.testutils.file_test_util import check_file_content, contains_exact_files
 
 
 def resolved_example_jar_at(path, org='com.example', name='lib'):
@@ -33,7 +32,7 @@ def resolved_example_jar_at(path, org='com.example', name='lib'):
 
 class ClasspathProductsTest(TestBase):
   def setUp(self):
-    super(ClasspathProductsTest, self).setUp()
+    super().setUp()
     init_subsystem(Target.Arguments)
 
   def test_single_classpath_element_no_excludes(self):

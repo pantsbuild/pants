@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 from io import open
@@ -28,7 +25,7 @@ class ExtraTestJarExample(JarTask):
 
   def __init__(self, context, workdir):
     # Constructor for custom task. Setup things that you need at pants initialization time.
-    super(ExtraTestJarExample, self).__init__(context, workdir)
+    super().__init__(context, workdir)
 
   # This method is called by pants, when the RoundEngine gets to the phase where your task is
   # attached.

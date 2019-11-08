@@ -1,23 +1,19 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import getpass
 import os
 import re
 import socket
 import time
-from builtins import object, open, str
+from collections import OrderedDict
 
-from pants import version
 from pants.base.build_environment import get_buildroot, get_scm
-from pants.util.collections_abc_backport import OrderedDict
 from pants.util.dirutil import safe_mkdir_for
+from pants.version import VERSION
 
 
-class RunInfo(object):
+class RunInfo:
   """A little plaintext file containing very basic info about a pants run.
 
   Can only be appended to, never edited.
@@ -48,24 +44,25 @@ class RunInfo(object):
   def get_as_dict(self):
     return self._info.copy()
 
-  def add_info(self, key, val, ignore_errors=False):
+  def add_info(self, key, val, ignore_errors=False, stringify=True):
     """Adds the given info and returns a dict composed of just this added info."""
-    self.add_infos((key, val), ignore_errors=ignore_errors)
+    self.add_infos((key, val), ignore_errors=ignore_errors, stringify=stringify)
 
   def add_infos(self, *keyvals, **kwargs):
     """Adds the given info and returns a dict composed of just this added info."""
     kv_pairs = []
     for key, val in keyvals:
       key = key.strip()
-      val = str(val).strip()
+      if kwargs.get('stringify', True):
+        val = str(val).strip()
       if ':' in key:
-        raise ValueError('info key "{}" must not contain a colon.'.format(key))
+        raise ValueError(f'info key "{key}" must not contain a colon.')
       kv_pairs.append((key, val))
 
     for k, v in kv_pairs:
       if k in self._info:
-        raise ValueError('info key "{}" already exists with value {}. '
-                         'Cannot add it again with value {}.'.format(k, self._info[k], v))
+        raise ValueError(f'info key "{k}" already exists with value {self._info[k]}. '
+                         'Cannot add it again with value {v}.')
       self._info[k] = v
 
     try:
@@ -85,14 +82,13 @@ class RunInfo(object):
     # TODO: Get rid of the redundant 'path' key once everyone is off it.
     self.add_infos(('id', run_id), ('timestamp', timestamp), ('datetime', datetime),
                    ('user', user), ('machine', machine), ('path', buildroot),
-                   ('buildroot', buildroot), ('version', version.VERSION))
+                   ('buildroot', buildroot), ('version', VERSION))
 
   def add_scm_info(self):
     """Adds SCM-related info."""
     scm = get_scm()
-    if scm:
-      revision = scm.commit_id
-      branch = scm.branch_name or revision
-    else:
-      revision, branch = 'none', 'none'
+    if not scm:
+      return
+    revision = scm.commit_id
+    branch = scm.branch_name or revision
     self.add_infos(('revision', revision), ('branch', branch))

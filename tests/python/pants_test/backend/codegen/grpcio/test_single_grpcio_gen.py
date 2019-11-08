@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from textwrap import dedent
 
@@ -37,6 +34,8 @@ class GrpcioMultipleGenTest(GrpcioTestBase):
 
     # then
     self.assertEqual(1, len(synthetic_target))
-    self.assertEqual({'com/example/example_pb2_grpc.py',
+    self.assertEqual({'com/__init__.py',
+                      'com/example/__init__.py',
+                      'com/example/example_pb2_grpc.py',
                       'com/example/example_pb2.py'},
                      set(synthetic_target[0].sources_relative_to_source_root()))

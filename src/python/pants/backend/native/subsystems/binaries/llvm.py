@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -11,7 +8,6 @@ from pants.backend.native.subsystems.utils.archive_file_mapper import ArchiveFil
 from pants.binaries.binary_tool import NativeTool
 from pants.binaries.binary_util import BinaryToolUrlGenerator
 from pants.engine.rules import RootRule, rule
-from pants.engine.selectors import Select
 from pants.util.dirutil import is_readable_dir
 from pants.util.memo import memoized_method, memoized_property
 
@@ -55,7 +51,7 @@ class LLVM(NativeTool):
 
   @memoized_method
   def select(self):
-    unpacked_path = super(LLVM, self).select()
+    unpacked_path = super().select()
     # The archive from releases.llvm.org wraps the extracted content into a directory one level
     # deeper, but the one from our S3 does not. We account for both here.
     children = os.listdir(unpacked_path)
@@ -67,7 +63,7 @@ class LLVM(NativeTool):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(LLVM, cls).subsystem_dependencies() + (ArchiveFileMapper.scoped(cls),)
+    return super().subsystem_dependencies() + (ArchiveFileMapper.scoped(cls),)
 
   @memoized_property
   def _file_mapper(self):
@@ -83,9 +79,9 @@ class LLVM(NativeTool):
   def linker(self, platform):
     return Linker(
       path_entries=self.path_entries,
-      exe_filename=platform.resolve_for_enum_variant({
-        'darwin': 'ld64.lld',
-        'linux': 'lld',
+      exe_filename=platform.match({
+        Platform.darwin: "ld64.lld",
+        Platform.linux: "lld",
       }),
       library_dirs=[],
       linking_library_dirs=[],
@@ -105,7 +101,7 @@ class LLVM(NativeTool):
     return CCompiler(
       path_entries=self.path_entries,
       exe_filename='clang',
-      library_dirs=self._common_lib_dirs,
+      runtime_library_dirs=self._common_lib_dirs,
       include_dirs=self._common_include_dirs,
       extra_args=[])
 
@@ -117,24 +113,24 @@ class LLVM(NativeTool):
     return CppCompiler(
       path_entries=self.path_entries,
       exe_filename='clang++',
-      library_dirs=self._common_lib_dirs,
+      runtime_library_dirs=self._common_lib_dirs,
       include_dirs=(self._cpp_include_dirs + self._common_include_dirs),
       extra_args=[])
 
 
 # TODO(#5663): use this over the XCode linker!
-@rule(Linker, [Select(Platform), Select(LLVM)])
-def get_lld(platform, llvm):
+@rule
+def get_lld(platform: Platform, llvm: LLVM) -> Linker:
   return llvm.linker(platform)
 
 
-@rule(CCompiler, [Select(LLVM)])
-def get_clang(llvm):
+@rule
+def get_clang(llvm: LLVM) -> CCompiler:
   return llvm.c_compiler()
 
 
-@rule(CppCompiler, [Select(LLVM)])
-def get_clang_plusplus(llvm):
+@rule
+def get_clang_plusplus(llvm: LLVM) -> CppCompiler:
   return llvm.cpp_compiler()
 
 

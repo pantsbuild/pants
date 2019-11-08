@@ -1,18 +1,14 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import unittest
-from builtins import object
 
 from pants.fs.fs import safe_filename
 
 
 class SafeFilenameTest(unittest.TestCase):
-  class FixedDigest(object):
+  class FixedDigest:
     def __init__(self, size):
       self._size = size
 

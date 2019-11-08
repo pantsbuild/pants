@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import hashlib
 import os
@@ -10,20 +7,16 @@ import re
 import sys
 import tempfile
 import time
-from abc import abstractmethod, abstractproperty
-from builtins import object, open, str
+from abc import ABC, abstractmethod
 from contextlib import closing, contextmanager
 
 import requests
-import six
-from future.utils import PY3
 
 from pants.util.dirutil import safe_open
-from pants.util.meta import AbstractClass
 from pants.util.strutil import strip_prefix
 
 
-class Fetcher(object):
+class Fetcher:
   """A streaming URL fetcher that supports listeners."""
 
   class Error(Exception):
@@ -44,7 +37,7 @@ class Fetcher(object):
 
     def __init__(self, value=None, response_code=None):
       super(Fetcher.PermanentError, self).__init__(value)
-      if response_code and not isinstance(response_code, six.integer_types):
+      if response_code and not isinstance(response_code, int):
         raise ValueError('response_code must be an integer, got {}'.format(response_code))
       self._response_code = response_code
 
@@ -56,7 +49,7 @@ class Fetcher(object):
       """
       return self._response_code
 
-  class Listener(object):
+  class Listener:
     """A listener callback interface for HTTP GET requests made by a Fetcher."""
 
     def status(self, code, content_length=None):
@@ -158,10 +151,10 @@ class Fetcher(object):
       :type stream: :class:`io.RawIOBase`
       """
       self._width = width or 50
-      if not isinstance(self._width, six.integer_types):
+      if not isinstance(self._width, int):
         raise ValueError('The width must be an integer, given {}'.format(self._width))
       self._chunk_size_bytes = chunk_size_bytes or 10 * 1024
-      self._stream = stream or (sys.stderr.buffer if PY3 else sys.stderr)
+      self._stream = stream or sys.stderr.buffer
       self._start = time.time()
 
     def status(self, code, content_length=None):
@@ -183,19 +176,19 @@ class Fetcher(object):
         self.chunks = chunk_count
         if self.size:
           self._stream.write(b'\r')
-          self._stream.write('{:3}% '.format(int(self.read * 1.0 / self.size * 100)).encode('utf-8'))
+          self._stream.write(f'{int(self.read * 1.0 / self.size * 100):3}% '.encode())
         self._stream.write(b'.' * self.chunks)
         if self.size:
           size_width = len(str(self.download_size))
           downloaded = int(self.read / 1024)
-          self._stream.write('{} {} KB'.format(' ' * (self._width - self.chunks),
-                                               str(downloaded).rjust(size_width))
-                             .encode('utf-8'))
+          self._stream.write(
+            f"{' ' * (self._width - self.chunks)} {str(downloaded).rjust(size_width)} KB".encode()
+          )
         self._stream.flush()
 
     def finished(self):
       if self.chunks > 0:
-        self._stream.write(' {:.3f}s\n'.format(time.time() - self._start).encode('utf-8'))
+        self._stream.write(f' {time.time() - self._start:.3f}s\n'.encode())
         self._stream.flush()
 
   def __init__(self, root_dir, requests_api=None):
@@ -210,17 +203,19 @@ class Fetcher(object):
     self._root_dir = root_dir
     self._requests = requests_api or requests
 
-  class _Response(AbstractClass):
+  class _Response(ABC):
     """Abstracts a fetch response."""
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def status_code(self):
       """The HTTP status code for the fetch.
 
       :rtype: int
       """
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def size(self):
       """The size of the fetched file in bytes if known; otherwise, `None`.
 
@@ -252,6 +247,10 @@ class Fetcher(object):
     def __init__(self, url, resp):
       self._url = url
       self._resp = resp
+
+    @property
+    def headers(self):
+      return self._resp.headers
 
     @property
     def status_code(self):
@@ -347,12 +346,17 @@ class Fetcher(object):
                                   response_code=resp.status_code)
       listener.status(resp.status_code, content_length=resp.size)
 
+      content_encoding = resp.headers.get('content-encoding') if hasattr(resp, 'headers') else None
+      compressed_transfer = content_encoding == 'gzip' or content_encoding == 'deflate'
+
       read_bytes = 0
       for data in resp.iter_content(chunk_size_bytes=chunk_size_bytes):
         listener.recv_chunk(data)
         read_bytes += len(data)
-      if resp.size and read_bytes != resp.size:
+
+      if resp.size and read_bytes != resp.size and not compressed_transfer:
         raise self.Error('Expected {} bytes, read {}'.format(resp.size, read_bytes))
+
       listener.finished()
 
   def download(self, url, listener=None, path_or_fd=None, chunk_size_bytes=None, timeout_secs=None):
@@ -370,7 +374,7 @@ class Fetcher(object):
     """
     @contextmanager
     def download_fp(_path_or_fd):
-      if _path_or_fd and not isinstance(_path_or_fd, six.string_types):
+      if _path_or_fd and not isinstance(_path_or_fd, str):
         yield _path_or_fd, _path_or_fd.name
       else:
         if not _path_or_fd:

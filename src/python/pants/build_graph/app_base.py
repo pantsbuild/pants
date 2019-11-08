@@ -1,15 +1,10 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import map, object, open
-from collections import namedtuple
+from collections import OrderedDict, namedtuple
 from hashlib import sha1
 
-import six
 from twitter.common.dirutil import Fileset
 
 from pants.base.build_environment import get_buildroot
@@ -20,12 +15,11 @@ from pants.base.validation import assert_list
 from pants.build_graph.target import Target
 from pants.fs import archive as Archive
 from pants.source.wrapped_globs import FilesetWithSpec
-from pants.util.collections_abc_backport import OrderedDict
 from pants.util.dirutil import fast_relpath
 from pants.util.memo import memoized_property
 
 
-class RelativeToMapper(object):
+class RelativeToMapper:
   """A mapper that maps filesystem paths specified relative to a base directory."""
 
   def __init__(self, base):
@@ -42,7 +36,7 @@ class RelativeToMapper(object):
     return hash(self.base)
 
 
-class DirectoryReMapper(object):
+class DirectoryReMapper:
   """A mapper that maps files relative to a base directory into a destination directory."""
 
   class NonexistentBaseError(Exception):
@@ -99,7 +93,7 @@ class BundleProps(namedtuple('_BundleProps', ['rel_path', 'mapper', 'fileset']))
     return hash((self.rel_path, self.mapper))
 
 
-class Bundle(object):
+class Bundle:
   """A set of files to include in an application bundle.
 
   To learn about application bundles, see
@@ -155,7 +149,7 @@ class Bundle(object):
     # A fileset is either a glob, a string or a list of strings.
     if isinstance(fileset, FilesetWithSpec):
       pass
-    elif isinstance(fileset, six.string_types):
+    elif isinstance(fileset, str):
       fileset = [fileset]
     else:
       fileset = assert_list(fileset, key_arg='fileset')
@@ -187,11 +181,11 @@ class BundleField(tuple, PayloadField):
   @staticmethod
   def _hash_bundle(bundle):
     hasher = sha1()
-    hasher.update(bundle.rel_path.encode('utf-8'))
+    hasher.update(bundle.rel_path.encode())
     for abs_path in sorted(bundle.filemap.keys()):
-      buildroot_relative_path = os.path.relpath(abs_path, get_buildroot()).encode('utf-8')
+      buildroot_relative_path = os.path.relpath(abs_path, get_buildroot()).encode()
       hasher.update(buildroot_relative_path)
-      hasher.update(bundle.filemap[abs_path].encode('utf-8'))
+      hasher.update(bundle.filemap[abs_path].encode())
       if os.path.isfile(abs_path):
         # Update with any additional string to differentiate empty file with non-existing file.
         hasher.update(b'e')
@@ -250,7 +244,7 @@ class AppBase(Target):
       raise self.InvalidArchiveType(
         'Given archive type "{}" is invalid, choose from {}.'.format(
           payload.archive, list(Archive.TYPE_NAMES)))
-    super(AppBase, self).__init__(name=name, payload=payload, **kwargs)
+    super().__init__(name=name, payload=payload, **kwargs)
 
   def globs_relative_to_buildroot(self):
     buildroot = get_buildroot()
@@ -264,7 +258,7 @@ class AppBase(Target):
       else:
         # NB(nh): filemap is an OrderedDict, so this ordering is stable.
         globs += [fast_relpath(f, buildroot) for f in bundle.filemap.keys()]
-    super_globs = super(AppBase, self).globs_relative_to_buildroot()
+    super_globs = super().globs_relative_to_buildroot()
     if super_globs:
       globs += super_globs['globs']
     return {'globs': globs}
@@ -275,7 +269,7 @@ class AppBase(Target):
 
   @classmethod
   def compute_dependency_specs(cls, kwargs=None, payload=None):
-    for spec in super(AppBase, cls).compute_dependency_specs(kwargs, payload):
+    for spec in super().compute_dependency_specs(kwargs, payload):
       yield spec
 
     target_representation = kwargs or payload.as_dict()

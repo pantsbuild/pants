@@ -1,14 +1,11 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import open
+import subprocess
+from pathlib import Path
 from textwrap import dedent
 
-import six
 from pex.resolver import resolve
 
 from pants.backend.codegen.thrift.lib.thrift import Thrift
@@ -18,9 +15,8 @@ from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.build_environment import get_buildroot
-from pants.util.process_handler import subprocess
-from pants_test.subsystem.subsystem_util import global_subsystem_instance
-from pants_test.task_test_base import TaskTestBase
+from pants.testutil.subsystem.util import global_subsystem_instance
+from pants.testutil.task_test_base import TaskTestBase
 
 
 class ApacheThriftPyGenTest(TaskTestBase):
@@ -61,7 +57,7 @@ class ApacheThriftPyGenTest(TaskTestBase):
 
     symbols = {}
     with open(self.init_py_path(target, package_rel_dir), 'rb') as fp:
-      six.exec_(fp.read(), symbols)
+      exec(fp.read(), symbols)
 
     self.assertIn('__all__', symbols)
     self.assertEqual(sorted(('constants', 'ttypes') + services), sorted(symbols['__all__']))
@@ -89,6 +85,30 @@ class ApacheThriftPyGenTest(TaskTestBase):
                      set(synthetic_target.sources_relative_to_source_root()))
     self.assert_ns_package(synthetic_target, 'foo')
     self.assert_leaf_package(synthetic_target, 'foo/bar', 'ThingService')
+
+  def test_inserts_unicode_header(self):
+    """Test that the thrift compiler inserts utf-8 coding header."""
+    self.create_file('src/thrift/com/foo/one.thrift', contents=dedent("""
+    namespace py foo.bar
+    /**
+     * This comment has a unicode string:	🐈
+     * That is a cat, and it's used for testing purposes.
+     * When this is compiled, the thrift compiler should include the "coding=UTF-8".
+     * at the beginning of the python file.
+     **/
+    struct Foo {
+      1: i64 id,
+    }(persisted='true')
+    """))
+    one = self.make_target(spec='src/thrift/com/foo:one',
+      target_type=PythonThriftLibrary,
+      sources=['one.thrift'])
+
+    _, synthetic_target = self.generate_single_thrift_target(one)
+    for filepath in synthetic_target.sources_relative_to_buildroot():
+      if '__init__' not in filepath:
+        first_line = Path(get_buildroot(), filepath).read_text().splitlines()[0]
+        self.assertEqual(first_line, "# -*- coding: utf-8 -*-")
 
   def test_nested_namespaces(self):
     self.create_file('src/thrift/com/foo/one.thrift', contents=dedent("""
@@ -147,14 +167,14 @@ class ApacheThriftPyGenTest(TaskTestBase):
     python_repos = PythonRepos.global_instance()
     interpreter = interpreter_cache.select_interpreter_for_targets(targets)
 
-    # We need setuptools to import namespace packages (via pkg_resources), so we prime the
-    # PYTHONPATH with interpreter extras, which Pants always populates with setuptools and wheel.
+    # We need setuptools to import namespace packages under python 2 (via pkg_resources), so we
+    # prime the PYTHONPATH with a known good version of setuptools.
     # TODO(John Sirois): We really should be emitting setuptools in a
     # `synthetic_target_extra_dependencies` override in `ApacheThriftPyGen`:
     #   https://github.com/pantsbuild/pants/issues/5975
-    pythonpath = list(interpreter.extras.values())
-    pythonpath.extend(os.path.join(get_buildroot(), t.target_base) for t in targets)
-    for resolved_dist in resolve(['thrift=={}'.format(self.get_thrift_version(apache_thrift_gen))],
+    pythonpath = [os.path.join(get_buildroot(), t.target_base) for t in targets]
+    for resolved_dist in resolve(['thrift=={}'.format(self.get_thrift_version(apache_thrift_gen)),
+                                  'setuptools==40.6.3'],
                                  interpreter=interpreter,
                                  context=python_repos.get_network_context(),
                                  fetchers=python_repos.get_fetchers()):

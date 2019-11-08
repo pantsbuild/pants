@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 from textwrap import dedent
@@ -17,7 +14,7 @@ from pants.backend.jvm.tasks.check_published_deps import CheckPublishedDeps
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
 from pants.java.jar.jar_dependency import JarDependency
-from pants_test.task_test_base import ConsoleTaskTestBase
+from pants.testutil.task_test_base import ConsoleTaskTestBase
 
 
 class CheckPublishedDepsTest(ConsoleTaskTestBase):
@@ -48,10 +45,10 @@ class CheckPublishedDepsTest(ConsoleTaskTestBase):
   def assert_console_output(self, *args, **kwargs):
     # Ensure that JarPublish's repos option is set, as CheckPublishedDeps consults it.
     self.set_options_for_scope('publish.jar', repos={})
-    return super(CheckPublishedDepsTest, self).assert_console_output(*args, **kwargs)
+    return super().assert_console_output(*args, **kwargs)
 
   def setUp(self):
-    super(CheckPublishedDepsTest, self).setUp()
+    super().setUp()
 
     self.create_file('repo/org.name/lib1/publish.properties', dedent("""
         revision.major.org.name%lib1=2

@@ -1,13 +1,7 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from builtins import object
 from hashlib import sha1
-
-from future.utils import PY3
 
 from pants.util.strutil import ensure_binary
 
@@ -18,7 +12,7 @@ class PayloadFieldAlreadyDefinedError(Exception): pass
 class PayloadFrozenError(Exception): pass
 
 
-class Payload(object):
+class Payload:
   """A mapping from field names to PayloadField instances.
 
   A Target will add PayloadFields to its Payload until instantiation is finished, at which point
@@ -125,13 +119,13 @@ class Payload(object):
           empty_hash = False
           fp = ensure_binary(fp)
           key = ensure_binary(key)
-          key_sha1 = sha1(key).hexdigest().encode('utf-8')
+          key_sha1 = sha1(key).hexdigest().encode()
           hasher.update(key_sha1)
           hasher.update(fp)
     if empty_hash:
       return None
     else:
-      return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
+      return hasher.hexdigest()
 
   def mark_dirty(self):
     """Invalidates memoized fingerprints for this payload.
@@ -145,11 +139,11 @@ class Payload(object):
       field.mark_dirty()
 
   def __getattr__(self, attr):
-    field = self._fields[attr]
+    try:
+      field = self._fields[attr]
+    except KeyError:
+      raise AttributeError(attr)
     if field is not None:
       return field.value
     else:
       return None
-
-  def __hasattr__(self, attr):
-    return attr in self._fields

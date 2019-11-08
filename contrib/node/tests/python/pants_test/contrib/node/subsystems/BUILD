@@ -6,9 +6,8 @@ python_tests(
   sources=['test_node_distribution.py'],
   dependencies=[
     'contrib/node/src/python/pants/contrib/node/subsystems',
-    'src/python/pants/util:process_handler',
-    'tests/python/pants_test/base:context_utils',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil/base:context_utils',
+    'src/python/pants/testutil/subsystem',
   ]
 )
 
@@ -16,7 +15,6 @@ python_tests(
   name='package_managers',
   sources=['test_package_managers.py'],
   dependencies=[
-    '3rdparty/python:mock',
     'contrib/node/src/python/pants/contrib/node/subsystems',
   ]
 )

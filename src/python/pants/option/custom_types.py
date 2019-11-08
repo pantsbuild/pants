@@ -1,19 +1,16 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
+import os
 import re
-from builtins import bytes, object, str
 
 from pants.option.errors import ParseError
+from pants.util.collections import Enum
 from pants.util.eval import parse_expression
 from pants.util.memo import memoized_method
-from pants.util.objects import enum
 
 
-class UnsetBool(object):
+class UnsetBool:
   """A type that can be used as the default value for a bool typed option to indicate un-set.
 
   In other words, `bool`-typed options with a `default=UnsetBool` that are not explicitly set will
@@ -75,12 +72,25 @@ def target_list_option(s):
   return _convert(s, (list, tuple))
 
 
+def _normalize_directory_separators(s):
+  """Coalesce runs of consecutive instances of `os.sep` in `s`, e.g. '//' -> '/' on POSIX.
+
+  The engine will use paths or target addresses either to form globs or to string-match against, and
+  including the directory separator '/' multiple times in a row e.g. '//' produces an equivalent
+  glob as with a single '/', but produces a different actual string, which will cause the engine to
+  fail to glob file paths or target specs correctly.
+
+  TODO: give the engine more control over matching paths so we don't have to sanitize the input!
+  """
+  return os.path.normpath(s)
+
+
 def dir_option(s):
   """Same type as 'str', but indicates string represents a directory path.
 
   :API: public
   """
-  return s
+  return _normalize_directory_separators(s)
 
 
 def file_option(s):
@@ -88,7 +98,7 @@ def file_option(s):
 
   :API: public
   """
-  return s
+  return _normalize_directory_separators(s)
 
 
 def dict_with_files_option(s):
@@ -116,7 +126,7 @@ def _convert(val, acceptable_types):
   return parse_expression(val, acceptable_types, raise_type=ParseError)
 
 
-class ListValueComponent(object):
+class ListValueComponent:
   """A component of the value of a list-typed option.
 
   One or more instances of this class can be merged to form a list value.
@@ -205,7 +215,7 @@ class ListValueComponent(object):
     :rtype: `ListValueComponent`
     """
     if isinstance(value, bytes):
-      value = value.decode('utf-8')
+      value = value.decode()
 
     if isinstance(value, str):
       comma_separated_exprs = cls._split_modifier_expr(value)
@@ -239,7 +249,7 @@ class ListValueComponent(object):
     return '{} +{} -{}'.format(self._action, self._appends, self._filters)
 
 
-class DictValueComponent(object):
+class DictValueComponent:
   """A component of the value of a dict-typed option.
 
   One or more instances of this class can be merged to form a dict value.
@@ -287,7 +297,7 @@ class DictValueComponent(object):
     :rtype: `DictValueComponent`
     """
     if isinstance(value, bytes):
-      value = value.decode('utf-8')
+      value = value.decode()
     if isinstance(value, cls):  # Ensure idempotency.
       action = value.action
       val = value.val
@@ -308,9 +318,11 @@ class DictValueComponent(object):
     return '{} {}'.format(self.action, self.val)
 
 
-class GlobExpansionConjunction(enum('conjunction', ['any_match', 'all_match'])):
+class GlobExpansionConjunction(Enum):
+  """Describe whether to require that only some or all glob strings match in a target's sources.
 
-  # NB: The `default_value` is automatically the first element of the value list, but can be
-  # overridden or made more explicit in the body of the class. We want to be explicit here about
-  # which behavior we have when merging globs, as that can affect performance.
-  default_value = 'any_match'
+  NB: this object is interpreted from within Snapshot::lift_path_globs() -- that method will need to
+  be aware of any changes to this object's definition.
+  """
+  any_match = "any_match"
+  all_match = "all_match"

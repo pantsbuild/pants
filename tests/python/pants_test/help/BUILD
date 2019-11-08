@@ -6,10 +6,8 @@ python_tests(
   sources=['test_build_dictionary_info_extracter.py'],
   coverage=['pants.help.build_dictionary_info_extracter'],
   dependencies=[
-    '3rdparty/python:future',
     'src/python/pants/build_graph',
     'src/python/pants/help',
-    'src/python/pants/util:objects',
   ]
 )
 
@@ -27,7 +25,6 @@ python_tests(
   sources=['test_help_info_extracter.py'],
   coverage=['pants.help.help_info_extracter'],
   dependencies=[
-    '3rdparty/python:mock',
     'src/python/pants/help',
     'src/python/pants/option',
   ]
@@ -45,14 +42,13 @@ python_tests(
   ]
 )
 
-
 python_tests(
   name='help_integration',
   sources=[
     'test_help_integration.py',
   ],
   dependencies=[
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
   ],
   tags = {'integration'},
 )

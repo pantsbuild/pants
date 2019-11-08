@@ -1,16 +1,13 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import json
 import os
-from builtins import open
 from textwrap import dedent
 
+from pants.fs.fs import safe_filename_from_path
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import temporary_dir
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class TestOptionsIntegration(PantsRunIntegrationTest):
@@ -102,10 +99,10 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
           only_overridden: True
           show_history: True
         """))
-      pants_run = self.run_pants(['--pants-config-files={}'.format(config_path), 'options'])
+      pants_run = self.run_pants([f'--pants-config-files={config_path}', 'options'])
       self.assert_success(pants_run)
       self.assertIn('options.only_overridden = True', pants_run.stdout_data)
-      self.assertIn('(from CONFIG in {})'.format(config_path), pants_run.stdout_data)
+      self.assertIn(f'(from CONFIG in {config_path})', pants_run.stdout_data)
 
   def test_options_deprecation_from_config(self):
     with temporary_dir(root_dir=os.path.abspath('.')) as tempdir:
@@ -125,14 +122,13 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
           [options]
           colors: False
         """))
-      pants_run = self.run_pants(['--pants-config-files={}'.format(config_path), 'options'])
+      pants_run = self.run_pants([f'--pants-config-files={config_path}', 'options'])
       self.assert_success(pants_run)
 
 
       self.assertIn('dummy-options.normal_option', pants_run.stdout_data)
       self.assertIn('dummy-options.dummy_crufty_deprecated_but_still_functioning',
                     pants_run.stdout_data)
-      self.assertNotIn('dummy-options.dummy_crufty_expired', pants_run.stdout_data)
 
   def test_from_config_invalid_section(self):
     with temporary_dir(root_dir=os.path.abspath('.')) as tempdir:
@@ -150,7 +146,7 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
           colors: False
           scope: options
         """))
-      pants_run = self.run_pants(['--pants-config-files={}'.format(config_path),
+      pants_run = self.run_pants([f'--pants-config-files={config_path}',
                                   'goals'])
       self.assert_failure(pants_run)
       self.assertIn('ERROR] Invalid scope [invalid_scope]', pants_run.stderr_data)
@@ -168,7 +164,7 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
           fail_fast: True
           invalid_option: True
         """))
-      pants_run = self.run_pants(['--pants-config-files={}'.format(config_path),
+      pants_run = self.run_pants([f'--pants-config-files={config_path}',
                                   'goals'])
       self.assert_failure(pants_run)
       self.assertIn("ERROR] Invalid option 'invalid_option' under [test.junit]",
@@ -194,7 +190,7 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
           [test.junit]
           fail_fast: True
         """))
-      pants_run = self.run_pants(['--pants-config-files={}'.format(config_path),
+      pants_run = self.run_pants([f'--pants-config-files={config_path}',
                                   'goals'])
       self.assert_failure(pants_run)
       self.assertIn("ERROR] Invalid option 'invalid_global' under [GLOBAL]", pants_run.stderr_data)
@@ -218,7 +214,7 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
 
       # Run with invalid config and invalid command line option.
       # Should error out with invalid command line option only.
-      pants_run = self.run_pants(['--pants-config-files={}'.format(config_path),
+      pants_run = self.run_pants([f'--pants-config-files={config_path}',
                                   '--test-junit-invalid=ALL',
                                   'goals'])
       self.assert_failure(pants_run)
@@ -227,27 +223,26 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
 
       # Run with invalid config only.
       # Should error out with `bad_option` and `invalid_scope` in config.
-      pants_run = self.run_pants(['--pants-config-files={}'.format(config_path),
+      pants_run = self.run_pants([f'--pants-config-files={config_path}',
                                   'goals'])
       self.assert_failure(pants_run)
       self.assertIn("ERROR] Invalid option 'bad_option' under [test.junit]", pants_run.stderr_data)
       self.assertIn("ERROR] Invalid scope [invalid_scope]", pants_run.stderr_data)
 
   def test_command_line_option_unused_by_goals(self):
-    self.assert_success(self.run_pants(['goals', '--bundle-jvm-archive=zip']))
-    self.assert_failure(self.run_pants(['goals', '--jvm-invalid=zip']))
+    self.assert_success(self.run_pants(['filter', '--bundle-jvm-archive=zip']))
+    self.assert_failure(self.run_pants(['filter', '--jvm-invalid=zip']))
 
   def test_non_recursive_quiet_no_output(self):
     pants_run = self.run_pants(['-q', 'compile'])
     self.assert_success(pants_run)
     self.assertEqual('', pants_run.stdout_data)
-    self.assertEqual('\n', pants_run.stderr_data)
 
   def test_skip_inherited(self):
     pants_run = self.run_pants([
       '--no-colors', '--no-jvm-platform-validate-colors', '--test-junit-colors',
       '--unpack-jars-colors', '--no-resolve-ivy-colors', '--imports-ivy-imports-colors',
-      '--compile-colors', '--no-compile-zinc-colors',
+      '--compile-colors', '--no-compile-rsc-colors',
       'options', '--skip-inherited', '--name=colors',
     ])
     self.assert_success(pants_run)
@@ -260,7 +255,7 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
     self.assertIn('unpack-jars.colors = True', lines)
     self.assertIn('imports.ivy-imports.colors = True', lines)
     self.assertIn('compile.colors = True', lines)
-    self.assertIn('compile.zinc.colors = False', lines)
+    self.assertIn('compile.rsc.colors = False', lines)
     # These should be omitted because they have the same value as their super-scope.
     self.assertNotIn('jvm-platform-validate.colors = False', lines)
     self.assertNotIn('resolve.ivy.colors = False', lines)
@@ -273,10 +268,28 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
           [GLOBAL]
           pants_ignore: +['some/random/dir']
         """))
-      pants_run = self.run_pants(['--pants-config-files={}'.format(config_path),
+      pants_run = self.run_pants([f'--pants-config-files={config_path}',
                                   '--no-colors',
                                   'options'])
       self.assert_success(pants_run)
-      self.assertIn("pants_ignore = ['.*/', '/dist/', 'some/random/dir'] (from CONFIG in {})"
-                    .format(config_path),
-                    pants_run.stdout_data)
+      self.assertIn(
+        f"pants_ignore = ['.*/', '/dist/', 'some/random/dir'] (from CONFIG in {config_path})",
+        pants_run.stdout_data
+      )
+
+  def test_pants_symlink_workdirs(self):
+    with temporary_dir() as tmp_dir:
+      symlink_workdir = f'{tmp_dir}/.pants.d'
+      physical_workdir_base = f'{tmp_dir}/workdirs'
+      physical_workdir = f'{physical_workdir_base}/{safe_filename_from_path(symlink_workdir)}'
+
+      pants_run = self.run_pants_with_workdir(
+        [f'--pants-physical-workdir-base={physical_workdir_base}', 'help'], symlink_workdir)
+      self.assert_success(pants_run)
+      # Make sure symlink workdir is pointing to physical workdir
+      self.assertTrue(os.readlink(symlink_workdir) == physical_workdir)
+
+      pants_run = self.run_pants_with_workdir(
+        [f'--pants-physical-workdir-base={physical_workdir_base}', 'clean-all'], symlink_workdir)
+      # Make sure both physical_workdir and symlink_workdir are empty after running clean-all
+      self.assertTrue(not os.listdir(symlink_workdir) and not os.listdir(physical_workdir))

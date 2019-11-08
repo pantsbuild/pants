@@ -1,14 +1,10 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import errno
 import logging
 import os
 import sys
-from builtins import open
 
 import psutil
 from fasteners import InterProcessLock
@@ -37,7 +33,7 @@ class OwnerPrintingInterProcessFileLock(InterProcessLock):
 
   def acquire(self, message_fn=print_to_stderr, **kwargs):
     logger.debug('acquiring lock: {!r}'.format(self))
-    super(OwnerPrintingInterProcessFileLock, self).acquire(blocking=False)
+    super().acquire(blocking=False)
     if not self.acquired:
       try:
         with open(self.message_path, 'rb') as f:
@@ -49,13 +45,13 @@ class OwnerPrintingInterProcessFileLock(InterProcessLock):
         else:
           raise
       message_fn(output)
-      super(OwnerPrintingInterProcessFileLock, self).acquire(**kwargs)
+      super().acquire(**kwargs)
 
     if self.acquired:
       current_process = psutil.Process()
       message = '{} ({})'.format(current_process.pid, ' '.join(current_process.cmdline()))
       with open(self.message_path, 'wb') as f:
-        f.write(message.encode('utf-8'))
+        f.write(message.encode())
 
     return self.acquired
 
@@ -63,4 +59,4 @@ class OwnerPrintingInterProcessFileLock(InterProcessLock):
     logger.debug('releasing lock: {!r}'.format(self))
     if self.acquired:
       safe_delete(self.message_path)
-    return super(OwnerPrintingInterProcessFileLock, self).release()
+    return super().release()

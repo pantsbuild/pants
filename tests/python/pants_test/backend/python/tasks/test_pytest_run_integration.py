@@ -1,29 +1,34 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import time
 
+from pants.testutil.interpreter_selection_utils import (
+  PY_3,
+  PY_27,
+  python_interpreter_path,
+  skip_unless_python3_present,
+  skip_unless_python27_and_python3_present,
+  skip_unless_python27_present,
+)
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
+from pants.testutil.pexrc_util import setup_pexrc_with_pex_python_path
 from pants.util.contextutil import temporary_dir
-from pants_test.backend.python.interpreter_selection_utils import (PY_3, PY_27,
-                                                                   python_interpreter_path,
-                                                                   skip_unless_python3,
-                                                                   skip_unless_python27,
-                                                                   skip_unless_python27_and_python3)
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
-from pants_test.testutils.pexrc_util import setup_pexrc_with_pex_python_path
 
 
 class PytestRunIntegrationTest(PantsRunIntegrationTest):
   testproject = 'testprojects/src/python/interpreter_selection'
 
+  # NB: Occasionally running a test in CI may take multiple seconds. The tests in this file which
+  # use the --timeout-default argument are not testing for performance regressions, but just for
+  # correctness of timeout behavior, so we set this to a higher value to avoid flakiness.
+  _non_flaky_timeout_seconds = 5
+
   def test_pytest_run_timeout_succeeds(self):
     pants_run = self.run_pants(['clean-all',
                                 'test.pytest',
-                                '--timeout-default=2',
+                                '--timeout-default={}'.format(self._non_flaky_timeout_seconds),
                                 'testprojects/tests/python/pants/timeout:exceeds_timeout',
                                 '--',
                                 '-kwithin_timeout'])
@@ -42,6 +47,7 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
                                 '--coverage=auto',
                                 '--timeout-default=1',
                                 '--cache-ignore',
+                                '--chroot',
                                 'testprojects/tests/python/pants/timeout:exceeds_timeout',
                                 '--',
                                 '-kexceeds_timeout'])
@@ -62,9 +68,10 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(['clean-all',
                                 'test.pytest',
                                 '--timeout-terminate-wait=2',
-                                '--timeout-default=5',
+                                '--timeout-default={}'.format(self._non_flaky_timeout_seconds),
                                 '--coverage=auto',
                                 '--cache-ignore',
+                                '--chroot',
                                 'testprojects/tests/python/pants/timeout:ignores_terminate'])
     end = time.time()
     self.assert_failure(pants_run)
@@ -87,7 +94,7 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(['clean-all',
                                 'test.pytest',
                                 '--timeout-terminate-wait=2',
-                                '--timeout-default=5',
+                                '--timeout-default={}'.format(self._non_flaky_timeout_seconds),
                                 '--cache-ignore',
                                 'testprojects/tests/python/pants/timeout:terminates_self'])
     end = time.time()
@@ -103,8 +110,8 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
     with temporary_dir() as coverage_dir:
       pants_run = self.run_pants(['clean-all',
                                   'test.pytest',
-                                  '--coverage=pants',
-                                  '--test-pytest-coverage-output-dir={}'.format(coverage_dir),
+                                  '--coverage=pants.constants_only',
+                                  f'--test-pytest-coverage-output-dir={coverage_dir}',
                                   'testprojects/tests/python/pants/constants_only'])
       self.assert_success(pants_run)
       self.assertTrue(os.path.exists(os.path.join(coverage_dir, 'coverage.xml')))
@@ -122,7 +129,7 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
       # current process started.
       self.assertTrue(os.path.exists('{}.0'.format(prof)))
 
-  @skip_unless_python27_and_python3
+  @skip_unless_python27_and_python3_present
   def test_pants_test_interpreter_selection_with_pexrc(self):
     """Test the pants test goal with intepreters selected from a PEX_PYTHON_PATH
     defined in a pexrc file on disk.
@@ -149,7 +156,7 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
         )
         self.assert_success(pants_run_3)
 
-  @skip_unless_python27
+  @skip_unless_python27_present
   def test_pants_test_interpreter_selection_with_option_2(self):
     """
     Test that the pants test goal properly constrains the SelectInterpreter task to Python 2
@@ -172,7 +179,7 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
       )
       self.assert_success(pants_run_2)
 
-  @skip_unless_python3
+  @skip_unless_python3_present
   def test_pants_test_interpreter_selection_with_option_3(self):
     """
     Test that the pants test goal properly constrains the SelectInterpreter task to Python 3

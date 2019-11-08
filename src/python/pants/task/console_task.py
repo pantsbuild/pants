@@ -1,35 +1,43 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import errno
 import os
 from contextlib import contextmanager
 
 from pants.base.exceptions import TaskError
+from pants.task.target_restriction_mixins import HasTransitiveOptionMixin
 from pants.task.task import QuietTaskMixin, Task
 from pants.util.dirutil import safe_open
+from pants.util.meta import classproperty
 
 
-class ConsoleTask(QuietTaskMixin, Task):
+class ConsoleTask(QuietTaskMixin, HasTransitiveOptionMixin, Task):
   """A task whose only job is to print information to the console.
 
   ConsoleTasks are not intended to modify build state.
   """
 
+  @classproperty
+  def _register_console_transitivity_option(cls):
+    """Some tasks register their own --transitive option, which act differently."""
+    return True
+
   @classmethod
   def register_options(cls, register):
-    super(ConsoleTask, cls).register_options(register)
+    super().register_options(register)
     register('--sep', default='\\n', metavar='<separator>',
              help='String to use to separate results.')
     register('--output-file', metavar='<path>',
              help='Write the console output to this file instead.')
 
+    if cls._register_console_transitivity_option:
+      register('--transitive', type=bool, default=True, fingerprint=True,
+               help='If True, use all targets in the build graph, else use only target roots.')
+
   def __init__(self, *args, **kwargs):
-    super(ConsoleTask, self).__init__(*args, **kwargs)
-    self._console_separator = self.get_options().sep.encode('utf-8').decode('unicode_escape')
+    super().__init__(*args, **kwargs)
+    self._console_separator = self.get_options().sep.encode().decode('unicode_escape')
     if self.get_options().output_file:
       try:
         self._outstream = safe_open(os.path.abspath(self.get_options().output_file), 'wb')
@@ -52,10 +60,10 @@ class ConsoleTask(QuietTaskMixin, Task):
   def execute(self):
     with self._guard_sigpipe():
       try:
-        targets = self.context.targets()
+        targets = self.get_targets() if self.act_transitively else self.context.target_roots
         for value in self.console_output(targets) or tuple():
-          self._outstream.write(value.encode('utf-8'))
-          self._outstream.write(self._console_separator.encode('utf-8'))
+          self._outstream.write(value.encode())
+          self._outstream.write(self._console_separator.encode())
       finally:
         self._outstream.flush()
         if self.get_options().output_file:

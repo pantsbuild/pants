@@ -1,10 +1,9 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
+from dataclasses import dataclass
+from typing import Any
 
 from twitter.common.collections import OrderedSet
 
@@ -18,7 +17,6 @@ from pants.build_graph.bundle_mixin import BundleMixin
 from pants.build_graph.target_scopes import Scopes
 from pants.fs import archive
 from pants.util.dirutil import safe_mkdir
-from pants.util.objects import datatype
 
 
 class BundleCreate(BundleMixin, JvmBinaryTask):
@@ -32,7 +30,7 @@ class BundleCreate(BundleMixin, JvmBinaryTask):
 
   @classmethod
   def register_options(cls, register):
-    super(BundleCreate, cls).register_options(register)
+    super().register_options(register)
     register('--deployjar', advanced=True, type=bool,
              fingerprint=True,
              help="Pack all 3rdparty and internal jar classfiles into a single deployjar in "
@@ -43,19 +41,27 @@ class BundleCreate(BundleMixin, JvmBinaryTask):
 
   @classmethod
   def implementation_version(cls):
-    return super(BundleCreate, cls).implementation_version() + [('BundleCreate', 1)]
+    return super().implementation_version() + [('BundleCreate', 1)]
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(BundleCreate, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data('consolidated_classpath')
 
   @classmethod
   def product_types(cls):
     return ['jvm_archives', 'jvm_bundles', 'deployable_archives']
 
-  class App(datatype(['address', 'binary', 'bundles', 'id', 'deployjar', 'archive', 'target'])):
+  @dataclass(frozen=True)
+  class App:
     """A uniform interface to an app."""
+    address: Any
+    binary: Any
+    bundles: Any
+    id: Any
+    deployjar: Any
+    archive: Any
+    target: Any
 
     @staticmethod
     def is_app(target):

@@ -1,19 +1,15 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import open
 
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.prepare_resources import PrepareResources
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
+from pants.testutil.task_test_base import TaskTestBase
 from pants.util.contextutil import temporary_dir
-from pants_test.task_test_base import TaskTestBase
 
 
 class PrepareResourcesTest(TaskTestBase):

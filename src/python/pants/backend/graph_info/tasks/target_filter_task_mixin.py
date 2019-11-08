@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.base.exceptions import TaskError
 from pants.task.task import Task
@@ -25,7 +22,7 @@ class TargetFilterTaskMixin(Task):
     :raises :class:`TargetFilterTaskMixin.InvalidTargetType`: when no target types correspond to
                                                               the given `alias`.
     """
-    registered_aliases = self.context.build_file_parser.registered_aliases()
+    registered_aliases = self.context.build_configuration.registered_aliases()
     target_types = registered_aliases.target_types_by_alias.get(alias, None)
     if not target_types:
       raise self.InvalidTargetType('Not a target type: {}'.format(alias))

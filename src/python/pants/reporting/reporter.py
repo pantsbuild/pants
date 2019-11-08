@@ -1,21 +1,17 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from builtins import object
 from collections import namedtuple
 
 from pants.reporting.report import Report
 
 
-class ReporterDestination(object):
+class ReporterDestination:
   OUT = 0
   ERR = 1
 
 
-class Reporter(object):
+class Reporter:
   """Formats and emits reports.
 
   Subclasses implement the callback methods, to provide specific reporting
@@ -47,6 +43,10 @@ class Reporter(object):
     """A workunit has finished."""
     pass
 
+  def bulk_record_workunits(self, engine_workunits):
+    """A collection of workunits from v2 engine part"""
+    pass
+
   def handle_log(self, workunit, level, *msg_elements):
     """Handle a message logged by pants code.
 
@@ -75,9 +75,9 @@ class Reporter(object):
     """
     pass
 
-  def is_under_main_root(self, workunit):
+  def is_under_background_root(self, workunit):
     """Is the workunit running under the main thread's root."""
-    return self.run_tracker.is_under_main_root(workunit)
+    return self.run_tracker.is_under_background_root(workunit)
 
   def level_for_workunit(self, workunit, default_level):
     if workunit.log_config and workunit.log_config.level:

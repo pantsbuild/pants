@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import re
-from builtins import str
 
 from pants.backend.jvm.ivy_utils import IvyUtils
 from pants.backend.jvm.subsystems.shader import Shader
@@ -24,11 +20,11 @@ class IvyOutdated(NailgunTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(IvyOutdated, cls).subsystem_dependencies() + (IvySubsystem.scoped(cls),)
+    return super().subsystem_dependencies() + (IvySubsystem.scoped(cls),)
 
   @classmethod
   def register_options(cls, register):
-    super(IvyOutdated, cls).register_options(register)
+    super().register_options(register)
     register('--confs', type=list, default=['default'],
              help='Pass a configuration to ivy in addition to the default ones.')
     register('--exclude-patterns', type=list, default=[],

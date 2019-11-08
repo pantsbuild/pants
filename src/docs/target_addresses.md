@@ -84,7 +84,7 @@ A trailing single colon specifies a glob of targets at the specified location:
 
     :::bash
     $ ./pants list tests/python/pants_test/:
-    tests/python/pants_test:int-test
+    src/python/pants/testutil:int-test
     tests/python/pants_test:base_test
     tests/python/pants_test:test_infra
     tests/python/pants_test:test_maven_layout
@@ -93,11 +93,11 @@ A trailing double colon specifies a recursive glob of targets at the specified l
 
     :::bash
     $ ./pants list tests/python/pants_test/::
-    tests/python/pants_test:int-test
+    src/python/pants/testutil:int-test
     tests/python/pants_test:base_test
     tests/python/pants_test:test_infra
     tests/python/pants_test:test_maven_layout
     tests/python/pants_test/base:base
     ...
-    tests/python/pants_test/tasks:sorttargets
-    tests/python/pants_test/testutils:testutils
+    tests/python/pants_test/tasks:sort_targets
+    src/python/pants/testutil:testutils

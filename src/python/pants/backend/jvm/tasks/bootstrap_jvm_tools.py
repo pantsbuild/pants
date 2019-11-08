@@ -1,65 +1,62 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import hashlib
 import os
 import shutil
 import textwrap
 import threading
-from builtins import map
 from collections import defaultdict
 from textwrap import dedent
-
-from future.utils import PY3
 
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.subsystems.resolve_subsystem import JvmResolveSubsystem
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.tasks.classpath_entry import ClasspathEntry
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.coursier_resolve import CoursierMixin
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyResolveFingerprintStrategy, IvyTaskMixin
 from pants.backend.jvm.tasks.jar_task import JarTask
+from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.target import Target
+from pants.engine.fs import Digest, PathGlobs, PathGlobsAndRoot
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.java import util
 from pants.java.executor import Executor
-from pants.util.dirutil import safe_mkdir_for
+from pants.util.dirutil import fast_relpath, safe_mkdir_for
 from pants.util.memo import memoized_property
 
 
 class ShadedToolFingerprintStrategy(IvyResolveFingerprintStrategy):
   def __init__(self, main, custom_rules=None):
     # The bootstrapper uses no custom confs in its resolves.
-    super(ShadedToolFingerprintStrategy, self).__init__(confs=None)
+    super().__init__(confs=None)
 
     self._main = main
     self._custom_rules = custom_rules
 
   def compute_fingerprint(self, target):
     hasher = hashlib.sha1()
-    base_fingerprint = super(ShadedToolFingerprintStrategy, self).compute_fingerprint(target)
+    base_fingerprint = super().compute_fingerprint(target)
     if base_fingerprint is None:
       return None
 
     hasher.update(b'version=2')
-    hasher.update(base_fingerprint.encode('utf-8'))
+    hasher.update(base_fingerprint.encode())
 
     # NB: this series of updates must always cover the same fields that populate `_tuple`'s slots
     # to ensure proper invalidation.
-    hasher.update(self._main.encode('utf-8'))
+    hasher.update(self._main.encode())
     if self._custom_rules:
       for rule in self._custom_rules:
-        hasher.update(rule.render().encode('utf-8'))
+        hasher.update(rule.render().encode())
 
-    return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
+    return hasher.hexdigest()
 
   def _tuple(self):
     # NB: this tuple's slots - used for `==/hash()` - must be kept in agreement with the hashed
@@ -83,7 +80,7 @@ class BootstrapJvmTools(IvyTaskMixin, CoursierMixin, JarTask):
 
   @classmethod
   def register_options(cls, register):
-    super(BootstrapJvmTools, cls).register_options(register)
+    super().register_options(register)
     register('--eager', type=bool, default=False,
              help='Eagerly bootstrap all known JVM tools, instead of fetching them on-demand. '
                   'Useful for creating a warm Pants workspace, e.g., for containerizing.')
@@ -94,12 +91,16 @@ class BootstrapJvmTools(IvyTaskMixin, CoursierMixin, JarTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(BootstrapJvmTools, cls).subsystem_dependencies() + (IvySubsystem, Shader.Factory)
+    return super().subsystem_dependencies() + (IvySubsystem, Shader.Factory)
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(BootstrapJvmTools, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     Shader.Factory.prepare_tools(round_manager)
+
+  @classmethod
+  def implementation_version(cls):
+    return super().implementation_version() + [('BootstrapJvmTools', 2)]
 
   class ToolResolveError(TaskError):
     """Indicates an error resolving a required JVM tool classpath."""
@@ -179,7 +180,7 @@ class BootstrapJvmTools(IvyTaskMixin, CoursierMixin, JarTask):
     return None
 
   def __init__(self, *args, **kwargs):
-    super(BootstrapJvmTools, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._tool_cache_path = os.path.join(self.workdir, 'tool_cache')
 
   def execute(self):
@@ -239,15 +240,13 @@ class BootstrapJvmTools(IvyTaskMixin, CoursierMixin, JarTask):
 
   def _bootstrap_classpath(self, jvm_tool, targets):
     self._check_underspecified_tools(jvm_tool, targets)
-    workunit_name = 'bootstrap-{}'.format(jvm_tool.key)
+    self.context.log.debug(f'Bootstrapping {jvm_tool.key}')
+    classpath_holder = ClasspathProducts(self.get_options().pants_workdir)
     if JvmResolveSubsystem.global_instance().get_options().resolver == 'ivy':
-      ivy_classpath = self.ivy_classpath(targets, silent=True, workunit_name=workunit_name)
-      return ivy_classpath
+      self.resolve(executor=None, targets=targets, classpath_products=classpath_holder)
     else:
-      classpath_holder = ClasspathProducts(self.get_options().pants_workdir)
       CoursierMixin.resolve(self, targets, classpath_holder, sources=False, javadoc=False, executor=None)
-      coursier_classpath = [cp_entry for _, cp_entry in classpath_holder.get_for_targets(targets)]
-      return coursier_classpath
+    return [cp_entry for _, cp_entry in classpath_holder.get_classpath_entries_for_targets(targets)]
 
   @memoized_property
   def shader(self):
@@ -272,7 +271,7 @@ class BootstrapJvmTools(IvyTaskMixin, CoursierMixin, JarTask):
       shaded_jar = os.path.join(self._tool_cache_path, 'shaded_jars', jar_name)
 
       if not invalidation_check.invalid_vts and os.path.exists(shaded_jar):
-        return [shaded_jar]
+        return [self._shaded_jar_as_classpath_entry(shaded_jar)]
 
       # Ensure we have a single binary jar we can shade.
       binary_jar = os.path.join(self._tool_cache_path, 'binary_jars', jar_name)
@@ -280,11 +279,11 @@ class BootstrapJvmTools(IvyTaskMixin, CoursierMixin, JarTask):
 
       classpath = self._bootstrap_classpath(jvm_tool, targets)
       if len(classpath) == 1:
-        shutil.copy(classpath[0], binary_jar)
+        shutil.copy(classpath[0].path, binary_jar)
       else:
         with self.open_jar(binary_jar) as jar:
           for classpath_jar in classpath:
-            jar.writejar(classpath_jar)
+            jar.writejar(classpath_jar.path)
           jar.main(jvm_tool.main)
 
       # Now shade the binary jar and return that single jar as the safe tool classpath.
@@ -316,7 +315,20 @@ class BootstrapJvmTools(IvyTaskMixin, CoursierMixin, JarTask):
       if self.artifact_cache_writes_enabled():
         self.update_artifact_cache([(tool_vts, [shaded_jar])])
 
-      return [shaded_jar]
+      return [self._shaded_jar_as_classpath_entry(shaded_jar)]
+
+  def _shaded_jar_as_classpath_entry(self, shaded_jar):
+    # Capture a Snapshot for the jar.
+    buildroot = get_buildroot()
+    snapshot = self.context._scheduler.capture_snapshots([
+        PathGlobsAndRoot(
+          PathGlobs([fast_relpath(shaded_jar, buildroot)]),
+          buildroot,
+          Digest.load(shaded_jar),
+        )
+      ])[0]
+    snapshot.directory_digest.dump(shaded_jar)
+    return ClasspathEntry(shaded_jar, directory_digest=snapshot.directory_digest)
 
   def check_artifact_cache_for(self, invalidation_check):
     tool_vts = self.tool_vts(invalidation_check)

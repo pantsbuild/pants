@@ -1,121 +1,125 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-import os.path
-import sys
-from builtins import str
-
+from pants.backend.python.rules.inject_init import InjectedInitDigest
+from pants.backend.python.rules.pex import (
+  CreatePex,
+  Pex,
+  PexInterpreterConstraints,
+  PexRequirements,
+)
 from pants.backend.python.subsystems.pytest import PyTest
-from pants.engine.fs import Digest, MergedDirectories, Snapshot, UrlToFetch
-from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcessResult,
-                                           FallibleExecuteProcessResult)
-from pants.engine.legacy.graph import TransitiveHydratedTarget
-from pants.engine.rules import optionable_rule, rule
-from pants.engine.selectors import Get, Select
-from pants.rules.core.core_test_model import Status, TestResult
+from pants.backend.python.subsystems.python_setup import PythonSetup
+from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
+from pants.build_graph.address import Address
+from pants.engine.fs import Digest, DirectoriesToMerge
+from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
+from pants.engine.legacy.graph import BuildFileAddresses, HydratedTarget, TransitiveHydratedTargets
+from pants.engine.legacy.structs import PythonTestsAdaptor
+from pants.engine.rules import UnionRule, optionable_rule, rule
+from pants.engine.selectors import Get
+from pants.rules.core.core_test_model import Status, TestResult, TestTarget
+from pants.rules.core.strip_source_root import SourceRootStrippedSources
 
 
-# This class currently exists so that other rules could be added which turned a HydratedTarget into
-# a language-specific test result, and could be installed alongside run_python_test.
-# Hopefully https://github.com/pantsbuild/pants/issues/4535 should help resolve this.
-class PyTestResult(TestResult):
-  pass
+@rule
+def run_python_test(
+  test_target: PythonTestsAdaptor,
+  pytest: PyTest,
+  python_setup: PythonSetup,
+  subprocess_encoding_environment: SubprocessEncodingEnvironment
+) -> TestResult:
+  """Runs pytest for one target."""
 
+  # TODO(7726): replace this with a proper API to get the `closure` for a
+  # TransitiveHydratedTarget.
+  transitive_hydrated_targets = yield Get(
+    TransitiveHydratedTargets, BuildFileAddresses((test_target.address,))
+  )
+  all_targets = transitive_hydrated_targets.closure
+  all_target_adaptors = tuple(t.adaptor for t in all_targets)
 
-# TODO: Support deps
-# TODO: Support resources
-@rule(PyTestResult, [Select(TransitiveHydratedTarget), Select(PyTest)])
-def run_python_test(transitive_hydrated_target, pytest):
-  target_root = transitive_hydrated_target.root
-
-  # TODO: Inject versions and digests here through some option, rather than hard-coding it.
-  interpreter_major, interpreter_minor = sys.version_info[0:2]
-  pex_name, digest = {
-    (2, 7): ("pex27", Digest('0ecbf48e3e240a413189194a9f829aec10446705c84db310affe36e23e741dbc', 1812737)),
-    (3, 6): ("pex36", Digest('ba865e7ce7a840070d58b7ba24e7a67aff058435cfa34202abdd878e7b5d351d', 1812158)),
-    (3, 7): ("pex37", Digest('51bf8e84d5290fe5ff43d45be78d58eaf88cf2a5e995101c8ff9e6a73a73343d', 1813189))
-  }.get((interpreter_major, interpreter_minor), (None, None))
-  if pex_name is None:
-    raise ValueError("Current interpreter {}.{} is not supported, as there is no corresponding PEX to download.".format(interpreter_major, interpreter_minor))
-
-  pex_snapshot = yield Get(Snapshot,
-    UrlToFetch("https://github.com/pantsbuild/pex/releases/download/v1.6.1/{}".format(pex_name), digest))
-
-  all_targets = [target_root] + [dep.root for dep in transitive_hydrated_target.dependencies]
+  interpreter_constraints = PexInterpreterConstraints.create_from_adaptors(
+    adaptors=tuple(all_target_adaptors),
+    python_setup=python_setup
+  )
 
   # Produce a pex containing pytest and all transitive 3rdparty requirements.
-  all_requirements = []
-  for maybe_python_req_lib in all_targets:
-    # This is a python_requirement()-like target.
-    if hasattr(maybe_python_req_lib.adaptor, 'requirement'):
-      all_requirements.append(str(maybe_python_req_lib.requirement))
-    # This is a python_requirement_library()-like target.
-    if hasattr(maybe_python_req_lib.adaptor, 'requirements'):
-      for py_req in maybe_python_req_lib.adaptor.requirements:
-        all_requirements.append(str(py_req.requirement))
-
-  # TODO: This should be configurable, both with interpreter constraints, and for remote execution.
-  python_binary = sys.executable
-
-  # TODO: This is non-hermetic because the requirements will be resolved on the fly by
-  # pex27, where it should be hermetically provided in some way.
   output_pytest_requirements_pex_filename = 'pytest-with-requirements.pex'
-  requirements_pex_argv = [
-    './{}'.format(pex_snapshot.files[0]),
-    '--python', python_binary,
-    '-e', 'pytest:main',
-    '-o', output_pytest_requirements_pex_filename,
-    # Sort all user requirement strings to increase the chance of cache hits across invocations.
-  ] + list(pytest.get_requirement_strings()) + sorted(all_requirements)
-  requirements_pex_request = ExecuteProcessRequest(
-    argv=tuple(requirements_pex_argv),
-    input_files=pex_snapshot.directory_digest,
-    description='Resolve requirements for {}'.format(target_root.address.reference()),
-    # TODO: This should not be necessary
-    env={'PATH': os.path.dirname(python_binary)},
-    output_files=(output_pytest_requirements_pex_filename,),
+  requirements = PexRequirements.create_from_adaptors(
+    adaptors=all_target_adaptors,
+    additional_requirements=pytest.get_requirement_strings()
   )
-  requirements_pex_response = yield Get(
-    ExecuteProcessResult, ExecuteProcessRequest, requirements_pex_request)
 
-  # Gather sources.
-  # TODO: make TargetAdaptor return a 'sources' field with an empty snapshot instead of raising to
-  # simplify the hasattr() checks here!
-  all_sources_digests = []
-  for maybe_source_target in all_targets:
-    if hasattr(maybe_source_target.adaptor, 'sources'):
-      sources_snapshot = maybe_source_target.adaptor.sources.snapshot
-      all_sources_digests.append(sources_snapshot.directory_digest)
+  resolved_requirements_pex = yield Get(
+    Pex, CreatePex(
+      output_filename=output_pytest_requirements_pex_filename,
+      requirements=requirements,
+      interpreter_constraints=interpreter_constraints,
+      entry_point="pytest:main",
+    )
+  )
 
-  all_input_digests = all_sources_digests + [
-    requirements_pex_response.output_directory_digest,
+  # Get the file names for the test_target, adjusted for the source root. This allows us to
+  # specify to Pytest which files to test and thus to avoid the test auto-discovery defined by
+  # https://pytest.org/en/latest/goodpractices.html#test-discovery. In addition to a performance
+  # optimization, this ensures that any transitive sources, such as a test project file named
+  # test_fail.py, do not unintentionally end up being run as tests.
+
+  source_root_stripped_test_target_sources = yield Get(
+      SourceRootStrippedSources, Address, test_target.address.to_address()
+    )
+
+  source_root_stripped_sources = yield [
+    Get(SourceRootStrippedSources, HydratedTarget, target_adaptor)
+    for target_adaptor in all_targets
+  ]
+
+  stripped_sources_digests = [stripped_sources.snapshot.directory_digest for stripped_sources in source_root_stripped_sources]
+  sources_digest = yield Get(
+    Digest, DirectoriesToMerge(directories=tuple(stripped_sources_digests)),
+  )
+
+  inits_digest = yield Get(InjectedInitDigest, Digest, sources_digest)
+
+  all_input_digests = [
+    sources_digest,
+    inits_digest.directory_digest,
+    resolved_requirements_pex.directory_digest,
   ]
   merged_input_files = yield Get(
     Digest,
-    MergedDirectories,
-    MergedDirectories(directories=tuple(all_input_digests)),
+    DirectoriesToMerge,
+    DirectoriesToMerge(directories=tuple(all_input_digests)),
   )
 
-  request = ExecuteProcessRequest(
-    argv=('./pytest-with-requirements.pex',),
+  test_target_sources_file_names = sorted(source_root_stripped_test_target_sources.snapshot.files)
+  request = resolved_requirements_pex.create_execute_request(
+    python_setup=python_setup,
+    subprocess_encoding_environment=subprocess_encoding_environment,
+    pex_path=f'./{output_pytest_requirements_pex_filename}',
+    pex_args=test_target_sources_file_names,
     input_files=merged_input_files,
-    description='Run pytest for {}'.format(target_root.address.reference()),
-    # TODO: This should not be necessary
-    env={'PATH': os.path.dirname(python_binary)}
+    description=f'Run Pytest for {test_target.address.reference()}',
+    # TODO(#8584): hook this up to TestRunnerTaskMixin so that we can configure the default timeout
+    #  and also use the specified max timeout time.
+    timeout_seconds=getattr(test_target, 'timeout', 60)
   )
 
   result = yield Get(FallibleExecuteProcessResult, ExecuteProcessRequest, request)
-  # TODO: Do something with stderr?
   status = Status.SUCCESS if result.exit_code == 0 else Status.FAILURE
 
-  yield PyTestResult(status=status, stdout=result.stdout.decode('utf-8'))
+  yield TestResult(
+    status=status,
+    stdout=result.stdout.decode(),
+    stderr=result.stderr.decode(),
+  )
 
 
 def rules():
   return [
-      run_python_test,
-      optionable_rule(PyTest),
-    ]
+    run_python_test,
+    UnionRule(TestTarget, PythonTestsAdaptor),
+    optionable_rule(PyTest),
+    optionable_rule(PythonSetup),
+  ]

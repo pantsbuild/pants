@@ -1,17 +1,14 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import json
-from builtins import filter, str
 
 from colors import black, blue, cyan, green, magenta, red, white
 from packaging.version import Version
 
-from pants.option.arg_splitter import GLOBAL_SCOPE
+from pants.option.options_fingerprinter import CoercingOptionEncoder
 from pants.option.ranked_value import RankedValue
+from pants.option.scope import GLOBAL_SCOPE
 from pants.task.console_task import ConsoleTask
 from pants.version import PANTS_SEMVER
 
@@ -26,7 +23,7 @@ class ExplainOptionsTask(ConsoleTask):
 
   @classmethod
   def register_options(cls, register):
-    super(ExplainOptionsTask, cls).register_options(register)
+    super().register_options(register)
     register('--scope', help='Only show options in this scope. Use GLOBAL for global scope.')
     register('--name', help='Only show options with this name.')
     register('--rank', choices=RankedValue.get_names(),
@@ -174,4 +171,4 @@ class ExplainOptionsTask(ConsoleTask):
           if self.is_json():
             inner_map["history"] = history_list
     if self.is_json():
-      yield json.dumps(output_map, indent=2, sort_keys=True)
+      yield json.dumps(output_map, indent=2, sort_keys=True, cls=CoercingOptionEncoder)

@@ -2,16 +2,19 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd .. && pwd -P)
-source ${REPO_ROOT}/build-support/common.sh
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd .. && pwd -P)
+
+# shellcheck source=build-support/common.sh
+source "${REPO_ROOT}/build-support/common.sh"
 
 REQUIREMENTS=(
-  ${REPO_ROOT}/3rdparty/python/requirements.txt
-  ${REPO_ROOT}/3rdparty/python/twitter/commons/requirements.txt
-  ${REPO_ROOT}/pants-plugins/3rdparty/python/requirements.txt
+  "${REPO_ROOT}/3rdparty/python/requirements.txt"
+  "${REPO_ROOT}/3rdparty/python/twitter/commons/requirements.txt"
+  "${REPO_ROOT}/pants-plugins/3rdparty/python/requirements.txt"
+  "${REPO_ROOT}/contrib/python/src/python/pants/contrib/python/checks/checker/3rdparty/requirements.txt"
 )
 
-venv_dir_prefix="${REPO_ROOT}/build-support/pants_dev_deps"
+venv_dir_prefix="${REPO_ROOT}/build-support/virtualenvs/$(uname)/pants_dev_deps"
 
 function venv_dir() {
   py_venv_version=$(${PY} -c 'import sys; print("".join(map(str, sys.version_info[0:2])))')
@@ -19,23 +22,16 @@ function venv_dir() {
 }
 
 function activate_venv() {
+  # Because the venv/bin/activate script's location is dynamic and not located in a fixed
+  # place, Shellcheck will not be able to find it so we tell Shellcheck to ignore the file.
+  # shellcheck source=/dev/null
   source "$(venv_dir)/bin/activate"
 }
 
 function remove_venv() {
   rm -rf "$(venv_dir)"
-  # If `pants_dev_deps.venv` or `pants_dev_deps.py{2,3}.venv` still exist, delete both the legacy folders
-  # and the cached Python interpreter folder, which contains problematic symlinks. Note we only perform
-  # these removals for the first time, to avoid continually deleting the cache when switching
-  # between valid venvs.
-  legacy_venv_dirs=("${venv_dir_prefix}.venv" "${venv_dir_prefix}.py2.venv" "${venv_dir_prefix}.py3.venv")
-  for legacy_venv_dir in "${legacy_venv_dirs[@]}"; do
-    if [ -d "${legacy_venv_dir}" ]; then
-      rm -rf "${legacy_venv_dirs[@]}"
-      rm -rf "${HOME}/.cache/pants/python_cache/interpreters"
-      break
-    fi
-  done
+  # Also remove legacy folders.
+  rm -rf "${venv_dir_prefix}.venv" "${venv_dir_prefix}.py{2,3}.venv"
 }
 
 function create_venv() {
@@ -44,8 +40,7 @@ function create_venv() {
 }
 
 function ensure_gcc() {
-  GCC_VERSION=$(gcc -v 2>&1)
-  if (( $? != 0 )); then
+  if ! GCC_VERSION="$(gcc -v 2>&1)"; then
     die "$(cat << MESSAGE
 ERROR: unable to execute 'gcc'. Please verify that your compiler is installed, in your
        \$PATH and functional.
@@ -64,20 +59,20 @@ MESSAGE
 
 function activate_pants_venv() {
   fingerprint=""
-  for req in ${REQUIREMENTS[@]}; do
-    fingerprint="${fingerprint}$(cat ${req} | fingerprint_data)"
+  for req in "${REQUIREMENTS[@]}"; do
+    fingerprint="${fingerprint}$(fingerprint_data < "${req}")"
   done
   fingerprint=$(echo "${fingerprint}" | fingerprint_data)
 
   BOOTSTRAPPED_FILE="$(venv_dir)/BOOTSTRAPPED.${fingerprint}"
 
-  if ! [ -f ${BOOTSTRAPPED_FILE} ]; then
+  if ! [ -f "${BOOTSTRAPPED_FILE}" ]; then
     log "Bootstrapping pants_deps with requirements:"
     # Use -f ${REPO_ROOT}/third_party if patching in local dependencies like so
     # pip_extra="-f ${REPO_ROOT}/third_party"
     pip_extra=""
 
-    for req in ${REQUIREMENTS[@]}; do
+    for req in "${REQUIREMENTS[@]}"; do
       log "  ${req}"
     done
 
@@ -87,7 +82,7 @@ function activate_pants_venv() {
     # Needed for compilation of native python distributions.
     ensure_gcc
 
-    for req in ${REQUIREMENTS[@]}; do
+    for req in "${REQUIREMENTS[@]}"; do
       pip install ${pip_extra} -r "${req}" || \
         die "Failed to install requirements from ${req}."
     done

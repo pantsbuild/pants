@@ -1,15 +1,11 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import shutil
 import tempfile
 import unittest
 
-import six
 from pathspec import PathSpec
 from pathspec.patterns import GitWildMatchPattern
 from twitter.common.collections import OrderedSet
@@ -254,7 +250,7 @@ class FilesystemBuildFileTest(unittest.TestCase):
     build_file = self.create_buildfile('BUILD.code')
 
     parsed_locals = {}
-    six.exec_(build_file.code(), {'java_library': dict}, parsed_locals)
+    exec(build_file.code(), {'java_library': dict}, parsed_locals)
     lib = parsed_locals.pop('lib', None)
     self.assertEqual(dict(name='jake', age=42), lib)
 

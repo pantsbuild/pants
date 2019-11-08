@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -17,11 +14,11 @@ class LocalPythonDistributionArtifact(Task):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(LocalPythonDistributionArtifact, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data('local_wheels')
 
   def __init__(self, *args, **kwargs):
-    super(LocalPythonDistributionArtifact, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self.dist_dir = self.get_options().pants_distdir
 
   def execute(self):
@@ -39,7 +36,7 @@ class LocalPythonDistributionArtifact(Task):
       for output_dir, base_names in target_local_wheels.items():
         for base_name in base_names:
           wheel_output = os.path.join(output_dir, base_name)
-          self.context.log.debug('found local built wheels {}'.format(wheel_output))
+          self.context.log.debug(f'found local built wheels {wheel_output}')
           # Create a copy for wheel in dist dir.
           wheel_copy = os.path.join(self.dist_dir, base_name)
           atomic_copy(wheel_output, wheel_copy)

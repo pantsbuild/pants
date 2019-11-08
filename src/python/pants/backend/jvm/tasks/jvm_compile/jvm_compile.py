@@ -1,47 +1,62 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import functools
 import os
-from builtins import object, open, str
 from multiprocessing import cpu_count
-
-from future.utils import string_types
-from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
 from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.subsystems.zinc import Zinc
+from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.javac_plugin import JavacPlugin
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
 from pants.backend.jvm.tasks.classpath_products import ClasspathEntry
-from pants.backend.jvm.tasks.jvm_compile.class_not_found_error_patterns import \
-  CLASS_NOT_FOUND_ERROR_PATTERNS
+from pants.backend.jvm.tasks.jvm_compile.class_not_found_error_patterns import (
+  CLASS_NOT_FOUND_ERROR_PATTERNS,
+)
 from pants.backend.jvm.tasks.jvm_compile.compile_context import CompileContext
-from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailure, ExecutionGraph,
-                                                                 Job)
-from pants.backend.jvm.tasks.jvm_compile.missing_dependency_finder import (CompileErrorExtractor,
-                                                                           MissingDependencyFinder)
+from pants.backend.jvm.tasks.jvm_compile.execution_graph import (
+  ExecutionFailure,
+  ExecutionGraph,
+  Job,
+)
+from pants.backend.jvm.tasks.jvm_compile.missing_dependency_finder import (
+  CompileErrorExtractor,
+  MissingDependencyFinder,
+)
 from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import WorkerPool
 from pants.base.workunit import WorkUnitLabel
-from pants.engine.fs import PathGlobs, PathGlobsAndRoot
+from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, PathGlobs, PathGlobsAndRoot
+from pants.java.distribution.distribution import DistributionLocator
 from pants.option.compiler_option_sets_mixin import CompilerOptionSetsMixin
+from pants.option.ranked_value import RankedValue
 from pants.reporting.reporting_utils import items_to_report_element
-from pants.util.contextutil import Timer
-from pants.util.dirutil import (fast_relpath, read_file, safe_delete, safe_mkdir, safe_rmtree,
-                                safe_walk)
+from pants.util.collections import Enum
+from pants.util.contextutil import Timer, temporary_dir
+from pants.util.dirutil import (
+  fast_relpath,
+  read_file,
+  safe_delete,
+  safe_file_dump,
+  safe_mkdir,
+  safe_rmtree,
+)
 from pants.util.fileutil import create_size_estimators
 from pants.util.memo import memoized_method, memoized_property
+
+
+# Well known metadata file to register javac plugins.
+_JAVAC_PLUGIN_INFO_FILE = 'META-INF/services/com.sun.source.util.Plugin'
+
+# Well known metadata file to register annotation processors with a java 1.6+ compiler.
+_PROCESSOR_INFO_FILE = 'META-INF/services/javax.annotation.processing.Processor'
 
 
 class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
@@ -53,13 +68,18 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
 
   size_estimators = create_size_estimators()
 
+  class Compiler(Enum):
+    ZINC = 'zinc'
+    RSC = 'rsc'
+    JAVAC = 'javac'
+
   @classmethod
   def size_estimator_by_name(cls, estimation_strategy_name):
     return cls.size_estimators[estimation_strategy_name]
 
   @classmethod
   def register_options(cls, register):
-    super(JvmCompile, cls).register_options(register)
+    super().register_options(register)
 
     register('--args', advanced=True, type=list,
              default=list(cls.get_args_default(register.bootstrap)), fingerprint=True,
@@ -69,6 +89,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
              help='When set, any invalid/incompatible analysis files will be deleted '
                   'automatically.  When unset, an error is raised instead.')
 
+    # TODO(#7682): convert these into option sets!
     register('--warnings', default=True, type=bool, fingerprint=True,
              help='Compile with all configured warnings enabled.')
 
@@ -79,6 +100,11 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     register('--no-warning-args', advanced=True, type=list, fingerprint=True,
              default=list(cls.get_no_warning_args_default()),
              help='Extra compiler args to use when warnings are disabled.')
+
+    register('--compiler-option-sets-enabled-scalac-plugins', advanced=True, type=dict,
+             fingerprint=True,
+             help='A mapping of (compiler option set name) -> (list of scalac plugin names to '
+                  'be enabled when this option set is enabled).')
 
     register('--debug-symbols', type=bool, fingerprint=True,
              help='Compile with debug symbol enabled.')
@@ -133,11 +159,11 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
 
   @classmethod
   def implementation_version(cls):
-    return super(JvmCompile, cls).implementation_version() + [('JvmCompile', 3)]
+    return super().implementation_version() + [('JvmCompile', 3)]
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(JvmCompile, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
 
     round_manager.require_data('compile_classpath')
 
@@ -160,7 +186,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(JvmCompile, cls).subsystem_dependencies() + (DependencyContext,
+    return super().subsystem_dependencies() + (DependencyContext,
                                                               Java,
                                                               JvmPlatform,
                                                               ScalaPlatform,
@@ -256,14 +282,57 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     """Classpath entries containing scalac plugins."""
     return []
 
-  def write_extra_resources(self, compile_context):
-    """Writes any extra, out-of-band resources for a target to its classes directory.
+  def post_compile_extra_resources(self, compile_context):
+    """Produces a dictionary of any extra, out-of-band resources for a target.
 
     E.g., targets that produce scala compiler plugins or annotation processor files
     produce an info file. The resources will be added to the runtime_classpath.
-    Returns a list of pairs (root, [absolute paths of files under root]).
+    :return: A dict from classpath-relative filename to file content.
     """
-    pass
+    result = {}
+    target = compile_context.target
+
+    if isinstance(target, JavacPlugin):
+      result[_JAVAC_PLUGIN_INFO_FILE] = target.classname
+    elif isinstance(target, AnnotationProcessor) and target.processors:
+      result[_PROCESSOR_INFO_FILE] = '{}\n'.format('\n'.join(p.strip() for p in target.processors))
+
+    return result
+
+  def post_compile_extra_resources_digest(self, compile_context,
+                                          prepend_post_merge_relative_path=True):
+    """Compute a Digest for the post_compile_extra_resources for the given context."""
+    # TODO: Switch to using #7739 once it is available.
+    extra_resources = self.post_compile_extra_resources(compile_context)
+    if not extra_resources:
+      return EMPTY_DIRECTORY_DIGEST
+
+    def _snapshot_resources(resources, prefix='.'):
+      with temporary_dir() as root_dir:
+        for filename, filecontent in resources.items():
+          safe_file_dump(os.path.join(os.path.join(root_dir, prefix), filename), filecontent)
+
+        extra_resources_relative_to_rootdir = {os.path.join(prefix, k): v for k, v in
+                                               resources.items()}
+        snapshot, = self.context._scheduler.capture_snapshots([
+          PathGlobsAndRoot(PathGlobs(extra_resources_relative_to_rootdir), root_dir)
+        ])
+
+      return snapshot.directory_digest
+
+    if prepend_post_merge_relative_path:
+      rel_post_compile_merge_dir = fast_relpath(compile_context.post_compile_merge_dir,
+                                                get_buildroot())
+      return _snapshot_resources(extra_resources, prefix=rel_post_compile_merge_dir)
+    else:
+      return _snapshot_resources(extra_resources)
+
+  def write_argsfile(self, ctx, args):
+    """Write the argsfile for this context."""
+    with open(ctx.args_file, 'w') as fp:
+      for arg in args:
+        fp.write(arg)
+        fp.write('\n')
 
   def create_empty_extra_products(self):
     """Create any products the subclass task supports in addition to the runtime_classpath.
@@ -285,9 +354,11 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     return ccs
 
   def __init__(self, *args, **kwargs):
-    super(JvmCompile, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._targets_to_compile_settings = None
 
+    # TODO: self._jvm_options doesn't seem to record changes from `--<scope>-jvm-options` on the
+    # command line (but this might work in pants.ini?)!
     # JVM options for running the compiler.
     self._jvm_options = self.get_options().jvm_options
 
@@ -321,23 +392,33 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
   @memoized_property
   def _missing_deps_finder(self):
     dep_analyzer = JvmDependencyAnalyzer(get_buildroot(),
+                                         self._get_jvm_distribution(),
                                          self.context.products.get_data('runtime_classpath'))
     return MissingDependencyFinder(dep_analyzer, CompileErrorExtractor(
       self.get_options().class_not_found_error_patterns))
 
   def create_compile_context(self, target, target_workdir):
-    return CompileContext(target,
-                          os.path.join(target_workdir, 'z.analysis'),
-                          ClasspathEntry(os.path.join(target_workdir, 'classes')),
-                          ClasspathEntry(os.path.join(target_workdir, 'z.jar')),
-                          os.path.join(target_workdir, 'logs'),
-                          os.path.join(target_workdir, 'zinc_args'),
-                          self._compute_sources_for_target(target))
+    return CompileContext(target=target,
+                          analysis_file=os.path.join(target_workdir, 'z.analysis'),
+                          classes_dir=ClasspathEntry(os.path.join(target_workdir, 'classes')),
+                          jar_file=ClasspathEntry(os.path.join(target_workdir, 'z.jar')),
+                          log_dir=os.path.join(target_workdir, 'logs'),
+                          args_file=os.path.join(target_workdir, 'zinc_args'),
+                          post_compile_merge_dir=os.path.join(target_workdir,
+                                                              'post_compile_merge_dir'),
+                          sources=self._compute_sources_for_target(target))
 
   def execute(self):
-    if JvmPlatform.global_instance().get_options().compiler != self.compiler_name:
-      # If the requested compiler is not the one supported by this task,
-      # bail early.
+    requested_compiler = JvmPlatform.global_instance().get_options().compiler
+    if requested_compiler != self.compiler_name:
+      return
+
+    if requested_compiler == self.Compiler.ZINC and self.compiler_name == self.Compiler.RSC:
+      # Issue a deprecation warning (above) and rewrite zinc to rsc, as zinc is being deprecated.
+      JvmPlatform.global_instance().get_options().compiler = RankedValue(0, self.compiler_name)
+    elif requested_compiler != self.compiler_name:
+      # If the requested compiler is not the one supported by this task, log and abort
+      self.context.log.debug('Requested an unsupported compiler [{}], aborting'.format(requested_compiler))
       return
 
     # In case we have no relevant targets and return early, create the requested product maps.
@@ -376,8 +457,8 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
         for ccs in compile_contexts.values():
           cc = self.select_runtime_context(ccs)
           for conf in self._confs:
-            classpath_product.remove_for_target(cc.target, [(conf, cc.classes_dir.path)])
-            classpath_product.add_for_target(cc.target, [(conf, cc.jar_file.path)])
+            classpath_product.remove_for_target(cc.target, [(conf, cc.classes_dir)])
+            classpath_product.add_for_target(cc.target, [(conf, cc.jar_file)])
 
   def _classpath_for_context(self, context):
     if self.get_options().use_classpath_jars:
@@ -400,8 +481,8 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]
     valid_targets = [vt.target for vt in invalidation_check.all_vts if vt.valid]
 
-    if self.execution_strategy == self.HERMETIC:
-      self._set_direcotry_digests_for_valid_target_classpath_directories(valid_targets, compile_contexts)
+    if self.execution_strategy == self.ExecutionStrategy.hermetic:
+      self._set_directory_digests_for_valid_target_classpath_directories(valid_targets, compile_contexts)
 
     for valid_target in valid_targets:
       cc = self.select_runtime_context(compile_contexts[valid_target])
@@ -423,7 +504,8 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
       # workunit is on the bottom of the page rather than possibly in the middle.
       worker_pool = WorkerPool(workunit.parent,
                                self.context.run_tracker,
-                               self._worker_count)
+                               self._worker_count,
+                               workunit.name)
 
     # Prepare the output directory for each invalid target, and confirm that analysis is valid.
     for target in invalid_targets:
@@ -451,23 +533,27 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     with open(path, 'w') as f:
       f.write(text)
 
-  def _set_direcotry_digests_for_valid_target_classpath_directories(self, valid_targets, compile_contexts):
+  def _set_directory_digests_for_valid_target_classpath_directories(self, valid_targets, compile_contexts):
+    def _get_relative_classpath_for_target(target):
+      cc = self.select_runtime_context(compile_contexts[target])
+      if self.get_options().use_classpath_jars:
+        return fast_relpath(cc.jar_file.path, get_buildroot())
+      else:
+        return fast_relpath(cc.classes_dir.path, get_buildroot()) + '/**'
+
     snapshots = self.context._scheduler.capture_snapshots(
       tuple(PathGlobsAndRoot(PathGlobs(
-        [self._get_relative_classes_dir_from_target(target, compile_contexts)]
+        [_get_relative_classpath_for_target(target)]
       ), get_buildroot()) for target in valid_targets))
-    [self._set_direcotry_digest_for_compile_context(
-      snapshot.directory_digest, target, compile_contexts)
-      for target, snapshot in list(zip(valid_targets, snapshots))]
+    for target, snapshot in list(zip(valid_targets, snapshots)):
+      cc = self.select_runtime_context(compile_contexts[target])
+      self._set_directory_digest_for_compile_context(cc, snapshot.directory_digest)
 
-  def _get_relative_classes_dir_from_target(self, target, compile_contexts):
-    cc = self.select_runtime_context(compile_contexts[target])
-    return fast_relpath(cc.classes_dir.path, get_buildroot()) + '/**'
-
-  def _set_direcotry_digest_for_compile_context(self, directory_digest, target, compile_contexts):
-    cc = self.select_runtime_context(compile_contexts[target])
-    new_classpath_entry = ClasspathEntry(cc.classes_dir.path, directory_digest)
-    cc.classes_dir = new_classpath_entry
+  def _set_directory_digest_for_compile_context(self, ctx, directory_digest):
+    if self.get_options().use_classpath_jars:
+      ctx.jar_file = ClasspathEntry(ctx.jar_file.path, directory_digest)
+    else:
+      ctx.classes_dir = ClasspathEntry(ctx.classes_dir.path, directory_digest)
 
   def _compile_vts(self, vts, ctx, upstream_analysis, dependency_classpath, progress_message, settings,
                    compiler_option_sets, zinc_file_manager, counter):
@@ -552,10 +638,19 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     # Note that we get() options and getattr() target fields and task methods,
     # so we're robust when those don't exist (or are None).
     plugins_key = '{}_plugins'.format(compiler)
+
+    dep_context = DependencyContext.global_instance()
+    compiler_option_sets = dep_context.defaulted_property(target, 'compiler_option_sets')
+
     requested_plugins = (
       tuple(getattr(self, plugins_key, []) or []) +
       tuple(options_src.get_options().get(plugins_key, []) or []) +
-      tuple((getattr(target, plugins_key, []) or []))
+      tuple((getattr(target, plugins_key, []) or [])) +
+      tuple(
+        plugin_name
+        for option_set_name in compiler_option_sets
+        for plugin_name in self.get_options().compiler_option_sets_enabled_scalac_plugins.get(option_set_name, [])
+      )
     )
     # Allow multiple flags and also comma-separated values in a single flag.
     requested_plugins = {p for val in requested_plugins for p in val.split(',')}
@@ -585,7 +680,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
 
   def _find_missing_deps(self, compile_logs, target):
     with self.context.new_workunit('missing-deps-suggest', labels=[WorkUnitLabel.COMPILER]):
-      compile_failure_log = '\n'.join(read_file(log).decode('utf-8') for log in compile_logs)
+      compile_failure_log = '\n'.join(read_file(log) for log in compile_logs)
 
       missing_dep_suggestions, no_suggestions = self._missing_deps_finder.find(
         compile_failure_log, target)
@@ -642,26 +737,31 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
         else:
           yield compile_context.classes_dir.path, compile_context.analysis_file
 
+  def exec_graph_double_check_cache_key_for_target(self, target):
+    return 'double_check_cache({})'.format(target.address.spec)
+
   def exec_graph_key_for_target(self, compile_target):
     return "compile({})".format(compile_target.address.spec)
 
   def _create_compile_jobs(self, compile_contexts, invalid_targets, invalid_vts, classpath_product):
-    class Counter(object):
-      def __init__(self, size, initial=0):
+    class Counter:
+      def __init__(self, size=0):
         self.size = size
-        self.count = initial
+        self.count = 0
 
       def __call__(self):
         self.count += 1
         return self.count
 
+      def increment_size(self, by=1):
+        self.size += by
+
       def format_length(self):
         return len(str(self.size))
-    counter = Counter(len(invalid_vts))
 
     jobs = []
+    counter = Counter()
 
-    jobs.extend(self.pre_compile_jobs(counter))
     invalid_target_set = set(invalid_targets)
     for ivts in invalid_vts:
       # Invalidated targets are a subset of relevant targets: get the context for this one.
@@ -669,43 +769,55 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
       invalid_dependencies = self._collect_invalid_compile_dependencies(compile_target,
                                                                         invalid_target_set)
 
-      jobs.extend(
-        self.create_compile_jobs(compile_target, compile_contexts, invalid_dependencies, ivts,
-          counter, classpath_product))
+      new_jobs, new_count = self.create_compile_jobs(
+          compile_target, compile_contexts, invalid_dependencies, ivts, counter, classpath_product)
+      jobs.extend(new_jobs)
+      counter.increment_size(by=new_count)
 
-    counter.size = len(jobs)
     return jobs
-
-  def pre_compile_jobs(self, counter):
-    """Override this to provide jobs that are not related to particular targets.
-
-    This is only called when there are invalid targets."""
-    return []
 
   def create_compile_jobs(self, compile_target, all_compile_contexts, invalid_dependencies, ivts,
     counter, classpath_product):
+    """Return a list of jobs, and a count of those jobs that represent meaningful ("countable") work."""
 
     context_for_target = all_compile_contexts[compile_target]
     compile_context = self.select_runtime_context(context_for_target)
 
-    job = Job(self.exec_graph_key_for_target(compile_target),
-              functools.partial(
-                self._default_work_for_vts,
-                ivts,
-                compile_context,
-                'runtime_classpath',
-                counter,
-                all_compile_contexts,
-                classpath_product),
-              [self.exec_graph_key_for_target(target) for target in invalid_dependencies],
-              self._size_estimator(compile_context.sources),
-              # If compilation and analysis work succeeds, validate the vts.
-              # Otherwise, fail it.
-              on_success=ivts.update,
-              on_failure=ivts.force_invalidate)
-    return [job]
+    compile_deps = [self.exec_graph_key_for_target(target) for target in invalid_dependencies]
 
-  def check_cache(self, vts, counter):
+    # The cache checking job doesn't technically have any dependencies, but we want to delay it
+    # until immediately before we would otherwise try compiling, so we indicate that it depends on
+    # all compile dependencies.
+    double_check_cache_job = Job(
+      key=self.exec_graph_double_check_cache_key_for_target(compile_target),
+      fn=functools.partial(self._default_double_check_cache_for_vts, ivts),
+      dependencies=compile_deps,
+      options_scope=self.options_scope,
+      target=compile_target)
+    # The compile job depends on the cache check job. This decomposition is necessary in order to
+    # support more complex situations where compilation runs multiple jobs in parallel, and wants to
+    # double check the cache before starting any of them.
+    compile_job = Job(
+      key=self.exec_graph_key_for_target(compile_target),
+      fn=functools.partial(
+        self._default_work_for_vts,
+        ivts,
+        compile_context,
+        'runtime_classpath',
+        counter,
+        all_compile_contexts,
+        classpath_product),
+      dependencies=[double_check_cache_job.key] + compile_deps,
+      size=self._size_estimator(compile_context.sources),
+      # If compilation and analysis work succeeds, validate the vts.
+      # Otherwise, fail it.
+      on_success=ivts.update,
+      on_failure=ivts.force_invalidate,
+      options_scope=self.options_scope,
+      target=compile_target)
+    return ([double_check_cache_job, compile_job], 1)
+
+  def check_cache(self, vts):
     """Manually checks the artifact cache (usually immediately before compilation.)
 
     Returns true if the cache was hit successfully, indicating that no compilation is necessary.
@@ -721,7 +833,6 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
       'Cache returned unexpected target: {} vs {}'.format(cached_vts, [vts])
     )
     self.context.log.info('Hit cache during double check for {}'.format(vts.target.address.spec))
-    counter()
     return True
 
   def should_compile_incrementally(self, vts, ctx):
@@ -737,56 +848,23 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
 
   def _record_target_stats(self, target, classpath_len, sources_len, compiletime, is_incremental,
     stats_key):
+    # TODO: classpath_len doesn't *really* capture what we're looking for -- the cumulative size of
+    # classpath files might be, though. Capturing the digest of the input classpath might give us
+    # that, though (as well as the source files?).
     def record(k, v):
       self.context.run_tracker.report_target_info(self.options_scope, target, [stats_key, k], v)
+    self.context.log.debug("self.options_scope:{}, target:{}, stats_key:{}".format(self.options_scope, target, stats_key))
+    self.context.log.debug(
+      '[Timing({})] {}: {} sec; {} sources; {} classpath elements'
+      .format(stats_key, target.address.spec, compiletime, sources_len, classpath_len))
     record('time', compiletime)
     record('classpath_len', classpath_len)
     record('sources_len', sources_len)
     record('incremental', is_incremental)
 
   def _collect_invalid_compile_dependencies(self, compile_target, invalid_target_set):
-    # Collects all invalid dependencies that are not dependencies of other invalid dependencies
-    # within the closure of compile_target.
-    invalid_dependencies = OrderedSet()
-
-    def work(target):
-      pass
-
-    def predicate(target):
-      if target is compile_target:
-        return True
-      if target in invalid_target_set:
-        invalid_dependencies.add(target)
-        return self._on_invalid_compile_dependency(target, compile_target)
-      return True
-
-    compile_target.walk(work, predicate)
-    return invalid_dependencies
-
-  def _on_invalid_compile_dependency(self, dep, compile_target):
-    """Decide whether to continue searching for invalid targets to use in the execution graph.
-
-    By default, don't recurse because once we have an invalid dependency, we can rely on its
-    dependencies having been compiled already.
-
-    Override to adjust this behavior."""
-    return False
-
-  def _create_context_jar(self, compile_context):
-    """Jar up the compile_context to its output jar location.
-
-    TODO(stuhood): In the medium term, we hope to add compiler support for this step, which would
-    allow the jars to be used as compile _inputs_ as well. Currently using jar'd compile outputs as
-    compile inputs would make the compiler's analysis useless.
-      see https://github.com/twitter-forks/sbt/tree/stuhood/output-jars
-    """
-    root = compile_context.classes_dir.path
-    with compile_context.open_jar(mode='w') as jar:
-      for abs_sub_dir, dirnames, filenames in safe_walk(root):
-        for name in dirnames + filenames:
-          abs_filename = os.path.join(abs_sub_dir, name)
-          arcname = fast_relpath(abs_filename, root)
-          jar.write(abs_filename, arcname)
+    all_strict_deps = DependencyContext.global_instance().dependencies_respecting_strict_deps(compile_target)
+    return list(set(invalid_target_set) & set(all_strict_deps) - set([compile_target]))
 
   def _compute_sources_for_target(self, target):
     """Computes and returns the sources (relative to buildroot) for the given target."""
@@ -809,14 +887,6 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     def extra_compile_classpath_iter():
       for conf in self._confs:
         for jar in self.extra_compile_time_classpath_elements():
-          if isinstance(jar, string_types):
-            # Backwards compatibility
-            deprecated_conditional(
-              lambda: True,
-              "1.12.0.dev0",
-              "Extra compile classpath auto-promotion from string to ClasspathEntry",
-            )
-            jar = ClasspathEntry(jar)
           yield (conf, jar)
 
     return list(extra_compile_classpath_iter())
@@ -833,13 +903,78 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     plugin_tgts = self.context.targets(predicate=lambda t: isinstance(t, plugin_cls))
     return {t.plugin: t.closure() for t in plugin_tgts}
 
+  @staticmethod
+  def _local_jvm_distribution(settings=None):
+    settings_args = [settings] if settings else []
+    try:
+      local_distribution = JvmPlatform.preferred_jvm_distribution(settings_args, strict=True)
+    except DistributionLocator.Error:
+      local_distribution = JvmPlatform.preferred_jvm_distribution(settings_args, strict=False)
+    return local_distribution
+
+  class _HermeticDistribution(object):
+    def __init__(self, home_path, distribution):
+      self._underlying = distribution
+      self._home = home_path
+
+    def find_libs(self, names):
+      underlying_libs = self._underlying.find_libs(names)
+      return [self._rehome(l) for l in underlying_libs]
+
+    def find_libs_path_globs(self, names):
+      path_globs = []
+      filenames = []
+      # We have to move the jars to top level directory because globbing jdk home with symlinks
+      # would cause failing to scan the directory. https://github.com/pantsbuild/pants/issues/8460
+      for lib_abs in self._underlying.find_libs(names):
+        root = os.path.dirname(lib_abs)
+        filename = os.path.basename(lib_abs)
+        filenames.append(filename)
+        path_globs.append(PathGlobsAndRoot(PathGlobs((filename,)), root))
+      return (filenames, path_globs)
+
+    @property
+    def java(self):
+      return os.path.join(self._home, 'bin', 'java')
+
+    @property
+    def home(self):
+      return self._home
+
+    @property
+    def underlying_home(self):
+      return self._underlying.home
+
+    def _unroot_lib_path(self, path):
+      return path[len(self._underlying.home)+1:]
+
+    def _rehome(self, l):
+      return os.path.join(self._home, self._unroot_lib_path(l))
+
+  def _get_jvm_distribution(self):
+    # TODO We may want to use different jvm distributions depending on what
+    # java version the target expects to be compiled against.
+    # See: https://github.com/pantsbuild/pants/issues/6416 for covering using
+    #      different jdks in remote builds.
+    local_distribution = self._local_jvm_distribution()
+    return self.execution_strategy.match({
+      self.ExecutionStrategy.subprocess: lambda: local_distribution,
+      self.ExecutionStrategy.nailgun: lambda: local_distribution,
+      self.ExecutionStrategy.hermetic: lambda: self._HermeticDistribution('.jdk', local_distribution),
+    })()
+
+  def _default_double_check_cache_for_vts(self, vts):
+    # Double check the cache before beginning compilation
+    if self.check_cache(vts):
+      vts.update()
+
   def _default_work_for_vts(self, vts, ctx, input_classpath_product_key, counter, all_compile_contexts, output_classpath_product):
     progress_message = ctx.target.address.spec
 
-    # Double check the cache before beginning compilation
-    hit_cache = self.check_cache(vts, counter)
-
-    if not hit_cache:
+    # See whether the cache-doublecheck job hit the cache: if so, noop: otherwise, compile.
+    if vts.valid:
+      counter()
+    else:
       # Compute the compile classpath for this target.
       dependency_cp_entries = self._zinc.compile_classpath_entries(
         input_classpath_product_key,
@@ -858,8 +993,8 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
 
       dep_context = DependencyContext.global_instance()
       tgt, = vts.targets
-      compiler_option_sets = dep_context.defaulted_property(tgt, lambda x: x.compiler_option_sets)
-      zinc_file_manager = dep_context.defaulted_property(tgt, lambda x: x.zinc_file_manager)
+      compiler_option_sets = dep_context.defaulted_property(tgt, 'compiler_option_sets')
+      zinc_file_manager = dep_context.defaulted_property(tgt, 'zinc_file_manager')
       with Timer() as timer:
         directory_digest = self._compile_vts(vts,
                           ctx,
@@ -871,7 +1006,8 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
                           zinc_file_manager,
                           counter)
 
-      ctx.classes_dir = ClasspathEntry(ctx.classes_dir.path, directory_digest)
+      # Store the produced Digest (if any).
+      self._set_directory_digest_for_compile_context(ctx, directory_digest)
 
       self._record_target_stats(tgt,
                                 len(dependency_cp_entries),
@@ -879,12 +1015,6 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
                                 timer.elapsed,
                                 is_incremental,
                                 'compile')
-
-      # Write any additional resources for this target to the target workdir.
-      self.write_extra_resources(ctx)
-
-      # Jar the compiled output.
-      self._create_context_jar(ctx)
 
     # Update the products with the latest classes.
     output_classpath_product.add_for_target(

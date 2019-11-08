@@ -1,14 +1,12 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
 from pants.base.build_environment import get_buildroot
-from pants_test.backend.python.pants_requirement_integration_test_base import \
-  PantsRequirementIntegrationTestBase
+from pants_test.backend.python.pants_requirement_integration_test_base import (
+  PantsRequirementIntegrationTestBase,
+)
 
 
 class PantsRequirementIntegrationTest(PantsRequirementIntegrationTestBase):
@@ -16,6 +14,11 @@ class PantsRequirementIntegrationTest(PantsRequirementIntegrationTestBase):
   declare its dependencies on pants modules. This plugin, when added to the
   pythonpath and backend_packages, should be able to declare new BUILD file
   objects."""
+
+  @classmethod
+  def use_pantsd_env_var(cls):
+    """The test fails to run under pantsd because of a failure to initialize a subsystem"""
+    return False
 
   def run_with_testproject_backend_pkgs(self, cmd):
     testproject_backend_src_dir = os.path.join(

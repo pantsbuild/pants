@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import logging
 import sys
-from builtins import object
 
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.workunit import WorkUnit, WorkUnitLabel
@@ -24,7 +20,7 @@ from pants.task.task import QuietTaskMixin
 logger = logging.getLogger(__name__)
 
 
-class GoalRunnerFactory(object):
+class GoalRunnerFactory:
   def __init__(self, root_dir, options, build_config, run_tracker, reporting, graph_session,
                target_roots, exiter=sys.exit):
     """
@@ -51,15 +47,16 @@ class GoalRunnerFactory(object):
     self._explain = self._global_options.explain
     self._kill_nailguns = self._global_options.kill_nailguns
 
-  def _maybe_handle_help(self, help_request):
+  def handle_help(self):
     """Handle requests for `help` information."""
-    if help_request:
-      help_printer = HelpPrinter(self._options)
-      result = help_printer.print_help()
-      self._exiter(result)
+    help_printer = HelpPrinter(self._options)
+    return help_printer.print_help()
 
-  def _determine_goals(self, address_mapper, requested_goals):
+  def _determine_v1_goals(self, address_mapper, options):
     """Check and populate the requested goals for a given run."""
+    v1_goals, ambiguous_goals, _ = options.goals_by_version
+    requested_goals = v1_goals + ambiguous_goals
+
     spec_parser = CmdLineSpecParser(self._root_dir)
 
     for goal in requested_goals:
@@ -95,7 +92,7 @@ class GoalRunnerFactory(object):
         self._root_dir
       )
 
-      goals = self._determine_goals(address_mapper, self._options.goals)
+      goals = self._determine_v1_goals(address_mapper, self._options)
       is_quiet = self._should_be_quiet(goals)
 
       target_root_instances = self._roots_to_targets(build_graph, self._target_roots)
@@ -114,6 +111,7 @@ class GoalRunnerFactory(object):
                         requested_goals=self._options.goals,
                         build_graph=build_graph,
                         build_file_parser=build_file_parser,
+                        build_configuration=self._build_config,
                         address_mapper=address_mapper,
                         invalidation_report=invalidation_report,
                         scheduler=self._graph_session.scheduler_session)
@@ -121,7 +119,6 @@ class GoalRunnerFactory(object):
       return goals, context
 
   def create(self):
-    self._maybe_handle_help(self._options.help_request)
     goals, context = self._setup_context()
     return GoalRunner(context=context,
                       goals=goals,
@@ -129,8 +126,12 @@ class GoalRunnerFactory(object):
                       kill_nailguns=self._kill_nailguns)
 
 
-class GoalRunner(object):
-  """Lists installed goals or else executes a named goal."""
+class GoalRunner:
+  """Lists installed goals or else executes a named goal.
+
+  NB: GoalRunner represents a v1-only codepath. v2 goals are registered via `@console_rule` and
+  the `pants.engine.goal.Goal` class.
+  """
 
   Factory = GoalRunnerFactory
 

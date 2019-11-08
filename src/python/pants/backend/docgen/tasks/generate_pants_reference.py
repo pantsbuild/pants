@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -11,8 +8,7 @@ from pants.goal.goal import Goal
 from pants.help.build_dictionary_info_extracter import BuildDictionaryInfoExtracter
 from pants.help.help_info_extracter import HelpInfoExtracter
 from pants.help.scope_info_iterator import ScopeInfoIterator
-from pants.option.arg_splitter import GLOBAL_SCOPE
-from pants.option.scope import ScopeInfo
+from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.task.task import Task
 from pants.util.dirutil import safe_open
 
@@ -41,7 +37,7 @@ class GeneratePantsReference(Task):
                   'a standalone build dictionary page.')
 
   def __init__(self, *args, **kwargs):
-    super(GeneratePantsReference, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._outdir = os.path.join(self.get_options().pants_distdir, 'reference')
 
   def execute(self):
@@ -85,7 +81,7 @@ class GeneratePantsReference(Task):
     self.context.products.register_data(self.PANTS_REFERENCE_PRODUCT, ref_page)
 
   def _gen_build_dictionary(self):
-    buildfile_aliases = self.context.build_file_parser.registered_aliases()
+    buildfile_aliases = self.context.build_configuration.registered_aliases()
     extracter = BuildDictionaryInfoExtracter(buildfile_aliases)
     target_type_infos = extracter.get_target_type_info()
     other_infos = sorted(extracter.get_object_info() + extracter.get_object_factory_info())

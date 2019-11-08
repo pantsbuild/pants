@@ -1,21 +1,16 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import json
 import os
 import re
-from builtins import open
 
 from twitter.common.collections import maybe_list
 
 from pants.base.build_environment import get_buildroot
 from pants.build_graph.intermediate_target_factory import hash_target
-from pants.util.process_handler import subprocess
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest, ensure_resolver
 from pants_test.backend.project_info.tasks.resolve_jars_test_mixin import ResolveJarsTestMixin
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_resolver
 
 
 class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
@@ -219,32 +214,6 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       self.assertEqual('java8', json_data['targets'][test_target]['test_platform'])
 
   @ensure_resolver
-  def test_intellij_integration(self):
-    with self.temporary_workdir() as workdir:
-      exported_file = os.path.join(workdir, "export_file.json")
-      p = subprocess.Popen(['build-support/pants-intellij.sh', '--export-output-file=' + exported_file],
-                           stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-      p.communicate()
-      self.assertEqual(p.returncode, 0)
-
-      with open(exported_file, 'r') as data_file:
-        json_data = json.load(data_file)
-
-      python_setup = json_data['python_setup']
-      self.assertIsNotNone(python_setup)
-      self.assertIsNotNone(python_setup['interpreters'])
-
-      default_interpreter = python_setup['default_interpreter']
-      self.assertIsNotNone(default_interpreter)
-      self.assertIsNotNone(python_setup['interpreters'][default_interpreter])
-      self.assertTrue(os.path.exists(python_setup['interpreters'][default_interpreter]['binary']))
-      self.assertTrue(os.path.exists(python_setup['interpreters'][default_interpreter]['chroot']))
-
-      python_target = json_data['targets']['src/python/pants/backend/python/targets:targets']
-      self.assertIsNotNone(python_target)
-      self.assertEqual(default_interpreter, python_target['python_interpreter'])
-
-  @ensure_resolver
   def test_intransitive_and_scope(self):
     with self.temporary_workdir() as workdir:
       test_path = 'testprojects/maven_layout/provided_patching/one/src/main/java'
@@ -256,13 +225,14 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       self.assertEqual('compile test', json_data['targets'][synthetic_target]['scope'])
 
   @ensure_resolver
-  def test_export_is_target_roots(self):
+  def test_export_properly_marks_target_roots(self):
     with self.temporary_workdir() as workdir:
-      test_target = 'examples/tests/java/org/pantsbuild/example/::'
-      json_data = self.run_export(test_target, workdir, load_libs=False)
+      # We use this directory because it has subdirectories, so the `::` glob captures multiple
+      # targets, and it also depends on an examples/src/resources outside of the directory.
+      test_path = 'examples/src/java/org/pantsbuild/example/hello'
+      json_data = self.run_export(f"{test_path}::", workdir, load_libs=False)
       for target_address, attributes in json_data['targets'].items():
-        # Make sure all targets under `test_target`'s directory are target roots.
-        self.assertEqual(
-          attributes['is_target_root'],
-          target_address.startswith("examples/tests/java/org/pantsbuild/example")
-        )
+        if target_address.startswith(test_path):
+          self.assertTrue(attributes['is_target_root'])
+        else:
+          self.assertFalse(attributes['is_target_root'])

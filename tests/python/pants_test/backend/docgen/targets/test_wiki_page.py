@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from textwrap import dedent
 
@@ -11,7 +8,7 @@ from pants.base.build_environment import get_buildroot
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 class WikiPageTest(TestBase):
@@ -30,7 +27,7 @@ class WikiPageTest(TestBase):
     )
 
   def setUp(self):
-    super(WikiPageTest, self).setUp()
+    super().setUp()
 
     self.add_to_build_file('src/docs', dedent("""
 

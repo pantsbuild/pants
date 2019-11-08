@@ -1,14 +1,10 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
 from pants.base.file_system_project_tree import FileSystemProjectTree
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
-from pants_test.testutils.py2_compat import assertRegex
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class FilemapIntegrationTest(PantsRunIntegrationTest):
@@ -20,13 +16,13 @@ class FilemapIntegrationTest(PantsRunIntegrationTest):
   }
 
   def setUp(self):
-    super(FilemapIntegrationTest, self).setUp()
+    super().setUp()
 
     project_tree = FileSystemProjectTree(os.path.abspath(self.PATH_PREFIX), ['BUILD', '.*'])
     scan_set = set()
 
     def should_ignore(file):
-      return file.endswith('.pyc')
+      return file.endswith('.pyc') or file.endswith('__init__.py')
 
     for root, dirs, files in project_tree.walk(''):
       scan_set.update({os.path.join(root, f) for f in files if not should_ignore(f)})
@@ -37,15 +33,14 @@ class FilemapIntegrationTest(PantsRunIntegrationTest):
     return '{}:{}'.format(self.PATH_PREFIX, test_name)
 
   def _extract_exclude_output(self, test_name):
-    stdout_data = self.do_command('filemap',
-                                  self._mk_target(test_name),
-                                  success=True).stdout_data
-
-    return {s.split(' ')[0].replace(self.PATH_PREFIX, '')
-            for s in stdout_data.split('\n') if s.startswith(self.PATH_PREFIX)}
-
-  def test_testprojects(self):
-    self.do_command('filemap', 'testprojects::', success=True)
+    stdout_data = self.do_command(
+      'filemap', self._mk_target(test_name), success=True
+    ).stdout_data
+    return {
+      s.split(' ')[0].replace(self.PATH_PREFIX, '')
+      for s in stdout_data.split('\n')
+      if s.startswith(self.PATH_PREFIX) and '__init__.py' not in s
+    }
 
   def test_python_sources(self):
     run = self.do_command('filemap',
@@ -62,8 +57,7 @@ class FilemapIntegrationTest(PantsRunIntegrationTest):
       pants_run = self.do_command('filemap',
                                   self._mk_target('exclude_strings_disallowed'),
                                   success=False)
-      assertRegex(self, pants_run.stderr_data,
-                               r'Excludes of type `.*` are not supported')
+      self.assertRegex(pants_run.stderr_data, r'Excludes of type `.*` are not supported')
 
   def test_exclude_list_of_strings(self):
     test_out = self._extract_exclude_output('exclude_list_of_strings')
