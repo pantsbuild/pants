@@ -380,8 +380,9 @@ impl super::CommandRunner for CommandRunner {
                             // This timeout is here to make sure that if something goes wrong, e.g.
                             // the connection hangs, we don't poll forever.
                             let elapsed = start_time.elapsed();
+                            let total_timeout = timeout + command_runner.queue_buffer_time;
 
-                            if elapsed > timeout + command_runner.queue_buffer_time {
+                            if elapsed > total_timeout {
                               let ExecutionHistory {
                                 mut attempts,
                                 mut current_attempt,
@@ -390,8 +391,8 @@ impl super::CommandRunner for CommandRunner {
                               attempts.push(current_attempt);
                               future::ok(future::Loop::Break(FallibleExecuteProcessResult {
                                 stdout: Bytes::from(format!(
-                                  "Exceeded timeout of {:?} with {:?} for operation {}, {}",
-                                  timeout, elapsed, operation_name, description
+                                  "Exceeded timeout of {:?} ({:?} for the process and {:?} for remoting buffer time) with {:?} for operation {}, {}",
+                                  total_timeout, timeout, command_runner.queue_buffer_time, elapsed, operation_name, description
                                 )),
                                 stderr: Bytes::new(),
                                 exit_code: -libc::SIGTERM,
