@@ -115,13 +115,13 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
       return target_roots
 
     global_options = options.for_global_scope()
-    return TargetRootsCalculator.create(
+    return TargetRootsCalculator(
       options=options,
       build_root=build_root,
       session=graph_session.scheduler_session,
-      exclude_patterns=tuple(global_options.exclude_target_regexp),
-      tags=tuple(global_options.tag)
-    )
+      exclude_patterns=global_options.exclude_target_regexp,
+      tags=global_options.tag
+    ).calculate()
 
   @classmethod
   def create(cls, args, env, target_roots=None, daemon_graph_session=None,

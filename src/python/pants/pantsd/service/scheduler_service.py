@@ -213,12 +213,12 @@ class SchedulerService(PantsService):
 
   def _body(self, session, options, options_bootstrapper):
     global_options = options.for_global_scope()
-    target_roots = TargetRootsCalculator.create(
+    target_roots = TargetRootsCalculator(
       options=options,
       session=session.scheduler_session,
-      exclude_patterns=tuple(global_options.exclude_target_regexp) if global_options.exclude_target_regexp else tuple(),
-      tags=tuple(global_options.tag) if global_options.tag else tuple()
-    )
+      exclude_patterns=global_options.exclude_target_regexp,
+      tags=global_options.tag
+    ).calculate()
     exit_code = PANTS_SUCCEEDED_EXIT_CODE
 
     v1_goals, ambiguous_goals, v2_goals = options.goals_by_version

@@ -224,7 +224,7 @@ class SpecsMatcher:
   tags: Tuple
   exclude_patterns: Tuple
 
-  def __init__(self, tags: Optional[Tuple] = None, exclude_patterns: Tuple = ()) -> None:
+  def __init__(self, tags: Optional[Tuple]=None, exclude_patterns: Tuple=()) -> None:
     self.tags = tuple(tags or [])
     self.exclude_patterns = tuple(exclude_patterns)
 
