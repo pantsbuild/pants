@@ -90,7 +90,7 @@ function build_native_image_tool {
 
 function fetch_scala_compiler_jars {
   # TODO: the scala version used to build the pants zinc wrapper must also be changed if this is!
-  version='2.12.8'
+  version='2.12.10'
   "$(get_coursier)" fetch \
                     org.scala-lang:scala-{compiler,library,reflect}:"$version"
 }

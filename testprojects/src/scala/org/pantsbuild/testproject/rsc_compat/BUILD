@@ -8,10 +8,10 @@ jar_library(
     jars=[scala_jar(org='com.twitter', name='rsc-rules', rev = "0.0.0-780-e57a1c9c")]
 )
 
-SEMANTICDB_REV='4.1.1'
+SEMANTICDB_REV='4.2.5'
 jar_library(name = 'semanticdb-scalac',
             jars = [
-              jar(org = 'org.scalameta', name = 'semanticdb-scalac_2.12.8', rev = SEMANTICDB_REV),
+              jar(org = 'org.scalameta', name = 'semanticdb-scalac_2.12.10', rev = SEMANTICDB_REV),
             ])
 
 jar_library(name = 'semanticdb',

@@ -102,22 +102,22 @@ class ExportTest(ConsoleTaskTestBase):
     self.make_target(
       ':scalac_2_12',
       JarLibrary,
-      jars=[JarDependency('org.scala-lang', 'scala-compiler', '2.12.8')]
+      jars=[JarDependency('org.scala-lang', 'scala-compiler', '2.12.10')]
     )
     self.make_target(
       ':scala-library_2_12',
       JarLibrary,
-      jars=[JarDependency('org.scala-lang', 'scala-library', '2.12.8')]
+      jars=[JarDependency('org.scala-lang', 'scala-library', '2.12.10')]
     )
     self.make_target(
       ':scala-reflect_2_12',
       JarLibrary,
-      jars=[JarDependency('org.scala-lang', 'scala-reflect', '2.12.8')]
+      jars=[JarDependency('org.scala-lang', 'scala-reflect', '2.12.10')]
     )
     self.make_target(
       ':scala-repl_2_12',
       JarLibrary,
-      jars=[JarDependency('org.scala-lang', 'scala-repl', '2.12.8')]
+      jars=[JarDependency('org.scala-lang', 'scala-repl', '2.12.10')]
     )
     self.make_target(
       ':scalastyle_2_12',

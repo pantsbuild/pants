@@ -110,9 +110,9 @@ The following is an abbreviated export file from a command in the pants repo:
     "scala_platform": {
         "scala_version": "2.12",
         "compiler_classpath": [
-          "/Users/dmcclanahan/tools/pants-v4/.pants.d/bootstrap/bootstrap-jvm-tools/a0ebe8e0b001/ivy/jars/org.scala-lang/scala-compiler/jars/scala-compiler-2.12.8.jar",
-          "/Users/dmcclanahan/tools/pants-v4/.pants.d/bootstrap/bootstrap-jvm-tools/a0ebe8e0b001/ivy/jars/org.scala-lang/scala-library/jars/scala-library-2.12.8.jar",
-          "/Users/dmcclanahan/tools/pants-v4/.pants.d/bootstrap/bootstrap-jvm-tools/a0ebe8e0b001/ivy/jars/org.scala-lang/scala-reflect/jars/scala-reflect-2.12.8.jar",
+          "/Users/dmcclanahan/tools/pants-v4/.pants.d/bootstrap/bootstrap-jvm-tools/a0ebe8e0b001/ivy/jars/org.scala-lang/scala-compiler/jars/scala-compiler-2.12.10.jar",
+          "/Users/dmcclanahan/tools/pants-v4/.pants.d/bootstrap/bootstrap-jvm-tools/a0ebe8e0b001/ivy/jars/org.scala-lang/scala-library/jars/scala-library-2.12.10.jar",
+          "/Users/dmcclanahan/tools/pants-v4/.pants.d/bootstrap/bootstrap-jvm-tools/a0ebe8e0b001/ivy/jars/org.scala-lang/scala-reflect/jars/scala-reflect-2.12.10.jar",
           "/Users/dmcclanahan/tools/pants-v4/.pants.d/bootstrap/bootstrap-jvm-tools/a0ebe8e0b001/ivy/jars/org.scala-lang.modules/scala-xml_2.12/jars/scala-xml_2.12-1.0.6.jar"
         ]
     },
