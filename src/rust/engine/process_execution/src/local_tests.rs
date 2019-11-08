@@ -675,13 +675,17 @@ fn local_only_scratch_files_materialized() {
 #[test]
 fn timeout() {
   let result = run_command_locally(ExecuteProcessRequest {
-    argv: vec![find_bash(), "-c".to_owned(), "/bin/sleep 0.5".to_string()],
+    argv: vec![
+      find_bash(),
+      "-c".to_owned(),
+      "/bin/sleep 0.2; /bin/echo -n 'European Burmese'".to_string(),
+    ],
     env: BTreeMap::new(),
     input_files: EMPTY_DIGEST,
     output_files: BTreeSet::new(),
     output_directories: BTreeSet::new(),
-    timeout: Duration::from_millis(300),
-    description: "timeout".to_string(),
+    timeout: Duration::from_millis(100),
+    description: "sleepy-cat".to_string(),
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
       hashing::EMPTY_DIGEST,
     jdk_home: None,
@@ -693,7 +697,7 @@ fn timeout() {
   assert_eq!(result.exit_code, -15);
   let error_msg = String::from_utf8(result.stdout.to_vec()).unwrap();
   assert_that(&error_msg).contains("Exceeded timeout");
-  assert_that(&error_msg).contains("timeout");
+  assert_that(&error_msg).contains("sleepy-cat");
 }
 
 fn run_command_locally(req: ExecuteProcessRequest) -> Result<FallibleExecuteProcessResult, String> {
