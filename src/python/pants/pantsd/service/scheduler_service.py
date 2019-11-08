@@ -173,7 +173,7 @@ class SchedulerService(PantsService):
     For v2: running an entire v2 run
     The exit_code in the return indicates whether any issue was encountered
 
-    :returns: `(LegacyGraphSession, TargetRoots, exit_code)`
+    :returns: `(LegacyGraphSession, TargetRootsCalculator, exit_code)`
     """
     # If any nodes exist in the product graph, wait for the initial watchman event to avoid
     # racing watchman startup vs invalidation events.
@@ -191,17 +191,17 @@ class SchedulerService(PantsService):
     else:
       fn = self._body
 
-    target_roots, exit_code = fn(session, options, options_bootstrapper)
-    return session, target_roots, exit_code
+    target_roots_calculator, exit_code = fn(session, options, options_bootstrapper)
+    return session, target_roots_calculator, exit_code
 
   def _loop(self, session, options, options_bootstrapper):
     # TODO: See https://github.com/pantsbuild/pants/issues/6288 regarding Ctrl+C handling.
     iterations = options.for_global_scope().loop_max
-    target_roots = None
+    target_roots_calculator = None
     exit_code = PANTS_SUCCEEDED_EXIT_CODE
     while iterations and not self._state.is_terminating:
       try:
-        target_roots, exit_code = self._body(session, options, options_bootstrapper)
+        target_roots_calculator, exit_code = self._body(session, options, options_bootstrapper)
       except session.scheduler_session.execution_error_type as e:
         # Render retryable exceptions raised by the Scheduler.
         print(e, file=sys.stderr)
@@ -209,16 +209,17 @@ class SchedulerService(PantsService):
       iterations -= 1
       while iterations and not self._state.is_terminating and not self._loop_condition.wait(timeout=1):
         continue
-    return target_roots, exit_code
+    return target_roots_calculator, exit_code
 
-  def _body(self, session, options, options_bootstrapper):
+  @staticmethod
+  def _body(session, options, options_bootstrapper):
     global_options = options.for_global_scope()
-    target_roots = TargetRootsCalculator(
+    target_roots_calculator = TargetRootsCalculator(
       options=options,
       session=session.scheduler_session,
       exclude_patterns=global_options.exclude_target_regexp,
       tags=global_options.tag
-    ).calculate()
+    )
     exit_code = PANTS_SUCCEEDED_EXIT_CODE
 
     v1_goals, ambiguous_goals, v2_goals = options.goals_by_version
@@ -230,10 +231,10 @@ class SchedulerService(PantsService):
       exit_code = session.run_console_rules(
           options_bootstrapper,
           goals,
-          target_roots,
+          target_roots_calculator,
         )
 
-    return target_roots, exit_code
+    return target_roots_calculator, exit_code
 
   def run(self):
     """Main service entrypoint."""

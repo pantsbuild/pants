@@ -110,9 +110,10 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     return graph_session, graph_session.scheduler_session
 
   @staticmethod
-  def _maybe_init_target_roots(target_roots, graph_session, options, build_root):
-    if target_roots:
-      return target_roots
+  def _maybe_init_target_roots_calculator(target_roots_calculator, graph_session,
+                                          options, build_root):
+    if target_roots_calculator:
+      return target_roots_calculator
 
     global_options = options.for_global_scope()
     return TargetRootsCalculator(
@@ -121,16 +122,16 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
       session=graph_session.scheduler_session,
       exclude_patterns=global_options.exclude_target_regexp,
       tags=global_options.tag
-    ).calculate()
+    )
 
   @classmethod
-  def create(cls, args, env, target_roots=None, daemon_graph_session=None,
+  def create(cls, args, env, target_roots_calculator=None, daemon_graph_session=None,
              options_bootstrapper=None):
     """Creates a new LocalPantsRunner instance by parsing options.
 
     :param list args: The arguments (e.g. sys.argv) for this run.
     :param dict env: The environment (e.g. os.environ) for this run.
-    :param TargetRoots target_roots: The target roots for this run.
+    :param TargetRootsCalculator target_roots_calculator: Calculates the target roots for this run.
     :param LegacyGraphSession daemon_graph_session: The graph helper for this session.
     :param OptionsBootstrapper options_bootstrapper: The OptionsBootstrapper instance to reuse.
     """
@@ -164,8 +165,8 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
       options
     )
 
-    target_roots = cls._maybe_init_target_roots(
-      target_roots,
+    target_roots_calculator = cls._maybe_init_target_roots_calculator(
+      target_roots_calculator,
       graph_session,
       options,
       build_root
@@ -178,21 +179,21 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
       options,
       options_bootstrapper,
       build_config,
-      target_roots,
+      target_roots_calculator,
       graph_session,
       scheduler_session,
       daemon_graph_session is not None,
       profile_path
     )
 
-  def __init__(self, build_root, options, options_bootstrapper, build_config, target_roots,
-               graph_session, scheduler_session, is_daemon, profile_path):
+  def __init__(self, build_root, options, options_bootstrapper, build_config,
+               target_roots_calculator, graph_session, scheduler_session, is_daemon, profile_path):
     """
     :param string build_root: The build root for this run.
     :param Options options: The parsed options for this run.
     :param OptionsBootstrapper options_bootstrapper: The OptionsBootstrapper instance to use.
     :param BuildConfiguration build_config: The parsed build configuration for this run.
-    :param TargetRoots target_roots: The `TargetRoots` for this run.
+    :param TargetRootsCalculator target_roots_calculator: Calculates the `TargetRoots` for this run.
     :param LegacyGraphSession graph_session: A LegacyGraphSession instance for graph reuse.
     :param bool is_daemon: Whether or not this run was launched with a daemon graph helper.
     :param string profile_path: The profile path - if any (from from the `PANTS_PROFILE` env var).
@@ -201,7 +202,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     self._options = options
     self._options_bootstrapper = options_bootstrapper
     self._build_config = build_config
-    self._target_roots = target_roots
+    self._target_roots_calculator = target_roots_calculator
     self._graph_session = graph_session
     self._scheduler_session = scheduler_session
     self._is_daemon = is_daemon
@@ -265,7 +266,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
       self._run_tracker,
       self._reporting,
       self._graph_session,
-      self._target_roots,
+      self._target_roots_calculator.calculate(),
       self._exiter
     )
     if self._options.help_request:
@@ -288,7 +289,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     return self._graph_session.run_console_rules(
       self._options_bootstrapper,
       goals,
-      self._target_roots,
+      self._target_roots_calculator.calculate(),
     )
 
   @staticmethod
