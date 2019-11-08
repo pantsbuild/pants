@@ -17,6 +17,7 @@ use std::process::{Command, Stdio};
 use std::sync::Arc;
 use store::{OneOffStoreFileByDigest, Snapshot, Store};
 
+use tokio::timer::Timeout;
 use tokio_codec::{BytesCodec, FramedRead};
 use tokio_process::CommandExt;
 
@@ -259,8 +260,9 @@ impl CapturedWorkdir for CommandRunner {
     StreamedHermeticCommand::new(&req.argv[0])
       .args(&req.argv[1..])
       .current_dir(&workdir_path)
-      .envs(req.env)
+      .envs(&req.env)
       .stream()
+      .map(|s| Timeout::new(s, req.timeout).map_err(|e| e.to_string()))
       .map(|s| {
         // NB: Converting from `impl Stream` to `Box<dyn Stream>` requires this odd dance.
         let stream: Box<dyn Stream<Item = _, Error = _> + Send> = Box::new(s);
