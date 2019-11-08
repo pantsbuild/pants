@@ -1,8 +1,10 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pex.orderedset import OrderedSet
+from pathlib import Path
+from typing import Set
 
+from pants.base.build_root import BuildRoot
 from pants.engine.console import Console
 from pants.engine.goal import Goal, LineOriented
 from pants.engine.legacy.graph import TransitiveHydratedTargets
@@ -16,28 +18,50 @@ class Filedeps(LineOriented, Goal):
   closure of targets are also included.
   """
 
-  # TODO: Until this implements more of the options of `filedeps`, it can't claim the name!
   name = 'fast-filedeps'
+
+  @classmethod
+  def register_options(cls, register):
+    super().register_options(register)
+    register(
+      '--absolute', type=bool, default=True,
+      help='If True, output with absolute path; else, output with path relative to the build root'
+    )
+    register(
+      '--globs', type=bool,
+      help='Instead of outputting filenames, output globs (ignoring excludes)'
+    )
 
 
 @console_rule
 def file_deps(
   console: Console,
   filedeps_options: Filedeps.Options,
+  build_root: BuildRoot,
   transitive_hydrated_targets: TransitiveHydratedTargets
 ) -> Filedeps:
 
-  uniq_set = OrderedSet()
+  absolute = filedeps_options.values.absolute
+  globs = filedeps_options.values.globs
+
+  unique_rel_paths: Set[str] = set()
 
   for hydrated_target in transitive_hydrated_targets.closure:
+    adaptor = hydrated_target.adaptor
     if hydrated_target.address.rel_path:
-      uniq_set.add(hydrated_target.address.rel_path)
-    if hasattr(hydrated_target.adaptor, "sources"):
-      uniq_set.update(hydrated_target.adaptor.sources.snapshot.files)
+      unique_rel_paths.add(hydrated_target.address.rel_path)
+    if hasattr(adaptor, "sources"):
+      sources_paths = (
+        adaptor.sources.snapshot.files
+        if not globs
+        else adaptor.sources.filespec["globs"]
+      )
+      unique_rel_paths.update(sources_paths)
 
   with Filedeps.line_oriented(filedeps_options, console) as print_stdout:
-    for f_path in uniq_set:
-      print_stdout(f_path)
+    for rel_path in sorted(unique_rel_paths):
+      final_path = str(Path(build_root.path, rel_path)) if absolute else rel_path
+      print_stdout(final_path)
 
   return Filedeps(exit_code=0)
 
