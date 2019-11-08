@@ -1,6 +1,6 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
+import os
 import shlex
 import unittest
 
@@ -12,6 +12,7 @@ from pants.option.arg_splitter import (
   VersionHelp,
 )
 from pants.option.scope import ScopeInfo
+from pants.util.contextutil import pushd, temporary_dir
 
 
 def task(scope):
@@ -31,7 +32,7 @@ class ArgSplitterTest(unittest.TestCase):
                         subsys('jvm'), subsys('jvm.test.junit'),
                         subsys('reporting'), intermediate('test'), task('test.junit')]
 
-  def _split(self, args_str, expected_goals, expected_scope_to_flags, expected_target_specs,
+  def _split(self, args_str, expected_goals, expected_scope_to_flags, expected_positional_args,
              expected_passthru=None, expected_passthru_owner=None,
              expected_is_help=False, expected_help_advanced=False, expected_help_all=False,
              expected_unknown_scopes=None):
@@ -39,12 +40,12 @@ class ArgSplitterTest(unittest.TestCase):
     expected_unknown_scopes = expected_unknown_scopes or []
     splitter = ArgSplitter(ArgSplitterTest._known_scope_infos)
     args = shlex.split(args_str)
-    goals, scope_to_flags, target_specs, passthru, passthru_owner, unknown_scopes = splitter.split_args(args)
-    self.assertEqual(expected_goals, goals)
-    self.assertEqual(expected_scope_to_flags, scope_to_flags)
-    self.assertEqual(expected_target_specs, target_specs)
-    self.assertEqual(expected_passthru, passthru)
-    self.assertEqual(expected_passthru_owner, passthru_owner)
+    split_args = splitter.split_args(args)
+    self.assertEqual(expected_goals, split_args.goals)
+    self.assertEqual(expected_scope_to_flags, split_args.scope_to_flags)
+    self.assertEqual(expected_positional_args, split_args.positional_args)
+    self.assertEqual(expected_passthru, split_args.passthru)
+    self.assertEqual(expected_passthru_owner, split_args.passthru_owner)
     self.assertEqual(expected_is_help, splitter.help_request is not None)
     self.assertEqual(expected_help_advanced,
                       (isinstance(splitter.help_request, OptionsHelp) and
@@ -52,7 +53,7 @@ class ArgSplitterTest(unittest.TestCase):
     self.assertEqual(expected_help_all,
                       (isinstance(splitter.help_request, OptionsHelp) and
                        splitter.help_request.all_scopes))
-    self.assertEqual(expected_unknown_scopes, unknown_scopes)
+    self.assertEqual(expected_unknown_scopes, split_args.unknown_scopes)
 
   def _split_help(self, args_str, expected_goals, expected_scope_to_flags, expected_target_specs,
                   expected_help_advanced=False, expected_help_all=False):
@@ -78,6 +79,23 @@ class ArgSplitterTest(unittest.TestCase):
     splitter = ArgSplitter(ArgSplitterTest._known_scope_infos)
     splitter.split_args(shlex.split(args_str))
     self.assertTrue(isinstance(splitter.help_request, NoGoalHelp))
+
+  def test_is_positional_arg(self):
+    def assert_positional(arg):
+      self.assertTrue(ArgSplitter.is_positional_arg(arg))
+    def assert_not_positional(arg):
+      self.assertFalse(ArgSplitter.is_positional_arg(arg))
+
+    assert_positional('a/b/c')
+    assert_positional('a/b:c')
+    assert_positional(':c')
+    with temporary_dir() as tmpdir:
+      os.mkdir(os.path.join(tmpdir, 'foo'))
+      with pushd(tmpdir):
+        assert_positional('foo')
+
+    assert_not_positional('foo')
+    assert_not_positional('a_b_c')
 
   def test_basic_arg_splitting(self):
     # Various flag combos.
@@ -169,15 +187,10 @@ class ArgSplitterTest(unittest.TestCase):
 
   def test_help_detection(self):
     self._split_help('./pants', [], {'': []}, [])
-    self._split_help('./pants goal', [], {'': []}, [])
     self._split_help('./pants -f', [], {'': ['-f']}, [])
-    self._split_help('./pants goal -f', [], {'': ['-f']}, [])
     self._split_help('./pants help', [], {'': []}, [])
-    self._split_help('./pants goal help', [], {'': []}, [])
     self._split_help('./pants -h', [], {'': []}, [])
-    self._split_help('./pants goal -h', [], {'': []}, [])
     self._split_help('./pants --help', [], {'': []}, [])
-    self._split_help('./pants goal --help', [], {'': []}, [])
     self._split_help('./pants help compile -x', ['compile'],
                 {'': [], 'compile': ['-x']}, [])
     self._split_help('./pants help compile -x', ['compile'],

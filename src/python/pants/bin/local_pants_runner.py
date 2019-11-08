@@ -224,7 +224,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     spec_parser = CmdLineSpecParser(get_buildroot())
     target_specs = [
       spec_parser.parse_spec(spec).to_spec_string()
-      for spec in self._options.target_specs
+      for spec in self._options.positional_args
     ]
     # Note: This will not include values from `--owner-of` or `--changed-*` flags.
     self._run_tracker.run_info.add_info("specs_from_command_line", target_specs, stringify=False)

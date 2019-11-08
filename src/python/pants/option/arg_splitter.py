@@ -4,7 +4,8 @@
 import os
 import sys
 from abc import ABC
-from collections import namedtuple
+from dataclasses import dataclass
+from typing import Dict, List
 
 from twitter.common.collections import OrderedSet
 
@@ -15,18 +16,15 @@ class ArgSplitterError(Exception):
   pass
 
 
-class SplitArgs(namedtuple('SplitArgs',
-                           ['goals', 'scope_to_flags', 'targets', 'passthru', 'passthru_owner', 'unknown_scopes'])):
-  """The result of splitting args.
-
-  goals: A list of explicitly specified goals.
-  scope_to_flags: An ordered map from scope name to the list of flags belonging to that scope.
-                  The global scope is specified as an empty string.
-                  Keys are in the order encountered in the args.
-  targets: A list of target specs.
-  passthru: Any remaining args specified after a -- separator.
-  passthru_owner: The scope specified last on the command line, if any. None otherwise.
-  """
+@dataclass(frozen=True)
+class SplitArgs:
+  """The result of splitting args."""
+  goals: List[str]  # Explicitly requested goals.
+  scope_to_flags: Dict[str, List[str]]  # Scope name -> list of flags in that scope.
+  positional_args: List[str]  # The positional args for the goals.
+  passthru: List[str]  # Any remaining args specified after a -- separator.
+  passthru_owner: str  # The scope specified last on the command line, if any. None otherwise.
+  unknown_scopes: List[str]
 
 
 class HelpRequest(ABC):
@@ -66,7 +64,7 @@ class NoGoalHelp(HelpRequest):
 
 
 class ArgSplitter:
-  """Splits a command-line into scoped sets of flags, and a set of targets.
+  """Splits a command-line into scoped sets of flags, and a set of positional args.
 
   Recognizes, e.g.:
 
@@ -82,7 +80,8 @@ class ArgSplitter:
   _HELP_ALL_SCOPES_ARGS = ('--help-all', 'help-all')
   _HELP_VERSION_ARGS = ('-v', '-V', '--version')
   _HELP_GOALS_ARGS = ('goals',)
-  _HELP_ARGS = _HELP_BASIC_ARGS + _HELP_ADVANCED_ARGS + _HELP_ALL_SCOPES_ARGS + _HELP_VERSION_ARGS + _HELP_GOALS_ARGS
+  _HELP_ARGS = (_HELP_BASIC_ARGS + _HELP_ADVANCED_ARGS + _HELP_ALL_SCOPES_ARGS +
+                _HELP_VERSION_ARGS + _HELP_GOALS_ARGS)
 
   def __init__(self, known_scope_infos):
     self._known_scope_infos = known_scope_infos
@@ -143,7 +142,7 @@ class ArgSplitter:
       if s not in scope_to_flags:
         scope_to_flags[s] = []
 
-    targets = []
+    positional_args = []
     passthru = []
     passthru_owner = None
 
@@ -152,14 +151,9 @@ class ArgSplitter:
     # pass just a list of flags, so don't skip it in that case.
     if not self._at_flag() and self._unconsumed_args:
       self._unconsumed_args.pop()
-    if self._unconsumed_args and self._unconsumed_args[-1] == 'goal':
-      # TODO: Temporary warning. Eventually specifying 'goal' will be an error.
-      print("WARNING: Specifying 'goal' explicitly is no longer necessary, and deprecated.",
-            file=sys.stderr)
-      self._unconsumed_args.pop()
 
-    def assign_flag_to_scope(flag, default_scope):
-      flag_scope, descoped_flag = self._descope_flag(flag, default_scope=default_scope)
+    def assign_flag_to_scope(flg, default_scope):
+      flag_scope, descoped_flag = self._descope_flag(flg, default_scope=default_scope)
       if flag_scope not in scope_to_flags:
         scope_to_flags[flag_scope] = []
       scope_to_flags[flag_scope].append(descoped_flag)
@@ -185,8 +179,8 @@ class ArgSplitter:
         # We assume any args here are in global scope.
         if not self._check_for_help_request(arg):
           assign_flag_to_scope(arg, GLOBAL_SCOPE)
-      elif os.path.sep in arg or ':' in arg or os.path.isdir(arg):
-        targets.append(arg)
+      elif self.is_positional_arg(arg):
+        positional_args.append(arg)
       elif arg not in self._known_scopes:
         self._unknown_scopes.append(arg)
 
@@ -200,7 +194,17 @@ class ArgSplitter:
     if not goals and not self._help_request:
       self._help_request = NoGoalHelp()
 
-    return SplitArgs(goals, scope_to_flags, targets, passthru, passthru_owner if passthru else None, self._unknown_scopes)
+    return SplitArgs(list(goals), scope_to_flags, positional_args, passthru,
+                     passthru_owner if passthru else None, self._unknown_scopes)
+
+  @staticmethod
+  def is_positional_arg(arg: str) -> bool:
+    """Does arg 'look like' a positional arg (rather than a goal name).
+
+    An arg is a positional arg if it looks like a target spec or a path.
+    In the future we can expand this heuristic to support other kinds of positional args.
+    """
+    return os.path.sep in arg or ':' in arg or os.path.isdir(arg)
 
   def _consume_scope(self):
     """Returns a pair (scope, list of flags encountered in that scope).
