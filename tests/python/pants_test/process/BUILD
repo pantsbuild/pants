@@ -4,7 +4,7 @@
 python_tests(
   dependencies = [
     'src/python/pants/process',
-    'tests/python/pants_test:test_base',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil:test_base',
+    'src/python/pants/testutil/subsystem',
   ]
 )

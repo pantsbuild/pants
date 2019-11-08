@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.engine.goal import Outputting
-from pants_test.engine.util import MockConsole
+from pants.testutil.engine.util import MockConsole
 
 
 def test_outputting_goal():

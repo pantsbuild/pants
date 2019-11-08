@@ -3,8 +3,8 @@
 
 import re
 
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.dirutil import read_file
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 TEST_DIR = 'testprojects/src/scala/org/pantsbuild/testproject'

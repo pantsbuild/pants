@@ -4,8 +4,8 @@
 import json
 from pathlib import Path
 
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import temporary_file_path
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class RunTrackerIntegrationTest(PantsRunIntegrationTest):

@@ -11,7 +11,7 @@ from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.context import Context
-from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
+from pants.testutil.jvm.nailgun_task_test_base import NailgunTaskTestBase
 from twitter.common.collections import OrderedSet
 
 from pants.contrib.scrooge.tasks.scrooge_gen import ScroogeGen

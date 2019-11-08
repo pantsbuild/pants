@@ -9,8 +9,8 @@ python_library(
     'src/python/pants/backend/python/targets',
     'src/python/pants/build_graph',
     'src/python/pants/subsystem',
-    'tests/python/pants_test/subsystem:subsystem_utils',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/testutil/subsystem',
+    'src/python/pants/testutil:task_test_base',
   ]
 )
 
@@ -31,7 +31,7 @@ python_tests(
   dependencies = [
     'src/python/pants/util:collections',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'testprojects/src/python:python_distribution_directory',
     'testprojects/tests/python:example_test_directory',
   ],
@@ -51,7 +51,7 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/source',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/testutil:task_test_base',
   ],
 )
 
@@ -61,7 +61,7 @@ python_tests(
   dependencies = [
     '3rdparty/python:pex',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'tests/python/pants_test:interpreter_selection_utils',
     'testprojects/src/python:interpreter_selection_directory',
   ],
@@ -86,7 +86,7 @@ python_tests(
   sources = ['test_isort_run_integration.py'],
   dependencies = [
     'src/python/pants/backend/python/tasks',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'testprojects/tests/java/org/pantsbuild/testproject:dummies_directory',
   ],
   tags = {'integration'},
@@ -104,8 +104,8 @@ python_tests(
     'src/python/pants/source',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test:task_test_base',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil:task_test_base',
+    'src/python/pants/testutil/subsystem',
     ':python_task_test_base',
   ],
   timeout=240,
@@ -116,9 +116,9 @@ python_tests(
   sources = ['test_pytest_run_integration.py'],
   dependencies = [
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'tests/python/pants_test:interpreter_selection_utils',
-    'tests/python/pants_test/testutils:pexrc_util',
+    'src/python/pants/testutil:pexrc_util',
     'examples:3rdparty_directory',
     'testprojects/src/python:interpreter_selection_directory',
     'testprojects/tests/python/pants:conf_test_directory',
@@ -146,7 +146,7 @@ python_tests(
   dependencies = [
     '3rdparty/python:pex',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'testprojects/src/python:python_distribution_directory',
   ],
   tags = {'integration'},
@@ -170,7 +170,7 @@ python_tests(
   name = 'python_repl_integration',
   sources = ['test_python_repl_integration.py'],
   dependencies = [
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'testprojects/src/python:interpreter_selection_directory',
   ],
   tags = {'integration'},
@@ -183,9 +183,9 @@ python_tests(
   dependencies = [
     '3rdparty/python:pex',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'tests/python/pants_test:interpreter_selection_utils',
-    'tests/python/pants_test/testutils:pexrc_util',
+    'src/python/pants/testutil:pexrc_util',
     'testprojects/src/python:interpreter_selection_directory',
     'testprojects/src/python:print_env_directory',
   ],
@@ -218,7 +218,7 @@ python_tests(
     'src/python/pants/base:build_environment',
     'src/python/pants/task',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/testutil:task_test_base',
   ],
 )
 
@@ -233,7 +233,7 @@ python_tests(
     'src/python/pants/backend/python/tasks',
     'src/python/pants/base:exceptions',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/testutil:task_test_base',
   ],
 )
 
@@ -253,7 +253,7 @@ python_tests(
     'src/python/pants/fs',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil/subsystem',
     'tests/python/pants_test:interpreter_selection_utils',
   ],
 )
@@ -282,6 +282,6 @@ python_tests(
     'src/python/pants/backend/python/tasks',
     'src/python/pants/task',
     'src/python/pants/util:collections',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/testutil:task_test_base',
   ],
 )

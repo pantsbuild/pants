@@ -10,9 +10,9 @@ import requests
 from pants.goal.run_tracker import RunTracker
 from pants.reporting.reporting import Reporting
 from pants.reporting.reporting_server import PantsHandler, ReportingServer
+from pants.testutil.test_base import TestBase
 from pants.util.contextutil import http_server, temporary_dir
 from pants.util.dirutil import safe_file_dump
-from pants_test.test_base import TestBase
 
 
 class ReportingTest(TestBase):

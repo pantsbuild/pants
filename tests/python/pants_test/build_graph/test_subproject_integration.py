@@ -4,8 +4,8 @@
 from contextlib import contextmanager
 from textwrap import dedent
 
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.dirutil import safe_file_dump, safe_rmtree
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 SUBPROJ_SPEC = 'testprojects/src/python/subproject_test/'

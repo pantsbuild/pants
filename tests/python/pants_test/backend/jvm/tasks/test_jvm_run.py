@@ -8,8 +8,8 @@ from contextlib import contextmanager
 from pants.backend.jvm.subsystems.jvm import JVM
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.jvm_run import JvmRun
+from pants.testutil.jvm.jvm_task_test_base import JvmTaskTestBase
 from pants.util.contextutil import pushd, temporary_dir
-from pants_test.jvm.jvm_task_test_base import JvmTaskTestBase
 
 
 class JvmRunTest(JvmTaskTestBase):

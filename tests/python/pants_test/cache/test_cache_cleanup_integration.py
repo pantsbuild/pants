@@ -5,9 +5,9 @@ import glob
 import os
 import time
 
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_delete, safe_mkdir, touch
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class CacheCleanupIntegrationTest(PantsRunIntegrationTest):

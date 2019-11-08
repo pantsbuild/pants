@@ -5,7 +5,7 @@ import os
 
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 def single(directory, name=None):

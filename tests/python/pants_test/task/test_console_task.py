@@ -7,7 +7,7 @@ from io import BytesIO
 from queue import Empty, Queue
 
 from pants.task.console_task import ConsoleTask
-from pants_test.task_test_base import TaskTestBase
+from pants.testutil.task_test_base import TaskTestBase
 
 
 class ConsoleTaskTest(TaskTestBase):

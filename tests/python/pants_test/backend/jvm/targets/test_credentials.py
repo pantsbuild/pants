@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.backend.jvm.targets.credentials import LiteralCredentials
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 class CredentialsTest(TestBase):

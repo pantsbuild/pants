@@ -8,7 +8,7 @@ from pants.source.source_root import (
   SourceRootFactory,
   SourceRootTrie,
 )
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 # Shorthand, to cut some verbosity down in the tests.

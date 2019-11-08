@@ -7,9 +7,9 @@ import re
 import unittest.mock
 
 from pants.base.exception_sink import ExceptionSink
+from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir
 from pants.util.osutil import get_normalized_os_name
-from pants_test.test_base import TestBase
 
 
 class TestExceptionSink(TestBase):

@@ -11,8 +11,8 @@ from pants.backend.jvm.tasks.ivy_imports import IvyImports
 from pants.backend.jvm.tasks.jar_import_products import JarImportProducts
 from pants.java.jar.jar_dependency import JarDependency
 from pants.java.jar.jar_dependency_utils import M2Coordinate
+from pants.testutil.jvm.nailgun_task_test_base import NailgunTaskTestBase
 from pants.util.contextutil import open_zip, temporary_dir
-from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 
 
 class IvyImportsTest(NailgunTaskTestBase):

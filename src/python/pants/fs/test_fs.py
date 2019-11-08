@@ -17,9 +17,9 @@ from pants.engine.fs import (
 from pants.engine.goal import Goal
 from pants.engine.rules import RootRule, console_rule
 from pants.engine.selectors import Get
+from pants.testutil.console_rule_test_base import ConsoleRuleTestBase
+from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir
-from pants_test.console_rule_test_base import ConsoleRuleTestBase
-from pants_test.test_base import TestBase
 
 
 @dataclass(frozen=True)

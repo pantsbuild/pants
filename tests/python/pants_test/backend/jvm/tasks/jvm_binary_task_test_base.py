@@ -5,7 +5,7 @@ import os
 
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
-from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
+from pants.testutil.jvm.nailgun_task_test_base import NailgunTaskTestBase
 
 
 class JvmBinaryTaskTestBase(NailgunTaskTestBase):

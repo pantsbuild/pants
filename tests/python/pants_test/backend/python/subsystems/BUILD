@@ -7,7 +7,7 @@ python_tests(
   dependencies=[
     'src/python/pants/backend/python/subsystems',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:test_base',
-    'tests/python/pants_test/testutils:pexrc_util',
+    'src/python/pants/testutil:test_base',
+    'src/python/pants/testutil:pexrc_util',
   ]
 )

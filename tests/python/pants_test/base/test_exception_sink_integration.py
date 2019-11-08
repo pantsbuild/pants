@@ -9,9 +9,9 @@ from textwrap import dedent
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import read_file, safe_file_dump, safe_mkdir, touch
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class ExceptionSinkIntegrationTest(PantsRunIntegrationTest):

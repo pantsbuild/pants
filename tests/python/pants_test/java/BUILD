@@ -28,7 +28,7 @@ python_tests(
   dependencies = [
     '3rdparty/python:psutil',
     'src/python/pants/java:nailgun_executor',
-    'tests/python/pants_test:test_base'
+    'src/python/pants/testutil:test_base'
   ]
 )
 
@@ -63,7 +63,7 @@ python_tests(
   name = 'nailgun_integration',
   sources = ['test_nailgun_integration.py'],
   dependencies = [
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'examples/src/scala/org/pantsbuild/example:hello_directory',
   ],
   tags = {'integration'},
@@ -77,6 +77,6 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:nailgun_task',
     'src/python/pants/java:util',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/jvm:nailgun_task_test_base',
+    'src/python/pants/testutil/jvm:nailgun_task_test_base',
   ]
 )

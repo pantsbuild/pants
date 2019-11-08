@@ -6,7 +6,7 @@ from contextlib import contextmanager
 
 from pants.pantsd.service.fs_event_service import FSEventService
 from pants.pantsd.watchman import Watchman
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 class TestFSEventService(TestBase):

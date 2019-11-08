@@ -4,7 +4,7 @@
 import os
 
 from pants.base.file_system_project_tree import FileSystemProjectTree
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class FilemapIntegrationTest(PantsRunIntegrationTest):

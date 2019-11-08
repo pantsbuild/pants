@@ -5,7 +5,7 @@
 from pants.backend.graph_info.tasks.cloc import CountLinesOfCode
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.python.targets.python_library import PythonLibrary
-from pants_test.task_test_base import ConsoleTaskTestBase
+from pants.testutil.task_test_base import ConsoleTaskTestBase
 
 
 class ClocTest(ConsoleTaskTestBase):

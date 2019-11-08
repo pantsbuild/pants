@@ -11,9 +11,9 @@ from pathlib import Path
 from textwrap import dedent
 from typing import Optional, Sequence
 
+from pants.testutil.git_util import initialize_repo
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_file_dump, safe_mkdir_for
-from pants_test.testutils.git_util import initialize_repo
 
 
 class PreCommitHookTest(unittest.TestCase):

@@ -13,8 +13,8 @@ from pants.option.scope import GLOBAL_SCOPE
 from pants.subsystem.subsystem import Subsystem
 from pants.subsystem.subsystem_client_mixin import SubsystemDependency
 from pants.task.task import Task
+from pants.testutil.task_test_base import TaskTestBase
 from pants.util.dirutil import safe_rmtree
-from pants_test.task_test_base import TaskTestBase
 
 
 class DummyTask(Task):

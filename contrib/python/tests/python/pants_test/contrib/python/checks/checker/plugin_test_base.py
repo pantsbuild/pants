@@ -5,8 +5,8 @@ import copy
 import os
 import unittest
 
+from pants.testutil.option.fakes import create_options
 from pants.util.dirutil import safe_mkdtemp
-from pants_test.option.util.fakes import create_options
 
 from pants.contrib.python.checks.checker.common import Nit, PythonFile
 

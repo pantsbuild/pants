@@ -9,9 +9,9 @@ from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.java.nailgun_executor import NailgunProcessGroup
+from pants.testutil.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import safe_mkdir
-from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 
 
 class NailgunTaskTest(JvmToolTaskTestBase):

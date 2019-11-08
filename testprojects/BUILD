@@ -5,6 +5,6 @@ files(
   name = 'pants_plugins_directory',
   sources = rglobs('pants-plugins/*'),
   dependencies = [
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
   ],
 )

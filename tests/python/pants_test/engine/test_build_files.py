@@ -23,6 +23,7 @@ from pants.engine.nodes import Return, Throw
 from pants.engine.parser import HydratedStruct, SymbolTable
 from pants.engine.rules import rule
 from pants.engine.struct import Struct, StructWithDeps
+from pants.testutil.engine.util import Target, run_rule
 from pants.util.objects import Exactly
 from pants_test.engine.examples.parsers import (
   JsonParser,
@@ -30,7 +31,6 @@ from pants_test.engine.examples.parsers import (
   PythonCallbacksParser,
 )
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
-from pants_test.engine.util import Target, run_rule
 
 
 class ParseAddressFamilyTest(unittest.TestCase):

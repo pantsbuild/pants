@@ -14,8 +14,8 @@ from pants.backend.python.targets.python_requirement_library import PythonRequir
 from pants.backend.python.tasks.select_interpreter import SelectInterpreter
 from pants.base.exceptions import TaskError
 from pants.option.ranked_value import RankedValue
+from pants.testutil.task_test_base import TaskTestBase
 from pants.util.dirutil import chmod_plus_x, safe_mkdtemp
-from pants_test.task_test_base import TaskTestBase
 
 
 class SelectInterpreterTest(TaskTestBase):

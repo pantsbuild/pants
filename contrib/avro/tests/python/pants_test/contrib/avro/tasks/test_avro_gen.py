@@ -4,7 +4,7 @@
 from textwrap import dedent
 
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
+from pants.testutil.jvm.nailgun_task_test_base import NailgunTaskTestBase
 
 from pants.contrib.avro.targets.java_avro_library import JavaAvroLibrary
 from pants.contrib.avro.tasks.avro_gen import AvroJavaGenTask

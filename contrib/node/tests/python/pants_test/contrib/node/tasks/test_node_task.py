@@ -7,8 +7,8 @@ import string
 from textwrap import dedent
 
 from pants.build_graph.target import Target
+from pants.testutil.task_test_base import TaskTestBase
 from pants.util.contextutil import pushd, temporary_dir
-from pants_test.task_test_base import TaskTestBase
 
 from pants.contrib.node.targets.node_module import NodeModule
 from pants.contrib.node.targets.node_remote_module import NodeRemoteModule

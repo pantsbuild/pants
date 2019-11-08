@@ -6,8 +6,8 @@ python_tests(
   sources=['test_node_distribution.py'],
   dependencies=[
     'contrib/node/src/python/pants/contrib/node/subsystems',
-    'tests/python/pants_test/base:context_utils',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil/base:context_utils',
+    'src/python/pants/testutil/subsystem',
   ]
 )
 

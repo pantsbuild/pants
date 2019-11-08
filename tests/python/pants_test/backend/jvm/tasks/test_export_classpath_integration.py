@@ -5,8 +5,8 @@ import os
 import time
 
 from pants.java.jar.manifest import Manifest
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import open_zip
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class ExportClasspathIntegrationTest(PantsRunIntegrationTest):

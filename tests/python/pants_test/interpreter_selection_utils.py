@@ -1,6 +1,7 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from pants.base.deprecated import deprecated_module
 from pants.testutil.interpreter_selection_utils import PY_2 as PY_2  # noqa
 from pants.testutil.interpreter_selection_utils import PY_3 as PY_3  # noqa
 from pants.testutil.interpreter_selection_utils import PY_27 as PY_27  # noqa
@@ -31,3 +32,9 @@ from pants.testutil.interpreter_selection_utils import (
 from pants.testutil.interpreter_selection_utils import (
   skip_unless_python36_present as skip_unless_python36_present,
 )  # noqa
+
+
+deprecated_module(
+  removal_version="1.25.0.dev0",
+  hint_message="Import pants.testutil.interpreter_selection_utils instead."
+)

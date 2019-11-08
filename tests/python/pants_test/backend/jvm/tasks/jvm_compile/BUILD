@@ -9,7 +9,7 @@ python_tests(
     'src/python/pants/backend/jvm/tasks/jvm_compile:jvm_classpath_publisher',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/testutil:task_test_base',
   ],
 )
 
@@ -19,7 +19,7 @@ python_tests(
   dependencies = [
     'src/python/pants/backend/jvm/tasks/jvm_compile',
     'src/python/pants/backend/jvm/tasks:classpath_products',
-    'tests/python/pants_test/jvm:nailgun_task_test_base',
+    'src/python/pants/testutil/jvm:nailgun_task_test_base',
   ],
 )
 
@@ -29,7 +29,7 @@ python_library(
   sources=['base_compile_integration_test.py'],
   dependencies=[
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
   ],
 )
 
@@ -50,7 +50,7 @@ python_tests(
   sources=['test_dep_exports_integration.py'],
   dependencies = [
     'src/python/pants/base:build_environment',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'testprojects/tests/java/org/pantsbuild/testproject:exports_directory',
     'testprojects/tests/scala/org/pantsbuild/testproject:exports_directory',
     'testprojects/tests/scala/org/pantsbuild/testproject:non_exports_directory',
@@ -72,7 +72,7 @@ python_tests(
   name='missing_dependency_finder_integration',
   sources=['test_missing_dependency_finder_integration.py'],
   dependencies=[
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'src/python/pants/backend/jvm/tasks/jvm_compile:missing_dependency_finder',
     'testprojects/src/java/org/pantsbuild/testproject:dummies_directory',
     'testprojects/src/java/org/pantsbuild/testproject:missingjardepswhitelist_directory',

@@ -11,7 +11,7 @@ import pywatchman
 
 from pants.pantsd.watchman import Watchman
 from pants.pantsd.watchman_client import StreamableWatchmanClient
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 class TestWatchman(TestBase):

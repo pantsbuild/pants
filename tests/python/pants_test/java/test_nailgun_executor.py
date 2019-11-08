@@ -8,7 +8,7 @@ from contextlib import contextmanager
 import psutil
 
 from pants.java.nailgun_executor import NailgunExecutor
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 PATCH_OPTS = dict(autospec=True, spec_set=True)

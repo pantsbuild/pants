@@ -4,7 +4,7 @@
 import threading
 
 from pants.pantsd.service.pants_service import PantsService
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 class RunnableTestService(PantsService):

@@ -4,7 +4,7 @@
 from pants.backend.jvm.tasks.benchmark_run import BenchmarkRun
 from pants.base.exceptions import TaskError
 from pants.build_graph.target import Target
-from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
+from pants.testutil.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 
 
 class BenchmarkRunTest(JvmToolTaskTestBase):

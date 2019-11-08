@@ -3,8 +3,8 @@
 
 import os
 
+from pants.testutil.task_test_base import TaskTestBase
 from pants.util.contextutil import temporary_file
-from pants_test.task_test_base import TaskTestBase
 
 from pants.contrib.go.targets.go_binary import GoBinary
 from pants.contrib.go.tasks.go_go import GoEnv, GoGo, GoInteropTask

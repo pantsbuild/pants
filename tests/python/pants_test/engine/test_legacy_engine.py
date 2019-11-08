@@ -3,7 +3,7 @@
 
 from pants.base.exceptions import TaskError
 from pants.engine.legacy_engine import Engine
-from pants_test.engine.base_engine_test import EngineTestBase
+from pants.testutil.engine.base_engine_test import EngineTestBase
 
 
 class EngineTest(EngineTestBase):

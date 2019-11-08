@@ -6,7 +6,7 @@ import os
 from pants.backend.native.targets.external_native_library import ExternalNativeLibrary
 from pants.backend.native.tasks.conan_fetch import ConanFetch
 from pants.backend.native.tasks.conan_prep import ConanPrep
-from pants_test.task_test_base import TaskTestBase
+from pants.testutil.task_test_base import TaskTestBase
 
 
 class ConanFetchTest(TaskTestBase):

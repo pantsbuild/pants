@@ -9,8 +9,8 @@ from pants.backend.jvm.tasks.reports.junit_html_report import (
   ReportTestCase,
   ReportTestSuite,
 )
+from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir
-from pants_test.test_base import TestBase
 
 
 class TestJUnitHtmlReport(TestBase):

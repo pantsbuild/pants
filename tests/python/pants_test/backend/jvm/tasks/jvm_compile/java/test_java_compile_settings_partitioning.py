@@ -12,11 +12,11 @@ from pants.backend.jvm.tasks.jvm_compile.rsc.rsc_compile import RscCompile
 from pants.base.revision import Revision
 from pants.java.distribution.distribution import DistributionLocator
 from pants.subsystem.subsystem import Subsystem
+from pants.testutil.jvm.nailgun_task_test_base import NailgunTaskTestBase
+from pants.testutil.subsystem.util import init_subsystem
 from pants.util.memo import memoized_method
 from pants.util.osutil import get_os_name, normalize_os_name
 from pants_test.java.distribution.test_distribution import EXE, distribution
-from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
-from pants_test.subsystem.subsystem_util import init_subsystem
 
 
 class JavaCompileSettingsPartitioningTest(NailgunTaskTestBase):

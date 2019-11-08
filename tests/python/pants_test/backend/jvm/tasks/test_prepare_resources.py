@@ -8,8 +8,8 @@ from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.prepare_resources import PrepareResources
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
+from pants.testutil.task_test_base import TaskTestBase
 from pants.util.contextutil import temporary_dir
-from pants_test.task_test_base import TaskTestBase
 
 
 class PrepareResourcesTest(TaskTestBase):

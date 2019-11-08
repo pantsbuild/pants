@@ -6,8 +6,8 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from pants.init.logging import get_numeric_level, setup_logging
+from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir
-from pants_test.test_base import TestBase
 
 
 class LoggingTest(TestBase):

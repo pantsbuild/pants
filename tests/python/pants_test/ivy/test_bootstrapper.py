@@ -6,7 +6,7 @@ import unittest
 
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy_subsystem import IvySubsystem
-from pants_test.subsystem.subsystem_util import init_subsystem
+from pants.testutil.subsystem.util import init_subsystem
 
 
 class BootstrapperTest(unittest.TestCase):

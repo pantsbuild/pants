@@ -6,6 +6,6 @@ python_tests(
     'src/python/pants/backend/python/targets',
     'src/python/pants/backend/python:python_requirement',
     'src/python/pants/util:collections',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
   ]
 )

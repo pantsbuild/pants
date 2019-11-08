@@ -9,6 +9,6 @@ python_tests(
     'src/python/pants/base:build_file',
     'src/python/pants/base:project_tree',
     'src/python/pants/build_graph',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
   ],
 )

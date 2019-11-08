@@ -9,7 +9,7 @@ python_tests(
     'src/python/pants/java/distribution',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil/subsystem',
   ],
   timeout = 15,
 )
@@ -21,8 +21,8 @@ python_tests(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/java/distribution',
     'src/python/pants/util:osutil',
-    'tests/python/pants_test:int-test',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil:int-test',
+    'src/python/pants/testutil/subsystem',
     'testprojects/src/java/org/pantsbuild/testproject:printversion_directory'
   ],
   tags = {'integration'},

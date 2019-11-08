@@ -6,7 +6,7 @@ python_tests(
   sources=['test_node_remote_module.py'],
   dependencies=[
     'contrib/node/src/python/pants/contrib/node/targets:node_remote_module',
-    'tests/python/pants_test:test_base'
+    'src/python/pants/testutil:test_base'
   ]
 )
 
@@ -15,7 +15,7 @@ python_tests(
   sources=['test_node_package.py'],
   dependencies=[
     'contrib/node/src/python/pants/contrib/node/targets:node_package',
-    'tests/python/pants_test:test_base'
+    'src/python/pants/testutil:test_base'
   ]
 )
 
@@ -24,6 +24,6 @@ python_tests(
   sources=['test_node_module.py'],
   dependencies=[
     'contrib/node/src/python/pants/contrib/node/targets:node_module',
-    'tests/python/pants_test:test_base'
+    'src/python/pants/testutil:test_base'
   ]
 )

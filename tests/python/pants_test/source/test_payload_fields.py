@@ -4,7 +4,7 @@
 from pants.engine.fs import Digest, Snapshot
 from pants.source.payload_fields import SourcesField
 from pants.source.wrapped_globs import Globs, LazyFilesetWithSpec
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 class PayloadTest(TestBase):

@@ -12,8 +12,8 @@ python_tests(
     'src/python/pants/engine:selectors',
     'src/python/pants/util:collections',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:test_base',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil:test_base',
+    'src/python/pants/testutil/subsystem',
   ]
 )
 
@@ -25,7 +25,7 @@ python_tests(
     'src/python/pants/engine:fs',
     'src/python/pants/engine:rules',
     'src/python/pants/util:collections',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
   ]
 )
 
@@ -33,7 +33,7 @@ python_tests(
   name='python_test_runner_integration',
   source='test_python_test_runner_integration.py',
   dependencies=[
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'testprojects/tests/python/pants:dummies_directory',
   ],
   tags={'integration'},
@@ -44,7 +44,7 @@ python_tests(
   name='python_fmt_integration',
   source='test_python_fmt_integration.py',
   dependencies=[
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'testprojects/src/python:unicode_directory',
     'examples/src/python/example:hello_directory',
   ],

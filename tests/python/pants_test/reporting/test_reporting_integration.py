@@ -11,9 +11,9 @@ from pathlib import Path
 import psutil
 from parameterized import parameterized
 
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import http_server
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 _HEADER = 'invocation_id,task_name,targets_hash,target_id,cache_key_id,cache_key_hash,phase,valid'

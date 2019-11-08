@@ -6,7 +6,7 @@ from pants.backend.python.register import build_file_aliases
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.base.build_environment import pants_version
 from pants.build_graph.address_lookup_error import AddressLookupError
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 class PantsRequirementTest(TestBase):

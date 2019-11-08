@@ -6,7 +6,7 @@ python_tests(
     'contrib/awslambda/python/src/python/pants/contrib/awslambda/python:plugin',
     'contrib/awslambda/python/src/python/pants/contrib/awslambda/python:examples_directory',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
   ],
   tags={'integration'},
   timeout=120,

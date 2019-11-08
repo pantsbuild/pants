@@ -8,9 +8,9 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
 from pants.cache.cache_setup import CacheFactory, CacheSetup
 from pants.task.task import Task
+from pants.testutil.task_test_base import TaskTestBase
 from pants.util.contextutil import open_tar, temporary_dir
 from pants.util.dirutil import safe_open
-from pants_test.task_test_base import TaskTestBase
 
 
 SYMLINK_NAME = 'link'

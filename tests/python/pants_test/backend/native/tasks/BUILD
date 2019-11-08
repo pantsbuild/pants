@@ -15,6 +15,6 @@ python_library(
     'src/python/pants/backend/native',
     'src/python/pants/backend/native/targets',
     'src/python/pants/backend/python/tasks',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/testutil:task_test_base',
   ],
 )
