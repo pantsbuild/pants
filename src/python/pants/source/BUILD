@@ -16,6 +16,7 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
