@@ -262,7 +262,6 @@ impl CapturedWorkdir for CommandRunner {
       .current_dir(&workdir_path)
       .envs(&req.env)
       .stream()
-      .map(|s| Timeout::new(s, req.timeout).map_err(|e| e.to_string()))
       .map(|s| {
         // NB: Converting from `impl Stream` to `Box<dyn Stream>` requires this odd dance.
         let stream: Box<dyn Stream<Item = _, Error = _> + Send> = Box::new(s);
@@ -363,7 +362,10 @@ pub trait CapturedWorkdir {
       // code. The idea going forward though is we eventually want to pass incremental results on
       // down the line for streaming process results to console logs, etc. as tracked by:
       //   https://github.com/pantsbuild/pants/issues/6089
-      .and_then(ChildResults::collect_from)
+      .map(ChildResults::collect_from)
+      .and_then(move |child_results_future| {
+        Timeout::new(child_results_future, req_timeout).map_err(|e| e.to_string())
+      })
       .and_then(move |child_results| {
         let output_snapshot = if output_file_paths.is_empty() && output_dir_paths.is_empty() {
           future::ok(store::Snapshot::empty()).to_boxed()
