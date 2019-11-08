@@ -5,6 +5,7 @@ import logging
 import os
 import weakref
 from hashlib import sha1
+from typing import Optional, Sequence, Union
 
 from twitter.common.collections import OrderedSet
 
@@ -831,12 +832,12 @@ class Target(AbstractTarget):
 
   # List of glob patterns, or a single glob pattern.
   # Subclasses can override, typically to specify a file extension (e.g., '*.java').
-  default_sources_globs = None
+  default_sources_globs: Optional[Union[str, Sequence[str]]] = None
 
   # List of glob patterns, or a single glob pattern.
   # Subclasses can override, to specify files that should be excluded from the
   # default_sources_globs (e.g., '*Test.java').
-  default_sources_exclude_globs = None
+  default_sources_exclude_globs: Optional[Union[str, Sequence[str]]] = None
 
   @classmethod
   def supports_default_sources(cls):
