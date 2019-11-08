@@ -6,11 +6,12 @@ python_tests(
   name='filedeps',
   source='test_filedeps.py',
   dependencies=[
+    'src/python/pants/backend/codegen/thrift/java',
+    'src/python/pants/backend/jvm/targets:all',
+    'src/python/pants/backend/python/targets',
     'src/python/pants/build_graph',
-    'src/python/pants/engine/legacy:graph',
     'src/python/pants/rules/core',
-    'src/python/pants/testutil:test_base',
-    'src/python/pants/testutil/engine:util',
+    'src/python/pants/testutil:console_rule_test_base',
   ]
 )
 
