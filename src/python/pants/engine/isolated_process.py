@@ -56,7 +56,7 @@ class ExecuteProcessRequest:
     self.argv = argv
     self.input_files = input_files
     self.description = description
-    self.env = tuple(item for pair in env.items() for item in pair) if env else ()
+    self.env = tuple(item for pair in env.items() for item in pair) if env is not None else ()  # type: ignore
     self.output_files = output_files or ()
     self.output_directories = output_directories or ()
     self.timeout_seconds = timeout_seconds
@@ -84,13 +84,13 @@ class MultiPlatformExecuteProcessRequest:
       if PlatformConstraint(constraint.value)
     )
     if len({req.description for req in request_dict.values()}) != 1:
-      raise ValueError(f"The `description` of all execute_process_requests in a {self.__name__} must be identical.")
+      raise ValueError(f"The `description` of all execute_process_requests in a {MultiPlatformExecuteProcessRequest.__name__} must be identical.")
 
     self.platform_constraints = validated_constraints
     self.execute_process_requests = tuple(request_dict.values())
 
   @property
-  def product_description(self):
+  def product_description(self) -> ProductDescription:
     # we can safely extract the first description because we guarantee that at
     # least one request exists and that all of their descriptions are the same
     # in __new__

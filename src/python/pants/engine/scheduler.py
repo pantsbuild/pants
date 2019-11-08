@@ -9,12 +9,11 @@ import time
 import traceback
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE
 from pants.engine.fs import Digest, DirectoryToMaterialize, PathGlobsAndRoot
-from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveProcessResult
 from pants.engine.native import Function, TypeId
 from pants.engine.nodes import Return, Throw
 from pants.engine.objects import Collection
@@ -23,6 +22,10 @@ from pants.engine.selectors import Params
 from pants.util.contextutil import temporary_file_path
 from pants.util.dirutil import check_no_overlapping_paths
 from pants.util.strutil import pluralize
+
+
+if TYPE_CHECKING:
+  from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveProcessResult
 
 
 logger = logging.getLogger(__name__)
@@ -546,14 +549,17 @@ class SchedulerSession:
     )
     return self._scheduler._raise_or_return(result)
 
-  def run_local_interactive_process(self, request: InteractiveProcessRequest) -> InteractiveProcessResult:
+  def run_local_interactive_process(
+    self, request: 'InteractiveProcessRequest'
+  ) -> 'InteractiveProcessResult':
     sched_pointer = self._scheduler._scheduler
 
-    result  = self._scheduler._native.lib.run_local_interactive_process(
+    wrapped_result  = self._scheduler._native.lib.run_local_interactive_process(
       sched_pointer,
       self._scheduler._to_value(request)
     )
-    return self._scheduler._raise_or_return(result)
+    result: 'InteractiveProcessResult' = self._scheduler._raise_or_return(wrapped_result)
+    return result
 
   def materialize_directories(self, directories_paths_and_digests):
     """Creates the specified directories on the file system.
