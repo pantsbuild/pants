@@ -4,6 +4,7 @@
 import logging
 import os
 import threading
+from typing import Optional
 
 from pants.binaries.binary_util import BinaryRequest, BinaryUtil
 from pants.engine.fs import PathGlobs, PathGlobsAndRoot
@@ -25,9 +26,9 @@ class BinaryToolBase(Subsystem):
   """
   # Subclasses must set these to appropriate values for the tool they define.
   # They must also set options_scope appropriately.
-  platform_dependent = None
-  archive_type = None  # See pants.fs.archive.archive for valid string values.
-  default_version = None
+  platform_dependent: Optional[bool] = None
+  archive_type: Optional[str] = None  # See pants.fs.archive.archive for valid string values.
+  default_version: Optional[str] = None
 
   # Subclasses may set this to the tool name as understood by BinaryUtil.
   # If unset, it defaults to the value of options_scope.
