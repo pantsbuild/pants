@@ -307,6 +307,7 @@ pub trait CapturedWorkdir {
     let output_dir_paths2 = output_dir_paths.clone();
 
     let req_description = req.description;
+    let req_timeout = req.timeout;
     let maybe_jdk_home = req.jdk_home;
     let unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule =
       req.unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule;
@@ -408,7 +409,25 @@ pub trait CapturedWorkdir {
             preserved_path, req_description
           );
         } // Else, workdir gets dropped here
-        result
+        match result {
+          Ok(fallible_execute_process_result) => Ok(fallible_execute_process_result),
+          Err(msg) => {
+            if msg == "deadline has elapsed" {
+              Ok(FallibleExecuteProcessResult {
+                stdout: Bytes::from(format!(
+                  "Exceeded timeout of {:?} for local process execution, {}",
+                  req_timeout, req_description
+                )),
+                stderr: Bytes::new(),
+                exit_code: -libc::SIGTERM,
+                output_directory: hashing::EMPTY_DIGEST,
+                execution_attempts: vec![],
+              })
+            } else {
+              Err(msg)
+            }
+          }
+        }
       })
       .to_boxed()
   }

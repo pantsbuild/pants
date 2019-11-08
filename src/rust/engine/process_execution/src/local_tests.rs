@@ -690,16 +690,7 @@ fn timeout() {
   })
   .unwrap();
 
-  assert_eq!(
-    result,
-    FallibleExecuteProcessResult {
-      stdout: as_bytes(""),
-      stderr: as_bytes(""),
-      exit_code: -15,
-      output_directory: EMPTY_DIGEST,
-      execution_attempts: vec![],
-    }
-  );
+  assert_eq!(result.exit_code, -15);
   let error_msg = String::from_utf8(result.stdout.to_vec()).unwrap();
   assert_that(&error_msg).contains("Exceeded timeout");
   assert_that(&error_msg).contains("timeout");
