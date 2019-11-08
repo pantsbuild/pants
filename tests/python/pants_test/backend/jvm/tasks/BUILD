@@ -69,7 +69,7 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:bench_directory',
   ],
   tags = {'integration'},
-  timeout = 120,
+  timeout = 210,
 )
 
 python_tests(
@@ -84,7 +84,7 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:deployexcludes_directory',
     'testprojects/src/java/org/pantsbuild/testproject:manifest_directory',
   ],
-  timeout=360,
+  timeout=420,
   tags = {'integration'},
 )
 
@@ -435,7 +435,8 @@ python_tests(
     'src/python/pants/testutil/jvm:jvm_tool_task_test_base',
     'src/python/pants/testutil/subsystem',
     'src/python/pants/testutil:task_test_base',
-  ]
+  ],
+  timeout = 120,
 )
 
 python_tests(
@@ -514,7 +515,7 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:unicode_directory',
   ],
   tags = {'integration'},
-  timeout = 240,
+  timeout = 320,
 )
 
 python_tests(
@@ -539,7 +540,7 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:unicode_directory',
   ],
   tags = {'integration'},
-  timeout = 240,
+  timeout = 460,
 )
 
 python_tests(
@@ -586,7 +587,7 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:jvmprepcommand_directory',
   ],
   tags = {'integration'},
-  timeout = 90,
+  timeout = 250,
 )
 
 python_tests(
@@ -718,7 +719,7 @@ python_tests(
     'testprojects/src/scala/org/pantsbuild/testproject:procedure_syntax_directory',
     'testprojects/src/scala/org/pantsbuild/testproject:rsc_compat_directory',
   ],
-  timeout=240,
+  timeout=340,
   tags = {'integration'},
 )
 
@@ -748,7 +749,7 @@ python_tests(
     'examples/src/scala/org/pantsbuild/example:hello_directory',
     'testprojects/src/scala/org/pantsbuild/testproject:unicode_directory',
   ],
-  timeout=300,
+  timeout=480,
   tags = {'integration'},
 )
 
@@ -760,7 +761,7 @@ python_tests(
     'testprojects/maven_layout:provided_patching_directory',
     'testprojects/src/java/org/pantsbuild/testproject:provided_directory',
   ],
-  timeout=300,
+  timeout=720,
   tags = {'integration'},
 )
 
@@ -771,7 +772,7 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'testprojects/src/java/org/pantsbuild/testproject:runtime_directory',
   ],
-  timeout=300,
+  timeout=600,
   tags = {'integration'},
 )
 

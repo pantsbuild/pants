@@ -49,5 +49,6 @@ python_tests(
     'examples/src/python/example:hello_directory',
   ],
   tags={'integration'},
+  timeout = 90,
 )
 

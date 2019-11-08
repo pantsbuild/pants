@@ -18,4 +18,5 @@ python_tests(
     'contrib/mypy:examples_directory',
   ],
   tags={'integration'},
+  timeout = 120,
 )

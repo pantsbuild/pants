@@ -42,7 +42,7 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:missingjardepswhitelist_directory',
   ],
   tags={'integration'},
-  timeout=360,
+  timeout=540,
 )
 
 python_tests(

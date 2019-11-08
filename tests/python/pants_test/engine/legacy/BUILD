@@ -36,7 +36,7 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:bundle_directory',
   ],
   tags = {'integration'},
-  timeout = 240,
+  timeout = 480,
 )
 
 python_tests(
@@ -100,7 +100,7 @@ python_tests(
     'examples/src/scala/org/pantsbuild/example:hello_directory',
   ],
   tags = {'integration'},
-  timeout = 30,
+  timeout = 40,
 )
 
 python_tests(

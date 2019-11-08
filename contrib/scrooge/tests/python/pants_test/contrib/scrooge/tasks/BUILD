@@ -36,7 +36,7 @@ python_tests(
     'contrib/scrooge:thrift_tests_directory',
   ],
   tags={'integration'},
-  timeout=180,
+  timeout=270,
 )
 
 python_tests(

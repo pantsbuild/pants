@@ -46,7 +46,7 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:bundle_directory',
   ],
   tags = {'integration'},
-  timeout = 180,
+  timeout = 300,
 )
 
 python_tests(

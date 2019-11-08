@@ -9,5 +9,5 @@ python_tests(
     'contrib/scalajs:examples_directory',
   ],
   tags={'integration'},
-  timeout=180,
+  timeout=270,
 )

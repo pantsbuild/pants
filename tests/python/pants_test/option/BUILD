@@ -13,7 +13,6 @@ python_tests(
     'src/python/pants/testutil/option',
     'src/python/pants/testutil:test_base',
   ],
-  timeout=30,
 )
 
 python_tests(
