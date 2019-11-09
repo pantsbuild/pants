@@ -72,8 +72,7 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestBase {
 
   @Test
   public void testShardedTesting12() {
-    invokeConsoleRunner("MockTest1 MockTest2 MockTest3 "
-        + "-test-shard 1/2");
+    invokeConsoleRunner("MockTest1 MockTest2 MockTest3 -test-shard 1/2");
     assertEquals("test12 test21 test31", TestRegistry.getCalledTests());
   }
 
@@ -118,6 +117,41 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestBase {
   public void testShardedTesting34() {
     invokeConsoleRunner("MockTest1 MockTest2 MockTest3 -test-shard 3/4");
     assertEquals("test21", TestRegistry.getCalledTests());
+  }
+
+  @Test
+  public void testShardedTesting02Scala() {
+    invokeConsoleRunner("MockScalaTest MockScalaTest1 MockScalaTest2 MockScalaTest3 "
+        + "-test-shard 0/2");
+    assertEquals("MockScalaTest-1 MockScalaTest-3", TestRegistry.getCalledTests());
+  }
+
+  @Test
+  public void testShardedTesting12Scala() {
+    invokeConsoleRunner("MockScalaTest MockScalaTest1 MockScalaTest2 MockScalaTest3 "
+        + "-test-shard 1/2");
+    assertEquals("MockScalaTest-2 MockScalaTest-4", TestRegistry.getCalledTests());
+  }
+
+  @Test
+  public void testShardedTesting03Scala() {
+    invokeConsoleRunner("MockScalaTest MockScalaTest1 MockScalaTest2 MockScalaTest3 "
+        + "-test-shard 0/3");
+    assertEquals("MockScalaTest-1 MockScalaTest-4", TestRegistry.getCalledTests());
+  }
+
+  @Test
+  public void testShardedTesting13Scala() {
+    invokeConsoleRunner("MockScalaTest MockScalaTest1 MockScalaTest2 MockScalaTest3 "
+        + "-test-shard 1/3");
+    assertEquals("MockScalaTest-2", TestRegistry.getCalledTests());
+  }
+
+  @Test
+  public void testShardedTesting23Scala() {
+    invokeConsoleRunner("MockScalaTest MockScalaTest1 MockScalaTest2 MockScalaTest3 "
+        + "-test-shard 2/3");
+    assertEquals("MockScalaTest-3", TestRegistry.getCalledTests());
   }
 
   @Test
