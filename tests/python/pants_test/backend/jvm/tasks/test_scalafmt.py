@@ -23,8 +23,7 @@ class ScalaFmtTestBase(NailgunTaskTestBase):
   @classmethod
   def alias_groups(cls):
     return super().alias_groups().merge(
-      BuildFileAliases(targets={'java_tests': JUnitTests,
-                                'junit_tests': JUnitTests,
+      BuildFileAliases(targets={'junit_tests': JUnitTests,
                                 'scala_library': ScalaLibrary}))
 
   def setUp(self):
