@@ -168,6 +168,7 @@ class CoursierMixin(JvmResolverBase):
             success = self._load_from_results_dir(compile_classpath, vt_set_results_dir,
               coursier_cache_dir, invalidation_check, pants_jar_base_dir)
             if success:
+              resolve_vts.update()
               return
 
         jars_to_resolve, pinned_coords = self._compute_jars_to_resolve_and_pin(raw_jar_deps,
