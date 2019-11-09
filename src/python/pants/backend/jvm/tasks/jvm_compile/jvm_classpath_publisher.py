@@ -3,6 +3,8 @@
 
 import os
 
+from twitter.common.collections import OrderedSet
+
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.java.util import safe_classpath
@@ -17,6 +19,10 @@ class RuntimeClasspathPublisher(Task):
     super().register_options(register)
     register('--manifest-jar-only', type=bool, default=False,
              help='Only export classpath in a manifest jar.')
+    register('--transitive-only', type=bool, default=False,
+             help='Only export the classpath of the transitive dependencies of the target roots. '
+                  'This avoids jarring up the target roots themselves, which allows an IDE to '
+                  'insert their own modules more easily to cover the source files of target roots.')
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -29,7 +35,11 @@ class RuntimeClasspathPublisher(Task):
   def execute(self):
     basedir = os.path.join(self.get_options().pants_distdir, self._output_folder)
     runtime_classpath = self.context.products.get_data('runtime_classpath')
+
     targets = self.context.targets()
+    if self.get_options().transitive_only:
+      targets = list(OrderedSet(targets) - set(self.context.target_roots))
+
     if self.get_options().manifest_jar_only:
       classpath = ClasspathUtil.classpath(targets, runtime_classpath)
       # Safely create e.g. dist/export-classpath/manifest.jar
