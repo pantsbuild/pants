@@ -9,6 +9,9 @@ not undergone the vetting associated with ``stable`` releases.
 
 API Changes
 ~~~~~~~~~~~
+* Deprecate pantsbuild.pants.testinfra in favor of pantsbuild.pants.testutil (#8583)
+  `PR #8583 <https://github.com/pantsbuild/pants/pull/8583>`_
+
 * Remove `datatype()` and `TypedCollection` (#8576)
   `PR #8576 <https://github.com/pantsbuild/pants/pull/8576>`_
 
@@ -48,9 +51,6 @@ Refactoring, Improvements, and Tooling
 
 * Remove duplicate target name for `backend/python/targets` (#8598)
   `PR #8598 <https://github.com/pantsbuild/pants/pull/8598>`_
-
-* Deprecate pantsbuild.pants.testinfra in favor of pantsbuild.pants.testutil (#8583)
-  `PR #8583 <https://github.com/pantsbuild/pants/pull/8583>`_
 
 * Prep for 1.22.0rc2 (#8595)
   `PR #8595 <https://github.com/pantsbuild/pants/pull/8595>`_
