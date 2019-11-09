@@ -4,6 +4,8 @@
 import copy
 import re
 import sys
+from typing import List
+
 from dataclasses import dataclass
 
 from pants.base.deprecated import warn_or_error
@@ -195,7 +197,7 @@ class Options:
     return self._positional_args
 
   @property
-  def positional_args(self):
+  def positional_args(self) -> List[str]:
     """The positional args to operate on.
 
     :API: public

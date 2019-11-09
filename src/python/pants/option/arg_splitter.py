@@ -4,9 +4,9 @@
 import os
 import sys
 from abc import ABC
-from dataclasses import dataclass
-from typing import Dict, List
+from typing import Dict, List, Optional
 
+from dataclasses import dataclass
 from twitter.common.collections import OrderedSet
 
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
@@ -23,7 +23,7 @@ class SplitArgs:
   scope_to_flags: Dict[str, List[str]]  # Scope name -> list of flags in that scope.
   positional_args: List[str]  # The positional args for the goals.
   passthru: List[str]  # Any remaining args specified after a -- separator.
-  passthru_owner: str  # The scope specified last on the command line, if any. None otherwise.
+  passthru_owner: Optional[str]  # The scope specified last on the command line, if any.
   unknown_scopes: List[str]
 
 
