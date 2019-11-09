@@ -9,6 +9,7 @@ import subprocess
 import time
 import traceback
 from contextlib import contextmanager
+from typing import Optional
 
 import psutil
 
@@ -541,7 +542,7 @@ class FingerprintedProcessManager(ProcessManager):
   """A `ProcessManager` subclass that provides a general strategy for process fingerprinting."""
 
   FINGERPRINT_KEY = 'fingerprint'
-  FINGERPRINT_CMD_KEY = None
+  FINGERPRINT_CMD_KEY: Optional[str] = None
   FINGERPRINT_CMD_SEP = '='
 
   @property

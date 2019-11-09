@@ -8,5 +8,6 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:meta',
     'src/python/pants/util:xml_parser',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )

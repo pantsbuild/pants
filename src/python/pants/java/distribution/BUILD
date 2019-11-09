@@ -11,6 +11,7 @@ python_library(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:osutil',
   ],
+  tags = {"partially_type_checked"},
 )
 
 resources(

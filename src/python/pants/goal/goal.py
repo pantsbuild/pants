@@ -1,6 +1,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from typing import Dict
+
 from pants.goal.error import GoalError
 from pants.option.optionable import Optionable
 from pants.util.memo import memoized
@@ -36,7 +38,7 @@ class Goal:
 
   :API: public
   """
-  _goal_by_name = dict()
+  _goal_by_name: Dict[str, "_Goal"] = {}
 
   def __new__(cls, *args, **kwargs):
     raise TypeError('Do not instantiate {0}. Call by_name() instead.'.format(cls))
