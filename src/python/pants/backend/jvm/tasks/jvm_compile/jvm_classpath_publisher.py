@@ -17,6 +17,8 @@ class RuntimeClasspathPublisher(Task):
     super().register_options(register)
     register('--manifest-jar-only', type=bool, default=False,
              help='Only export classpath in a manifest jar.')
+    register('--internal-classpath-only', type=bool, default=True,
+             help='Only export the classpath of source targets, not 3rdparty jars.')
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -35,7 +37,9 @@ class RuntimeClasspathPublisher(Task):
       # Safely create e.g. dist/export-classpath/manifest.jar
       safe_classpath(classpath, basedir, "manifest.jar")
     else:
-      ClasspathProducts.create_canonical_classpath(runtime_classpath,
-                                                   targets,
-                                                   basedir,
-                                                   save_classpath_file=True)
+      ClasspathProducts.create_canonical_classpath(
+        runtime_classpath,
+        targets,
+        basedir,
+        internal_classpath_only=self.get_options().internal_classpath_only,
+        save_classpath_file=True)
