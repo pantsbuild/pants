@@ -29,7 +29,7 @@ class GoogleJavaFormatBase(RewriteBase):
 
   @classmethod
   def target_types(cls):
-    return ['java_library', 'junit_tests', 'java_tests']
+    return ['java_library', 'junit_tests']
 
   @classmethod
   def source_extension(cls):
