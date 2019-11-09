@@ -166,7 +166,7 @@ class CoursierMixin(JvmResolverBase):
           if resolve_vts.valid or len(self.check_artifact_cache([resolve_vts])[0]) == len(resolve_vts.targets):
             # Load up from the results dir
             success = self._load_from_results_dir(compile_classpath, vt_set_results_dir,
-              coursier_cache_dir, invalidation_check, pants_jar_base_dir)
+                                                  coursier_cache_dir, invalidation_check, pants_jar_base_dir)
             if success:
               resolve_vts.update()
               return
