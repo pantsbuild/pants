@@ -36,9 +36,8 @@ class RuntimeClasspathPublisher(Task):
     basedir = os.path.join(self.get_options().pants_distdir, self._output_folder)
     runtime_classpath = self.context.products.get_data('runtime_classpath')
 
-    targets = self.context.targets()
-    if self.get_options().transitive_only:
-      targets = list(OrderedSet(targets) - set(self.context.target_roots))
+    targets = OrderedSet(self.get_targets()) - set(self.context.target_roots) \
+      if self.get_options().transitive_only else self.get_targets()
 
     if self.get_options().manifest_jar_only:
       classpath = ClasspathUtil.classpath(targets, runtime_classpath)
