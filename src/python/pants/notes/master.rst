@@ -4,8 +4,84 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
-1.23.0dev0 (11/03/2019)
------------------------
+1.23.0.dev1 (11/08/2019)
+------------------------
+
+API Changes
+~~~~~~~~~~~
+* Remove `datatype()` and `TypedCollection` (#8576)
+  `PR #8576 <https://github.com/pantsbuild/pants/pull/8576>`_
+
+* Replace `Collection.of(T)` with typed `Collection[T]` (#8574)
+  `PR #8574 <https://github.com/pantsbuild/pants/pull/8574>`_
+
+New Features
+~~~~~~~~~~~~
+* Add options to `fast-filedeps` to bring it close to parity with V1 `filedeps` (#8184)
+  `PR #8184 <https://github.com/pantsbuild/pants/pull/8184>`_
+
+* v2 `./pants run` (#8573)
+  `PR #8573 <https://github.com/pantsbuild/pants/pull/8573>`_
+
+* A mixin for v2 goals that have non-line-oriented output. (#8565)
+  `PR #8565 <https://github.com/pantsbuild/pants/pull/8565>`_
+
+* add compiler_option_sets_enabled_scalac_plugins option to JvmCompile (#8567)
+  `PR #8567 <https://github.com/pantsbuild/pants/pull/8567>`_
+
+Bugfixes
+~~~~~~~~
+* Respect a target's specified timeout with V2 Pytest runner (#8278)
+  `PR #8278 <https://github.com/pantsbuild/pants/pull/8278>`_
+
+* Fix V2 pytest caching issues from using FrozenSet (#8591)
+  `PR #8591 <https://github.com/pantsbuild/pants/pull/8591>`_
+
+* Fix fingerprint dict with files (#8569)
+  `PR #8569 <https://github.com/pantsbuild/pants/pull/8569>`_
+
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Partially type check `binaries`, `source`, `fs`, `net`, and more of  `engine` (#8596)
+  `PR #8596 <https://github.com/pantsbuild/pants/pull/8596>`_
+
+* Remove duplicate target name for `backend/python/targets` (#8598)
+  `PR #8598 <https://github.com/pantsbuild/pants/pull/8598>`_
+
+* Deprecate pantsbuild.pants.testinfra in favor of pantsbuild.pants.testutil (#8583)
+  `PR #8583 <https://github.com/pantsbuild/pants/pull/8583>`_
+
+* Prep for 1.22.0rc2 (#8595)
+  `PR #8595 <https://github.com/pantsbuild/pants/pull/8595>`_
+
+* v2-only mode should not acknowledge v1 goals (#8518)
+  `PR #8518 <https://github.com/pantsbuild/pants/pull/8518>`_
+
+* Partially type check core `base`, `engine`, `option`, and `subsystem` code (#8590)
+  `PR #8590 <https://github.com/pantsbuild/pants/pull/8590>`_
+
+* Move testinfra code from `tests/python/pants_tests` to `src/python/pants/testutil` (#8400)
+  `PR #8400 <https://github.com/pantsbuild/pants/pull/8400>`_
+
+* Add a buffer for queueing process execution to remote timeout (#8432)
+  `PR #8432 <https://github.com/pantsbuild/pants/pull/8432>`_
+
+* Eagerly fail deprecated options (#8556)
+  `PR #8556 <https://github.com/pantsbuild/pants/pull/8556>`_
+
+* Directly use `option.scope` instead of re-exports (#8578)
+  `PR #8578 <https://github.com/pantsbuild/pants/pull/8578>`_
+
+* Deduplicate requirements in V2 pex generation rule (#8577)
+  `PR #8577 <https://github.com/pantsbuild/pants/pull/8577>`_
+
+* Set user agent header on auth requests too. (#8562)
+  `PR #8562 <https://github.com/pantsbuild/pants/pull/8562>`_
+
+
+1.23.0.dev0 (11/03/2019)
+------------------------
 
 New Features
 ~~~~~~~~~~~~
@@ -108,7 +184,7 @@ Refactoring, Improvements, and Tooling
 
 
 1.22.0rc0 (10/20/2019)
-------------------------
+----------------------
 
 New Features
 ~~~~~~~~~~~~
