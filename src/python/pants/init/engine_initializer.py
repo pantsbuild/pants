@@ -21,7 +21,7 @@ from pants.build_graph.address import BuildFileAddress
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.remote_sources import RemoteSources
 from pants.engine.addressable import BuildFileAddresses
-from pants.engine.build_files import create_graph_rules
+from pants.engine.build_files import ProvenancedBuildFileAddresses, create_graph_rules
 from pants.engine.console import Console
 from pants.engine.fs import Workspace, create_fs_rules
 from pants.engine.goal import Goal
@@ -44,7 +44,7 @@ from pants.engine.legacy.structs import (
   TargetAdaptor,
 )
 from pants.engine.legacy.structs import rules as structs_rules
-from pants.engine.mapper import AddressMapper
+from pants.engine.mapper import AddressMapper, ResolveError
 from pants.engine.parser import SymbolTable
 from pants.engine.platform import create_platform_rules
 from pants.engine.rules import RootRule, UnionMembership, rule
@@ -378,7 +378,13 @@ class EngineInitializer:
     def single_build_file_address(specs: Specs) -> BuildFileAddress:
       build_file_addresses = yield Get(BuildFileAddresses, Specs, specs)
       if len(build_file_addresses.dependencies) != 1:
-        raise Exception("This goal only works with a single target, but has been given multiple targets.")
+        provenanced_addresses = yield Get(ProvenancedBuildFileAddresses, Specs, specs)
+        matched_addrs = [addr.build_file_address.to_address() for addr in provenanced_addresses]
+        output = '\n '.join(f':{addr}' for addr in matched_addrs)
+        raise ResolveError(
+          "This goal only works with a single target, but has been given multiple targets:\n"
+          f"Did you mean one of:\n {output}"
+        )
       yield build_file_addresses.dependencies[0]
 
     # Create a Scheduler containing graph and filesystem rules, with no installed goals. The
