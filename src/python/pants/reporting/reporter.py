@@ -1,7 +1,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from collections import namedtuple
+from dataclasses import dataclass
 
 from pants.reporting.report import Report
 
@@ -18,10 +18,13 @@ class Reporter:
   functionality, e.g., to console or to browser.
   """
 
-  # Generic reporting settings.
-  #   log_level: Display log messages up to this level.
-  #   subsettings: subclass-specific settings.
-  Settings = namedtuple('Settings', ['log_level'])
+  @dataclass(frozen=True)
+  class Settings:
+    """Generic reporting settings.
+
+    Subclasses of Reporter should extend their own Settings and add any additional settings they'd
+    like."""
+    log_level: str  # Display log messages up to this level.
 
   def __init__(self, run_tracker, settings):
     self.run_tracker = run_tracker

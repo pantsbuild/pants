@@ -6,7 +6,8 @@ import os
 import re
 import time
 import uuid
-from collections import defaultdict, namedtuple
+from collections import defaultdict
+from dataclasses import dataclass
 from itertools import zip_longest
 from textwrap import dedent
 
@@ -36,14 +37,14 @@ class HtmlReporter(Reporter):
   ad-hoc templates and client-side spaghetti code.
   """
 
-  # HTML reporting settings.
-  #   html_dir: Where the report files go.
-  #   template_dir: Where to find mustache templates.
-  Settings = namedtuple('Settings', Reporter.Settings._fields + ('html_dir', 'template_dir'))
+  @dataclass(frozen=True)
+  class Settings(Reporter.Settings):
+    html_dir: str  # Where the report files go.
+    template_dir: str  # Where to find mustache templates.
 
   def __init__(self, run_tracker, settings):
     super().__init__(run_tracker, settings)
-     # The main report, and associated tool outputs, go under this dir.
+    # The main report, and associated tool outputs, go under this dir.
     self._html_dir = settings.html_dir
 
     # We render HTML from mustache templates.

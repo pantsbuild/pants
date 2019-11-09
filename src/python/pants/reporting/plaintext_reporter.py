@@ -1,7 +1,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from collections import namedtuple
+from dataclasses import dataclass
+from typing import Any
 
 from colors import cyan, green, red, yellow
 
@@ -48,17 +49,16 @@ class PlainTextReporter(PlainTextReporterBase):
   confusing to try and show progress for background work too.
   """
 
-  # Console reporting settings.
-  #   outfile: Write output to this file-like object (analogous to stdout).
-  #   errfile: Write error output to this file-like object (analogous to stderr).
-  #   color: use ANSI colors in output.
-  #   indent: Whether to indent the reporting to reflect the nesting of workunits.
-  #   timing: Show timing report at the end of the run.
-  #   cache_stats: Show artifact cache report at the end of the run.
-  Settings = namedtuple('Settings',
-                        Reporter.Settings._fields + ('outfile', 'errfile', 'color', 'indent',
-                                                     'timing', 'cache_stats', 'label_format',
-                                                     'tool_output_format'))
+  @dataclass(frozen=True)
+  class Settings(Reporter.Settings):
+    outfile: Any  # Write output to this file-like object (analogous to stdout).
+    errfile: Any  # Write error output to this file-like object (analogous to stderr).
+    color: bool  # use ANSI colors in output.
+    indent: bool  # Whether to indent the reporting to reflect the nesting of workunits.
+    timing: bool  # Show timing report at the end of the run.
+    cache_stats: bool  # Show artifact cache report at the end of the run.
+    label_format: Any
+    tool_output_format: Any
 
   _COLOR_BY_LEVEL = {
     Report.FATAL: red,
