@@ -13,7 +13,7 @@ class SubsystemError(Exception):
   """An error in a subsystem."""
 
 
-S = TypeVar("S", bound="Subsystem")
+_S = TypeVar("_S", bound="Subsystem")
 
 
 class Subsystem(SubsystemClientMixin, Optionable):
@@ -86,7 +86,7 @@ class Subsystem(SubsystemClientMixin, Optionable):
   _scoped_instances: Dict[Tuple["Subsystem", str], "Subsystem"] = {}
 
   @classmethod
-  def global_instance(cls: Type[S]) -> S:
+  def global_instance(cls: Type[_S]) -> _S:
     """Returns the global instance of this subsystem.
 
     :API: public
@@ -96,7 +96,7 @@ class Subsystem(SubsystemClientMixin, Optionable):
     return cls._instance_for_scope(cls.options_scope)  # type: ignore
 
   @classmethod
-  def scoped_instance(cls: Type[S], optionable: Optionable) -> S:
+  def scoped_instance(cls: Type[_S], optionable: Optionable) -> _S:
     """Returns an instance of this subsystem for exclusive use by the given `optionable`.
 
     :API: public
@@ -110,7 +110,7 @@ class Subsystem(SubsystemClientMixin, Optionable):
     return cls._instance_for_scope(cls.subscope(optionable.options_scope))
 
   @classmethod
-  def _instance_for_scope(cls: Type[S], scope: str) -> S:
+  def _instance_for_scope(cls: Type[_S], scope: str) -> _S:
     if cls._options is None:
       raise cls.UninitializedSubsystemError(cls.__name__, scope)
     key = (cls, scope)
