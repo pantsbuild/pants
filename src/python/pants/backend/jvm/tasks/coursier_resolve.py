@@ -163,14 +163,12 @@ class CoursierMixin(JvmResolverBase):
           # Check each individual target without context first
           # If the individuals are valid, check them as a VersionedTargetSet
           # The order of 'or' statement matters, because checking for cache is more expensive.
-          if not invalidation_check.invalid_vts and \
-            (resolve_vts.valid or len(self.check_artifact_cache([resolve_vts])[0]) == len(resolve_vts.targets)):
-            if resolve_vts.valid:
-              # Load up from the results dir
-              success = self._load_from_results_dir(compile_classpath, vt_set_results_dir,
-                coursier_cache_dir, invalidation_check, pants_jar_base_dir)
-              if success:
-                return
+          if resolve_vts.valid or len(self.check_artifact_cache([resolve_vts])[0]) == len(resolve_vts.targets):
+            # Load up from the results dir
+            success = self._load_from_results_dir(compile_classpath, vt_set_results_dir,
+              coursier_cache_dir, invalidation_check, pants_jar_base_dir)
+            if success:
+              return
 
         jars_to_resolve, pinned_coords = self._compute_jars_to_resolve_and_pin(raw_jar_deps,
                                                                                artifact_set,
