@@ -4,9 +4,9 @@
 import os
 import sys
 from abc import ABC
+from dataclasses import dataclass
 from typing import Dict, List, Optional
 
-from dataclasses import dataclass
 from twitter.common.collections import OrderedSet
 
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
