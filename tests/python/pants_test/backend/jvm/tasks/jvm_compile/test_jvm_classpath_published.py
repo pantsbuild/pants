@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+import re
 from textwrap import dedent
 
 from pants.backend.jvm.targets.jar_library import JarLibrary
@@ -13,7 +14,7 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.java.jar.jar_dependency import JarDependency
 from pants.java.jar.jar_dependency_utils import M2Coordinate
 from pants.testutil.task_test_base import TaskTestBase
-from pants.util.contextutil import temporary_dir
+from pants.util.contextutil import open_zip, temporary_dir
 from pants.util.dirutil import safe_open, touch
 
 
@@ -98,12 +99,12 @@ class RuntimeClasspathPublisherTest(TaskTestBase):
           ]
         )
 
-  def _assert_internal_classpath_option(self, *, internal_classpath_only: bool) -> None:
+  def _assert_internal_classpath_option(self, *, manifest_jar: bool, internal_classpath_only: bool) -> None:
     with temporary_dir(root_dir=self.pants_workdir) as jar_dir, \
          temporary_dir(root_dir=self.pants_workdir) as dist_dir:
       self.set_options(pants_distdir=dist_dir,
-                       internal_classpath_only=internal_classpath_only)
-      self.set_options_for_scope('resolver', resolver='coursier')
+                       internal_classpath_only=internal_classpath_only,
+                       manifest_jar=manifest_jar)
 
       self.add_to_build_file('java/classpath', dedent("""\
       jar_library(
@@ -144,19 +145,38 @@ class RuntimeClasspathPublisherTest(TaskTestBase):
 
       task.execute()
 
-      all_output = os.listdir(target_classpath_output)
+      if manifest_jar:
+        if internal_classpath_only:
+          expected_num_artifacts = 1
+        else:
+          expected_num_artifacts = 2
+        manifest_jar_path = os.path.join(target_classpath_output, 'manifest.jar')
+        with open_zip(manifest_jar_path) as zf:
+          with zf.open('META-INF/MANIFEST.MF') as manifest_file:
+            all_output = ''.join(
+              re.sub(r'^(Class-Path:)? |\n+', '', line.decode('utf-8')) for line in manifest_file
+            ).split(' ')
+      else:
+        if internal_classpath_only:
+          expected_num_artifacts = 2
+        else:
+          expected_num_artifacts = 4
+        all_output = os.listdir(target_classpath_output)
 
       # Check that the artifacts from the jar library are only exported with
       # --no-internal-classpath-only.
+      self.assertEqual(len(all_output), expected_num_artifacts)
+
+      self.assertTrue(any('java-lib' in jar for jar in all_output))
       if internal_classpath_only:
-        self.assertEqual(len(all_output), 2)
-        self.assertNoIn('java.classpath.jar-lib-0.jar', all_output)
+        self.assertFalse(any('jar-lib' in jar for jar in all_output))
       else:
-        self.assertEqual(len(all_output), 4)
-        self.assertIn('java.classpath.jar-lib-0.jar', all_output)
+        self.assertTrue(any('jar-lib' in jar for jar in all_output))
 
   def test_internal_classpath_only(self):
-    self._assert_internal_classpath_option(internal_classpath_only=True)
+    self._assert_internal_classpath_option(manifest_jar=True, internal_classpath_only=True)
+    self._assert_internal_classpath_option(manifest_jar=False, internal_classpath_only=True)
 
   def test_no_internal_classpath_only(self):
-    self._assert_internal_classpath_option(internal_classpath_only=False)
+    self._assert_internal_classpath_option(manifest_jar=True, internal_classpath_only=False)
+    self._assert_internal_classpath_option(manifest_jar=False, internal_classpath_only=False)
