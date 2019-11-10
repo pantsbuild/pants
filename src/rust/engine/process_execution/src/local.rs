@@ -17,6 +17,7 @@ use std::process::{Command, Stdio};
 use std::sync::Arc;
 use store::{OneOffStoreFileByDigest, Snapshot, Store};
 
+use tokio::timer::Timeout;
 use tokio_codec::{BytesCodec, FramedRead};
 use tokio_process::CommandExt;
 
@@ -259,7 +260,7 @@ impl CapturedWorkdir for CommandRunner {
     StreamedHermeticCommand::new(&req.argv[0])
       .args(&req.argv[1..])
       .current_dir(&workdir_path)
-      .envs(req.env)
+      .envs(&req.env)
       .stream()
       .map(|s| {
         // NB: Converting from `impl Stream` to `Box<dyn Stream>` requires this odd dance.
@@ -305,6 +306,7 @@ pub trait CapturedWorkdir {
     let output_dir_paths2 = output_dir_paths.clone();
 
     let req_description = req.description;
+    let req_timeout = req.timeout;
     let maybe_jdk_home = req.jdk_home;
     let unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule =
       req.unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule;
@@ -360,7 +362,10 @@ pub trait CapturedWorkdir {
       // code. The idea going forward though is we eventually want to pass incremental results on
       // down the line for streaming process results to console logs, etc. as tracked by:
       //   https://github.com/pantsbuild/pants/issues/6089
-      .and_then(ChildResults::collect_from)
+      .map(ChildResults::collect_from)
+      .and_then(move |child_results_future| {
+        Timeout::new(child_results_future, req_timeout).map_err(|e| e.to_string())
+      })
       .and_then(move |child_results| {
         let output_snapshot = if output_file_paths.is_empty() && output_dir_paths.is_empty() {
           future::ok(store::Snapshot::empty()).to_boxed()
@@ -406,7 +411,25 @@ pub trait CapturedWorkdir {
             preserved_path, req_description
           );
         } // Else, workdir gets dropped here
-        result
+        match result {
+          Ok(fallible_execute_process_result) => Ok(fallible_execute_process_result),
+          Err(msg) => {
+            if msg == "deadline has elapsed" {
+              Ok(FallibleExecuteProcessResult {
+                stdout: Bytes::from(format!(
+                  "Exceeded timeout of {:?} for local process execution, {}",
+                  req_timeout, req_description
+                )),
+                stderr: Bytes::new(),
+                exit_code: -libc::SIGTERM,
+                output_directory: hashing::EMPTY_DIGEST,
+                execution_attempts: vec![],
+              })
+            } else {
+              Err(msg)
+            }
+          }
+        }
       })
       .to_boxed()
   }
