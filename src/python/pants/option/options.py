@@ -196,7 +196,7 @@ class Options:
     return self._positional_args
 
   @property
-  def positional_args(self) -> List[str]:
+  def positional_args(self):
     """The positional args to operate on.
 
     :API: public
