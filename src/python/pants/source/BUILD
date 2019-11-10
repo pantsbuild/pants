@@ -26,4 +26,5 @@ python_library(
     ':source',
     'src/python/pants/engine:fs',
   ],
+  tags = {"partially_type_checked"},
 )

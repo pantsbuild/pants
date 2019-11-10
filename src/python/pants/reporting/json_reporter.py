@@ -1,7 +1,8 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from collections import defaultdict, namedtuple
+from collections import defaultdict
+from dataclasses import dataclass
 from itertools import zip_longest
 
 from pants.reporting.reporter import Reporter
@@ -18,8 +19,9 @@ class JsonReporter(Reporter):
     'DEBUG',
   ]
 
-  # JSON reporting settings.
-  Settings = namedtuple('Settings', Reporter.Settings._fields)
+  @dataclass(frozen=True)
+  class Settings(Reporter.Settings):
+    pass
 
   def __init__(self, run_tracker, settings):
     super().__init__(run_tracker, settings)

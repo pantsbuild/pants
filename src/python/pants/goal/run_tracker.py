@@ -355,7 +355,8 @@ class RunTracker(Subsystem):
 
   @property
   def _stats_version(self) -> int:
-    return self.get_options().stats_version
+    stats_version: int = self.get_options().stats_version
+    return stats_version
 
   def log(self, level, *msg_elements):
     """Log a message against the current workunit."""

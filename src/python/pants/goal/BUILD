@@ -7,6 +7,7 @@ python_library(
   dependencies = [
     ':goal',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -14,7 +15,8 @@ python_library(
   sources = ['aggregated_timings.py'],
   dependencies = [
     'src/python/pants/util:dirutil',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 # this is in goal because of run_tracker
@@ -24,7 +26,8 @@ python_library(
   dependencies = [
     'src/python/pants/cache',
     'src/python/pants/util:dirutil',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -43,11 +46,13 @@ python_library(
     'src/python/pants/reporting:report',
     'src/python/pants/source',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
   name = 'error',
   sources = ['error.py'],
+  tags = {"partially_type_checked"},
 )
 
 # TODO(benjy): As a result of a renaming, we ended up with this target owning only one source
@@ -61,13 +66,13 @@ python_library(
     'src/python/pants/option',
     'src/python/pants/util:memo',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
   name = 'pantsd_stats',
   sources = ['pantsd_stats.py'],
-  dependencies = [
-  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -78,6 +83,7 @@ python_library(
     'src/python/pants/util:collections',
     'src/python/pants/util:dirutil',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -95,11 +101,12 @@ python_library(
     'src/python/pants/base:worker_pool',
     'src/python/pants/base:workunit',
     'src/python/pants/option',
-    'src/python/pants/reporting', # XXX(fixme)
+    'src/python/pants/reporting',
     'src/python/pants/subsystem',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -109,4 +116,5 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/scm',
   ],
+  tags = {"partially_type_checked"},
 )

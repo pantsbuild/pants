@@ -9,7 +9,8 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -24,6 +25,7 @@ python_library(
     'src/python/pants/util:socket',
     'src/python/pants/util:strutil',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -32,7 +34,8 @@ python_library(
   dependencies = [
     '3rdparty/python:contextlib2',
     ':nailgun_protocol'
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -41,7 +44,8 @@ python_library(
   dependencies = [
     '3rdparty/python:dataclasses',
     'src/python/pants/util:osutil',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -55,6 +59,7 @@ python_library(
     'src/python/pants/pantsd:process_manager',
     'src/python/pants/util:dirutil',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -68,4 +73,5 @@ python_library(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:process_handler',
   ],
+  tags = {"partially_type_checked"},
 )

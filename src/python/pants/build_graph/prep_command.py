@@ -1,6 +1,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from typing import FrozenSet
+
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
@@ -22,20 +24,20 @@ class PrepCommand(Target):
 
   :API: public
   """
-  _goals=frozenset()
+  _goals: FrozenSet[str] = frozenset()
 
   @staticmethod
-  def add_allowed_goal(goal):
+  def add_allowed_goal(goal: str) -> None:
     """Add a named goal to the list of valid goals for the 'goal' parameter."""
     PrepCommand._goals = frozenset(list(PrepCommand._goals) + [goal])
 
   @classmethod
-  def reset(cls):
+  def reset(cls) -> None:
     """Used for testing purposes to reset state."""
     cls._goals = frozenset()
 
   @staticmethod
-  def allowed_goals():
+  def allowed_goals() -> FrozenSet[str]:
     return PrepCommand._goals
 
   def __init__(self, address=None, payload=None, prep_executable=None, prep_args=None,
