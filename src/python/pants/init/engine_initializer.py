@@ -21,7 +21,7 @@ from pants.build_graph.address import BuildFileAddress
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.remote_sources import RemoteSources
 from pants.engine.addressable import BuildFileAddresses
-from pants.engine.build_files import ProvenancedBuildFileAddresses, create_graph_rules
+from pants.engine.build_files import create_graph_rules
 from pants.engine.console import Console
 from pants.engine.fs import Workspace, create_fs_rules
 from pants.engine.goal import Goal
@@ -378,11 +378,12 @@ class EngineInitializer:
     def single_build_file_address(specs: Specs) -> BuildFileAddress:
       build_file_addresses = yield Get(BuildFileAddresses, Specs, specs)
       if len(build_file_addresses.dependencies) != 1:
-        provenanced_addresses = yield Get(ProvenancedBuildFileAddresses, Specs, specs)
-        matched_addrs = [addr.build_file_address.to_address() for addr in provenanced_addresses]
-        output = '\n '.join(f':{addr}' for addr in matched_addrs)
+        potential_addresses = yield Get(BuildFileAddresses, Specs, specs)
+        targets = [bfa.to_address() for bfa in potential_addresses]
+        output = '\n '.join(f'{target}' for target in targets)
+
         raise ResolveError(
-          "This goal only works with a single target, but has been given multiple targets:\n"
+          "Expected a single target, but was given multiple targets:\n"
           f"Did you mean one of:\n {output}"
         )
       yield build_file_addresses.dependencies[0]
