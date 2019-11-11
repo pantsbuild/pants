@@ -380,7 +380,7 @@ class EngineInitializer:
       if len(build_file_addresses.dependencies) != 1:
         potential_addresses = yield Get(BuildFileAddresses, Specs, specs)
         targets = [bfa.to_address() for bfa in potential_addresses]
-        output = '\n '.join(f'{target}' for target in targets)
+        output = '\n '.join(str(target) for target in targets)
 
         raise ResolveError(
           "Expected a single target, but was given multiple targets:\n"
