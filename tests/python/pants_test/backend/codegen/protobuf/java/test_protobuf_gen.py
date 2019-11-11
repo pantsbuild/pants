@@ -9,7 +9,7 @@ from pants.backend.codegen.protobuf.java.protobuf_gen import ProtobufGen
 from pants.backend.codegen.protobuf.java.register import build_file_aliases as register_codegen
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.build_graph.register import build_file_aliases as register_core
-from pants_test.task_test_base import TaskTestBase
+from pants.testutil.task_test_base import TaskTestBase
 
 
 class ProtobufGenTest(TaskTestBase):

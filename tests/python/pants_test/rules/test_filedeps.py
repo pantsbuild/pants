@@ -1,268 +1,257 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import unittest
-from textwrap import dedent
-from unittest.mock import Mock
+from typing import List, Optional, Set
+from unittest import skip
 
-from pex.orderedset import OrderedSet
+from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
+from pants.backend.jvm.targets.java_library import JavaLibrary
+from pants.backend.jvm.targets.jvm_app import JvmApp
+from pants.backend.jvm.targets.jvm_binary import JvmBinary
+from pants.backend.jvm.targets.scala_library import ScalaLibrary
+from pants.backend.python.targets.python_library import PythonLibrary
+from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.build_graph.resources import Resources
+from pants.build_graph.target import Target
+from pants.rules.core import filedeps
+from pants.testutil.console_rule_test_base import ConsoleRuleTestBase
 
-from pants.build_graph.address import Address, BuildFileAddress
-from pants.engine.legacy.graph import HydratedTarget, TransitiveHydratedTargets
-from pants.rules.core.filedeps import file_deps
-from pants_test.engine.util import MockConsole, run_rule
-from pants_test.test_base import TestBase
 
+class FileDepsTest(ConsoleRuleTestBase):
 
-@unittest.skip(reason='Bitrot discovered during #6880: should be ported to ConsoleRuleTestBase.')
-class FileDepsTest(TestBase):
+  goal_cls = filedeps.Filedeps
 
-  def filedeps_rule_test(self, transitive_targets, expected_console_output):
-    console = MockConsole()
+  @classmethod
+  def rules(cls):
+    return super().rules() + filedeps.rules()
 
-    run_rule(file_deps, console, transitive_targets)
-
-    self.assertEquals(console.stdout.getvalue(), expected_console_output)
-  
-  @staticmethod
-  def make_build_target_address(spec, ext=""):
-    address = Address.parse(spec)
-    return BuildFileAddress(
-      target_name=address.target_name,
-      rel_path='{}/BUILD{}'.format(address.spec_path, ext),
-    )
-    
-  def mock_target_adaptor(self, source_files_in_dict):
-    adaptor = Mock()
-    adaptor.sources = Mock()
-    adaptor.sources.snapshot = self.make_snapshot(source_files_in_dict)
-    return adaptor
-
-  def mock_hydrated_target(self, target_address, source_files_in_dict, dependencies):
-    adaptor = self.mock_target_adaptor(source_files_in_dict)
-    return HydratedTarget(target_address, adaptor, tuple(d.address for d in dependencies))
-
-  def test_output_no_target(self):
-    transitive_targets = TransitiveHydratedTargets((), set())
-    
-    self.filedeps_rule_test(
-      transitive_targets,
-      ""
+  @classmethod
+  def alias_groups(cls) -> BuildFileAliases:
+    return BuildFileAliases(
+      targets={
+        'target': Target,
+        'resources': Resources,
+        'java_library': JavaLibrary,
+        'java_thrift_library': JavaThriftLibrary,
+        'jvm_app': JvmApp,
+        'jvm_binary': JvmBinary,
+        'scala_library': ScalaLibrary,
+        'python_library': PythonLibrary,
+      },
     )
 
-  def test_output_one_target_no_source(self):
-    target_address = FileDepsTest.make_build_target_address("some/target")
-    hydrated_target = self.mock_hydrated_target(target_address, {}, ())
-    
-    transitive_targets = TransitiveHydratedTargets(
-      (hydrated_target,),
-      {hydrated_target}
-    )
-    
-    self.filedeps_rule_test(
-      transitive_targets,
-      "some/target/BUILD\n"
-    )
-
-  def test_output_one_target_one_source(self):
-    target_address = FileDepsTest.make_build_target_address("some/target")
-    hydrated_target = self.mock_hydrated_target(target_address, {"some/file.py": "", }, ())
-    
-    transitive_targets = TransitiveHydratedTargets(
-      (hydrated_target,),
-      {hydrated_target}
-    )
-    
-    self.filedeps_rule_test(
-      transitive_targets,
-      dedent(
-        '''\
-        some/target/BUILD
-        some/file.py
-        ''')
+  def create_python_library(
+    self, path: str,
+    *,
+    sources: Optional[List[str]] = None,
+    dependencies: Optional[List[str]] = None
+  ) -> None:
+    self.create_library(
+      path=path,
+      target_type="python_library",
+      name="target",
+      sources=sources or [],
+      dependencies=dependencies or []
     )
 
-  def test_output_one_target_no_source_one_dep(self):
-    dep_address = FileDepsTest.make_build_target_address("dep/target")
-    dep_target = self.mock_hydrated_target(dep_address, {"dep/file.py": "", }, ())
-    
-    target_address = FileDepsTest.make_build_target_address("some/target")
-    hydrated_target = self.mock_hydrated_target(target_address, {}, (dep_target,))
-    
-    transitive_targets = TransitiveHydratedTargets(
-      (hydrated_target,), 
-      OrderedSet([hydrated_target, dep_target])
-    )
-    
-    self.filedeps_rule_test(
-      transitive_targets,
-      dedent(
-        '''\
-        some/target/BUILD
-        dep/target/BUILD
-        dep/file.py
-        ''')
+  def assert_filedeps(self, *, targets: List[str], expected: Set[str], globs: bool = False) -> None:
+    args = ["--no-fast-filedeps-absolute"]
+    if globs:
+      args.append("--fast-filedeps-globs")
+    self.assert_console_output(*expected, args=args + targets)
+
+  def test_no_target(self) -> None:
+    self.assert_filedeps(targets=[], expected=set())
+
+  def test_one_target_no_source(self) -> None:
+    self.add_to_build_file("some/target", target="target()")
+    self.assert_filedeps(targets=["some/target"], expected={"some/target/BUILD"})
+
+  def test_one_target_one_source(self) -> None:
+    self.create_python_library("some/target", sources=["file.py"])
+    self.assert_filedeps(
+      targets=["some/target"], expected={"some/target/BUILD", "some/target/file.py"}
     )
 
-  def test_output_one_target_one_source_with_dep(self):
-    dep_address = FileDepsTest.make_build_target_address("dep/target")
-    dep_target = self.mock_hydrated_target(dep_address, {"dep/file.py": "", }, ())
-    
-    target_address = FileDepsTest.make_build_target_address("some/target")
-    hydrated_target = self.mock_hydrated_target(
-      target_address, 
-      {"some/file.py": "", },
-      (dep_target,)
-    )
-    
-    transitive_targets = TransitiveHydratedTargets(
-      (hydrated_target,),
-      OrderedSet([hydrated_target, dep_target])
-    )
-    
-    self.filedeps_rule_test(
-      transitive_targets,
-      dedent(
-        '''\
-        some/target/BUILD
-        some/file.py
-        dep/target/BUILD
-        dep/file.py
-        ''')
+  def test_one_target_multiple_source(self) -> None:
+    self.create_python_library("some/target", sources=["file1.py", "file2.py"])
+    self.assert_filedeps(
+      targets=["some/target"],
+      expected={"some/target/BUILD", "some/target/file1.py", "some/target/file2.py"}
     )
 
-  def test_output_multiple_targets_one_source(self):
-    target_address1 = FileDepsTest.make_build_target_address("some/target")
-    hydrated_target1 = self.mock_hydrated_target(target_address1, {"some/file.py": "", }, ())
-    
-    target_address2 = FileDepsTest.make_build_target_address("other/target")
-    hydrated_target2 = self.mock_hydrated_target(target_address2, {"other/file.py": "", }, ())
-     
-    transitive_targets = TransitiveHydratedTargets(
-      (hydrated_target1, hydrated_target2), 
-      OrderedSet([hydrated_target1, hydrated_target2])
-    )
-    
-    self.filedeps_rule_test(
-      transitive_targets,
-      dedent(
-        '''\
-        some/target/BUILD
-        some/file.py
-        other/target/BUILD
-        other/file.py
-        ''')
+  def test_one_target_no_source_one_dep(self) -> None:
+    self.create_python_library("dep/target", sources=["file.py"])
+    self.create_python_library("some/target", dependencies=["dep/target"])
+    self.assert_filedeps(
+      targets=["some/target"],
+      expected={"some/target/BUILD", "dep/target/BUILD", "dep/target/file.py"}
     )
 
-  def test_outputs_multiple_targets_one_source_with_dep(self):
-    #   target1                 target2
-    #  source="some/file.py"  source="other/file.py"
-    #   /                       /
-    #  dep1                   dep2
-    dep_address1 = FileDepsTest.make_build_target_address("dep1/target")
-    dep_target1 = self.mock_hydrated_target(dep_address1, {"dep1/file.py": "", }, ())
-    
-    target_address1 = FileDepsTest.make_build_target_address("some/target")
-    hydrated_target1 = self.mock_hydrated_target(
-      target_address1,
-      {"some/file.py": "", },
-      (dep_target1,)
+  def test_one_target_one_source_with_dep(self) -> None:
+    self.create_python_library("dep/target", sources=["file.py"])
+    self.create_python_library("some/target", sources=["file.py"], dependencies=["dep/target"])
+    self.assert_filedeps(
+      targets=["some/target"],
+      expected={
+        "some/target/BUILD", "some/target/file.py", "dep/target/BUILD", "dep/target/file.py"
+      }
     )
 
-    dep_address2 = FileDepsTest.make_build_target_address("dep2/target")
-    dep_target2 = self.mock_hydrated_target(dep_address2, {"dep2/file.py": "", }, ())
-
-    target_address2 = FileDepsTest.make_build_target_address("other/target")
-    hydrated_target2 = self.mock_hydrated_target(
-      target_address2,
-      {"other/file.py": "", },
-      (dep_target2,))
- 
-    transitive_targets = TransitiveHydratedTargets(
-      (hydrated_target1, hydrated_target2), 
-      OrderedSet([hydrated_target1, hydrated_target2, dep_target1, dep_target2])
-    )
-    
-    self.filedeps_rule_test(
-      transitive_targets,
-      dedent(
-        '''\
-        some/target/BUILD
-        some/file.py
-        other/target/BUILD
-        other/file.py
-        dep1/target/BUILD
-        dep1/file.py
-        dep2/target/BUILD
-        dep2/file.py
-        ''')
+  def test_multiple_targets_one_source(self) -> None:
+    self.create_python_library("some/target", sources=["file.py"])
+    self.create_python_library("other/target", sources=["file.py"])
+    self.assert_filedeps(
+      targets=["some/target", "other/target"],
+      expected={
+        "some/target/BUILD", "some/target/file.py", "other/target/BUILD", "other/target/file.py"
+      }
     )
 
-  def test_output_multiple_targets_one_source_overlapping(self):
-    #   target1                target2
-    #  source="some/file.py"  source="some/file.py"
-    #   /                      /
-    #  dep                   dep
-    dep_address = FileDepsTest.make_build_target_address("dep/target")
-    dep_target = self.mock_hydrated_target(dep_address, {"dep/file.py": "", }, ())
-  
-    target_address1 = FileDepsTest.make_build_target_address("some/target")
-    hydrated_target1 = self.mock_hydrated_target(
-      target_address1,
-      {"some/file.py": "", },
-      (dep_target,)
-    )
-    
-    target_address2 = FileDepsTest.make_build_target_address("some/target")
-    hydrated_target2 = self.mock_hydrated_target(
-      target_address2,
-      {"some/file.py": "", },
-      (dep_target,)
-    )
-    
-    transitive_targets = TransitiveHydratedTargets(
-      (hydrated_target1, hydrated_target2),
-      OrderedSet([hydrated_target1, hydrated_target2, dep_target])
+  def test_multiple_targets_one_source_with_dep(self) -> None:
+    self.create_python_library("dep1/target", sources=["file.py"])
+    self.create_python_library("dep2/target", sources=["file.py"])
+    self.create_python_library("some/target", sources=["file.py"], dependencies=["dep1/target"])
+    self.create_python_library("other/target", sources=["file.py"], dependencies=["dep2/target"])
+    self.assert_filedeps(
+      targets=["some/target", "other/target"],
+      expected={
+        "some/target/BUILD",
+        "some/target/file.py",
+        "other/target/BUILD",
+        "other/target/file.py",
+        "dep1/target/BUILD",
+        "dep1/target/file.py",
+        "dep2/target/BUILD",
+        "dep2/target/file.py",
+      }
     )
 
-    self.filedeps_rule_test(
-      transitive_targets,
-      dedent(
-        '''\
-        some/target/BUILD
-        some/file.py
-        dep/target/BUILD
-        dep/file.py
-        ''')
+  def test_multiple_targets_one_source_overlapping(self) -> None:
+    self.create_python_library("dep/target", sources=["file.py"])
+    self.create_python_library("some/target", sources=["file.py"], dependencies=["dep/target"])
+    self.create_python_library("other/target", sources=["file.py"], dependencies=["dep/target"])
+    self.assert_filedeps(
+      targets=["some/target", "other/target"],
+      expected={
+        "some/target/BUILD",
+        "some/target/file.py",
+        "other/target/BUILD",
+        "other/target/file.py",
+        "dep/target/BUILD",
+        "dep/target/file.py",
+      }
     )
 
-  def test_output_one_target_multiple_source(self):
-    target_address = FileDepsTest.make_build_target_address("some/target")
-    hydrated_target = self.mock_hydrated_target(
-      target_address,
-      {
-        "some/file1.py": "",
-        "some/file2.py": "",
-      }, ())
-
-    transitive_targets = TransitiveHydratedTargets((hydrated_target,), {hydrated_target})
-
-    self.filedeps_rule_test(
-      transitive_targets,
-      dedent(
-        '''\
-        some/target/BUILD
-        some/file1.py
-        some/file2.py
-        ''')
+  def test_globs(self) -> None:
+    self.create_files("some/target", ["test1.py", "test2.py"])
+    self.add_to_build_file(
+      "some/target", target="target(name='target', sources=globs('test*.py'))"
+    )
+    self.assert_filedeps(
+      targets=["some/target"],
+      expected={"some/target/BUILD", "some/target/test*.py"},
+      globs=True
     )
 
-  def test_output_one_target_build_with_ext_no_source(self):
-    target_address = FileDepsTest.make_build_target_address("some/target", ".ext")
-    hydrated_target = self.mock_hydrated_target(target_address, {}, ())
+  def test_build_with_file_ext(self) -> None:
+    self.create_file("some/target/BUILD.ext", contents="target()")
+    self.assert_filedeps(targets=["some/target"], expected={"some/target/BUILD.ext"})
 
-    transitive_targets = TransitiveHydratedTargets((hydrated_target,), {hydrated_target})
+  def test_resources(self) -> None:
+    self.create_resources("src/resources", "data", "data.json")
+    self.assert_filedeps(
+      targets=["src/resources:data"], expected={"src/resources/BUILD", "src/resources/data.json"}
+    )
 
-    self.filedeps_rule_test(
-      transitive_targets,
-      'some/target/BUILD.ext\n')
+  @skip("V2 does not yet hydrate java_sources for scala_library targets. Once this happens, "
+        "we must teach filedeps.py to check the target_adaptor for java_sources.")
+  def test_scala_with_java_sources(self) -> None:
+    self.create_file("src/java/j.java")
+    self.create_file("src/scala/s.scala")
+    self.add_to_build_file(
+      "src/java", target="java_library(sources=['j.java'], dependencies=['src/scala'])"
+    )
+    self.add_to_build_file(
+      "src/scala", target="scala_library(sources=['s.scala'], java_sources=['src/java'])"
+    )
+    expected = {"src/java/BUILD", "src/java/j.java", "src/scala/BUILD", "src/scala/s.scala"}
+    self.assert_filedeps(targets=["src/java"], expected=expected)
+    self.assert_filedeps(targets=["src/scala"], expected=expected)
+
+  def test_filter_out_synthetic_targets(self) -> None:
+    self.create_library(
+      path="src/thrift/storage",
+      target_type="java_thrift_library",
+      name="storage",
+      sources=["data_types.thrift"],
+    )
+    java_lib = self.create_library(
+      path="src/java/lib",
+      target_type="java_library",
+      name="lib",
+      sources=["lib1.java"],
+      dependencies=["src/thrift/storage"],
+    )
+    self.create_file('.pants.d/gen/thrift/java/storage/Angle.java')
+    synthetic_java_lib = self.make_target(
+      spec='.pants.d/gen/thrift/java/storage',
+      target_type=JavaLibrary,
+      derived_from=self.target('src/thrift/storage'),
+      sources=['Angle.java']
+    )
+    java_lib.inject_dependency(synthetic_java_lib.address)
+    self.assert_filedeps(
+      targets=["src/java/lib"],
+      expected={
+        "src/java/lib/BUILD",
+        "src/java/lib/lib1.java",
+        "src/thrift/storage/BUILD",
+        "src/thrift/storage/data_types.thrift",
+      }
+    )
+
+  @skip("V2 does not yet hydrate bundles or binary attributes for jvm_app. After this is added,"
+        "we must add similar logic to the V1 filedeps goal for jvm_apps.")
+  def test_jvm_app(self) -> None:
+    self.create_library(
+      path="src/thrift/storage",
+      target_type="java_thrift_library",
+      name="storage",
+      sources=["data_types.thrift"],
+    )
+    self.create_library(
+      path="src/java/lib",
+      target_type="java_library",
+      name="lib",
+      sources=["lib1.java"],
+      dependencies=["src/thrift/storage"],
+    )
+    self.create_library(
+      path="src/java/bin",
+      target_type="jvm_binary",
+      name="bin",
+      sources=["main.java"],
+      main="bin.Main",
+      dependencies=["src/java/lib"]
+    )
+    self.create_file("project/config/app.yaml")
+    self.create_library(
+      path="project",
+      target_type="jvm_app",
+      name="app",
+      binary="src/java/bin",
+      bundles=["bundle(fileset=['config/app.yaml'])"]
+    )
+    self.assert_filedeps(
+      targets=["project:app"],
+      expected={
+        "project/BUILD",
+        "project/config/app.yaml",
+        "src/java/bin/BUILD",
+        "src/java/bin/main.java",
+        "src/java/lib/BUILD",
+        "src/java/lib/lib1.java",
+        "src/thrift/storage/BUILD"
+        "src/thrift/storage/data_types.thrift"
+      })

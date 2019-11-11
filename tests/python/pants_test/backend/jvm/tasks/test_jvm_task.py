@@ -5,7 +5,7 @@ import os
 
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.jvm_task import JvmTask
-from pants_test.jvm.jvm_task_test_base import JvmTaskTestBase
+from pants.testutil.jvm.jvm_task_test_base import JvmTaskTestBase
 
 
 class DummyJvmTask(JvmTask):

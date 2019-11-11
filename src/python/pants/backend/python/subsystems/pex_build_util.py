@@ -82,7 +82,7 @@ def targets_by_platform(targets, python_setup):
 def identify_missing_init_files(sources: Sequence[str]) -> Set[str]:
   """Return the list of paths that would need to be added to ensure that every package has
   an __init__.py. """
-  packages = set()
+  packages: Set[str] = set()
   for source in sources:
     if source.endswith('.py'):
       pkg_dir = os.path.dirname(source)

@@ -4,8 +4,8 @@
 from pants.backend.python.rules.inject_init import InjectedInitDigest, inject_init
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, EMPTY_SNAPSHOT, Snapshot
 from pants.engine.rules import RootRule
+from pants.testutil.test_base import TestBase
 from pants.util.collections import assert_single_element
-from pants_test.test_base import TestBase
 
 
 class TestInjectInit(TestBase):

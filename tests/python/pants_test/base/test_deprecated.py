@@ -19,8 +19,8 @@ from pants.base.deprecated import (
   deprecated_module,
   warn_or_error,
 )
+from pants.testutil.test_base import TestBase
 from pants.util.collections import assert_single_element
-from pants_test.test_base import TestBase
 
 
 _FAKE_CUR_VERSION = '2.0.0.dev0'

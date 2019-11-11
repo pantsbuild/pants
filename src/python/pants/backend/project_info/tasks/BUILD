@@ -78,7 +78,7 @@ python_library(
   dependencies = [
     ':idea_resources',
     'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/backend/python/targets:python',
+    'src/python/pants/backend/python/targets',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:generator',

@@ -12,11 +12,11 @@ import time
 import unittest
 from textwrap import dedent
 
+from pants.testutil.pants_run_integration_test import read_pantsd_log
+from pants.testutil.process_test_util import no_lingering_process_by_command
 from pants.util.contextutil import environment_as, temporary_dir, temporary_file
 from pants.util.dirutil import rm_rf, safe_file_dump, safe_mkdir, safe_open, touch
-from pants_test.pants_run_integration_test import read_pantsd_log
 from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
-from pants_test.testutils.process_test_util import no_lingering_process_by_command
 
 
 def launch_file_toucher(f):

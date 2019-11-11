@@ -5,9 +5,9 @@ import os
 import re
 
 from pants.base.build_environment import get_buildroot
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import open_zip, temporary_dir
 from pants.util.dirutil import safe_rmtree
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 def shared_artifacts(version, extra_jar=None):

@@ -29,9 +29,9 @@ from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency import JarDependency
 from pants.java.jar.jar_dependency_utils import M2Coordinate
+from pants.testutil.subsystem.util import init_subsystem
+from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir, temporary_file, temporary_file_path
-from pants_test.subsystem.subsystem_util import init_subsystem
-from pants_test.test_base import TestBase
 
 
 def coord(org, name, classifier=None, rev=None, ext=None):

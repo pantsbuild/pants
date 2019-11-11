@@ -8,7 +8,7 @@ python_tests(
     'src/python/pants/invalidation',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil/subsystem',
   ]
 )
 
@@ -18,7 +18,7 @@ python_tests(
   dependencies = [
     'src/python/pants/invalidation',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
   ]
 )
 
@@ -27,7 +27,7 @@ python_tests(
   sources = ['test_strict_deps_invalidation_integration.py'],
   dependencies = [
     'src/python/pants/base:build_environment',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'testprojects/tests/java/org/pantsbuild/testproject:strictdeps_directory',
   ],
   tags = {'integration'},

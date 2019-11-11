@@ -13,8 +13,8 @@ from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.tasks.resolve_requirements import ResolveRequirements
 from pants.base.build_environment import get_buildroot
+from pants.testutil.task_test_base import TaskTestBase
 from pants.util.contextutil import temporary_dir, temporary_file
-from pants_test.task_test_base import TaskTestBase
 
 
 class ResolveRequirementsTest(TaskTestBase):

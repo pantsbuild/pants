@@ -6,8 +6,8 @@ import configparser
 from pants.base.build_environment import get_default_pants_config_file
 from pants.base.exceptions import TaskError
 from pants.core_tasks.generate_pants_ini import GeneratePantsIni
+from pants.testutil.task_test_base import ConsoleTaskTestBase
 from pants.version import VERSION
-from pants_test.task_test_base import ConsoleTaskTestBase
 
 
 class GeneratePantsIniTest(ConsoleTaskTestBase):

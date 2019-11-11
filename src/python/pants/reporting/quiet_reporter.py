@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import sys
-from collections import namedtuple
+from dataclasses import dataclass
 
 from colors import red
 
@@ -13,7 +13,12 @@ from pants.reporting.reporter import Reporter
 
 class QuietReporter(PlainTextReporterBase):
   """Squelched plaintext reporting, only prints errors and timing/cache stats (if requested)."""
-  Settings = namedtuple('Settings', Reporter.Settings._fields + ('color', 'timing', 'cache_stats'))
+
+  @dataclass(frozen=True)
+  class Settings(Reporter.Settings):
+    color: bool
+    timing: bool
+    cache_stats: bool
 
   def open(self):
     """Implementation of Reporter callback."""

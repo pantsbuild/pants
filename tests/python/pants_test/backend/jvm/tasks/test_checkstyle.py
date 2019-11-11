@@ -8,8 +8,8 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.checkstyle import Checkstyle
 from pants.base.exceptions import TaskError
 from pants.build_graph.address import Address
-from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
-from pants_test.task_test_base import ensure_cached
+from pants.testutil.jvm.nailgun_task_test_base import NailgunTaskTestBase
+from pants.testutil.task_test_base import ensure_cached
 
 
 class CheckstyleTest(NailgunTaskTestBase):

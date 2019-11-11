@@ -94,11 +94,6 @@ def run_python_test(
   )
 
   test_target_sources_file_names = sorted(source_root_stripped_test_target_sources.snapshot.files)
-  # NB: we use the hardcoded and generic bin name `python`, rather than something dynamic like
-  # `sys.executable`, to ensure that the interpreter may be discovered both locally and in remote
-  # execution (so long as `env` is populated with a `PATH` env var and `python` is discoverable
-  # somewhere on that PATH). This is only used to run the downloaded PEX tool; it is not
-  # necessarily the interpreter that PEX will use to execute the generated .pex file.
   request = resolved_requirements_pex.create_execute_request(
     python_setup=python_setup,
     subprocess_encoding_environment=subprocess_encoding_environment,
@@ -106,6 +101,9 @@ def run_python_test(
     pex_args=test_target_sources_file_names,
     input_files=merged_input_files,
     description=f'Run Pytest for {test_target.address.reference()}',
+    # TODO(#8584): hook this up to TestRunnerTaskMixin so that we can configure the default timeout
+    #  and also use the specified max timeout time.
+    timeout_seconds=getattr(test_target, 'timeout', 60)
   )
 
   result = yield Get(FallibleExecuteProcessResult, ExecuteProcessRequest, request)

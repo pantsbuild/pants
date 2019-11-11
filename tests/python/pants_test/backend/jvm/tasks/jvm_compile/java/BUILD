@@ -67,7 +67,7 @@ python_tests(
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
     'examples/src/java/org/pantsbuild/example:javac_directory',
   ],
-  timeout = 360,
+  timeout = 530,
   tags = {'integration'},
 )
 
@@ -81,8 +81,8 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/java/distribution',
-    'tests/python/pants_test/jvm:nailgun_task_test_base',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil/jvm:nailgun_task_test_base',
+    'src/python/pants/testutil/subsystem',
   ],
 )
 
@@ -93,6 +93,6 @@ python_library(
     'src/python/pants/fs',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
   ],
 )

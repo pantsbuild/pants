@@ -3,7 +3,7 @@
 
 from pants.backend.python.register import build_file_aliases
 from pants.base.exceptions import TargetDefinitionException
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 class TestPythonBinary(TestBase):

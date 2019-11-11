@@ -7,9 +7,9 @@ from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.build_environment import get_buildroot
 from pants.java import util
 from pants.net.http.fetcher import Fetcher
+from pants.testutil.jvm.nailgun_task_test_base import NailgunTaskTestBase
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_concurrent_rename
-from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 
 
 class DummyRunJavaTask(NailgunTask):

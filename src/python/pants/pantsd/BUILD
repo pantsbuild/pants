@@ -9,7 +9,8 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/process',
     'src/python/pants/util:dirutil',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(

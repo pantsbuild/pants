@@ -6,9 +6,9 @@ from collections import defaultdict
 
 from pants.base.exceptions import TargetDefinitionException
 from pants.goal.products import MultipleRootedProducts
+from pants.testutil.task_test_base import TaskTestBase
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import touch
-from pants_test.task_test_base import TaskTestBase
 
 from pants.contrib.node.targets.node_bundle import NodeBundle
 from pants.contrib.node.targets.node_module import NodeModule

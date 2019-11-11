@@ -6,11 +6,12 @@ python_tests(
   name='filedeps',
   source='test_filedeps.py',
   dependencies=[
+    'src/python/pants/backend/codegen/thrift/java',
+    'src/python/pants/backend/jvm/targets:all',
+    'src/python/pants/backend/python/targets',
     'src/python/pants/build_graph',
-    'src/python/pants/engine/legacy:graph',
     'src/python/pants/rules/core',
-    'tests/python/pants_test:test_base',
-    'tests/python/pants_test/engine:util',
+    'src/python/pants/testutil:console_rule_test_base',
   ]
 )
 
@@ -18,7 +19,7 @@ python_tests(
   name='filedeps_integration',
   source='test_filedeps_integration.py',
   dependencies=[
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'examples/src/java/org/pantsbuild/example:hello_directory',
     'examples/src/scala/org/pantsbuild/example:hello_directory',
     'examples/src/resources/org/pantsbuild/example:hello_directory',
@@ -34,8 +35,8 @@ python_tests(
     'src/python/pants/engine/legacy:graph',
     'src/python/pants/engine/legacy:structs',
     'src/python/pants/rules/core',
-    'tests/python/pants_test:test_base',
-    'tests/python/pants_test/engine:util',
+    'src/python/pants/testutil:test_base',
+    'src/python/pants/testutil/engine:util',
   ]
 )
 
@@ -47,9 +48,9 @@ python_tests(
     'src/python/pants/engine/legacy:graph',
     'src/python/pants/engine/legacy:structs',
     'src/python/pants/rules/core',
-    'tests/python/pants_test:test_base',
-    'tests/python/pants_test:console_rule_test_base',
-    'tests/python/pants_test/engine:util',
+    'src/python/pants/testutil:test_base',
+    'src/python/pants/testutil:console_rule_test_base',
+    'src/python/pants/testutil/engine:util',
   ]
 )
 
@@ -57,7 +58,7 @@ python_tests(
   name='fmt_integration',
   source='test_fmt_integration.py',
   dependencies=[
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'testprojects/tests/java/org/pantsbuild/testproject:dummies_directory',
   ],
   tags={'integration'},

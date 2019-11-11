@@ -8,7 +8,7 @@ from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
 from pants.build_graph.target import Target
 from pants.engine.legacy.graph import LegacyBuildGraph
-from pants_test.subsystem.subsystem_util import init_subsystem
+from pants.testutil.subsystem.util import init_subsystem
 
 
 class BuildFileAliasesTest(unittest.TestCase):

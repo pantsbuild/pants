@@ -7,7 +7,7 @@ python_tests(
   coverage=['pants.core_tasks.bash_completion'],
   dependencies=[
     'src/python/pants/core_tasks',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/testutil:task_test_base',
   ]
 )
 
@@ -17,7 +17,7 @@ python_tests(
   dependencies = [
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
   ],
   tags = {'integration'},
 )
@@ -30,7 +30,7 @@ python_tests(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/core_tasks',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/testutil:task_test_base',
   ],
 )
 
@@ -40,7 +40,7 @@ python_tests(
   dependencies = [
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
   ],
   tags = {'integration'},
 )
@@ -54,8 +54,8 @@ python_tests(
     'src/python/pants/core_tasks',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test:task_test_base',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil:task_test_base',
+    'src/python/pants/testutil/subsystem',
   ]
 )
 
@@ -63,9 +63,9 @@ python_tests(
   name = 'substitute_target_aliases_integration',
   sources = ['test_substitute_target_aliases_integration.py'],
   dependencies = [
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'testprojects/src/java/org/pantsbuild/testproject:aliases_directory'
   ],
   tags = {'integration'},
-  timeout = 120,
+  timeout = 270,
 )

@@ -10,7 +10,7 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.resources import Resources
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 class PythonTargetTest(TestBase):

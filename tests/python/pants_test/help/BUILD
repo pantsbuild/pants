@@ -48,7 +48,7 @@ python_tests(
     'test_help_integration.py',
   ],
   dependencies=[
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
   ],
   tags = {'integration'},
 )

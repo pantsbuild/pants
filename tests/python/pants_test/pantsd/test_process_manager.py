@@ -17,9 +17,9 @@ from pants.pantsd.process_manager import (
   ProcessMetadataManager,
   swallow_psutil_exceptions,
 )
+from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_file_dump
-from pants_test.test_base import TestBase
 
 
 PATCH_OPTS = dict(autospec=True, spec_set=True)

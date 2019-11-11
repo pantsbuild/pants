@@ -12,9 +12,9 @@ from pants.backend.jvm.targets.java_agent import JavaAgent
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.jar_task import JarBuilderTask, JarTask
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.testutil.jvm.jar_task_test_base import JarTaskTestBase
 from pants.util.contextutil import open_zip, temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir, safe_mkdtemp, safe_open, safe_rmtree
-from pants_test.jvm.jar_task_test_base import JarTaskTestBase
 
 
 class BaseJarTaskTest(JarTaskTestBase):

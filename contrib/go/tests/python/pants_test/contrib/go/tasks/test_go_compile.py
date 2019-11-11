@@ -4,8 +4,8 @@
 import os
 import time
 
+from pants.testutil.task_test_base import TaskTestBase
 from pants.util.dirutil import touch
-from pants_test.task_test_base import TaskTestBase
 
 from pants.contrib.go.targets.go_library import GoLibrary
 from pants.contrib.go.tasks.go_compile import GoCompile

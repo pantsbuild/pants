@@ -6,15 +6,16 @@ python_library(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:strutil',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
   name = "tests",
   dependencies = [
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:test_base',
-    'tests/python/pants_test:console_rule_test_base',
-    'tests/python/pants_test/engine:util',
+    'src/python/pants/testutil:test_base',
+    'src/python/pants/testutil:console_rule_test_base',
+    'src/python/pants/testutil/engine:util',
   ]
 )

@@ -5,7 +5,7 @@ import os
 
 from pants.backend.jvm.tasks.jvmdoc_gen import Jvmdoc, JvmdocGen
 from pants.base.exceptions import TaskError
-from pants_test.jvm.jvm_task_test_base import JvmTaskTestBase
+from pants.testutil.jvm.jvm_task_test_base import JvmTaskTestBase
 
 
 dummydoc = Jvmdoc(tool_name='dummydoc', product_type='dummydoc')

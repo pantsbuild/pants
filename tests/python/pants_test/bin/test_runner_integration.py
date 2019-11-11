@@ -5,7 +5,7 @@ from pathlib import Path
 
 from pants.base.build_environment import get_buildroot
 from pants.option.scope import GLOBAL_SCOPE_CONFIG_SECTION
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class RunnerIntegrationTest(PantsRunIntegrationTest):

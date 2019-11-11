@@ -110,7 +110,8 @@ python_library(
     'src/python/pants/base:exception_sink',
     ':rules',
     ':platform',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -120,10 +121,10 @@ python_library(
     '3rdparty/python:dataclasses',
     ':fs',
     ':rules',
-    ':selectors',
     ':platform',
     'src/python/pants/util:meta',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -167,6 +168,7 @@ python_library(
       'src/python/pants/util:memo',
       'src/python/pants/util:osutil',
   ],
+  tags = {"type_checked"},
 )
 
 python_library(
@@ -210,7 +212,7 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/base:specs',
     'src/python/pants/rules/core:core',
-  ]
+  ],
 )
 
 python_library(
@@ -228,6 +230,7 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
   ],
+  tags = {"partially_type_checked"},
 )
 
 

@@ -13,6 +13,7 @@ from pants.backend.python.tasks.build_local_python_distributions import (
 )
 from pants.backend.python.tasks.resolve_requirements import ResolveRequirements
 from pants.backend.python.tasks.select_interpreter import SelectInterpreter
+from pants.testutil.task_test_base import DeclarativeTaskTestMixin
 from pants.util.collections import Enum, assert_single_element
 from pants.util.meta import classproperty
 from pants_test.backend.python.tasks.python_task_test_base import (
@@ -20,7 +21,6 @@ from pants_test.backend.python.tasks.python_task_test_base import (
   name_and_platform,
   normalized_current_platform,
 )
-from pants_test.task_test_base import DeclarativeTaskTestMixin
 
 
 class BuildLocalPythonDistributionsTestBase(PythonTaskTestBase, DeclarativeTaskTestMixin):

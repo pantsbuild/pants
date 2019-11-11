@@ -7,5 +7,6 @@ python_library(
     '3rdparty/python:psutil',
     'src/python/pants/subsystem',
     'src/python/pants/util:dirutil',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )

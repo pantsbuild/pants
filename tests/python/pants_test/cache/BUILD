@@ -8,7 +8,7 @@ python_tests(
     'src/python/pants/cache',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
   ]
 )
 
@@ -21,7 +21,7 @@ python_tests(
     'src/python/pants/invalidation',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
   ]
 )
 
@@ -34,9 +34,9 @@ python_tests(
     'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
     'src/python/pants/task',
-    'tests/python/pants_test:test_base',
-    'tests/python/pants_test/option/util',
-    'tests/python/pants_test/testutils:mock_logger',
+    'src/python/pants/testutil:test_base',
+    'src/python/pants/testutil/option',
+    'src/python/pants/testutil:mock_logger',
   ]
 )
 
@@ -49,7 +49,7 @@ python_tests(
     'src/python/pants/base:payload',
     'src/python/pants/build_graph:build_graph',
     'src/python/pants/cache:cache',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/testutil:task_test_base',
   ],
 )
 
@@ -60,7 +60,7 @@ python_tests(
     'src/python/pants/task:task',
     'src/python/pants/cache:cache',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/testutil:task_test_base',
   ],
 )
 
@@ -70,7 +70,7 @@ python_library(
   dependencies = [
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/testutils:file_test_util',
+    'src/python/pants/testutil:file_test_util',
   ]
 )
 
@@ -80,7 +80,7 @@ python_tests(
   dependencies = [
     '3rdparty/python:responses',
     'src/python/pants/cache',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
   ],
   timeout = 90
 )
@@ -90,7 +90,7 @@ python_tests(
   sources = ['test_resolver.py'],
   dependencies = [
     'src/python/pants/cache',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil/subsystem',
   ]
 )
 
@@ -101,9 +101,9 @@ python_tests(
     'src/python/pants/backend/jvm/tasks/jvm_compile/zinc',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'testprojects/src/java/org/pantsbuild/testproject:unicode_directory',
   ],
   tags = {'integration'},
-  timeout = 480,
+  timeout = 600,
 )

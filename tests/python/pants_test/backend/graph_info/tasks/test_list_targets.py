@@ -12,7 +12,7 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
 from pants.rules.core import list_targets
-from pants_test.console_rule_test_base import ConsoleRuleTestBase
+from pants.testutil.console_rule_test_base import ConsoleRuleTestBase
 
 
 class ListTargetsTest(ConsoleRuleTestBase):
@@ -40,27 +40,25 @@ class ListTargetsTest(ConsoleRuleTestBase):
   def rules(cls):
     return super().rules() + list_targets.rules()
 
-  def setUp(self):
+  def setUp(self) -> None:
     super().setUp()
 
     # Setup a BUILD tree for various list tests
     class Lib:
-
-      def __init__(self, name, provides=False):
+      def __init__(self, name: str, provides: bool = False) -> None:
         self.name = name
-        self.provides = dedent("""
+        self.provides = dedent(f"""
             artifact(
               org='com.example',
-              name='{0}',
+              name='{name}',
               repo=public
             )
-            """.format(name)).strip() if provides else 'None'
+            """).strip() if provides else 'None'
 
-    def create_library(path, *libs):
+    def create_library(path: str, *libs: Lib) -> None:
       libs = libs or [Lib(os.path.basename(os.path.dirname(self.build_path(path))))]
       for lib in libs:
-        target = "java_library(name='{name}', provides={provides}, sources=[])\n".format(
-          name=lib.name, provides=lib.provides)
+        target = f"java_library(name='{lib.name}', provides={lib.provides}, sources=[])\n"
         self.add_to_build_file(path, target)
 
     create_library('a')

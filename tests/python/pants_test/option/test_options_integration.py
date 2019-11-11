@@ -6,8 +6,8 @@ import os
 from textwrap import dedent
 
 from pants.fs.fs import safe_filename_from_path
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import temporary_dir
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class TestOptionsIntegration(PantsRunIntegrationTest):

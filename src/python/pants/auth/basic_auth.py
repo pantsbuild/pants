@@ -58,11 +58,9 @@ class BasicAuth(Subsystem):
   def authenticate(self, provider: str, creds: Optional[BasicAuthCreds] = None, cookies: Optional[Cookies] = None) -> None:
     """Authenticate against the specified provider.
 
-    :param str provider: Authorize against this provider.
-    :param pants.auth.basic_auth.BasicAuthCreds creds: The creds to use.
-      If unspecified, assumes that creds are set in the netrc file.
-    :param pants.auth.cookies.Cookies cookies: Store the auth cookies in this instance.
-      If unspecified, uses the global instance.
+    :param provider: Authorize against this provider.
+    :param creds: The creds to use. If unspecified, assumes that creds are set in the netrc file.
+    :param cookies: Store the auth cookies in this instance. If unspecified, uses the global instance.
     :raises pants.auth.basic_auth.BasicAuthException: If auth fails due to misconfiguration or
       rejection by the server.
     """
@@ -81,10 +79,10 @@ class BasicAuth(Subsystem):
     if not self.get_options().allow_insecure_urls and not url.startswith('https://'):
       raise BasicAuthException(f'Auth url for provider {provider} is not secure: {url}.')
 
-    if creds:
-      auth = requests.auth.HTTPBasicAuth(creds.username, creds.password)
-    else:
-      auth = None  # requests will use the netrc creds.
+    auth = (
+      requests.auth.HTTPBasicAuth(creds.username, creds.password)
+      if creds else None
+    )
     response = requests.get(url, auth=auth, headers={'User-Agent': f'pants/v{VERSION}'})
 
     if response.status_code != requests.codes.ok:

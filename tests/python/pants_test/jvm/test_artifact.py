@@ -3,7 +3,7 @@
 
 from pants.backend.jvm.artifact import Artifact, PublicationMetadata
 from pants.backend.jvm.repository import Repository
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 class ArtifactTest(TestBase):

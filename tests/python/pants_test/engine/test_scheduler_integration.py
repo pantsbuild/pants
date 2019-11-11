@@ -3,8 +3,8 @@
 
 from pathlib import Path
 
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
 from pants.util.contextutil import temporary_dir
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
 
 
 class SchedulerIntegrationTest(PantsRunIntegrationTest):

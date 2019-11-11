@@ -4,7 +4,7 @@
 from pants.backend.graph_info.tasks.target_filter_task_mixin import TargetFilterTaskMixin
 from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
 from pants.build_graph.target import Target
-from pants_test.task_test_base import TaskTestBase
+from pants.testutil.task_test_base import TaskTestBase
 
 
 class TargetFilterTaskMixinTest(TaskTestBase):

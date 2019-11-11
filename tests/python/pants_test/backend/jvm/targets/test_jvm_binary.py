@@ -10,7 +10,7 @@ from pants.base.payload_field import FingerprintedField
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.java.jar.exclude import Exclude
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 class JarRulesTest(unittest.TestCase):

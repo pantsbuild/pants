@@ -1,6 +1,8 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from typing import TYPE_CHECKING, List, Optional
+
 from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 from pex.pex_info import PexInfo
@@ -10,17 +12,23 @@ from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import is_executable, safe_concurrent_creation
 
 
+if TYPE_CHECKING:
+  from pants.backend.python.python_requirement import PythonRequirement  # noqa
+
+
 class ExecutablePexTool(Subsystem):
 
   entry_point = None
 
-  base_requirements = []
+  base_requirements: List['PythonRequirement'] = []
 
   @classmethod
   def subsystem_dependencies(cls):
     return super().subsystem_dependencies() + (PexBuilderWrapper.Factory,)
 
-  def bootstrap(self, interpreter, pex_file_path, extra_reqs=None):
+  def bootstrap(
+    self, interpreter, pex_file_path, extra_reqs: Optional[List['PythonRequirement']] = None
+  ) -> PEX:
     # Caching is done just by checking if the file at the specified path is already executable.
     if not is_executable(pex_file_path):
       pex_info = PexInfo.default(interpreter=interpreter)

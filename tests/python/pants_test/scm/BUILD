@@ -8,6 +8,6 @@ python_tests(
     'src/python/pants/scm:git',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/testutils:git_util',
+    'src/python/pants/testutil:git_util',
   ]
 )

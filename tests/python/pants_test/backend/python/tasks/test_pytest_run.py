@@ -18,11 +18,11 @@ from pants.backend.python.tasks.select_interpreter import SelectInterpreter
 from pants.base.exceptions import ErrorWhileTesting, TaskError
 from pants.build_graph.target import Target
 from pants.source.source_root import SourceRootConfig
+from pants.testutil.subsystem.util import init_subsystem
+from pants.testutil.task_test_base import DeclarativeTaskTestMixin, ensure_cached
 from pants.util.contextutil import pushd, temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdtemp, safe_rmtree
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
-from pants_test.subsystem.subsystem_util import init_subsystem
-from pants_test.task_test_base import DeclarativeTaskTestMixin, ensure_cached
 
 
 # NB: Our production code depends on `pytest-cov` which indirectly depends on `coverage`, but in

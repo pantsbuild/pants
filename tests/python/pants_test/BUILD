@@ -18,7 +18,8 @@ python_library(
   ],
   provides=pants_setup_py(
     name='pantsbuild.pants.testinfra',
-    description='Test support for writing Pants plugins.',
+    description='DEPRECATED: use pantsbuild.pants.testutil instead.\n\n'
+                'Test support for writing Pants plugins.',
     namespace_packages=['pants_test'],
     additional_classifiers=[
       'Topic :: Software Development :: Testing',
@@ -30,6 +31,7 @@ python_library(
   name = 'int-test-for-export',
   sources = ['pants_run_integration_test.py'],
   dependencies = [
+    'src/python/pants/base:deprecated',
     'src/python/pants/testutil:int-test-for-export',
   ]
 )
@@ -46,6 +48,7 @@ python_library(
   name = 'test_base',
   sources = ['test_base.py'],
   dependencies = [
+    'src/python/pants/base:deprecated',
     'src/python/pants/testutil:test_base',
   ]
 )
@@ -54,6 +57,7 @@ python_library(
   name = 'console_rule_test_base',
   sources = ['console_rule_test_base.py'],
   dependencies = [
+    'src/python/pants/base:deprecated',
     'src/python/pants/testutil:console_rule_test_base',
   ]
 )
@@ -63,6 +67,7 @@ python_library(
   name = 'task_test_base',
   sources = ['task_test_base.py'],
   dependencies = [
+    'src/python/pants/base:deprecated',
     'src/python/pants/testutil:task_test_base',
   ]
 )
@@ -71,6 +76,7 @@ python_library(
   name='interpreter_selection_utils',
   sources=['interpreter_selection_utils.py'],
   dependencies = [
+    'src/python/pants/base:deprecated',
     'src/python/pants/testutil:interpreter_selection_utils',
   ]
 )
@@ -79,10 +85,10 @@ python_tests(
   name = 'test_maven_layout',
   sources = ['test_maven_layout.py'],
   dependencies = [
-    ':test_base',
     'src/python/pants/backend/jvm/subsystems:junit',
     'src/python/pants/build_graph',
     'src/python/pants/source',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil:test_base',
+    'src/python/pants/testutil/subsystem',
   ]
 )

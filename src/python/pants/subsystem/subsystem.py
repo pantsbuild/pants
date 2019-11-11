@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import inspect
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Type, TypeVar
 
 from pants.option.optionable import Optionable
 from pants.option.scope import ScopeInfo
@@ -11,6 +11,9 @@ from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin, Subsyst
 
 class SubsystemError(Exception):
   """An error in a subsystem."""
+
+
+_S = TypeVar("_S", bound="Subsystem")
 
 
 class Subsystem(SubsystemClientMixin, Optionable):
@@ -83,7 +86,7 @@ class Subsystem(SubsystemClientMixin, Optionable):
   _scoped_instances: Dict[Tuple["Subsystem", str], "Subsystem"] = {}
 
   @classmethod
-  def global_instance(cls) -> "Subsystem":
+  def global_instance(cls: Type[_S]) -> _S:
     """Returns the global instance of this subsystem.
 
     :API: public
@@ -93,7 +96,7 @@ class Subsystem(SubsystemClientMixin, Optionable):
     return cls._instance_for_scope(cls.options_scope)  # type: ignore
 
   @classmethod
-  def scoped_instance(cls, optionable: Optionable) -> "Subsystem":
+  def scoped_instance(cls: Type[_S], optionable: Optionable) -> _S:
     """Returns an instance of this subsystem for exclusive use by the given `optionable`.
 
     :API: public
@@ -107,7 +110,7 @@ class Subsystem(SubsystemClientMixin, Optionable):
     return cls._instance_for_scope(cls.subscope(optionable.options_scope))
 
   @classmethod
-  def _instance_for_scope(cls, scope: str) -> "Subsystem":
+  def _instance_for_scope(cls: Type[_S], scope: str) -> _S:
     if cls._options is None:
       raise cls.UninitializedSubsystemError(cls.__name__, scope)
     key = (cls, scope)
@@ -116,7 +119,7 @@ class Subsystem(SubsystemClientMixin, Optionable):
     return cls._scoped_instances[key]
 
   @classmethod
-  def reset(cls, reset_options=True):
+  def reset(cls, reset_options: bool = True) -> None:
     """Forget all option values and cached subsystem instances.
 
     Used primarily for test isolation and to reset subsystem state for pantsd.

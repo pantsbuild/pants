@@ -85,7 +85,7 @@ python_tests(
   dependencies = [
     '3rdparty/python:dataclasses',
     'src/python/pants/util:meta',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
   ],
 )
 
@@ -103,7 +103,7 @@ python_tests(
   coverage = ['pants.util.objects'],
   dependencies = [
     'src/python/pants/util:objects',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
   ],
 )
 
@@ -112,7 +112,7 @@ python_tests(
   sources = ['test_osutil.py'],
   dependencies = [
     'src/python/pants/util:osutil',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
   ],
 )
 

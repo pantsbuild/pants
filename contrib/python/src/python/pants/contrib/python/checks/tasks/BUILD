@@ -6,7 +6,7 @@ python_library(
     '3rdparty/python:pex',
     ':resources',
     'src/python/pants/backend/python/subsystems',
-    'src/python/pants/backend/python/targets:python',
+    'src/python/pants/backend/python/targets',
     'src/python/pants/backend/python/tasks',
     'src/python/pants/backend/python:interpreter_cache',
     'src/python/pants/base:exceptions',

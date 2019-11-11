@@ -6,8 +6,8 @@ from contextlib import contextmanager
 
 from pants.build_graph.target import Target
 from pants.task.mutex_task_mixin import MutexTaskMixin
+from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir
-from pants_test.test_base import TestBase
 
 
 class LogViewerTaskMixin(MutexTaskMixin):

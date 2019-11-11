@@ -30,11 +30,11 @@ from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.jar.jar_dependency import JarDependency
+from pants.testutil.subsystem.util import init_subsystems
+from pants.testutil.task_test_base import ConsoleTaskTestBase
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import chmod_plus_x, safe_open
 from pants.util.osutil import get_os_name, normalize_os_name
-from pants_test.subsystem.subsystem_util import init_subsystems
-from pants_test.task_test_base import ConsoleTaskTestBase
 
 
 class ExportTest(ConsoleTaskTestBase):

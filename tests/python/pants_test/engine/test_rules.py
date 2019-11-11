@@ -22,14 +22,14 @@ from pants.engine.rules import (
   rule,
 )
 from pants.engine.selectors import Get
-from pants_test.engine.examples.parsers import JsonParser
-from pants_test.engine.util import (
+from pants.testutil.engine.util import (
   TARGET_TABLE,
   assert_equal_with_printing,
   create_scheduler,
   run_rule,
 )
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
+from pants_test.engine.examples.parsers import JsonParser
 
 
 class A:

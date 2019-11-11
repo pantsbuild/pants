@@ -10,7 +10,7 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
   ]
 )
 
@@ -29,7 +29,7 @@ python_tests(
   name = 'subproject_integration',
   sources = ['test_subproject_integration.py'],
   dependencies = [
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
   ],
   tags = {'integration'},
 )
@@ -41,7 +41,7 @@ python_tests(
   dependencies = [
     'src/python/pants/build_graph',
     'src/python/pants/engine/legacy:graph',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil/subsystem',
   ]
 )
 
@@ -51,7 +51,7 @@ python_tests(
   dependencies = [
     'src/python/pants/base:build_file',
     'src/python/pants/build_graph',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
   ]
 )
 
@@ -61,7 +61,7 @@ python_tests(
     'src/python/pants/java/jar',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/build_graph',
-    'tests/python/pants_test:test_base'
+    'src/python/pants/testutil:test_base'
   ],
 )
 
@@ -69,13 +69,14 @@ python_tests(
   name = 'build_graph_integration',
   sources = ['test_build_graph_integration.py'],
   dependencies = [
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'testprojects/src/java/org/pantsbuild/testproject:cycle1_directory',
     'testprojects/src/java/org/pantsbuild/testproject:cycle2_directory',
     'testprojects/src/python:build_file_imports_function_directory',
     'testprojects/src/python:build_file_imports_module_directory',
   ],
   tags = {'integration'},
+  timeout = 75,
 )
 
 python_tests(
@@ -83,7 +84,7 @@ python_tests(
   sources = ['test_intermediate_target_integration.py'],
   dependencies = [
     'src/python/pants/build_graph',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'testprojects/maven_layout:provided_patching_directory',
     'testprojects/src/java/org/pantsbuild/testproject:intransitive_directory',
     'testprojects/src/java/org/pantsbuild/testproject:runtime_directory',
@@ -98,8 +99,8 @@ python_tests(
     'src/python/pants/base:payload',
     'src/python/pants/base:payload_field',
     'src/python/pants/build_graph',
-    'tests/python/pants_test:test_base',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil:test_base',
+    'src/python/pants/testutil/subsystem',
   ]
 )
 
@@ -109,7 +110,7 @@ python_tests(
   dependencies = [
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/build_graph',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
   ]
 )
 
@@ -122,8 +123,8 @@ python_tests(
     'src/python/pants/base:payload',
     'src/python/pants/build_graph',
     'src/python/pants/source',
-    'tests/python/pants_test:test_base',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil:test_base',
+    'src/python/pants/testutil/subsystem',
   ]
 )
 
@@ -133,7 +134,7 @@ python_tests(
   dependencies = [
     'src/python/pants/build_graph',
     'src/python/pants/source',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
   ]
 )
 
@@ -143,6 +144,6 @@ python_tests(
   dependencies = [
     'src/python/pants/build_graph',
     'src/python/pants/task',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/testutil:task_test_base',
   ]
 )

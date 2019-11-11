@@ -3,7 +3,7 @@
 
 from pants.base.build_environment import pants_version
 from pants.version import VERSION as _VERSION
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 class PantsPluginPantsRequirementTest(TestBase):

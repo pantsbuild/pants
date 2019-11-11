@@ -42,7 +42,7 @@ class ScalaFix(RewriteBase):
 
   @classmethod
   def target_types(cls):
-    return ['scala_library', 'junit_tests', 'java_tests']
+    return ['scala_library', 'junit_tests']
 
   @classmethod
   def source_extension(cls):

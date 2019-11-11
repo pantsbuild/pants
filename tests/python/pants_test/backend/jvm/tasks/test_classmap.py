@@ -5,10 +5,10 @@ from contextlib import contextmanager
 
 from pants.backend.jvm.tasks.classmap import ClassmapTask
 from pants.build_graph.target import Target
+from pants.testutil.subsystem.util import init_subsystem
+from pants.testutil.task_test_base import ConsoleTaskTestBase
 from pants.util.contextutil import open_zip
 from pants_test.backend.jvm.tasks.jvm_binary_task_test_base import JvmBinaryTaskTestBase
-from pants_test.subsystem.subsystem_util import init_subsystem
-from pants_test.task_test_base import ConsoleTaskTestBase
 
 
 class ClassmapTaskTest(ConsoleTaskTestBase, JvmBinaryTaskTestBase):

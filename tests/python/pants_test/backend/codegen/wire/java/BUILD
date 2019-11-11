@@ -15,8 +15,8 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/java/jar',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test/jvm:nailgun_task_test_base',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil/jvm:nailgun_task_test_base',
+    'src/python/pants/testutil:test_base',
   ]
 )
 
@@ -27,8 +27,8 @@ python_tests(
   dependencies = [
     'src/python/pants/base:build_environment',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:int-test',
-    'tests/python/pants_test/testutils:file_test_util',
+    'src/python/pants/testutil:int-test',
+    'src/python/pants/testutil:file_test_util',
     'examples/src/java/org/pantsbuild/example:wire_directory',
   ],
   tags = {'integration'},

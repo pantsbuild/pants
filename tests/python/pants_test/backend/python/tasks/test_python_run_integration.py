@@ -5,8 +5,7 @@ import os
 
 from pex.pex_info import PexInfo
 
-from pants.util.contextutil import temporary_dir
-from pants_test.interpreter_selection_utils import (
+from pants.testutil.interpreter_selection_utils import (
   PY_3,
   PY_27,
   python_interpreter_path,
@@ -14,8 +13,9 @@ from pants_test.interpreter_selection_utils import (
   skip_unless_python27_and_python3_present,
   skip_unless_python27_present,
 )
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
-from pants_test.testutils.pexrc_util import setup_pexrc_with_pex_python_path
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
+from pants.testutil.pexrc_util import setup_pexrc_with_pex_python_path
+from pants.util.contextutil import temporary_dir
 
 
 class PythonRunIntegrationTest(PantsRunIntegrationTest):

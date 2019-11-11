@@ -4,7 +4,7 @@
 
 from pants.build_graph.target_filter_subsystem import TargetFilter, TargetFiltering
 from pants.task.task import Task
-from pants_test.task_test_base import TaskTestBase
+from pants.testutil.task_test_base import TaskTestBase
 
 
 class TestTargetFilter(TaskTestBase):

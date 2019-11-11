@@ -6,7 +6,7 @@ from textwrap import dedent
 from pants.base.build_file import BuildFile
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.build_graph.address import Address
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 from pants.contrib.buildgen.build_file_manipulator import (BuildFileManipulator,
                                                            BuildTargetParseError)

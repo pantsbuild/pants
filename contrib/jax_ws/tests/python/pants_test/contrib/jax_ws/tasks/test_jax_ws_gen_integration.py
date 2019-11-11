@@ -5,9 +5,9 @@ import os
 from contextlib import contextmanager
 from textwrap import dedent
 
+from pants.testutil.file_test_util import exact_files
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.dirutil import safe_open
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
-from pants_test.testutils.file_test_util import exact_files
 
 
 class JaxWsGenTest(PantsRunIntegrationTest):

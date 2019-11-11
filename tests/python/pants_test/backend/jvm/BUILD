@@ -13,7 +13,7 @@ python_tests(
   name='integration',
   sources=globs('*_integration.py'),
   dependencies=[
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'examples/tests/java/org/pantsbuild/example:hello_directory',
   ],
   tags={'integration'},

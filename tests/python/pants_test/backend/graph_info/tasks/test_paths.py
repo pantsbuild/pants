@@ -4,7 +4,7 @@
 
 from pants.backend.graph_info.tasks.paths import Path, Paths
 from pants.base.exceptions import TaskError
-from pants_test.task_test_base import ConsoleTaskTestBase
+from pants.testutil.task_test_base import ConsoleTaskTestBase
 
 
 class PathsTest(ConsoleTaskTestBase):

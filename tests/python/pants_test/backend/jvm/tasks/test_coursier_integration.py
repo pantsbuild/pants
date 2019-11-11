@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class CouriserIntegrationTest(PantsRunIntegrationTest):

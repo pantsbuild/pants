@@ -4,7 +4,7 @@
 python_library(
   name = 'base',
   dependencies = [
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
   ],
 )
 
@@ -13,7 +13,7 @@ python_tests(
   sources = ['test_unknown_arguments_integration.py'],
   dependencies = [
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
   ],
   tags = {'integration'},
 )
@@ -34,7 +34,7 @@ python_tests(
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
   ]
 )
 
@@ -42,11 +42,11 @@ python_tests(
   name = 'jvm_app_integration',
   sources = ['test_jvm_app_integration.py'],
   dependencies = [
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'testprojects/src/java/org/pantsbuild/testproject:bundle_directory',
   ],
   tags = {'integration'},
-  timeout = 180,
+  timeout = 300,
 )
 
 python_tests(
@@ -54,7 +54,7 @@ python_tests(
   sources = ['test_python_binary.py'],
   dependencies = [
     ':base',
-    'src/python/pants/backend/python/targets:python',
+    'src/python/pants/backend/python/targets',
     'src/python/pants/build_graph',
   ]
 )
@@ -78,10 +78,10 @@ python_tests(
   dependencies = [
     'src/python/pants/backend/jvm:artifact',
     'src/python/pants/backend/jvm:repository',
-    'src/python/pants/backend/python/targets:python',
+    'src/python/pants/backend/python/targets',
     'src/python/pants/backend/python:python_artifact',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
-    'tests/python/pants_test:test_base'
+    'src/python/pants/testutil:test_base'
   ]
 )

@@ -3,7 +3,7 @@
 
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.source.filespec import matches_filespec
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 class FilespecTest(TestBase):

@@ -24,8 +24,8 @@ from pants.engine.isolated_process import (
 from pants.engine.rules import RootRule, rule
 from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Get
+from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir
-from pants_test.test_base import TestBase
 
 
 @dataclass(frozen=True)
@@ -350,19 +350,17 @@ class IsolatedProcessTest(TestBase, unittest.TestCase):
       (FileContent("roland", b"European Burmese", False),)
     )
 
-  def test_exercise_python_side_of_timeout_implementation(self):
-    # Local execution currently doesn't support timeouts,
-    # but this allows us to ensure that all of the setup
-    # on the python side does not blow up.
-
+  def test_timeout(self):
     request = ExecuteProcessRequest(
-      argv=("/bin/bash", "-c", "/bin/sleep 1; echo -n 'European Burmese'"),
+      argv=("/bin/bash", "-c", "/bin/sleep 0.2; /bin/echo -n 'European Burmese'"),
       timeout_seconds=0.1,
       description='sleepy-cat',
       input_files=EMPTY_DIRECTORY_DIGEST,
     )
-
-    self.scheduler.product_request(ExecuteProcessResult, [request])[0]
+    result = self.scheduler.product_request(FallibleExecuteProcessResult, [request])[0]
+    self.assertNotEqual(result.exit_code, 0)
+    self.assertIn(b"Exceeded timeout", result.stdout)
+    self.assertIn(b"sleepy-cat", result.stdout)
 
   def test_javac_compilation_example_success(self):
     self.create_dir('simple')
@@ -374,7 +372,7 @@ class Simple {
 
     request = JavacCompileRequest(
       BinaryLocation('/usr/bin/javac'),
-      JavacSources((u'simple/Simple.java',)),
+      JavacSources(('simple/Simple.java',)),
     )
 
     result = self.scheduler.product_request(JavacCompileResult, [request])[0]

@@ -24,10 +24,10 @@ from pants.engine.parser import HydratedStruct, SymbolTable
 from pants.engine.rules import rule
 from pants.engine.selectors import Get
 from pants.engine.struct import Struct
+from pants.testutil.engine.util import TARGET_TABLE, Target
 from pants.util.dirutil import safe_open
 from pants_test.engine.examples.parsers import JsonParser
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
-from pants_test.engine.util import TARGET_TABLE, Target
 
 
 class Thing:

@@ -39,12 +39,12 @@ from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.parser import Parser
 from pants.option.ranked_value import RankedValue
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
+from pants.testutil.option.fakes import create_options
+from pants.testutil.test_base import TestBase
 from pants.util.collections import Enum, assert_single_element
 from pants.util.contextutil import temporary_file, temporary_file_path
 from pants.util.dirutil import safe_mkdtemp
 from pants.util.strutil import safe_shlex_join
-from pants_test.option.util.fakes import create_options
-from pants_test.test_base import TestBase
 
 
 _FAKE_CUR_VERSION = '1.0.0.dev0'

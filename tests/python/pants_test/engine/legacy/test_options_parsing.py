@@ -6,7 +6,7 @@ from pants.engine.selectors import Params
 from pants.init.options_initializer import BuildConfigInitializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.scope import GLOBAL_SCOPE, Scope, ScopedOptions
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 class TestEngineOptionsParsing(TestBase):

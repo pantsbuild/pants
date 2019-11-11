@@ -5,7 +5,7 @@ python_library(
   name = "projects_test_base",
   source = 'projects_test_base.py',
   dependencies = [
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
   ],
 )
 

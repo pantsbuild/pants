@@ -10,10 +10,9 @@ python_tests(
     'src/python/pants/base:deprecated',
     'src/python/pants/option',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test/option/util',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil/option',
+    'src/python/pants/testutil:test_base',
   ],
-  timeout=30,
 )
 
 python_tests(
@@ -21,7 +20,7 @@ python_tests(
   sources=globs('*_integration.py'),
   dependencies=[
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
     'testprojects/src/python:plugins_directory',
   ],
   tags = {'integration'},

@@ -16,7 +16,7 @@ python_library(
 python_tests(
   name='integration',
   dependencies=[
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
   ],
   tags = {'integration'},
 )

@@ -3,8 +3,8 @@
 
 import os.path
 
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
 from pants.util.dirutil import rm_rf, touch
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
 
 
 class ListOwnersIntegrationTest(PantsRunIntegrationTest):

@@ -13,10 +13,3 @@ python_library(
     'src/python/pants/build_graph',
   ],
 )
-
-
-# TODO: Old name.  Remove after all references are fixed to refer directly to the target above.
-target(
-  name = 'python',
-  dependencies = [':targets'],
-)

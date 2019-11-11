@@ -7,8 +7,8 @@ from pants.engine.fs import Digest, FileContent, InputFilesContent, Workspace
 from pants.engine.interactive_runner import InteractiveRunner
 from pants.rules.core import run
 from pants.rules.core.binary import CreatedBinary
-from pants_test.console_rule_test_base import ConsoleRuleTestBase
-from pants_test.engine.util import MockConsole, run_rule
+from pants.testutil.console_rule_test_base import ConsoleRuleTestBase
+from pants.testutil.engine.util import MockConsole, run_rule
 
 
 class RunTest(ConsoleRuleTestBase):

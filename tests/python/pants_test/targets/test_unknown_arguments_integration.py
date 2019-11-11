@@ -5,8 +5,8 @@ import os
 from contextlib import contextmanager
 from textwrap import dedent
 
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import temporary_dir
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class TestUnknownArgumentsIntegration(PantsRunIntegrationTest):

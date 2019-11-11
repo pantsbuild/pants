@@ -6,9 +6,9 @@ import unittest
 from contextlib import contextmanager
 
 from pants.invalidation.build_invalidator import BuildInvalidator, CacheKey
+from pants.testutil.subsystem.util import init_subsystem
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_rmtree
-from pants_test.subsystem.subsystem_util import init_subsystem
 
 
 class CacheKeyTest(unittest.TestCase):

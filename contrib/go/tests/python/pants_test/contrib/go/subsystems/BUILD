@@ -6,8 +6,8 @@ python_tests(
   sources=['test_fetchers.py'],
   dependencies=[
     'contrib/go/src/python/pants/contrib/go/subsystems',
-    'tests/python/pants_test/subsystem:subsystem_utils',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil/subsystem',
+    'src/python/pants/testutil:test_base',
   ]
 )
 
@@ -17,7 +17,7 @@ python_tests(
   dependencies=[
     'contrib/go/src/python/pants/contrib/go/subsystems',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/testutil/subsystem',
   ]
 )
 
@@ -35,7 +35,7 @@ python_tests(
   dependencies=[
     'contrib/go/src/python/pants/contrib/go/subsystems',
     'contrib/go:examples_directory',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
   ],
   tags={'integration'},
   timeout=180,

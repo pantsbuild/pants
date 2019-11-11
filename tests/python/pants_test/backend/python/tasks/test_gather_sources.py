@@ -12,8 +12,8 @@ from pants.backend.python.tasks.gather_sources import GatherSources
 from pants.build_graph.files import Files
 from pants.build_graph.resources import Resources
 from pants.source.source_root import SourceRootConfig
+from pants.testutil.task_test_base import TaskTestBase
 from pants.util.contextutil import temporary_dir
-from pants_test.task_test_base import TaskTestBase
 
 
 class GatherSourcesTest(TaskTestBase):

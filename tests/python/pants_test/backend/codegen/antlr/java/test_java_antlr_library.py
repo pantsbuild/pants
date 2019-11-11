@@ -6,7 +6,7 @@ from textwrap import dedent
 from pants.backend.codegen.antlr.java.java_antlr_library import JavaAntlrLibrary
 from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 class JavaAntlrLibraryTest(TestBase):

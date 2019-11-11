@@ -4,7 +4,7 @@
 import logging
 import textwrap
 
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 from pants.contrib.python.checks.checker.file_excluder import FileExcluder
 

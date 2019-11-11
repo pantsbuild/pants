@@ -13,18 +13,17 @@ from pants.base.exceptions import TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.resources import Resources
 from pants.source.source_root import SourceRootConfig
+from pants.testutil.jvm.nailgun_task_test_base import NailgunTaskTestBase
+from pants.testutil.subsystem.util import init_subsystem
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import fast_relpath
-from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
-from pants_test.subsystem.subsystem_util import init_subsystem
 
 
 class ScalaFmtTestBase(NailgunTaskTestBase):
   @classmethod
   def alias_groups(cls):
     return super().alias_groups().merge(
-      BuildFileAliases(targets={'java_tests': JUnitTests,
-                                'junit_tests': JUnitTests,
+      BuildFileAliases(targets={'junit_tests': JUnitTests,
                                 'scala_library': ScalaLibrary}))
 
   def setUp(self):

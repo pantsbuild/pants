@@ -2,10 +2,14 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Any, Tuple
+from typing import TYPE_CHECKING, Tuple
 
 from pants.base.exception_sink import ExceptionSink
 from pants.engine.rules import RootRule
+
+
+if TYPE_CHECKING:
+  from pants.engine.scheduler import SchedulerSession
 
 
 @dataclass(frozen=True)
@@ -22,7 +26,7 @@ class InteractiveProcessRequest:
 
 @dataclass(frozen=True)
 class InteractiveRunner:
-  _scheduler: Any
+  _scheduler: 'SchedulerSession'
 
   def run_local_interactive_process(self, request: InteractiveProcessRequest) -> InteractiveProcessResult:
     ExceptionSink.toggle_ignoring_sigint_v2_engine(True)

@@ -74,21 +74,12 @@ from pants.backend.jvm.tasks.scalafix import ScalaFixCheck, ScalaFixFix
 from pants.backend.jvm.tasks.scalafmt import ScalaFmtCheckFormat, ScalaFmtFormat
 from pants.backend.jvm.tasks.scalastyle import Scalastyle
 from pants.backend.jvm.tasks.unpack_jars import UnpackJars
-from pants.base.deprecated import warn_or_error
 from pants.build_graph.app_base import Bundle, DirectoryReMapper
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar as task
 from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency import JarDependencyParseContextWrapper
-
-
-class DeprecatedJavaTests(JUnitTests):
-  def __init__(self, *args, **kwargs):
-    super().__init__(*args, **kwargs)
-    warn_or_error('1.4.0.dev0',
-                  'java_tests(...) target type',
-                  'Use junit_tests(...) instead for target {}.'.format(self.address.spec))
 
 
 def build_file_aliases():
@@ -101,7 +92,6 @@ def build_file_aliases():
       'java_agent': JavaAgent,
       'java_library': JavaLibrary,
       'javac_plugin': JavacPlugin,
-      'java_tests': DeprecatedJavaTests,
       'junit_tests': JUnitTests,
       'jvm_app': JvmApp,
       'jvm_binary': JvmBinary,

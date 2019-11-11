@@ -8,7 +8,7 @@ from twitter.common.dirutil.fileset import Fileset
 from pants.backend.codegen.antlr.python.antlr_py_gen import AntlrPyGen
 from pants.backend.codegen.antlr.python.python_antlr_library import PythonAntlrLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
+from pants.testutil.jvm.nailgun_task_test_base import NailgunTaskTestBase
 
 
 class AntlrPyGenTest(NailgunTaskTestBase):

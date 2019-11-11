@@ -4,7 +4,7 @@
 from twitter.common.collections import OrderedSet
 
 from pants.goal.products import UnionProducts
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 class UnionProductsTest(TestBase):

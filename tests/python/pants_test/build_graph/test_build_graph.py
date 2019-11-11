@@ -10,7 +10,7 @@ from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.target import Target
 from pants.java.jar.jar_dependency import JarDependency
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 # TODO(Eric Ayers) There are many untested methods in BuildGraph left to be tested.

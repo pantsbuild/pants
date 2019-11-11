@@ -3,7 +3,7 @@
 
 import os
 from dataclasses import dataclass
-from typing import Any, Optional, Sequence, Set
+from typing import Dict, Optional, Sequence, Set, Tuple
 
 from pants.base.project_tree_factory import get_project_tree
 from pants.engine.objects import Collection
@@ -22,7 +22,7 @@ class SourceRootCategories:
 @dataclass(frozen=True)
 class SourceRoot:
   path: str
-  langs: Any
+  langs: Tuple[str, ...]
   category: str
 
 
@@ -47,18 +47,15 @@ class SourceRootFactory:
       for canonical in canonicalized:
         yield canonical
 
-  def create(self, relpath, langs, category):
-    """Return a source root at the given `relpath` for the given `langs` and `category`.
-
-    :returns: :class:`SourceRoot`.
-    """
+  def create(self, relpath, langs, category) -> SourceRoot:
+    """Return a source root at the given `relpath` for the given `langs` and `category`."""
     return SourceRoot(relpath, tuple(sorted(self._canonicalize_langs(langs))), category)
 
 
 class SourceRoots:
   """An interface for querying source roots."""
 
-  def __init__(self, source_root_config):
+  def __init__(self, source_root_config: 'SourceRootConfig') -> None:
     """Create an object for querying source roots via patterns in a trie.
 
     :param source_root_config: The SourceRootConfig for the source root patterns to query against.
@@ -90,17 +87,16 @@ class SourceRoots:
 
     :param path: Find the source root for this path, relative to the buildroot.
     :return: A SourceRoot instance, or None if the path is not located under a source root
-             and `unmatched==fail`.
+             and `unmatched == fail`.
     """
     matched = self._trie.find(path)
     if matched:
       return matched
     elif self._options.unmatched == 'fail':
       return None
-    elif self._options.unmatched == 'create':
-      # If no source root is found, use the path directly.
-      # TODO: Remove this logic. It should be an error to have no matching source root.
-      return SourceRoot(path, (), SourceRootCategories.UNKNOWN)
+    # If no source root is found, use the path directly.
+    # TODO: Remove this logic. It should be an error to have no matching source root.
+    return SourceRoot(path, (), SourceRootCategories.UNKNOWN)
 
   def traverse(self) -> Set[str]:
     return self._trie.traverse()
@@ -204,11 +200,9 @@ class SourceRootConfig(Subsystem):
     'src/main/go/src': ('go',),
   }
 
-  _DEFAULT_TEST_ROOTS = {
-  }
+  _DEFAULT_TEST_ROOTS: Dict[str, Tuple[str, ...]] = {}
 
-  _DEFAULT_THIRDPARTY_ROOTS = {
-  }
+  _DEFAULT_THIRDPARTY_ROOTS: Dict[str, Tuple[str, ...]] = {}
 
   @classmethod
   def register_options(cls, register):
@@ -251,11 +245,8 @@ class SourceRootConfig(Subsystem):
   def get_source_roots(self):
     return SourceRoots(self)
 
-  def create_trie(self):
-    """Create a trie of source root patterns from options.
-
-    :returns: :class:`SourceRootTrie`
-    """
+  def create_trie(self) -> 'SourceRootTrie':
+    """Create a trie of source root patterns from options."""
     trie = SourceRootTrie(self.source_root_factory)
     options = self.get_options()
 
@@ -270,11 +261,8 @@ class SourceRootConfig(Subsystem):
     return trie
 
   @memoized_property
-  def source_root_factory(self):
-    """Creates source roots that respects language canonicalizations.
-
-    :returns: :class:`SourceRootFactory`
-    """
+  def source_root_factory(self) -> SourceRootFactory:
+    """Creates source roots that respects language canonicalizations."""
     return SourceRootFactory(self.get_options().lang_canonicalizations)
 
 
@@ -290,8 +278,7 @@ class SourceRootTrie:
   """
   class InvalidPath(Exception):
     def __init__(self, path, reason):
-      super(SourceRootTrie.InvalidPath, self).__init__(
-        'Invalid source root path or pattern: {}. Reason: {}.'.format(path, reason))
+      super().__init__(f'Invalid source root path or pattern: {path}. Reason: {reason}.')
 
   class Node:
     def __init__(self):
@@ -336,7 +323,7 @@ class SourceRootTrie:
       else:
         yield '', self.langs, self.category
 
-  def __init__(self, source_root_factory):
+  def __init__(self, source_root_factory: SourceRootFactory) -> None:
     self._source_root_factory = source_root_factory
     self._root = SourceRootTrie.Node()
 
@@ -387,14 +374,14 @@ class SourceRootTrie:
     traverse_helper(self._root, [])
     return source_roots
 
-  def find(self, path):
+  def find(self, path) -> Optional[SourceRoot]:
     """Find the source root for the given path."""
     keys = ['^'] + path.split(os.path.sep)
     for i in range(len(keys)):
       # See if we have a match at position i.  We have such a match if following the path
       # segments into the trie, from the root, leads us to a terminal.
       node = self._root
-      langs = set()
+      langs: Set[str] = set()
       j = i
       while j < len(keys):
         child = node.get_child(keys[j], langs)

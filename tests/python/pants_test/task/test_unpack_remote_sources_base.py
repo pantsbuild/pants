@@ -4,7 +4,7 @@
 import unittest
 
 from pants.task.unpack_remote_sources_base import UnpackRemoteSourcesBase
-from pants_test.test_base import TestBase
+from pants.testutil.test_base import TestBase
 
 
 class UnpackRemoteSourcesTest(TestBase):
