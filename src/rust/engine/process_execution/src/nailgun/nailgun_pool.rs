@@ -125,7 +125,6 @@ impl NailgunPool {
       debug!("Locking nailgun process pool so that only one can be connecting at a time.");
       let mut processes = processes.lock();
       debug!("Locked!");
-//      let maybe_process = processes.get_mut(&name);
       let connection_result = if let Some(process) = processes.get_mut(&name) {
         // Clone some fields that we need for later
         let (process_name, process_fingerprint, process_port, build_id_that_started_the_server) = (
@@ -226,6 +225,9 @@ impl NailgunPool {
     .to_boxed()
   }
 
+  //
+  // This is a blocking method that is being called under the NailgunProcessMap's lock (see #8543)
+  //
   fn start_new_nailgun(
     processes: &mut NailgunProcessMap,
     name: String,

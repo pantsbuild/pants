@@ -1,6 +1,5 @@
 use std::collections::btree_map::BTreeMap;
 use std::collections::btree_set::BTreeSet;
-//use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
@@ -8,7 +7,6 @@ use std::time::Duration;
 use boxfuture::{try_future, BoxFuture, Boxable};
 use futures::future::Future;
 use futures::stream::Stream;
-//use hashing::Digest;
 use log::{debug, trace};
 use nails::execution::{child_channel, ChildInput, ChildOutput, Command};
 use tokio::net::TcpStream;
@@ -32,10 +30,7 @@ mod parsed_jvm_command_lines_tests;
 use async_semaphore::AsyncSemaphore;
 pub use nailgun_pool::NailgunPool;
 use parsed_jvm_command_lines::ParsedJVMCommandLines;
-//use std::fs::{read_link, remove_file};
 use std::net::SocketAddr;
-//use store::Store;
-//use workunit_store::WorkUnitStore;
 
 // Hardcoded constants for connecting to nailgun
 static NAILGUN_MAIN_CLASS: &str = "com.martiansoftware.nailgun.NGServer";
@@ -246,7 +241,6 @@ impl CapturedWorkdir for CommandRunner {
     let req2 = req.clone();
     let workdir_for_this_nailgun = self.get_nailgun_workdir(&nailgun_name)?;
     let workdir_for_this_nailgun1 = workdir_for_this_nailgun.clone();
-    let executor = self.executor.clone();
     let build_id = context.build_id.clone();
     let store = self.inner.store.clone();
     let workunit_store = context.workunit_store.clone();
@@ -258,19 +252,17 @@ impl CapturedWorkdir for CommandRunner {
     let nails_command = self
       .async_semaphore
       .with_acquired(move || {
-        // Connect to a running nailgun.
-        executor.spawn_on_io_pool(futures::future::lazy(move || {
-          nailgun_pool.connect(
-            nailgun_name.clone(),
-            nailgun_req,
-            workdir_for_this_nailgun1,
-            nailgun_req_digest,
-            build_id,
-            store,
-            req.input_files,
-            workunit_store,
-          )
-        }))
+        // Get the port of a running nailgun server (or a new nailgun server if it doesn't exist)
+        nailgun_pool.connect(
+          nailgun_name.clone(),
+          nailgun_req,
+          workdir_for_this_nailgun1,
+          nailgun_req_digest,
+          build_id,
+          store,
+          req.input_files,
+          workunit_store,
+        )
       })
       .map_err(|e| format!("Failed to connect to nailgun! {}", e))
       .inspect(move |_| debug!("Connected to nailgun instance {}", &nailgun_name3))
