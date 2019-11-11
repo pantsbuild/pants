@@ -95,6 +95,7 @@ class ScroogeGenTest(NailgunTaskTestBase):
         language='{language}',
         compiler_args={compiler_args},
         strict_deps=True,
+        tags=['my_tag'],
       )
     '''.format(language=language, compiler_args=compiler_args_str))
 
@@ -130,6 +131,7 @@ class ScroogeGenTest(NailgunTaskTestBase):
       self.assertEqual(call_kwargs['provides'], None)
       self.assertEqual(call_kwargs['derived_from'], target)
       self.assertEqual(call_kwargs['strict_deps'], True)
+      self.assertEqual(call_kwargs['tags'], {'my_tag'})
 
       sources = call_kwargs['sources']
       self.assertEqual(sources.files, ())
