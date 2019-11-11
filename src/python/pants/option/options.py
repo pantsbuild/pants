@@ -5,7 +5,6 @@ import copy
 import re
 import sys
 from dataclasses import dataclass
-from typing import List
 
 from pants.base.deprecated import warn_or_error
 from pants.option.arg_splitter import ArgSplitter
