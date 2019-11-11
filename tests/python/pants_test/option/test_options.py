@@ -242,7 +242,7 @@ class OptionsTest(TestBase):
     options = self._parse('./pants --verbose')
     self.assertEqual(True, options.for_global_scope().verbose)
     options = self._parse('./pants -z compile path/to/tgt')
-    self.assertEqual(['path/to/tgt'], options.target_specs)
+    self.assertEqual(['path/to/tgt'], options.positional_args)
     self.assertEqual(True, options.for_global_scope().verbose)
 
     with self.assertRaises(ParseError):
@@ -736,7 +736,7 @@ class OptionsTest(TestBase):
       bootstrapper = OptionsBootstrapper.create(args=shlex.split(cmdline))
       bootstrap_options = bootstrapper.bootstrap_options.for_global_scope()
       options = self._parse(cmdline, bootstrap_option_values=bootstrap_options)
-      sorted_specs = sorted(options.target_specs)
+      sorted_specs = sorted(options.positional_args)
       self.assertEqual(['bar', 'fleem:tgt', 'foo', 'morx:tgt'], sorted_specs)
 
   def test_passthru_args(self):
@@ -1300,7 +1300,7 @@ class OptionsTest(TestBase):
           # Set the Levenshtein edit distance to search for misspelled options.
         'option_name_check_distance': 2,
           # If bootstrap option values are provided, this option is accessed and must be provided.
-        'target_spec_files': [],
+        'positional_arg_files': [],
         },
       })
       return self._parse(safe_shlex_join(['./pants'] + list(args)),

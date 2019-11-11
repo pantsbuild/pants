@@ -127,27 +127,28 @@ class Options:
     complete_known_scope_infos = cls.complete_scopes(known_scope_infos)
     splitter = ArgSplitter(complete_known_scope_infos)
     args = sys.argv if args is None else args
-    goals, scope_to_flags, target_specs, passthru, passthru_owner, unknown_scopes = splitter.split_args(args)
+    split_args = splitter.split_args(args)
 
     option_tracker = OptionTracker()
 
     if bootstrap_option_values:
-      target_spec_files = bootstrap_option_values.target_spec_files
-      if target_spec_files:
-        for spec in target_spec_files:
-          with open(spec, 'r') as f:
-            target_specs.extend([line for line in [line.strip() for line in f] if line])
+      positional_arg_files = bootstrap_option_values.positional_arg_files
+      if positional_arg_files:
+        for positional_arg_file in positional_arg_files:
+          with open(positional_arg_file, 'r') as f:
+            split_args.positional_args.extend([line for line in [line.strip() for line in f] if line])
 
     help_request = splitter.help_request
 
     parser_hierarchy = ParserHierarchy(env, config, complete_known_scope_infos, option_tracker)
     bootstrap_option_values = bootstrap_option_values
     known_scope_to_info = {s.scope: s for s in complete_known_scope_infos}
-    return cls(goals, scope_to_flags, target_specs, passthru, passthru_owner, help_request,
+    return cls(split_args.goals, split_args.scope_to_flags, split_args.positional_args,
+               split_args.passthru, split_args.passthru_owner, help_request,
                parser_hierarchy, bootstrap_option_values, known_scope_to_info,
-               option_tracker, unknown_scopes)
+               option_tracker, split_args.unknown_scopes)
 
-  def __init__(self, goals, scope_to_flags, target_specs, passthru, passthru_owner, help_request,
+  def __init__(self, goals, scope_to_flags, positional_args, passthru, passthru_owner, help_request,
                parser_hierarchy, bootstrap_option_values, known_scope_to_info,
                option_tracker, unknown_scopes):
     """The low-level constructor for an Options instance.
@@ -156,7 +157,7 @@ class Options:
     """
     self._goals = goals
     self._scope_to_flags = scope_to_flags
-    self._target_specs = target_specs
+    self._positional_args = positional_args
     self._passthru = passthru
     self._passthru_owner = passthru_owner
     self._help_request = help_request
@@ -190,7 +191,16 @@ class Options:
 
     :API: public
     """
-    return self._target_specs
+    warn_or_error('1.25.0.dev2', '.target_specs', 'Use .positional_args instead')
+    return self._positional_args
+
+  @property
+  def positional_args(self):
+    """The positional args to operate on.
+
+    :API: public
+    """
+    return self._positional_args
 
   @property
   def goals(self):
@@ -246,7 +256,7 @@ class Options:
     no_flags = {}
     return Options(self._goals,
                    no_flags,
-                   self._target_specs,
+                   self._positional_args,
                    self._passthru,
                    self._passthru_owner,
                    self._help_request,

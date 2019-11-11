@@ -229,8 +229,12 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                   'Later files override earlier ones.')
     register('--pythonpath', advanced=True, type=list,
              help='Add these directories to PYTHONPATH to search for plugins.')
-    register('--target-spec-file', type=list, dest='target_spec_files', daemon=False,
+    register('--target-spec-file', type=list, dest='positional_arg_files', daemon=False,
+             removal_version='1.25.0.dev2',
+             removal_hint='Use --positional-arg-file instead',
              help='Read additional specs from this file, one per line')
+    register('--positional-arg-file', type=list, dest='positional_arg_files', daemon=False,
+             help='Read additional positional args from this file, one per line')
     register('--verify-config', type=bool, default=True, daemon=False,
              advanced=True,
              help='Verify that all config file values correspond to known options.')
