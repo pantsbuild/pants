@@ -33,6 +33,7 @@
 codegen/classes/
 htmlcov/
 out/
+/src/rust/engine/engine_cffi/logs/
 # remove root-level /bin, which is created by Eclipse
 /bin/
 /build-support/*.pex
