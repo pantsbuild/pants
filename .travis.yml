@@ -67,7 +67,7 @@ matrix:
     os: osx
     script:
     - ./build-support/bin/ci.py --bootstrap
-    - './untilfail.py ./pants.pex --cache-ignore test test tests/python/pants_test/base/es:prints_traceback_on_sigusr2'
+    - './untilfail.py ./pants.pex --cache-ignore test test tests/python/pants_test/base/es:dumps_logs_on_signal tests/python/pants_test/base/es:dumps_traceback_on_sigabrt tests/python/pants_test/base/es:keyboardinterrupt tests/python/pants_test/base/es:prints_traceback_on_sigusr2'
     stage: Bootstrap Pants
 stages:
 - if: type != cron

@@ -8,7 +8,7 @@ python_tests(
     'testprojects/src/python:coordinated_runs_directory',
     'testprojects:pants_plugins_directory',
   ],
-  timeout = 20,
+  timeout = 50,
   tags = {'platform_specific_behavior', 'integration'},
 )
 
@@ -22,7 +22,7 @@ python_tests(
     'testprojects/src/python:coordinated_runs_directory',
     'testprojects:pants_plugins_directory',
   ],
-  timeout = 10,
+  timeout = 40,
   tags = {'platform_specific_behavior', 'integration'},
 )
 
@@ -36,7 +36,7 @@ python_tests(
     'testprojects/src/python:coordinated_runs_directory',
     'testprojects:pants_plugins_directory',
   ],
-  timeout = 5,
+  timeout = 10,
   tags = {'platform_specific_behavior', 'integration'},
 )
 
@@ -50,7 +50,7 @@ python_tests(
     'testprojects/src/python:coordinated_runs_directory',
     'testprojects:pants_plugins_directory',
   ],
-  timeout = 5,
+  timeout = 10,
   tags = {'platform_specific_behavior', 'integration'},
 )
 
@@ -64,7 +64,7 @@ python_tests(
     'testprojects/src/python:coordinated_runs_directory',
     'testprojects:pants_plugins_directory',
   ],
-  timeout = 10,
+  timeout = 40,
   tags = {'platform_specific_behavior', 'integration'},
 )
 
@@ -78,7 +78,7 @@ python_tests(
     'testprojects/src/python:coordinated_runs_directory',
     'testprojects:pants_plugins_directory',
   ],
-  timeout = 5,
+  timeout = 10,
   tags = {'platform_specific_behavior', 'integration'},
 )
 
@@ -106,7 +106,7 @@ python_tests(
     'testprojects/src/python:coordinated_runs_directory',
     'testprojects:pants_plugins_directory',
   ],
-  timeout = 10,
+  timeout = 20,
   tags = {'platform_specific_behavior', 'integration'},
 )
 
@@ -120,6 +120,6 @@ python_tests(
     'testprojects/src/python:coordinated_runs_directory',
     'testprojects:pants_plugins_directory',
   ],
-  timeout = 10,
+  timeout = 20,
   tags = {'platform_specific_behavior', 'integration'},
 )
