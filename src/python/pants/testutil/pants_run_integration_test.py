@@ -60,7 +60,7 @@ class PantsJoinHandle:
       communicate_fn = SubprocessProcessHandler(self.process).communicate_teeing_stdout_and_stderr
     if stdin_data is not None:
       stdin_data = ensure_binary(stdin_data)
-    (stdout_data, stderr_data) = communicate_fn(stdin_data)
+    (stdout_data, stderr_data) = communicate_fn(stdin_data, timeout=20)
 
     if self.process.returncode != PANTS_SUCCEEDED_EXIT_CODE:
       render_logs(self.workdir)

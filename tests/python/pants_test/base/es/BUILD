@@ -92,7 +92,7 @@ python_tests(
     'testprojects/src/python:coordinated_runs_directory',
     'testprojects:pants_plugins_directory',
   ],
-  timeout = 10,
+  timeout = 40,
   tags = {'platform_specific_behavior', 'integration'},
 )
 
