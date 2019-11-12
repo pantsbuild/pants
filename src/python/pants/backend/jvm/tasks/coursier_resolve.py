@@ -162,11 +162,14 @@ class CoursierMixin(JvmResolverBase):
         if not self.get_options().report:
           # Check each individual target without context first
           # If the individuals are valid, check them as a VersionedTargetSet
-          if not invalidation_check.invalid_vts and resolve_vts.valid:
+          # The order of 'or' statement matters, because checking for cache is more expensive.
+          if resolve_vts.valid or (self.artifact_cache_reads_enabled() and
+                                   len(self.check_artifact_cache([resolve_vts])[0]) == len(resolve_vts.targets)):
             # Load up from the results dir
             success = self._load_from_results_dir(compile_classpath, vt_set_results_dir,
                                                   coursier_cache_dir, invalidation_check, pants_jar_base_dir)
             if success:
+              resolve_vts.update()
               return
 
         jars_to_resolve, pinned_coords = self._compute_jars_to_resolve_and_pin(raw_jar_deps,
@@ -183,6 +186,9 @@ class CoursierMixin(JvmResolverBase):
 
         self._populate_results_dir(vt_set_results_dir, results)
         resolve_vts.update()
+
+        if self.artifact_cache_writes_enabled():
+          self.update_artifact_cache([(resolve_vts, [vt_set_results_dir])])
 
   def _override_classifiers_for_conf(self, conf):
      # TODO Encapsulate this in the result from coursier instead of here.
