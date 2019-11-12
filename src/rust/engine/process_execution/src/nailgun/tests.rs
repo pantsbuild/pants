@@ -113,7 +113,7 @@ fn materialize_with_jdk(
   jdk_path: PathBuf,
 ) -> Result<(), String> {
   let executor = task_executor::Executor::new();
-  let materializer = CommandRunner::materialize_workdir_for_server(
+  let materializer = super::NailgunPool::materialize_workdir_for_server(
     runner.inner.store.clone(),
     dir,
     jdk_path,

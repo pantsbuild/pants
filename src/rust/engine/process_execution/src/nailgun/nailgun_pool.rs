@@ -2,12 +2,16 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::HashMap;
+use std::fs::{read_link, remove_file};
 use std::io;
 use std::io::BufRead;
+use std::os::unix::fs::symlink;
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::Arc;
 
+use boxfuture::{try_future, BoxFuture, Boxable};
+use futures::future::Future;
 use log::{debug, info};
 use parking_lot::Mutex;
 use regex::Regex;
@@ -18,6 +22,8 @@ use lazy_static::lazy_static;
 use crate::ExecuteProcessRequest;
 use digest::Digest as DigestTrait;
 use sha2::Sha256;
+use store::Store;
+use workunit_store::WorkUnitStore;
 
 lazy_static! {
   static ref NAILGUN_PORT_REGEX: Regex = Regex::new(r".*\s+port\s+(\d+)\.$").unwrap();
@@ -39,6 +45,49 @@ impl NailgunPool {
     }
   }
 
+  // TODO(#8481) When we correctly set the input_files field of the nailgun EPR, we won't need to pass it here as an argument.
+  pub fn materialize_workdir_for_server(
+    store: Store,
+    workdir_for_server: PathBuf,
+    requested_jdk_home: PathBuf,
+    input_files: Digest,
+    workunit_store: WorkUnitStore,
+  ) -> BoxFuture<(), String> {
+    // Materialize the directory for running the nailgun server, if we need to.
+    let workdir_for_server2 = workdir_for_server.clone();
+
+    // TODO(#8481) This materializes the input files in the client req, which is a superset of the files we need (we only need the classpath, not the input files)
+    store.materialize_directory(workdir_for_server.clone(), input_files, workunit_store)
+    .and_then(move |_metadata| {
+      let jdk_home_in_workdir = &workdir_for_server.clone().join(".jdk");
+      let jdk_home_in_workdir2 = jdk_home_in_workdir.clone();
+      let jdk_home_in_workdir3 = jdk_home_in_workdir.clone();
+      if jdk_home_in_workdir.exists() {
+        let maybe_existing_jdk = read_link(jdk_home_in_workdir).map_err(|e| format!("{}", e));
+        let maybe_existing_jdk2 = maybe_existing_jdk.clone();
+        if maybe_existing_jdk.is_err() || (maybe_existing_jdk.is_ok() && maybe_existing_jdk.unwrap() != requested_jdk_home) {
+          remove_file(jdk_home_in_workdir2)
+              .map_err(|err| format!(
+                "Error removing existing (but incorrect) jdk symlink. We wanted it to point to {:?}, but it pointed to {:?}. {}",
+                &requested_jdk_home, &maybe_existing_jdk2, err
+              ))
+              .and_then(|_| {
+                symlink(requested_jdk_home, jdk_home_in_workdir3)
+                    .map_err(|err| format!("Error overwriting symlink for local execution in workdir {:?}: {:?}", &workdir_for_server, err))
+              })
+        } else {
+          debug!("JDK home for Nailgun already exists in {:?}. Using that one.", &workdir_for_server);
+          Ok(())
+        }
+      } else {
+        symlink(requested_jdk_home, jdk_home_in_workdir)
+            .map_err(|err| format!("Error making new symlink for local execution in workdir {:?}: {:?}", &workdir_for_server, err))
+      }
+    })
+    .inspect(move |_| debug!("Materialized directory {:?} before connecting to nailgun server.", &workdir_for_server2))
+    .to_boxed()
+  }
+
   ///
   /// Given a `NailgunProcessName` and a `ExecuteProcessRequest` configuration,
   /// return a port of a nailgun server running under that name and configuration.
@@ -50,124 +99,136 @@ impl NailgunPool {
     &self,
     name: NailgunProcessName,
     startup_options: ExecuteProcessRequest,
-    workdir_path: &PathBuf,
+    workdir_path: PathBuf,
     nailgun_req_digest: Digest,
     build_id_requesting_connection: String,
-  ) -> Result<Port, String> {
-    debug!("Locking nailgun process pool so that only one can be connecting at a time.");
-    let mut processes = self.processes.lock();
-    debug!("Locked!");
+    store: Store,
+    input_files: Digest,
+    workunit_store: WorkUnitStore,
+  ) -> BoxFuture<Port, String> {
+    let processes = self.processes.clone();
 
-    let jdk_path = startup_options.jdk_home.clone().ok_or_else(|| {
+    let jdk_path = try_future!(startup_options.jdk_home.clone().ok_or_else(|| {
       format!(
         "jdk_home is not set for nailgun server startup request {:#?}",
         &startup_options
       )
-    })?;
-    let requested_server_fingerprint =
-      NailgunProcessFingerprint::new(nailgun_req_digest, jdk_path)?;
+    }));
+    let requested_server_fingerprint = try_future!(NailgunProcessFingerprint::new(
+      nailgun_req_digest,
+      jdk_path.clone()
+    ));
 
-    let maybe_process = processes.get_mut(&name);
-    let connection_result = if let Some(process) = maybe_process {
-      // Clone some fields that we need for later
-      let (process_name, process_fingerprint, process_port, build_id_that_started_the_server) = (
-        process.name.clone(),
-        process.fingerprint.clone(),
-        process.port,
-        process.build_id.clone(),
-      );
+    Self::materialize_workdir_for_server(
+      store, workdir_path.clone(), jdk_path, input_files, workunit_store
+    ).and_then(move |_| {
+      debug!("Locking nailgun process pool so that only one can be connecting at a time.");
+      let mut processes = processes.lock();
+      debug!("Locked!");
+      let connection_result = if let Some(process) = processes.get_mut(&name) {
+        // Clone some fields that we need for later
+        let (process_name, process_fingerprint, process_port, build_id_that_started_the_server) = (
+          process.name.clone(),
+          process.fingerprint.clone(),
+          process.port,
+          process.build_id.clone(),
+        );
 
-      debug!(
-        "Checking if nailgun server {} is still alive at port {}...",
-        &process_name, process_port
-      );
+        debug!(
+          "Checking if nailgun server {} is still alive at port {}...",
+          &process_name, process_port
+        );
 
-      // If the process is in the map, check if it's alive using the handle.
-      let status = {
-        process
-          .handle
-          .lock()
-          .try_wait()
-          .map_err(|e| format!("Error getting the process status! {}", e))
-          .clone()
-      };
-      match status {
-        Ok(None) => {
-          // Process hasn't exited yet
-          debug!(
-            "Found nailgun process {}, with fingerprint {:?}",
-            &name, process_fingerprint
-          );
-          if requested_server_fingerprint == process_fingerprint {
-            debug!("The fingerprint of the running nailgun {:?} matches the requested fingerprint {:?}. Connecting to existing server.",
-                   requested_server_fingerprint, process_fingerprint);
-            Ok(process_port)
-          } else {
-            // The running process doesn't coincide with the options we want.
-            if build_id_that_started_the_server == build_id_requesting_connection {
-              Err(format!(
-                   "Trying to change the JVM options for a running nailgun server that was started this run, with name {}.\
+        // If the process is in the map, check if it's alive using the handle.
+        let status = {
+          process
+              .handle
+              .lock()
+              .try_wait()
+              .map_err(|e| format!("Error getting the process status! {}", e))
+              .clone()
+        };
+        match status {
+          Ok(None) => {
+            // Process hasn't exited yet
+            debug!(
+              "Found nailgun process {}, with fingerprint {:?}",
+              &name, process_fingerprint
+            );
+            if requested_server_fingerprint == process_fingerprint {
+              debug!("The fingerprint of the running nailgun {:?} matches the requested fingerprint {:?}. Connecting to existing server.",
+                     requested_server_fingerprint, process_fingerprint);
+              Ok(process_port)
+            } else {
+              // The running process doesn't coincide with the options we want.
+              if build_id_that_started_the_server == build_id_requesting_connection {
+                Err(format!(
+                  "Trying to change the JVM options for a running nailgun server that was started this run, with name {}.\
                     There is exactly one nailgun server per task, so it shouldn't be possible to change the options of a nailgun server mid-run.\
                     This might be a problem with how we calculate the keys of nailgun servers (https://github.com/pantsbuild/pants/issues/8527).",
-                    &name)
-              )
-            } else {
-              // Restart it.
-              // Since the stored server was started in a different pants run,
-              // no client will be running on that server.
-              debug!(
-                "The options for server process {} are different to the startup_options, \
+                  &name)
+                )
+              } else {
+                // Restart it.
+                // Since the stored server was started in a different pants run,
+                // no client will be running on that server.
+                debug!(
+                  "The options for server process {} are different to the startup_options, \
                  and the original process was started in a different pants run.\n\
                  Startup Options: {:?}\n Process Cmd: {:?}",
-                &process_name, startup_options, process_fingerprint
-              );
-              debug!("Restarting the server...");
-              self.start_new_nailgun(
-                &mut *processes,
-                name,
-                startup_options,
-                workdir_path,
-                requested_server_fingerprint,
-                build_id_requesting_connection,
-              )
+                  &process_name, startup_options, process_fingerprint
+                );
+                debug!("Restarting the server...");
+                Self::start_new_nailgun(
+                  &mut *processes,
+                  name,
+                  startup_options,
+                  &workdir_path,
+                  requested_server_fingerprint,
+                  build_id_requesting_connection,
+                )
+              }
             }
           }
+          Ok(_) => {
+            // The process has exited with some exit code
+            debug!("The requested nailgun server was not running anymore. Restarting process...");
+            Self::start_new_nailgun(
+              &mut *processes,
+              name,
+              startup_options,
+              &workdir_path,
+              requested_server_fingerprint,
+              build_id_requesting_connection,
+            )
+          }
+          Err(e) => Err(e),
         }
-        Ok(_) => {
-          // The process has exited with some exit code
-          debug!("The requested nailgun server was not running anymore. Restarting process...");
-          self.start_new_nailgun(
-            &mut *processes,
-            name,
-            startup_options,
-            workdir_path,
-            requested_server_fingerprint,
-            build_id_requesting_connection,
-          )
-        }
-        Err(e) => Err(e),
-      }
-    } else {
-      // We don't have a running nailgun registered in the map.
-      debug!(
-        "No nailgun server is running with name {}. Starting one...",
-        &name
-      );
-      self.start_new_nailgun(
-        &mut *processes,
-        name,
-        startup_options,
-        workdir_path,
-        requested_server_fingerprint,
-        build_id_requesting_connection,
-      )
-    };
-    debug!("Unlocking nailgun process pool.");
-    connection_result
+      } else {
+        // We don't have a running nailgun registered in the map.
+        debug!(
+          "No nailgun server is running with name {}. Starting one...",
+          &name
+        );
+        Self::start_new_nailgun(
+          &mut *processes,
+          name,
+          startup_options,
+          &workdir_path,
+          requested_server_fingerprint,
+          build_id_requesting_connection,
+        )
+      };
+      debug!("Unlocking nailgun process pool.");
+      connection_result
+    })
+    .to_boxed()
   }
 
+  //
+  // This is a blocking method that is being called under the NailgunProcessMap's lock (see #8543)
+  //
   fn start_new_nailgun(
-    &self,
     processes: &mut NailgunProcessMap,
     name: String,
     startup_options: ExecuteProcessRequest,
