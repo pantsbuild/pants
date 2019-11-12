@@ -37,7 +37,7 @@ class ThriftLinter(LintTaskMixin, NailgunTask):
                   'this value if it is set.')
     register('--ignore-errors', default=False, advanced=True, type=bool,
              fingerprint=True,
-             help='Ignore any error so always thrift-linter always exit 0.')
+             help='Ignore any error so thrift-linter always exit 0.')
     register('--linter-args', default=[], advanced=True, type=list, fingerprint=True,
              help='Additional options passed to the linter.')
     register('--worker-count', default=multiprocessing.cpu_count(), advanced=True, type=int,
