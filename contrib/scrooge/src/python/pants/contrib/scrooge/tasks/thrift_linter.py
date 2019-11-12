@@ -35,6 +35,9 @@ class ThriftLinter(LintTaskMixin, NailgunTask):
              fingerprint=True,
              help='Sets the default strictness for targets. The `strict` option overrides '
                   'this value if it is set.')
+    register('--ignore-errors', default=False, advanced=True, type=bool,
+             fingerprint=True,
+             help='Ignore any error so always thrift-linter always exit 0.')
     register('--linter-args', default=[], advanced=True, type=list, fingerprint=True,
              help='Additional options passed to the linter.')
     register('--worker-count', default=multiprocessing.cpu_count(), advanced=True, type=int,
@@ -76,12 +79,11 @@ class ThriftLinter(LintTaskMixin, NailgunTask):
 
     config_args.extend(self.get_options().linter_args)
 
-    # N.B. We always set --fatal-warnings to make sure errors like missing-namespace are at least printed.
-    # If --no-strict is turned on, the return code will be 0 instead of 1, but the errors/warnings
-    # need to always be printed.
-    config_args.append('--fatal-warnings')
-    if not self._is_strict(target):
-      config_args.append('--ignore-errors')
+    if self._is_strict(target):
+      config_args.append('--fatal-warnings')
+    else:
+      # Make sure errors like missing-namespace are at least printed.
+      config_args.append('--warnings')
 
     paths = list(target.sources_relative_to_buildroot())
     include_paths = calculate_include_paths([target], self._is_thrift)
