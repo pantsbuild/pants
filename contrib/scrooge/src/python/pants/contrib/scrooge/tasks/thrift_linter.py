@@ -85,6 +85,9 @@ class ThriftLinter(LintTaskMixin, NailgunTask):
       # Make sure errors like missing-namespace are at least printed.
       config_args.append('--warnings')
 
+    if self.get_options().ignore_errors:
+      config_args.append('--ignore-errors')
+
     paths = list(target.sources_relative_to_buildroot())
     include_paths = calculate_include_paths([target], self._is_thrift)
     if target.include_paths:
