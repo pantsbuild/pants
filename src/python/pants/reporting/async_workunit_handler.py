@@ -21,6 +21,9 @@ class AsyncWorkunitHandler:
     self._thread_runner.start()
 
   def end(self):
+    #poll workunits one last time before exiting
+    workunits = self.scheduler.poll_workunits()
+    self.callback(workunits)
     if self._thread_runner:
       self._thread_runner.stop_request.set()
 
