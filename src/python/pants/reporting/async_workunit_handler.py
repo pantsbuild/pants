@@ -23,19 +23,21 @@ class AsyncWorkunitHandler:
   def end(self):
     #poll workunits one last time before exiting
     workunits = self.scheduler.poll_workunits()
-    self.callback(workunits)
+    if self.callback:
+      self.callback(workunits)
     if self._thread_runner:
-      self._thread_runner.stop_request.set()
+      self._thread_runner.join()
 
   @contextmanager
   def session(self) -> Iterator[None]:
-    self.start()
     try:
+      self.start()
       yield
-    except Exception as e:
       self.end()
+    except Exception as e:
+      if self._thread_runner:
+        self._thread_runner.join()
       raise e
-    self.end()
 
 
 class _InnerHandler(threading.Thread):
