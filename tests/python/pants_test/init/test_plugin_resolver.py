@@ -57,7 +57,7 @@ class PluginResolverTest(unittest.TestCase):
           yield new_chroot, True
 
     with provide_chroot(chroot) as (root_dir, create_artifacts):
-      env = {'PANTS_BOOTSTRAPDIR': root_dir}
+      env = {}
       repo_dir = None
       if plugins:
         repo_dir = os.path.join(root_dir, 'repo')
@@ -73,6 +73,7 @@ class PluginResolverTest(unittest.TestCase):
           if create_artifacts:
             self.create_plugin(repo_dir, plugin, version, packager_cls=packager_cls)
         env['PANTS_PLUGINS'] = '[{}]'.format(','.join(map(repr, plugin_list)))
+        env['PANTS_PLUGIN_CACHE_DIR'] = os.path.join(root_dir, 'plugin-cache')
 
       configpath = os.path.join(root_dir, 'pants.ini')
       if create_artifacts:
@@ -136,7 +137,7 @@ class PluginResolverTest(unittest.TestCase):
       self.assertEqual(2, len(working_set.entries))
 
       safe_rmtree(repo_dir)
-      with self.assertRaises(Unsatisfiable):
+      with self.assertRaises(FileNotFoundError):
         with self.plugin_resolution(interpreter=python37,
                                     chroot=chroot,
                                     plugins=[('jake', '1.2.3'), ('jane', '3.4.5')]):
