@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.build_graph.address import Address, BuildFileAddress
-from pants.engine.addressable import BuildFileAddresses
 from pants.engine.fs import Digest, FileContent, InputFilesContent, Workspace
 from pants.engine.interactive_runner import InteractiveRunner
 from pants.rules.core import run
@@ -33,8 +32,7 @@ class RunTest(ConsoleRuleTestBase):
       target_name=address.target_name,
       rel_path=f'{address.spec_path}/BUILD'
     )
-    build_file_addresses = BuildFileAddresses((bfa,))
-    res = run_rule(run.run, console, workspace, interactive_runner, build_file_addresses, {
+    res = run_rule(run.run, console, workspace, interactive_runner, bfa, {
       (CreatedBinary, Address): lambda _: self.create_mock_binary(program_text)
     })
     return res
