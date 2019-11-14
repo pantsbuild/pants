@@ -137,7 +137,7 @@ class ShaderTest(unittest.TestCase):
     self.assertEqual(('com.foo.bar.**', f'{Shading.SHADE_PREFIX}com.foo.bar.@1'),
                      Shading.create_relocate(from_pattern='com.foo.bar.**'))
 
-    self.assertEqual(('com.foo.bar.**', f"{'__my_prefix__.'}com.foo.bar.@1"),
+    self.assertEqual(('com.foo.bar.**', "__my_prefix__.com.foo.bar.@1"),
                      Shading.create_relocate(from_pattern='com.foo.bar.**',
                                       shade_prefix='__my_prefix__.'))
 

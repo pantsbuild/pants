@@ -379,7 +379,7 @@ class GitTest(unittest.TestCase):
       self.assertEqual({'baz'}, self.git.changes_in('HEAD'))
 
       # Tag-to-sha
-      self.assertEqual({'baz'}, self.git.changes_in(f"{'v1'}..{c4}"))
+      self.assertEqual({'baz'}, self.git.changes_in(f"v1..{c4}"))
 
       # We can get multiple changes from one ref
       commit_contents_to_files('5', 'foo', 'bar')

@@ -155,10 +155,10 @@ class JarDependencyManagementIntegrationTest(PantsRunIntegrationTest):
         run = self.run_pants([
           f'--pants-distdir={distdir}',
           'binary',
-          f"{self.project}:{'managed'}",
-          f"{self.project}:{'managed2'}",
-          f"--jar-dependency-management-default-target={''}",
-          f"--jar-dependency-management-conflict-strategy={'USE_MANAGED'}",
+          f"{self.project}:managed",
+          f"{self.project}:managed2",
+          "--jar-dependency-management-default-target=",
+          "--jar-dependency-management-conflict-strategy=USE_MANAGED",
         ])
         self.assert_success(run)
         bin1 = os.path.join(distdir, 'managed.jar')
@@ -171,8 +171,8 @@ class JarDependencyManagementIntegrationTest(PantsRunIntegrationTest):
       run = self.run_pants([
         'export',
         f'{self.project}::',
-        f"--jar-dependency-management-default-target={''}",
-        f"--jar-dependency-management-conflict-strategy={'USE_MANAGED'}",
+        "--jar-dependency-management-default-target=",
+        "--jar-dependency-management-conflict-strategy=USE_MANAGED",
       ])
       self.assert_success(run)
 

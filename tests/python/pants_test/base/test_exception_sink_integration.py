@@ -228,7 +228,7 @@ Current thread [^\n]+ \\(most recent call first\\):
 
     # The exiter that gets added when this option is changed prints that option to stderr.
     changed_exiter_run = self.run_pants([
-      f"--lifecycle-stubs-add-exiter-message='{'NEW MESSAGE'}'",
+      "--lifecycle-stubs-add-exiter-message='NEW MESSAGE'",
     ] + lifecycle_stub_cmdline)
     self.assert_failure(changed_exiter_run)
     self.assertIn('erroneous!', changed_exiter_run.stderr_data)

@@ -22,7 +22,7 @@ class BuildLocalPythonDistributionsIntegrationTest(PantsRunIntegrationTest):
   py_dist_test = 'testprojects/tests/python/example_test/python_distribution'
 
   def _assert_nation_and_greeting(self, output, punctuation='!'):
-    self.assertEquals(f"""hello{punctuation}\nUnited States\n""", output)
+    self.assertEquals(f"hello{punctuation}\nUnited States\n", output)
 
   def test_pydist_binary(self):
     with temporary_dir() as tmp_dir:
