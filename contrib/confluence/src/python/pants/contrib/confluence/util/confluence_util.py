@@ -66,7 +66,7 @@ class Confluence:
     try:
       return Confluence(api, confluence_url, api.login(user, password), fmt)
     except XMLRPCError as e:
-      raise ConfluenceError(f'Failed to log in to {confluence_url}: {e}')
+      raise ConfluenceError(f'Failed to log in to {confluence_url}: {e!r}')
 
   @staticmethod
   def get_url(server_url, wiki_space, page_title):
@@ -87,7 +87,7 @@ class Confluence:
     try:
       return self._api_entrypoint.getPage(self._session_token, wiki_space, page_title)
     except XMLRPCError as e:
-      log.warning(f'Failed to fetch page {page_title}: {e}')
+      log.warning(f'Failed to fetch page {page_title}: {e!r}')
       return None
 
   def storepage(self, page):
@@ -107,7 +107,7 @@ class Confluence:
     try:
       self._api_entrypoint.removePage(self._session_token, page)
     except XMLRPCError as e:
-      raise ConfluenceError(f'Failed to delete page: {e}')
+      raise ConfluenceError(f'Failed to delete page: {e!r}')
 
   def create(self, space, title, content, parent_page=None, **pageoptions):
     """ Create a new confluence page with the given title and content.  Additional page options

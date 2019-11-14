@@ -40,7 +40,7 @@ class CppTask(Task):
       # TODO: capture stdout/stderr and redirect to log
       subprocess.check_call(cmd, stdout=workunit.output('stdout'), stderr=workunit.output('stderr'))
     except subprocess.CalledProcessError as e:
-      raise TaskError(f'Execution failed: {e}')
+      raise TaskError(f'Execution failed: {e!r}')
 
   @property
   def cpp_toolchain(self):

@@ -103,7 +103,7 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
           self.context.build_graph.maybe_inject_address_closure(dep_address)
           dependencies.add(self.context.build_graph.get_target(dep_address))
         except AddressLookupError as e:
-          raise AddressLookupError(f'{e}\n  referenced from {self.options_scope} scope')
+          raise AddressLookupError(f'{e!r}\n  referenced from {self.options_scope} scope')
     return deps
 
   def _validate_language(self, target):

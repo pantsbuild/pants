@@ -118,12 +118,12 @@ class ConfluencePublish(Task):
       page = wiki.create_html_page(space, title, body, parent, **pageopts)
       return page['url']
     except ConfluenceError as e:
-      raise TaskError(f'Failed to update confluence: {e}')
+      raise TaskError(f'Failed to update confluence: {e!r}')
   
   def login(self):
     if not self._wiki:
       try:
         self._wiki = Confluence.login(self.url, self.user, self.api())
       except ConfluenceError as e:
-        raise TaskError(f'Failed to login to confluence: {e}')
+        raise TaskError(f'Failed to login to confluence: {e!r}')
     return self._wiki
