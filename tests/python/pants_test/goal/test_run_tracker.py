@@ -6,6 +6,7 @@ import json
 import threading
 from urllib.parse import parse_qs
 
+from pants.auth.basic_auth import BasicAuth
 from pants.auth.cookies import Cookies
 from pants.goal.run_tracker import RunTracker
 from pants.testutil.test_base import TestBase
@@ -60,11 +61,12 @@ class RunTrackerTest(TestBase):
     server_thread.daemon = True
     server_thread.start()
 
-    self.context(for_subsystems=[Cookies])
-    self.assertTrue(RunTracker.post_stats(mk_url('/upload'), stats, stats_version=1))
-    self.assertTrue(RunTracker.post_stats(mk_url('/upload'), stats, stats_version=2))
-    self.assertTrue(RunTracker.post_stats(mk_url('/redirect307'), stats, stats_version=1))
-    self.assertFalse(RunTracker.post_stats(mk_url('/redirect302'), stats, stats_version=2))
+    self.context(for_subsystems=[Cookies, BasicAuth],
+        options={BasicAuth.options_scope: {'test-provider': {}}})
+    self.assertTrue(RunTracker.post_stats(mk_url('/upload'), stats, stats_version=1, auth_provider='test-provider'))
+    self.assertTrue(RunTracker.post_stats(mk_url('/upload'), stats, stats_version=2, auth_provider='test-provider'))
+    self.assertTrue(RunTracker.post_stats(mk_url('/redirect307'), stats, stats_version=1, auth_provider='test-provider'))
+    self.assertFalse(RunTracker.post_stats(mk_url('/redirect302'), stats, stats_version=2, auth_provider='test-provider'))
     server.shutdown()
     server.server_close()
 
