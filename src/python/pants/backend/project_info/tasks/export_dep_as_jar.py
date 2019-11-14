@@ -14,7 +14,6 @@ from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.project_info.tasks.export import SourceRootTypes
-from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.build_environment import get_buildroot
 from pants.build_graph.resources import Resources
 from pants.java.distribution.distribution import DistributionLocator
@@ -82,6 +81,14 @@ class ExportDepAsJar(ConsoleTask):
     else:
       return '{0}:{1}'.format(jar.org, jar.name)
 
+  @staticmethod
+  def _exclude_id(jar):
+    """Create a string identifier for the Exclude key.
+    :param Exclude jar: key for an excluded jar
+    :returns: String representing the key as a maven coordinate
+    """
+    return '{0}:{1}'.format(jar.org, jar.name) if jar.name else jar.org
+
   def _resolve_jars_info(self, targets, classpath_products):
     """Consults ivy_jar_products to export the external libraries.
 
@@ -110,7 +117,7 @@ class ExportDepAsJar(ConsoleTask):
 
     def _get_target_type(tgt):
       def is_test(t):
-        return isinstance(t, JUnitTests) or isinstance(t, PythonTests)
+        return isinstance(t, JUnitTests)
 
       if is_test(tgt):
         return SourceRootTypes.TEST
