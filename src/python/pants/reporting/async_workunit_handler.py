@@ -17,16 +17,19 @@ class AsyncWorkunitHandler:
     self._thread_runner = None
 
   def start(self):
-    self._thread_runner = _InnerHandler(self.scheduler, self.callback, self.report_interval)
-    self._thread_runner.start()
+    if self.callback is not None:
+      self._thread_runner = _InnerHandler(self.scheduler, self.callback, self.report_interval)
+      self._thread_runner.start()
 
   def end(self):
-    #poll workunits one last time before exiting
+    if self._thread_runner:
+      self._thread_runner.join()
+
+    # After stopping the thread, poll workunits one last time to make sure
+    # we report any workunits that were added after the last time the thread polled.
     workunits = self.scheduler.poll_workunits()
     if self.callback:
       self.callback(workunits)
-    if self._thread_runner:
-      self._thread_runner.join()
 
   @contextmanager
   def session(self) -> Iterator[None]:
@@ -41,7 +44,7 @@ class AsyncWorkunitHandler:
 
 
 class _InnerHandler(threading.Thread):
-  def __init__(self, scheduler: Any, callback: Optional[Callable], report_interval: float):
+  def __init__(self, scheduler: Any, callback: Callable, report_interval: float):
     super(_InnerHandler, self).__init__()
     self.scheduler = scheduler
     self.stop_request = threading.Event()
@@ -51,8 +54,7 @@ class _InnerHandler(threading.Thread):
   def run(self):
     while not self.stop_request.isSet():
       workunits = self.scheduler.poll_workunits()
-      if self.callback:
-        self.callback(workunits)
+      self.callback(workunits)
       self.stop_request.wait(timeout=self.report_interval)
 
   def join(self, timeout=None):
