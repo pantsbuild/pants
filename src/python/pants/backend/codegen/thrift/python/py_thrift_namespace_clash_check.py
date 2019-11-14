@@ -6,6 +6,7 @@ import re
 from collections import OrderedDict, defaultdict
 
 from pants.backend.codegen.thrift.python.python_thrift_library import PythonThriftLibrary
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.engine.fs import FilesContent
 from pants.task.task import Task
@@ -140,6 +141,14 @@ Errors:
     return namespaces_by_files
 
   def execute(self):
+    deprecated_conditional(
+      lambda: self.get_options().strict,
+      removal_version='1.25.0.dev0',
+      entity_description=self.options_scope,
+      hint_message='--strict will be removed. '
+                   'Please use --strict-clashing-py-namespace or --strict-missing-py-namespace '
+                   'to be more explicit on which error type should fail the build.')
+
     py_thrift_targets = self.get_targets(lambda tgt: isinstance(tgt, PythonThriftLibrary))
     thrift_file_sources_by_target = self._get_python_thrift_library_sources(py_thrift_targets)
     py_namespaces_by_target = self._extract_all_python_namespaces(thrift_file_sources_by_target,
