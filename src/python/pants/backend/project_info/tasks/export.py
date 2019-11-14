@@ -73,8 +73,6 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
       DistributionLocator, JvmPlatform, PythonInterpreterCache, ScalaPlatform
     )
 
-
-
   @staticmethod
   def _is_jvm(dep):
     return  isinstance(dep, (JarLibrary, JvmTarget, JvmApp))
@@ -160,7 +158,7 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
 
     return compile_classpath
 
-  def generate_targets_map(self, targets, classpath_products=None, runtime_classpath=None):
+  def generate_targets_map(self, targets, classpath_products=None):
     """Generates a dictionary containing all pertinent information about the target graph.
 
     The return dictionary is suitable for serialization by json.dumps.
@@ -168,21 +166,6 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
     :param classpath_products: Optional classpath_products. If not provided when the --libraries
       option is `True`, this task will perform its own jar resolution.
     """
-    def _get_target_type(tgt):
-      def is_test(t):
-        return isinstance(t, JUnitTests) or isinstance(t, PythonTests)
-      if is_test(tgt):
-        return ExportTask.SourceRootTypes.TEST
-      else:
-        if (isinstance(tgt, Resources) and
-          tgt in resource_target_map and
-          is_test(resource_target_map[tgt])):
-          return ExportTask.SourceRootTypes.TEST_RESOURCE
-        elif isinstance(tgt, Resources):
-          return ExportTask.SourceRootTypes.RESOURCE
-        else:
-          return ExportTask.SourceRootTypes.SOURCE
-
     targets_map = {}
     resource_target_map = {}
     python_interpreter_targets_mapping = defaultdict(list)
@@ -200,24 +183,41 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
       """
       :type current_target:pants.build_graph.target.Target
       """
+      def get_target_type(tgt):
+        def is_test(t):
+          return isinstance(t, JUnitTests) or isinstance(t, PythonTests)
+        if is_test(tgt):
+          return SourceRootTypes.TEST
+        else:
+          if (isinstance(tgt, Resources) and
+              tgt in resource_target_map and
+                is_test(resource_target_map[tgt])):
+            return SourceRootTypes.TEST_RESOURCE
+          elif isinstance(tgt, Resources):
+            return SourceRootTypes.RESOURCE
+          else:
+            return SourceRootTypes.SOURCE
+
       info = {
-        # this means 'dependencies'
         'targets': [],
         'libraries': [],
         'roots': [],
         'id': current_target.id,
-        'target_type': _get_target_type(current_target),
+        'target_type': get_target_type(current_target),
+        # NB: is_code_gen should be removed when export format advances to 1.1.0 or higher
+        'is_code_gen': current_target.is_synthetic,
         'is_synthetic': current_target.is_synthetic,
         'pants_target_type': self._get_pants_target_alias(type(current_target)),
-        'is_target_root': current_target in target_roots_set,
-        'transitive': current_target.transitive,
-        'scope': str(current_target.scope)
       }
 
       if not current_target.is_synthetic:
         info['globs'] = current_target.globs_relative_to_buildroot()
         if self.get_options().sources:
           info['sources'] = list(current_target.sources_relative_to_buildroot())
+
+      info['transitive'] = current_target.transitive
+      info['scope'] = str(current_target.scope)
+      info['is_target_root'] = current_target in target_roots_set
 
       if isinstance(current_target, PythonRequirementLibrary):
         reqs = current_target.payload.get_field_value('requirements', set())
@@ -271,15 +271,13 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
         if hasattr(current_target, 'test_platform'):
           info['test_platform'] = current_target.test_platform.name
 
+      info['roots'] = [{
+        'source_root': source_root_package_prefix[0],
+        'package_prefix': source_root_package_prefix[1]
+      } for source_root_package_prefix in self._source_roots_for_target(current_target)]
+
       if classpath_products:
-        info['libraries'].extend(self._jar_id(lib) for lib in target_libraries)
-
-      if current_target in target_roots_set:
-        info['roots'] = [{
-          'source_root': source_root_package_prefix[0],
-          'package_prefix': source_root_package_prefix[1]
-        } for source_root_package_prefix in self._source_roots_for_target(current_target)]
-
+        info['libraries'] = [self._jar_id(lib) for lib in target_libraries]
       targets_map[current_target.address.spec] = info
 
     for target in targets:
@@ -329,17 +327,6 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
 
     if classpath_products:
       graph_info['libraries'] = self._resolve_jars_info(targets, classpath_products)
-      for t in targets:
-        target_type = _get_target_type(t)
-        if t in target_roots_set or target_type == ExportTask.SourceRootTypes.RESOURCE or target_type == ExportTask.SourceRootTypes.TEST_RESOURCE or targets_map[t.address.spec]['pants_target_type'] == 'jar_library':
-          continue
-
-        targets_map[t.address.spec]['pants_target_type'] = 'jar_library'
-        targets_map[t.address.spec]['libraries'] = [t.id]
-        jar_products = runtime_classpath.get_for_target(t)
-        for conf, jar_entry in jar_products:
-          if 'z.jar' in jar_entry:
-            graph_info['libraries'][t.id][conf] = jar_entry
 
     if python_interpreter_targets_mapping:
       # NB: We've selected a python interpreter compatible with each python target individually into
@@ -429,13 +416,8 @@ class Export(ExportTask, ConsoleTask):
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
 
-  @classmethod
-  def prepare(cls, options, round_manager):
-    round_manager.require_data('runtime_classpath')
-
   def console_output(self, targets, classpath_products=None):
-    runtime_classpath = self.context.products.get_data('runtime_classpath')
-    graph_info = self.generate_targets_map(targets, classpath_products=classpath_products, runtime_classpath=runtime_classpath)
+    graph_info = self.generate_targets_map(targets, classpath_products=classpath_products)
     if self.get_options().formatted:
       return json.dumps(graph_info, indent=4, separators=(',', ': ')).splitlines()
     else:
