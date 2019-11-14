@@ -468,7 +468,7 @@ def unit_tests(python_version: PythonVersion) -> Dict:
     "name": f"Unit tests (Python {python_version.decimal})",
     "script": [
       "travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py --unit-tests --plugin-tests "
-      f"--remote-execution-enabled --python-version {python_version.decimal}"
+      f"--python-version {python_version.decimal}"
     ],
   }
   shard["env"] = shard.get("env", []) + [f"CACHE_NAME=unit_tests.py{python_version.number}"]
@@ -555,7 +555,7 @@ def integration_tests_v2(python_version: PythonVersion) -> Dict:
     "script": [
       (
         "travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py --integration-tests-v2 "
-        f"--remote-execution-enabled --python-version {python_version.decimal}"
+        f"--python-version {python_version.decimal}"
       ),
     ]
   }

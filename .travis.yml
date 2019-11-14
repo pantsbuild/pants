@@ -383,7 +383,7 @@ matrix:
     - '3.7'
     script:
     - travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py
-      --unit-tests --plugin-tests --remote-execution-enabled --python-version 3.7
+      --unit-tests --plugin-tests --python-version 3.7
     stage: Test Pants (Cron)
     sudo: required
   - addons:
@@ -444,7 +444,7 @@ matrix:
     - '3.7'
     script:
     - travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py
-      --integration-tests-v2 --remote-execution-enabled --python-version 3.7
+      --integration-tests-v2 --python-version 3.7
     stage: Test Pants (Cron)
     sudo: required
   - addons:
@@ -680,7 +680,7 @@ matrix:
     - '3.7'
     script:
     - travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py
-      --unit-tests --plugin-tests --remote-execution-enabled --python-version 3.6
+      --unit-tests --plugin-tests --python-version 3.6
     stage: Test Pants
     sudo: required
   - addons:
@@ -740,7 +740,7 @@ matrix:
     - '3.7'
     script:
     - travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py
-      --integration-tests-v2 --remote-execution-enabled --python-version 3.6
+      --integration-tests-v2 --python-version 3.6
     stage: Test Pants
     sudo: required
   - addons:
