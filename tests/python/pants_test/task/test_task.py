@@ -181,7 +181,7 @@ class TaskTest(TaskTestBase):
     )
 
   def _write_build_file(self):
-    self.add_to_build_file('',f'\nfiles(\n  name = "t",\n  sources = ["{self._filename}"],\n)\n')
+    self.add_to_build_file('' ,f'\nfiles(\n  name = "t",\n  sources = ["{self._filename}"],\n)\n')
 
   def _task(self, incremental, options=None):
     target = self.target(':t')
