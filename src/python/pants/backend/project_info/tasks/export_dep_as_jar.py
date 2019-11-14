@@ -31,6 +31,8 @@ class ExportDepAsJar(ConsoleTask):
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
+    register('--formatted', type=bool, implicit_value=False,
+      help='Causes output to be a single line of JSON.')
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -270,7 +272,10 @@ class ExportDepAsJar(ConsoleTask):
   def console_output(self, targets):
     compile_classpath = self.context.products.get_data('runtime_classpath')
     runtime_classpath = self.context.products.get_data('runtime_classpath')
-    graph_info = self.generate_targets_map(self.context.targets(lambda t: isinstance(t, JvmTarget)),
+    graph_info = self.generate_targets_map(targets,
       classpath_products=compile_classpath,
       runtime_classpath=runtime_classpath)
-    return json.dumps(graph_info, indent=4, separators=(',', ': ')).splitlines()
+    if self.get_options().formatted:
+      return json.dumps(graph_info, indent=4, separators=(',', ': ')).splitlines()
+    else:
+      return [json.dumps(graph_info)]
