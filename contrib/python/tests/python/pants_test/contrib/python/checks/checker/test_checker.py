@@ -20,10 +20,10 @@ class CheckstyleTest(unittest.TestCase):
       with safe_open(os.path.join(td, relpath), 'w') as fp:
         fp.write(contents)
 
-      args=['--root-dir={}'.format(td)]
+      args=[f'--root-dir={td}']
       for plugin_type in checker.plugins():
         opts = {'skip': False, 'max_length': self._MAX_LENGTH, 'ignore': ['E111']}
-        args.append('--{}-options={}'.format(plugin_type.name(), json.dumps(opts)))
+        args.append(f'--{plugin_type.name()}-options={json.dumps(opts)}')
       args.append(relpath)
 
       with open(os.path.join(td, 'stdout'), 'w+') as stdout:

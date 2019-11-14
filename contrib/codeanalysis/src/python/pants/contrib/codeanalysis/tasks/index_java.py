@@ -68,7 +68,7 @@ class IndexJava(NailgunTask):
         if self.dist.version < Revision.lenient('9'):
           # When run on JDK8, Kythe requires javac9 on the bootclasspath.
           javac9_cp = self.tool_classpath('javac9')
-          jvm_options.append('-Xbootclasspath/p:{}'.format(':'.join(javac9_cp)))
+          jvm_options.append(f"-Xbootclasspath/p:{':'.join(javac9_cp)}")
         jvm_options.extend(self.get_options().jvm_options)
 
         for vt in invalidation_check.invalid_vts:
@@ -79,10 +79,10 @@ class IndexJava(NailgunTask):
       self.context.products.get_data('kythe_entries_files', dict)[vt.target] = entries
 
   def _index(self, vt, indexer_cp, jvm_options):
-    self.context.log.info('Kythe indexing {}'.format(vt.target.address.spec))
+    self.context.log.info(f'Kythe indexing {vt.target.address.spec}')
     kzip_file = self.context.products.get_data('kzip_files').get(vt.target)
     if not kzip_file:
-      raise TaskError('No .kzip file found for {}'.format(vt.target.address.spec))
+      raise TaskError(f'No .kzip file found for {vt.target.address.spec}')
     args = [kzip_file, '--emit_jvm', 'semantic', '--out', self._entries_file(vt)]
     result = self.runjava(classpath=indexer_cp, main=self._KYTHE_JAVA_INDEXER_MAIN,
                           jvm_options=jvm_options,

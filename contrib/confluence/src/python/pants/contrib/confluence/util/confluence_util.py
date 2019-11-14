@@ -49,7 +49,7 @@ class Confluence:
     """
     server = ServerProxy(confluence_url + '/rpc/xmlrpc')
     user = user or getpass.getuser()
-    password = getpass.getpass('Please enter confluence password for %s: ' % user)
+    password = getpass.getpass(f'Please enter confluence password for {user}: ')
 
     if api_entrypoint in (None, 'confluence1'):
       # TODO(???) didn't handle this JSirois review comment:
@@ -61,18 +61,18 @@ class Confluence:
       api = server.confluence2
       fmt = 'xhtml'
     else:
-      raise ConfluenceError("Don't understand api_entrypoint %s" % api_entrypoint)
+      raise ConfluenceError(f"Don't understand api_entrypoint {api_entrypoint}")
 
     try:
       return Confluence(api, confluence_url, api.login(user, password), fmt)
     except XMLRPCError as e:
-      raise ConfluenceError('Failed to log in to %s: %s' % (confluence_url, e))
+      raise ConfluenceError(f'Failed to log in to {confluence_url}: {e}')
 
   @staticmethod
   def get_url(server_url, wiki_space, page_title):
     """ return the url for a confluence page in a given space and with a given
     title. """
-    return '%s/display/%s/%s' % (server_url, wiki_space, quote_plus(page_title))
+    return f'{server_url}/display/{wiki_space}/{quote_plus(page_title)}'
 
   def logout(self):
     """Terminates the session and connection to the server.
@@ -87,7 +87,7 @@ class Confluence:
     try:
       return self._api_entrypoint.getPage(self._session_token, wiki_space, page_title)
     except XMLRPCError as e:
-      log.warning('Failed to fetch page %s: %s' % (page_title, e))
+      log.warning(f'Failed to fetch page {page_title}: {e}')
       return None
 
   def storepage(self, page):
@@ -107,7 +107,7 @@ class Confluence:
     try:
       self._api_entrypoint.removePage(self._session_token, page)
     except XMLRPCError as e:
-      raise ConfluenceError('Failed to delete page: %s' % e)
+      raise ConfluenceError(f'Failed to delete page: {e}')
 
   def create(self, space, title, content, parent_page=None, **pageoptions):
     """ Create a new confluence page with the given title and content.  Additional page options
@@ -130,7 +130,7 @@ class Confluence:
       # Get the parent page id.
       parent_page_obj = self.getpage(space, parent_page)
       if parent_page_obj is None:
-        raise ConfluenceError('Failed to find parent page %s in space %s' % (parent_page, space))
+        raise ConfluenceError(f'Failed to find parent page {parent_page} in space {space}')
       pagedef['parentId'] = parent_page_obj['id']
 
     # Now create the page
@@ -144,7 +144,7 @@ class Confluence:
           <ac:plain-text-body><![CDATA[%s]]></ac:plain-text-body>
           </ac:macro>''' % html
     else:
-      raise ConfluenceError("Don't know how to convert %s to HTML" % format)
+      raise ConfluenceError(f"Don't know how to convert {format} to HTML")
     return self.create(space, title, content, parent_page, **pageoptions)
 
   def addattachment(self, page, filename):
@@ -152,7 +152,7 @@ class Confluence:
     Note: this will first read the entire file into memory"""
     mime_type = mimetypes.guess_type(filename, strict=False)[0]
     if not mime_type:
-      raise ConfluenceError('Failed to detect MIME type of %s' % filename)
+      raise ConfluenceError(f'Failed to detect MIME type of {filename}')
 
     try:
       with open(filename, 'rb') as f:
@@ -164,7 +164,7 @@ class Confluence:
                                                 attachment,
                                                 Binary(file_data))
     except (IOError, OSError) as e:
-      log.error('Failed to read data from file %s: %s' % (filename, str(e)))
+      log.error(f'Failed to read data from file {filename}: {str(e)}')
       return None
     except XMLRPCError:
       log.error('Failed to add file attachment %s to page: %s' %

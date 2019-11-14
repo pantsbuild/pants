@@ -52,10 +52,10 @@ class Buildozer(Task):
       self._execute_buildozer_script(options.command)
 
     if options.add_dependencies:
-      self._execute_buildozer_script('add dependencies {}'.format(options.add_dependencies))
+      self._execute_buildozer_script(f'add dependencies {options.add_dependencies}')
 
     if options.remove_dependencies:
-      self._execute_buildozer_script('remove dependencies {}'.format(options.remove_dependencies))
+      self._execute_buildozer_script(f'remove dependencies {options.remove_dependencies}')
 
   def _execute_buildozer_script(self, command):
     binary = BuildozerBinary.scoped_instance(self)
@@ -68,6 +68,6 @@ class Buildozer(Task):
       subprocess.check_call(buildozer_command, cwd=get_buildroot())
     except subprocess.CalledProcessError as err:
       if err.returncode == 3:
-        logger.warning('{} ... no changes were made'.format(buildozer_command))
+        logger.warning(f'{buildozer_command} ... no changes were made')
       else:
-        raise TaskError('{} ... exited non-zero ({}).'.format(buildozer_command, err.returncode))
+        raise TaskError(f'{buildozer_command} ... exited non-zero ({err.returncode}).')

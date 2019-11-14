@@ -32,7 +32,7 @@ class DependencySpec:
     for line in self.comments_above:
       line = line.strip()
       if line:
-        yield '# {line}'.format(line=line)
+        yield f'# {line}'
       else:
         yield ''
 
@@ -43,13 +43,12 @@ class DependencySpec:
       if not line:
         yield ''
       else:
-        yield '{indent_spaces}{line}'.format(indent_spaces=indent_spaces, line=line)
+        yield f'{indent_spaces}{line}'
 
   def lines(self, indent=4):
-    spec_line = "'{0}',".format(self.spec)
+    spec_line = f"'{self.spec}',"
     if self.side_comment is not None:
-      spec_line = '{spec_line}  # {comment}'.format(spec_line=spec_line,
-                                                    comment=self.side_comment)
+      spec_line = f'{spec_line}  # {self.side_comment}'
     comments_above = list(self.comments_above_lines())
     lines = comments_above + [spec_line]
     return list(self.indented_lines(lines, indent))
@@ -138,8 +137,7 @@ class BuildFileManipulator:
 
     calls_by_name = dict((name_from_call(call), call) for call in target_calls)
     if name not in calls_by_name:
-      raise BuildTargetParseError('Could not find target named {name} in {build_file}'
-                                  .format(name=name, build_file=build_file))
+      raise BuildTargetParseError(f'Could not find target named {name} in {build_file}')
 
     target_call = calls_by_name[name]
 
@@ -439,4 +437,4 @@ class BuildFileManipulator:
     if not dry_run:
       with open(self.build_file.full_path, 'w') as bf:
         bf.write('\n'.join(end_lines))
-      sys.stderr.write('WROTE to {full_path}\n'.format(full_path=self.build_file.full_path))
+      sys.stderr.write(f'WROTE to {self.build_file.full_path}\n')

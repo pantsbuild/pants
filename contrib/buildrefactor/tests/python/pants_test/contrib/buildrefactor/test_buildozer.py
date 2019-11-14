@@ -48,7 +48,7 @@ class BuildozerTest(TaskTestBase):
   def test_custom_command(self):
     new_build_name = 'b_2'
 
-    self._run_buildozer({ 'command': 'set name {}'.format(new_build_name) })
+    self._run_buildozer({ 'command': f'set name {new_build_name}' })
     self.assertInFile(new_build_name, os.path.join(self.build_root, 'b/BUILD'))
 
   def test_multiple_addresses(self):

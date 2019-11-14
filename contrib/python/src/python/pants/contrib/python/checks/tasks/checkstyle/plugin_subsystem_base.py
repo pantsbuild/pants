@@ -65,10 +65,10 @@ def default_subsystem_for_plugin(plugin_type):
     raise ValueError('Can only create a default plugin subsystem for subclasses of {}, given: {}'
                      .format(CheckstylePlugin, plugin_type))
 
-  return type(str('{}Subsystem'.format(plugin_type.__name__)),
+  return type(str(f'{plugin_type.__name__}Subsystem'),
               (PluginSubsystemBase,),
               {
-                str('options_scope'): 'pycheck-{}'.format(plugin_type.name()),
+                str('options_scope'): f'pycheck-{plugin_type.name()}',
                 str('plugin_type'): classmethod(lambda cls: plugin_type),
                 str('register_plugin_options'): classmethod(lambda cls, register: None),
               })

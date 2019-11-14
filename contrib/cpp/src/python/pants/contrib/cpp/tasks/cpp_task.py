@@ -36,11 +36,11 @@ class CppTask(Task):
 
   def run_command(self, cmd, workunit):
     try:
-      self.context.log.debug('Executing: {0}'.format(cmd))
+      self.context.log.debug(f'Executing: {cmd}')
       # TODO: capture stdout/stderr and redirect to log
       subprocess.check_call(cmd, stdout=workunit.output('stdout'), stderr=workunit.output('stderr'))
     except subprocess.CalledProcessError as e:
-      raise TaskError('Execution failed: {0}'.format(e))
+      raise TaskError(f'Execution failed: {e}')
 
   @property
   def cpp_toolchain(self):

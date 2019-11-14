@@ -51,7 +51,7 @@ class GoImportMetaTagReader(Subsystem):
       # See https://github.com/pantsbuild/pants/issues/3503.
       session.mount("http://",
                     requests.adapters.HTTPAdapter(max_retries=self.get_options().retries))
-      page_data = session.get('http://{import_path}?go-get=1'.format(import_path=import_path))
+      page_data = session.get(f'http://{import_path}?go-get=1')
     except requests.ConnectionError:
       return None
 

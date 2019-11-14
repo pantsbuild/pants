@@ -30,7 +30,7 @@ def find_includes(basedirs, source, log=None):
           include = os.path.join(basedir, capture)
           if os.path.exists(include):
             if log:
-              log.debug('{} has include {}'.format(source, include))
+              log.debug(f'{source} has include {include}')
             includes.add(include)
             added = True
         if not added:

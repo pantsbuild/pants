@@ -83,15 +83,15 @@ class FindBugs(NailgunTask):
 
   def _is_findbugs_target(self, target):
     if not isinstance(target, (JavaLibrary, JUnitTests)):
-      self.context.log.debug('Skipping [{}] because it is not a java library or java test'.format(target.address.spec))
+      self.context.log.debug(f'Skipping [{target.address.spec}] because it is not a java library or java test')
       return False
     if target.is_synthetic:
-      self.context.log.debug('Skipping [{}] because it is a synthetic target'.format(target.address.spec))
+      self.context.log.debug(f'Skipping [{target.address.spec}] because it is a synthetic target')
       return False
     for pattern in self._exclude_patterns:
       if pattern.search(target.address.spec):
         self.context.log.debug(
-          "Skipping [{}] because it matches exclude pattern '{}'".format(target.address.spec, pattern.pattern))
+          f"Skipping [{target.address.spec}] because it matches exclude pattern '{pattern.pattern}'")
         return False
     return True
 
@@ -127,7 +127,7 @@ class FindBugs(NailgunTask):
       if error_count + bug_counts['total'] > 0:
         self.context.log.info('')
         if error_count > 0:
-          self.context.log.warn('Errors: {}'.format(error_count))
+          self.context.log.warn(f'Errors: {error_count}')
         if bug_counts['total'] > 0:
           self.context.log.warn("Bugs: {total} (High: {high}, Normal: {normal}, Low: {low})".format(**bug_counts))
         if self.get_options().fail_on_error:
@@ -151,7 +151,7 @@ class FindBugs(NailgunTask):
     safe_mkdir(output_dir)
     output_file = os.path.join(output_dir, 'findbugsXml.xml')
 
-    aux_classpath_file = os.path.join(self.workdir, '{}.classpath'.format(os.path.basename(output_dir)))
+    aux_classpath_file = os.path.join(self.workdir, f'{os.path.basename(output_dir)}.classpath')
     with open(aux_classpath_file, 'w') as f:
       f.write('\n'.join(aux_classpath - target_jars))
 
@@ -159,9 +159,9 @@ class FindBugs(NailgunTask):
       '-auxclasspathFromFile', aux_classpath_file,
       '-projectName', target.address.spec,
       '-xml:withMessages',
-      '-effort:{}'.format(self.get_options().effort),
-      '-{}'.format(self.get_options().threshold),
-      '-nested:{}'.format('true' if self.get_options().nested else 'false'),
+      f'-effort:{self.get_options().effort}',
+      f'-{self.get_options().threshold}',
+      f"-nested:{('true' if self.get_options().nested else 'false')}",
       '-output', output_file,
       '-noClassOk'
     ]
@@ -200,8 +200,7 @@ class FindBugs(NailgunTask):
                           workunit_name='findbugs',
                           workunit_labels=[WorkUnitLabel.LINT])
     if result != 0:
-      raise TaskError('java {main} ... exited non-zero ({result})'.format(
-          main=self._FINDBUGS_MAIN, result=result))
+      raise TaskError(f'java {self._FINDBUGS_MAIN} ... exited non-zero ({result})')
 
     xml = XmlParser.from_file(output_file)
     for error in xml.parsed.getElementsByTagName('Error'):

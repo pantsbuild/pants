@@ -48,15 +48,15 @@ class LambdexRun(Task):
     with self.invalidated(targets=targets, invalidate_dependents=True) as invalidation_check:
       python_lambda_product = self.context.products.get_data('python_aws_lambda', dict)
       for vt in invalidation_check.all_vts:
-        lambda_path = os.path.join(vt.results_dir, '{}.pex'.format(vt.target.name))
+        lambda_path = os.path.join(vt.results_dir, f'{vt.target.name}.pex')
         if not vt.valid:
-          self.context.log.debug('Existing lambda for {} is invalid, rebuilding'.format(vt.target))
+          self.context.log.debug(f'Existing lambda for {vt.target} is invalid, rebuilding')
           self._create_lambda(vt.target, lambda_path)
         else:
-          self.context.log.debug('Using existing lambda for {}'.format(vt.target))
+          self.context.log.debug(f'Using existing lambda for {vt.target}')
 
         python_lambda_product[vt.target] = lambda_path
-        self.context.log.debug('created {}'.format(os.path.relpath(lambda_path, get_buildroot())))
+        self.context.log.debug(f'created {os.path.relpath(lambda_path, get_buildroot())}')
 
         # Put a copy in distdir.
         lambda_copy = os.path.join(self.get_options().pants_distdir, os.path.basename(lambda_path))
@@ -78,7 +78,7 @@ class LambdexRun(Task):
       cmdline, exit_code = lambdex.run(workunit_factory,
                                        ['build', '-e', target.handler, tmp_lambda_path])
       if exit_code != 0:
-        raise TaskError('{} ... exited non-zero ({}).'.format(cmdline, exit_code),
+        raise TaskError(f'{cmdline} ... exited non-zero ({exit_code}).',
                         exit_code=exit_code)
       shutil.move(tmp_lambda_path, lambda_path)
     return lambda_path
@@ -92,5 +92,5 @@ class LambdexRun(Task):
       for filename in filenames:
         paths.append(os.path.join(basedir, filename))
     if len(paths) != 1:
-      raise TaskError('Expected one binary but found: {}'.format(', '.join(sorted(paths))))
+      raise TaskError(f"Expected one binary but found: {', '.join(sorted(paths))}")
     return paths[0]

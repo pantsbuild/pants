@@ -117,7 +117,7 @@ class PythonFile(object):
     return self.lines[self.line_range(line_number)]
 
   def __str__(self):
-    return 'PythonFile({filename})'.format(filename=self.filename)
+    return f'PythonFile({self.filename})'
 
   @classmethod
   def parse(cls, filename, root=None):
@@ -266,7 +266,7 @@ class Nit(object):
 
   def __init__(self, code, severity, filename, message, line_range=None, lines=None):
     if severity not in self.SEVERITY:
-      raise ValueError('Severity should be one of {}'.format(' '.join(self.SEVERITY.values())))
+      raise ValueError(f"Severity should be one of {' '.join(self.SEVERITY.values())}")
     if not re.match(r'[A-Z]\d{3}', code):
       raise ValueError('Code must contain a prefix letter followed by a 3 digit number')
     self.filename = filename
@@ -288,7 +288,7 @@ class Nit(object):
       if line_range.stop - line_range.start > 1:
         return '%03d-%03d' % (line_range.start, line_range.stop - 1)
       else:
-        return '%03d' % line_range.start
+        return f'{line_range.start:03d}'
 
   @property
   def message(self):
@@ -320,7 +320,7 @@ class CheckSyntaxError(Exception):
     # NB: E901 is the SyntaxError PEP8 code.
     # See:https://pycodestyle.readthedocs.io/en/latest/intro.html#error-codes
     return Nit('E901', Nit.ERROR, self.filename,
-               'SyntaxError: {error}'.format(error=self._syntax_error.msg),
+               f'SyntaxError: {self._syntax_error.msg}',
                line_range=line_range, lines=lines)
 
 
@@ -329,7 +329,7 @@ class CheckstylePlugin(object):
 
   @classmethod
   def name(cls):
-    raise NotImplementedError('{} must override and provide a plugin name.'.format(cls))
+    raise NotImplementedError(f'{cls} must override and provide a plugin name.')
 
   def __init__(self, options, python_file):
     super(CheckstylePlugin, self).__init__()
@@ -345,7 +345,7 @@ class CheckstylePlugin(object):
 
   def nits(self):
     """Returns an iterable of Nit pertinent to the enclosed python file."""
-    raise NotImplementedError('{} must override.'.format(type(self)))
+    raise NotImplementedError(f'{type(self)} must override.')
 
   def __iter__(self):
     for nit in self.nits():

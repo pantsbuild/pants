@@ -54,20 +54,20 @@ class JaxWsGen(SimpleCodegenTask, NailgunTask):
       with self.context.new_workunit(name='wsimport',
                                      cmd=' '.join(wsimport_cmd),
                                      labels=[WorkUnitLabel.TOOL]) as workunit:
-        self.context.log.debug('Executing {}'.format(' '.join(wsimport_cmd)))
+        self.context.log.debug(f"Executing {' '.join(wsimport_cmd)}")
         return_code = subprocess.Popen(wsimport_cmd,
                                        stdout=workunit.output('stdout'),
                                        stderr=workunit.output('stderr')).wait()
         workunit.set_outcome(WorkUnit.FAILURE if return_code else WorkUnit.SUCCESS)
         if return_code:
-          raise TaskError('wsimport exited non-zero {rc}'.format(rc=return_code))
+          raise TaskError(f'wsimport exited non-zero {return_code}')
 
   def _build_wsimport_cmd(self, target, target_workdir, url):
     distribution = DistributionLocator.cached(jdk=True)
     # Ported and trimmed down from:
     # https://java.net/projects/jax-ws-commons/sources/svn/content/trunk/
     # jaxws-maven-plugin/src/main/java/org/jvnet/jax_ws_commons/jaxws/WsImportMojo.java?rev=1191
-    cmd = ['{}/bin/wsimport'.format(distribution.real_home)]
+    cmd = [f'{distribution.real_home}/bin/wsimport']
     if self.get_options().ws_verbose:
       cmd.append('-verbose')
     if self.get_options().ws_quiet:
@@ -76,7 +76,7 @@ class JaxWsGen(SimpleCodegenTask, NailgunTask):
     cmd.extend(['-keep', '-s', os.path.abspath(target_workdir)])
     cmd.extend(['-d', os.path.abspath(target_workdir)])
     if target.payload.xjc_args:
-      cmd.extend(('-B{}'.format(a) if a.startswith('-') else a) for a in target.payload.xjc_args)
+      cmd.extend((f'-B{a}' if a.startswith('-') else a) for a in target.payload.xjc_args)
     cmd.append('-B-no-header') # Don't let xjc write out a timestamp, because it'll break caching.
     cmd.extend(target.payload.extra_args)
     cmd.append(url)

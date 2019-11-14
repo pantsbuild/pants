@@ -77,7 +77,7 @@ class Checker(object):
       for i, nit in enumerate(plugin_factory(python_file)):
         if i == 0:
           # NB: Add debug log header for nits from each plugin, but only if there are nits from it.
-          self.log.debug('Nits from plugin {} for {}'.format(plugin_name, filename))
+          self.log.debug(f'Nits from plugin {plugin_name} for {filename}')
 
         if not nit.has_lines_to_display:
           yield nit
@@ -102,7 +102,7 @@ class Checker(object):
       if i == 0:
         print()  # Add an extra newline to clean up the output only if we have nits.
       if nit.severity >= log_threshold:
-        print('{nit}\n'.format(nit=nit))
+        print(f'{nit}\n')
       if nit.severity >= fail_threshold:
         failure_count += 1
     return failure_count
@@ -173,15 +173,15 @@ def main(args=None):
                            'skipped.')
 
   for plugin_type in plugins():
-    parser.add_argument('--{}-options'.format(plugin_type.name()),
+    parser.add_argument(f'--{plugin_type.name()}-options',
                         metavar='JSON',
-                        help='JSON formatted options for the {} plugin'.format(plugin_type.name()))
+                        help=f'JSON formatted options for the {plugin_type.name()} plugin')
 
   args = parser.parse_args(args=args)
 
   plugin_factories = {}
   for plugin_type in plugins():
-    option_name = '{}_options'.format(plugin_type.name().replace('-', '_'))
+    option_name = f"{plugin_type.name().replace('-', '_')}_options"
     option_blob = getattr(args, option_name)
     option_dict = json.loads(option_blob) if option_blob else {}
     options = argparse.Namespace(**option_dict)

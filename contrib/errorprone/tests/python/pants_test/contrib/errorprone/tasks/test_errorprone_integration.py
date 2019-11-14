@@ -68,9 +68,9 @@ class ErrorProneTest(PantsRunIntegrationTest):
       args = [
         'compile',
         '--cache-write',
-        "--cache-write-to=['{}']".format(cache),
+        f"--cache-write-to=['{cache}']",
         '--cache-read',
-        "--cache-read-from=['{}']".format(cache),
+        f"--cache-read-from=['{cache}']",
         'contrib/errorprone/tests/java/org/pantsbuild/contrib/errorprone:warning',
       ]
 
@@ -96,9 +96,9 @@ class ErrorProneTest(PantsRunIntegrationTest):
       args = [
         'compile',
         '--cache-write',
-        "--cache-write-to=['{}']".format(cache),
+        f"--cache-write-to=['{cache}']",
         '--cache-read',
-        "--cache-read-from=['{}']".format(cache),
+        f"--cache-read-from=['{cache}']",
         'contrib/errorprone/tests/java/org/pantsbuild/contrib/errorprone:error',
       ]
 

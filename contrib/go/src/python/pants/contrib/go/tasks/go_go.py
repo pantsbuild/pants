@@ -66,7 +66,7 @@ class GoEnv(GoInteropTask):
     process = subprocess.Popen(cmd, shell=True, env=env, **kwargs)
     result = process.wait()
     if result != 0:
-      raise TaskError('{} failed with exit code {}'.format(cmd, result), exit_code=result)
+      raise TaskError(f'{cmd} failed with exit code {result}', exit_code=result)
 
 
 class GoGo(GoInteropTask):
@@ -78,4 +78,4 @@ class GoGo(GoInteropTask):
     go_cmd = self.go_dist.create_go_cmd(gopath=go_path, cmd=cmd, args=args)
     result = go_cmd.spawn(**kwargs).wait()
     if result != 0:
-      raise TaskError('{} failed with exit code {}'.format(go_cmd, result), exit_code=result)
+      raise TaskError(f'{go_cmd} failed with exit code {result}', exit_code=result)

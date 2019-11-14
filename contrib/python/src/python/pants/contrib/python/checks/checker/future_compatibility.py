@@ -47,18 +47,18 @@ class FutureCompatibility(CheckstylePlugin):
         if call.func.attr in self.BAD_ITERS and getattr(call.func.value, 'id', '') != 'six':
           yield self.error(
             'T602',
-            '{attr} disappears in Python 3.x.  Use non-iter instead.'.format(attr=call.func.attr),
+            f'{call.func.attr} disappears in Python 3.x.  Use non-iter instead.',
             call)
       elif isinstance(call.func, ast.Name):
         if call.func.id in self.BAD_FUNCTIONS:
           yield self.error(
             'T603',
-            'Please avoid {func_id} as it disappears in Python 3.x.'.format(func_id=call.func.id),
+            f'Please avoid {call.func.id} as it disappears in Python 3.x.',
             call)
     for name in self.iter_ast_types(ast.Name):
       if name.id in self.BAD_NAMES:
         yield self.error(
-            'T604', 'Please avoid {id} as it disappears in Python 3.x.'.format(id=name.id), name)
+            'T604', f'Please avoid {name.id} as it disappears in Python 3.x.', name)
     for class_def in self.iter_ast_types(ast.ClassDef):
       for node in class_def.body:
         if not isinstance(node, ast.Assign):

@@ -37,7 +37,7 @@ class AvroJavaGenTest(PantsRunIntegrationTest):
 
   @staticmethod
   def avro_test_target(target_name):
-    return 'contrib/avro/tests/avro/org/pantsbuild/contrib/avro:{}'.format(target_name)
+    return f'contrib/avro/tests/avro/org/pantsbuild/contrib/avro:{target_name}'
 
   @staticmethod
   def get_gen_root(workdir, target_spec):

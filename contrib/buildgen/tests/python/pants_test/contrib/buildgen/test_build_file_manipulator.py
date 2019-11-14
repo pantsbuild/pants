@@ -174,7 +174,7 @@ class BuildFileManipulatorTest(TestBase):
                               '  ],']))
       self.assertEqual(tuple(no_deps.target_lines()),
                        tuple(['target_type(',
-                              "  name = '{0}',".format(no_deps_name),
+                              f"  name = '{no_deps_name}',",
                               '  dependencies = [',
                               "    ':a_fake_dep',",
                               "    ':b_fake_dep',",

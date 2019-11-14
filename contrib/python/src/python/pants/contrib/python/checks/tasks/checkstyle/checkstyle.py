@@ -86,7 +86,7 @@ class Checkstyle(LintTaskMixin, Task):
             target.has_sources(self._PYTHON_SOURCE_EXTENSION))
 
   _CHECKER_ADDRESS_SPEC = 'contrib/python/src/python/pants/contrib/python/checks/checker'
-  _CHECKER_REQ = 'pantsbuild.pants.contrib.python.checks.checker=={}'.format(pants_version())
+  _CHECKER_REQ = f'pantsbuild.pants.contrib.python.checks.checker=={pants_version()}'
   _CHECKER_ENTRYPOINT = 'pants.contrib.python.checks.checker.checker:main'
 
   @memoized_property
@@ -171,11 +171,11 @@ class Checkstyle(LintTaskMixin, Task):
     checker = self.checker_pex(interpreter)
 
     args = [
-      '--root-dir={}'.format(get_buildroot()),
-      '--severity={}'.format(self.get_options().severity),
+      f'--root-dir={get_buildroot()}',
+      f'--severity={self.get_options().severity}',
     ]
     if self.get_options().suppress:
-      args.append('--suppress={}'.format(self.get_options().suppress))
+      args.append(f'--suppress={self.get_options().suppress}')
     if self.get_options().strict:
       args.append('--strict')
 
@@ -188,7 +188,7 @@ class Checkstyle(LintTaskMixin, Task):
       argfile.write('\n'.join(sources))
       argfile.close()
 
-      args.append('@{}'.format(argfile.name))
+      args.append(f'@{argfile.name}')
 
       with self.context.new_workunit(name='pythonstyle',
                                      labels=[WorkUnitLabel.TOOL, WorkUnitLabel.LINT],

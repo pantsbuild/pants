@@ -27,6 +27,6 @@ class BuildozerBinary(NativeTool):
       subprocess.check_call([self.select(context), buildozer_command, spec], cwd=get_buildroot())
     except subprocess.CalledProcessError as err:
       if err.returncode == 3:
-        logger.warning('{} ... no changes were made'.format(buildozer_command))
+        logger.warning(f'{buildozer_command} ... no changes were made')
       else:
-        raise TaskError('{} ... exited non-zero ({}).'.format(buildozer_command, err.returncode))
+        raise TaskError(f'{buildozer_command} ... exited non-zero ({err.returncode}).')

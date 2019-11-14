@@ -31,7 +31,7 @@ class BundleEntries(NailgunTask):
       kythe_distdir = os.path.join(self.get_options().pants_distdir, 'kythe')
       safe_mkdir(kythe_distdir)
       uncompressed_kythe_distpath = os.path.join(
-        kythe_distdir, '{}.entries'.format(tgt.address.path_safe_spec))
+        kythe_distdir, f'{tgt.address.path_safe_spec}.entries')
       if archive == 'uncompressed':
         kythe_distpath = uncompressed_kythe_distpath
         shutil.copy(entries, kythe_distpath)
@@ -40,4 +40,4 @@ class BundleEntries(NailgunTask):
                                              format=archive,
                                              root_dir=os.path.dirname(entries),
                                              base_dir=os.path.basename(entries))
-      self.context.log.info('Copied entries to {}'.format(kythe_distpath))
+      self.context.log.info(f'Copied entries to {kythe_distpath}')

@@ -55,11 +55,11 @@ class MetaRename(Task):
     for concrete_target in dependee_targets:
       for formats in [
         { 'from': self._from_address.spec, 'to': self._to_address.spec },
-        { 'from': ':{}'.format(self._from_address.target_name), 'to': ':{}'.format(
+        { 'from': f':{self._from_address.target_name}', 'to': ':{}'.format(
           self._to_address.target_name) }
       ]:
         buildozer_binary.execute(
-          'replace dependencies {} {}'.format(formats['from'], formats['to']),
+          f"replace dependencies {formats['from']} {formats['to']}",
           spec=concrete_target.address.spec,
           context=self.context
         )
@@ -68,7 +68,7 @@ class MetaRename(Task):
 
   def update_original_build_name(self):
     BuildozerBinary.scoped_instance(self).execute(
-      'set name {}'.format(self._to_address.target_name),
+      f'set name {self._to_address.target_name}',
       spec=self._from_address.spec,
       context=self.context)
 

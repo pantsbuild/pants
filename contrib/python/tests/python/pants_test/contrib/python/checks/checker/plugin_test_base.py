@@ -42,7 +42,7 @@ class CheckstylePluginTestBase(unittest.TestCase):
                 expected_line_number=None):
     plugin = self.get_plugin(file_content)
     nits = list(plugin.nits())
-    self.assertEqual(1, len(nits), 'Expected single nit, got: {}'.format(nits))
+    self.assertEqual(1, len(nits), f'Expected single nit, got: {nits}')
     nit = nits[0]
     self.assertEqual(expected_code, nit.code)
     self.assertEqual(expected_severity, nit.severity)

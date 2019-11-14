@@ -68,15 +68,15 @@ class ErrorProne(NailgunTask):
 
   def _is_errorprone_target(self, target):
     if not target.has_sources(self._JAVA_SOURCE_EXTENSION):
-      self.context.log.debug('Skipping [{}] because it has no {} sources'.format(target.address.spec, self._JAVA_SOURCE_EXTENSION))
+      self.context.log.debug(f'Skipping [{target.address.spec}] because it has no {self._JAVA_SOURCE_EXTENSION} sources')
       return False
     if target.is_synthetic:
-      self.context.log.debug('Skipping [{}] because it is a synthetic target'.format(target.address.spec))
+      self.context.log.debug(f'Skipping [{target.address.spec}] because it is a synthetic target')
       return False
     for pattern in self._exclude_patterns:
       if pattern.search(target.address.spec):
         self.context.log.debug(
-          "Skipping [{}] because it matches exclude pattern '{}'".format(target.address.spec, pattern.pattern))
+          f"Skipping [{target.address.spec}] because it matches exclude pattern '{pattern.pattern}'")
         return False
     return True
 
@@ -143,7 +143,7 @@ class ErrorProne(NailgunTask):
       # For Java 8 we need to add the errorprone javac jar to the bootclasspath to
       # avoid the "java.lang.NoSuchFieldError: ANNOTATION_PROCESSOR_MODULE_PATH" error
       # See https://github.com/google/error-prone/issues/653 for more information
-      jvm_options.extend(['-Xbootclasspath/p:{}'.format(self.tool_classpath('errorprone-javac')[0])])
+      jvm_options.extend([f"-Xbootclasspath/p:{self.tool_classpath('errorprone-javac')[0]}"])
 
     args = [
       '-d', output_dir,
@@ -156,11 +156,11 @@ class ErrorProne(NailgunTask):
     if target.platform.target_level < Revision.lenient('10'):
       args.extend(['-target', str(target.platform.target_level)])
 
-    errorprone_classpath_file = os.path.join(self.workdir, '{}.classpath'.format(os.path.basename(output_dir)))
+    errorprone_classpath_file = os.path.join(self.workdir, f'{os.path.basename(output_dir)}.classpath')
     with open(errorprone_classpath_file, 'w') as f:
       f.write('-classpath ')
       f.write(':'.join(runtime_classpath))
-    args.append('@{}'.format(errorprone_classpath_file))
+    args.append(f'@{errorprone_classpath_file}')
 
     for opt in self.get_options().command_line_options:
       args.extend(safe_shlex_split(opt))

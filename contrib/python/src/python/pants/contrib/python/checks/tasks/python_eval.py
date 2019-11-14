@@ -86,7 +86,7 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
           if self.get_options().fail_slow:
             failed.append(target)
           else:
-            raise self.Error('Failed to eval {}'.format(target.address.spec),
+            raise self.Error(f'Failed to eval {target.address.spec}',
                              compiled=compiled,
                              failed=[target])
 
@@ -144,7 +144,7 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
         with safe_concurrent_creation(exec_pex_path) as safe_path:
           # Write the entry point.
           safe_mkdir(safe_path)
-          with open(os.path.join(safe_path, '{}.py'.format(self._EXEC_NAME)), 'w') as outfile:
+          with open(os.path.join(safe_path, f'{self._EXEC_NAME}.py'), 'w') as outfile:
             outfile.write(executable_file_content)
           pex_info = (target.pexinfo if isinstance(target, PythonBinary) else None) or PexInfo()
           # Override any user-specified entry point, under the assumption that the
@@ -164,14 +164,14 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
         returncode = pex.run(stdout=workunit.output('stdout'), stderr=workunit.output('stderr'))
         workunit.set_outcome(WorkUnit.SUCCESS if returncode == 0 else WorkUnit.FAILURE)
         if returncode != 0:
-          self.context.log.error('Failed to eval {}'.format(target.address.spec))
+          self.context.log.error(f'Failed to eval {target.address.spec}')
         return returncode
 
   @staticmethod
   def _get_modules(target):
     modules = []
     if isinstance(target, PythonBinary):
-      source = 'entry_point {}'.format(target.entry_point)
+      source = f'entry_point {target.entry_point}'
       components = target.entry_point.rsplit(':', 1)
       if not all([x.strip() for x in components]):
         raise TaskError('Invalid entry point {} for target {}'.format(
@@ -180,9 +180,9 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
       if len(components) == 2:
         func = components[1]
         data = TemplateData(source=source,
-                            import_statement='from {} import {}'.format(module, func))
+                            import_statement=f'from {module} import {func}')
       else:
-        data = TemplateData(source=source, import_statement='import {}'.format(module))
+        data = TemplateData(source=source, import_statement=f'import {module}')
       modules.append(data)
     else:
       for path in target.sources_relative_to_source_root():
@@ -191,10 +191,10 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
             module_path = os.path.dirname(path)
           else:
             module_path, _ = os.path.splitext(path)
-          source = 'file {}'.format(os.path.join(target.target_base, path))
+          source = f'file {os.path.join(target.target_base, path)}'
           module = module_path.replace(os.path.sep, '.')
           if module:
-            data = TemplateData(source=source, import_statement='import {}'.format(module))
+            data = TemplateData(source=source, import_statement=f'import {module}')
             modules.append(data)
     return modules
 

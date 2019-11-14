@@ -58,18 +58,18 @@ class ExtractJava(JvmToolTaskMixin):
     with self.invalidated(indexable_targets, invalidate_dependents=True) as invalidation_check:
       extractor_cp = self.tool_classpath('kythe-java-extractor')
       for vt in invalidation_check.invalid_vts:
-        self.context.log.info('Kythe extracting from {}\n'.format(vt.target.address.spec))
+        self.context.log.info(f'Kythe extracting from {vt.target.address.spec}\n')
         javac_args = self._get_javac_args_from_zinc_args(targets_to_zinc_args[vt.target])
         jvm_options = []
         if self.dist.version < Revision.lenient('9'):
           # When run on JDK8, Kythe requires javac9 on the bootclasspath.
           javac9_cp = self.tool_classpath('javac9')
-          jvm_options.append('-Xbootclasspath/p:{}'.format(':'.join(javac9_cp)))
+          jvm_options.append(f"-Xbootclasspath/p:{':'.join(javac9_cp)}")
         jvm_options.extend(self.get_options().jvm_options)
         jvm_options.extend([
-          '-DKYTHE_CORPUS={}'.format(vt.target.address.spec),
-          '-DKYTHE_ROOT_DIRECTORY={}'.format(vt.target.target_base),
-          '-DKYTHE_OUTPUT_DIRECTORY={}'.format(vt.results_dir)
+          f'-DKYTHE_CORPUS={vt.target.address.spec}',
+          f'-DKYTHE_ROOT_DIRECTORY={vt.target.target_base}',
+          f'-DKYTHE_OUTPUT_DIRECTORY={vt.results_dir}'
         ])
 
         result = self.dist.execute_java(

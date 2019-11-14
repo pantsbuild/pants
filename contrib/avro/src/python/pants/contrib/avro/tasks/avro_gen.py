@@ -56,7 +56,7 @@ class AvroJavaGenTask(SimpleCodegenTask, NailgunTask):
                           main='org.apache.avro.tool.Main',
                           args=args)
     if result != 0:
-      raise TaskError('avro-tools failed with exit status {}'.format(result))
+      raise TaskError(f'avro-tools failed with exit status {result}')
 
   def _compile_schema(self, source, workdir):
     self._avro(['compile', 'schema', source, workdir])

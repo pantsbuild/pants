@@ -27,8 +27,8 @@ class MetaRenameTest(TaskTestBase):
 
     self.new_name = 'goo'
     self.spec_path = 'a'
-    self.set_options(**{ 'from': '{}:a'.format(self.spec_path),
-                         'to': '{}:{}'.format(self.spec_path, self.new_name) })
+    self.set_options(**{ 'from': f'{self.spec_path}:a',
+                         'to': f'{self.spec_path}:{self.new_name}' })
     self.meta_rename = self.create_task(
       self.context(target_roots=list(prepare_dependencies(self).values())))
 
