@@ -1,7 +1,6 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import os
 import unittest
 from unittest.mock import Mock
 
@@ -17,7 +16,8 @@ from pants.build_graph.target import Target
 from pants.scm.scm import Scm
 from pants.testutil.jvm.nailgun_task_test_base import NailgunTaskTestBase
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import safe_mkdir, safe_walk
+from pants.util.dirutil import safe_mkdir, safe_mkdtemp, safe_walk
+from pants.util.memo import memoized_classproperty
 
 
 class JarPublishTest(NailgunTaskTestBase):
@@ -34,9 +34,6 @@ class JarPublishTest(NailgunTaskTestBase):
 
   @classmethod
   def alias_groups(cls):
-    cls.push_db_basedir = os.path.join(cls._build_root(), "pushdb")
-    safe_mkdir(cls.push_db_basedir)
-
     return BuildFileAliases(
       targets={
         'jar_library': JarLibrary,
@@ -46,10 +43,21 @@ class JarPublishTest(NailgunTaskTestBase):
       objects={
         'artifact': Artifact,
         'scala_artifact': ScalaArtifact,
-        'internal': Repository(name='internal', url='http://example.com',
-                               push_db_basedir=cls.push_db_basedir),
+      },
+      context_aware_object_factories={
+        'internal': lambda _: Repository(
+          name='internal', url='http://example.com', push_db_basedir=cls.push_db_basedir
+        ),
       },
     )
+
+  @memoized_classproperty
+  def push_db_basedir(cls):
+    return safe_mkdtemp()
+
+  def setUp(self):
+    super().setUp()
+    safe_mkdir(self.push_db_basedir, clean=True)
 
   def _prepare_for_publishing(self, with_alias=False):
     targets = []
