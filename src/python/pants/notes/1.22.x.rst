@@ -3,6 +3,11 @@
 
 This document describes releases leading up to the ``1.22.x`` ``stable`` series.
 
+1.22.0 (11/14/2019)
+------------------------
+The first stable release of the 1.22.x series, with no changes since the previous rc!
+
+
 1.22.0rc2 (11/08/2019)
 ------------------------
 
