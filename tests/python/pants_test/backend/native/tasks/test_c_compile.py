@@ -18,8 +18,8 @@ class CCompileTest(NativeTaskTestBase, NativeCompileTestMixin):
     return CCompile
 
   def create_header_only_alternate_c_library(self, ext, **kwargs):
-    header_filename = 'test{}'.format(ext)
-    self.create_file('src/c/test/{}'.format(header_filename), contents=dedent("""
+    header_filename = f'test{ext}'
+    self.create_file(f'src/c/test/{header_filename}', contents=dedent("""
       #ifndef __TEST_H__
       #define __TEST_H__
 

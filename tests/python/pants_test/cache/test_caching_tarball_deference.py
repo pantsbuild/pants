@@ -84,7 +84,7 @@ class LocalCachingTarballDereferenceTest(TaskTestBase):
       self.artifact_cache,
       CacheFactory.make_task_cache_dirname(self.task),
       self._target.id,
-      '{}.tgz'.format(vt.cache_key.hash),
+      f'{vt.cache_key.hash}.tgz',
     )
 
   def _prepare_task(self, deference, regular_file, regular_file_in_results_dir):
@@ -113,7 +113,7 @@ class LocalCachingTarballDereferenceTest(TaskTestBase):
       regular_file=regular_file,
       regular_file_in_results_dir=regular_file_in_results_dir
     )
-    self.add_to_build_file('', 'dummy_cache_library(name = "t", source = "{}")'.format(self._filename))
+    self.add_to_build_file('', f'dummy_cache_library(name = "t", source = "{self._filename}")')
     self._target = self.target(':t')
     context = self.context(for_task_types=[DummyCacheTask], target_roots=[self._target])
     self.task = self.create_task(context)
@@ -128,10 +128,10 @@ class LocalCachingTarballDereferenceTest(TaskTestBase):
         with open_tar(artifact_address, 'r') as tarout:
           tarout.extractall(path=tmpdir)
         file_path = self._find_first_file_in_path(tmpdir, SYMLINK_NAME)
-        self.assertIsNotNone(file_path, "Cannot find file {} in artifact {}".format(SYMLINK_NAME, artifact_address))
+        self.assertIsNotNone(file_path, f"Cannot find file {SYMLINK_NAME} in artifact {artifact_address}")
         self.assertFalse(
           os.path.islink(file_path)
-          , "{} in artifact {} should not be a symlink but it is.".format(SYMLINK_NAME, artifact_address)
+          , f"{SYMLINK_NAME} in artifact {artifact_address} should not be a symlink but it is."
         )
         with open(file_path, 'rb') as f:
           self.assertEqual(DUMMY_FILE_CONTENT, f.read())
@@ -155,10 +155,10 @@ class LocalCachingTarballDereferenceTest(TaskTestBase):
           tarout.extractall(path=tmpdir)
 
         file_path = self._find_first_file_in_path(tmpdir, SYMLINK_NAME)
-        self.assertIsNotNone(file_path, "Cannot find file {} in artifact {}".format(SYMLINK_NAME, artifact_address))
+        self.assertIsNotNone(file_path, f"Cannot find file {SYMLINK_NAME} in artifact {artifact_address}")
         self.assertTrue(
           os.path.islink(file_path),
-          "{} in artifact {} should be a symlink but it is not.".format(SYMLINK_NAME, artifact_address)
+          f"{SYMLINK_NAME} in artifact {artifact_address} should be a symlink but it is not."
         )
         # The destination of the symlink should be non-existent, hence IOError.
         with self.assertRaises(IOError):
@@ -178,10 +178,10 @@ class LocalCachingTarballDereferenceTest(TaskTestBase):
           tarout.extractall(path=tmpdir)
 
         file_path = self._find_first_file_in_path(tmpdir, SYMLINK_NAME)
-        self.assertIsNotNone(file_path, "Cannot find file {} in artifact {}".format(SYMLINK_NAME, artifact_address))
+        self.assertIsNotNone(file_path, f"Cannot find file {SYMLINK_NAME} in artifact {artifact_address}")
         self.assertTrue(
           os.path.islink(file_path),
-          "{} in artifact {} should be a symlink but it is not.".format(SYMLINK_NAME, artifact_address)
+          f"{SYMLINK_NAME} in artifact {artifact_address} should be a symlink but it is not."
         )
         with open(file_path, 'rb') as f:
           self.assertEqual(DUMMY_FILE_CONTENT, f.read())

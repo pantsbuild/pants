@@ -25,7 +25,7 @@ class DepExportsIntegrationTest(PantsRunIntegrationTest):
       target_dir, target_name = target.rsplit(':', 1)
       shutil.copytree(target_dir, src_dir)
       with self.temporary_workdir() as workdir:
-        cmd = ['compile', '--lint-scalafmt-skip', '{}:{}'.format(src_dir, target_name)]
+        cmd = ['compile', '--lint-scalafmt-skip', f'{src_dir}:{target_name}']
         pants_run = self.run_pants_with_workdir(command=cmd, workdir=workdir)
         self.assert_success(pants_run)
 
@@ -34,14 +34,14 @@ class DepExportsIntegrationTest(PantsRunIntegrationTest):
 
         pants_run = self.run_pants_with_workdir(command=cmd, workdir=workdir)
         self.assert_success(pants_run)
-        self.assertTrue('{}:{}'.format(src_dir, target_name) in pants_run.stdout_data)
+        self.assertTrue(f'{src_dir}:{target_name}' in pants_run.stdout_data)
 
   def test_invalidation(self):
     for lang in self.SRC_TYPES:
       path = os.path.join(self.SRC_PREFIX, lang, self.SRC_PACKAGE)
-      target = '{}:D'.format(path)
-      self.modify_exports_and_compile(target, 'A.{}'.format(lang))
-      self.modify_exports_and_compile(target, 'B.{}'.format(lang))
+      target = f'{path}:D'
+      self.modify_exports_and_compile(target, f'A.{lang}')
+      self.modify_exports_and_compile(target, f'B.{lang}')
 
   def test_non_exports(self):
     pants_run = self.run_pants(['compile', '--lint-scalafmt-skip',

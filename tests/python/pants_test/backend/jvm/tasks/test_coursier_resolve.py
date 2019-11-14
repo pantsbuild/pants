@@ -55,7 +55,7 @@ class CoursierResolveTest(NailgunTaskTestBase):
   @contextmanager
   def _temp_task_cache_dir(self):
     with temporary_dir() as cache_dir:
-      self.set_options_for_scope('cache.{}'.format(self.options_scope),
+      self.set_options_for_scope(f'cache.{self.options_scope}',
         read_from=[cache_dir],
         write_to=[cache_dir])
       yield

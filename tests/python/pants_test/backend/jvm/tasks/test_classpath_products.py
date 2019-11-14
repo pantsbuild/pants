@@ -83,7 +83,7 @@ class ClasspathProductsTest(TestBase):
       classpath_product.add_for_target(a, [('default', '/dev/null')])
 
     self.assertEqual(
-      'Classpath entry /dev/null for target a:a is located outside the working directory "{}".'.format(self.pants_workdir),
+      f'Classpath entry /dev/null for target a:a is located outside the working directory "{self.pants_workdir}".',
       str(cm.exception))
 
   def test_fails_if_jar_paths_outside_buildroot(self):
@@ -94,7 +94,7 @@ class ClasspathProductsTest(TestBase):
       classpath_product.add_jars_for_targets([a], 'default', [(resolved_example_jar_at('/dev/null'))])
 
     self.assertEqual(
-      'Classpath entry /dev/null for target a:a is located outside the working directory "{}".'.format(self.pants_workdir),
+      f'Classpath entry /dev/null for target a:a is located outside the working directory "{self.pants_workdir}".',
       str(cm.exception))
 
   def test_excluded_classpath_element(self):
@@ -449,7 +449,7 @@ class ClasspathProductsTest(TestBase):
                                           ],
                                           {
                                             'a.b.b-classpath.txt':
-                                              '{}/a.jar\n'.format(self.pants_workdir)
+                                              f'{self.pants_workdir}/a.jar\n'
                                           })
 
     # incrementally add another jar dependency
@@ -514,9 +514,9 @@ class ClasspathProductsTest(TestBase):
                                             ['a.a-0.jar'],
                                             {
                                               'a.a-classpath.txt':
-                                                '{}/{}\n'.format(self.pants_workdir, jar_path),
+                                                f'{self.pants_workdir}/{jar_path}\n',
                                               'b.b-classpath.txt':
-                                                '{}/{}\n'.format(self.pants_workdir, jar_path),
+                                                f'{self.pants_workdir}/{jar_path}\n',
                                             })
 
   def _test_canonical_classpath_helper(self,

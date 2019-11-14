@@ -51,12 +51,12 @@ class ArtifactCacheStatsTest(TestBase):
     ]
 
     expected_hit_or_miss_files = {
-      '{}.misses'.format(self.TEST_CACHE_NAME_2):
-        '{} {}\n'.format(self.TEST_SPEC_A, str(self.TEST_LOCAL_ERROR.err)),
-      '{}.hits'.format(self.TEST_CACHE_NAME_1):
-        '{}\n'.format(self.TEST_SPEC_B),
-      '{}.misses'.format(self.TEST_CACHE_NAME_1):
-        '{} {}\n'.format(self.TEST_SPEC_C, str(self.TEST_REMOTE_ERROR.err)),
+      f'{self.TEST_CACHE_NAME_2}.misses':
+        f'{self.TEST_SPEC_A} {str(self.TEST_LOCAL_ERROR.err)}\n',
+      f'{self.TEST_CACHE_NAME_1}.hits':
+        f'{self.TEST_SPEC_B}\n',
+      f'{self.TEST_CACHE_NAME_1}.misses':
+        f'{self.TEST_SPEC_C} {str(self.TEST_REMOTE_ERROR.err)}\n',
     }
 
     with self.mock_artifact_cache_stats(expected_stats,

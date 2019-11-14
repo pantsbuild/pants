@@ -134,10 +134,10 @@ class ShaderTest(unittest.TestCase):
                      Shading.create_exclude_package('com.foo.bar', recursive=False))
 
   def test_relocate(self):
-    self.assertEqual(('com.foo.bar.**', '{}com.foo.bar.@1'.format(Shading.SHADE_PREFIX)),
+    self.assertEqual(('com.foo.bar.**', f'{Shading.SHADE_PREFIX}com.foo.bar.@1'),
                      Shading.create_relocate(from_pattern='com.foo.bar.**'))
 
-    self.assertEqual(('com.foo.bar.**', '{}com.foo.bar.@1'.format('__my_prefix__.')),
+    self.assertEqual(('com.foo.bar.**', f"{'__my_prefix__.'}com.foo.bar.@1"),
                      Shading.create_relocate(from_pattern='com.foo.bar.**',
                                       shade_prefix='__my_prefix__.'))
 
@@ -147,9 +147,9 @@ class ShaderTest(unittest.TestCase):
                                       shade_pattern='org.biz.baz.@1'))
 
   def test_relocate_package(self):
-    self.assertEqual(('com.foo.bar.**', '{}com.foo.bar.@1'.format(Shading.SHADE_PREFIX)),
+    self.assertEqual(('com.foo.bar.**', f'{Shading.SHADE_PREFIX}com.foo.bar.@1'),
                      Shading.create_relocate_package('com.foo.bar'))
-    self.assertEqual(('com.foo.bar.*', '{}com.foo.bar.@1'.format(Shading.SHADE_PREFIX)),
+    self.assertEqual(('com.foo.bar.*', f'{Shading.SHADE_PREFIX}com.foo.bar.@1'),
                      Shading.create_relocate_package('com.foo.bar', recursive=False))
     self.assertEqual(('com.foo.bar.**', '__p__.com.foo.bar.@1'),
                      Shading.create_relocate_package('com.foo.bar', shade_prefix='__p__.'))

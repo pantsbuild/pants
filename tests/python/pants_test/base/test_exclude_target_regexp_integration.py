@@ -26,7 +26,7 @@ class Bundles:
 
     @property
     def full_spec(self):
-      return '{project}:{name}'.format(project=Bundles.phrase_path, name=self.spec)
+      return f'{Bundles.phrase_path}:{self.spec}'
 
   # Bundles and their magic strings to expect in run outputs.
   lesser_of_two = Bundle('lesser-of-two',
@@ -48,14 +48,13 @@ class ExcludeTargetRegexpIntegrationTest(PantsRunIntegrationTest):
 
   def _bundle_path(self, bundle):
     return os.path.join(get_buildroot(), 'dist',
-                        '{prefix}.{name}-bundle'.format(prefix=Bundles.bundle_dir_prefix,
-                                                        name=bundle))
+                        f'{Bundles.bundle_dir_prefix}.{bundle}-bundle')
 
   @contextmanager
   def _handle_bundles(self, names):
     """Makes sure bundles don't exist to begin with, and deletes them afterward."""
     paths = [self._bundle_path(name) for name in names]
-    jars = ['{name}.jar'.format(name=name) for name in names]
+    jars = [f'{name}.jar' for name in names]
     yield (paths, jars)
     missing = []
     for path in paths:
@@ -63,8 +62,7 @@ class ExcludeTargetRegexpIntegrationTest(PantsRunIntegrationTest):
         os.unlink(path)
       else:
         missing.append(path)
-    self.assertFalse(missing, "Some bundles weren't generated! {missing}"
-        .format(missing=', '.join(missing)))
+    self.assertFalse(missing, f"Some bundles weren't generated! {', '.join(missing)}")
 
   def _test_bundle_existences(self, args, bundles, config=None):
     all_bundles = {bundle.spec for bundle in Bundles.all_bundles}
@@ -135,8 +133,8 @@ class ExcludeTargetRegexpIntegrationTest(PantsRunIntegrationTest):
   def test_only_exclude_roots(self):
     # You cannot exclude the trusty companion (ie dependency) of an included root.
     self._test_bundle_existences([
-          '{}:{}'.format(Bundles.phrase_path, Bundles.there_was_a_duck.spec),
-          '--exclude-target-regexp={}:{}'.format(Bundles.phrase_path, Bundles.trusty_companion),
+          f'{Bundles.phrase_path}:{Bundles.there_was_a_duck.spec}',
+          f'--exclude-target-regexp={Bundles.phrase_path}:{Bundles.trusty_companion}',
         ],
         {Bundles.there_was_a_duck},
     )

@@ -43,9 +43,9 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
     return False
 
   _binary_target_dir = 'testprojects/src/python/python_distribution/ctypes'
-  _binary_target = '{}:bin'.format(_binary_target_dir)
+  _binary_target = f'{_binary_target_dir}:bin'
   _binary_interop_target_dir = 'testprojects/src/python/python_distribution/ctypes_interop'
-  _binary_target_with_interop = '{}:bin'.format(_binary_interop_target_dir)
+  _binary_target_with_interop = f'{_binary_interop_target_dir}:bin'
   _wrapped_math_build_file = os.path.join(_binary_interop_target_dir, 'wrapped-math', 'BUILD')
   _binary_target_with_third_party = (
     'testprojects/src/python/python_distribution/ctypes_with_third_party:bin_with_third_party'
@@ -78,7 +78,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
         ToolchainVariant.llvm: ['clang', 'clang++'],
       })
       for compiler_name in compiler_names_to_check:
-        self.assertIn("selected compiler exe name: '{}'".format(compiler_name),
+        self.assertIn(f"selected compiler exe name: '{compiler_name}'",
                       pants_run.stdout_data)
 
       # All of our toolchains currently use the C++ compiler's filename as argv[0] for the linker,
@@ -88,7 +88,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
         ToolchainVariant.llvm: ['clang++'],
       })
       for linker_name in linker_names_to_check:
-        self.assertIn("selected linker exe name: '{}'".format(linker_name),
+        self.assertIn(f"selected linker exe name: '{linker_name}'",
                       pants_run.stdout_data)
 
       # Check for the pex and for the wheel produced for our python_dist().
@@ -99,7 +99,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
       # string in test_build_local_python_distributions.py.
       wheel_glob = os.path.join(tmp_dir, 'ctypes_test-0.0.1+*.whl')
       wheel_dist_with_path = assert_single_element(glob.glob(wheel_glob))
-      wheel_dist = re.sub('^{}{}'.format(re.escape(tmp_dir), os.path.sep), '', wheel_dist_with_path)
+      wheel_dist = re.sub(f'^{re.escape(tmp_dir)}{os.path.sep}', '', wheel_dist_with_path)
 
       dist_name, dist_version, wheel_platform = name_and_platform(wheel_dist)
       self.assertEqual(dist_name, 'ctypes_test')
@@ -112,7 +112,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
       # Verify that the wheel contains our shared libraries.
       wheel_files = ZipFile(wheel_dist_with_path).namelist()
 
-      dist_versioned_name = '{}-{}.data'.format(dist_name, dist_version)
+      dist_versioned_name = f'{dist_name}-{dist_version}.data'
       for shared_lib_filename in ['libasdf-c_ctypes.so', 'libasdf-cpp_ctypes.so']:
         full_path_in_wheel = os.path.join(dist_versioned_name, 'data', shared_lib_filename)
         self.assertIn(full_path_in_wheel, wheel_files)

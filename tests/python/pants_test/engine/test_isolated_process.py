@@ -63,8 +63,7 @@ class ShellCat:
     option_like_files = [p for p in cat_file_paths if p.startswith('-')]
     if option_like_files:
       raise ValueError(
-        "invalid file names: '{}' look like command-line options"
-        .format(option_like_files))
+        f"invalid file names: '{option_like_files}' look like command-line options")
 
     # Add /dev/null to the list of files, so that cat doesn't hang forever if no files are in the
     # Snapshot.
@@ -172,7 +171,7 @@ def javac_compile_process_result(javac_compile_req: JavacCompileRequest) -> Java
   java_files = javac_compile_req.javac_sources.java_files
   for java_file in java_files:
     if not java_file.endswith(".java"):
-      raise ValueError("Can only compile .java files but got {}".format(java_file))
+      raise ValueError(f"Can only compile .java files but got {java_file}")
   sources_snapshot = yield Get(Snapshot, PathGlobs, PathGlobs(java_files, ()))
   output_dirs = tuple({os.path.dirname(java_file) for java_file in java_files})
   process_request = ExecuteProcessRequest(

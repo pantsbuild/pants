@@ -28,7 +28,7 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
   def test_pytest_run_timeout_succeeds(self):
     pants_run = self.run_pants(['clean-all',
                                 'test.pytest',
-                                '--timeout-default={}'.format(self._non_flaky_timeout_seconds),
+                                f'--timeout-default={self._non_flaky_timeout_seconds}',
                                 'testprojects/tests/python/pants/timeout:exceeds_timeout',
                                 '--',
                                 '-kwithin_timeout'])
@@ -68,7 +68,7 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(['clean-all',
                                 'test.pytest',
                                 '--timeout-terminate-wait=2',
-                                '--timeout-default={}'.format(self._non_flaky_timeout_seconds),
+                                f'--timeout-default={self._non_flaky_timeout_seconds}',
                                 '--coverage=auto',
                                 '--cache-ignore',
                                 '--chroot',
@@ -94,7 +94,7 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(['clean-all',
                                 'test.pytest',
                                 '--timeout-terminate-wait=2',
-                                '--timeout-default={}'.format(self._non_flaky_timeout_seconds),
+                                f'--timeout-default={self._non_flaky_timeout_seconds}',
                                 '--cache-ignore',
                                 'testprojects/tests/python/pants/timeout:terminates_self'])
     end = time.time()
@@ -127,7 +127,7 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
       # Note that the subprocess profile mechanism will add a ".0" to the profile path.
       # We won't see a profile at prof itself because PANTS_PROFILE wasn't set when the
       # current process started.
-      self.assertTrue(os.path.exists('{}.0'.format(prof)))
+      self.assertTrue(os.path.exists(f'{prof}.0'))
 
   @skip_unless_python27_and_python3_present
   def test_pants_test_interpreter_selection_with_pexrc(self):
@@ -172,7 +172,7 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
       pants_run_2 = self.run_pants(
         command=[
           'test',
-          '{}:test_py2'.format(os.path.join(self.testproject,'python_3_selection_testing')),
+          f"{os.path.join(self.testproject, 'python_3_selection_testing')}:test_py2",
           '--python-setup-interpreter-constraints=["CPython<3"]',
         ],
         config=pants_ini_config
@@ -195,7 +195,7 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
       pants_run_3 = self.run_pants(
             command=[
               'test',
-              '{}:test_py3'.format(os.path.join(self.testproject, 'python_3_selection_testing')),
+              f"{os.path.join(self.testproject, 'python_3_selection_testing')}:test_py3",
               '--python-setup-interpreter-constraints=["CPython>=3"]',
             ],
             config=pants_ini_config

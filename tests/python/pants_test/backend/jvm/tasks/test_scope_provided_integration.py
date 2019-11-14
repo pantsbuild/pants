@@ -9,7 +9,7 @@ class ScopeProvidedIntegrationTest(PantsRunIntegrationTest):
 
   @classmethod
   def _spec(cls, name):
-    return 'testprojects/src/java/org/pantsbuild/testproject/provided:{}'.format(name)
+    return f'testprojects/src/java/org/pantsbuild/testproject/provided:{name}'
 
   def test_leaf_binary(self):
     self.assert_success(self.run_pants([
@@ -46,7 +46,7 @@ class ScopeProvidedShadowingIntegrationTest(PantsRunIntegrationTest):
 
   @classmethod
   def _spec(cls, name):
-    return 'testprojects/maven_layout/provided_patching/leaf:{}'.format(name)
+    return f'testprojects/maven_layout/provided_patching/leaf:{name}'
 
   def test_shadow_one(self):
     run = self.run_pants([

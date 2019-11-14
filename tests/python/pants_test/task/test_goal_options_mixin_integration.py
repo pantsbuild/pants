@@ -30,7 +30,7 @@ class TestGoalOptionsMixinIntegration(PantsRunIntegrationTest):
           'backend_packages': '+["pants_test.task.echo_plugin"]'
         }
       }
-      with self.pants_results(['echo'] + flags + ['{}:a'.format(foo_dir)],
+      with self.pants_results(['echo'] + flags + [f'{foo_dir}:a'],
                               config=config) as pants_run:
         self.assert_success(pants_run)
         def get_echo(which):

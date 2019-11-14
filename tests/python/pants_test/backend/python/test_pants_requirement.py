@@ -17,8 +17,7 @@ class PantsRequirementTest(TestBase):
 
   def assert_pants_requirement(self, python_requirement_library, expected_dist='pantsbuild.pants'):
     self.assertIsInstance(python_requirement_library, PythonRequirementLibrary)
-    expected = PythonRequirement('{key}=={version}'
-                                 .format(key=expected_dist, version=pants_version()))
+    expected = PythonRequirement(f'{expected_dist}=={pants_version()}')
 
     def key(python_requirement):
       return (python_requirement.requirement.key,

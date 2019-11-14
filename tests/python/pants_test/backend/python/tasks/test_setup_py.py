@@ -70,7 +70,7 @@ class TestSetupPy(SetupPyTestBase):
       target_map[name] = self.create_python_library(
         relpath=name,
         name=name,
-        provides='setup_py(name="{name}", version="0.0.0")'.format(name=name)
+        provides=f'setup_py(name="{name}", version="0.0.0")'
       )
     for name, deps in depmap.items():
       target = target_map[name]
@@ -224,7 +224,7 @@ class TestSetupPy(SetupPyTestBase):
         relpath=name,
         name=name,
         requirements=[
-          '{}==1.1.1'.format(name)
+          f'{name}==1.1.1'
         ]
       )
 

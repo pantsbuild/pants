@@ -106,7 +106,7 @@ class AntlrJavaGenTest(NailgunTaskTestBase):
     for source in syn_target.sources_relative_to_source_root():
       source_path = os.path.join(target_workdir, source)
       self.assertTrue(os.path.isfile(source_path),
-                      "{0} is not the source root for {1}".format(target_workdir, source))
+                      f"{target_workdir} is not the source root for {source}")
       self.assertEqual(expected_package, get_package(source_path))
 
       self.assertIn(syn_target, context.targets())
@@ -116,14 +116,14 @@ class AntlrJavaGenTest(NailgunTaskTestBase):
       expected_path_prefix = expected_package.replace('.', os.path.sep) + os.path.sep
       for source in syn_target.sources_relative_to_source_root():
         self.assertTrue(source.startswith(expected_path_prefix),
-                        "{0} does not start with {1}".format(source, expected_path_prefix))
+                        f"{source} does not start with {expected_path_prefix}")
 
     # Check that empty directories have been removed
     for root, dirs, files in os.walk(target_workdir):
       for d in dirs:
         full_dir = os.path.join(root, d)
         self.assertTrue(os.listdir(full_dir),
-                         "Empty directories should have been removed ({0})".format(full_dir))
+                         f"Empty directories should have been removed ({full_dir})")
 
     return syn_target
 
@@ -205,4 +205,4 @@ class AntlrJavaGenTest(NailgunTaskTestBase):
     time.sleep(1)
     fp2 = execute_and_get_synthetic_target_hash()
     self.assertEqual(fp1, fp2,
-        'Hash of generated synthetic target is not stable. {} != {}'.format(fp1, fp2))
+        f'Hash of generated synthetic target is not stable. {fp1} != {fp2}')

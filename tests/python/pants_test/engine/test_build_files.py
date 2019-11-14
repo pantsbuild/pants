@@ -235,12 +235,12 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
 
   def resolve_failure(self, scheduler, address):
     _, state = self._populate(scheduler, address)
-    self.assertEqual(type(state), Throw, '{} is not a Throw.'.format(state))
+    self.assertEqual(type(state), Throw, f'{state} is not a Throw.')
     return state.exc
 
   def resolve(self, scheduler, address):
     _, state = self._populate(scheduler, address)
-    self.assertEqual(type(state), Return, '{} is not a Return.'.format(state))
+    self.assertEqual(type(state), Return, f'{state} is not a Return.')
     return state.value.value
 
 
@@ -383,4 +383,4 @@ class InlinedGraphTest(GraphTestBase):
     failure = self.resolve_failure(scheduler, mismatch)
     self.assertEqual(type(failure),
                       expected_type,
-                      'type was not {}. Instead was {}, {!r}'.format(expected_type.__name__, type(failure).__name__, failure))
+                      f'type was not {expected_type.__name__}. Instead was {type(failure).__name__}, {failure!r}')

@@ -158,6 +158,6 @@ def cache_server(return_failed=False, cache_root=None):
   process.start()
   try:
     port = queue.get()
-    yield TestCacheServer('http://localhost:{0}'.format(port), cache_root)
+    yield TestCacheServer(f'http://localhost:{port}', cache_root)
   finally:
     process.terminate()

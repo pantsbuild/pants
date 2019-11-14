@@ -333,7 +333,7 @@ class JarPublishAuthTest(NailgunTaskTestBase):
 
     username = 'mjk'
     password = 'h.'
-    creds_options = ['-Dlogin={}'.format(username), '-Dpassword={}'.format(password)]
+    creds_options = [f'-Dlogin={username}', f'-Dpassword={password}']
 
     repo = {
       'auth': 'blah',

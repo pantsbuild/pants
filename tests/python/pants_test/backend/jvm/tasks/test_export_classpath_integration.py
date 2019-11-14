@@ -24,7 +24,7 @@ class ExportClasspathIntegrationTest(PantsRunIntegrationTest):
       # ctime is only accurate to second.
       time.sleep(1)
 
-    self.assertTrue(ctimes[1] > ctimes[0], "{} is not overwritten.".format(manifest_jar_path))
+    self.assertTrue(ctimes[1] > ctimes[0], f"{manifest_jar_path} is not overwritten.")
 
   def test_export_classpath_file_with_excludes(self):
     manifest_jar_path = "dist/export-classpath/manifest.jar"

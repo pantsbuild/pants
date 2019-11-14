@@ -49,13 +49,13 @@ class ResolveJarsTestMixin:
               }
             """))
 
-          binary_target = '{}:synthetic'.format(os.path.join(source_dir, 'src'))
+          binary_target = f"{os.path.join(source_dir, 'src')}:synthetic"
           pants_run = self.run_pants_with_workdir(['binary', binary_target,
-                                                   '--pants-distdir={}'.format(dist_dir)], workdir)
+                                                   f'--pants-distdir={dist_dir}'], workdir)
           self.assert_success(pants_run)
           jar_path = os.path.realpath(os.path.join(dist_dir, 'synthetic.jar'))
           self.assertTrue(os.path.exists(jar_path), 'Synthetic binary was not created!')
-          jar_url = 'file://{}'.format(os.path.abspath(jar_path))
+          jar_url = f'file://{os.path.abspath(jar_path)}'
 
           with open(os.path.join(source_dir, 'src', 'BUILD.two'), 'w+') as f:
             f.write(dedent("""
@@ -74,7 +74,7 @@ class ResolveJarsTestMixin:
 
           spec_names = ['lib_with_url', 'src']
 
-          targets = ['{0}:{1}'.format(os.path.join(source_dir, 'src'), name) for name in spec_names]
+          targets = [f"{os.path.join(source_dir, 'src')}:{name}" for name in spec_names]
 
           self.evaluate_subtask(targets, workdir, load_all,
                                 extra_args=[],

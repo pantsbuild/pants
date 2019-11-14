@@ -81,4 +81,4 @@ class ConsoleTaskTest(TaskTestBase):
 
       # Instead of taking the generic assertRaises raises message, provide a more detailed failure
       # message that shows exactly what untrapped error was on the queue.
-      self.fail('task raised {0}'.format(e))
+      self.fail(f'task raised {e}')

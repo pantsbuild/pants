@@ -77,5 +77,5 @@ class BaseZincCompileJDKTest(NailgunTaskTestBase):
     )
     self.assertFalse(
       os.path.islink(zinc.dist.home),
-      "Expected {} to not be a link, it was.".format(zinc.dist.home)
+      f"Expected {zinc.dist.home} to not be a link, it was."
     )

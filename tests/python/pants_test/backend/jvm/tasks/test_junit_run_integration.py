@@ -16,7 +16,7 @@ from pants_test.backend.jvm.tasks.missing_jvm_check import is_missing_jvm
 class JunitRunIntegrationTest(PantsRunIntegrationTest):
 
   def _testjvms(self, spec_name):
-    spec = 'testprojects/tests/java/org/pantsbuild/testproject/testjvms:{}'.format(spec_name)
+    spec = f'testprojects/tests/java/org/pantsbuild/testproject/testjvms:{spec_name}'
     self.assert_success(self.run_pants(['clean-all', 'test.junit', '--strict-jvm-version', spec]))
 
   @skipIf(is_missing_jvm('1.8'), 'no java 1.8 installation on testing machine')
@@ -51,12 +51,12 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
   @contextmanager
   def coverage(self, processor, xml_path, html_path, test_project, test_class='', tests=(), args=()):
     def test_specifier_arg(test):
-      return '--test={}#{}'.format(test_class, test)
+      return f'--test={test_class}#{test}'
 
     with self.pants_results(['clean-all', 'test.junit'] + list(args) +
                             [test_specifier_arg(name) for name in tests] +
                             [test_project,
-                             '--test-junit-coverage-processor={}'.format(processor),
+                             f'--test-junit-coverage-processor={processor}',
                              '--test-junit-coverage']) as results:
       self.assert_success(results)
 
@@ -204,7 +204,7 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
 
   def do_test_junit_run_with_html_report(self, tests=(), args=()):
     def html_report_test(test):
-      return '--test=org.pantsbuild.testproject.htmlreport.HtmlReportTest#{}'.format(test)
+      return f'--test=org.pantsbuild.testproject.htmlreport.HtmlReportTest#{test}'
 
     with self.pants_results(['clean-all', 'test.junit'] + list(args) +
                             [html_report_test(name) for name in tests] +

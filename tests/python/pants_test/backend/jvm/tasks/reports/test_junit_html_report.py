@@ -117,7 +117,7 @@ class TestJUnitHtmlReport(TestBase):
   def test_merged_no_conflict(self):
     with temporary_dir() as xml_dir:
       def write_xml(name, xml, path=''):
-        with open(os.path.join(xml_dir, path, 'TEST-{}.xml'.format(name)), 'w') as fp:
+        with open(os.path.join(xml_dir, path, f'TEST-{name}.xml'), 'w') as fp:
           fp.write(xml)
 
       write_xml('a-1', """
@@ -165,7 +165,7 @@ class TestJUnitHtmlReport(TestBase):
   def merge_conflict(self):
     with temporary_dir() as xml_dir:
       def write_xml(name, xml, path=''):
-        with open(os.path.join(xml_dir, path, 'TEST-{}.xml'.format(name)), 'w') as fp:
+        with open(os.path.join(xml_dir, path, f'TEST-{name}.xml'), 'w') as fp:
           fp.write(xml)
 
       write_xml('a-1', """

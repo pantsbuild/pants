@@ -18,7 +18,7 @@ class FilespecTest(TestBase):
     for expected in expected_matches:
       assertMatch(
           matches_filespec(expected, {'globs': [glob]}),
-          '{} {} path `{}`'.format(glob, match_state, expected),
+          f'{glob} {match_state} path `{expected}`',
       )
 
     # And confirm that it matches on-disk behaviour.
@@ -30,7 +30,7 @@ class FilespecTest(TestBase):
     snapshot, = self.scheduler.product_request(Snapshot, [PathGlobs([glob])])
     if negate:
       subset = set(expected_matches).intersection(set(snapshot.files))
-      self.assertEquals(subset, set(), '{} {} path(s) {}'.format(glob, match_state, subset))
+      self.assertEquals(subset, set(), f'{glob} {match_state} path(s) {subset}')
     else:
       self.assertEquals(sorted(expected_matches), sorted(snapshot.files))
 

@@ -30,7 +30,7 @@ class PrepCommandIntegrationTest(PantsRunIntegrationTest):
             prep_args=['{tmpdir}/{touch_target}'],
           )
         """.format(name=name, goal=name, tmpdir=workdir, touch_target=touch_target)))
-    return ['{}:{}'.format(prep_command_path, name) for name in cls._SENTINELS]
+    return [f'{prep_command_path}:{name}' for name in cls._SENTINELS]
 
   @classmethod
   def _goal_ran(cls, basedir, goal):

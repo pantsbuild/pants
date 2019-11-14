@@ -58,7 +58,7 @@ class BaseZincCompileIntegrationTest:
                 '-S-Yhot-statistics-enabled',
                 '-S-Yprofile-enabled',
                 '-S-Yprofile-destination',
-                '-S{}'.format(profile_destination),
+                f'-S{profile_destination}',
                 '-S-Ycache-plugin-class-loader:last-modified',
               ],
             },
@@ -157,7 +157,7 @@ class BaseZincCompileIntegrationTest:
       gen_file = self.get_only(found, 'Main_HelloWorld.java')
       self.assertTrue(gen_file.endswith(
         'org/pantsbuild/testproject/annotation/processorwithdep/main/Main_HelloWorld.java'),
-        msg='{} does not match'.format(gen_file))
+        msg=f'{gen_file} does not match')
 
 
     # Try to reproduce second compile that fails with missing symbol

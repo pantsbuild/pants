@@ -173,7 +173,7 @@ class ApacheThriftPyGenTest(TaskTestBase):
     # `synthetic_target_extra_dependencies` override in `ApacheThriftPyGen`:
     #   https://github.com/pantsbuild/pants/issues/5975
     pythonpath = [os.path.join(get_buildroot(), t.target_base) for t in targets]
-    for resolved_dist in resolve(['thrift=={}'.format(self.get_thrift_version(apache_thrift_gen)),
+    for resolved_dist in resolve([f'thrift=={self.get_thrift_version(apache_thrift_gen)}',
                                   'setuptools==40.6.3'],
                                  interpreter=interpreter,
                                  context=python_repos.get_network_context(),

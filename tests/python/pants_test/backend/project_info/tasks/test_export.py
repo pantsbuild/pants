@@ -387,7 +387,7 @@ class ExportTest(ConsoleTaskTestBase):
     source_root = result['targets']['project_info:third']['roots'][0]
     self.assertEqual('com.foo', source_root['package_prefix'])
     self.assertEqual(
-      '{0}/project_info/com/foo'.format(self.build_root),
+      f'{self.build_root}/project_info/com/foo',
       source_root['source_root']
     )
 
@@ -412,7 +412,7 @@ class ExportTest(ConsoleTaskTestBase):
       'is_target_root': True,
       'roots': [
          {
-           'source_root': '{root}/project_info/this/is/a/source'.format(root=self.build_root),
+           'source_root': f'{self.build_root}/project_info/this/is/a/source',
            'package_prefix': 'this.is.a.source'
          },
       ],
@@ -435,7 +435,7 @@ class ExportTest(ConsoleTaskTestBase):
     self.assertEqual('TEST', result['targets']['project_info:java_test']['target_type'])
     # Note that the junit dep gets auto-injected via the JUnit subsystem.
     self.assertEqual(['org.apache:apache-jar:12.12.2012',
-                      'junit:junit:{}'.format(JUnit.LIBRARY_REV)],
+                      f'junit:junit:{JUnit.LIBRARY_REV}'],
                      result['targets']['project_info:java_test']['libraries'])
     self.assertEqual('TEST_RESOURCE',
                      result['targets']['project_info:test_resource']['target_type'])

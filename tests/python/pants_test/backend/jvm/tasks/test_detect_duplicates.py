@@ -55,7 +55,7 @@ class DuplicateDetectorTest(JvmBinaryTaskTestBase):
                                  cache_path=jar_path,
                                  pants_path=jar_path)
       jar_dep = JarDependency(org='org.example', name=name, rev='0.0.1')
-      jar_library = self.make_target(spec='3rdparty:{}'.format(name),
+      jar_library = self.make_target(spec=f'3rdparty:{name}',
                                      target_type=JarLibrary,
                                      jars=[jar_dep])
       return jar_library, resolved_jar

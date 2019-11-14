@@ -27,7 +27,7 @@ class TestPythonTestRunnerIntegration(PantsRunIntegrationTest):
     self.assertEqual(
       len(want_lines),
       len(got_lines),
-      'Wrong number of lines comparing:\nWANT:\n{}\nGOT:\n{}'.format(want, got)
+      f'Wrong number of lines comparing:\nWANT:\n{want}\nGOT:\n{got}'
     )
 
     for line_number, (want_line, got_line) in enumerate(zip(want_lines, got_lines)):
@@ -37,8 +37,8 @@ class TestPythonTestRunnerIntegration(PantsRunIntegrationTest):
                          "Line {} wrong: want '{}', got '{}'"
                          .format(line_number, want_line, got_line))
       elif len(want_parts) == 2:
-        self.assertTrue(got_line.startswith(want_parts[0]), 'Line {} Want "{}" to start with "{}"'.format(line_number, got_line, want_parts[0]))
-        self.assertTrue(got_line.endswith(want_parts[1]), 'Line {} Want "{}" to end with "{}"'.format(line_number, got_line, want_parts[1]))
+        self.assertTrue(got_line.startswith(want_parts[0]), f'Line {line_number} Want "{got_line}" to start with "{want_parts[0]}"')
+        self.assertTrue(got_line.endswith(want_parts[1]), f'Line {line_number} Want "{got_line}" to end with "{want_parts[1]}"')
 
   def run_passing_pants_test(self, trailing_args):
     pants_run = self.run_pants(trailing_args)

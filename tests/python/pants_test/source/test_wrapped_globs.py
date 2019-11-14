@@ -53,7 +53,7 @@ class FilesetRelPathWrapperTest(TestBase):
     self.context().scan()
 
   def _spec_test(self, spec, expected):
-    self.add_to_build_file('y/BUILD', 'dummy_target(name="y", sources={})'.format(spec))
+    self.add_to_build_file('y/BUILD', f'dummy_target(name="y", sources={spec})')
     graph = self.context().scan()
     globs = graph.get_target_from_spec('y').globs_relative_to_buildroot()
     self.assertEqual(expected, globs)

@@ -234,7 +234,7 @@ class ContextutilTest(unittest.TestCase):
     # them from other instances.
     uuid_str = str(uuid.uuid4())
     def u(string: str) -> str:
-      return '{}#{}'.format(uuid_str, string)
+      return f'{uuid_str}#{string}'
     stdin_data = u('stdio')
     stdout_data = u('stdout')
     stderr_data = u('stderr')
@@ -264,7 +264,7 @@ class ContextutilTest(unittest.TestCase):
 
   def test_stdio_as(self) -> None:
     self.assertTrue(sys.stderr.fileno() > 2,
-                    "Expected a pseudofile as stderr, got: {}".format(sys.stderr))
+                    f"Expected a pseudofile as stderr, got: {sys.stderr}")
     old_stdout, old_stderr, old_stdin = sys.stdout, sys.stderr, sys.stdin
 
     # The first level tests that when `sys.std*` are file-likes (in particular, the ones set up in

@@ -23,7 +23,7 @@ class TestJvmDependencyUsageIntegration(PantsRunIntegrationTest):
           '--lint-jvm-dep-check-unnecessary-deps=fatal',
           'dep-usage',
           target,
-          '--dep-usage-jvm-output-file={}'.format(outfile),
+          f'--dep-usage-jvm-output-file={outfile}',
           ] + (extra_args if extra_args else [])
       if clean_all:
         args.insert(0, 'clean-all')
@@ -35,7 +35,7 @@ class TestJvmDependencyUsageIntegration(PantsRunIntegrationTest):
 
   def _assert_non_zero_usage(self, dep_usage_json):
     for entry in dep_usage_json:
-      self.assertGreater(entry['max_usage'], 0.0, 'Usage was 0.0 in: `{}`'.format(entry))
+      self.assertGreater(entry['max_usage'], 0.0, f'Usage was 0.0 in: `{entry}`')
 
   def test_dep_usage(self):
     target = 'testprojects/src/java/org/pantsbuild/testproject/unicode/main'
@@ -77,7 +77,7 @@ class TestJvmDependencyUsageIntegration(PantsRunIntegrationTest):
       self.temporary_workdir() as workdir:
       for compiler in ['rsc']:
         self._run_dep_usage(workdir, target, clean_all=True, cachedir=cachedir,
-          extra_args=['--no-dep-usage-jvm-summary', '--jvm-platform-compiler={}'.format(compiler)])
+          extra_args=['--no-dep-usage-jvm-summary', f'--jvm-platform-compiler={compiler}'])
 
   def test_dep_usage_target_with_no_deps(self):
     target = 'testprojects/src/java/org/pantsbuild/testproject/nocache'

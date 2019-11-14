@@ -22,18 +22,15 @@ class BuildLocalPythonDistributionsIntegrationTest(PantsRunIntegrationTest):
   py_dist_test = 'testprojects/tests/python/example_test/python_distribution'
 
   def _assert_nation_and_greeting(self, output, punctuation='!'):
-    self.assertEquals("""\
-hello{}
-United States
-""".format(punctuation), output)
+    self.assertEquals(f"""hello{punctuation}\nUnited States\n""", output)
 
   def test_pydist_binary(self):
     with temporary_dir() as tmp_dir:
       pex = os.path.join(tmp_dir, 'main_with_no_conflict.pex')
       command = [
-        '--pants-distdir={}'.format(tmp_dir),
+        f'--pants-distdir={tmp_dir}',
         'binary',
-        '{}:main_with_no_conflict'.format(self.hello_install_requires_dir),
+        f'{self.hello_install_requires_dir}:main_with_no_conflict',
       ]
       pants_run = self.run_pants(command=command)
       self.assert_success(pants_run)
@@ -50,10 +47,10 @@ United States
   def test_pydist_run(self):
     with temporary_dir() as tmp_dir:
       command=[
-        '--pants-distdir={}'.format(tmp_dir),
+        f'--pants-distdir={tmp_dir}',
         '--quiet',
         'run',
-        '{}:main_with_no_conflict'.format(self.hello_install_requires_dir)]
+        f'{self.hello_install_requires_dir}:main_with_no_conflict']
       pants_run = self.run_pants(command=command)
       self.assert_success(pants_run)
       # Check that text was properly printed to stdout.
@@ -61,7 +58,7 @@ United States
 
   def test_pydist_invalidation(self):
     """Test that the current version of a python_dist() is resolved after modifying its sources."""
-    hello_run = '{}:main_with_no_conflict'.format(self.hello_install_requires_dir)
+    hello_run = f'{self.hello_install_requires_dir}:main_with_no_conflict'
 
     with self.mock_buildroot(
         dirs_to_copy=[self.hello_install_requires_dir]) as buildroot, buildroot.pushd():
@@ -92,7 +89,7 @@ United States
   def test_pydist_test(self):
     with temporary_dir() as tmp_dir:
       command=[
-        '--pants-distdir={}'.format(tmp_dir),
+        f'--pants-distdir={tmp_dir}',
         'test',
         self.py_dist_test,
       ]

@@ -48,7 +48,7 @@ class TestTest(TestBase):
     return BuildFileAddress(
       build_file=None,
       target_name=address.target_name,
-      rel_path='{}/BUILD'.format(address.spec_path),
+      rel_path=f'{address.spec_path}/BUILD',
     )
 
   def test_outputs_success(self):

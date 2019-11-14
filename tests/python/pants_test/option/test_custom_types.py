@@ -99,8 +99,8 @@ class CustomTypesTest(unittest.TestCase):
     # Example of the kind of (unlikely) values that will defeat our heuristic, regex-based
     # splitter of list modifier expressions.
     funky_string = '],+['
-    self._do_split('+["{}"],-["foo"]'.format(funky_string),
-                   ['+["{}"]'.format(funky_string), '-["foo"]'])
+    self._do_split(f'+["{funky_string}"],-["foo"]',
+                   [f'+["{funky_string}"]', '-["foo"]'])
 
   def test_unicode_comments(self):
     """We had a bug where unicode characters in comments would cause the option parser to fail.

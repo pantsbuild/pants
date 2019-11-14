@@ -208,8 +208,8 @@ Current thread [^\n]+ \\(most recent call first\\):
     testproject_backend_pkg_name = 'test_pants_plugin'
     lifecycle_stub_cmdline = [
       '--no-enable-pantsd',
-      "--pythonpath=+['{}']".format(testproject_backend_src_dir),
-      "--backend-packages=+['{}']".format(testproject_backend_pkg_name),
+      f"--pythonpath=+['{testproject_backend_src_dir}']",
+      f"--backend-packages=+['{testproject_backend_pkg_name}']",
       # This task will always raise an exception.
       'lifecycle-stub-goal',
     ]
@@ -228,7 +228,7 @@ Current thread [^\n]+ \\(most recent call first\\):
 
     # The exiter that gets added when this option is changed prints that option to stderr.
     changed_exiter_run = self.run_pants([
-      "--lifecycle-stubs-add-exiter-message='{}'".format('NEW MESSAGE'),
+      f"--lifecycle-stubs-add-exiter-message='{'NEW MESSAGE'}'",
     ] + lifecycle_stub_cmdline)
     self.assert_failure(changed_exiter_run)
     self.assertIn('erroneous!', changed_exiter_run.stderr_data)
@@ -246,7 +246,7 @@ Current thread [^\n]+ \\(most recent call first\\):
       some_file = os.path.join(tmpdir, 'some_file')
       safe_file_dump(some_file, '')
       redirected_pants_run = self.run_pants([
-        "--lifecycle-stubs-new-interactive-stream-output-file={}".format(some_file),
+        f"--lifecycle-stubs-new-interactive-stream-output-file={some_file}",
       ] + lifecycle_stub_cmdline)
       self.assert_failure(redirected_pants_run)
       # The Exiter prints the final error message to whatever the interactive output stream is set

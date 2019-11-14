@@ -36,10 +36,10 @@ class BuildGraphIntegrationTest(PantsRunIntegrationTest):
       pants_run = self.run_pants([
         '--build-file-imports=error',
         'run',
-        '{}:hello'.format(dir),
+        f'{dir}:hello',
       ], print_exception_stacktrace=False)
       self.assert_failure(pants_run)
-      self.assertIn('{}/BUILD'.format(dir), pants_run.stderr_data)
+      self.assertIn(f'{dir}/BUILD', pants_run.stderr_data)
       self.assertIn('os.path', pants_run.stderr_data)
 
   def test_warn_module_import(self):
@@ -53,11 +53,11 @@ class BuildGraphIntegrationTest(PantsRunIntegrationTest):
       pants_run = self.run_pants([
         '--build-file-imports=warn',
         'run',
-        '{}:hello'.format(dir),
+        f'{dir}:hello',
       ])
       self.assert_success(pants_run)
       self.assertIn('Hello\n', pants_run.stdout_data)
-      self.assertIn('{}/BUILD'.format(dir), pants_run.stderr_data)
+      self.assertIn(f'{dir}/BUILD', pants_run.stderr_data)
       self.assertIn('os.path', pants_run.stderr_data)
 
   def test_allowed_module_import(self):
@@ -71,7 +71,7 @@ class BuildGraphIntegrationTest(PantsRunIntegrationTest):
       pants_run = self.run_pants([
         '--build-file-imports=allow',
         'run',
-        '{}:hello'.format(dir),
+        f'{dir}:hello',
       ])
     self.assert_success(pants_run)
     self.assertIn('Hello\n', pants_run.stdout_data)

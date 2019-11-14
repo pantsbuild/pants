@@ -34,7 +34,7 @@ class JvmPlatformAnalysisIntegrationTest(PantsRunIntegrationTest):
         f.write(contents)
 
     def spec(self, name):
-      return '{}:{}'.format(self.javadir, name)
+      return f'{self.javadir}:{name}'
 
     def clean_all(self):
       return self.test.run_pants_with_workdir(['clean-all'], workdir=self.workdir)

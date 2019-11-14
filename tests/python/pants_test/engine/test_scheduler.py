@@ -38,7 +38,7 @@ def nested_raise(x: B) -> A:
 
 @rule
 def consumes_a_and_b(a: A, b: B) -> str:
-  return str('{} and {}'.format(a, b))
+  return str(f'{a} and {b}')
 
 
 @dataclass(frozen=True)
@@ -275,7 +275,7 @@ Exception: WithDeps(Inner(InnerEntry { params: {TypeCheckFailWrapper}, rule: Tas
       self.assertTrue(exc_str.startswith(dedent("""\
         1 Exception raised in CFFI extern methods:
         Traceback (most recent call last):
-        """)), "exc_str was: {}".format(exc_str))
+        """)), f"exc_str was: {exc_str}")
 
     def assert_has_end_of_cffi_extern_error_traceback(exc_str):
       self.assertIn(dedent("""\
@@ -286,7 +286,7 @@ Exception: WithDeps(Inner(InnerEntry { params: {TypeCheckFailWrapper}, rule: Tas
             hash_ = hash(obj)
           File "<string>", line 2, in __hash__
         TypeError: unhashable type: 'list'
-        """), exc_str, "exc_str was: {}".format(exc_str))
+        """), exc_str, f"exc_str was: {exc_str}")
 
     resulting_engine_error = dedent("""\
         Exception: Types that will be passed as Params at the root of a graph need to be registered via RootRule:
@@ -305,7 +305,7 @@ Exception: WithDeps(Inner(InnerEntry { params: {TypeCheckFailWrapper}, rule: Tas
       The engine execution request raised this error, which is probably due to the errors in the
       CFFI extern methods listed above, as CFFI externs return None upon error:
       """), exc_str)
-    self.assertTrue(exc_str.endswith(resulting_engine_error), "exc_str was: {}".format(exc_str))
+    self.assertTrue(exc_str.endswith(resulting_engine_error), f"exc_str was: {exc_str}")
 
     PATCH_OPTS = dict(autospec=True, spec_set=True)
     def create_cffi_exception():

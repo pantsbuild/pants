@@ -654,7 +654,7 @@ class IvyFrozenResolutionTest(TestBase):
         FrozenResolution.load_from_file(resolve_file.name, [])
 
   def test_jar_relative_url(self):
-    abs_url = 'file://{}/a/b/c'.format(get_buildroot())
+    abs_url = f'file://{get_buildroot()}/a/b/c'
     rel_url = 'file:a/b/c'
 
     # Three equivalent ways of using absolute/relative url.
