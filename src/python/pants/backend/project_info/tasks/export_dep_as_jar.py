@@ -1,0 +1,276 @@
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+import json
+import os
+from collections import defaultdict
+
+from twitter.common.collections import OrderedSet
+
+from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
+from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
+from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.targets.junit_tests import JUnitTests
+from pants.backend.jvm.targets.jvm_target import JvmTarget
+from pants.backend.jvm.targets.scala_library import ScalaLibrary
+from pants.backend.project_info.tasks.export import SourceRootTypes
+from pants.backend.python.targets.python_tests import PythonTests
+from pants.base.build_environment import get_buildroot
+from pants.build_graph.resources import Resources
+from pants.java.distribution.distribution import DistributionLocator
+from pants.java.jar.jar_dependency_utils import M2Coordinate
+from pants.task.console_task import ConsoleTask
+from pants.util.memo import memoized_property
+
+
+class ExportDepAsJar(ConsoleTask):
+  """Create project info for IntelliJ with dependencies treated as jars."""
+
+  DEFAULT_EXPORT_VERSION = '1.0.11'
+
+  @classmethod
+  def register_options(cls, register):
+    super().register_options(register)
+
+  @classmethod
+  def prepare(cls, options, round_manager):
+    round_manager.require_data('runtime_classpath')
+
+  @property
+  def _output_folder(self):
+    return self.options_scope.replace('.', os.sep)
+
+  @staticmethod
+  def _source_roots_for_target(target):
+    """
+    :type target:pants.build_graph.target.Target
+    """
+
+    def root_package_prefix(source_file):
+      source = os.path.dirname(source_file)
+      return os.path.join(get_buildroot(), target.target_base, source), source.replace(os.sep, '.')
+
+    return {root_package_prefix(source) for source in target.sources_relative_to_source_root()}
+
+  @memoized_property
+  def target_aliases_map(self):
+    registered_aliases = self.context.build_configuration.registered_aliases()
+    mapping = {}
+    for alias, target_types in registered_aliases.target_types_by_alias.items():
+      # If a target class is registered under multiple aliases returns the last one.
+      for target_type in target_types:
+        mapping[target_type] = alias
+    return mapping
+
+  def _get_pants_target_alias(self, pants_target_type):
+    """Returns the pants target alias for the given target"""
+    if pants_target_type in self.target_aliases_map:
+      return self.target_aliases_map.get(pants_target_type)
+    else:
+      return "{}.{}".format(pants_target_type.__module__, pants_target_type.__name__)
+
+  @staticmethod
+  def _jar_id(jar):
+    """Create a string identifier for the IvyModuleRef key.
+    :param IvyModuleRef jar: key for a resolved jar
+    :returns: String representing the key as a maven coordinate
+    """
+    if jar.rev:
+      return '{0}:{1}:{2}'.format(jar.org, jar.name, jar.rev)
+    else:
+      return '{0}:{1}'.format(jar.org, jar.name)
+
+  def _resolve_jars_info(self, targets, classpath_products):
+    """Consults ivy_jar_products to export the external libraries.
+
+    :return: mapping of jar_id -> { 'default'     : <jar_file>,
+                                    'sources'     : <jar_file>,
+                                    'javadoc'     : <jar_file>,
+                                    <other_confs> : <jar_file>,
+                                  }
+    """
+    mapping = defaultdict(dict)
+    jar_products = classpath_products.get_artifact_classpath_entries_for_targets(
+      targets, respect_excludes=False)
+    for conf, jar_entry in jar_products:
+      conf = jar_entry.coordinate.classifier or 'default'
+      mapping[self._jar_id(jar_entry.coordinate)][conf] = jar_entry.cache_path
+    return mapping
+
+  def generate_targets_map(self, targets, classpath_products=None, runtime_classpath=None):
+    """Generates a dictionary containing all pertinent information about the target graph.
+
+    The return dictionary is suitable for serialization by json.dumps.
+    :param targets: The list of targets to generate the map for.
+    :param classpath_products: Optional classpath_products. If not provided when the --libraries
+      option is `True`, this task will perform its own jar resolution.
+    """
+
+    def _get_target_type(tgt):
+      def is_test(t):
+        return isinstance(t, JUnitTests) or isinstance(t, PythonTests)
+
+      if is_test(tgt):
+        return SourceRootTypes.TEST
+      else:
+        if (isinstance(tgt, Resources) and
+          tgt in resource_target_map and
+          is_test(resource_target_map[tgt])):
+          return SourceRootTypes.TEST_RESOURCE
+        elif isinstance(tgt, Resources):
+          return SourceRootTypes.RESOURCE
+        else:
+          return SourceRootTypes.SOURCE
+
+    targets_map = {}
+    resource_target_map = {}
+
+    # if self.get_options().libraries:
+    #   # NB(gmalmquist): This supports mocking the classpath_products in tests.
+    #   if classpath_products is None:
+    #     classpath_products = self.resolve_jars(targets)
+    # else:
+    #   classpath_products = None
+
+    target_roots_set = set(self.context.target_roots)
+
+    def process_target(current_target):
+      """
+      :type current_target:pants.build_graph.target.Target
+      """
+      info = {
+        # this means 'dependencies'
+        'targets': [],
+        'libraries': [],
+        'roots': [],
+        'id': current_target.id,
+        'target_type': _get_target_type(current_target),
+        'is_synthetic': current_target.is_synthetic,
+        'pants_target_type': self._get_pants_target_alias(type(current_target)),
+        'is_target_root': current_target in target_roots_set,
+        'transitive': current_target.transitive,
+        'scope': str(current_target.scope)
+      }
+
+      if not current_target.is_synthetic:
+        info['globs'] = current_target.globs_relative_to_buildroot()
+
+      def iter_transitive_jars(jar_lib):
+        """
+        :type jar_lib: :class:`pants.backend.jvm.targets.jar_library.JarLibrary`
+        :rtype: :class:`collections.Iterator` of
+                :class:`pants.java.jar.M2Coordinate`
+        """
+        if classpath_products:
+          jar_products = classpath_products.get_artifact_classpath_entries_for_targets((jar_lib,))
+          for _, jar_entry in jar_products:
+            coordinate = jar_entry.coordinate
+            # We drop classifier and type_ since those fields are represented in the global
+            # libraries dict and here we just want the key into that dict (see `_jar_id`).
+            yield M2Coordinate(org=coordinate.org, name=coordinate.name, rev=coordinate.rev)
+
+      target_libraries = OrderedSet()
+      if isinstance(current_target, JarLibrary):
+        target_libraries = OrderedSet(iter_transitive_jars(current_target))
+      for dep in current_target.dependencies:
+        info['targets'].append(dep.address.spec)
+        if isinstance(dep, JarLibrary):
+          for jar in dep.jar_dependencies:
+            target_libraries.add(M2Coordinate(jar.org, jar.name, jar.rev))
+          # Add all the jars pulled in by this jar_library
+          target_libraries.update(iter_transitive_jars(dep))
+        if isinstance(dep, Resources):
+          resource_target_map[dep] = current_target
+
+      if isinstance(current_target, ScalaLibrary):
+        for dep in current_target.java_sources:
+          info['targets'].append(dep.address.spec)
+          process_target(dep)
+
+      if isinstance(current_target, JvmTarget):
+        info['excludes'] = [self._exclude_id(exclude) for exclude in current_target.excludes]
+        info['platform'] = current_target.platform.name
+        if hasattr(current_target, 'test_platform'):
+          info['test_platform'] = current_target.test_platform.name
+
+      if classpath_products:
+        info['libraries'].extend(self._jar_id(lib) for lib in target_libraries)
+
+      if current_target in target_roots_set:
+        info['roots'] = [{
+          'source_root': source_root_package_prefix[0],
+          'package_prefix': source_root_package_prefix[1]
+        } for source_root_package_prefix in self._source_roots_for_target(current_target)]
+
+      targets_map[current_target.address.spec] = info
+
+    for target in targets:
+      process_target(target)
+
+    scala_platform = ScalaPlatform.global_instance()
+    scala_platform_map = {
+      'scala_version': scala_platform.version,
+      'compiler_classpath': [
+        cp_entry.path
+        for cp_entry in scala_platform.compiler_classpath_entries(self.context.products)
+      ],
+    }
+
+    jvm_platforms_map = {
+      'default_platform': JvmPlatform.global_instance().default_platform.name,
+      'platforms': {
+        str(platform_name): {
+          'target_level': str(platform.target_level),
+          'source_level': str(platform.source_level),
+          'args': platform.args,
+        } for platform_name, platform in JvmPlatform.global_instance().platforms_by_name.items()},
+    }
+
+    graph_info = {
+      'version': self.DEFAULT_EXPORT_VERSION,
+      'targets': targets_map,
+      'jvm_platforms': jvm_platforms_map,
+      'scala_platform': scala_platform_map,
+      # `jvm_distributions` are static distribution settings from config,
+      # `preferred_jvm_distributions` are distributions that pants actually uses for the
+      # given platform setting.
+      'preferred_jvm_distributions': {}
+    }
+
+    for platform_name, platform in JvmPlatform.global_instance().platforms_by_name.items():
+      preferred_distributions = {}
+      for strict, strict_key in [(True, 'strict'), (False, 'non_strict')]:
+        try:
+          dist = JvmPlatform.preferred_jvm_distribution([platform], strict=strict)
+          preferred_distributions[strict_key] = dist.home
+        except DistributionLocator.Error:
+          pass
+
+      if preferred_distributions:
+        graph_info['preferred_jvm_distributions'][platform_name] = preferred_distributions
+
+    if classpath_products:
+      graph_info['libraries'] = self._resolve_jars_info(targets, classpath_products)
+      for t in targets:
+        target_type = _get_target_type(t)
+        if t in target_roots_set or target_type == SourceRootTypes.RESOURCE or \
+          target_type == SourceRootTypes.TEST_RESOURCE or \
+          targets_map[t.address.spec]['pants_target_type'] == 'jar_library':
+          continue
+
+        targets_map[t.address.spec]['pants_target_type'] = 'jar_library'
+        targets_map[t.address.spec]['libraries'] = [t.id]
+        jar_products = runtime_classpath.get_for_target(t)
+        for conf, jar_entry in jar_products:
+          if 'z.jar' in jar_entry:
+            graph_info['libraries'][t.id][conf] = jar_entry
+
+    return graph_info
+
+  def console_output(self, targets):
+    compile_classpath = self.context.products.get_data('runtime_classpath')
+    runtime_classpath = self.context.products.get_data('runtime_classpath')
+    graph_info = self.generate_targets_map(self.context.targets(lambda t: isinstance(t, JvmTarget)),
+      classpath_products=compile_classpath,
+      runtime_classpath=runtime_classpath)
+    return json.dumps(graph_info, indent=4, separators=(',', ': ')).splitlines()
