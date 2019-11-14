@@ -109,6 +109,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/engine/examples:scheduler_inputs',
     'src/python/pants/testutil/engine:util',
+    'src/python/pants/reporting',
   ]
 )
 
