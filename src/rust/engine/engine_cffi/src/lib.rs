@@ -389,7 +389,7 @@ fn make_core(
   )
 }
 
-fn workunits_to_py_tuple_value<'a>(workunits: &mut impl Iterator<Item = &'a WorkUnit>) -> Value {
+fn workunits_to_py_tuple_value<'a>(workunits: impl Iterator<Item = &'a WorkUnit>) -> Value {
   let workunit_values = workunits
     .map(|workunit: &WorkUnit| {
       let mut workunit_zipkin_trace_info = vec![
