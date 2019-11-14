@@ -45,14 +45,14 @@ pub struct WorkUnit {
 #[derive(Clone, Default)]
 pub struct WorkUnitStore {
   workunits: Arc<Mutex<Vec<WorkUnit>>>,
-  last_seen_workunit: usize,
+  last_seen_workunit: Arc<Mutex<usize>>,
 }
 
 impl WorkUnitStore {
   pub fn new() -> WorkUnitStore {
     WorkUnitStore {
       workunits: Arc::new(Mutex::new(Vec::new())),
-      last_seen_workunit: 0,
+      last_seen_workunit: Arc::new(Mutex::new(0)),
     }
   }
 
@@ -70,9 +70,11 @@ impl WorkUnitStore {
   {
     let workunits = self.workunits.lock();
     let cur_len = workunits.len();
-    let latest = self.last_seen_workunit;
-    self.last_seen_workunit = cur_len;
-    f(&workunits[latest..cur_len])
+    let mut latest_guard = (*self.last_seen_workunit).lock();
+    let latest: &mut usize = &mut *latest_guard;
+    let output = f(&workunits[*latest..cur_len]);
+    *latest = cur_len;
+    output
   }
 }
 
