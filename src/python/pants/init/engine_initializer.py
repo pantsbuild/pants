@@ -205,7 +205,7 @@ class LegacyGraphSession:
     :returns: An exit code.
     """
 
-    async_reporter = AsyncWorkunitHandler(self.scheduler_session, callback=None, report_interval_seconds=0.01)
+    async_reporter = AsyncWorkunitHandler(self.scheduler_session, callback=None)
     subject = target_roots.specs
     console = Console(
       use_colors=options_bootstrapper.bootstrap_options.for_global_scope().colors

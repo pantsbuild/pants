@@ -276,10 +276,7 @@ def _make_rule(
       for p, s in rule_visitor.gets)
 
     # Register dependencies for @console_rule/Goal.
-    if is_goal_cls:
-      dependency_rules = (optionable_rule(return_type.Options),)
-    else:
-      dependency_rules = None
+    dependency_rules = (optionable_rule(return_type.Options),) if is_goal_cls else None
 
     func.rule = TaskRule(
         return_type,
