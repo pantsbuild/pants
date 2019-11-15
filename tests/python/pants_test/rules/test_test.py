@@ -18,7 +18,7 @@ from pants.rules.core.test import (
   coordinator_of_tests,
   fast_test,
 )
-from pants.testutil.engine.util import MockConsole, MockedYieldGet, run_rule
+from pants.testutil.engine.util import MockConsole, MockGet, run_rule
 from pants.testutil.test_base import TestBase
 
 
@@ -30,8 +30,8 @@ class TestTest(TestBase):
     res = run_rule(
       fast_test,
       rule_args=[console, (addr,)],
-      mocked_yield_gets=[
-        MockedYieldGet(
+      mock_gets=[
+        MockGet(
           product_type=AddressAndTestResult,
           subject_type=Address,
           mock=lambda _: AddressAndTestResult(addr, result),
@@ -91,8 +91,8 @@ class TestTest(TestBase):
     res = run_rule(
       fast_test,
       rule_args=[console, (target1, target2)],
-      mocked_yield_gets=[
-        MockedYieldGet(product_type=AddressAndTestResult, subject_type=Address, mock=make_result),
+      mock_gets=[
+        MockGet(product_type=AddressAndTestResult, subject_type=Address, mock=make_result),
       ],
     )
 
@@ -132,8 +132,8 @@ class TestTest(TestBase):
           UnionMembership(union_rules={TestTarget: [PythonTestsAdaptor]}),
           AddressProvenanceMap(bfaddr_to_spec={}),
         ],
-        mocked_yield_gets=[
-          MockedYieldGet(
+        mock_gets=[
+          MockGet(
             product_type=TestResult,
             subject_type=PythonTestsAdaptor,
             mock=lambda _: TestResult(status=Status.FAILURE, stdout='foo', stderr=''),
@@ -157,8 +157,8 @@ class TestTest(TestBase):
           UnionMembership(union_rules={TestTarget: [PythonTestsAdaptor]}),
           AddressProvenanceMap(bfaddr_to_spec={bfaddr: DescendantAddresses(directory='some/dir')}),
         ],
-        mocked_yield_gets=[
-          MockedYieldGet(
+        mock_gets=[
+          MockGet(
             product_type=TestResult,
             subject_type=PythonTestsAdaptor,
             mock=lambda _: TestResult(status=Status.SUCCESS, stdout='foo', stderr=''),
@@ -183,8 +183,8 @@ class TestTest(TestBase):
           UnionMembership(union_rules={TestTarget: [PythonTestsAdaptor]}),
           AddressProvenanceMap(bfaddr_to_spec={bfaddr: DescendantAddresses(directory='some/dir')}),
         ],
-        mocked_yield_gets=[
-          MockedYieldGet(
+        mock_gets=[
+          MockGet(
             product_type=TestResult,
             subject_type=PythonTestsAdaptor,
             mock=lambda _: TestResult(status=Status.SUCCESS, stdout='foo', stderr=''),
@@ -214,8 +214,8 @@ class TestTest(TestBase):
               bfaddr: SingleAddress(directory='some/dir', name='bin'),
             }),
           ],
-          mocked_yield_gets=[
-            MockedYieldGet(
+          mock_gets=[
+            MockGet(
               product_type=TestResult,
               subject_type=PythonTestsAdaptor,
               mock=lambda _: TestResult(status=Status.SUCCESS, stdout='foo', stderr=''),

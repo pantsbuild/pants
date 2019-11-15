@@ -7,7 +7,7 @@ from pants.engine.interactive_runner import InteractiveRunner
 from pants.rules.core import run
 from pants.rules.core.binary import CreatedBinary
 from pants.testutil.console_rule_test_base import ConsoleRuleTestBase
-from pants.testutil.engine.util import MockConsole, MockedYieldGet, run_rule
+from pants.testutil.engine.util import MockConsole, MockGet, run_rule
 
 
 class RunTest(ConsoleRuleTestBase):
@@ -35,8 +35,8 @@ class RunTest(ConsoleRuleTestBase):
     res = run_rule(
       run.run,
       rule_args=[console, workspace, interactive_runner, bfa],
-      mocked_yield_gets=[
-        MockedYieldGet(
+      mock_gets=[
+        MockGet(
           product_type=CreatedBinary,
           subject_type=Address,
           mock=lambda _: self.create_mock_binary(program_text)

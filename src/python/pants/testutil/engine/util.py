@@ -22,7 +22,7 @@ from pants.util.objects import SubclassesOf
 
 
 @dataclass(frozen=True)
-class MockedYieldGet:
+class MockGet:
   product_type: Type
   subject_type: Type
   mock: Callable[[Any], Any]
@@ -32,7 +32,7 @@ def run_rule(
   rule,
   *,
   rule_args: Optional[Sequence[Any]] = None,
-  mocked_yield_gets: Optional[Sequence[MockedYieldGet]] = None
+  mock_gets: Optional[Sequence[MockGet]] = None
 ):
   """A test helper function that runs an @rule with a set of arguments and mocked Get providers.
 
@@ -53,8 +53,8 @@ def run_rule(
   return_value = run_rule(
     my_co_rule,
     rule_args=[arg1],
-    mocked_yield_gets=[
-      MockedYieldGet(
+    mock_gets=[
+      MockGet(
         product_type=Listing,
         subject_type=Dir,
         mock=lambda subject_val: Listing(..),
@@ -74,9 +74,9 @@ def run_rule(
     raise ValueError('Rule expected to receive arguments of the form: {}; got: {}'.format(
       task_rule.input_selectors, rule_args))
 
-  if mocked_yield_gets is not None and len(mocked_yield_gets) != len(task_rule.input_gets):
+  if mock_gets is not None and len(mock_gets) != len(task_rule.input_gets):
     raise ValueError('Rule expected to receive Get providers for {}; got: {}'.format(
-      task_rule.input_gets, mocked_yield_gets))
+      task_rule.input_gets, mock_gets))
 
   res = rule(*(rule_args or ()))
   if not isinstance(res, GeneratorType):
@@ -84,9 +84,9 @@ def run_rule(
 
   def get(product, subject):
     provider = next((
-      mocked_yield_get.mock
-      for mocked_yield_get in mocked_yield_gets
-      if mocked_yield_get.product_type == product and mocked_yield_get.subject_type == type(subject)
+      mock_get.mock
+      for mock_get in mock_gets
+      if mock_get.product_type == product and mock_get.subject_type == type(subject)
     ), None)
     if provider is None:
       raise AssertionError('Rule requested: Get{}, which cannot be satisfied.'.format(

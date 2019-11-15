@@ -23,7 +23,7 @@ from pants.engine.nodes import Return, Throw
 from pants.engine.parser import HydratedStruct, SymbolTable
 from pants.engine.rules import rule
 from pants.engine.struct import Struct, StructWithDeps
-from pants.testutil.engine.util import MockedYieldGet, Target, run_rule
+from pants.testutil.engine.util import MockGet, Target, run_rule
 from pants.util.objects import Exactly
 from pants_test.engine.examples.parsers import (
   JsonParser,
@@ -40,13 +40,13 @@ class ParseAddressFamilyTest(unittest.TestCase):
     af = run_rule(
       parse_address_family,
       rule_args=[address_mapper, Dir('/dev/null')],
-      mocked_yield_gets=[
-        MockedYieldGet(
+      mock_gets=[
+        MockGet(
           product_type=Snapshot,
           subject_type=PathGlobs,
           mock=lambda _: Snapshot(Digest('abc', 10), ('/dev/null/BUILD',), ()),
         ),
-        MockedYieldGet(
+        MockGet(
           product_type=FilesContent,
           subject_type=Digest,
           mock=lambda _: FilesContent([FileContent('/dev/null/BUILD', b'', False)]),
@@ -68,13 +68,13 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
     pbfas = run_rule(
       provenanced_addresses_from_address_families,
       rule_args=[address_mapper, specs],
-      mocked_yield_gets=[
-        MockedYieldGet(
+      mock_gets=[
+        MockGet(
           product_type=Snapshot,
           subject_type=PathGlobs,
           mock=lambda _: snapshot,
         ),
-        MockedYieldGet(
+        MockGet(
           product_type=AddressFamily,
           subject_type=Dir,
           mock=lambda _: address_family,

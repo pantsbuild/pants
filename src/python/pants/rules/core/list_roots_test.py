@@ -7,7 +7,7 @@ from pants.engine.fs import Digest, PathGlobs, Snapshot
 from pants.rules.core import list_roots
 from pants.source.source_root import SourceRoot, SourceRootCategories, SourceRootConfig
 from pants.testutil.console_rule_test_base import ConsoleRuleTestBase
-from pants.testutil.engine.util import MockedYieldGet, run_rule
+from pants.testutil.engine.util import MockGet, run_rule
 from pants.testutil.test_base import TestBase
 
 
@@ -59,8 +59,8 @@ class AllRootsTest(TestBase):
     output = run_rule(
       list_roots.all_roots,
       rule_args=[source_root_config],
-      mocked_yield_gets=[
-        MockedYieldGet(product_type=Snapshot, subject_type=PathGlobs, mock=provider_rule),
+      mock_gets=[
+        MockGet(product_type=Snapshot, subject_type=PathGlobs, mock=provider_rule),
       ],
     )
 
