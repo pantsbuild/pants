@@ -1214,17 +1214,20 @@ impl Node for NodeKey {
 
     let handle_workunits =
       context.session.should_report_workunits() || context.session.should_record_zipkin_spans();
-    let node_workunit_params = if handle_workunits {
-      let maybe_display_info: Option<String> = match self {
-        NodeKey::Task(ref task) => task.get_display_info().map(|s| s.to_owned()),
-        _ => None,
-      };
-      let node_name = maybe_display_info.unwrap_or_else(|| format!("{}", self));
-      let start_time = std::time::SystemTime::now();
-      Some((node_name, start_time, span_id.clone()))
-    } else {
-      None
+
+    let maybe_display_info: Option<String> = match self {
+      NodeKey::Task(ref task) => task.get_display_info().map(|s| s.to_owned()),
+      _ => None,
     };
+
+    let node_workunit_params = match maybe_display_info {
+      Some(ref node_name) if handle_workunits => {
+        let start_time = std::time::SystemTime::now();
+        Some((node_name.clone(), start_time, span_id.clone()))
+      }
+      _ => None,
+    };
+
     let context2 = context.clone();
     futures::future::lazy(|| {
       set_parent_id(span_id);
