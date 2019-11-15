@@ -24,6 +24,7 @@ from pants.engine.rules import (
 from pants.engine.selectors import Get
 from pants.testutil.engine.util import (
   TARGET_TABLE,
+  MockedYieldGet,
   assert_equal_with_printing,
   create_scheduler,
   run_rule,
@@ -87,9 +88,11 @@ def a_console_rule_generator(console: Console) -> Example:
 
 class RuleTest(unittest.TestCase):
   def test_run_rule_console_rule_generator(self):
-    res = run_rule(a_console_rule_generator, Console(), {
-        (A, str): lambda _: A(),
-      })
+    res = run_rule(
+      a_console_rule_generator,
+      rule_args=[Console()],
+      mocked_yield_gets=[MockedYieldGet(product_type=A, subject_type=str, mock=lambda _: A())],
+    )
     self.assertEquals(res, Example(0))
 
 

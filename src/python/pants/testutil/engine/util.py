@@ -3,8 +3,10 @@
 
 import os
 import re
+from dataclasses import dataclass
 from io import StringIO
 from types import GeneratorType
+from typing import Any, Callable, Optional, Sequence, Type
 
 from colors import blue, green, red
 
@@ -19,7 +21,19 @@ from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS
 from pants.util.objects import SubclassesOf
 
 
-def run_rule(rule, *args):
+@dataclass(frozen=True)
+class MockedYieldGet:
+  product_type: Type
+  subject_type: Type
+  mock: Callable[[Any], Any]
+
+
+def run_rule(
+  rule,
+  *,
+  rule_args: Optional[Sequence[Any]] = None,
+  mocked_yield_gets: Optional[Sequence[MockedYieldGet]] = None
+):
   """A test helper function that runs an @rule with a set of arguments and Get providers.
 
   An @rule named `my_rule` that takes one argument and makes no `Get` requests can be invoked
@@ -45,23 +59,24 @@ def run_rule(rule, *args):
   if task_rule is None:
     raise TypeError('Expected to receive a decorated `@rule`; got: {}'.format(rule))
 
-  gets_len = len(task_rule.input_gets)
-
-  if len(args) != len(task_rule.input_selectors) + (1 if gets_len else 0):
+  if rule_args is not None and len(rule_args) != len(task_rule.input_selectors):
     raise ValueError('Rule expected to receive arguments of the form: {}; got: {}'.format(
-      task_rule.input_selectors, args))
+      task_rule.input_selectors, rule_args))
 
-  args, get_providers = (args[:-1], args[-1]) if gets_len > 0 else (args, {})
-  if gets_len != len(get_providers):
+  if mocked_yield_gets is not None and len(mocked_yield_gets) != len(task_rule.input_gets):
     raise ValueError('Rule expected to receive Get providers for {}; got: {}'.format(
-      task_rule.input_gets, get_providers))
+      task_rule.input_gets, mocked_yield_gets))
 
-  res = rule(*args)
+  res = rule(*(rule_args or ()))
   if not isinstance(res, GeneratorType):
     return res
 
   def get(product, subject):
-    provider = get_providers.get((product, type(subject)))
+    provider = next((
+      mocked_yield_get.mock
+      for mocked_yield_get in mocked_yield_gets
+      if mocked_yield_get.product_type == product and mocked_yield_get.subject_type == type(subject)
+    ), None)
     if provider is None:
       raise AssertionError('Rule requested: Get{}, which cannot be satisfied.'.format(
         (product, type(subject), subject)))

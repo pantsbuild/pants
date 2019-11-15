@@ -17,6 +17,7 @@ python_library(
   source = 'util.py',
   dependencies = [
     '3rdparty/python:ansicolors',
+    '3rdparty/python:dataclasses',
     'src/python/pants/base:project_tree',
     'src/python/pants/binaries',
     'src/python/pants/engine:addressable',

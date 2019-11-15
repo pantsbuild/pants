@@ -18,7 +18,7 @@ from pants.rules.core.test import (
   coordinator_of_tests,
   fast_test,
 )
-from pants.testutil.engine.util import MockConsole, run_rule
+from pants.testutil.engine.util import MockConsole, MockedYieldGet, run_rule
 from pants.testutil.test_base import TestBase
 
 
@@ -27,9 +27,17 @@ class TestTest(TestBase):
     console = MockConsole(use_colors=False)
 
     addr = self.make_build_target_address("some/target")
-    res = run_rule(fast_test, console, (addr,), {
-      (AddressAndTestResult, Address): lambda _: AddressAndTestResult(addr, result),
-    })
+    res = run_rule(
+      fast_test,
+      rule_args=[console, (addr,)],
+      mocked_yield_gets=[
+        MockedYieldGet(
+          product_type=AddressAndTestResult,
+          subject_type=Address,
+          mock=lambda _: AddressAndTestResult(addr, result),
+        ),
+      ],
+    )
 
     self.assertEquals(console.stdout.getvalue(), expected_console_output)
     self.assertEquals(0 if success else 1, res.exit_code)
@@ -80,9 +88,13 @@ class TestTest(TestBase):
         raise Exception("Unrecognised target")
       return AddressAndTestResult(target, tr)
 
-    res = run_rule(fast_test, console, (target1, target2), {
-      (AddressAndTestResult, Address): make_result,
-    })
+    res = run_rule(
+      fast_test,
+      rule_args=[console, (target1, target2)],
+      mocked_yield_gets=[
+        MockedYieldGet(product_type=AddressAndTestResult, subject_type=Address, mock=make_result),
+      ],
+    )
 
     self.assertEqual(1, res.exit_code)
     self.assertEquals(console.stdout.getvalue(), dedent("""\
@@ -115,13 +127,19 @@ class TestTest(TestBase):
     with self.captured_logging(logging.INFO):
       result = run_rule(
         coordinator_of_tests,
-        HydratedTarget(addr, target_adaptor, ()),
-        UnionMembership(union_rules={TestTarget: [PythonTestsAdaptor]}),
-        AddressProvenanceMap(bfaddr_to_spec={}),
-        {
-          (TestResult, PythonTestsAdaptor):
-            lambda _: TestResult(status=Status.FAILURE, stdout='foo', stderr=''),
-        })
+        rule_args=[
+          HydratedTarget(addr, target_adaptor, ()),
+          UnionMembership(union_rules={TestTarget: [PythonTestsAdaptor]}),
+          AddressProvenanceMap(bfaddr_to_spec={}),
+        ],
+        mocked_yield_gets=[
+          MockedYieldGet(
+            product_type=TestResult,
+            subject_type=PythonTestsAdaptor,
+            mock=lambda _: TestResult(status=Status.FAILURE, stdout='foo', stderr=''),
+          ),
+        ],
+      )
 
     self.assertEqual(
       result,
@@ -134,15 +152,19 @@ class TestTest(TestBase):
     with self.captured_logging(logging.INFO):
       result = run_rule(
         coordinator_of_tests,
-        HydratedTarget(bfaddr.to_address(), target_adaptor, ()),
-        UnionMembership(union_rules={TestTarget: [PythonTestsAdaptor]}),
-        AddressProvenanceMap(bfaddr_to_spec={
-          bfaddr: DescendantAddresses(directory='some/dir')
-        }),
-        {
-          (TestResult, PythonTestsAdaptor):
-            lambda _: TestResult(status=Status.SUCCESS, stdout='foo', stderr=''),
-        })
+        rule_args=[
+          HydratedTarget(bfaddr.to_address(), target_adaptor, ()),
+          UnionMembership(union_rules={TestTarget: [PythonTestsAdaptor]}),
+          AddressProvenanceMap(bfaddr_to_spec={bfaddr: DescendantAddresses(directory='some/dir')}),
+        ],
+        mocked_yield_gets=[
+          MockedYieldGet(
+            product_type=TestResult,
+            subject_type=PythonTestsAdaptor,
+            mock=lambda _: TestResult(status=Status.SUCCESS, stdout='foo', stderr=''),
+          ),
+        ],
+      )
 
       self.assertEqual(
         result,
@@ -156,15 +178,19 @@ class TestTest(TestBase):
     with self.captured_logging(logging.INFO):
       result = run_rule(
         coordinator_of_tests,
-        HydratedTarget(bfaddr.to_address(), target_adaptor, ()),
-        UnionMembership(union_rules={TestTarget: [PythonTestsAdaptor]}),
-        AddressProvenanceMap(bfaddr_to_spec={
-          bfaddr: DescendantAddresses(directory='some/dir')
-        }),
-        {
-          (TestResult, PythonTestsAdaptor):
-            lambda _: TestResult(status=Status.SUCCESS, stdout='foo', stderr=''),
-        })
+        rule_args=[
+          HydratedTarget(bfaddr.to_address(), target_adaptor, ()),
+          UnionMembership(union_rules={TestTarget: [PythonTestsAdaptor]}),
+          AddressProvenanceMap(bfaddr_to_spec={bfaddr: DescendantAddresses(directory='some/dir')}),
+        ],
+        mocked_yield_gets=[
+          MockedYieldGet(
+            product_type=TestResult,
+            subject_type=PythonTestsAdaptor,
+            mock=lambda _: TestResult(status=Status.SUCCESS, stdout='foo', stderr=''),
+          ),
+        ],
+      )
 
       self.assertEqual(
         result,
@@ -181,12 +207,18 @@ class TestTest(TestBase):
       with self.assertRaisesRegex(AssertionError, r'Rule requested: .* which cannot be satisfied.'):
         run_rule(
           coordinator_of_tests,
-          HydratedTarget(bfaddr.to_address(), target_adaptor, ()),
-          UnionMembership(union_rules={TestTarget: [PythonTestsAdaptor]}),
-          AddressProvenanceMap(bfaddr_to_spec={
-            bfaddr: SingleAddress(directory='some/dir', name='bin')
-          }),
-          {
-            (TestResult, TestTarget):
-              lambda _: TestResult(status=Status.SUCCESS, stdout='foo', stderr=''),
-          })
+          rule_args=[
+            HydratedTarget(bfaddr.to_address(), target_adaptor, ()),
+            UnionMembership(union_rules={TestTarget: [PythonTestsAdaptor]}),
+            AddressProvenanceMap(bfaddr_to_spec={
+              bfaddr: SingleAddress(directory='some/dir', name='bin'),
+            }),
+          ],
+          mocked_yield_gets=[
+            MockedYieldGet(
+              product_type=TestResult,
+              subject_type=PythonTestsAdaptor,
+              mock=lambda _: TestResult(status=Status.SUCCESS, stdout='foo', stderr=''),
+            ),
+          ],
+        )

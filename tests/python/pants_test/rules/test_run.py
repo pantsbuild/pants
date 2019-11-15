@@ -7,7 +7,7 @@ from pants.engine.interactive_runner import InteractiveRunner
 from pants.rules.core import run
 from pants.rules.core.binary import CreatedBinary
 from pants.testutil.console_rule_test_base import ConsoleRuleTestBase
-from pants.testutil.engine.util import MockConsole, run_rule
+from pants.testutil.engine.util import MockConsole, MockedYieldGet, run_rule
 
 
 class RunTest(ConsoleRuleTestBase):
@@ -27,14 +27,22 @@ class RunTest(ConsoleRuleTestBase):
     workspace = Workspace(self.scheduler)
     interactive_runner = InteractiveRunner(self.scheduler)
     address = Address.parse(spec)
-    bfa =  BuildFileAddress(
+    bfa = BuildFileAddress(
       build_file=None,
       target_name=address.target_name,
       rel_path=f'{address.spec_path}/BUILD'
     )
-    res = run_rule(run.run, console, workspace, interactive_runner, bfa, {
-      (CreatedBinary, Address): lambda _: self.create_mock_binary(program_text)
-    })
+    res = run_rule(
+      run.run,
+      rule_args=[console, workspace, interactive_runner, bfa],
+      mocked_yield_gets=[
+        MockedYieldGet(
+          product_type=CreatedBinary,
+          subject_type=Address,
+          mock=lambda _: self.create_mock_binary(program_text)
+        ),
+      ],
+    )
     return res
 
   def test_normal_run(self) -> None:
