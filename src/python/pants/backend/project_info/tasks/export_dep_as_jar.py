@@ -23,8 +23,15 @@ from pants.util.memo import memoized_property
 
 
 class ExportDepAsJar(ConsoleTask):
-  """Create project info for IntelliJ with dependencies treated as jars."""
+  """[Experimental] Create project info for IntelliJ with dependencies treated as jars.
 
+  This is an experimental task that mimics export but uses the jars for
+  jvm dependencies instead of sources.
+  """
+
+  # TODO:
+  # 1) Consolidate the version number with export task
+  # 2) Refactor the code further to minimize code duplication with export.
   DEFAULT_EXPORT_VERSION = '1.0.11'
 
   @classmethod
