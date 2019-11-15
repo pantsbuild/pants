@@ -7,7 +7,6 @@ target(
     ':dependencies',
     ':depmap',
     ':export',
-    ':export_dep_as_jar',
     ':filedeps',
     ':idea_plugin_gen',
   ],
