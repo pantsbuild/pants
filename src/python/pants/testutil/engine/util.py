@@ -34,22 +34,33 @@ def run_rule(
   rule_args: Optional[Sequence[Any]] = None,
   mocked_yield_gets: Optional[Sequence[MockedYieldGet]] = None
 ):
-  """A test helper function that runs an @rule with a set of arguments and Get providers.
+  """A test helper function that runs an @rule with a set of arguments and mocked Get providers.
 
   An @rule named `my_rule` that takes one argument and makes no `Get` requests can be invoked
   like so (although you could also just invoke it directly):
   ```
-  return_value = run_rule(my_rule, arg1)
+  return_value = run_rule(my_rule, rule_args=[arg1])
   ```
 
-  In the case of an @rule that makes Get requests, things get more interesting: an extra argument
-  is required that represents a dict mapping (product, subject) type pairs to one argument functions
-  that take a subject value and return a product value.
+  In the case of an @rule that makes Get requests, things get more interesting: the
+  `mocked_yield_gets` argument must be provided as a sequence of `MockedYieldGet`s. Each
+  MockedYieldGet takes the Product and Subject type, along with a one-argument function that
+  takes a subject value and returns a product value.
 
   So in the case of an @rule named `my_co_rule` that takes one argument and makes Get requests
-  for product and subject types (Listing, Dir), the invoke might look like:
+  for a product type `Listing` with subject type `Dir`, the invoke might look like:
   ```
-  return_value = run_rule(my_co_rule, arg1, {(Listing, Dir): lambda x: Listing(..)})
+  return_value = run_rule(
+    my_co_rule,
+    rule_args=[arg1],
+    mocked_yield_gets=[
+      MockedYieldGet(
+        product_type=Listing,
+        subject_type=Dir,
+        mock=lambda subject_val: Listing(..),
+      ),
+    ],
+  )
   ```
 
   :returns: The return value of the completed @rule.
