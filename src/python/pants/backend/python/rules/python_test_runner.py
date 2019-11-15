@@ -67,7 +67,14 @@ def run_python_test(
   # test_fail.py, do not unintentionally end up being run as tests.
 
   source_root_stripped_test_target_sources = yield Get(
-      SourceRootStrippedSources, Address, test_target.address.to_address()
+    SourceRootStrippedSources, Address, test_target.address.to_address()
+  )
+
+  if not source_root_stripped_test_target_sources.snapshot.files:
+    yield TestResult(
+      status=Status.SUCCESS,
+      stdout="",
+      stderr="",
     )
 
   source_root_stripped_sources = yield [
