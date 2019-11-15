@@ -30,6 +30,22 @@ python_tests(
 )
 
 python_tests(
+  name='python_test_runner',
+  source='test_python_test_runner.py',
+  dependencies=[
+    'src/python/pants/backend/python/rules',
+    'src/python/pants/backend/python/subsystems',
+    'src/python/pants/engine:fs',
+    'src/python/pants/engine:rules',
+    'src/python/pants/engine:selectors',
+    'src/python/pants/util:collections',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/testutil:test_base',
+    'src/python/pants/testutil/subsystem',
+  ]
+)
+
+python_tests(
   name='python_test_runner_integration',
   source='test_python_test_runner_integration.py',
   dependencies=[
