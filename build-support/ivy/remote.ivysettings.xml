@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<!--
+Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+-->
+
+<ivysettings>
+  <settings defaultResolver="maven-central-mirror"/>
+  <resolvers>
+    <!--
+    We tweak two attributes away from defaults:
+
+    1. @descriptor: By default ivy does not require metadata (or successful metadata downloads).
+       This can lead to jars downloading without their transitive deps which leads to confusing
+       failures later when classpaths are constructed and used. We setup the maven central
+       resolver to require successful pom downloads here.
+
+    2. @root: We point remote execution at the RBE maven central mirror to avoid DDOSing maven
+       central.
+    -->
+    <ibiblio
+      name="maven-central-mirror"
+      m2compatible="true"
+      descriptor="required"
+      root="https://maven-central.storage-download.googleapis.com/repos/central/data"
+    />
+  </resolvers>
+</ivysettings>
