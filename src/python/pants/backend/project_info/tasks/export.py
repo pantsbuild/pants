@@ -36,15 +36,6 @@ from pants.task.console_task import ConsoleTask
 from pants.util.memo import memoized_property
 
 
-class SourceRootTypes:
-  """Defines SourceRoot Types Constants"""
-  SOURCE = 'SOURCE'  # Source Target
-  TEST = 'TEST'  # Test Target
-  SOURCE_GENERATED = 'SOURCE_GENERATED'  # Code Gen Source Targets
-  EXCLUDED = 'EXCLUDED'  # Excluded Target
-  RESOURCE = 'RESOURCE'  # Resource belonging to Source Target
-  TEST_RESOURCE = 'TEST_RESOURCE'  # Resource belonging to Test Target
-
 # Changing the behavior of this task may affect the IntelliJ Pants plugin.
 # Please add @yic to reviews for this file.
 class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
@@ -72,6 +63,15 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
     return super().subsystem_dependencies() + (
       DistributionLocator, JvmPlatform, PythonInterpreterCache, ScalaPlatform
     )
+
+  class SourceRootTypes:
+    """Defines SourceRoot Types Constants"""
+    SOURCE = 'SOURCE'  # Source Target
+    TEST = 'TEST'  # Test Target
+    SOURCE_GENERATED = 'SOURCE_GENERATED'  # Code Gen Source Targets
+    EXCLUDED = 'EXCLUDED'  # Excluded Target
+    RESOURCE = 'RESOURCE'  # Resource belonging to Source Target
+    TEST_RESOURCE = 'TEST_RESOURCE'  # Resource belonging to Test Target
 
   @staticmethod
   def _is_jvm(dep):
@@ -187,16 +187,16 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
         def is_test(t):
           return isinstance(t, JUnitTests) or isinstance(t, PythonTests)
         if is_test(tgt):
-          return SourceRootTypes.TEST
+          return ExportTask.SourceRootTypes.TEST
         else:
           if (isinstance(tgt, Resources) and
               tgt in resource_target_map and
                 is_test(resource_target_map[tgt])):
-            return SourceRootTypes.TEST_RESOURCE
+            return ExportTask.SourceRootTypes.TEST_RESOURCE
           elif isinstance(tgt, Resources):
-            return SourceRootTypes.RESOURCE
+            return ExportTask.SourceRootTypes.RESOURCE
           else:
-            return SourceRootTypes.SOURCE
+            return ExportTask.SourceRootTypes.SOURCE
 
       info = {
         'targets': [],
