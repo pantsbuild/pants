@@ -39,33 +39,11 @@ def run_python_test(
   all_targets = transitive_hydrated_targets.closure
   all_target_adaptors = tuple(t.adaptor for t in all_targets)
 
-  interpreter_constraints = PexInterpreterConstraints.create_from_adaptors(
-    adaptors=tuple(all_target_adaptors),
-    python_setup=python_setup
-  )
-
-  # Produce a pex containing pytest and all transitive 3rdparty requirements.
-  output_pytest_requirements_pex_filename = 'pytest-with-requirements.pex'
-  requirements = PexRequirements.create_from_adaptors(
-    adaptors=all_target_adaptors,
-    additional_requirements=pytest.get_requirement_strings()
-  )
-
-  resolved_requirements_pex = yield Get(
-    Pex, CreatePex(
-      output_filename=output_pytest_requirements_pex_filename,
-      requirements=requirements,
-      interpreter_constraints=interpreter_constraints,
-      entry_point="pytest:main",
-    )
-  )
-
   # Get the file names for the test_target, adjusted for the source root. This allows us to
   # specify to Pytest which files to test and thus to avoid the test auto-discovery defined by
   # https://pytest.org/en/latest/goodpractices.html#test-discovery. In addition to a performance
   # optimization, this ensures that any transitive sources, such as a test project file named
   # test_fail.py, do not unintentionally end up being run as tests.
-
   source_root_stripped_test_target_sources = yield Get(
     SourceRootStrippedSources, Address, test_target.address.to_address()
   )
@@ -89,15 +67,35 @@ def run_python_test(
 
   inits_digest = yield Get(InjectedInitDigest, Digest, sources_digest)
 
-  all_input_digests = [
-    sources_digest,
-    inits_digest.directory_digest,
-    resolved_requirements_pex.directory_digest,
-  ]
+  interpreter_constraints = PexInterpreterConstraints.create_from_adaptors(
+    adaptors=tuple(all_target_adaptors),
+    python_setup=python_setup
+  )
+
+  output_pytest_requirements_pex_filename = 'pytest-with-requirements.pex'
+  requirements = PexRequirements.create_from_adaptors(
+    adaptors=all_target_adaptors,
+    additional_requirements=pytest.get_requirement_strings()
+  )
+
+  resolved_requirements_pex = yield Get(
+    Pex, CreatePex(
+      output_filename=output_pytest_requirements_pex_filename,
+      requirements=requirements,
+      interpreter_constraints=interpreter_constraints,
+      entry_point="pytest:main",
+    )
+  )
+
   merged_input_files = yield Get(
     Digest,
-    DirectoriesToMerge,
-    DirectoriesToMerge(directories=tuple(all_input_digests)),
+    DirectoriesToMerge(
+      directories=(
+        sources_digest,
+        inits_digest.directory_digest,
+        resolved_requirements_pex.directory_digest,
+      )
+    ),
   )
 
   test_target_sources_file_names = sorted(source_root_stripped_test_target_sources.snapshot.files)
