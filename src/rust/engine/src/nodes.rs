@@ -1215,13 +1215,13 @@ impl Node for NodeKey {
     let handle_workunits =
       context.session.should_report_workunits() || context.session.should_record_zipkin_spans();
     let node_workunit_params = if handle_workunits {
-      let node_name = format!("{}", self);
-      let start_time = std::time::SystemTime::now();
-      let display_info: Option<String> = match self {
+      let maybe_display_info: Option<String> = match self {
         NodeKey::Task(ref task) => task.get_display_info().map(|s| s.to_owned()),
         _ => None,
       };
-      Some((node_name, start_time, span_id.clone(), display_info))
+      let node_name = maybe_display_info.unwrap_or_else(|| format!("{}", self));
+      let start_time = std::time::SystemTime::now();
+      Some((node_name, start_time, span_id.clone()))
     } else {
       None
     };
@@ -1240,14 +1240,13 @@ impl Node for NodeKey {
       }
     })
     .inspect(move |_: &NodeResult| {
-      if let Some((node_name, start_time, span_id, display_info)) = node_workunit_params {
+      if let Some((name, start_time, span_id)) = node_workunit_params {
         let workunit = WorkUnit {
-          name: node_name,
+          name,
           time_span: TimeSpan::since(&start_time),
           span_id,
           // TODO: set parent_id with the proper value, issue #7969
           parent_id: None,
-          display_info,
         };
         context2.session.workunit_store().add_workunit(workunit)
       };

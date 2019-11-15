@@ -223,7 +223,6 @@ impl ByteStore {
           time_span: TimeSpan::since(&start_time),
           span_id: workunit_store::generate_random_64bit_string(),
           parent_id: workunit_store::get_parent_id(),
-          display_info: None,
         };
         workunit_store.add_workunit(workunit);
         future
@@ -303,7 +302,6 @@ impl ByteStore {
           time_span: TimeSpan::since(&start_time),
           span_id: workunit_store::generate_random_64bit_string(),
           parent_id: workunit_store::get_parent_id(),
-          display_info: None,
         };
         workunit_store.add_workunit(workunit);
         future
@@ -352,7 +350,6 @@ impl ByteStore {
           time_span: TimeSpan::since(&start_time),
           span_id: workunit_store::generate_random_64bit_string(),
           parent_id: workunit_store::get_parent_id(),
-          display_info: None,
         };
         workunit_store.add_workunit(workunit);
         future

@@ -410,10 +410,6 @@ fn workunits_to_py_tuple_value<'a>(workunits: impl Iterator<Item = &'a WorkUnit>
         workunit_zipkin_trace_info.push(externs::store_utf8("parent_id"));
         workunit_zipkin_trace_info.push(externs::store_utf8(parent_id));
       }
-      if let Some(display_info) = &workunit.display_info {
-        workunit_zipkin_trace_info.push(externs::store_utf8("display_info"));
-        workunit_zipkin_trace_info.push(externs::store_utf8(display_info));
-      }
       externs::store_dict(&workunit_zipkin_trace_info)
     })
     .collect::<Vec<_>>();

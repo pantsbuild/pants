@@ -40,7 +40,6 @@ pub struct WorkUnit {
   pub time_span: TimeSpan,
   pub span_id: String,
   pub parent_id: Option<String>,
-  pub display_info: Option<String>,
 }
 
 #[derive(Clone, Default)]
