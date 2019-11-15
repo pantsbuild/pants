@@ -1,6 +1,6 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
+import copy
 import logging
 from contextlib import contextmanager
 
@@ -8,8 +8,9 @@ from pants.base.build_environment import get_buildroot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, Exiter
-from pants.base.workunit import WorkUnit
+from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.bin.goal_runner import GoalRunner
+from pants.build_graph.build_file_parser import BuildFileParser
 from pants.engine.native import Native
 from pants.goal.run_tracker import RunTracker
 from pants.help.help_printer import HelpPrinter
@@ -271,7 +272,24 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     if self._options.help_request:
       return goal_runner_factory.handle_help()
 
-    return goal_runner_factory.create().run()
+    with self._run_tracker.new_workunit(name='setup', labels=[WorkUnitLabel.SETUP]):
+      # build_file_parser = BuildFileParser(self._build_config, self._build_root)
+      build_graph, address_mapper = self._graph_session.create_build_graph(
+        self._target_roots,
+        self._build_root
+      )
+      import sys
+      while True:
+        goal_runner_factory.create(build_graph.clone_new(), copy.copy(address_mapper)).run()
+        self._reporting.initialize(self._run_tracker, self._options, start_time=self._run_start_time)
+        print('\nPress enter to continue >>>')
+        # import subprocess
+        # import os
+        # subprocess.check_output(['rm', '-rf', os.path.join('.pants.d', 'build_invalidator')])
+
+        for line in sys.stdin:
+          break
+    # return goal_runner_factory.create(build_graph, address_mapper).run()
 
   def _maybe_run_v2(self):
     # N.B. For daemon runs, @console_rules are invoked pre-fork -

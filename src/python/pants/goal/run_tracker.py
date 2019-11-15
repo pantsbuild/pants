@@ -210,8 +210,8 @@ class RunTracker(Subsystem):
     Must be called before `start`.
     """
     if self.run_info:
-      raise AssertionError('RunTracker.initialize must not be called multiple times.')
-
+      # raise AssertionError('RunTracker.initialize must not be called multiple times.')
+      self.run_info = RunInfo(os.path.join(self.run_info_dir, 'info'))
     # Initialize the run.
 
     info_dir = os.path.join(self.get_options().pants_workdir, self.options_scope)

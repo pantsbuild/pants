@@ -60,9 +60,9 @@ class RunInfo:
       kv_pairs.append((key, val))
 
     for k, v in kv_pairs:
-      if k in self._info:
-        raise ValueError(f'info key "{k}" already exists with value {self._info[k]}. '
-                         'Cannot add it again with value {v}.')
+      # if k in self._info:
+      #   raise ValueError(f'info key "{k}" already exists with value {self._info[k]}. '
+      #                    'Cannot add it again with value {v}.')
       self._info[k] = v
 
     try:

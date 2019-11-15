@@ -15,7 +15,7 @@ class WelSpec extends WordSpec with MustMatchers {
       WelcomeEverybody(List()).size mustEqual 0
     }
     "greet both" in {
-      WelcomeEverybody(List("Pat", "Sandy")).size mustEqual 2
+      WelcomeEverybody(List("Pat", "Sandy", "123")).size mustEqual 2
     }
   }
 }

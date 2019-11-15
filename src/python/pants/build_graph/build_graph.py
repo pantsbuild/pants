@@ -255,13 +255,14 @@ class BuildGraph(ABC):
     """
     self._invalidated()
     if self.contains_address(target.address):
-      raise ValueError('Attempted to inject synthetic {target} derived from {derived_from}'
-                       ' into the BuildGraph with address {address}, but there is already a Target'
-                       ' {existing_target} with that address'
-                       .format(target=target,
-                               derived_from=derived_from,
-                               address=target.address,
-                               existing_target=self.get_target(target.address)))
+      self._target_by_address.pop(target.address)
+      # raise ValueError('Attempted to inject synthetic {target} derived from {derived_from}'
+      #                  ' into the BuildGraph with address {address}, but there is already a Target'
+      #                  ' {existing_target} with that address'
+      #                  .format(target=target,
+      #                          derived_from=derived_from,
+      #                          address=target.address,
+      #                          existing_target=self.get_target(target.address)))
 
     dependencies = dependencies or frozenset()
     address = target.address

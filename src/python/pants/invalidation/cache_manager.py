@@ -152,7 +152,7 @@ class VersionedTargetSet:
       if self.has_previous_results_dir:
         yield self.previous_results_dir
 
-  @memoized_method
+  # @memoized_method
   def _target_to_vt(self):
     return {vt.target: vt for vt in self.versioned_targets}
 
