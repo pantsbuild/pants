@@ -23,7 +23,7 @@ from pants.util.dirutil import safe_mkdir
 _TEMPLATE_BASEDIR = 'templates/idea'
 
 # Follow `export.py` for versioning strategy.
-IDEA_PLUGIN_VERSION = '0.0.3'
+IDEA_PLUGIN_VERSION = '0.0.4'
 
 
 class IdeaPluginGen(ConsoleTask):
@@ -62,6 +62,8 @@ class IdeaPluginGen(ConsoleTask):
     register('--incremental-import', type=int, default=None,
              help='Enable incremental import of targets with the given graph depth. Supported '
                   'by IntelliJ Pants plugin versions `>= 1.9.2`.')
+    register('--dep-as-jar', type=bool, default=False,
+             help='If true, treat source dependencies as 3rdparty jars.')
     register('--java-encoding', default='UTF-8',
              help='Sets the file encoding for java files in this project.')
     register('--open-with', type=str, default=None, recursive=True,
@@ -135,6 +137,7 @@ class IdeaPluginGen(ConsoleTask):
       project_path=os.path.join(get_buildroot(), abs_target_specs[0].split(':')[0]),
       idea_plugin_version=IDEA_PLUGIN_VERSION,
       incremental_import=self.get_options().incremental_import,
+      dep_as_jar=self.get_options().dep_as_jar,
     )
 
     # Generate (without merging in any extra components).
