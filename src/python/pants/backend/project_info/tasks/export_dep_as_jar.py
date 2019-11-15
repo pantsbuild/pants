@@ -29,7 +29,7 @@ class ExportDepAsJar(ConsoleTask):
   jvm dependencies instead of sources.
   """
 
-  # TODO:
+  # TODO(yic):
   # 1) Consolidate the version number with export task
   # 2) Refactor the code further to minimize code duplication with export.
   DEFAULT_EXPORT_VERSION = '1.0.11'
@@ -113,7 +113,7 @@ class ExportDepAsJar(ConsoleTask):
       mapping[self._jar_id(jar_entry.coordinate)][conf] = jar_entry.cache_path
     return mapping
 
-  def generate_targets_map(self, targets, classpath_products=None, runtime_classpath=None):
+  def generate_targets_map(self, targets, runtime_classpath):
     """Generates a dictionary containing all pertinent information about the target graph.
 
     The return dictionary is suitable for serialization by json.dumps.
@@ -169,8 +169,8 @@ class ExportDepAsJar(ConsoleTask):
         :rtype: :class:`collections.Iterator` of
                 :class:`pants.java.jar.M2Coordinate`
         """
-        if classpath_products:
-          jar_products = classpath_products.get_artifact_classpath_entries_for_targets((jar_lib,))
+        if runtime_classpath:
+          jar_products = runtime_classpath.get_artifact_classpath_entries_for_targets((jar_lib,))
           for _, jar_entry in jar_products:
             coordinate = jar_entry.coordinate
             # We drop classifier and type_ since those fields are represented in the global
@@ -201,7 +201,7 @@ class ExportDepAsJar(ConsoleTask):
         if hasattr(current_target, 'test_platform'):
           info['test_platform'] = current_target.test_platform.name
 
-      if classpath_products:
+      if runtime_classpath:
         info['libraries'].extend(self._jar_id(lib) for lib in target_libraries)
 
       if current_target in target_roots_set:
@@ -257,8 +257,8 @@ class ExportDepAsJar(ConsoleTask):
       if preferred_distributions:
         graph_info['preferred_jvm_distributions'][platform_name] = preferred_distributions
 
-    if classpath_products:
-      graph_info['libraries'] = self._resolve_jars_info(targets, classpath_products)
+    if runtime_classpath:
+      graph_info['libraries'] = self._resolve_jars_info(targets, runtime_classpath)
       for t in targets:
         target_type = _get_target_type(t)
         if t in target_roots_set or target_type == SourceRootTypes.RESOURCE or \
@@ -275,12 +275,9 @@ class ExportDepAsJar(ConsoleTask):
 
     return graph_info
 
-  def console_output(self, targets):
-    compile_classpath = self.context.products.get_data('runtime_classpath')
-    runtime_classpath = self.context.products.get_data('runtime_classpath')
-    graph_info = self.generate_targets_map(targets,
-      classpath_products=compile_classpath,
-      runtime_classpath=runtime_classpath)
+  def console_output(self, targets, runtime_classpath=None):
+    runtime_classpath = runtime_classpath or self.context.products.get_data('runtime_classpath')
+    graph_info = self.generate_targets_map(targets, runtime_classpath=runtime_classpath)
     if self.get_options().formatted:
       return json.dumps(graph_info, indent=4, separators=(',', ': ')).splitlines()
     else:
