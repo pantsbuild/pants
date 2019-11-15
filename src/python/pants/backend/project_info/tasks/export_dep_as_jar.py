@@ -140,14 +140,6 @@ class ExportDepAsJar(ConsoleTask):
 
     targets_map = {}
     resource_target_map = {}
-
-    # if self.get_options().libraries:
-    #   # NB(gmalmquist): This supports mocking the classpath_products in tests.
-    #   if classpath_products is None:
-    #     classpath_products = self.resolve_jars(targets)
-    # else:
-    #   classpath_products = None
-
     target_roots_set = set(self.context.target_roots)
 
     def process_target(current_target):
