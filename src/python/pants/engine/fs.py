@@ -7,7 +7,7 @@ from typing import Any, Iterable, Optional, Tuple
 
 from pants.engine.objects import Collection
 from pants.engine.rules import RootRule
-from pants.option.custom_types import GlobExpansionConjunction
+from pants.option.custom_types import GlobExpansionConjunction as GlobExpansionConjunction
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.util.dirutil import maybe_read_file, safe_delete, safe_file_dump
 from pants.util.meta import frozen_after_init

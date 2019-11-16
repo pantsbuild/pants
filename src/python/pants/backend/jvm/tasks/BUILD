@@ -195,6 +195,7 @@ python_library(
     'src/python/pants/goal:products',
     'src/python/pants/util:dirutil',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(

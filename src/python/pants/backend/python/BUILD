@@ -47,7 +47,8 @@ python_library(
     'src/python/pants/subsystem',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -61,6 +62,7 @@ python_library(
     'src/python/pants/build_graph',
     'src/python/pants/util:meta',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(

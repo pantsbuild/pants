@@ -7,7 +7,8 @@ python_library(
   dependencies=[
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -18,6 +19,7 @@ python_library(
     'src/python/pants/base:hash_utils',
     'src/python/pants/base:payload_field',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -59,6 +61,7 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:fileutil',
   ],
+  tags = {"partially_type_checked"},
 )
 
 resources(
@@ -69,8 +72,7 @@ resources(
 python_library(
   name='repository',
   sources=['repository.py'],
-  dependencies = [
-  ]
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -90,4 +92,5 @@ python_library(
     ':artifact',
     'src/python/pants/base:validation',
   ],
+  tags = {"partially_type_checked"},
 )
