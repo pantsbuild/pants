@@ -34,7 +34,7 @@ public final class Greeting {
   }
 
   public static String greet(String greetee) {
-    return String.format("123", greetee);
+    return String.format("Hello, %s!", greetee);
   }
 
   private Greeting() {

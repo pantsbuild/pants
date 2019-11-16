@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
-import os
 import sys
 
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
@@ -85,14 +84,14 @@ class GoalRunnerFactory:
 
     return any(goal.has_task_of_type(QuietTaskMixin) for goal in goals)
 
-  def _setup_context(self, build_graph, address_mapper):
+  def _setup_context(self):
     with self._run_tracker.new_workunit(name='setup', labels=[WorkUnitLabel.SETUP]):
-      if not build_graph:
-        build_graph, address_mapper = self._graph_session.create_build_graph(
-          self._target_roots,
-          self._root_dir
-        )
       build_file_parser = BuildFileParser(self._build_config, self._root_dir)
+      build_graph, address_mapper = self._graph_session.create_build_graph(
+        self._target_roots,
+        self._root_dir
+      )
+
       goals = self._determine_v1_goals(address_mapper, self._options)
       is_quiet = self._should_be_quiet(goals)
 
@@ -119,8 +118,8 @@ class GoalRunnerFactory:
 
       return goals, context
 
-  def create(self, build_graph=None, address_mapper=None):
-    goals, context = self._setup_context(build_graph, address_mapper)
+  def create(self):
+    goals, context = self._setup_context()
     return GoalRunner(context=context,
                       goals=goals,
                       run_tracker=self._run_tracker,
@@ -198,18 +197,9 @@ class GoalRunner:
     return result
 
   def run(self):
-    # while True:
-      global_options = self._context.options.for_global_scope()
+    global_options = self._context.options.for_global_scope()
 
-      if not self._is_valid_workdir(global_options.pants_workdir):
-        return 1
+    if not self._is_valid_workdir(global_options.pants_workdir):
+      return 1
 
-      self._run_goals()
-
-      # import subprocess
-      # subprocess.check_output(['rm', '-rf', os.path.join(global_options.pants_workdir, 'build_invalidator')])
-
-      # for line in sys.stdin:
-      #   break
-
-    # return self._run_goals()
+    return self._run_goals()

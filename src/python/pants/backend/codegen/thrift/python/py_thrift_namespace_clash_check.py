@@ -140,4 +140,4 @@ Errors:
     thrift_file_sources_by_target = self._get_python_thrift_library_sources(py_thrift_targets)
     py_namespaces_by_target = self._extract_all_python_namespaces(thrift_file_sources_by_target)
     namespaces_by_files = self._determine_clashing_namespaces(py_namespaces_by_target)
-    # self.context.products.register_data('_py_thrift_namespaces_by_files', namespaces_by_files)
+    self.context.products.register_data('_py_thrift_namespaces_by_files', namespaces_by_files)

@@ -280,16 +280,12 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
       )
       import sys
       while True:
-        goal_runner_factory.create(build_graph.clone_new(), copy.copy(address_mapper)).run()
+        # goal_runner_factory.create(build_graph.clone_new(), copy.copy(address_mapper)).run()
         self._reporting.initialize(self._run_tracker, self._options, start_time=self._run_start_time)
+        goal_runner_factory.create().run()
         print('\nPress enter to continue >>>')
-        # import subprocess
-        # import os
-        # subprocess.check_output(['rm', '-rf', os.path.join('.pants.d', 'build_invalidator')])
-
         for line in sys.stdin:
           break
-    # return goal_runner_factory.create(build_graph, address_mapper).run()
 
   def _maybe_run_v2(self):
     # N.B. For daemon runs, @console_rules are invoked pre-fork -
