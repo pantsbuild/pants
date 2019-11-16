@@ -6,19 +6,28 @@ from pants.build_graph.target import Target
 
 
 class Files(Target):
-  """A collection of loose files."""
+  """A collection of loose files.
+
+  Exactly one of `sources` or `urls` should be specified.
+  """
 
   @classmethod
   def alias(cls):
     return 'files'
 
-  def __init__(self, address=None, payload=None, sources=None, **kwargs):
+  def __init__(self, address=None, payload=None, sources=None, urls=None, **kwargs):
     """
     :API: public
 
-    :param sources: Files to "include". Paths are relative to the BUILD file's directory.
-    :type sources: :class:`pants.source.wrapped_globs.FilesetWithSpec` or list of strings
+    :param sources: File names or globs to "include" as data dependencies. Paths are relative to
+      the BUILD file's directory.
+    :param urls: HTTP urls to fetch and "include" as data dependencies.
+    :type urls: List of UrlToFetch instances (produced by the `url` alias in a BUILD file).
     """
+
+    # NB: URLs are fetched, snapshotted, and converted to a sources argument during target
+    # hydration, so we discard the argument here. See #4535.
+
     payload = payload or Payload()
     payload.add_fields({
       'sources': self.create_sources_field(sources,

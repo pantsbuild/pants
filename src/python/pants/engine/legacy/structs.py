@@ -6,11 +6,13 @@ import os.path
 from abc import ABCMeta, abstractmethod
 from collections.abc import MutableSequence, MutableSet
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any, Callable, Tuple
 
+from pants.base.exceptions import TargetDefinitionException
+from pants.build_graph.address import BuildFileAddress
 from pants.build_graph.target import Target
 from pants.engine.addressable import addressable_list
-from pants.engine.fs import GlobExpansionConjunction, PathGlobs
+from pants.engine.fs import GlobExpansionConjunction, PathGlobs, UrlToFetch
 from pants.engine.objects import Locatable
 from pants.engine.rules import UnionRule, union
 from pants.engine.struct import Struct, StructWithDeps
@@ -157,6 +159,37 @@ class SourcesField:
   def __repr__(self):
     return '{}(address={}, input_globs={}, arg={}, filespecs={!r})'.format(
       type(self).__name__, self.address, self.base_globs, self.arg, self.filespecs)
+
+
+@dataclass(frozen=True)
+class UrlsField:
+  """A list of URLs that can be captured as Sources for a target.
+
+  See SourcesField for more information on Sources construction.
+  """
+  address: BuildFileAddress
+  urls: Tuple[UrlToFetch, ...]
+
+
+class FilesAdaptor(TargetAdaptor):
+  """Adaptor for the `Files` Target type."""
+
+  @property
+  def field_adaptors(self):
+    with exception_logging(logger, 'Exception in `field_adaptors` property'):
+      field_adaptors = super().field_adaptors
+      urls = getattr(self, 'urls', None)
+      if urls is None:
+        return field_adaptors
+
+      if any(isinstance(f, SourcesField) for f in field_adaptors):
+        raise TargetDefinitionException(
+            self.address,
+            'Only one of the `urls` and `source(s)` arguments may be specified.',
+          )
+
+      urls_field = UrlsField(self.address, tuple(urls))
+      return field_adaptors + (urls_field,)
 
 
 class JvmBinaryAdaptor(TargetAdaptor):
@@ -438,5 +471,6 @@ class GlobsWithConjunction:
 def rules():
   return [
     UnionRule(HydrateableField, SourcesField),
+    UnionRule(HydrateableField, UrlsField),
     UnionRule(HydrateableField, BundlesField),
   ]

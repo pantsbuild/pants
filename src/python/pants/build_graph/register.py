@@ -16,6 +16,7 @@ from pants.build_graph.remote_sources import RemoteSources
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.build_graph.target_scopes import ScopedDependencyFactory
+from pants.engine.fs import Digest, UrlToFetch
 from pants.source.wrapped_globs import Globs, RGlobs, ZGlobs
 from pants.util.netrc import Netrc
 
@@ -45,9 +46,11 @@ def build_file_aliases():
       'target': Target,
     },
     objects={
+      'digest': Digest,
       'get_buildroot': get_buildroot,
       'netrc': Netrc,
       'pants_version': pants_version,
+      'url': UrlToFetch,
     },
     context_aware_object_factories={
       'buildfile_path': BuildFilePath,

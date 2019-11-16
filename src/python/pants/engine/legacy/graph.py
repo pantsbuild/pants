@@ -21,9 +21,21 @@ from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.remote_sources import RemoteSources
 from pants.engine.addressable import BuildFileAddresses
-from pants.engine.fs import PathGlobs, Snapshot
+from pants.engine.fs import (
+  DirectoriesToMerge,
+  DirectoryWithPrefixToAdd,
+  PathGlobs,
+  Snapshot,
+  UrlToFetch,
+)
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
-from pants.engine.legacy.structs import BundleAdaptor, BundlesField, HydrateableField, SourcesField
+from pants.engine.legacy.structs import (
+  BundleAdaptor,
+  BundlesField,
+  HydrateableField,
+  SourcesField,
+  UrlsField,
+)
 from pants.engine.mapper import AddressMapper
 from pants.engine.objects import Collection
 from pants.engine.parser import HydratedStruct
@@ -412,9 +424,6 @@ def find_owners(
     # Handle `sources`-declaring targets.
     # NB: Deleted files can only be matched against the 'filespec' (ie, `PathGlobs`) for a target,
     # so we don't actually call `fileset.matches` here.
-    # TODO: This matching logic should be implemented using the rust `fs` crate for two reasons:
-    #  1) having two implementations isn't great
-    #  2) we're expanding sources via HydratedTarget, but it isn't necessary to do that to match
     target_sources = target_kwargs.get('sources', None)
     if target_sources and any_matches_filespec(sources_set, target_sources.filespec):
       return True
@@ -544,6 +553,23 @@ def hydrate_sources(
 
 
 @rule
+def hydrate_urls(urls_field: UrlsField) -> HydratedField:
+  """Given a UrlsField, fetch all urls and merge into a single Snapshot."""
+  spec_path = urls_field.address.spec_path
+
+  snapshots = yield [Get(Snapshot, UrlToFetch, u) for u in urls_field.urls]
+  relative_snapshot = yield Get(Snapshot, DirectoriesToMerge(tuple(s.directory_digest for s in snapshots)))
+  snapshot = yield Get(Snapshot, DirectoryWithPrefixToAdd(relative_snapshot.directory_digest, spec_path))
+
+  fileset = _eager_fileset_with_spec('', {'globs': snapshot.files}, snapshot)
+
+  # NB: The `urls` and `sources` arguments are mutually exclusive, so hydration of UrlsField
+  # produces the same argument name and relies on deduplication of keyword arguments to detect
+  # mixed usage.
+  yield HydratedField('sources', fileset)
+
+
+@rule
 def hydrate_bundles(
   bundles_field: BundlesField, glob_match_error_behavior: GlobMatchErrorBehavior
 ) -> HydratedField:
@@ -583,6 +609,7 @@ def create_legacy_graph_tasks():
     hydrate_target,
     find_owners,
     hydrate_sources,
+    hydrate_urls,
     hydrate_bundles,
     RootRule(OwnersRequest),
   ]

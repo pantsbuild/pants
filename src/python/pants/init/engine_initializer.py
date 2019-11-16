@@ -32,6 +32,7 @@ from pants.engine.legacy.graph import LegacyBuildGraph, create_legacy_graph_task
 from pants.engine.legacy.options_parsing import create_options_parsing_rules
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
 from pants.engine.legacy.structs import (
+  FilesAdaptor,
   JvmAppAdaptor,
   JvmBinaryAdaptor,
   PageAdaptor,
@@ -91,7 +92,7 @@ def _apply_default_sources_globs(base_class, target_type):
 
 # TODO: These calls mutate the adaptor classes for some known library types to copy over
 # their default source globs while preserving their concrete types. As with the alias replacement
-# below, this is a delaying tactic to avoid elevating the TargetAdaptor API.
+# below, this is a delaying tactic to avoid elevating the TargetAdaptor API. See #4535.
 _apply_default_sources_globs(JvmAppAdaptor, JvmApp)
 _apply_default_sources_globs(PythonAppAdaptor, PythonApp)
 _apply_default_sources_globs(JvmBinaryAdaptor, JvmBinary)
@@ -129,9 +130,8 @@ def _legacy_symbol_table(build_file_aliases):
       )
 
   # TODO: The alias replacement here is to avoid elevating "TargetAdaptors" into the public
-  # API until after https://github.com/pantsbuild/pants/issues/3560 has been completed.
-  # These should likely move onto Target subclasses as the engine gets deeper into beta
-  # territory.
+  # API until after #4535 has been completed.
+  table['files'] = FilesAdaptor
   table['python_library'] = PythonTargetAdaptor
   table['jvm_app'] = JvmAppAdaptor
   table['jvm_binary'] = JvmBinaryAdaptor

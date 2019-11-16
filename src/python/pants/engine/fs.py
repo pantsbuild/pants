@@ -195,6 +195,12 @@ class UrlToFetch:
   digest: Digest
   name: Optional[str] = None
 
+  def __post_init__(self):
+    if not isinstance(self.url, str):
+      raise TypeError(f'Expected the `url` argument to be a `str`: was {self.url}')
+    if not isinstance(self.digest, Digest):
+      raise TypeError(f'Expected the `digest` argument to be a `Digest`: was {self.digest}')
+
 
 @dataclass(frozen=True)
 class Workspace:
