@@ -22,6 +22,21 @@ class JvmTaskTestBase(TaskTestBase):
     super().setUp()
     init_subsystem(JvmResolveSubsystem)
     self.set_options_for_scope('resolver', resolver='ivy')
+    if os.path.isfile('/PANTS_GCP_REMOTE'):
+      # Use the GCP maven mirrors, so we don't get throttled for DOSing maven central.
+      # Note that this recapitulates the logic in pants.remote.ini. Unfortunately we
+      # can't access the real options inside tests, and plumbing these through everywhere
+      # they're needed is prohibitive. So we repeat the logic here.
+      maven_central_mirror_root_url = 'https://maven-central.storage-download.googleapis.com/repos/central/data'
+      maven_central_mirror_ivy_bootstrap_jar_url = f'{maven_central_mirror_root_url}/org/apache/ivy/ivy/2.4.0/ivy-2.4.0.jar'
+      maven_central_mirror_ivy_settings = 'build-support/ivy/remote.ivysettings.xml'
+
+      self.set_options_for_scope('coursier', repos=[maven_central_mirror_root_url])
+      for scope in ['ivy', 'ivy.outdated', 'ivy.outdated.ivy']:
+        self.set_options_for_scope(scope,
+                                   bootstrap_jar_url=maven_central_mirror_ivy_bootstrap_jar_url,
+                                   bootstrap_ivy_settings=maven_central_mirror_ivy_settings,
+                                   ivy_settings=maven_central_mirror_ivy_settings)
 
   def populate_runtime_classpath(self, context, classpath=None):
     """
