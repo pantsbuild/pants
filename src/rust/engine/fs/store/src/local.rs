@@ -301,13 +301,24 @@ impl ByteStore {
       EntryType::File => self.inner.file_dbs.clone(),
     };
 
-    try_future!(dbs).load_bytes_with(digest.0, move |bytes| {
-                if bytes.len() == digest.1 {
-                    Ok(f(bytes))
-                } else {
-                    Err(format!("Got hash collision reading from store - digest {:?} was requested, but retrieved bytes with that fingerprint had length {}. Congratulations, you may have broken sha256! Underlying bytes: {:?}", digest, bytes.len(), bytes))
-                }
-            }).to_boxed()
+    try_future!(dbs)
+      .load_bytes_with(digest.0, move |bytes| {
+        if bytes.len() == digest.1 {
+          Ok(f(bytes))
+        } else {
+          let bytes_preview = bytes.slice(0, std::cmp::min(64, bytes.len()));
+          Err(format!(
+            concat!(
+              "{:?} was requested, but retrieved bytes with ",
+              "that fingerprint had length {}. Content started with:\n  {:?}"
+            ),
+            digest,
+            bytes.len(),
+            bytes_preview
+          ))
+        }
+      })
+      .to_boxed()
   }
 
   pub fn all_digests(&self, entry_type: EntryType) -> Result<Vec<Digest>, String> {

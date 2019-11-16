@@ -278,6 +278,10 @@ impl Store {
   ) -> BoxFuture<Snapshot, String> {
     let store = self.clone();
 
+    if name.file_name().is_none() {
+      return future::err(format!("Got invalid name for snapshotted file: {:?}", name)).to_boxed();
+    }
+
     #[derive(Clone)]
     struct Digester {
       digest: hashing::Digest,

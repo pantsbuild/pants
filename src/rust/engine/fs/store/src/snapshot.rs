@@ -136,12 +136,16 @@ impl Snapshot {
     let mut dir_futures: Vec<BoxFuture<bazel_protos::remote_execution::DirectoryNode, String>> =
       Vec::new();
 
-    for (first_component, group) in &path_stats
-      .iter()
-      .cloned()
-      .group_by(|s| s.path().components().next().unwrap().as_os_str().to_owned())
-    {
+    for (first_component_opt, group) in &path_stats.iter().cloned().group_by(|s| {
+      s.path()
+        .components()
+        .next()
+        .map(|p| p.as_os_str().to_owned())
+    }) {
       let mut path_group: Vec<PathStat> = group.collect();
+
+      let first_component = try_future!(first_component_opt
+        .ok_or_else(|| format!("Item(s) did not have a valid path prefix: {:?}", path_group)));
       if path_group.len() == 1 && path_group[0].path().components().count() == 1 {
         // Exactly one entry with exactly one component indicates either a file in this directory,
         // or an empty directory.
