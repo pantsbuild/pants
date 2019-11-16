@@ -234,10 +234,10 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     if self._repro:
       self._repro.capture(self._run_tracker.run_info.get_as_dict())
 
-  def run(self):
+  def run(self, is_run_under_daemon):
     with LocalExiter.wrap_global_exiter(self._run_tracker, self._repro), \
          maybe_profiled(self._profile_path):
-      self._run()
+      self._run(is_run_under_daemon)
 
   def _maybe_handle_help(self):
     """Handle requests for `help` information."""
@@ -246,7 +246,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
       result = help_printer.print_help()
       self._exiter(result)
 
-  def _maybe_run_v1(self):
+  def _maybe_run_v1(self, is_run_under_daemon):
     v1_goals, ambiguous_goals, _ = self._options.goals_by_version
     if not self._global_options.v1:
       if v1_goals:
@@ -271,13 +271,17 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     if self._options.help_request:
       return goal_runner_factory.handle_help()
 
-    with self._run_tracker.new_workunit(name='setup', labels=[WorkUnitLabel.SETUP]):
+    # with self._run_tracker.new_workunit(name='setup', labels=[WorkUnitLabel.SETUP]):
+    if is_run_under_daemon:
       while True:
         self._reporting.initialize(self._run_tracker, self._options, start_time=self._run_start_time)
         goal_runner_factory.create().run()
-        print('\nPress enter to continue >>>')
+        print('\nPress any key to continue >>>')
         for line in sys.stdin:
           break
+    else:
+      self._reporting.initialize(self._run_tracker, self._options, start_time=self._run_start_time)
+      return goal_runner_factory.create().run()
 
   def _maybe_run_v2(self):
     # N.B. For daemon runs, @console_rules are invoked pre-fork -
@@ -313,14 +317,14 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     if engine_workunits:
       self._run_tracker.report.bulk_record_workunits(engine_workunits)
 
-  def _run(self):
+  def _run(self, is_run_under_daemon):
     engine_result = PANTS_FAILED_EXIT_CODE
     goal_runner_result = PANTS_FAILED_EXIT_CODE
     try:
       self._maybe_handle_help()
 
       engine_result = self._maybe_run_v2()
-      goal_runner_result = self._maybe_run_v1()
+      goal_runner_result = self._maybe_run_v1(is_run_under_daemon)
     finally:
       try:
         self._update_stats()

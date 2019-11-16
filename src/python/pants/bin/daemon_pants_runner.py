@@ -256,7 +256,7 @@ class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
           )
           runner.set_start_time(self._maybe_get_client_start_time_from_env(self._env))
 
-          runner.run()
+          runner.run(isinstance(self, DaemonPantsRunner))
       except KeyboardInterrupt:
         self._exiter.exit_and_fail('Interrupted by user.\n')
       except _PantsRunFinishedWithFailureException as e:

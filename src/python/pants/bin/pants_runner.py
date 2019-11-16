@@ -96,4 +96,4 @@ class PantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         options_bootstrapper=options_bootstrapper
     )
     runner.set_start_time(self._start_time)
-    return runner.run()
+    return runner.run(is_run_under_daemon=False)
