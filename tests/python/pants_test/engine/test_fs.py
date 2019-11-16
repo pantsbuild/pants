@@ -549,6 +549,21 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
           81
         ))
 
+  def test_download_with_name(self):
+    with self.isolated_local_store():
+      with http_server(StubHandler) as port:
+        expected_name = "some_other_name/with/a/unix/path"
+        url = UrlToFetch(
+            "http://localhost:{}/CNAME".format(port),
+            self.pantsbuild_digest,
+            name=expected_name,
+          )
+        snapshot, = self.scheduler.product_request(Snapshot, subjects=[url])
+        self.assert_snapshot_equals(snapshot, [expected_name], Digest(
+          "97698a6f727c5bf312fa6da3dd9739229d6f17da7c30020f4425b4233d4ebeea",
+          89
+        ))
+
   def test_download_missing_file(self):
     with self.isolated_local_store():
       with http_server(StubHandler) as port:

@@ -18,8 +18,12 @@ use parking_lot::RwLock;
 use std::collections::BTreeMap;
 
 /// Return the Python value None.
-pub fn none() -> Handle {
-  with_externs(|e| (e.clone_val)(e.context, &e.none))
+pub fn none() -> Value {
+  with_externs(|e| e.none.clone())
+}
+
+pub fn is_none(h: &Handle) -> bool {
+  with_externs(|e| (e.equals)(e.context, h, &e.none as &Handle))
 }
 
 pub fn get_value_from_type_id(ty: TypeId) -> Value {
@@ -374,7 +378,7 @@ pub type ExternContext = raw::c_void;
 pub struct Externs {
   pub context: *const ExternContext,
   pub log_level: u8,
-  pub none: Handle,
+  pub none: Value,
   pub call: CallExtern,
   pub generator_send: GeneratorSendExtern,
   pub get_type_for: GetTypeForExtern,
@@ -501,7 +505,7 @@ impl From<Result<Value, String>> for PyResult {
 
 impl From<Result<(), String>> for PyResult {
   fn from(res: Result<(), String>) -> Self {
-    PyResult::from(res.map(|()| Value::from(none())))
+    PyResult::from(res.map(|()| none()))
   }
 }
 

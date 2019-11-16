@@ -124,7 +124,7 @@ pub extern "C" fn externs_set(
   externs::set_externs(Externs {
     context,
     log_level,
-    none,
+    none: Value::new(none),
     call,
     generator_send,
     get_type_for,
@@ -809,10 +809,10 @@ pub extern "C" fn capture_snapshots(
         nodes::Snapshot::lift_path_globs(&externs::project_ignoring_type(&value, "path_globs"));
       let digest_hint = {
         let maybe_digest = externs::project_ignoring_type(&value, "digest_hint");
-        if maybe_digest == Value::from(externs::none()) {
-          None
+        if let Some(digest) = maybe_digest.into_option() {
+          Some(nodes::lift_digest(&digest)?)
         } else {
-          Some(nodes::lift_digest(&maybe_digest)?)
+          None
         }
       };
       path_globs.map(|path_globs| (path_globs, root, digest_hint))

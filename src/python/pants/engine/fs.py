@@ -187,8 +187,13 @@ class MaterializeDirectoriesResult(Collection[MaterializeDirectoryResult]):
 
 @dataclass(frozen=True)
 class UrlToFetch:
+  """A SHA-256 digested HTTP URL with an optional output name.
+
+  If the name is not specified, an attempt is made to infer it from the URL.
+  """
   url: str
   digest: Digest
+  name: Optional[str] = None
 
 
 @dataclass(frozen=True)

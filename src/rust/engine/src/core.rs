@@ -243,6 +243,17 @@ impl Value {
   pub fn new(handle: Handle) -> Value {
     Value(Arc::new(handle))
   }
+
+  ///
+  /// If this Value is Python's None, returns an optional None: otherwise, the Value.
+  ///
+  pub fn into_option(self) -> Option<Value> {
+    if externs::is_none(&self) {
+      None
+    } else {
+      Some(self)
+    }
+  }
 }
 
 impl Deref for Value {

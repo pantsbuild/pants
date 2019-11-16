@@ -767,14 +767,9 @@ impl DownloadedFile {
     core: Arc<Core>,
     url: Url,
     digest: hashing::Digest,
+    file_name: String,
     workunit_store: WorkUnitStore,
   ) -> BoxFuture<store::Snapshot, String> {
-    let file_name = try_future!(url
-      .path_segments()
-      .and_then(Iterator::last)
-      .map(str::to_owned)
-      .ok_or_else(|| format!("Error getting the file name from the parsed URL: {}", url)));
-
     core
       .store()
       .load_file_bytes_with(digest, |_| (), workunit_store)
@@ -899,6 +894,20 @@ impl WrappedNode for DownloadedFile {
     let url = try_future!(Url::parse(&url_to_fetch)
       .map_err(|err| throw(&format!("Error parsing URL {}: {}", url_to_fetch, err))));
 
+    let file_name = if let Some(name) = externs::project_ignoring_type(&value, "name").into_option()
+    {
+      externs::val_to_str(&name)
+    } else {
+      try_future!(url
+        .path_segments()
+        .and_then(Iterator::last)
+        .map(str::to_owned)
+        .ok_or_else(|| throw(&format!(
+          "Error getting the file name from the parsed URL: {}",
+          url
+        ))))
+    };
+
     let expected_digest = try_future!(lift_digest(&externs::project_ignoring_type(
       &value, "digest"
     ))
@@ -909,6 +918,7 @@ impl WrappedNode for DownloadedFile {
         context.core.clone(),
         url,
         expected_digest,
+        file_name,
         context.session.workunit_store(),
       )
       .map(Arc::new)
@@ -1002,7 +1012,7 @@ impl Task {
     entry: Arc<rule_graph::Entry<Rule>>,
     generator: Value,
   ) -> NodeFuture<Value> {
-    future::loop_fn(Value::from(externs::none()), move |input| {
+    future::loop_fn(externs::none(), move |input| {
       let context = context.clone();
       let params = params.clone();
       let entry = entry.clone();
