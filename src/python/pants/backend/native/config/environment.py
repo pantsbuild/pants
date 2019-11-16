@@ -187,7 +187,7 @@ class Assembler(_AlgebraicDataclass, _Executable):
   path_entries: Tuple[str, ...]
   exe_filename: str
   runtime_library_dirs: Tuple[str, ...]
-  extra_args: Tuple[str]
+  extra_args: Tuple[str, ...]
 
 
 class _LinkerMixin(_Executable):

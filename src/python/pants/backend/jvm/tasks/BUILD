@@ -165,6 +165,7 @@ python_library(
 python_library(
   name = 'classpath_entry',
   sources = ['classpath_entry.py'],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -177,6 +178,7 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:strutil',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -517,6 +519,7 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/task',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -547,6 +550,7 @@ python_library(
     'src/python/pants/process',
     'src/python/pants/task',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(

@@ -60,7 +60,7 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
     'src/python/pants/util:meta',
-  ]
+  ],
 )
 
 python_library(
@@ -69,19 +69,18 @@ python_library(
   dependencies = [
     'src/python/pants/base:payload_field',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
   name = 'python_requirement',
   sources = ['python_requirement.py'],
-  dependencies = [
-  ]
+  tags = {"partially_type_checked"},
 )
 
 python_library(
   name = 'python_requirements',
   sources = ['python_requirements.py'],
-  dependencies = [
-  ]
+  tags = {"partially_type_checked"},
 )
 
