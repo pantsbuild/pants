@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import copy
 import logging
+import sys
 from contextlib import contextmanager
 
 from pants.base.build_environment import get_buildroot
@@ -10,7 +11,6 @@ from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, Exiter
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.bin.goal_runner import GoalRunner
-from pants.build_graph.build_file_parser import BuildFileParser
 from pants.engine.native import Native
 from pants.goal.run_tracker import RunTracker
 from pants.help.help_printer import HelpPrinter
@@ -273,14 +273,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
       return goal_runner_factory.handle_help()
 
     with self._run_tracker.new_workunit(name='setup', labels=[WorkUnitLabel.SETUP]):
-      # build_file_parser = BuildFileParser(self._build_config, self._build_root)
-      build_graph, address_mapper = self._graph_session.create_build_graph(
-        self._target_roots,
-        self._build_root
-      )
-      import sys
       while True:
-        # goal_runner_factory.create(build_graph.clone_new(), copy.copy(address_mapper)).run()
         self._reporting.initialize(self._run_tracker, self._options, start_time=self._run_start_time)
         goal_runner_factory.create().run()
         print('\nPress enter to continue >>>')
