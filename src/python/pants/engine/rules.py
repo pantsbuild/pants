@@ -9,10 +9,11 @@ import sys
 import typing
 from abc import ABC, abstractmethod
 from collections import OrderedDict
+from collections.abc import Generator as BaseGenerator
 from collections.abc import Iterable
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import Any, Callable, Dict, Optional, Tuple, Type
+from typing import Any, Callable, Dict, Optional, Tuple, Type, Union
 
 import asttokens
 from twitter.common.collections import OrderedSet
@@ -291,23 +292,60 @@ def _make_rule(
   return wrapper
 
 
-class MissingTypeAnnotation(TypeError):
-  """Indicates a missing type annotation for an `@rule`."""
+class InvalidTypeAnnotation(TypeError):
+  """Indicates an incorrect type annotation for an `@rule`."""
 
 
-class MissingReturnTypeAnnotation(MissingTypeAnnotation):
+class MissingReturnTypeAnnotation(InvalidTypeAnnotation):
   """Indicates a missing return type annotation for an `@rule`."""
 
 
-class MissingParameterTypeAnnotation(MissingTypeAnnotation):
+class InvalidGeneratorReturnTypeAnnotation(InvalidTypeAnnotation):
+  """Indicates an incorrect Generator return type annotation for an `@rule`."""
+
+
+class MissingParameterTypeAnnotation(InvalidTypeAnnotation):
   """Indicates a missing parameter type annotation for an `@rule`."""
 
 
+def _validate_get_yield_type(yield_type: Any) -> bool:
+  if yield_type is Get:
+    return True
+  mypy_base_type = getattr(yield_type, '__origin__', None)
+  if mypy_base_type is None:
+    return False
+  if mypy_base_type is list:
+    # If the type was List[Get].
+    element_type, = yield_type.__args__
+    return _validate_get_yield_type(element_type)
+  if mypy_base_type is Union:
+    # If the type was Union[Get, List[Get]].
+    return all(_validate_get_yield_type(t) for t in yield_type.__args__)
+  return False
+
+
+def _maybe_extract_generator(*, name: str, annotation: Any) -> Optional[type]:
+  if getattr(annotation, '__origin__', None) is not BaseGenerator:
+    return None
+  yield_type, send_type, return_type = annotation.__args__
+  if isinstance(return_type, type) and _validate_get_yield_type(yield_type):
+    return return_type
+  raise InvalidGeneratorReturnTypeAnnotation(
+    f'The return type annotation for {name} was a generator, and generator return types must '
+    'specify Get, List[Get], or Union[Get, List[Get]] as the "yield type", and a `type` as the '
+    f'"return type". The annotation type was: Generator[{yield_type}, {send_type}, {return_type}].')
+
+
 def _ensure_type_annotation(
-  annotation: Any, name: str, empty_value: Any, raise_type: Type[MissingTypeAnnotation]
+  *, annotation: Any, name: str, empty_value: Any, raise_type: Type[InvalidTypeAnnotation],
+  allow_generator: bool = False,
 ) -> type:
   if annotation == empty_value:
     raise raise_type(f'{name} is missing a type annotation.')
+  if allow_generator:
+    maybe_generator_type = _maybe_extract_generator(name=name, annotation=annotation)
+    if maybe_generator_type is not None:
+      return maybe_generator_type
   if not isinstance(annotation, type):
     raise raise_type(f'The annotation for {name} must be a type, '
                      f'got {annotation} of type {type(annotation)}.')
@@ -328,7 +366,8 @@ def rule(*args, cacheable=True) -> Callable:
     annotation=signature.return_annotation,
     name=f'{func_id} return',
     empty_value=inspect.Signature.empty,
-    raise_type=MissingReturnTypeAnnotation
+    raise_type=MissingReturnTypeAnnotation,
+    allow_generator=True,
   )
   parameter_types = tuple(
     _ensure_type_annotation(

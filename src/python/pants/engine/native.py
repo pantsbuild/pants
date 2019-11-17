@@ -505,6 +505,13 @@ class _FFISpecification(object):
         # Break.
         response.tag = self._lib.Broke
         response.broke = (c.to_value(res),)
+    except StopIteration as e:
+      if e.args:
+        # This was a `return` from a generator function.
+        response.tag = self._lib.Broke
+        response.broke = (c.to_value(e.value),)
+      else:
+        raise
     except Exception as e:
       # Throw.
       response.tag = self._lib.Throw
