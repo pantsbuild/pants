@@ -20,6 +20,6 @@ pub extern "C" fn initnative_engine() {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn PyInit_native_engine() -> *mut raw::c_void {
-  wrapped_PyInit_native_engine()
+pub extern "C" fn PyInit_native_engine() -> *mut raw::c_void {
+  unsafe { wrapped_PyInit_native_engine() }
 }
