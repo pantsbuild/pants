@@ -502,6 +502,8 @@ class _FFISpecification(object):
             c.identities_buf([c.identify(g.subject) for g in res]),
           )
       else:
+        # TODO: this will soon become obsolete when all @rules are fully mypy-annotated and must
+        # `return` instead of `yield` at the end!
         # Break.
         response.tag = self._lib.Broke
         response.broke = (c.to_value(res),)
