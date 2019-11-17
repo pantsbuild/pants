@@ -42,6 +42,7 @@ python_library(
   name='jvm_task_test_base',
   sources=['jvm_task_test_base.py'],
   dependencies=[
+    'build-support/ivy',
     'src/python/pants/backend/jvm/tasks:classpath_products',
     'src/python/pants/testutil/subsystem',
     'src/python/pants/testutil:task_test_base',
