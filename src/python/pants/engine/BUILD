@@ -56,7 +56,7 @@ python_library(
     'src/python/pants/option',
     'src/python/pants/util:meta',
   ],
-  tags = {'partially_type_checked'},
+  tags = {'type_checked'},
 )
 
 python_library(
@@ -89,6 +89,7 @@ python_library(
     'src/python/pants/util:filtering',
     'src/python/pants/util:objects',
   ],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
