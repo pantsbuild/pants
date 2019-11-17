@@ -262,7 +262,7 @@ class CoursierMixin(JvmResolverBase):
     """
     # Prepare coursier args
     coursier_subsystem_instance = CoursierSubsystem.global_instance()
-    coursier_jar = coursier_subsystem_instance.bootstrap_coursier(self.context.new_workunit)
+    coursier_jar = coursier_subsystem_instance.select()
 
     repos = coursier_subsystem_instance.get_options().repos
     # make [repoX, repoY] -> ['-r', repoX, '-r', repoY]
