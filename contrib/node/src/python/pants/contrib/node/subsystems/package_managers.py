@@ -56,7 +56,7 @@ class PackageManager:
     raise NotImplementedError
 
   def _get_add_package_args(self, package, type_option, version_option):
-    """Returns command line args to add a node pacakge.
+    """Returns command line args to add a node package.
 
     :rtype: list of strings
     """
