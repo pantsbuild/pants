@@ -8,6 +8,8 @@ from collections import namedtuple
 from collections.abc import Iterable
 from typing import Generic, Iterator, TypeVar
 
+from pants.util.meta import sentinel_attribute
+
 
 class SerializationError(Exception):
   """Indicates an error serializing an object."""

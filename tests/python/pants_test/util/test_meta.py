@@ -6,8 +6,13 @@ from abc import ABC, abstractmethod
 from dataclasses import FrozenInstanceError, dataclass
 
 from pants.testutil.test_base import TestBase
-from pants.util.meta import (SingletonMetaclass, classproperty, frozen_after_init,
-                             sentinel_attribute, staticproperty)
+from pants.util.meta import (
+  SingletonMetaclass,
+  classproperty,
+  frozen_after_init,
+  sentinel_attribute,
+  staticproperty,
+)
 
 
 class AbstractClassTest(TestBase):
