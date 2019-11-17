@@ -510,7 +510,7 @@ class _FFISpecification(object):
     except StopIteration as e:
       if not e.args:
         raise
-      # This was a `return` from a generator or coroutine, as opposed to a `StopIteration` raised
+      # This was a `return` from a coroutine, as opposed to a `StopIteration` raised
       # by calling `next()` on an empty iterator.
       response.tag = self._lib.Broke
       response.broke = (c.to_value(e.value),)
