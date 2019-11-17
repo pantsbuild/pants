@@ -8,21 +8,26 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
   <settings defaultResolver="maven-central-mirror"/>
   <resolvers>
     <!--
-    We tweak two attributes away from defaults:
+    Identical to ivysettings.xml, except we point remote execution at the RBE maven central mirror
+    to avoid DDOSing maven central. -->
+    <chain name="pants-chain-repos" returnFirst="true">
+      <ibiblio
+              name="maven-central-mirror"
+              m2compatible="true"
+              descriptor="required"
+              root="https://maven-central.storage-download.googleapis.com/repos/central/data"/>
 
-    1. @descriptor: By default ivy does not require metadata (or successful metadata downloads).
-       This can lead to jars downloading without their transitive deps which leads to confusing
-       failures later when classpaths are constructed and used. We setup the maven central
-       resolver to require successful pom downloads here.
+      <!-- The mvn standard local filesystem repo/cache -->
+      <filesystem name="local.m2" m2compatible="true" local="true" checkmodified="true">
+        <ivy pattern="${m2.repo.dir}/${m2.repo.pom}"/>
+        <artifact pattern="${m2.repo.dir}/${m2.repo.artifact}"/>
+      </filesystem>
 
-    2. @root: We point remote execution at the RBE maven central mirror to avoid DDOSing maven
-       central.
-    -->
-    <ibiblio
-      name="maven-central-mirror"
-      m2compatible="true"
-      descriptor="required"
-      root="https://maven-central.storage-download.googleapis.com/repos/central/data"
-    />
+      <!-- Custom repo for Kythe jars, as Google don't currently publish them anywhere. -->
+      <url name="toolchainlabs/binhost">
+        <artifact pattern="https://github.com/toolchainlabs/binhost/raw/master/${kythe.artifact}" />
+      </url>
+    </chain>
+
   </resolvers>
 </ivysettings>
