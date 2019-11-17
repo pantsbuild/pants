@@ -260,7 +260,7 @@ class TestRunnerTaskMixin:
         try:
           process_handler.wait(timeout=wait_time)
         except subprocess.TimeoutExpired:
-          self.context.log.warn(
+          self.context.log.warning(
             'Timed out test did not terminate gracefully after {} seconds, killing...'.format(wait_time))
           process_handler.kill()
 
@@ -289,7 +289,7 @@ class TestRunnerTaskMixin:
     timeout_maximum = self.get_options().timeout_maximum
     if timeout is not None and timeout_maximum is not None:
       if timeout > timeout_maximum:
-        self.context.log.warn(
+        self.context.log.warning(
           "Warning: Timeout for {target} ({timeout}s) exceeds {timeout_maximum}s. Capping.".format(
             target=target.address.spec,
             timeout=timeout,

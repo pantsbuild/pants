@@ -152,15 +152,15 @@ class DuplicateDetector(JvmBinaryTask):
     return conflicts_by_artifacts
 
   def _log_conflicts(self, conflicts_by_artifacts, target):
-    self.context.log.warn('\n ===== For target {}:'.format(target))
+    self.context.log.warning('\n ===== For target {}:'.format(target))
     for artifacts, duplicate_files in conflicts_by_artifacts.items():
       if len(artifacts) < 2:
         continue
-      self.context.log.warn(
+      self.context.log.warning(
         'Duplicate classes and/or resources detected in artifacts: {}'.format(artifacts))
       dup_list = list(duplicate_files)
       for duplicate_file in dup_list[:self.max_dups]:
-        self.context.log.warn('     {}'.format(duplicate_file))
+        self.context.log.warning('     {}'.format(duplicate_file))
       if len(dup_list) > self.max_dups:
-        self.context.log.warn('     ... {remaining} more ...'
+        self.context.log.warning('     ... {remaining} more ...'
                               .format(remaining=(len(dup_list) - self.max_dups)))

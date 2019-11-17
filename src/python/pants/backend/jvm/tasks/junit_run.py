@@ -156,18 +156,18 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
 
     if options.default_concurrency == JUnitTests.CONCURRENCY_PARALLEL_CLASSES_AND_METHODS:
       if not options.use_experimental_runner:
-        self.context.log.warn('--default-concurrency=PARALLEL_CLASSES_AND_METHODS is '
+        self.context.log.warning('--default-concurrency=PARALLEL_CLASSES_AND_METHODS is '
                               'experimental, use --use-experimental-runner.')
       args.append('-default-concurrency')
       args.append('PARALLEL_CLASSES_AND_METHODS')
     elif options.default_concurrency == JUnitTests.CONCURRENCY_PARALLEL_METHODS:
       if not options.use_experimental_runner:
-        self.context.log.warn('--default-concurrency=PARALLEL_METHODS is experimental, use '
+        self.context.log.warning('--default-concurrency=PARALLEL_METHODS is experimental, use '
                               '--use-experimental-runner.')
       if options.test_shard:
         # NB(zundel): The experimental junit runner doesn't support test sharding natively.  The
         # legacy junit runner allows both methods and classes to run in parallel with this option.
-        self.context.log.warn('--default-concurrency=PARALLEL_METHODS with test sharding will '
+        self.context.log.warning('--default-concurrency=PARALLEL_METHODS with test sharding will '
                               'run classes in parallel too.')
       args.append('-default-concurrency')
       args.append('PARALLEL_METHODS')

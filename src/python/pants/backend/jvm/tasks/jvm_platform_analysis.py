@@ -183,7 +183,7 @@ class JvmPlatformValidate(JvmPlatformAnalysisMixin, Task):
     try:
       sort_targets(self.jvm_targets)
     except CycleException:
-      self.context.log.warn('Cannot validate dependencies when cycles exist in the build graph.')
+      self.context.log.warning('Cannot validate dependencies when cycles exist in the build graph.')
       return
 
     try:
@@ -209,7 +209,7 @@ class JvmPlatformValidate(JvmPlatformAnalysisMixin, Task):
         raise e
       else:
         assert self.check == 'warn'
-        self.context.log.warn(error_message)
+        self.context.log.warning(error_message)
         return error_message
 
   def _create_individual_error_message(self, target, invalid_dependencies):

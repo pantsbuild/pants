@@ -102,7 +102,7 @@ and/or files which need to be edited will be dumped to: {}
       if is_strict:
         raise error
       else:
-        self.context.log.warn(str(error))
+        self.context.log.warning(str(error))
     return py_namespaces_by_target
 
   class ClashingNamespaceError(TaskError): pass
@@ -137,7 +137,7 @@ Errors:
       if is_strict:
         raise error
       else:
-        self.context.log.warn(str(error))
+        self.context.log.warning(str(error))
     return namespaces_by_files
 
   def execute(self):

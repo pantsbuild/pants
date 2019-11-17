@@ -251,7 +251,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
   def _scrub_cov_env_vars(self):
     cov_env_vars = {k: v for k, v in os.environ.items() if self._is_coverage_env_var(k)}
     if cov_env_vars:
-      self.context.log.warn('Scrubbing coverage environment variables\n\t{}'
+      self.context.log.warning('Scrubbing coverage environment variables\n\t{}'
                             .format('\n\t'.join(sorted(f'{k}={v}'
                                                        for k, v in cov_env_vars.items()))))
       with environment_as(**{k: None for k in cov_env_vars}):
@@ -355,7 +355,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
               # ... and we end up appending <pex_src_root>/foo/bar to the coverage_sources.
               break
           if not found_target_base:
-            self.context.log.warn(f'Coverage path {morf} is not in any target. Skipping.')
+            self.context.log.warning(f'Coverage path {morf} is not in any target. Skipping.')
         else:
           # The source is to be interpreted as a package name.
           coverage_morfs.append(morf)
@@ -381,7 +381,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
         with self._maybe_run_in_chroot():
           # On failures or timeouts, the .coverage file won't be written.
           if not os.path.exists('.coverage'):
-            self.context.log.warn('No .coverage file was found! Skipping coverage reporting.')
+            self.context.log.warning('No .coverage file was found! Skipping coverage reporting.')
           else:
             coverage_workdir = workdirs.coverage_path
             coverage_reports = self.get_options().coverage_reports

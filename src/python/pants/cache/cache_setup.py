@@ -223,7 +223,7 @@ class CacheFactory:
       # no-op
       return spec
     except Resolver.ResolverError as e:
-      self._log.warn('Error while resolving from {0}: {1}'.format(spec.remote, str(e)))
+      self._log.warning('Error while resolving from {0}: {1}'.format(spec.remote, str(e)))
       # If for some reason resolver fails we continue to use local cache
       if spec.local:
         return CacheSpec(local=spec.local, remote=None)

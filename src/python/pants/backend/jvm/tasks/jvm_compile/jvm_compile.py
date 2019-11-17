@@ -570,7 +570,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
                    compiled individually.
     """
     if not ctx.sources:
-      self.context.log.warn('Skipping {} compile for targets with no sources:\n  {}'
+      self.context.log.warning('Skipping {} compile for targets with no sources:\n  {}'
                             .format(self.name(), vts.targets))
     else:
       counter_val = str(counter()).rjust(counter.format_length(), ' ')
@@ -715,11 +715,11 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
         self.context.log.info(suggestion_msg)
 
       if no_suggestions:
-        self.context.log.warn('Unable to find any deps from target\'s transitive '
+        self.context.log.warning('Unable to find any deps from target\'s transitive '
                                'dependencies that provide the following missing classes:')
         no_suggestion_msg = '\n   '.join(sorted(list(no_suggestions)))
-        self.context.log.warn('  {}'.format(no_suggestion_msg))
-        self.context.log.warn(self.get_options().missing_deps_not_found_msg)
+        self.context.log.warning('  {}'.format(no_suggestion_msg))
+        self.context.log.warning(self.get_options().missing_deps_not_found_msg)
 
   def _upstream_analysis(self, compile_contexts, classpath_entries):
     """Returns tuples of classes_dir->analysis_file for the closure of the target."""

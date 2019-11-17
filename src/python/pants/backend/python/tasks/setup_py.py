@@ -534,7 +534,7 @@ class SetupPy(Task):
           # hygiene.
           # raise cls.UndefinedSource('{} is source but does not belong to a package!'
           #                           .format(filename))
-          self.context.log.warn('{} is source but does not belong to a package.'
+          self.context.log.warning('{} is source but does not belong to a package.'
                                 .format(real_filename))
         else:
           continue

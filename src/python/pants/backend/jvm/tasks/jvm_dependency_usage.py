@@ -187,10 +187,10 @@ class JvmDependencyUsage(Task):
               lambda spec: next(self.context.resolve(spec).__iter__())
             )
         except Exception:
-          self.context.log.warn("Can't deserialize json for target {}".format(target))
+          self.context.log.warning("Can't deserialize json for target {}".format(target))
           return Node(target.concrete_derived_from)
       else:
-        self.context.log.warn("No cache entry for {}".format(target))
+        self.context.log.warning("No cache entry for {}".format(target))
         return Node(target.concrete_derived_from)
 
     return creator

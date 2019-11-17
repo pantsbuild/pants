@@ -748,7 +748,7 @@ class RunTrackerLogger:
   def info(self, *msg_elements):
     self._run_tracker.log(Report.INFO, *msg_elements)
 
-  def warn(self, *msg_elements):
+  def warning(self, *msg_elements):
     self._run_tracker.log(Report.WARN, *msg_elements)
 
   def error(self, *msg_elements):

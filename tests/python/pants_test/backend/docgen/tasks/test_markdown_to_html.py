@@ -144,13 +144,13 @@ class MarkdownToHtmlTest(TaskTestBase):
     self.set_options(ignore_failure=True)
     bad_rst = self.target(':bad_rst')
     context = self.context(target_roots=[bad_rst])
-    context.log.warn = unittest.mock.Mock()
+    context.log.warning = unittest.mock.Mock()
     task = self.create_task(context)
     task.execute()
 
     # The render error should have been logged.
-    self.assertEqual(1, context.log.warn.call_count)
-    args, kwargs = context.log.warn.call_args
+    self.assertEqual(1, context.log.warning.call_count)
+    args, kwargs = context.log.warning.call_args
     self.assertEqual(0, len(kwargs))
     self.assertEqual(1, len(args))
     self.assertIn('bad.rst', args[0])

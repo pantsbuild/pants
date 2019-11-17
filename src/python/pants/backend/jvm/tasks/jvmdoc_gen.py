@@ -197,7 +197,7 @@ class JvmdocGen(SkipAndTransitiveOptionsRegistrar, HasSkipAndTransitiveOptionsMi
       message = 'Failed to process {} for {} [{}]: {}'.format(
                 self.jvmdoc().tool_name, targetlist, result, " ".join(command))
       if self.ignore_failure:
-        self.context.log.warn(message)
+        self.context.log.warning(message)
       else:
         raise TaskError(message)
 

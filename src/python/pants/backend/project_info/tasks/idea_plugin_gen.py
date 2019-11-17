@@ -178,7 +178,7 @@ class IdeaPluginGen(ConsoleTask):
     jvm_target_num = len([x for x in self.context.target_roots if isinstance(x, JvmTarget)])
     python_target_num = len([x for x in self.context.target_roots if isinstance(x, PythonTarget)])
     if python_target_num > jvm_target_num:
-      logging.warn('This is likely a python project. Please make sure to '
+      logging.warning('This is likely a python project. Please make sure to '
                    'select the proper python interpreter as Project SDK in IntelliJ.')
 
     ide_file = self.generate_project()

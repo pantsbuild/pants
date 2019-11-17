@@ -244,9 +244,9 @@ class Cobertura(CoverageEngine):
 
   def should_report(self, execution_failed_exception=None):
     if execution_failed_exception:
-      self._settings.log.warn('Test failed: {0}'.format(execution_failed_exception))
+      self._settings.log.warning('Test failed: {0}'.format(execution_failed_exception))
       if self._settings.coverage_force:
-        self._settings.log.warn('Generating report even though tests failed.')
+        self._settings.log.warning('Generating report even though tests failed.')
         return True
       else:
         return False

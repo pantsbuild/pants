@@ -204,7 +204,7 @@ class MarkdownToHtml(Task):
       if returncode != 0:
         message = '{} rendered with errors.'.format(source_path)
         if self.get_options().ignore_failure:
-          self.context.log.warn(message)
+          self.context.log.warning(message)
         else:
           raise TaskError(message, exit_code=returncode, failed_targets=[page])
 
