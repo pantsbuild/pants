@@ -205,7 +205,7 @@ def _hydrate(item_type, spec_path, **kwargs):
 @rule
 async def provenanced_addresses_from_address_families(
     address_mapper: AddressMapper, specs: Specs
-) -> ProvenancedBuildFileAddresses:
+) -> Generator[Union[Get, List[Get]], Any, ProvenancedBuildFileAddresses]:
   """Given an AddressMapper and list of Specs, return matching ProvenancedBuildFileAddresses.
 
 :raises: :class:`ResolveError` if:
