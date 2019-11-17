@@ -278,6 +278,8 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     # without resorting to heavier options parsing.
     register('--enable-pantsd', advanced=True, type=bool, default=False,
              help='Enables use of the pants daemon (and implicitly, the v2 engine). (Beta)')
+    register('--v1-loop', advanced=True, type=bool, default=False,
+      help='Enables use of the pants daemon (and implicitly, the v2 engine). (Beta)')
 
     # Whether or not to make necessary arrangements to have concurrent runs in pants.
     # In practice, this means that if this is set, a run will not even try to use pantsd.

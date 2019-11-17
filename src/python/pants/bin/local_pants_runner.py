@@ -272,7 +272,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
       return goal_runner_factory.handle_help()
 
     # with self._run_tracker.new_workunit(name='setup', labels=[WorkUnitLabel.SETUP]):
-    if is_run_under_daemon:
+    if is_run_under_daemon and self._options_bootstrapper.bootstrap_options.for_global_scope().v1_loop:
       while True:
         self._reporting.initialize(self._run_tracker, self._options, start_time=self._run_start_time)
         goal_runner_factory.create().run()
