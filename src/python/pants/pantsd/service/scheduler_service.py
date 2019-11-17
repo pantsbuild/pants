@@ -126,6 +126,9 @@ class SchedulerService(PantsService):
     invalidated = self._scheduler.invalidate_files(files)
     if invalidated:
       self._loop_condition.notify_all()
+      with self._fs_event_service.dirty_lock:
+        if not self._fs_event_service.dirty.is_set():
+          self._fs_event_service.dirty.set()
 
     self._maybe_invalidate_scheduler_batch()
 

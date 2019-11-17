@@ -3,6 +3,7 @@
 
 import logging
 import os
+import threading
 
 from pants.pantsd.service.pants_service import PantsService
 from pants.pantsd.watchman import Watchman
@@ -17,6 +18,9 @@ class FSEventService(PantsService):
   """
 
   ZERO_DEPTH = ['depth', 'eq', 0]
+
+  dirty = threading.Event()
+  dirty_lock = threading.Lock()
 
   PANTS_ALL_FILES_SUBSCRIPTION_NAME = 'all_files'
   PANTS_PID_SUBSCRIPTION_NAME = 'pantsd_pid'

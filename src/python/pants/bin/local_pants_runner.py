@@ -1,7 +1,6 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import logging
-import sys
 from contextlib import contextmanager
 
 from pants.base.build_environment import get_buildroot
@@ -20,6 +19,7 @@ from pants.init.repro import Reproducer
 from pants.init.target_roots_calculator import TargetRootsCalculator
 from pants.option.arg_splitter import UnknownGoalHelp
 from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.pantsd.service.fs_event_service import FSEventService
 from pants.reporting.reporting import Reporting
 from pants.util.contextutil import maybe_profiled
 
@@ -276,9 +276,10 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
       while True:
         self._reporting.initialize(self._run_tracker, self._options, start_time=self._run_start_time)
         goal_runner_factory.create().run()
-        print('\nPress any key to continue >>>')
-        for line in sys.stdin:
-          break
+        logger.info('Waiting for changes...')
+        FSEventService.dirty.wait()
+        with FSEventService.dirty_lock:
+          FSEventService.dirty.clear()
     else:
       self._reporting.initialize(self._run_tracker, self._options, start_time=self._run_start_time)
       return goal_runner_factory.create().run()
