@@ -123,35 +123,48 @@ def staticproperty(func: Callable[..., T]) -> T:
   return ClassPropertyDescriptor(func, doc)  # type: ignore[arg-type, return-value]
 
 
-class ClassDecoratorWithSentinelAttribute(ABC):
+class _ClassDecoratorWithSentinelAttribute(ABC):
+  """Base class to wrap a class decorator which sets a "sentinel attribute".
+
+  This functionality is exposed via the `@sentinel_attribute(name: str)` decorator.
+  """
+
   @abstractproperty
   def sentinel_attribute(self) -> str: ...
 
   @abstractmethod
-  def __call__(self, cls: Type[T]) -> Type[T]: ...
+  def __call__(self, cls: type) -> type: ...
 
-  def define_instance_of(self, obj: Type[T], **kwargs) -> Type[T]:
+  def define_instance_of(self, obj: type, **kwargs) -> type:
     return type(obj.__name__, (obj,), {
       self.sentinel_attribute: True,
       **kwargs
     })
 
-  def is_instance(self, obj: Any) -> bool:
+  def is_instance(self, obj: type) -> bool:
     return hasattr(obj, self.sentinel_attribute)
 
 
-SentinelAttributeType = TypeVar("SentinelAttributeType", bound=ClassDecoratorWithSentinelAttribute)
+def sentinel_attribute(attribute_name: str) -> Callable[[Callable[[type], type]], _ClassDecoratorWithSentinelAttribute]:
+  """Wraps a class decorator to add a "sentinel attribute" to decorated classes.
 
+  A "sentinel attribute" is an attribute added to the wrapped class decorator's result with
+  `.define_instance_of()`. The wrapped class decorator can then be imported and used to check
+  whether some class object was wrapped with that decorator with `.is_instance()`.
 
-def sentinel_attribute(attribute_name: str) -> Callable[[Callable[[Type[T]], Type[T]]], Type[SentinelAttributeType]]:
-  def wrapper(func: Callable[[Type[T]], Type[T]]) -> Type[SentinelAttributeType]:
-    class WrappedFunction(ClassDecoratorWithSentinelAttribute):
+  When used on a class decorator method, the method should return
+  `<method name>.define_instance_of(cls)`, where `cls` is the class object that the decorator would
+  otherwise return.
+  """
+
+  def wrapper(func: Callable[[type], type]) -> _ClassDecoratorWithSentinelAttribute:
+    class WrappedFunction(_ClassDecoratorWithSentinelAttribute):
       @property
       def sentinel_attribute(self):
         return attribute_name
 
       @wraps(func)
-      def __call__(self, cls: Type[T]) -> Type[T]:
+      def __call__(self, cls: type) -> type:
         return func(cls)
 
     return WrappedFunction()

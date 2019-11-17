@@ -204,4 +204,6 @@ def union(cls):
     desc = f' ("{cls.__doc__}")' if cls.__doc__ else ''
     return f'Type {type(subject).__name__} is not a member of the {cls.__name__} @union{desc}'
 
-  return union.define_instance_of(cls, non_member_error_message=staticmethod(non_member_error_message))
+  return union.define_instance_of(
+    cls,
+    non_member_error_message=staticmethod(non_member_error_message))
