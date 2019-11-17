@@ -1,7 +1,6 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import os
 import unittest
 
 from pants.ivy.bootstrapper import Bootstrapper
@@ -20,9 +19,6 @@ class BootstrapperTest(unittest.TestCase):
     ivy = bootstrapper.ivy()
     self.assertIsNotNone(ivy.ivy_resolution_cache_dir)
     self.assertIsNone(ivy.ivy_settings)
-    bootstrap_jar_path = os.path.join(ivy_subsystem.get_options().pants_bootstrapdir,
-                                      'tools', 'jvm', 'ivy', 'bootstrap.jar')
-    self.assertTrue(os.path.exists(bootstrap_jar_path))
 
   def test_reset(self):
     bootstrapper1 = Bootstrapper.instance()
