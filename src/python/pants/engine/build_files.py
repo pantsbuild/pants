@@ -5,7 +5,7 @@ import logging
 from collections.abc import MutableMapping, MutableSequence
 from dataclasses import dataclass
 from os.path import dirname, join
-from typing import Dict
+from typing import Any, Dict, Generator, List, Tuple, Union
 
 from twitter.common.collections import OrderedSet
 
@@ -42,14 +42,16 @@ def _key_func(entry):
 
 
 @rule
-def parse_address_family(address_mapper: AddressMapper, directory: Dir) -> AddressFamily:
+def parse_address_family(address_mapper: AddressMapper, directory: Dir) -> Generator[Get, Any, AddressFamily]:
   """Given an AddressMapper and a directory, return an AddressFamily.
 
   The AddressFamily may be empty, but it will not be None.
   """
   patterns = tuple(join(directory.path, p) for p in address_mapper.build_patterns)
   path_globs = PathGlobs(include=patterns, exclude=address_mapper.build_ignore_patterns)
+  snapshot: Snapshot
   snapshot = yield Get(Snapshot, PathGlobs, path_globs)
+  files_content: FilesContent
   files_content = yield Get(FilesContent, Digest, snapshot.directory_digest)
 
   if not files_content:
@@ -63,7 +65,7 @@ def parse_address_family(address_mapper: AddressMapper, directory: Dir) -> Addre
         filecontent_product.path, filecontent_product.content, address_mapper.parser
       )
     )
-  yield AddressFamily.create(directory.path, address_maps)
+  return AddressFamily.create(directory.path, address_maps)
 
 
 def _raise_did_you_mean(address_family, name, source=None):
@@ -82,13 +84,14 @@ def _raise_did_you_mean(address_family, name, source=None):
 
 
 @rule
-def hydrate_struct(address_mapper: AddressMapper, address: Address) -> HydratedStruct:
+def hydrate_struct(address_mapper: AddressMapper, address: Address) -> Generator[Union[Get, List[Get]], Any, HydratedStruct]:
   """Given an AddressMapper and an Address, resolve a Struct from a BUILD file.
 
   Recursively collects any embedded addressables within the Struct, but will not walk into a
   dependencies field, since those should be requested explicitly by rules.
   """
 
+  address_family: AddressFamily
   address_family = yield Get(AddressFamily, Dir(address.spec_path))
 
   struct = address_family.addressables.get(address)
@@ -131,6 +134,7 @@ def hydrate_struct(address_mapper: AddressMapper, address: Address) -> HydratedS
   collect_inline_dependencies(struct)
 
   # And then hydrate the inline dependencies.
+  hydrated_inline_dependencies: Tuple[HydratedStruct, ...]
   hydrated_inline_dependencies = yield [
     Get(HydratedStruct, Address, a) for a in inline_dependencies
   ]
@@ -155,7 +159,8 @@ def hydrate_struct(address_mapper: AddressMapper, address: Address) -> HydratedS
     return value
 
   # NB: Some pythons throw an UnboundLocalError for `idx` if it is a simple local variable.
-  maybe_consume.idx = 0
+  # TODO(#8496): create a decorator for functions which declare a sentinel variable like this!
+  maybe_consume.idx = 0         # type: ignore
 
   # 'zip' the previously-requested dependencies back together as struct fields.
   def consume_dependencies(item, args=None):
@@ -177,7 +182,7 @@ def hydrate_struct(address_mapper: AddressMapper, address: Address) -> HydratedS
         hydrated_args[key] = maybe_consume(key, value)
     return _hydrate(type(item), address.spec_path, **hydrated_args)
 
-  yield HydratedStruct(consume_dependencies(struct, args={"address": address}))
+  return HydratedStruct(consume_dependencies(struct, args={"address": address}))
 
 
 def _hydrate(item_type, spec_path, **kwargs):
@@ -204,7 +209,7 @@ def _hydrate(item_type, spec_path, **kwargs):
 @rule
 def provenanced_addresses_from_address_families(
     address_mapper: AddressMapper, specs: Specs
-) -> ProvenancedBuildFileAddresses:
+) -> Generator[Union[Get, List[Get]], Any, ProvenancedBuildFileAddresses]:
   """Given an AddressMapper and list of Specs, return matching ProvenancedBuildFileAddresses.
 
 :raises: :class:`ResolveError` if:
@@ -249,10 +254,10 @@ def provenanced_addresses_from_address_families(
     )
 
   # NB: This may be empty, as the result of filtering by tag and exclude patterns!
-  yield ProvenancedBuildFileAddresses(
+  return ProvenancedBuildFileAddresses(
     tuple(
       ProvenancedBuildFileAddress(
-        build_file_address=addr, provenance=addr_to_provenance.get(addr)
+        build_file_address=addr, provenance=addr_to_provenance[addr]
       )
       for addr in matched_addresses
     )
@@ -261,7 +266,7 @@ def provenanced_addresses_from_address_families(
 
 @rule
 def remove_provenance(pbfas: ProvenancedBuildFileAddresses) -> BuildFileAddresses:
-  yield BuildFileAddresses(tuple(pbfa.build_file_address for pbfa in pbfas))
+  return BuildFileAddresses(tuple(pbfa.build_file_address for pbfa in pbfas))
 
 
 @dataclass(frozen=True)
@@ -287,7 +292,7 @@ def _spec_to_globs(address_mapper, specs):
   return PathGlobs(include=patterns, exclude=address_mapper.build_ignore_patterns)
 
 
-def create_graph_rules(address_mapper):
+def create_graph_rules(address_mapper: AddressMapper):
   """Creates tasks used to parse Structs from BUILD files.
 
 :param address_mapper_key: The subject key for an AddressMapper instance.
