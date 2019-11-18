@@ -3,10 +3,11 @@
 
 import os
 
-from pants.backend.native.config.environment import CCompiler, CppCompiler, Linker, Platform
+from pants.backend.native.config.environment import CCompiler, CppCompiler, Linker
 from pants.backend.native.subsystems.utils.archive_file_mapper import ArchiveFileMapper
 from pants.binaries.binary_tool import NativeTool
 from pants.binaries.binary_util import BinaryToolUrlGenerator
+from pants.engine.platform import Platform
 from pants.engine.rules import RootRule, rule
 from pants.util.dirutil import is_readable_dir
 from pants.util.memo import memoized_method, memoized_property
@@ -76,17 +77,18 @@ class LLVM(NativeTool):
   def path_entries(self):
     return self._filemap([('bin',)])
 
-  def linker(self, platform):
+  # TODO(#5663): this is currently dead code.
+  def linker(self, platform: Platform) -> Linker:
     return Linker(
       path_entries=self.path_entries,
       exe_filename=platform.match({
         Platform.darwin: "ld64.lld",
         Platform.linux: "lld",
       }),
-      library_dirs=[],
-      linking_library_dirs=[],
-      extra_args=[],
-      extra_object_files=[],
+      runtime_library_dirs=(),
+      linking_library_dirs=(),
+      extra_args=(),
+      extra_object_files=(),
     )
 
   @memoized_property
@@ -97,25 +99,25 @@ class LLVM(NativeTool):
   def _common_lib_dirs(self):
     return self._filemap([('lib',)])
 
-  def c_compiler(self):
+  def c_compiler(self) -> CCompiler:
     return CCompiler(
       path_entries=self.path_entries,
       exe_filename='clang',
       runtime_library_dirs=self._common_lib_dirs,
       include_dirs=self._common_include_dirs,
-      extra_args=[])
+      extra_args=())
 
   @memoized_property
   def _cpp_include_dirs(self):
     return self._filemap([('include/c++/v1',)])
 
-  def cpp_compiler(self):
+  def cpp_compiler(self) -> CppCompiler:
     return CppCompiler(
       path_entries=self.path_entries,
       exe_filename='clang++',
       runtime_library_dirs=self._common_lib_dirs,
       include_dirs=(self._cpp_include_dirs + self._common_include_dirs),
-      extra_args=[])
+      extra_args=())
 
 
 # TODO(#5663): use this over the XCode linker!

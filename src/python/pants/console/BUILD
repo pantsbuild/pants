@@ -6,5 +6,6 @@ python_library(
   sources = ['stty_utils.py'],
   dependencies = [
     'src/python/pants/util:process_handler',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )

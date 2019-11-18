@@ -46,6 +46,7 @@ python_library(
     'src/python/pants/util:netrc',
     'src/python/pants/util:objects',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -64,6 +65,7 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -85,4 +87,5 @@ python_library(
     'src/python/pants/build_graph',
     'src/python/pants/util:memo',
   ],
+  tags = {"partially_type_checked"},
 )

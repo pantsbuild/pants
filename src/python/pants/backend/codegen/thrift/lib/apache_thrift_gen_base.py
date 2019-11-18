@@ -5,6 +5,7 @@ import os
 import re
 import shutil
 import subprocess
+from typing import Optional
 
 from twitter.common.collections import OrderedSet
 
@@ -20,7 +21,7 @@ from pants.util.memo import memoized_property
 class ApacheThriftGenBase(SimpleCodegenTask):
   # The name of the thrift generator to use. Subclasses must set.
   # E.g., java, py (see `thrift -help` for all available generators).
-  thrift_generator = None
+  thrift_generator: Optional[str] = None
 
   # Subclasses may set their own default generator options.
   default_gen_options_map = None

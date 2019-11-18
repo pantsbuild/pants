@@ -47,9 +47,9 @@ class _ExtensibleAlgebraic(ABC):
     cur_value = getattr(self, field_name)
 
     if prepend:
-      new_value = list_value + cur_value
+      new_value = tuple(list_value) + tuple(cur_value)
     else:
-      new_value = cur_value + list_value
+      new_value = tuple(cur_value) + tuple(list_value)
 
     arg_dict = {field_name: new_value}
     return self.copy(**arg_dict)
@@ -93,7 +93,7 @@ class _ExtensibleAlgebraic(ABC):
     for list_field_name in shared_list_fields:
       lhs_value = getattr(self, list_field_name)
       rhs_value = getattr(other, list_field_name)
-      overwrite_kwargs[list_field_name] = lhs_value + rhs_value
+      overwrite_kwargs[list_field_name] = tuple(lhs_value) + tuple(rhs_value)
 
     return self.copy(**overwrite_kwargs)
 
@@ -187,7 +187,7 @@ class Assembler(_AlgebraicDataclass, _Executable):
   path_entries: Tuple[str, ...]
   exe_filename: str
   runtime_library_dirs: Tuple[str, ...]
-  extra_args: Tuple[str]
+  extra_args: Tuple[str, ...]
 
 
 class _LinkerMixin(_Executable):
@@ -212,7 +212,7 @@ class _LinkerMixin(_Executable):
   def invocation_environment_dict(self):
     ret = super(_LinkerMixin, self).invocation_environment_dict.copy()
 
-    full_library_path_dirs = self.linking_library_dirs + [
+    full_library_path_dirs = list(self.linking_library_dirs) + [
       os.path.dirname(f) for f in self.extra_object_files
     ]
 

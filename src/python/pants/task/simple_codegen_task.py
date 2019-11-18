@@ -5,6 +5,7 @@ import logging
 import os
 from abc import abstractmethod
 from collections import OrderedDict
+from typing import Optional, Tuple, Type
 
 from twitter.common.collections import OrderedSet
 
@@ -13,6 +14,7 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
+from pants.build_graph.target import Target
 from pants.engine.fs import Digest, PathGlobs, PathGlobsAndRoot
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
 from pants.task.task import Task
@@ -29,12 +31,12 @@ class SimpleCodegenTask(Task):
   """
   # Subclasses may override to provide the type of gen targets the target acts on.
   # E.g., JavaThriftLibrary. If not provided, the subclass must implement is_gentarget.
-  gentarget_type = None
+  gentarget_type: Optional[Type[Target]] = None
 
   # Subclasses may override to provide a list of glob patterns matching the generated sources,
   # relative to the target's workdir.
   # These must be a tuple of strings, e.g. ('**/*.java',).
-  sources_globs = None
+  sources_globs: Optional[Tuple[str, ...]] = None
 
   # Tuple of glob patterns to exclude from the above matches.
   sources_exclude_globs = ()

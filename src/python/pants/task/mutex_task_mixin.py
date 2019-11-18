@@ -3,6 +3,7 @@
 
 from abc import abstractmethod
 from collections import defaultdict
+from typing import DefaultDict
 
 from pants.base.exceptions import TaskError
 from pants.build_graph.target import Target
@@ -40,7 +41,7 @@ class MutexTaskMixin(Task):
   class IncompatibleActivationsError(TaskError):
     """Indicates a mutexed task group had more than one task eligible to run."""
 
-  _implementations = defaultdict(set)
+  _implementations: DefaultDict = defaultdict(set)
 
   @classmethod
   def reset_implementations(cls):

@@ -124,41 +124,41 @@ class XCodeCLITools(Subsystem):
     return self._get_existing_subdirs('include')
 
   @memoized_method
-  def assembler(self):
+  def assembler(self) -> Assembler:
     return Assembler(
       path_entries=self.path_entries(),
       exe_filename='as',
-      runtime_library_dirs=[],
-      extra_args=[])
+      runtime_library_dirs=(),
+      extra_args=())
 
   @memoized_method
-  def linker(self):
+  def linker(self) -> Linker:
     return Linker(
       path_entries=self.path_entries(),
       exe_filename='ld',
-      runtime_library_dirs=[],
-      linking_library_dirs=[],
-      extra_args=[MIN_OSX_VERSION_ARG],
-      extra_object_files=[],
+      runtime_library_dirs=(),
+      linking_library_dirs=(),
+      extra_args=(MIN_OSX_VERSION_ARG,),
+      extra_object_files=(),
     )
 
   @memoized_method
-  def c_compiler(self):
+  def c_compiler(self) -> CCompiler:
     return CCompiler(
       path_entries=self.path_entries(),
       exe_filename='clang',
       runtime_library_dirs=self.lib_dirs(),
       include_dirs=self.include_dirs(),
-      extra_args=[MIN_OSX_VERSION_ARG])
+      extra_args=(MIN_OSX_VERSION_ARG,))
 
   @memoized_method
-  def cpp_compiler(self):
+  def cpp_compiler(self) -> CppCompiler:
     return CppCompiler(
       path_entries=self.path_entries(),
       exe_filename='clang++',
       runtime_library_dirs=self.lib_dirs(),
       include_dirs=self.include_dirs(include_cpp_inc=True),
-      extra_args=[MIN_OSX_VERSION_ARG])
+      extra_args=(MIN_OSX_VERSION_ARG,))
 
 
 @rule
