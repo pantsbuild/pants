@@ -5,7 +5,7 @@ import logging
 from collections.abc import MutableMapping, MutableSequence
 from dataclasses import dataclass
 from os.path import dirname, join
-from typing import Dict, Tuple
+from typing import Dict
 
 from twitter.common.collections import OrderedSet
 
@@ -131,9 +131,8 @@ async def hydrate_struct(address_mapper: AddressMapper, address: Address) -> Hyd
   collect_inline_dependencies(struct)
 
   # And then hydrate the inline dependencies.
-  hydrated_inline_dependencies: Tuple[HydratedStruct, ...] = await MultiGet(
-    Get[HydratedStruct](Address, a) for a in inline_dependencies
-  )
+  hydrated_inline_dependencies = await MultiGet(Get[HydratedStruct](Address, a)
+                                                for a in inline_dependencies)
   dependencies = [d.value for d in hydrated_inline_dependencies]
 
   def maybe_consume(outer_key, value):

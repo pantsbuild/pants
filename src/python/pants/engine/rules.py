@@ -375,7 +375,7 @@ def rule_decorator(*args, **kwargs) -> Callable:
     annotation=signature.return_annotation,
     name=f'{func_id} return',
     empty_value=inspect.Signature.empty,
-    raise_type=MissingReturnTypeAnnotation,
+    raise_type=MissingReturnTypeAnnotation
   )
   parameter_types = tuple(
     _ensure_type_annotation(
