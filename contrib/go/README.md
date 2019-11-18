@@ -175,7 +175,7 @@ index 5d283d4..38ed297 100644
 +go_remote_library(rev='v1.1')
 ```
 Here we've used the `v1.1` tag of the `github.com/gorilla/mux` project, but we could also use a sha
-or branch name (not reccomended since branches can float).
+or branch name (not recommended since branches can float).
 
 Re-running buildgen finds success:
 ```
@@ -342,7 +342,7 @@ Go and the Go ecosystem provide rich tool support. From native Go tools like `go
 to editors like `vim` and [Sublime](https://www.sublimetext.com/) that have plugins supporting Go
 symbol resolution and more. These tools all rely on a `GOROOT` and a `GOPATH` to know where to find
 binaries and code to operate against. Since pants controls the Go workspace these tools are
-unuseable without knowledge of the Pants-synthesized workspaces.  The `./pants go` and
+unusable without knowledge of the Pants-synthesized workspaces.  The `./pants go` and
 `./pants go-env` goals can help use or integrate with these tools.
 
 ### go

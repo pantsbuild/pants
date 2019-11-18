@@ -4,14 +4,10 @@
 import hashlib
 import logging
 import os
-import shutil
 
-from pants.base.build_environment import get_buildroot
 from pants.ivy.ivy import Ivy
 from pants.ivy.ivy_subsystem import IvySubsystem
-from pants.net.http.fetcher import Fetcher
-from pants.util.contextutil import temporary_file
-from pants.util.dirutil import safe_delete, touch
+from pants.util.dirutil import safe_concurrent_creation, safe_delete
 
 
 logger = logging.getLogger(__name__)
@@ -24,9 +20,7 @@ class Bootstrapper:
   public jar repositories and a standard ivy local cache directory to execute resolve operations.
 
   By default ivy will be bootstrapped from a stable ivy jar version found in maven central, but
-  this can be over-ridden with the ``--ivy-bootstrap-jar-url`` option.  Additionally the
-  bootstrapping will use a connect/read timeout of 1 second by default, but this can be raised by
-  specifying a ``--ivy-bootstrap-fetch-timeout-secs`` option.
+  this can be over-ridden with the ``--ivy-bootstrap-jar-urls`` option.
 
   After bootstrapping, ivy will re-resolve itself.  By default it does this via maven central, but
   a custom ivy tool classpath can be specified by using the ``--ivy-ivy-profile`` option to point to
@@ -59,7 +53,8 @@ class Bootstrapper:
   def __init__(self, ivy_subsystem=None):
     """Creates an ivy bootstrapper."""
     self._ivy_subsystem = ivy_subsystem or IvySubsystem.global_instance()
-    self._version_or_ivyxml = self._ivy_subsystem.get_options().ivy_profile
+    self._version = self._ivy_subsystem.get_options().version
+    self._ivyxml = self._ivy_subsystem.get_options().ivy_profile
     self._classpath = None
 
   @classmethod
@@ -96,32 +91,28 @@ class Bootstrapper:
     return self._classpath
 
   def _bootstrap_ivy_classpath(self, workunit_factory, retry=True):
-    # TODO(John Sirois): Extract a ToolCache class to control the path structure:
-    # https://jira.twitter.biz/browse/DPB-283
-
     ivy_bootstrap_dir = os.path.join(self._ivy_subsystem.get_options().pants_bootstrapdir,
                                      'tools', 'jvm', 'ivy')
     digest = hashlib.sha1()
-    if os.path.isfile(self._version_or_ivyxml):
-      with open(self._version_or_ivyxml, 'rb') as fp:
+    if self._ivyxml and os.path.isfile(self._ivyxml):
+      with open(self._ivyxml, 'rb') as fp:
         digest.update(fp.read())
-    else:
-      digest.update(self._version_or_ivyxml.encode())
+    digest.update(self._version.encode())
     classpath = os.path.join(ivy_bootstrap_dir, f'{digest.hexdigest()}')
 
     if not os.path.exists(classpath):
-      ivy = self._bootstrap_ivy(os.path.join(ivy_bootstrap_dir, 'bootstrap.jar'))
-      args = ['-confs', 'default', '-cachepath', classpath]
-      if os.path.isfile(self._version_or_ivyxml):
-        args.extend(['-ivy', self._version_or_ivyxml])
-      else:
-        args.extend(['-dependency', 'org.apache.ivy', 'ivy', self._version_or_ivyxml])
+      with safe_concurrent_creation(classpath) as safe_classpath:
+        ivy = self._bootstrap_ivy()
+        args = ['-confs', 'default', '-cachepath', safe_classpath]
+        if self._ivyxml and os.path.isfile(self._ivyxml):
+          args.extend(['-ivy', self._ivyxml])
+        else:
+          args.extend(['-dependency', 'org.apache.ivy', 'ivy', self._version])
 
-      try:
-        ivy.execute(args=args, workunit_factory=workunit_factory, workunit_name='ivy-bootstrap')
-      except ivy.Error as e:
-        safe_delete(classpath)
-        raise self.Error('Failed to bootstrap an ivy classpath! {}'.format(e))
+        try:
+          ivy.execute(args=args, workunit_factory=workunit_factory, workunit_name='ivy-bootstrap')
+        except ivy.Error as e:
+          raise self.Error('Failed to bootstrap an ivy classpath! {}'.format(e))
 
     with open(classpath, 'r') as fp:
       cp = fp.read().strip().split(os.pathsep)
@@ -132,28 +123,9 @@ class Bootstrapper:
         raise self.Error('Ivy bootstrapping failed - invalid classpath: {}'.format(':'.join(cp)))
       return cp
 
-  def _bootstrap_ivy(self, bootstrap_jar_path):
+  def _bootstrap_ivy(self):
     options = self._ivy_subsystem.get_options()
-    if not os.path.exists(bootstrap_jar_path):
-      with temporary_file() as bootstrap_jar:
-        fetcher = Fetcher(get_buildroot())
-        checksummer = fetcher.ChecksumListener(digest=hashlib.sha1())
-        try:
-          logger.info('\nDownloading {}'.format(options.bootstrap_jar_url))
-          # TODO: Capture the stdout of the fetcher, instead of letting it output
-          # to the console directly.
-          fetcher.download(options.bootstrap_jar_url,
-                           listener=fetcher.ProgressListener().wrap(checksummer),
-                           path_or_fd=bootstrap_jar,
-                           timeout_secs=options.bootstrap_fetch_timeout_secs)
-          logger.info('sha1: {}'.format(checksummer.checksum))
-          bootstrap_jar.close()
-          touch(bootstrap_jar_path)
-          shutil.move(bootstrap_jar.name, bootstrap_jar_path)
-        except fetcher.Error as e:
-          raise self.Error('Problem fetching the ivy bootstrap jar! {}'.format(e))
-
-    return Ivy(bootstrap_jar_path,
+    return Ivy(self._ivy_subsystem.select(),
                ivy_settings=options.bootstrap_ivy_settings or options.ivy_settings,
                ivy_resolution_cache_dir=self._ivy_subsystem.resolution_cache_dir(),
                extra_jvm_options=self._ivy_subsystem.extra_jvm_options())

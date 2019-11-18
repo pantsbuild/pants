@@ -113,7 +113,7 @@ class ImportOracle:
 
     :rtype: bool
     """
-    # The "C" package is a psuedo-package that links through to the c stdlib, see:
+    # The "C" package is a pseudo-package that links through to the c stdlib, see:
     #   http://blog.golang.org/c-go-cgo
     return import_path == 'C' or import_path in self.go_stdlib
 
