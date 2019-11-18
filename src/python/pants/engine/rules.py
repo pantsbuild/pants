@@ -142,16 +142,17 @@ The rule defined by function `{func_name}` begins at:
       return True
     return False
 
-  def _matches_get_name(self, node):
+  def _matches_get_name(self, node: Any) -> bool:
     return isinstance(node, ast.Name) and node.id == Get.__name__
 
-  def _is_get(self, node):
+  def _is_get(self, node: Any) -> bool:
     if isinstance(node, ast.Call):
       if self._matches_get_name(node.func):
         return True
       if isinstance(node.func, ast.Subscript) and self._matches_get_name(node.func.value):
         return True
       return False
+    return False
 
   def visit_Call(self, node) -> None:
     self.generic_visit(node)
