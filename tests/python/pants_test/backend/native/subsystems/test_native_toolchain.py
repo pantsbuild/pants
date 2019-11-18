@@ -121,7 +121,7 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
         yield toolchain
 
   def _invoke_compiler(self, compiler, args):
-    cmd = [compiler.exe_filename] + compiler.extra_args + args
+    cmd = [compiler.exe_filename] + list(compiler.extra_args) + args
     env = compiler.invocation_environment_dict
     # TODO: add an `extra_args`-like field to `Executable`s which allows for overriding env vars
     # like this, but declaratively!
@@ -129,7 +129,7 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
     return self._invoke_capturing_output(cmd, env)
 
   def _invoke_linker(self, linker, args):
-    cmd = [linker.exe_filename] + linker.extra_args + args
+    cmd = [linker.exe_filename] + list(linker.extra_args) + args
     return self._invoke_capturing_output(
       cmd,
       linker.invocation_environment_dict)
