@@ -3,6 +3,7 @@
 
 from collections import namedtuple
 from textwrap import dedent
+from typing import List
 
 from pants.base.exceptions import TaskError
 from pants.java.distribution.distribution import DistributionLocator
@@ -46,7 +47,7 @@ class JvmToolMixin:
       """
       return options.for_scope(self.scope).is_default(self.key.replace('-', '_'))
 
-  _jvm_tools = []  # List of JvmTool objects.
+  _jvm_tools: List[JvmTool] = []
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -147,15 +148,12 @@ class JvmToolMixin:
     round_manager.require_data('jvm_build_tools_classpath_callbacks')
 
   @staticmethod
-  def get_registered_tools():
-    """Returns all registered jvm tools.
-
-    :rtype: list of :class:`JvmToolMixin.JvmTool`
-    """
+  def get_registered_tools() -> List["JvmTool"]:
+    """Returns all registered jvm tools."""
     return JvmToolMixin._jvm_tools
 
   @staticmethod
-  def reset_registered_tools():
+  def reset_registered_tools() -> None:
     """Needed only for test isolation."""
     JvmToolMixin._jvm_tools = []
 

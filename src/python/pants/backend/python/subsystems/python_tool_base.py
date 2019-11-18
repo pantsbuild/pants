@@ -1,6 +1,8 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from typing import Optional, Sequence
+
 from pants.subsystem.subsystem import Subsystem
 
 
@@ -8,10 +10,10 @@ class PythonToolBase(Subsystem):
   """Base class for subsystems that configure a python tool to be invoked out-of-process."""
 
   # Subclasses must set.
-  default_requirements = None
-  default_entry_point = None
+  default_requirements: Optional[Sequence[str]] = None
+  default_entry_point: Optional[str] = None
   # Subclasses need not override.
-  default_interpreter_constraints = []
+  default_interpreter_constraints: Sequence[str] = []
 
   @classmethod
   def register_options(cls, register):

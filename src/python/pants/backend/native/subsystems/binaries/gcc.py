@@ -3,9 +3,10 @@
 
 import os
 
-from pants.backend.native.config.environment import CCompiler, CppCompiler, Platform
+from pants.backend.native.config.environment import CCompiler, CppCompiler
 from pants.backend.native.subsystems.utils.archive_file_mapper import ArchiveFileMapper
 from pants.binaries.binary_tool import NativeTool
+from pants.engine.platform import Platform
 from pants.engine.rules import rule
 from pants.util.memo import memoized_method, memoized_property
 
@@ -57,13 +58,13 @@ class GCC(NativeTool):
       ('lib/gcc/*', self.version(), 'include'),
     ])
 
-  def c_compiler(self, platform):
+  def c_compiler(self, platform: Platform) -> CCompiler:
     return CCompiler(
       path_entries=self.path_entries,
       exe_filename='gcc',
       runtime_library_dirs=self._common_lib_dirs(platform),
       include_dirs=self._common_include_dirs,
-      extra_args=[])
+      extra_args=())
 
   @memoized_property
   def _cpp_include_dirs(self):
@@ -83,13 +84,13 @@ class GCC(NativeTool):
 
     return most_cpp_include_dirs + [plat_cpp_header_dir]
 
-  def cpp_compiler(self, platform):
+  def cpp_compiler(self, platform: Platform) -> CppCompiler:
     return CppCompiler(
       path_entries=self.path_entries,
       exe_filename='g++',
       runtime_library_dirs=self._common_lib_dirs(platform),
       include_dirs=(self._common_include_dirs + self._cpp_include_dirs),
-      extra_args=[])
+      extra_args=())
 
 
 @rule
