@@ -21,6 +21,8 @@ from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS
 from pants.util.objects import SubclassesOf
 
 
+# TODO(#6742): Improve the type signature by using generics and type vars. `mock` should be
+#  `Callable[[SubjectType], ProductType]`.
 @dataclass(frozen=True)
 class MockGet:
   product_type: Type
@@ -43,9 +45,9 @@ def run_rule(
   ```
 
   In the case of an @rule that makes Get requests, things get more interesting: the
-  `mocked_yield_gets` argument must be provided as a sequence of `MockedYieldGet`s. Each
-  MockedYieldGet takes the Product and Subject type, along with a one-argument function that
-  takes a subject value and returns a product value.
+  `mock_gets` argument must be provided as a sequence of `MockGet`s. Each MockGet takes the Product
+  and Subject type, along with a one-argument function that takes a subject value and returns a
+  product value.
 
   So in the case of an @rule named `my_co_rule` that takes one argument and makes Get requests
   for a product type `Listing` with subject type `Dir`, the invoke might look like:
@@ -57,7 +59,7 @@ def run_rule(
       MockGet(
         product_type=Listing,
         subject_type=Dir,
-        mock=lambda subject_val: Listing(..),
+        mock=lambda dir_subject: Listing(..),
       ),
     ],
   )
