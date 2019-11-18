@@ -15,6 +15,7 @@ class LoggingTest(TestBase):
 
   @classmethod
   def setUpClass(cls) -> None:
+    super().setUpClass()
     # NB: We must set this up at the class level, rather than per-test level, because
     # `init_rust_logging` must never be called more than once. The Rust logger is global and static,
     # and initializing it twice in the same test class results in a SIGABRT.
