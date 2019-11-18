@@ -45,6 +45,7 @@ class SourceRootTypes:
   RESOURCE = 'RESOURCE'  # Resource belonging to Source Target
   TEST_RESOURCE = 'TEST_RESOURCE'  # Resource belonging to Test Target
 
+
 # Changing the behavior of this task may affect the IntelliJ Pants plugin.
 # Please add @yic to reviews for this file.
 class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
