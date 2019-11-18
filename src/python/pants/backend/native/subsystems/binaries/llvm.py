@@ -77,6 +77,7 @@ class LLVM(NativeTool):
   def path_entries(self):
     return self._filemap([('bin',)])
 
+  # TODO(#5663): this is currently dead code.
   def linker(self, platform: Platform) -> Linker:
     return Linker(
       path_entries=self.path_entries,
