@@ -26,7 +26,7 @@ pub struct Types {
   pub multi_platform_process_request: TypeId,
   pub process_result: TypeId,
   pub generator: TypeId,
-  pub async_generator: TypeId,
+  pub coroutine: TypeId,
   pub url_to_fetch: TypeId,
   pub string: TypeId,
   pub bytes: TypeId,

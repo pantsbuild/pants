@@ -509,7 +509,8 @@ class _FFISpecification(object):
         response.broke = (c.to_value(res),)
     except StopIteration as e:
       if e.args:
-        # This was a `return` from a generator function.
+        # This was a `return` from a generator or coroutine, as opposed to a `StopIteration` raised
+        # by calling `next()` on an empty iterator.
         response.tag = self._lib.Broke
         response.broke = (c.to_value(e.value),)
       else:
@@ -577,7 +578,7 @@ class EngineTypes(NamedTuple):
   multi_platform_process_request: TypeId
   process_result: TypeId
   generator: TypeId
-  async_generator: TypeId
+  coroutine: TypeId
   url_to_fetch: TypeId
   string: TypeId
   bytes: TypeId
@@ -935,7 +936,7 @@ class Native(metaclass=SingletonMetaclass):
         multi_platform_process_request=ti(MultiPlatformExecuteProcessRequest),
         process_result=ti(FallibleExecuteProcessResult),
         generator=ti(GeneratorType),
-        async_generator=ti(CoroutineType),
+        coroutine=ti(CoroutineType),
         url_to_fetch=ti(UrlToFetch),
         string=ti(str),
         bytes=ti(bytes),

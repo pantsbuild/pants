@@ -1068,7 +1068,7 @@ impl WrappedNode for Task {
       .then(move |task_result| match task_result {
         Ok(val) => match externs::get_type_for(&val) {
           t if t == context.core.types.generator => Self::generate(context, params, entry, val),
-          t if t == context.core.types.async_generator => {
+          t if t == context.core.types.coroutine => {
             Self::generate(context, params, entry, val)
           }
           t if t == product => ok(val),

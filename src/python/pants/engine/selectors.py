@@ -19,20 +19,39 @@ class Get(Generic[_Product]):
   """Experimental synchronous generator API.
 
   May be called equivalently as either:
-    # verbose form: Get(product_type, subject_declared_type, subject)
-    # shorthand form: Get(product_type, subject_type(subject))
+    # verbose form: Get[product](subject_declared_type, subject)
+    # shorthand form: Get[product](subject_declared_type(<constructor args for subject>))
   """
   product: Type[_Product]
   subject_declared_type: type
   subject: Optional[Any]
 
-  def __await__(self) -> 'Generator[Any, Any, _Product]':
-    """Allow a Get to be `await`ed, returning a type-checked result."""
+  def __await__(self) -> Generator[Any, Any, _Product]:
+    """Allow a Get to be `await`ed within an `async` method, returning a strongly-typed result.
+
+    The `yield`ed value `self` is interpreted by the engine within `extern_generator_send()` in
+    `native.py`. This class will yield a single Get instance, which is converted into
+    `PyGeneratorResponse::Get` from `externs.rs` via the python `cffi` library and the rust
+    `cbindgen` crate.
+
+    This is how this method is eventually called:
+    - When the engine calls an `async def` method decorated with `@rule`, an instance of
+      `types.CoroutineType` is created.
+    - The engine will call `.send(None)` on the coroutine, which will either:
+      - raise StopIteration with a value (if the coroutine `return`s), or
+      - return a `Get` instance to the engine (if the rule instead called `await Get(...)`).
+    - The engine will fulfill the `Get` request to produce `x`, then call `.send(x)` and repeat the
+      above until StopIteration.
+
+    See more information about implementing this method at
+    https://www.python.org/dev/peps/pep-0492/#await-expression.
+    """
     result = yield self
     return cast(_Product, result)
 
   @classmethod
   def __class_getitem__(cls, product_type):
+    """Override the behavior of Get[T] to shuffle over the product T into the constructor args."""
     return lambda *args: cls(product_type, *args)
 
   def __init__(self, *args: Any) -> None:
@@ -87,34 +106,34 @@ class Get(Generic[_Product]):
       if isinstance(index_expr, ast.Name):
         subscript_args = (index_expr,)
       else:
-        raise ValueError(f'Unrecognized Get type index arg: {index_expr}')
+        raise ValueError(f'Unrecognized type argument T for Get[T]: {ast.dump(index_expr)}')
     else:
-      raise ValueError(f'Unrecognized Get call node type: {func}')
+      raise ValueError(
+        f'Unrecognized Get call node type: expected Get or Get[T], received {ast.dump(call_node)}')
 
+    # Shuffle over the type parameter to be the first argument, if provided.
     combined_args = subscript_args + tuple(call_node.args)
 
     if len(combined_args) == 2:
       product_type, subject_constructor = combined_args
       if not isinstance(product_type, ast.Name) or not isinstance(subject_constructor, ast.Call):
-        # TODO(#7114): describe what types of objects are expected in the get call, not just the
-        # argument names. After #7114 this will be easier because they will just be types!
         raise ValueError(
-          'Two arg form of {} expected (product_type, subject_type(subject)), but '
-                        'got: ({})'.format(Get.__name__, render_args(combined_args)))
+          f'Two arg form of {Get.__name__} expected (product_type, subject_type(subject)), but '
+          f'got: ({render_args(combined_args)})')
       return (product_type.id, subject_constructor.func.id)
     elif len(combined_args) == 3:
       product_type, subject_declared_type, _ = combined_args
       if not isinstance(product_type, ast.Name) or not isinstance(subject_declared_type, ast.Name):
         raise ValueError(
-          'Three arg form of {} expected (product_type, subject_declared_type, subject), but '
-                        'got: ({})'.format(Get.__name__, render_args(combined_args)))
+          f'Three arg form of {Get.__name__} expected (product_type, subject_declared_type, subject), but '
+          f'got: ({render_args(combined_args)})')
       return (product_type.id, subject_declared_type.id)
     else:
-      raise ValueError('Invalid {}; expected either two or three args, but '
-                      'got: ({})'.format(Get.__name__, render_args(combined_args)))
+      raise ValueError(f'Invalid {Get.__name__}; expected either two or three args, but '
+                       f'got: ({render_args(combined_args)})')
 
   @classmethod
-  def create_statically_for_rule_graph(cls, product_type, subject_type):
+  def create_statically_for_rule_graph(cls, product_type, subject_type) -> 'Get':
     """Construct a `Get` with a None value.
 
     This method is used to help make it explicit which `Get` instances are parsed from @rule bodies
@@ -130,10 +149,24 @@ class MultiGet(Generic[_Product]):
   gets: Tuple[Get[_Product], ...]
 
   def __await__(self) -> Generator[Any, Any, Tuple[_Product, ...]]:
+    """Yield a tuple of Get instances with the same subject/product type pairs all at once.
+
+    The `yield`ed value `self.gets` is interpreted by the engine within `extern_generator_send()` in
+    `native.py`. This class will yield a tuple of Get instances, which is converted into
+    `PyGeneratorResponse::GetMulti` from `externs.rs`.
+
+    The engine will fulfill these Get instances in parallel, and return a tuple of _Product
+    instances to this method, which then returns this tuple to the `@rule` which called
+    `await MultiGet(Get[_Product](...) for ... in ...)`.
+    """
     result = yield self.gets
     return cast(Tuple[_Product, ...], result)
 
   def __init__(self, gets: Iterable[Get[_Product]]) -> None:
+    """Create a MultiGet from a generator expression.
+
+    This constructor will infer this class's _Product parameter from the input `gets`.
+    """
     self.gets = tuple(gets)
 
 
