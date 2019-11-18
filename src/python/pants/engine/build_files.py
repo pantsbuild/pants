@@ -5,7 +5,7 @@ import logging
 from collections.abc import MutableMapping, MutableSequence
 from dataclasses import dataclass
 from os.path import dirname, join
-from typing import Dict
+from typing import Dict, Tuple
 
 from twitter.common.collections import OrderedSet
 
@@ -49,8 +49,8 @@ async def parse_address_family(address_mapper: AddressMapper, directory: Dir) ->
   """
   patterns = tuple(join(directory.path, p) for p in address_mapper.build_patterns)
   path_globs = PathGlobs(include=patterns, exclude=address_mapper.build_ignore_patterns)
-  snapshot = await Get[Snapshot](PathGlobs, path_globs)
-  files_content = await Get[FilesContent](Digest, snapshot.directory_digest)
+  snapshot: Snapshot = await Get(Snapshot, PathGlobs, path_globs)
+  files_content: FilesContent = await Get(FilesContent, Digest, snapshot.directory_digest)
 
   if not files_content:
     raise ResolveError(
@@ -89,7 +89,7 @@ async def hydrate_struct(address_mapper: AddressMapper, address: Address) -> Hyd
   dependencies field, since those should be requested explicitly by rules.
   """
 
-  address_family = await Get[AddressFamily](Dir(address.spec_path))
+  address_family: AddressFamily = await Get(AddressFamily, Dir(address.spec_path))
 
   struct = address_family.addressables.get(address)
   addresses = address_family.addressables
@@ -131,8 +131,9 @@ async def hydrate_struct(address_mapper: AddressMapper, address: Address) -> Hyd
   collect_inline_dependencies(struct)
 
   # And then hydrate the inline dependencies.
-  hydrated_inline_dependencies = await MultiGet(Get[HydratedStruct](Address, a)
-                                                for a in inline_dependencies)
+  hydrated_inline_dependencies: Tuple[HydratedStruct, ...] = await MultiGet(
+    Get(HydratedStruct, Address, a) for a in inline_dependencies
+  )
   dependencies = [d.value for d in hydrated_inline_dependencies]
 
   def maybe_consume(outer_key, value):
@@ -213,9 +214,9 @@ async def provenanced_addresses_from_address_families(
 :raises: :class:`AddressLookupError` if no targets are matched for non-SingleAddress specs.
 """
   # Capture a Snapshot covering all paths for these Specs, then group by directory.
-  snapshot = await Get[Snapshot](PathGlobs, _spec_to_globs(address_mapper, specs))
+  snapshot = await Get(Snapshot, PathGlobs, _spec_to_globs(address_mapper, specs))
   dirnames = {dirname(f) for f in snapshot.files}
-  address_families = await MultiGet(Get[AddressFamily](Dir(d)) for d in dirnames)
+  address_families = await MultiGet(Get(AddressFamily, Dir(d)) for d in dirnames)
   address_family_by_directory = {af.namespace: af for af in address_families}
 
   matched_addresses = OrderedSet()
