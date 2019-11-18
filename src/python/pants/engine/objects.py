@@ -171,7 +171,7 @@ class Collection(Generic[_C], Iterable):
     return bool(self.dependencies)
 
 
-@sentinel_attribute('_is_union')
+@sentinel_attribute
 def union(cls):
   """A class decorator which other classes can specify that they can resolve to with `UnionRule`.
 

@@ -1,7 +1,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from abc import ABC, abstractmethod, abstractproperty
+from abc import ABC, abstractmethod
 from dataclasses import FrozenInstanceError
 from functools import wraps
 from typing import Any, Callable, Optional, Type, TypeVar, Union
@@ -126,26 +126,23 @@ def staticproperty(func: Callable[..., T]) -> T:
 class _ClassDecoratorWithSentinelAttribute(ABC):
   """Base class to wrap a class decorator which sets a "sentinel attribute".
 
-  This functionality is exposed via the `@sentinel_attribute(name: str)` decorator.
+  This functionality is exposed via the `@sentinel_attribute` decorator.
   """
-
-  @abstractproperty
-  def sentinel_attribute(self) -> str: ...
 
   @abstractmethod
   def __call__(self, cls: type) -> type: ...
 
   def define_instance_of(self, obj: type, **kwargs) -> type:
     return type(obj.__name__, (obj,), {
-      self.sentinel_attribute: True,
+      '_sentinel_attribute_type': type(self),
       **kwargs
     })
 
   def is_instance(self, obj: type) -> bool:
-    return hasattr(obj, self.sentinel_attribute)
+    return (getattr(obj, '_sentinel_attribute_type', None) == type(self))
 
 
-def sentinel_attribute(attribute_name: str) -> Callable[[Callable[[type], type]], _ClassDecoratorWithSentinelAttribute]:
+def sentinel_attribute(decorator: Callable[[type], type]) -> _ClassDecoratorWithSentinelAttribute:
   """Wraps a class decorator to add a "sentinel attribute" to decorated classes.
 
   A "sentinel attribute" is an attribute added to the wrapped class decorator's result with
@@ -157,21 +154,15 @@ def sentinel_attribute(attribute_name: str) -> Callable[[Callable[[type], type]]
   otherwise return.
   """
 
-  def wrapper(func: Callable[[type], type]) -> _ClassDecoratorWithSentinelAttribute:
-    class WrappedFunction(_ClassDecoratorWithSentinelAttribute):
-      @property
-      def sentinel_attribute(self):
-        return attribute_name
+  class WrappedFunction(_ClassDecoratorWithSentinelAttribute):
+    @wraps(decorator)
+    def __call__(self, cls: type) -> type:
+      return decorator(cls)
 
-      @wraps(func)
-      def __call__(self, cls: type) -> type:
-        return func(cls)
-
-    return WrappedFunction()
-  return wrapper
+  return WrappedFunction()
 
 
-@sentinel_attribute('_frozen_after_init')
+@sentinel_attribute
 def frozen_after_init(cls: C) -> C:
   """Class decorator to freeze any modifications to the object after __init__() is done.
 

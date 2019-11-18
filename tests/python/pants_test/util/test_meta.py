@@ -255,7 +255,7 @@ with an @classproperty decorator."""):
 class SentinelAttributeTest(unittest.TestCase):
 
   def test_sentinel_attribute(self):
-    @sentinel_attribute('_test_attr_name')
+    @sentinel_attribute
     def f(cls):
       return f.define_instance_of(cls)
 
@@ -263,8 +263,7 @@ class SentinelAttributeTest(unittest.TestCase):
     class C:
       pass
 
-    self.assertEqual(f.sentinel_attribute, '_test_attr_name')
-    self.assertTrue(C._test_attr_name)
+    self.assertEqual(C._sentinel_attribute_type, type(f))
     self.assertTrue(f.is_instance(C))
 
 
