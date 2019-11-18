@@ -4,21 +4,23 @@
 import os
 import urllib
 
+from pants.binaries.binary_tool import Script
+from pants.binaries.binary_util import BinaryToolUrlGenerator
 from pants.java.distribution.distribution import DistributionLocator
-from pants.subsystem.subsystem import Subsystem
 
 
-class IvySubsystem(Subsystem):
+class IvySubsystem(Script):
   """Common configuration items for ivy tasks.
 
   :API: public
   """
   options_scope = 'ivy'
+  default_version = '2.4.0'
 
-  _DEFAULT_VERSION = '2.4.0'
-  _DEFAULT_URL = ('https://repo1.maven.org/maven2/'
-                  'org/apache/ivy/ivy/'
-                  '{version}/ivy-{version}.jar'.format(version=_DEFAULT_VERSION))
+  _default_urls = [
+      'https://repo1.maven.org/maven2/org/apache/ivy/ivy/{version}/ivy-{version}.jar',
+      'https://maven-central.storage-download.googleapis.com/repos/central/data/org/apache/ivy/ivy/{version}/ivy-{version}.jar',
+    ]
 
   @classmethod
   def register_options(cls, register):
@@ -27,12 +29,16 @@ class IvySubsystem(Subsystem):
              help='Specify a proxy URL for http requests.')
     register('--https-proxy', advanced=True,
              help='Specify a proxy URL for https requests.')
-    register('--bootstrap-jar-url', advanced=True, default=cls._DEFAULT_URL,
+    register('--bootstrap-jar-url', advanced=True, default=cls._default_urls[0],
+             removal_version='1.25.0.dev1', removal_hint='Use --bootstrap-jar-urls',
              help='Location to download a bootstrap version of Ivy.')
+    register('--bootstrap-jar-urls', advanced=True, type=list, default=cls._default_urls,
+             help='List of URLs with templated {version}s to use to download a bootstrap copy of Ivy.')
     register('--bootstrap-fetch-timeout-secs', type=int, advanced=True, default=10,
+             removal_version='1.25.0.dev1', removal_hint='Use --binaries-fetch-timeout-secs.',
              help='Timeout the fetch if the connection is idle for longer than this value.')
-    register('--ivy-profile', advanced=True, default=cls._DEFAULT_VERSION,
-             help='The version of ivy to fetch.')
+    register('--ivy-profile', advanced=True, default=None,
+             help='An ivy.xml file.')
     register('--cache-dir', advanced=True, default=os.path.expanduser('~/.ivy2/pants'),
              help='The default directory used for both the Ivy resolution and repository caches.'
                   'If you want to isolate the resolution cache from the repository cache, we '
@@ -50,6 +56,14 @@ class IvySubsystem(Subsystem):
   @classmethod
   def subsystem_dependencies(cls):
     return super().subsystem_dependencies() + (DistributionLocator,)
+
+  def get_external_url_generator(self):
+    # NB: Remove with deprecation.
+    if self.get_options().is_flagged('bootstrap_jar_url'):
+      urls = [self.get_options().bootstrap_jar_url]
+    else:
+      urls = list(self.get_options().bootstrap_jar_urls)
+    return IvyUrlGenerator(urls)
 
   def http_proxy(self):
     """Set ivy to use an http proxy.
@@ -107,3 +121,13 @@ class IvySubsystem(Subsystem):
       return self.get_options().repository_cache_dir
     else:
       return self.get_options().cache_dir
+
+
+class IvyUrlGenerator(BinaryToolUrlGenerator):
+
+  def __init__(self, template_urls):
+    super(IvyUrlGenerator, self).__init__()
+    self._template_urls = template_urls
+
+  def generate_urls(self, version, host_platform):
+    return [url.format(version=version) for url in self._template_urls]

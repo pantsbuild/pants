@@ -4,6 +4,82 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.23.0.dev2 (11/18/2019)
+------------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Bump to the latest versions of various self-published JVM 3rdparty dependencies. (#8634)
+  `PR #8634 <https://github.com/pantsbuild/pants/pull/8634>`_
+
+* Change RscCompile --workflow-override flag to --scala-workflow-override. (#8575)
+  `PR #8575 <https://github.com/pantsbuild/pants/pull/8575>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Allow console_rule to request a single `BuildFileAddress` (#8586)
+  `PR #8586 <https://github.com/pantsbuild/pants/pull/8586>`_
+
+* Allow test sharding on scalatest classes (#8609)
+  `PR #8609 <https://github.com/pantsbuild/pants/pull/8609>`_
+
+* Use timeouts for V2 local execution (#8582)
+  `Issue #5833 <https://github.com/pantsbuild/pants/issues/5833>`_
+  `PR #8582 <https://github.com/pantsbuild/pants/pull/8582>`_
+
+* Add --transitive-only option to export-classpath (#8605)
+  `PR #8605 <https://github.com/pantsbuild/pants/pull/8605>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix sorting of junit tests in presence of a timeout. (#8600)
+  `PR #8600 <https://github.com/pantsbuild/pants/pull/8600>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Bump to rust 1.39.0. (#8627)
+  `PR #8627 <https://github.com/pantsbuild/pants/pull/8627>`_
+
+* Move ivy and coursier bootstrapping to BinaryUtil. (#8637)
+  `PR #8637 <https://github.com/pantsbuild/pants/pull/8637>`_
+
+* Prep for 1.22.0 (#8623)
+  `PR #8623 <https://github.com/pantsbuild/pants/pull/8623>`_
+
+* Port cloc to v2 (#8251)
+  `PR #8251 <https://github.com/pantsbuild/pants/pull/8251>`_
+
+* Fix PluginResolverTest: isolate the plugin cache. (#8615)
+  `PR #8615 <https://github.com/pantsbuild/pants/pull/8615>`_
+
+* Move materialization of dirs for Nailgun server to NailgunPool (#8587)
+  `PR #8587 <https://github.com/pantsbuild/pants/pull/8587>`_
+
+* Allow coursier use local cache (#8608)
+  `PR #8608 <https://github.com/pantsbuild/pants/pull/8608>`_
+
+* Options parsing shouldn't care that positional args are specs. (#8602)
+  `PR #8602 <https://github.com/pantsbuild/pants/pull/8602>`_
+
+* Gitignore rust logs (#8610)
+  `PR #8610 <https://github.com/pantsbuild/pants/pull/8610>`_
+
+* Add tags and scope attribute passthrough to ScroogeGen (#8599)
+  `PR #8599 <https://github.com/pantsbuild/pants/pull/8599>`_
+
+* Partially type check `auth`, `build_graph`, `goal`, `java`, `process`, and `reporting` (#8604)
+  `PR #8604 <https://github.com/pantsbuild/pants/pull/8604>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Fix some typos in documentation (#8636)
+  `PR #8636 <https://github.com/pantsbuild/pants/pull/8636>`_
+
 1.23.0.dev1 (11/08/2019)
 ------------------------
 

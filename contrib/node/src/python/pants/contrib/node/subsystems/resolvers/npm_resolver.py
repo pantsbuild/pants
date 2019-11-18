@@ -102,7 +102,7 @@ class NpmResolver(Subsystem, NodeResolverBase):
       # Copy the package.json and then remove the file: dependencies from package.json
       # Run the install and symlink the file: dependencies using their node_paths
       # Afterwards, restore the original package.json to not cause diff changes when resolve_locally=True
-      # The file mutation is occuring in place and the package.json may potentially not be restored here
+      # The file mutation is occurring in place and the package.json may potentially not be restored here
       # if the process is closed.
       with safe_temp_edit('package.json') as package_json:
         with open(package_json, 'r') as package_json_file:
