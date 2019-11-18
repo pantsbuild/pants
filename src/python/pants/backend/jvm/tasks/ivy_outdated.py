@@ -35,7 +35,7 @@ class IvyOutdated(NailgunTask):
                           classpath=[
                             JarDependency(org='org.pantsbuild',
                                           name='ivy-dependency-update-checker',
-                                          rev='0.0.1'),
+                                          rev='0.0.4'),
                           ],
                           main=cls._IVY_DEPENDENCY_UPDATE_MAIN,
                           custom_rules=[

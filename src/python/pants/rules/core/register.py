@@ -3,6 +3,7 @@
 
 from pants.rules.core import (
   binary,
+  cloc,
   filedeps,
   fmt,
   lint,
@@ -16,6 +17,7 @@ from pants.rules.core import (
 
 def rules():
   return [
+    *cloc.rules(),
     *binary.rules(),
     *fmt.rules(),
     *lint.rules(),

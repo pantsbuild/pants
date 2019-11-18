@@ -35,7 +35,7 @@ class Scoverage(CoverageEngine):
 
       def scoverage_report_jar(**kwargs):
         return JarDependency(org='org.pantsbuild', name='scoverage-report-generator_2.12',
-          rev='0.0.1', **kwargs)
+          rev='0.0.2', **kwargs)
 
       # We need to inject report generator at runtime.
       cls.register_jvm_tool(register,

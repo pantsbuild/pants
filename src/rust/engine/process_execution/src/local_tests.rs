@@ -633,7 +633,7 @@ fn local_only_scratch_files_materialized() {
   let roland_directory_digest = TestDirectory::containing_roland().digest();
   executor
     .block_on(store.record_directory(&TestDirectory::containing_roland().directory(), true))
-    .expect("Error saving directory");;
+    .expect("Error saving directory");
   executor
     .block_on(store.store_file_bytes(TestData::roland().bytes(), false))
     .expect("Error saving file bytes");

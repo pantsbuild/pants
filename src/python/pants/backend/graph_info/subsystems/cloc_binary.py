@@ -12,3 +12,4 @@ class ClocBinary(Script):
 
   replaces_scope = 'cloc'
   replaces_name = 'version'
+
