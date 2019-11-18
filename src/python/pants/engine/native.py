@@ -9,7 +9,7 @@ import sys
 import sysconfig
 import traceback
 from contextlib import closing
-from types import GeneratorType
+from types import CoroutineType, GeneratorType
 from typing import Any, NamedTuple, Tuple, Type
 
 import cffi
@@ -577,6 +577,7 @@ class EngineTypes(NamedTuple):
   multi_platform_process_request: TypeId
   process_result: TypeId
   generator: TypeId
+  async_generator: TypeId
   url_to_fetch: TypeId
   string: TypeId
   bytes: TypeId
@@ -934,6 +935,7 @@ class Native(metaclass=SingletonMetaclass):
         multi_platform_process_request=ti(MultiPlatformExecuteProcessRequest),
         process_result=ti(FallibleExecuteProcessResult),
         generator=ti(GeneratorType),
+        async_generator=ti(CoroutineType),
         url_to_fetch=ti(UrlToFetch),
         string=ti(str),
         bytes=ti(bytes),

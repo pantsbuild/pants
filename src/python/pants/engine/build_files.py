@@ -5,7 +5,7 @@ import logging
 from collections.abc import MutableMapping, MutableSequence
 from dataclasses import dataclass
 from os.path import dirname, join
-from typing import Any, Dict, Generator, List, Tuple, Union
+from typing import Dict, Tuple
 
 from twitter.common.collections import OrderedSet
 
@@ -24,7 +24,7 @@ from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper, Resolv
 from pants.engine.objects import Locatable, SerializableFactory, Validatable
 from pants.engine.parser import HydratedStruct
 from pants.engine.rules import RootRule, rule
-from pants.engine.selectors import Get
+from pants.engine.selectors import Get, MultiGet
 from pants.engine.struct import Struct
 from pants.util.objects import TypeConstraintError
 
@@ -42,17 +42,15 @@ def _key_func(entry):
 
 
 @rule
-def parse_address_family(address_mapper: AddressMapper, directory: Dir) -> Generator[Get, Any, AddressFamily]:
+async def parse_address_family(address_mapper: AddressMapper, directory: Dir) -> AddressFamily:
   """Given an AddressMapper and a directory, return an AddressFamily.
 
   The AddressFamily may be empty, but it will not be None.
   """
   patterns = tuple(join(directory.path, p) for p in address_mapper.build_patterns)
   path_globs = PathGlobs(include=patterns, exclude=address_mapper.build_ignore_patterns)
-  snapshot: Snapshot
-  snapshot = yield Get(Snapshot, PathGlobs, path_globs)
-  files_content: FilesContent
-  files_content = yield Get(FilesContent, Digest, snapshot.directory_digest)
+  snapshot: Snapshot = await Get(Snapshot, PathGlobs, path_globs)
+  files_content: FilesContent = await Get(FilesContent, Digest, snapshot.directory_digest)
 
   if not files_content:
     raise ResolveError(
@@ -84,15 +82,14 @@ def _raise_did_you_mean(address_family, name, source=None):
 
 
 @rule
-def hydrate_struct(address_mapper: AddressMapper, address: Address) -> Generator[Union[Get, List[Get]], Any, HydratedStruct]:
+async def hydrate_struct(address_mapper: AddressMapper, address: Address) -> HydratedStruct:
   """Given an AddressMapper and an Address, resolve a Struct from a BUILD file.
 
   Recursively collects any embedded addressables within the Struct, but will not walk into a
   dependencies field, since those should be requested explicitly by rules.
   """
 
-  address_family: AddressFamily
-  address_family = yield Get(AddressFamily, Dir(address.spec_path))
+  address_family: AddressFamily = await Get(AddressFamily, Dir(address.spec_path))
 
   struct = address_family.addressables.get(address)
   addresses = address_family.addressables
@@ -134,10 +131,9 @@ def hydrate_struct(address_mapper: AddressMapper, address: Address) -> Generator
   collect_inline_dependencies(struct)
 
   # And then hydrate the inline dependencies.
-  hydrated_inline_dependencies: Tuple[HydratedStruct, ...]
-  hydrated_inline_dependencies = yield [
+  hydrated_inline_dependencies: Tuple[HydratedStruct, ...] = await MultiGet(
     Get(HydratedStruct, Address, a) for a in inline_dependencies
-  ]
+  )
   dependencies = [d.value for d in hydrated_inline_dependencies]
 
   def maybe_consume(outer_key, value):
@@ -207,9 +203,9 @@ def _hydrate(item_type, spec_path, **kwargs):
 
 
 @rule
-def provenanced_addresses_from_address_families(
+async def provenanced_addresses_from_address_families(
     address_mapper: AddressMapper, specs: Specs
-) -> Generator[Union[Get, List[Get]], Any, ProvenancedBuildFileAddresses]:
+) -> ProvenancedBuildFileAddresses:
   """Given an AddressMapper and list of Specs, return matching ProvenancedBuildFileAddresses.
 
 :raises: :class:`ResolveError` if:
@@ -218,9 +214,9 @@ def provenanced_addresses_from_address_families(
 :raises: :class:`AddressLookupError` if no targets are matched for non-SingleAddress specs.
 """
   # Capture a Snapshot covering all paths for these Specs, then group by directory.
-  snapshot = yield Get(Snapshot, PathGlobs, _spec_to_globs(address_mapper, specs))
+  snapshot = await Get(Snapshot, PathGlobs, _spec_to_globs(address_mapper, specs))
   dirnames = {dirname(f) for f in snapshot.files}
-  address_families = yield [Get(AddressFamily, Dir(d)) for d in dirnames]
+  address_families = await MultiGet(Get(AddressFamily, Dir(d)) for d in dirnames)
   address_family_by_directory = {af.namespace: af for af in address_families}
 
   matched_addresses = OrderedSet()

@@ -1068,6 +1068,9 @@ impl WrappedNode for Task {
       .then(move |task_result| match task_result {
         Ok(val) => match externs::get_type_for(&val) {
           t if t == context.core.types.generator => Self::generate(context, params, entry, val),
+          t if t == context.core.types.async_generator => {
+            Self::generate(context, params, entry, val)
+          }
           t if t == product => ok(val),
           _ => err(throw(&format!(
             "{:?} returned a result value that did not satisfy its constraints: {:?}",

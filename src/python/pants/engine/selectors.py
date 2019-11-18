@@ -4,7 +4,7 @@
 import ast
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import Any, Tuple, Type
+from typing import Any, Iterable, Tuple, Type
 
 from pants.util.meta import frozen_after_init
 from pants.util.objects import TypeConstraint
@@ -23,6 +23,10 @@ class Get:
   subject_declared_type: Type
   subject: Any
 
+  def __await__(self):
+    result = yield self
+    return result
+
   def __init__(self, *args: Any) -> None:
     if len(args) not in (2, 3):
       raise ValueError(
@@ -34,9 +38,9 @@ class Get:
       if isinstance(subject, (type, TypeConstraint)):
         raise TypeError(dedent("""\
           The two-argument form of Get does not accept a type as its second argument.
-        
+
           args were: Get({args!r})
-        
+
           Get.create_statically_for_rule_graph() should be used to generate a Get() for
           the `input_gets` field of a rule. If you are using a `yield Get(...)` in a rule
           and a type was intended, use the 3-argument version:
@@ -94,6 +98,20 @@ class Get:
     and which are instantiated during rule execution.
     """
     return cls(product_type, subject_type, None)
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class MultiGet:
+  """Can be constructed with an iterable of `Get()`s and `await`ed to evaluate them in parallel."""
+  gets: Tuple[Get, ...]
+
+  def __await__(self):
+    result = yield self.gets
+    return result
+
+  def __init__(self, gets: Iterable[Get]) -> None:
+    self.gets = tuple(gets)
 
 
 @frozen_after_init
