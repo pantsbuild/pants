@@ -12,28 +12,24 @@ class PyTest(Subsystem):
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--version', default='pytest>=3.0.7,<3.7', help="Requirement string for Pytest.")
+    register('--version', default='pytest>=5.2.4', help="Requirement string for Pytest.")
     register(
       '--pytest-plugins',
       type=list,
-      default=[
-        'pytest-timeout>=1.2,<1.3',
-        'pytest-cov>=2.4,<2.5',
-        "unittest2>=0.6.0,<=1.9.0 ; python_version<'3'"
-      ],
+      default=['pytest-timeout>=1.3.3', 'pytest-cov>=2.8.1'],
       help="Requirement strings for any plugins or additional requirements you'd like to use.",
     )
-    register('--requirements', advanced=True, default='pytest>=3.0.7,<3.7',
+    register('--requirements', advanced=True, default='pytest>=5.2.4',
              help='Requirements string for the pytest library.',
              removal_version="1.25.0.dev0", removal_hint="Use --version instead.")
-    register('--timeout-requirements', advanced=True, default='pytest-timeout>=1.2,<1.3',
+    register('--timeout-requirements', advanced=True, default='pytest-timeout>=1.3.3',
              help='Requirements string for the pytest-timeout library.',
              removal_version="1.25.0.dev0", removal_hint="Use --pytest-plugins instead.")
-    register('--cov-requirements', advanced=True, default='pytest-cov>=2.4,<2.5',
+    register('--cov-requirements', advanced=True, default='pytest-cov>=2.8.1',
              help='Requirements string for the pytest-cov library.',
              removal_version="1.25.0.dev0", removal_hint="Use --pytest-plugins instead.")
     register('--unittest2-requirements', advanced=True,
-             default="unittest2>=0.6.0,<=1.9.0 ; python_version<'3'",
+             default="unittest2>=1.1.0 ; python_version<'3'",
              help='Requirements string for the unittest2 library, which some python versions '
                   'may need.',
              removal_version="1.25.0.dev0", removal_hint="Use --pytest-plugins instead.")
@@ -63,14 +59,9 @@ class PyTest(Subsystem):
       )
     if configured_deprecated_option:
       return (
-        "more-itertools<6.0.0 ; python_version<'3'",
         opts.requirements,
         opts.timeout_requirements,
         opts.cov_requirements,
         opts.unittest2_requirements,
       )
-    return (
-      "more-itertools<6.0.0 ; python_version<'3'",
-      opts.version,
-      *opts.pytest_plugins
-    )
+    return (opts.version, *opts.pytest_plugins)
