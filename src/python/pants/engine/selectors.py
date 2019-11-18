@@ -4,29 +4,26 @@
 import ast
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import Any, Generator, Generic, Iterable, Optional, Tuple, Type, TypeVar, cast
+from typing import Any, Generator, Iterable, Tuple, Type, cast
 
 from pants.util.meta import frozen_after_init
 from pants.util.objects import TypeConstraint
 
 
-_Product = TypeVar("_Product")
-
-
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class Get(Generic[_Product]):
+class Get:
   """Experimental synchronous generator API.
 
   May be called equivalently as either:
-    # verbose form: Get[product](subject_declared_type, subject)
-    # shorthand form: Get[product](subject_declared_type(<constructor args for subject>))
+    # verbose form: Get(product, subject_declared_type, subject)
+    # shorthand form: Get(product, subject_declared_type(<constructor args for subject>))
   """
-  product: Type[_Product]
-  subject_declared_type: type
-  subject: Optional[Any]
+  product: Type
+  subject_declared_type: Type
+  subject: Any
 
-  def __await__(self) -> Generator[Any, Any, _Product]:
+  def __await__(self) -> Generator[Any, Any, Any]:
     """Allow a Get to be `await`ed within an `async` method, returning a strongly-typed result.
 
     The `yield`ed value `self` is interpreted by the engine within `extern_generator_send()` in
@@ -47,12 +44,7 @@ class Get(Generic[_Product]):
     https://www.python.org/dev/peps/pep-0492/#await-expression.
     """
     result = yield self
-    return cast(_Product, result)
-
-  @classmethod
-  def __class_getitem__(cls, product_type):
-    """Override the behavior of Get[T] to shuffle over the product T into the constructor args."""
-    return lambda *args: cls(product_type, *args)
+    return result
 
   def __init__(self, *args: Any) -> None:
     if len(args) not in (2, 3):
@@ -90,47 +82,30 @@ class Get(Generic[_Product]):
     :param call_node: An `ast.Call` node representing a call to `Get(..)`.
     :return: A tuple of product type id and subject type id.
     """
-    def render_args(args):
+    def render_args():
       return ', '.join(
         # Dump the Name's id to simplify output when available, falling back to the name of the
         # node's class.
         getattr(a, 'id', type(a).__name__)
-        for a in args)
+        for a in call_node.args)
 
-    # If the Get was provided with a type parameter, use that as the `product_type`.
-    func = call_node.func
-    if isinstance(func, ast.Name):
-      subscript_args = ()
-    elif isinstance(func, ast.Subscript):
-      index_expr = func.slice.value
-      if isinstance(index_expr, ast.Name):
-        subscript_args = (index_expr,)
-      else:
-        raise ValueError(f'Unrecognized type argument T for Get[T]: {ast.dump(index_expr)}')
-    else:
-      raise ValueError(
-        f'Unrecognized Get call node type: expected Get or Get[T], received {ast.dump(call_node)}')
-
-    # Shuffle over the type parameter to be the first argument, if provided.
-    combined_args = subscript_args + tuple(call_node.args)
-
-    if len(combined_args) == 2:
-      product_type, subject_constructor = combined_args
+    if len(call_node.args) == 2:
+      product_type, subject_constructor = call_node.args
       if not isinstance(product_type, ast.Name) or not isinstance(subject_constructor, ast.Call):
         raise ValueError(
-          f'Two arg form of {Get.__name__} expected (product_type, subject_type(subject)), but '
-          f'got: ({render_args(combined_args)})')
+          'Two arg form of {} expected (product_type, subject_type(subject)), but '
+                        'got: ({})'.format(Get.__name__, render_args()))
       return (product_type.id, subject_constructor.func.id)
-    elif len(combined_args) == 3:
-      product_type, subject_declared_type, _ = combined_args
+    elif len(call_node.args) == 3:
+      product_type, subject_declared_type, _ = call_node.args
       if not isinstance(product_type, ast.Name) or not isinstance(subject_declared_type, ast.Name):
         raise ValueError(
-          f'Three arg form of {Get.__name__} expected (product_type, subject_declared_type, subject), but '
-          f'got: ({render_args(combined_args)})')
+          'Three arg form of {} expected (product_type, subject_declared_type, subject), but '
+                        'got: ({})'.format(Get.__name__, render_args()))
       return (product_type.id, subject_declared_type.id)
     else:
-      raise ValueError(f'Invalid {Get.__name__}; expected either two or three args, but '
-                       f'got: ({render_args(combined_args)})')
+      raise ValueError('Invalid {}; expected either two or three args, but '
+                      'got: ({})'.format(Get.__name__, render_args()))
 
   @classmethod
   def create_statically_for_rule_graph(cls, product_type, subject_type) -> 'Get':
@@ -144,25 +119,25 @@ class Get(Generic[_Product]):
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class MultiGet(Generic[_Product]):
+class MultiGet:
   """Can be constructed with an iterable of `Get()`s and `await`ed to evaluate them in parallel."""
-  gets: Tuple[Get[_Product], ...]
+  gets: Tuple[Get, ...]
 
-  def __await__(self) -> Generator[Any, Any, Tuple[_Product, ...]]:
+  def __await__(self) -> Generator[Any, Any, Tuple[Any, ...]]:
     """Yield a tuple of Get instances with the same subject/product type pairs all at once.
 
     The `yield`ed value `self.gets` is interpreted by the engine within `extern_generator_send()` in
     `native.py`. This class will yield a tuple of Get instances, which is converted into
     `PyGeneratorResponse::GetMulti` from `externs.rs`.
 
-    The engine will fulfill these Get instances in parallel, and return a tuple of _Product
+    The engine will fulfill these Get instances in parallel, and return a tuple of T
     instances to this method, which then returns this tuple to the `@rule` which called
-    `await MultiGet(Get[_Product](...) for ... in ...)`.
+    `await MultiGet(Get(T, ...) for ... in ...)`.
     """
     result = yield self.gets
-    return cast(Tuple[_Product, ...], result)
+    return cast(Tuple[Any, ...], result)
 
-  def __init__(self, gets: Iterable[Get[_Product]]) -> None:
+  def __init__(self, gets: Iterable[Get]) -> None:
     """Create a MultiGet from a generator expression.
 
     This constructor will infer this class's _Product parameter from the input `gets`.
