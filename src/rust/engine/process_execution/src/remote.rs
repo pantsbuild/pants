@@ -734,21 +734,21 @@ impl CommandRunner {
         }
         future::err(ExecutionError::MissingDigests(missing_digests)).to_boxed()
       }
-      code => {
-        // Error we see from Google's RBE service if we use pre-emptable workers and one gets pre-empted.
-        if code == grpcio::RpcStatusCode::Aborted
-          && status.get_message() == "the bot running the task appears to be lost"
-        {
+      code => match code {
+        grpcio::RpcStatusCode::Aborted
+        | grpcio::RpcStatusCode::Internal
+        | grpcio::RpcStatusCode::ResourceExhausted
+        | grpcio::RpcStatusCode::Unavailable
+        | grpcio::RpcStatusCode::Unknown => {
           future::err(ExecutionError::Retryable(status.get_message().to_owned())).to_boxed()
-        } else {
-          future::err(ExecutionError::Fatal(format!(
-            "Error from remote execution: {:?}: {:?}",
-            code,
-            status.get_message()
-          )))
-          .to_boxed()
         }
-      }
+        _ => future::err(ExecutionError::Fatal(format!(
+          "Error from remote execution: {:?}: {:?}",
+          code,
+          status.get_message()
+        )))
+        .to_boxed(),
+      },
     }
     .to_boxed()
   }
