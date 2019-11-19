@@ -49,7 +49,6 @@ target(
     ':runtime_directory',
     ':shading_directory',
     ':shadingdep_directory',
-    ':targetlevels_directory',
     ':thriftdeptest_directory',
     ':typeparameters_directory',
     ':unicode_directory',
@@ -335,11 +334,6 @@ files(
 files(
   name = 'shadingdep_directory',
   sources = rglobs('shadingdep/*'),
-)
-
-files(
-  name = 'targetlevels_directory',
-  sources = rglobs('targetlevels/*'),
 )
 
 files(
