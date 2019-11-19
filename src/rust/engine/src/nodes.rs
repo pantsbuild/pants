@@ -1210,27 +1210,33 @@ impl Node for NodeKey {
   type Error = Failure;
 
   fn run(self, context: Context) -> NodeFuture<NodeResult> {
-    let span_id = generate_random_64bit_string();
-
     let handle_workunits =
       context.session.should_report_workunits() || context.session.should_record_zipkin_spans();
 
-    let maybe_display_info: Option<String> = match self {
-      NodeKey::Task(ref task) if handle_workunits => task.get_display_info().map(|s| s.to_owned()),
-      _ => None,
-    };
+    let (node_workunit_params, maybe_span_id) = if handle_workunits {
+      let span_id = generate_random_64bit_string();
+      let maybe_display_info: Option<String> = match self {
+        NodeKey::Task(ref task) => task.get_display_info().map(|s| s.to_owned()),
+        _ => None,
+      };
 
-    let node_workunit_params = match maybe_display_info {
-      Some(ref node_name) if handle_workunits => {
-        let start_time = std::time::SystemTime::now();
-        Some((node_name.clone(), start_time, span_id.clone()))
-      }
-      _ => None,
+      let node_workunit_params = match maybe_display_info {
+        Some(ref node_name) => {
+          let start_time = std::time::SystemTime::now();
+          Some((node_name.clone(), start_time, span_id.clone()))
+        }
+        _ => None,
+      };
+      (node_workunit_params, Some(span_id))
+    } else {
+      (None, None)
     };
 
     let context2 = context.clone();
     futures::future::lazy(|| {
-      set_parent_id(span_id);
+      if let Some(span_id) = maybe_span_id {
+        set_parent_id(span_id);
+      }
       match self {
         NodeKey::DigestFile(n) => n.run(context).map(NodeResult::from).to_boxed(),
         NodeKey::DownloadedFile(n) => n.run(context).map(NodeResult::from).to_boxed(),
