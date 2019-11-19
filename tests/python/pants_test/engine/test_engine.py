@@ -9,7 +9,7 @@ from typing import List
 from pants.engine.rules import RootRule, rule
 from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Get
-from pants.reporting.async_workunit_handler import AsyncWorkunitHandler
+from pants.reporting.streaming_workunit_handler import StreamingWorkunitHandler
 from pants.testutil.engine.util import assert_equal_with_printing, remove_locations_from_traceback
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
 
@@ -249,7 +249,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
         self.workunits.extend(workunits)
 
     tracker = Tracker()
-    async_reporter = AsyncWorkunitHandler(scheduler, callback=tracker.add, report_interval_seconds=0.01)
+    async_reporter = StreamingWorkunitHandler(scheduler, callback=tracker.add, report_interval_seconds=0.01)
     with async_reporter.session():
       scheduler.product_request(Fib, subjects=[0])
 

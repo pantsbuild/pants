@@ -107,10 +107,10 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
       v2_ui = options.for_global_scope().v2_ui
       zipkin_trace_v2 = options.for_scope('reporting').zipkin_trace_v2
       #TODO(gregorys) This should_report_workunits flag must be set to True for
-      # AsyncWorkunitHandler to receive WorkUnits. It should eventually
+      # StreamingWorkunitHandler to receive WorkUnits. It should eventually
       # be merged with the zipkin_trace_v2 flag, since they both involve most
       # of the same engine functionality, but for now is separate to avoid
-      # breaking functionality associated with zipkin tracing while iterating on async workunit reporting.
+      # breaking functionality associated with zipkin tracing while iterating on streaming workunit reporting.
       should_report_workunits = False
       graph_session = graph_scheduler_helper.new_session(zipkin_trace_v2, RunTracker.global_instance().run_id, v2_ui, should_report_workunits)
     return graph_session, graph_session.scheduler_session

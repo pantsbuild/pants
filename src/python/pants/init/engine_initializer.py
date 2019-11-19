@@ -56,7 +56,7 @@ from pants.option.global_options import (
   ExecutionOptions,
   GlobMatchErrorBehavior,
 )
-from pants.reporting.async_workunit_handler import AsyncWorkunitHandler
+from pants.reporting.streaming_workunit_handler import StreamingWorkunitHandler
 
 
 logger = logging.getLogger(__name__)
@@ -205,7 +205,7 @@ class LegacyGraphSession:
     :returns: An exit code.
     """
 
-    async_reporter = AsyncWorkunitHandler(self.scheduler_session, callback=None)
+    streaming_reporter = StreamingWorkunitHandler(self.scheduler_session, callback=None)
     subject = target_roots.specs
     console = Console(
       use_colors=options_bootstrapper.bootstrap_options.for_global_scope().colors
@@ -213,7 +213,7 @@ class LegacyGraphSession:
     workspace = Workspace(self.scheduler_session)
     interactive_runner = InteractiveRunner(self.scheduler_session)
 
-    with async_reporter.session():
+    with streaming_reporter.session():
       for goal in goals:
         goal_product = self.goal_map[goal]
         params = Params(subject, options_bootstrapper, console, workspace, interactive_runner)
