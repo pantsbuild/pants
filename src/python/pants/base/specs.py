@@ -197,6 +197,7 @@ _specificity = {
   SiblingAddresses: 1,
   AscendantAddresses: 2,
   DescendantAddresses: 3,
+  type(None): 99
 }
 
 
