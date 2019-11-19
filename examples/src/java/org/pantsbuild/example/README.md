@@ -333,7 +333,6 @@ jvm-platforms in pants.ini, and set what targets use which platforms. For exampl
     [jvm-platform]
     default_platform: java8
     platforms: {
-        'java7': {'source': '7', 'target': '7', 'args': [] },
         'java8': {'source': '8', 'target': '8', 'args': [] },
         java9': {'source': '9', 'target': '9', 'args': [] },
       }
@@ -343,7 +342,7 @@ And then in a BUILD file:
     :::python
     java_library(name='my-library',
       sources=globs('*.java'),
-      platform='java8',
+      platform='java9',
     )
 
 You can also override these on the cli:
@@ -359,7 +358,7 @@ appropriate java distribution, you can use the `$JAVA_HOME` symbol in the
     [jvm-platform]
     default_platform: java8
     platforms: {
-        'java7': {'source': '7', 'target': '7', 'args': ["-C-bootclasspath:$JAVA_HOME/jre/lib/resources.jar:$JAVA_HOME/jre/lib/rt.jar:$JAVA_HOME/jre/lib/sunrsasign.jar:$JAVA_HOME/jre/lib/jsse.jar:$JAVA_HOME/jre/lib/jce.jar:$JAVA_HOME/jre/lib/charsets.jar:$JAVA_HOME/jre/lib/jfr.jar:$JAVA_HOME/jre/classes"] },
+        'java8': {'source': '8', 'target': '8', 'args': ["-C-bootclasspath:$JAVA_HOME/jre/lib/resources.jar:$JAVA_HOME/jre/lib/rt.jar:$JAVA_HOME/jre/lib/sunrsasign.jar:$JAVA_HOME/jre/lib/jsse.jar:$JAVA_HOME/jre/lib/jce.jar:$JAVA_HOME/jre/lib/charsets.jar:$JAVA_HOME/jre/lib/jfr.jar:$JAVA_HOME/jre/classes"] },
       }
 
 Your `-bootclasspath` should be designed to work with any compatible version of
@@ -370,7 +369,7 @@ should design your bootclasspath to reference the union of all possible jars
 you might need to pull in from different JVMs (any paths that aren't available
 will simply be ignored by java).
 
-**Note:** Currently, pants is known to work with OpenJDK and Oracle JDK version 7 or greater.
+**Note:** Currently, pants is known to work with OpenJDK and Oracle JDK version 8 or greater.
 
 
 <a pantsmark="jvm_bundles"></a>

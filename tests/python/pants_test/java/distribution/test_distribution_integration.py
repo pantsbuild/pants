@@ -22,21 +22,21 @@ def _distribution_locator(distribution_locator_options=None):
 def _get_two_distributions():
   with _distribution_locator() as locator:
     try:
-      java7 = locator.cached(minimum_version='1.7', maximum_version='1.7.9999')
       java8 = locator.cached(minimum_version='1.8', maximum_version='1.8.9999')
-      return java7, java8
+      java9 = locator.cached(minimum_version='1.9', maximum_version='1.9.9999')
+      return java8, java9
     except DistributionLocator.Error:
       return None
 
 
 class DistributionIntegrationTest(PantsRunIntegrationTest):
   def _test_two_distributions(self, os_name=None):
-    java7, java8 = _get_two_distributions()
+    java8, java9 = _get_two_distributions()
     os_name = os_name or get_os_name()
 
-    self.assertNotEqual(java7.home, java8.home)
+    self.assertNotEqual(java8.home, java9.home)
 
-    for (one, two) in ((java7, java8), (java8, java7)):
+    for (one, two) in ((java8, java9), (java9, java8)):
       target_spec = 'testprojects/src/java/org/pantsbuild/testproject/printversion'
       run = self.run_pants(['run', target_spec],
                            config={
@@ -56,11 +56,11 @@ class DistributionIntegrationTest(PantsRunIntegrationTest):
       self.assert_success(run)
       self.assertIn(f'java.home:{os.path.realpath(one.home)}', run.stdout_data)
 
-  @skipIf(_get_two_distributions() is None, 'Could not find java 7 and java 8 jvms to test with.')
+  @skipIf(_get_two_distributions() is None, 'Could not find java 8 and java 9 jvms to test with.')
   def test_jvm_jdk_paths_supercedes_environment_variables(self):
     self._test_two_distributions()
 
-  @skipIf(_get_two_distributions() is None, 'Could not find java 7 and java 8 jvms to test with.')
+  @skipIf(_get_two_distributions() is None, 'Could not find java 8 and java 9 jvms to test with.')
   def test_jdk_paths_with_aliased_os_names(self):
     # NB(gmalmquist): This test will silently no-op and do nothing if the testing machine is running
     # an esoteric os (eg, windows).
