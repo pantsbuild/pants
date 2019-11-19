@@ -338,6 +338,10 @@ def _ensure_type_annotation(
 
 
 PUBLIC_RULE_DECORATOR_ARGUMENTS = set(['name'])
+# We don't want @rule-writers to use 'cacheable' as a kwarg directly, but rather
+# set it implicitly based on whether the rule annotation is @rule or @console_rule.
+# So we leave it out of PUBLIC_RULE_DECORATOR_ARGUMENTS.
+IMPLICIT_PRIVATE_RULE_DECORATOR_ARGUMENTS = set(['cacheable'])
 
 
 def rule_decorator(*args, **kwargs) -> Callable:
@@ -347,17 +351,14 @@ def rule_decorator(*args, **kwargs) -> Callable:
       f'type-annotated. Given {args}.'
     )
 
-  # We don't want @rule-writers to use 'cacheable' as a kwarg directly, but rather
-  # set it implicitly based on whether the rule annotation is @rule or @console_rule.
-  # So we leave it out of PUBLIC_RULE_DECORATOR_ARGUMENTS.
-  if len(set(kwargs) - PUBLIC_RULE_DECORATOR_ARGUMENTS - set(['cacheable'])) != 0:
+  if len(set(kwargs) - PUBLIC_RULE_DECORATOR_ARGUMENTS - IMPLICIT_PRIVATE_RULE_DECORATOR_ARGUMENTS) != 0:
     raise UnrecognizedRuleArgument(
       f"`@rule`s and `@console_rule`s only accept the following keyword arguments: {PUBLIC_RULE_DECORATOR_ARGUMENTS}"
     )
 
   func = args[0]
 
-  cacheable = kwargs.get('cacheable', True) # type: bool
+  cacheable = kwargs['cacheable'] # type: bool
   name = kwargs.get('name')
 
   signature = inspect.signature(func)
@@ -527,13 +528,13 @@ class TaskRule(Rule):
     self.name = name
 
   def __str__(self):
-    return ('({}, {!r}, {}, gets={}, opts={} name={})'
-            .format(self.output_type.__name__,
+    return ('(name={}, {!r}, {}, gets={}, opts={})'
+            .format(self.name or '<not defined>',
+                    self.output_type.__name__,
                     self.input_selectors,
                     self.func.__name__,
                     self.input_gets,
                     self.dependency_optionables,
-                    self.name or '<not defined>',
                     ))
 
   @property

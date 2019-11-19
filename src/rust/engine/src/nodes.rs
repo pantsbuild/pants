@@ -1216,7 +1216,7 @@ impl Node for NodeKey {
       context.session.should_report_workunits() || context.session.should_record_zipkin_spans();
 
     let maybe_display_info: Option<String> = match self {
-      NodeKey::Task(ref task) => task.get_display_info().map(|s| s.to_owned()),
+      NodeKey::Task(ref task) if handle_workunits => task.get_display_info().map(|s| s.to_owned()),
       _ => None,
     };
 
