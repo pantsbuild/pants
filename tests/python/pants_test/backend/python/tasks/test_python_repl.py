@@ -132,8 +132,8 @@ class PythonReplTest(PythonTaskTestBase):
 
   def test_requirement(self):
     self.do_test_repl(code=['import six',
-                            'print("python 2?:{}".format(six.PY2))'],
-                      expected=['python 2?:True'],
+                            'print("python 3?:{}".format(six.PY3))'],
+                      expected=['python 3?:True'],
                       targets=[self.six])
 
   def test_mixed_python(self):
@@ -142,10 +142,10 @@ class PythonReplTest(PythonTaskTestBase):
                             'from lib.lib import go',
                             'print("teapot response code is: {}".format(requests.codes.teapot))',
                             'go()',
-                            'print("python 2?:{}".format(six.PY2))'],
+                            'print("python 3?:{}".format(six.PY3))'],
                       expected=['teapot response code is: 418',
                                 'gogogo!',
-                                'python 2?:True'],
+                                'python 3?:True'],
                       targets=[self.requests, self.binary])
 
   def test_disallowed_mix(self):
