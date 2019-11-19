@@ -455,7 +455,7 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
     deprecated_conditional(
       lambda: self.get_options().is_default("fast"),
       removal_version="1.25.0.dev2",
-      entity_description="using the default value for --no-fast/--fast",
+      entity_description="Pants defaulting to `--fast` for tests",
       hint_message="Please explicitly set the flag `--fast`. The default will change from `--fast` "
                    "to `--no-fast` in 1.25.0.dev2, and the option will be removed in 1.27.0.dev2. "
                    "We recommend setting the option to `--no-fast` for better isolation of tests "
@@ -464,7 +464,7 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
     deprecated_conditional(
       lambda: self.get_options().is_default("chroot"),
       removal_version="1.25.0.dev2",
-      entity_description="using the default value for --no-chroot/--chroot",
+      entity_description="Pants defaulting to `--no-chroot` for tests",
       hint_message="Please explicitly set the flag `--chroot`. The default will change from "
                    "`--no-chroot` to `--chroot` in 1.25.0.dev2, and the option will likely be "
                    "removed in 1.29.0.dev2. We recommend setting the option to `--chroot` for "
