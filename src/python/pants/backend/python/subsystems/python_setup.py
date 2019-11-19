@@ -23,7 +23,7 @@ class PythonSetup(Subsystem):
   def register_options(cls, register):
     super().register_options(register)
     register('--interpreter-constraints', advanced=True, fingerprint=True, type=list,
-             default=['CPython>=2.7,<3', 'CPython>=3.6,<4'],
+             default=['CPython>=3.6,<4'],
              metavar='<requirement>',
              help="Constrain the selected Python interpreter.  Specify with requirement syntax, "
                   "e.g. 'CPython>=2.7,<3' (A CPython interpreter with version >=2.7 AND version <3)"
