@@ -17,13 +17,13 @@ from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecute
 from pants.engine.legacy.graph import BuildFileAddresses, HydratedTarget, TransitiveHydratedTargets
 from pants.engine.legacy.structs import PythonTestsAdaptor
 from pants.engine.rules import UnionRule, optionable_rule, rule
-from pants.engine.selectors import Get
+from pants.engine.selectors import Get, MultiGet
 from pants.rules.core.core_test_model import Status, TestResult, TestTarget
 from pants.rules.core.strip_source_root import SourceRootStrippedSources
 
 
 @rule
-def run_python_test(
+async def run_python_test(
   test_target: PythonTestsAdaptor,
   pytest: PyTest,
   python_setup: PythonSetup,
@@ -33,7 +33,7 @@ def run_python_test(
 
   # TODO(7726): replace this with a proper API to get the `closure` for a
   # TransitiveHydratedTarget.
-  transitive_hydrated_targets = yield Get(
+  transitive_hydrated_targets = await Get(
     TransitiveHydratedTargets, BuildFileAddresses((test_target.address,))
   )
   all_targets = transitive_hydrated_targets.closure
@@ -44,28 +44,28 @@ def run_python_test(
   # https://pytest.org/en/latest/goodpractices.html#test-discovery. In addition to a performance
   # optimization, this ensures that any transitive sources, such as a test project file named
   # test_fail.py, do not unintentionally end up being run as tests.
-  source_root_stripped_test_target_sources = yield Get(
+  source_root_stripped_test_target_sources = await Get(
     SourceRootStrippedSources, Address, test_target.address.to_address()
   )
 
   if not source_root_stripped_test_target_sources.snapshot.files:
-    yield TestResult(
+    return TestResult(
       status=Status.SUCCESS,
       stdout="",
       stderr="",
     )
 
-  source_root_stripped_sources = yield [
+  source_root_stripped_sources = await MultiGet(
     Get(SourceRootStrippedSources, HydratedTarget, target_adaptor)
     for target_adaptor in all_targets
-  ]
+  )
 
   stripped_sources_digests = [stripped_sources.snapshot.directory_digest for stripped_sources in source_root_stripped_sources]
-  sources_digest = yield Get(
+  sources_digest = await Get(
     Digest, DirectoriesToMerge(directories=tuple(stripped_sources_digests)),
   )
 
-  inits_digest = yield Get(InjectedInitDigest, Digest, sources_digest)
+  inits_digest = await Get(InjectedInitDigest, Digest, sources_digest)
 
   interpreter_constraints = PexInterpreterConstraints.create_from_adaptors(
     adaptors=tuple(all_target_adaptors),
@@ -78,7 +78,7 @@ def run_python_test(
     additional_requirements=pytest.get_requirement_strings()
   )
 
-  resolved_requirements_pex = yield Get(
+  resolved_requirements_pex = await Get(
     Pex, CreatePex(
       output_filename=output_pytest_requirements_pex_filename,
       requirements=requirements,
@@ -87,7 +87,7 @@ def run_python_test(
     )
   )
 
-  merged_input_files = yield Get(
+  merged_input_files = await Get(
     Digest,
     DirectoriesToMerge(
       directories=(
@@ -111,10 +111,10 @@ def run_python_test(
     timeout_seconds=getattr(test_target, 'timeout', 60)
   )
 
-  result = yield Get(FallibleExecuteProcessResult, ExecuteProcessRequest, request)
+  result = await Get(FallibleExecuteProcessResult, ExecuteProcessRequest, request)
   status = Status.SUCCESS if result.exit_code == 0 else Status.FAILURE
 
-  yield TestResult(
+  return TestResult(
     status=status,
     stdout=result.stdout.decode(),
     stderr=result.stderr.decode(),

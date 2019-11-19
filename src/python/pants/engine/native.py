@@ -9,7 +9,7 @@ import sys
 import sysconfig
 import traceback
 from contextlib import closing
-from types import CoroutineType, GeneratorType
+from types import CoroutineType
 from typing import Any, NamedTuple, Tuple, Type
 
 import cffi

@@ -34,7 +34,7 @@ class MockWorkspaceGoal(Goal):
 
 @console_rule
 def workspace_console_rule(console: Console, workspace: Workspace, msg: MessageToConsoleRule) -> MockWorkspaceGoal:
-  digest = yield Get(Digest, InputFilesContent, msg.input_files_content)
+  digest = await Get(Digest, InputFilesContent, msg.input_files_content)
   output = workspace.materialize_directories((
     DirectoryToMaterialize(path=msg.tmp_dir, directory_digest=digest),
   ))

@@ -82,7 +82,7 @@ class Example(Goal):
 
 @console_rule
 def a_console_rule_generator(console: Console) -> Example:
-  a = yield Get(A, str('a str!'))
+  a = await Get(A, str('a str!'))
   console.print_stdout(str(a))
   yield Example(exit_code=0)
 
@@ -311,7 +311,7 @@ class RuleGraphTest(TestBase):
 
     @rule
     def d_from_a_and_suba(a: A, suba: SubA) -> D:
-      _ = yield Get(A, C, C())  # noqa: F841
+      _ = await Get(A, C, C())  # noqa: F841
 
     @rule
     def a_from_c(c: C) -> A:
@@ -512,7 +512,7 @@ class RuleGraphTest(TestBase):
     # be surprising.
     @rule
     def a(sub_a: SubA) -> A:
-      _ = yield Get(B, C())  # noqa: F841
+      _ = await Get(B, C())  # noqa: F841
 
     @rule
     def b_from_suba(suba: SubA) -> B:
@@ -801,7 +801,7 @@ class RuleGraphTest(TestBase):
   def test_get_simple(self):
     @rule
     def a() -> A:
-      _ = yield Get(B, D, D())  # noqa: F841
+      _ = await Get(B, D, D())  # noqa: F841
 
     @rule
     def b_from_d(d: D) -> B:
@@ -832,7 +832,7 @@ Could not resolve type `XXX` in top level of module pants_test.engine.test_rules
       class XXX: pass
       @rule
       def f() -> A:
-        a = yield Get(A, XXX, 3)
+        a = await Get(A, XXX, 3)
         yield a
 
     # This fails because the argument is defined in this file's module, but it is not a type.
@@ -840,7 +840,7 @@ Could not resolve type `XXX` in top level of module pants_test.engine.test_rules
 Expected a `type` constructor for `_this_is_not_a_type`, but got: 3 (type `int`)"""):
       @rule
       def g() -> A:
-        a = yield Get(A, _this_is_not_a_type, 3)
+        a = await Get(A, _this_is_not_a_type, 3)
         yield a
 
   def test_validate_yield_statements_in_rule_body(self):
@@ -869,7 +869,7 @@ Expected a `type` constructor for `_this_is_not_a_type`, but got: 3 (type `int`)
       @rule
       def g() -> A:
         # This is a yield statement without an assignment, and not at the end.
-        yield Get(B, D, D())
+        await Get(B, D, D())
         yield A()
     exc_msg = str(cm.exception)
     exc_msg_trimmed = re.sub(r'^.*?(test_rules\.py)', r'\1', exc_msg, flags=re.MULTILINE)
@@ -878,22 +878,22 @@ In function g: yield in @rule without assignment must come at the end of a serie
 
 A yield in an @rule without an assignment is equivalent to a return, and we
 currently require that no statements follow such a yield at the same level of nesting.
-Use `_ = yield Get(...)` if you wish to yield control to the engine and discard the
+Use `_ = await Get(...)` if you wish to yield control to the engine and discard the
 result.
 
-Note that any `yield Get(...)` in an @rule without assignment is also currently not
+Note that any `await Get(...)` in an @rule without assignment is also currently not
 supported. See https://github.com/pantsbuild/pants/pull/8227 for progress.
 
 The invalid statement was:
 test_rules.py:{lineno}:{col}
-        yield Get(B, D, D())
+        await Get(B, D, D())
 
 The rule defined by function `g` begins at:
 test_rules.py:{rule_lineno}:{rule_col}
       @rule
       def g() -> A:
         # This is a yield statement without an assignment, and not at the end.
-        yield Get(B, D, D())
+        await Get(B, D, D())
         yield A()
 """.format(lineno=(sys._getframe().f_lineno - 26),
            col=8,
@@ -909,25 +909,25 @@ test_rules.py:{rule_lineno}:{rule_col}
     class X:
       y_value: Y
 
-    with self.assertRaisesWithMessageContaining(_RuleVisitor.YieldVisitError, '`yield Get(...)` in @rule is currently not allowed without an assignment.'):
+    with self.assertRaisesWithMessageContaining(_RuleVisitor.YieldVisitError, '`await Get(...)` in @rule is currently not allowed without an assignment.'):
       @rule
       def final_yield(n: type(None)) -> X:
-        yield Get(X, Y(n))
+        await Get(X, Y(n))
 
     # Try a more complex example.
     with self.assertRaises(_RuleVisitor.YieldVisitError) as cm:
       @rule
       def final_yield_within_if(n: type(None)) -> X:
         if n is None:
-          yield Get(X, Y(n))
+          await Get(X, Y(n))
     exc_msg = str(cm.exception)
     exc_msg_trimmed = re.sub(r'^.*?(test_rules\.py)', r'\1', exc_msg, flags=re.MULTILINE)
-    self.assertIn('`yield Get(...)` in @rule is currently not allowed without an assignment.',
+    self.assertIn('`await Get(...)` in @rule is currently not allowed without an assignment.',
                   exc_msg_trimmed)
     self.assertIn(f"""\
 The invalid statement was:
 test_rules.py:{sys._getframe().f_lineno - 9}:10
-          yield Get(X, Y(n))
+          await Get(X, Y(n))
 """, exc_msg_trimmed)
 
   def create_full_graph(self, rules, validate=True):

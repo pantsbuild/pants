@@ -18,7 +18,7 @@ class SourceRootStrippedSources:
 
 
 @rule
-def strip_source_root(
+async def strip_source_root(
   hydrated_target: HydratedTarget, source_root_config: SourceRootConfig
 ) -> SourceRootStrippedSources:
   """Relativize targets to their source root, e.g.
@@ -30,7 +30,7 @@ def strip_source_root(
   # TODO: make TargetAdaptor return a 'sources' field with an empty snapshot instead of raising to
   # simplify the hasattr() checks here!
   if not hasattr(target_adaptor, 'sources'):
-    yield SourceRootStrippedSources(snapshot=EMPTY_SNAPSHOT)
+    return SourceRootStrippedSources(snapshot=EMPTY_SNAPSHOT)
 
   digest = target_adaptor.sources.snapshot.directory_digest
   source_root = source_roots.find_by_path(target_adaptor.address.spec_path)
@@ -41,15 +41,15 @@ def strip_source_root(
   if target_adaptor.type_alias == Files.alias():
     source_root = None
 
-  resulting_digest = yield Get(
+  resulting_digest = await Get(
     Digest,
     DirectoryWithPrefixToStrip(
       directory_digest=digest,
       prefix=source_root.path if source_root else ""
     )
   )
-  resulting_snapshot = yield Get(Snapshot, Digest, resulting_digest)
-  yield SourceRootStrippedSources(snapshot=resulting_snapshot)
+  resulting_snapshot = await Get(Snapshot, Digest, resulting_digest)
+  return SourceRootStrippedSources(snapshot=resulting_snapshot)
 
 
 def rules():

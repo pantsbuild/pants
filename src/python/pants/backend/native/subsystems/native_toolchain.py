@@ -117,22 +117,22 @@ class LLVMCppToolchain:
 
 
 @rule
-def select_libc_objects(platform: Platform, native_toolchain: NativeToolchain) -> LibcObjects:
+async def select_libc_objects(platform: Platform, native_toolchain: NativeToolchain) -> LibcObjects:
   # We use lambdas here to avoid searching for libc on osx, where it will fail.
   paths = platform.match({
     Platform.darwin: lambda: [],
     Platform.linux: lambda: native_toolchain._libc_dev.get_libc_objects(),
   })()
-  yield LibcObjects(paths)
+  return LibcObjects(paths)
 
 
 @rule
-def select_assembler(platform: Platform, native_toolchain: NativeToolchain) -> Assembler:
+async def select_assembler(platform: Platform, native_toolchain: NativeToolchain) -> Assembler:
   if platform == Platform.darwin:
-    assembler = yield Get(Assembler, XCodeCLITools, native_toolchain._xcode_cli_tools)
+    assembler = await Get(Assembler, XCodeCLITools, native_toolchain._xcode_cli_tools)
   else:
-    assembler = yield Get(Assembler, Binutils, native_toolchain._binutils)
-  yield assembler
+    assembler = await Get(Assembler, Binutils, native_toolchain._binutils)
+  return assembler
 
 
 @dataclass(frozen=True)
@@ -146,23 +146,23 @@ class BaseLinker:
 
 # TODO: select the appropriate `Platform` in the `@rule` decl using variants!
 @rule
-def select_base_linker(platform: Platform, native_toolchain: NativeToolchain) -> BaseLinker:
+async def select_base_linker(platform: Platform, native_toolchain: NativeToolchain) -> BaseLinker:
   if platform == Platform.darwin:
     # TODO(#5663): turn this into LLVM when lld works.
-    linker = yield Get(Linker, XCodeCLITools, native_toolchain._xcode_cli_tools)
+    linker = await Get(Linker, XCodeCLITools, native_toolchain._xcode_cli_tools)
   else:
-    linker = yield Get(Linker, Binutils, native_toolchain._binutils)
+    linker = await Get(Linker, Binutils, native_toolchain._binutils)
   base_linker = BaseLinker(linker=linker)
-  yield base_linker
+  return base_linker
 
 
 @rule
-def select_gcc_linker(native_toolchain: NativeToolchain) -> GCCLinker:
-  base_linker = yield Get(BaseLinker, NativeToolchain, native_toolchain)
+async def select_gcc_linker(native_toolchain: NativeToolchain) -> GCCLinker:
+  base_linker = await Get(BaseLinker, NativeToolchain, native_toolchain)
   linker = base_linker.linker
-  libc_objects = yield Get(LibcObjects, NativeToolchain, native_toolchain)
+  libc_objects = await Get(LibcObjects, NativeToolchain, native_toolchain)
   linker_with_libc = linker.append_field('extra_object_files', libc_objects.crti_object_paths)
-  yield GCCLinker(linker_with_libc)
+  return GCCLinker(linker_with_libc)
 
 
 @rule
@@ -191,15 +191,15 @@ def select_gcc_install_location(gcc: GCC) -> GCCInstallLocationForLLVM:
 
 
 @rule
-def select_llvm_c_toolchain(platform: Platform, native_toolchain: NativeToolchain) -> LLVMCToolchain:
-  provided_clang = yield Get(CCompiler, LLVM, native_toolchain._llvm)
+async def select_llvm_c_toolchain(platform: Platform, native_toolchain: NativeToolchain) -> LLVMCToolchain:
+  provided_clang = await Get(CCompiler, LLVM, native_toolchain._llvm)
 
   if platform == Platform.darwin:
-    xcode_clang = yield Get(CCompiler, XCodeCLITools, native_toolchain._xcode_cli_tools)
+    xcode_clang = await Get(CCompiler, XCodeCLITools, native_toolchain._xcode_cli_tools)
     joined_c_compiler = provided_clang.sequence(xcode_clang)
   else:
-    gcc_install = yield Get(GCCInstallLocationForLLVM, GCC, native_toolchain._gcc)
-    provided_gcc = yield Get(CCompiler, GCC, native_toolchain._gcc)
+    gcc_install = await Get(GCCInstallLocationForLLVM, GCC, native_toolchain._gcc)
+    provided_gcc = await Get(CCompiler, GCC, native_toolchain._gcc)
     joined_c_compiler = (provided_clang
                          .sequence(provided_gcc)
                          .append_field('extra_args', gcc_install.as_clang_argv)
@@ -210,28 +210,28 @@ def select_llvm_c_toolchain(platform: Platform, native_toolchain: NativeToolchai
     '-x', 'c', '-std=c11',
   ])
 
-  llvm_linker_wrapper = yield Get(LLVMLinker, NativeToolchain, native_toolchain)
+  llvm_linker_wrapper = await Get(LLVMLinker, NativeToolchain, native_toolchain)
   working_linker = llvm_linker_wrapper.for_compiler(working_c_compiler, platform)
 
-  yield LLVMCToolchain(CToolchain(working_c_compiler, working_linker))
+  return LLVMCToolchain(CToolchain(working_c_compiler, working_linker))
 
 
 @rule
-def select_llvm_cpp_toolchain(
+async def select_llvm_cpp_toolchain(
   platform: Platform, native_toolchain: NativeToolchain
 ) -> LLVMCppToolchain:
-  provided_clangpp = yield Get(CppCompiler, LLVM, native_toolchain._llvm)
+  provided_clangpp = await Get(CppCompiler, LLVM, native_toolchain._llvm)
 
   # On OSX, we use the libc++ (LLVM) C++ standard library implementation. This is feature-complete
   # for OSX, but not for Linux (see https://libcxx.llvm.org/ for more info).
   if platform == Platform.darwin:
-    xcode_clangpp = yield Get(CppCompiler, XCodeCLITools, native_toolchain._xcode_cli_tools)
+    xcode_clangpp = await Get(CppCompiler, XCodeCLITools, native_toolchain._xcode_cli_tools)
     joined_cpp_compiler = provided_clangpp.sequence(xcode_clangpp)
     extra_llvm_linking_library_dirs = []
     linker_extra_args = []
   else:
-    gcc_install = yield Get(GCCInstallLocationForLLVM, GCC, native_toolchain._gcc)
-    provided_gpp = yield Get(CppCompiler, GCC, native_toolchain._gcc)
+    gcc_install = await Get(GCCInstallLocationForLLVM, GCC, native_toolchain._gcc)
+    provided_gpp = await Get(CppCompiler, GCC, native_toolchain._gcc)
     joined_cpp_compiler = (provided_clangpp
                            .sequence(provided_gpp)
                            # NB: we use g++'s headers on Linux, and therefore their C++ standard
@@ -253,45 +253,45 @@ def select_llvm_cpp_toolchain(
     '-nostdinc++',
   ])
 
-  llvm_linker_wrapper = yield Get(LLVMLinker, NativeToolchain, native_toolchain)
+  llvm_linker_wrapper = await Get(LLVMLinker, NativeToolchain, native_toolchain)
   working_linker = (llvm_linker_wrapper
                     .for_compiler(working_cpp_compiler, platform)
                     .append_field('linking_library_dirs', extra_llvm_linking_library_dirs)
                     .prepend_field('extra_args', linker_extra_args))
 
-  yield LLVMCppToolchain(CppToolchain(working_cpp_compiler, working_linker))
+  return LLVMCppToolchain(CppToolchain(working_cpp_compiler, working_linker))
 
 
 @rule
-def select_gcc_c_toolchain(platform: Platform, native_toolchain: NativeToolchain) -> GCCCToolchain:
-  provided_gcc = yield Get(CCompiler, GCC, native_toolchain._gcc)
+async def select_gcc_c_toolchain(platform: Platform, native_toolchain: NativeToolchain) -> GCCCToolchain:
+  provided_gcc = await Get(CCompiler, GCC, native_toolchain._gcc)
 
   if platform == Platform.darwin:
     # GCC needs access to some headers that are only provided by the XCode toolchain
     # currently (e.g. "_stdio.h"). These headers are unlikely to change across versions, so this is
     # probably safe.
-    xcode_clang = yield Get(CCompiler, XCodeCLITools, native_toolchain._xcode_cli_tools)
+    xcode_clang = await Get(CCompiler, XCodeCLITools, native_toolchain._xcode_cli_tools)
     joined_c_compiler = provided_gcc.sequence(xcode_clang)
   else:
     joined_c_compiler = provided_gcc
 
   # GCC needs an assembler, so we provide that (platform-specific) tool here.
-  assembler = yield Get(Assembler, NativeToolchain, native_toolchain)
+  assembler = await Get(Assembler, NativeToolchain, native_toolchain)
   working_c_compiler = joined_c_compiler.sequence(assembler).prepend_field('extra_args', [
     '-x', 'c', '-std=c11',
   ])
 
-  gcc_linker_wrapper = yield Get(GCCLinker, NativeToolchain, native_toolchain)
+  gcc_linker_wrapper = await Get(GCCLinker, NativeToolchain, native_toolchain)
   working_linker = gcc_linker_wrapper.for_compiler(working_c_compiler, platform)
 
-  yield GCCCToolchain(CToolchain(working_c_compiler, working_linker))
+  return GCCCToolchain(CToolchain(working_c_compiler, working_linker))
 
 
 @rule
-def select_gcc_cpp_toolchain(
+async def select_gcc_cpp_toolchain(
   platform: Platform, native_toolchain: NativeToolchain
 ) -> GCCCppToolchain:
-  provided_gpp = yield Get(CppCompiler, GCC, native_toolchain._gcc)
+  provided_gpp = await Get(CppCompiler, GCC, native_toolchain._gcc)
 
   if platform == Platform.darwin:
     # GCC needs access to some headers that are only provided by the XCode toolchain
@@ -299,13 +299,13 @@ def select_gcc_cpp_toolchain(
     # probably safe.
     # TODO: we should be providing all of these (so we can eventually phase out XCodeCLITools
     # entirely).
-    xcode_clangpp = yield Get(CppCompiler, XCodeCLITools, native_toolchain._xcode_cli_tools)
+    xcode_clangpp = await Get(CppCompiler, XCodeCLITools, native_toolchain._xcode_cli_tools)
     joined_cpp_compiler = provided_gpp.sequence(xcode_clangpp)
   else:
     joined_cpp_compiler = provided_gpp
 
   # GCC needs an assembler, so we provide that (platform-specific) tool here.
-  assembler = yield Get(Assembler, NativeToolchain, native_toolchain)
+  assembler = await Get(Assembler, NativeToolchain, native_toolchain)
   working_cpp_compiler = joined_cpp_compiler.sequence(assembler).prepend_field('extra_args', [
     '-x', 'c++', '-std=c++11',
     # This flag is intended to avoid using any of the headers from our LLVM distribution's C++
@@ -315,10 +315,10 @@ def select_gcc_cpp_toolchain(
     '-nostdinc++',
   ])
 
-  gcc_linker_wrapper = yield Get(GCCLinker, NativeToolchain, native_toolchain)
+  gcc_linker_wrapper = await Get(GCCLinker, NativeToolchain, native_toolchain)
   working_linker = gcc_linker_wrapper.for_compiler(working_cpp_compiler, platform)
 
-  yield GCCCppToolchain(CppToolchain(working_cpp_compiler, working_linker))
+  return GCCCppToolchain(CppToolchain(working_cpp_compiler, working_linker))
 
 
 @dataclass(frozen=True)
@@ -328,27 +328,27 @@ class ToolchainVariantRequest:
 
 
 @rule
-def select_c_toolchain(toolchain_variant_request: ToolchainVariantRequest) -> CToolchain:
+async def select_c_toolchain(toolchain_variant_request: ToolchainVariantRequest) -> CToolchain:
   use_gcc = toolchain_variant_request.variant == ToolchainVariant.gnu
   if use_gcc:
-    toolchain_resolved = yield Get(GCCCToolchain, NativeToolchain, toolchain_variant_request.toolchain)
+    toolchain_resolved = await Get(GCCCToolchain, NativeToolchain, toolchain_variant_request.toolchain)
   else:
-    toolchain_resolved = yield Get(LLVMCToolchain, NativeToolchain, toolchain_variant_request.toolchain)
-  yield toolchain_resolved.c_toolchain
+    toolchain_resolved = await Get(LLVMCToolchain, NativeToolchain, toolchain_variant_request.toolchain)
+  return toolchain_resolved.c_toolchain
 
 
 @rule
-def select_cpp_toolchain(toolchain_variant_request: ToolchainVariantRequest) -> CppToolchain:
+async def select_cpp_toolchain(toolchain_variant_request: ToolchainVariantRequest) -> CppToolchain:
   use_gcc = toolchain_variant_request.variant == ToolchainVariant.gnu
   if use_gcc:
-    toolchain_resolved = yield Get(
+    toolchain_resolved = await Get(
       GCCCppToolchain, NativeToolchain, toolchain_variant_request.toolchain
     )
   else:
-    toolchain_resolved = yield Get(
+    toolchain_resolved = await Get(
       LLVMCppToolchain, NativeToolchain, toolchain_variant_request.toolchain
     )
-  yield toolchain_resolved.cpp_toolchain
+  return toolchain_resolved.cpp_toolchain
 
 
 def create_native_toolchain_rules():

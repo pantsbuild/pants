@@ -45,11 +45,11 @@ class Fib:
 
 
 @rule(name="fib")
-def fib(n: int) -> Fib:
+async def fib(n: int) -> Fib:
   if n < 2:
-    yield Fib(n)
-  x, y = yield Get(Fib, int(n-2)), Get(Fib, int(n-1))
-  yield Fib(x.val + y.val)
+    return Fib(n)
+  x, y = await Get(Fib, int(n-2)), Get(Fib, int(n-1))
+  return Fib(x.val + y.val)
 
 
 @dataclass(frozen=True)
@@ -64,7 +64,7 @@ class MyFloat:
 
 @rule
 def upcast(n: MyInt) -> MyFloat:
-  yield MyFloat(float(n.val))
+  return MyFloat(float(n.val))
 
 
 class EngineTest(unittest.TestCase, SchedulerTestBase):

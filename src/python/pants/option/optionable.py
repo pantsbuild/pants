@@ -12,10 +12,10 @@ from pants.option.scope import Scope, ScopedOptions, ScopeInfo
 from pants.util.meta import classproperty
 
 
-def _construct_optionable(optionable_factory):
+async def _construct_optionable(optionable_factory):
   scope = optionable_factory.options_scope
-  scoped_options = yield Get(ScopedOptions, Scope(str(scope)))
-  yield optionable_factory.optionable_cls(scope, scoped_options.options)
+  scoped_options = await Get(ScopedOptions, Scope(str(scope)))
+  return optionable_factory.optionable_cls(scope, scoped_options.options)
 
 
 class OptionableFactory(ABC):

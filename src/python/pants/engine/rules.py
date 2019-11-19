@@ -9,9 +9,7 @@ import sys
 import typing
 from abc import ABC, abstractmethod
 from collections import OrderedDict
-from collections.abc import Iterable
 from dataclasses import dataclass
-from textwrap import dedent
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type
 
 from twitter.common.collections import OrderedSet
@@ -250,14 +248,14 @@ def union(cls):
   Annotating a class with @union allows other classes to use a UnionRule() instance to indicate that
   they can be resolved to this base union class. This class will never be instantiated, and should
   have no members -- it is used as a tag only, and will be replaced with whatever object is passed
-  in as the subject of a `yield Get(...)`. See the following example:
+  in as the subject of a `await Get(...)`. See the following example:
 
   @union
   class UnionBase: pass
 
   @rule
   def get_some_union_type(x: X) -> B:
-    result = yield Get(ResultType, UnionBase, x.f())
+    result = await Get(ResultType, UnionBase, x.f())
     # ...
 
   If there exists a single path from (whatever type the expression `x.f()` returns) -> `ResultType`
