@@ -104,7 +104,7 @@ class TestBestUrlSelector(TestBase):
         self.assertEqual(urlparse(expected_url), url)
 
         if with_error:
-          raise RequestException('error connecting to {}'.format(url))
+          raise RequestException(f'error connecting to {url}')
     except RequestException:
       pass
 

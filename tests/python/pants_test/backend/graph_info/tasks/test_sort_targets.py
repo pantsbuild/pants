@@ -32,7 +32,7 @@ class SortTargetsTest(BaseSortTargetsTest):
     super().setUp()
 
     def add_to_build_file(path, name, *deps):
-      all_deps = ["'{0}'".format(dep) for dep in list(deps)]
+      all_deps = [f"'{dep}'" for dep in list(deps)]
       self.add_to_build_file(path, dedent("""
           python_library(name='{name}',
             sources=[],

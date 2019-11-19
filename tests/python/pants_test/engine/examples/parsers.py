@@ -19,7 +19,7 @@ from pants.util.strutil import ensure_text
 def _import(typename):
   modulename, _, symbolname = typename.rpartition('.')
   if not modulename:
-    raise ParseError('Expected a fully qualified type name, given {}'.format(typename))
+    raise ParseError(f'Expected a fully qualified type name, given {typename}')
   try:
     mod = importlib.import_module(modulename)
     try:
@@ -97,7 +97,7 @@ class JsonParser(Parser):
           offset += len(lines[0]) - len(line)
           break
         else:
-          raise ParseError('Unexpected json line:\n{}'.format(lines[0]))
+          raise ParseError(f'Unexpected json line:\n{lines[0]}')
 
       lines = json[offset:].splitlines()
       if not lines:
@@ -135,7 +135,7 @@ class JsonParser(Parser):
         col_padding = ' ' * col_width
 
         def format_line(line):
-          return '{col_padding}  {line}'.format(col_padding=col_padding, line=line)
+          return f'{col_padding}  {line}'
 
         header_lines = [format_line(line) for line in json[:offset].splitlines()]
 
@@ -166,7 +166,7 @@ def _object_encoder(obj, inline):
   encoded = obj._asdict()
   if 'type_alias' not in encoded:
     encoded = encoded.copy()
-    encoded['type_alias'] = '{}.{}'.format(inspect.getmodule(obj).__name__, type(obj).__name__)
+    encoded['type_alias'] = f'{inspect.getmodule(obj).__name__}.{type(obj).__name__}'
   return {k: v for k, v in encoded.items() if v}
 
 
@@ -223,7 +223,7 @@ class PythonAssignmentsParser(Parser):
         continue
 
       if not Serializable.is_serializable(obj):
-        raise ParseError('Found a non-serializable top-level object: {}'.format(obj))
+        raise ParseError(f'Found a non-serializable top-level object: {obj}')
 
       attributes = obj._asdict()
       if 'name' in attributes:

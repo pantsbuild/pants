@@ -372,7 +372,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
 
     list_of_filename_content_tuples = []
     for n in range(num_of_classes):
-      filename = 'FooTest{}.java'.format(n)
+      filename = f'FooTest{n}.java'
 
       content = dedent("""
           package org.pantsbuild.foo;

@@ -116,7 +116,7 @@ class ShaderIntegrationTest(PantsRunIntegrationTest):
           )
         """).format(name=tmp_name))
 
-      jar_path = os.path.join('dist', '{}.jar'.format(tmp_name))
+      jar_path = os.path.join('dist', f'{tmp_name}.jar')
 
       # Build a binary with no shading, and record the permissions.
       self.run_pants(['clean-all'])

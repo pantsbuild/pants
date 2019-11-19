@@ -27,7 +27,7 @@ class FakeRunTracker:
 class FakeWorkUnit:
   def __init__(self, parent, **kwargs):
     self.name = kwargs['name']
-    self.id = '{}_id'.format(self.name)
+    self.id = f'{self.name}_id'
     self.parent = parent
     self.cmd = ''
     self.labels = kwargs.get('labels', [])

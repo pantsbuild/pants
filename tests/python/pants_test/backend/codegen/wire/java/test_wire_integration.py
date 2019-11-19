@@ -27,7 +27,7 @@ class WireIntegrationTest(PantsRunIntegrationTest):
       pattern = 'gen/wire/[^/]*/[^/]*/[^/]*/org/pantsbuild/example/temperature/Temperature.java'
       files = exact_files(workdir)
       self.assertTrue(any(re.match(pattern, f) is not None for f in files),
-                      'Expected pattern: {} in {}'.format(pattern, files))
+                      f'Expected pattern: {pattern} in {files}')
 
   def test_bundle_wire_normal(self):
     with self.pants_results(['bundle.jvm',

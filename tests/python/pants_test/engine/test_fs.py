@@ -137,7 +137,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
       dest_path = os.path.join(project_tree.build_root, dest)
       relative_symlink(dest_path, link_path)
 
-    exc_reg = '.*While expanding link.*{}.*may not traverse outside of the buildroot.*{}.*'.format(link, dest)
+    exc_reg = f'.*While expanding link.*{link}.*may not traverse outside of the buildroot.*{dest}.*'
     with self.assertRaisesRegexp(Exception, exc_reg):
       self.assert_walk_files([link], [], prepare=prepare)
 
@@ -542,7 +542,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
   def test_download(self):
     with self.isolated_local_store():
       with http_server(StubHandler) as port:
-        url = UrlToFetch("http://localhost:{}/CNAME".format(port), self.pantsbuild_digest)
+        url = UrlToFetch(f"http://localhost:{port}/CNAME", self.pantsbuild_digest)
         snapshot, = self.scheduler.product_request(Snapshot, subjects=[url])
         self.assert_snapshot_equals(snapshot, ["CNAME"], Digest(
           "16ba2118adbe5b53270008790e245bbf7088033389461b08640a4092f7f647cf",
@@ -552,7 +552,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
   def test_download_missing_file(self):
     with self.isolated_local_store():
       with http_server(StubHandler) as port:
-        url = UrlToFetch("http://localhost:{}/notfound".format(port), self.pantsbuild_digest)
+        url = UrlToFetch(f"http://localhost:{port}/notfound", self.pantsbuild_digest)
         with self.assertRaises(ExecutionError) as cm:
           self.scheduler.product_request(Snapshot, subjects=[url])
         self.assertIn('404', str(cm.exception))
@@ -561,7 +561,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
     with self.isolated_local_store():
       with http_server(StubHandler) as port:
         url = UrlToFetch(
-          "http://localhost:{}/CNAME".format(port),
+          f"http://localhost:{port}/CNAME",
           Digest(
             self.pantsbuild_digest.fingerprint,
             self.pantsbuild_digest.serialized_bytes_length + 1,
@@ -593,7 +593,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
         # but we're not going to hit the HTTP server because it's cached,
         # so we shouldn't see an error...
         url = UrlToFetch(
-          "http://localhost:{}/roland".format(port),
+          f"http://localhost:{port}/roland",
           Digest('693d8db7b05e99c6b7a7c0616456039d89c555029026936248085193559a0b5d', 16),
         )
         snapshot, = self.scheduler.product_request(Snapshot, subjects=[url])
@@ -617,5 +617,5 @@ class StubHandler(BaseHTTPRequestHandler):
     code = 200 if self.path == "/CNAME" else 404
     self.send_response(code)
     self.send_header("Content-Type", "text/utf-8")
-    self.send_header("Content-Length", "{}".format(len(self.response_text)))
+    self.send_header("Content-Length", f"{len(self.response_text)}")
     self.end_headers()

@@ -35,7 +35,7 @@ class TestJarDependencyManagementSetup(JvmBinaryTaskTestBase):
     sets = {a: tgts for a, tgts in sets.items()
             if any(isinstance(t, JarLibrary) for t in tgts)}
     if len(sets) != 1:
-      raise ValueError('Test expected there to be only one artifact set! {}'.format(sets))
+      raise ValueError(f'Test expected there to be only one artifact set! {sets}')
     return next(iter(sets))
 
   def test_default_target(self):
@@ -291,7 +291,7 @@ class TestJarDependencyManagementSetup(JvmBinaryTaskTestBase):
     class FakeContext:
       def create_object(fake, target_type, name, **kwargs):
         return self.make_target(target_type=target_aliases[target_type],
-                                spec='//foo:{}'.format(name), **kwargs)
+                                spec=f'//foo:{name}', **kwargs)
 
     with self.assertRaises(ManagedJarLibraries.JarLibraryNameCollision):
       ManagedJarLibraries(FakeContext())(

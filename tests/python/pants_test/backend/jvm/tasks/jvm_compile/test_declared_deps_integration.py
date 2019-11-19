@@ -38,7 +38,7 @@ class DeclaredDepsIntegrationTest(BaseCompileIT):
     # Should fail when it is not whitelisted.
     self.do_test_success_and_failure(
       DIR_DEPS_WHITELISTED,
-      ['--lint-jvm-dep-check-missing-deps-whitelist=["{}"]'.format(DIR_DEPS_WHITELISTED)],
+      [f'--lint-jvm-dep-check-missing-deps-whitelist=["{DIR_DEPS_WHITELISTED}"]'],
       [],
       shared_args=[
         'lint',
@@ -51,7 +51,7 @@ class DeclaredDepsIntegrationTest(BaseCompileIT):
     # Should fail when it is not whitelisted.
     self.do_test_success_and_failure(
       JAR_DEPS_WHITELISTED,
-      ['--lint-jvm-dep-check-missing-deps-whitelist=["{}"]'.format(JAR_DEPS_WHITELISTED)],
+      [f'--lint-jvm-dep-check-missing-deps-whitelist=["{JAR_DEPS_WHITELISTED}"]'],
       [],
       shared_args=[
         'lint',

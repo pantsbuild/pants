@@ -32,7 +32,7 @@ class StrictDepsInvalidationIntegrationTest(PantsRunIntegrationTest):
         pants_run = self.run_pants_with_workdir(command=cmd, workdir=workdir)
         self.assert_success(pants_run)
         self.assertEqual(
-          '{}:{}'.format(src_dir, target_name) in pants_run.stdout_data,
+          f'{src_dir}:{target_name}' in pants_run.stdout_data,
           invalidate_root_target_expected)
 
   def test_strict_deps_false(self):

@@ -13,7 +13,7 @@ class IntransitiveIntegrationTest(PantsRunIntegrationTest):
     result = self.run_pants([
       '--no-java-strict-deps',
       'run.jvm',
-      '--main=org.pantsbuild.testproject.intransitive.{}'.format(main_class),
+      f'--main=org.pantsbuild.testproject.intransitive.{main_class}',
       self.test_spec,
     ])
     if not expected_success:

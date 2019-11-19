@@ -14,7 +14,7 @@ class JavacPluginIntegrationTest(BaseCompileIT):
   def _do_test(self, expected_args, config, target):
     with self.temporary_workdir() as workdir:
       pants_run = self.run_pants_with_workdir(
-        ['compile', '{}:{}'.format(self.example_dir, target)], workdir, config)
+        ['compile', f'{self.example_dir}:{target}'], workdir, config)
     self.assert_success(pants_run)
     self.assertIn('SimpleJavacPlugin ran with {} args: {}'.format(
       len(expected_args), ' '.join(expected_args)), pants_run.stdout_data)

@@ -33,15 +33,14 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
     """
     export_out_file = os.path.join(workdir, 'export_out.txt')
     args = ['export',
-            '--output-file={out_file}'.format(out_file=export_out_file)] + maybe_list(test_target)
+            f'--output-file={export_out_file}'] + maybe_list(test_target)
     libs_args = ['--no-export-libraries'] if not load_libs else self._confs_args
     if load_libs and only_default:
       libs_args = []
     pants_run = self.run_pants_with_workdir(args + libs_args + (extra_args or []), workdir)
     self.assert_success(pants_run)
     self.assertTrue(os.path.exists(export_out_file),
-                    msg='Could not find export output file in {out_file}'
-                        .format(out_file=export_out_file))
+                    msg=f'Could not find export output file in {export_out_file}')
     with open(export_out_file, 'r') as json_file:
       json_data = json.load(json_file)
       if not load_libs:
@@ -54,7 +53,7 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
     for jar in expected_jars:
       self.assertIn(jar, json_data['libraries'])
       for path in json_data['libraries'][jar].values():
-        self.assertTrue(os.path.exists(path), 'Expected jar at {} to actually exist.'.format(path))
+        self.assertTrue(os.path.exists(path), f'Expected jar at {path} to actually exist.')
 
   @ensure_resolver
   def test_export_code_gen(self):
@@ -64,7 +63,7 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       thrift_target_name = ('examples.src.thrift.org.pantsbuild.example.precipitation'
                             '.precipitation-java')
       codegen_target_regex = os.path.join(os.path.relpath(workdir, get_buildroot()),
-                                          'gen/thrift-java/[^/]*/[^/:]*/[^/:]*:{0}'.format(thrift_target_name))
+                                          f'gen/thrift-java/[^/]*/[^/:]*/[^/:]*:{thrift_target_name}')
       p = re.compile(codegen_target_regex)
       self.assertTrue(any(p.match(target) for target in json_data.get('targets').keys()))
 
@@ -217,10 +216,10 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
   def test_intransitive_and_scope(self):
     with self.temporary_workdir() as workdir:
       test_path = 'testprojects/maven_layout/provided_patching/one/src/main/java'
-      test_target = '{}:common'.format(test_path)
+      test_target = f'{test_path}:common'
       json_data = self.run_export(test_target, workdir)
-      h = hash_target('{}:shadow'.format(test_path), 'provided')
-      synthetic_target = '{}:shadow-unstable-provided-{}'.format(test_path, h)
+      h = hash_target(f'{test_path}:shadow', 'provided')
+      synthetic_target = f'{test_path}:shadow-unstable-provided-{h}'
       self.assertEqual(False, json_data['targets'][synthetic_target]['transitive'])
       self.assertEqual('compile test', json_data['targets'][synthetic_target]['scope'])
 

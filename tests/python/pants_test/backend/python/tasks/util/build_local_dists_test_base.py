@@ -108,9 +108,9 @@ class BuildLocalPythonDistributionsTestBase(PythonTaskTestBase, DeclarativeTaskT
     context, synthetic_target, fingerprint_suffix = self._create_distribution_synthetic_target(
       dist_target, **kwargs)
     resulting_dist_req = assert_single_element(synthetic_target.requirements.value)
-    expected_snapshot_version = '{}+{}'.format(expected_version, fingerprint_suffix)
+    expected_snapshot_version = f'{expected_version}+{fingerprint_suffix}'
     self.assertEquals(
-      '{}=={}'.format(expected_name, expected_snapshot_version),
+      f'{expected_name}=={expected_snapshot_version}',
       str(resulting_dist_req.requirement))
 
     local_wheel_products = context.products.get('local_wheels')

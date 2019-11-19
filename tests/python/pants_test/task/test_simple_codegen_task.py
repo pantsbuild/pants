@@ -87,8 +87,8 @@ class DummyGen(SimpleCodegenTask):
         self._test_case.create_dir(os.path.basename(path))
       self._test_case.create_file(path)
       with open(path, 'w') as f:
-        f.write('package {0};\n\n'.format(package_name))
-        f.write('public class {0} '.format(class_name))
+        f.write(f'package {package_name};\n\n')
+        f.write(f'public class {class_name} ')
         f.write('{\n\\\\ ... nothing ... \n}\n')
 
   def _dummy_sources_to_generate(self, target, target_workdir):
@@ -101,7 +101,7 @@ class DummyGen(SimpleCodegenTask):
             package_name, class_name = line.split(' ')
             yield os.path.join(target_workdir,
                                os.path.join(*package_name.split('.')),
-                               '{}.java'.format(class_name))
+                               f'{class_name}.java')
 
   def synthetic_target_type(self, target):
     return SyntheticDummyLibrary
@@ -161,10 +161,10 @@ class SimpleCodegenTaskTest(TaskTestBase):
       """).format(suffix=suffix) for suffix in dummy_suffixes))
 
     for suffix in dummy_suffixes:
-      self.create_file('gen-lib/org/pantsbuild/example/foo{suffix}.dummy'.format(suffix=suffix),
-        'org.pantsbuild.example Foo{0}'.format(suffix))
+      self.create_file(f'gen-lib/org/pantsbuild/example/foo{suffix}.dummy',
+        f'org.pantsbuild.example Foo{suffix}')
 
-    targets = [self.target('gen-lib:{suffix}'.format(suffix=suffix)) for suffix in dummy_suffixes]
+    targets = [self.target(f'gen-lib:{suffix}') for suffix in dummy_suffixes]
     task = self._create_dummy_task(target_roots=targets)
 
     expected_targets = set(targets)
@@ -236,9 +236,9 @@ class SimpleCodegenTaskTest(TaskTestBase):
       should_not_contain = ['org/pantsbuild/example/ChildClass']
       message = str(cm.exception)
       for item in should_contain:
-        self.assertTrue(item in message, 'Error message should contain "{}".'.format(item))
+        self.assertTrue(item in message, f'Error message should contain "{item}".')
       for item in should_not_contain:
-        self.assertFalse(item in message, 'Error message should not contain "{}".'.format(item))
+        self.assertFalse(item in message, f'Error message should not contain "{item}".')
     else:
       # Execute successfully.
       execute()

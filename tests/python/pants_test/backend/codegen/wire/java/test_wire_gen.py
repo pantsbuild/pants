@@ -37,8 +37,8 @@ class WireGenTest(NailgunTaskTestBase):
     context = self.context(target_roots=[simple_wire_target])
     task = self.create_task(context)
     self.assertEqual([
-      '--java_out={}'.format(self.TARGET_WORKDIR),
-      '--proto_path={}/src/wire'.format(self.build_root),
+      f'--java_out={self.TARGET_WORKDIR}',
+      f'--proto_path={self.build_root}/src/wire',
       'foo.proto'],
       task.format_args_for_target(simple_wire_target, self.TARGET_WORKDIR))
 
@@ -50,11 +50,11 @@ class WireGenTest(NailgunTaskTestBase):
                                      service_writer_options=['opt1', 'opt2'])
     task = self.create_task(self.context(target_roots=[wire_targetv1]))
     self.assertEqual([
-      '--java_out={}'.format(self.TARGET_WORKDIR),
+      f'--java_out={self.TARGET_WORKDIR}',
       '--service_writer=org.pantsbuild.DummyServiceWriter',
       '--service_writer_opt', 'opt1',
       '--service_writer_opt', 'opt2',
-      '--proto_path={}/src/wire'.format(self.build_root),
+      f'--proto_path={self.build_root}/src/wire',
       'bar.proto'],
       task.format_args_for_target(wire_targetv1, self.TARGET_WORKDIR))
 
@@ -71,13 +71,13 @@ class WireGenTest(NailgunTaskTestBase):
                                     enum_options=['enum1', 'enum2', 'enum3'],)
     task = self.create_task(self.context(target_roots=[kitchen_sink]))
     expected = [
-        '--java_out={}'.format(self.TARGET_WORKDIR),
+        f'--java_out={self.TARGET_WORKDIR}',
         '--no_options',
         '--service_writer=org.pantsbuild.DummyServiceWriter',
         '--registry_class=org.pantsbuild.Registry',
         '--roots=root1,root2,root3',
         '--enum_options=enum1,enum2,enum3',
-        '--proto_path={}/src/wire'.format(self.build_root),
+        f'--proto_path={self.build_root}/src/wire',
         'foo.proto',
         'bar.proto',
         'baz.proto',
@@ -97,7 +97,7 @@ class WireGenTest(NailgunTaskTestBase):
     context = self.context(target_roots=[parent_target, simple_wire_target])
     task = self.create_task(context)
     self.assertEqual([
-      '--java_out={}'.format(self.TARGET_WORKDIR),
-      '--proto_path={}/src/wire'.format(self.build_root),
+      f'--java_out={self.TARGET_WORKDIR}',
+      f'--proto_path={self.build_root}/src/wire',
       'foo.proto'],
       task.format_args_for_target(simple_wire_target, self.TARGET_WORKDIR))

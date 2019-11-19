@@ -30,9 +30,9 @@ class JarDependencyManagementIntegrationTest(PantsRunIntegrationTest):
     with self._testing_build_file():
       return self.run_pants([
         'run',
-        '{}:{}'.format(self.project, spec_name),
-        '--jar-dependency-management-default-target={}'.format(default_target or ''),
-        '--jar-dependency-management-conflict-strategy={}'.format(conflict_strategy or 'FAIL'),
+        f'{self.project}:{spec_name}',
+        f"--jar-dependency-management-default-target={(default_target or '')}",
+        f"--jar-dependency-management-conflict-strategy={(conflict_strategy or 'FAIL')}",
       ])
 
   def _classpath_result(self, *args, **kwargs):
@@ -153,12 +153,12 @@ class JarDependencyManagementIntegrationTest(PantsRunIntegrationTest):
     with self._testing_build_file():
       with temporary_dir() as distdir:
         run = self.run_pants([
-          '--pants-distdir={}'.format(distdir),
+          f'--pants-distdir={distdir}',
           'binary',
-          '{}:{}'.format(self.project, 'managed'),
-          '{}:{}'.format(self.project, 'managed2'),
-          '--jar-dependency-management-default-target={}'.format(''),
-          '--jar-dependency-management-conflict-strategy={}'.format('USE_MANAGED'),
+          f"{self.project}:managed",
+          f"{self.project}:managed2",
+          "--jar-dependency-management-default-target=",
+          "--jar-dependency-management-conflict-strategy=USE_MANAGED",
         ])
         self.assert_success(run)
         bin1 = os.path.join(distdir, 'managed.jar')
@@ -170,9 +170,9 @@ class JarDependencyManagementIntegrationTest(PantsRunIntegrationTest):
     with self._testing_build_file():
       run = self.run_pants([
         'export',
-        '{}::'.format(self.project),
-        '--jar-dependency-management-default-target={}'.format(''),
-        '--jar-dependency-management-conflict-strategy={}'.format('USE_MANAGED'),
+        f'{self.project}::',
+        "--jar-dependency-management-default-target=",
+        "--jar-dependency-management-conflict-strategy=USE_MANAGED",
       ])
       self.assert_success(run)
 

@@ -327,7 +327,7 @@ class FetcherRedirectTest(unittest.TestCase):
     def do_GET(self):
       if self.path.endswith('url2'):
         self.send_response(302)
-        redirect_url = '{}/url1'.format(FetcherRedirectTest._URL)
+        redirect_url = f'{FetcherRedirectTest._URL}/url1'
         self.send_header('Location', redirect_url)
         self.end_headers()
         self.wfile.write(f'redirecting you to {redirect_url}'.encode())
@@ -351,7 +351,7 @@ class FetcherRedirectTest(unittest.TestCase):
       port = httpd.server_address[1]
       httpd_thread = Thread(target=httpd.serve_forever)
       httpd_thread.start()
-      yield 'http://localhost:{0}'.format(port)
+      yield f'http://localhost:{port}'
     finally:
       if httpd:
         httpd.shutdown()

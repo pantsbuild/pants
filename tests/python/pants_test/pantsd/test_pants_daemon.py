@@ -61,7 +61,7 @@ class PantsDaemonTest(TestBase):
       self.pantsd._close_stdio()
       mock_close.assert_has_calls(unittest.mock.call(x) for x in fds)
       for handle in handles:
-        self.assertTrue(handle.closed, '{} was not closed'.format(handle))
+        self.assertTrue(handle.closed, f'{handle} was not closed')
 
   def test_shutdown(self):
     mock_thread = unittest.mock.Mock()

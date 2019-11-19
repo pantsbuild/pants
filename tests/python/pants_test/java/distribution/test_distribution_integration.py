@@ -46,7 +46,7 @@ class DistributionIntegrationTest(PantsRunIntegrationTest):
                                }
                              },
                              'jvm-platform': {
-                               'default_platform': 'java{}'.format(one.version.components[1]),
+                               'default_platform': f'java{one.version.components[1]}',
                                'compiler': 'javac',
                              }
                            },
@@ -54,7 +54,7 @@ class DistributionIntegrationTest(PantsRunIntegrationTest):
                              'JDK_HOME': two.home,
                            })
       self.assert_success(run)
-      self.assertIn('java.home:{}'.format(os.path.realpath(one.home)), run.stdout_data)
+      self.assertIn(f'java.home:{os.path.realpath(one.home)}', run.stdout_data)
 
   @skipIf(_get_two_distributions() is None, 'Could not find java 7 and java 8 jvms to test with.')
   def test_jvm_jdk_paths_supercedes_environment_variables(self):
@@ -76,7 +76,7 @@ class DistributionIntegrationTest(PantsRunIntegrationTest):
       target_spec = 'testprojects/src/java/org/pantsbuild/testproject/printversion'
       run = self.run_pants(['run', target_spec])
       self.assert_success(run)
-      self.assertIn('java.home:{}'.format(os.path.realpath(distribution.home)), run.stdout_data)
+      self.assertIn(f'java.home:{os.path.realpath(distribution.home)}', run.stdout_data)
 
   def test_jvm_meets_min_and_max_distribution(self):
     with _distribution_locator() as locator:
@@ -90,7 +90,7 @@ class DistributionIntegrationTest(PantsRunIntegrationTest):
                              }
                            })
       self.assert_success(run)
-      self.assertIn('java.home:{}'.format(os.path.realpath(distribution.home)), run.stdout_data)
+      self.assertIn(f'java.home:{os.path.realpath(distribution.home)}', run.stdout_data)
 
   def test_impossible_distribution_requirements(self):
     with _distribution_locator() as locator:

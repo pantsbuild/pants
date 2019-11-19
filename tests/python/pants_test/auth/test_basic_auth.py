@@ -52,7 +52,7 @@ class TestBasicAuth(TestBase):
       self.context(for_subsystems=[BasicAuth, Cookies], options={
         BasicAuth.options_scope: {
           'providers': {
-            'foobar': { 'url': 'http://localhost:{}'.format(self.port) }
+            'foobar': { 'url': f'http://localhost:{self.port}' }
           },
           'allow_insecure_urls': True
         },

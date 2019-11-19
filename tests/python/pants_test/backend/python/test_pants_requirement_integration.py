@@ -27,10 +27,10 @@ class PantsRequirementIntegrationTest(PantsRequirementIntegrationTestBase):
     pants_req_addr = 'testprojects/pants-plugins/3rdparty/python/pants'
     pants_test_infra_addr = 'tests/python/pants_test:test_infra'
     pre_cmd_args = [
-      "--pythonpath=+['{}']".format(testproject_backend_src_dir),
-      "--backend-packages=+['{}']".format(testproject_backend_pkg_name),
-      "--pants-test-infra-pants-requirement-target={}".format(pants_req_addr),
-      "--pants-test-infra-pants-test-infra-target={}".format(pants_test_infra_addr),
+      f"--pythonpath=+['{testproject_backend_src_dir}']",
+      f"--backend-packages=+['{testproject_backend_pkg_name}']",
+      f"--pants-test-infra-pants-requirement-target={pants_req_addr}",
+      f"--pants-test-infra-pants-test-infra-target={pants_test_infra_addr}",
     ]
     command = pre_cmd_args + cmd
     return self.run_pants(command=command)
@@ -41,7 +41,7 @@ class PantsRequirementIntegrationTest(PantsRequirementIntegrationTestBase):
     with self.create_unstable_pants_distribution() as repo:
       tests_dir = 'testprojects/pants-plugins/tests/python/test_pants_plugin'
       with self.file_renamed(os.path.join(get_buildroot(), tests_dir), 'TEST_BUILD', 'BUILD'):
-        test_pants_requirement_cmd = ['--python-repos-repos={}'.format(repo),
+        test_pants_requirement_cmd = [f'--python-repos-repos={repo}',
                                       'test',
                                       tests_dir]
         pants_run = self.run_with_testproject_backend_pkgs(test_pants_requirement_cmd)

@@ -17,7 +17,7 @@ class PantsRequirementIntegrationTestBase(PantsRunIntegrationTest):
     # The earliest pantsbuild.pants release on pypi is 0.0.17 so we grab a lower version and tack
     # on a globally unique local version identifier to ensure we can never collide with past,
     # present or future stable or unstable releases.
-    unstable_version = '0.0.0+{}'.format(uuid.uuid4().hex)
+    unstable_version = f'0.0.0+{uuid.uuid4().hex}'
 
     # Notes must be configured for all pants versions so we fake that out ephemerally here.
     # In pants-plugins/src/python/internal_backend/utilities/register.py see
@@ -39,7 +39,7 @@ class PantsRequirementIntegrationTestBase(PantsRunIntegrationTest):
   def create_unstable_pants_distribution(self):
     with self._unstable_pants_version():
       with temporary_dir() as dist_dir:
-        create_pants_dist_cmd = ['--pants-distdir={}'.format(dist_dir),
+        create_pants_dist_cmd = [f'--pants-distdir={dist_dir}',
                                  'setup-py',
                                  '--run=bdist_wheel',
                                  'src/python/pants:pants-packaged']
