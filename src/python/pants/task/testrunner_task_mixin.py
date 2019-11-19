@@ -11,6 +11,7 @@ from abc import abstractmethod
 from contextlib import contextmanager
 
 from pants.base.build_environment import get_buildroot
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import ErrorWhileTesting, TaskError
 from pants.build_graph.files import Files
 from pants.invalidation.cache_manager import VersionedTargetSet
@@ -450,6 +451,32 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
         yield chroot
 
   def _execute(self, all_targets):
+
+    deprecated_conditional(
+      lambda: self.get_options().is_default("fast"),
+      removal_version="1.25.0.dev2",
+      entity_description="using the default value for --no-fast/--fast",
+      hint_message="Please explicitly set the flag `--fast`. The default will change from `--fast` "
+                   "to `--no-fast` in 1.25.0.dev2, and the option will be removed in 1.27.0.dev2. "
+                   "We recommend setting the option to `--no-fast` for better isolation of tests "
+                   "and to prepare for Pants eventually dropping the option."
+    )
+    deprecated_conditional(
+      lambda: self.get_options().is_default("chroot"),
+      removal_version="1.25.0.dev2",
+      entity_description="using the default value for --no-chroot/--chroot",
+      hint_message="Please explicitly set the flag `--chroot`. The default will change from "
+                   "`--no-chroot` to `--chroot` in 1.25.0.dev2, and the option will likely be "
+                   "removed in 1.29.0.dev2. We recommend setting the option to `--chroot` for "
+                   "better isolation of tests and to prepare for Pants eventually dropping the "
+                   "option.\n\nSetting `--chroot` may result in failures at first due to not being "
+                   "able to find imports or resource files. The solution is to mark dependencies "
+                   "explicitly in the test target's BUILD. For loose files accessed via the "
+                   "language's file system (e.g. Python's `with open()`, declare those loose files "
+                   "as a new `files()` target and then depend on that `files()` target in the test "
+                   "target's BUILD."
+    )
+
     test_targets = self._get_test_targets()
     if not test_targets:
       return
