@@ -40,8 +40,8 @@ class JavaCompileSettingsPartitioningTest(NailgunTaskTestBase):
     return Revision.lenient(version)
 
   def _task_setup(self, targets, platforms=None, default_platform=None, **options):
-    options['source'] = options.get('source', '1.7')
-    options['target'] = options.get('target', '1.7')
+    options['source'] = options.get('source', '1.13')
+    options['target'] = options.get('target', '1.13')
     self.set_options(**options)
     self.set_options_for_scope('jvm-platform', platforms=platforms,
                                default_platform=default_platform)
@@ -90,23 +90,25 @@ class JavaCompileSettingsPartitioningTest(NailgunTaskTestBase):
                                                 self._format_partition(received)))
 
   def test_single_target(self):
-    java6 = self._java('six', '1.6')
-    partition = self._partition([java6], platforms=self._platforms('1.6'))
+    java11 = self._java('eleven', '1.11')
+    partition = self._partition([java11], platforms=self._platforms('1.11'))
     self.assertEqual(1, len(partition))
-    self.assertEqual({java6}, set(partition[self._version('1.6')]))
+    self.assertEqual({java11}, set(partition[self._version('1.11')]))
 
   def test_independent_targets(self):
-    java6 = self._java('six', '1.6')
-    java7 = self._java('seven', '1.7')
-    java8 = self._java('eight', '1.8')
-    partition = self._partition([java6, java7, java8],
-                                platforms=self._platforms('1.6', '1.7', '1.8'))
+    java11 = self._java('eleven', '1.11')
+    java12 = self._java('twelve', '1.12')
+    java13 = self._java('thirteen', '1.13')
+    partition = self._partition([java11, java12, java13],
+                                platforms=self._platforms('1.11', '1.12', '1.13'))
     expected = {self._version(java.payload.platform): {java}
-                for java in (java6, java7, java8)}
+                for java in (java11, java12, java13)}
     self.assertEqual(3, len(partition))
     self.assert_partitions_equal(expected, partition)
 
   def test_java_version_aliases(self):
+    # NB: This feature is only supported for Java 6-8. Java 9+ must be referred to, for example,
+    # as `9`, not `1.9`.
     expected = {}
     for version in (6, 7, 8):
       expected[Revision.lenient(f'1.{version}')] = {
@@ -119,62 +121,62 @@ class JavaCompileSettingsPartitioningTest(NailgunTaskTestBase):
     self.assert_partitions_equal(expected, partition)
 
   def test_valid_dependent_targets(self):
-    java6 = self._java('six', '1.6')
-    java7 = self._java('seven', '1.7')
-    java8 = self._java('eight', '1.8', deps=[java6])
+    java11 = self._java('eleven', '1.11')
+    java12 = self._java('twelve', '1.12')
+    java13 = self._java('thirteen', '1.13', deps=[java11])
 
-    partition = self._partition([java6, java7, java8],
-                                platforms=self._platforms('1.6', '1.7', '1.8'))
+    partition = self._partition([java11, java12, java13],
+                                platforms=self._platforms('1.11', '1.12', '1.13'))
     self.assert_partitions_equal({
-      self._version('1.6'): {java6},
-      self._version('1.7'): {java7},
-      self._version('1.8'): {java8},
+      self._version('1.11'): {java11},
+      self._version('1.12'): {java12},
+      self._version('1.13'): {java13},
     }, partition)
 
   def test_unspecified_default(self):
     java = self._java('unspecified', None)
-    java6 = self._java('six', '1.6', deps=[java])
-    java7 = self._java('seven', '1.7', deps=[java])
-    partition = self._partition([java7, java, java6], source='1.6', target='1.6',
-                                platforms=self._platforms('1.6', '1.7'),
-                                default_platform='1.6')
+    java11 = self._java('eleven', '1.11', deps=[java])
+    java12 = self._java('twelve', '1.12', deps=[java])
+    partition = self._partition([java12, java, java11], source='1.11', target='1.11',
+                                platforms=self._platforms('1.11', '1.12'),
+                                default_platform='1.11')
     self.assert_partitions_equal({
-      self._version('1.6'): {java, java6},
-      self._version('1.7'): {java7},
+      self._version('1.11'): {java, java11},
+      self._version('1.12'): {java12},
     }, partition)
 
   def test_invalid_source_target_combination_by_jvm_platform(self):
     java_wrong = self._java('source7target6', 'bad')
     with self.assertRaises(JvmPlatformSettings.IllegalSourceTargetCombination):
       self._settings_and_targets([java_wrong], platforms={
-        'bad': {'source': '1.7', 'target': '1.6'}
+        'bad': {'source': '1.12', 'target': '1.11'}
       })
 
   def test_valid_source_target_combination(self):
     platforms = {
-      'java67': {'source': 6, 'target': 7},
-      'java78': {'source': 7, 'target': 8},
-      'java68': {'source': 6, 'target': 8},
+      'java117': {'source': 6, 'target': 7},
+      'java128': {'source': 7, 'target': 8},
+      'java118': {'source': 6, 'target': 8},
     }
     self._settings_and_targets([
-      self._java('java67', 'java67'),
-      self._java('java78', 'java78'),
-      self._java('java68', 'java68'),
+      self._java('java117', 'java117'),
+      self._java('java128', 'java128'),
+      self._java('java118', 'java118'),
     ], platforms=platforms)
 
   def test_compile_setting_equivalence(self):
-    self.assertEqual(JvmPlatformSettings('1.6', '1.6', ['-Xfoo:bar']),
-                     JvmPlatformSettings('1.6', '1.6', ['-Xfoo:bar']))
+    self.assertEqual(JvmPlatformSettings('1.11', '1.11', ['-Xfoo:bar']),
+                     JvmPlatformSettings('1.11', '1.11', ['-Xfoo:bar']))
 
   def test_compile_setting_inequivalence(self):
-    self.assertNotEqual(JvmPlatformSettings('1.6', '1.6', ['-Xfoo:bar']),
-                        JvmPlatformSettings('1.6', '1.7', ['-Xfoo:bar']))
+    self.assertNotEqual(JvmPlatformSettings('1.11', '1.11', ['-Xfoo:bar']),
+                        JvmPlatformSettings('1.11', '1.12', ['-Xfoo:bar']))
 
-    self.assertNotEqual(JvmPlatformSettings('1.6', '1.6', ['-Xfoo:bar']),
-                        JvmPlatformSettings('1.6', '1.6', ['-Xbar:foo']))
+    self.assertNotEqual(JvmPlatformSettings('1.11', '1.11', ['-Xfoo:bar']),
+                        JvmPlatformSettings('1.11', '1.11', ['-Xbar:foo']))
 
-    self.assertNotEqual(JvmPlatformSettings('1.4', '1.6', ['-Xfoo:bar']),
-                        JvmPlatformSettings('1.6', '1.6', ['-Xfoo:bar']))
+    self.assertNotEqual(JvmPlatformSettings('1.4', '1.11', ['-Xfoo:bar']),
+                        JvmPlatformSettings('1.11', '1.11', ['-Xfoo:bar']))
 
   def _get_zinc_arguments(self, settings):
     distribution = JvmCompile._local_jvm_distribution(settings=settings)
@@ -183,13 +185,13 @@ class JavaCompileSettingsPartitioningTest(NailgunTaskTestBase):
   def test_java_home_extraction(self):
     init_subsystem(DistributionLocator)
     _, source, _, target, foo, bar, composite, single = tuple(self._get_zinc_arguments(
-      JvmPlatformSettings('1.7', '1.7', [
+      JvmPlatformSettings('1.12', '1.12', [
         'foo', 'bar', 'foo:$JAVA_HOME/bar:$JAVA_HOME/foobar', '$JAVA_HOME',
       ])
     ))
 
-    self.assertEqual('-C1.7', source)
-    self.assertEqual('-C1.7', target)
+    self.assertEqual('-C1.12', source)
+    self.assertEqual('-C1.12', target)
     self.assertEqual('foo', foo)
     self.assertEqual('bar', bar)
     self.assertNotEqual('$JAVA_HOME', single)
@@ -199,7 +201,7 @@ class JavaCompileSettingsPartitioningTest(NailgunTaskTestBase):
   def test_java_home_extraction_empty(self):
     init_subsystem(DistributionLocator)
     result = tuple(self._get_zinc_arguments(
-      JvmPlatformSettings('1.7', '1.7', [])
+      JvmPlatformSettings('1.12', '1.12', [])
     ))
     self.assertEqual(4, len(result),
                       msg='_get_zinc_arguments did not correctly handle empty args.')
