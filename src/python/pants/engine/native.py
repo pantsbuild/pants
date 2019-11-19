@@ -508,13 +508,12 @@ class _FFISpecification(object):
         response.tag = self._lib.Broke
         response.broke = (c.to_value(res),)
     except StopIteration as e:
-      if e.args:
-        # This was a `return` from a generator or coroutine, as opposed to a `StopIteration` raised
-        # by calling `next()` on an empty iterator.
-        response.tag = self._lib.Broke
-        response.broke = (c.to_value(e.value),)
-      else:
+      if not e.args:
         raise
+      # This was a `return` from a generator or coroutine, as opposed to a `StopIteration` raised
+      # by calling `next()` on an empty iterator.
+      response.tag = self._lib.Broke
+      response.broke = (c.to_value(e.value),)
     except Exception as e:
       # Throw.
       response.tag = self._lib.Throw
