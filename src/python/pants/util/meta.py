@@ -130,19 +130,19 @@ class _ClassDecoratorWithSentinelAttribute(ABC):
   """
 
   @abstractmethod
-  def __call__(self, cls: type) -> type: ...
+  def __call__(self, cls: Type) -> Type: ...
 
-  def define_instance_of(self, obj: type, **kwargs) -> type:
+  def define_instance_of(self, obj: Type, **kwargs) -> Type:
     return type(obj.__name__, (obj,), {
       '_sentinel_attribute_type': type(self),
       **kwargs
     })
 
-  def is_instance(self, obj: type) -> bool:
-    return (getattr(obj, '_sentinel_attribute_type', None) == type(self))
+  def is_instance(self, obj: Type) -> bool:
+    return getattr(obj, '_sentinel_attribute_type', None) is type(self)
 
 
-def sentinel_attribute(decorator: Callable[[type], type]) -> _ClassDecoratorWithSentinelAttribute:
+def sentinel_attribute(decorator: Callable[[Type], Type]) -> _ClassDecoratorWithSentinelAttribute:
   """Wraps a class decorator to add a "sentinel attribute" to decorated classes.
 
   A "sentinel attribute" is an attribute added to the wrapped class decorator's result with
@@ -156,7 +156,7 @@ def sentinel_attribute(decorator: Callable[[type], type]) -> _ClassDecoratorWith
 
   class WrappedFunction(_ClassDecoratorWithSentinelAttribute):
     @wraps(decorator)
-    def __call__(self, cls: type) -> type:
+    def __call__(self, cls: Type) -> Type:
       return decorator(cls)
 
   return WrappedFunction()
