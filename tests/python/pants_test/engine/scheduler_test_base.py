@@ -45,7 +45,9 @@ class SchedulerTestBase:
                    union_rules=None,
                    project_tree=None,
                    work_dir=None,
-                   include_trace_on_error=True):
+                   include_trace_on_error=True,
+                   should_report_workunits=False,
+                   ):
     """Creates a SchedulerSession for a Scheduler with the given Rules installed."""
     rules = rules or []
     work_dir = work_dir or self._create_work_dir()
@@ -58,7 +60,7 @@ class SchedulerTestBase:
                           union_rules,
                           DEFAULT_EXECUTION_OPTIONS,
                           include_trace_on_error=include_trace_on_error)
-    return scheduler.new_session(zipkin_trace_v2=False, build_id="buildid_for_test")
+    return scheduler.new_session(zipkin_trace_v2=False, build_id="buildid_for_test", should_report_workunits=should_report_workunits)
 
   def context_with_scheduler(self, scheduler, *args, **kwargs):
     return self.context(*args, scheduler=scheduler, **kwargs)

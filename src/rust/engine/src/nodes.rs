@@ -1205,7 +1205,10 @@ impl Node for NodeKey {
 
   fn run(self, context: Context) -> NodeFuture<NodeResult> {
     let span_id = generate_random_64bit_string();
-    let node_workunit_params = if context.session.should_record_zipkin_spans() {
+
+    let handle_workunits =
+      context.session.should_report_workunits() || context.session.should_record_zipkin_spans();
+    let node_workunit_params = if handle_workunits {
       let node_name = format!("{}", self);
       let start_time = std::time::SystemTime::now();
       Some((node_name, start_time, span_id.clone()))

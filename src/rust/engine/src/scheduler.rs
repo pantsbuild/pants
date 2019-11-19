@@ -40,6 +40,7 @@ struct InnerSession {
   // A place to store info about workunits in rust part
   workunit_store: WorkUnitStore,
   build_id: String,
+  should_report_workunits: bool,
 }
 
 #[derive(Clone)]
@@ -52,15 +53,17 @@ impl Session {
     should_render_ui: bool,
     ui_worker_count: usize,
     build_id: String,
+    should_report_workunits: bool,
   ) -> Session {
     let inner_session = InnerSession {
       preceding_graph_size: scheduler.core.graph.len(),
       roots: Mutex::new(HashSet::new()),
       display: EngineDisplay::create(ui_worker_count, should_render_ui)
         .map(|x| Arc::new(Mutex::new(x))),
-      should_record_zipkin_spans: should_record_zipkin_spans,
+      should_record_zipkin_spans,
       workunit_store: WorkUnitStore::new(),
-      build_id: build_id,
+      build_id,
+      should_report_workunits,
     };
     Session(Arc::new(inner_session))
   }
@@ -85,6 +88,10 @@ impl Session {
 
   pub fn should_record_zipkin_spans(&self) -> bool {
     self.0.should_record_zipkin_spans
+  }
+
+  pub fn should_report_workunits(&self) -> bool {
+    self.0.should_report_workunits
   }
 
   pub fn workunit_store(&self) -> WorkUnitStore {

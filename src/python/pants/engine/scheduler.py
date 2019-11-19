@@ -9,7 +9,7 @@ import time
 import traceback
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Dict, Tuple
 
 from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE
@@ -250,6 +250,10 @@ class Scheduler:
   def _metrics(self, session):
     return self._from_value(self._native.lib.scheduler_metrics(self._scheduler, session))
 
+  def poll_workunits(self, session) -> Tuple[Dict[str, Any], ...]:
+    result: Tuple[Dict[str, Any], ...] = self._from_value(self._native.lib.poll_session_workunits(self._scheduler, session))
+    return result
+
   def with_fork_context(self, func):
     """See the rustdocs for `scheduler_fork_context` for more information."""
     res = self._native.lib.scheduler_fork_context(self._scheduler, Function(self._to_key(func)))
@@ -291,10 +295,10 @@ class Scheduler:
   def garbage_collect_store(self):
     self._native.lib.garbage_collect_store(self._scheduler)
 
-  def new_session(self, zipkin_trace_v2, build_id, v2_ui=False):
+  def new_session(self, zipkin_trace_v2, build_id, v2_ui=False, should_report_workunits=False):
     """Creates a new SchedulerSession for this Scheduler."""
     return SchedulerSession(self, self._native.new_session(
-      self._scheduler, zipkin_trace_v2, v2_ui, multiprocessing.cpu_count(), build_id)
+      self._scheduler, zipkin_trace_v2, v2_ui, multiprocessing.cpu_count(), build_id, should_report_workunits)
     )
 
 
@@ -323,6 +327,10 @@ class SchedulerSession:
     self._scheduler = scheduler
     self._session = session
     self._run_count = 0
+
+  def poll_workunits(self) -> Tuple[Dict[str, Any], ...]:
+    result: Tuple[Dict[str, Any], ...] = self._scheduler.poll_workunits(self._session)
+    return result
 
   def graph_len(self):
     return self._scheduler.graph_len()

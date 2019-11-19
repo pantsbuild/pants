@@ -44,22 +44,46 @@ pub struct WorkUnit {
 
 #[derive(Clone, Default)]
 pub struct WorkUnitStore {
-  workunits: Arc<Mutex<HashSet<WorkUnit>>>,
+  inner: Arc<Mutex<WorkUnitInnerStore>>,
+}
+
+#[derive(Default)]
+pub struct WorkUnitInnerStore {
+  pub workunits: Vec<WorkUnit>,
+  last_seen_workunit: usize,
 }
 
 impl WorkUnitStore {
   pub fn new() -> WorkUnitStore {
     WorkUnitStore {
-      workunits: Arc::new(Mutex::new(HashSet::new())),
+      inner: Arc::new(Mutex::new(WorkUnitInnerStore {
+        workunits: Vec::new(),
+        last_seen_workunit: 0,
+      })),
     }
   }
 
-  pub fn get_workunits(&self) -> Arc<Mutex<HashSet<WorkUnit>>> {
-    self.workunits.clone()
+  pub fn get_workunits(&self) -> Arc<Mutex<WorkUnitInnerStore>> {
+    self.inner.clone()
   }
 
   pub fn add_workunit(&self, workunit: WorkUnit) {
-    self.workunits.lock().insert(workunit);
+    self.inner.lock().workunits.push(workunit.clone());
+  }
+
+  pub fn with_latest_workunits<F, T>(&mut self, f: F) -> T
+  where
+    F: FnOnce(&[WorkUnit]) -> T,
+  {
+    let mut inner_guard = (*self.inner).lock();
+    let inner_store: &mut WorkUnitInnerStore = &mut *inner_guard;
+    let workunits = &inner_store.workunits;
+    let cur_len = workunits.len();
+    let latest: usize = inner_store.last_seen_workunit;
+
+    let output = f(&workunits[latest..cur_len]);
+    inner_store.last_seen_workunit = cur_len;
+    output
   }
 }
 
@@ -79,6 +103,7 @@ pub fn workunits_with_constant_span_id(workunit_store: &WorkUnitStore) -> HashSe
   workunit_store
     .get_workunits()
     .lock()
+    .workunits
     .iter()
     .map(|workunit| WorkUnit {
       span_id: String::from("ignore"),
