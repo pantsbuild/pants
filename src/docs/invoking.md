@@ -128,20 +128,41 @@ cases where relatively small portions of the repo have changed since the previou
 
 As of `1.4.0`, there is one remaining set of caveats to using the daemon:
 
-* Although `./pants repl` works, it is missing some advanced TTY integrations which prevent
-  line editing and some control sequences from being propagated. See the
-  [Daemon Beta milestone](https://github.com/pantsbuild/pants/milestone/11) for a summary.
+* Although `./pants repl` works, it is missing some advanced TTY integrations which prevent line
+  editing and some control sequences from being propagated. Ammonite in particular has a known issue
+  -- see [#5223](https://github.com/pantsbuild/pants/issues/5223).
 
 ### Usage
 
-To enable the daemon, see the example in `pants.daemon.ini` in the root of the pantsbuild repo:
+To enable the daemon, turn on the `--enable-pantsd` global option via CLI arg, environment variable, or `pants.ini` (see [[Options|pants('src/docs:options')]]).
 
-!inc(../../pants.daemon.ini)
+#### Killing the Daemon
+
+To kill the daemon, you can run either `clean-all` or `kill-pantsd`:
+
+    :::bash
+    ./pants clean-all
+    ./pants kill-pantsd
+
+
+#### Observation Tools
+
+To see what's going on with the daemon, you can tail the pantsd log file in another window:
+
+    :::bash
+    cd $SOURCE
+    tail -F .pants.d/pantsd/pantsd.log
+
+To see what's going on with the client and daemon processes, you can watch the process table:
+
+    :::bash
+    watch -n.1 "ps -ef | grep -v grep | grep pants"
+
 
 ### Rollout
 
 The daemon will be in beta until the caveat mentioned above is addressed, but we hope to
-enable the daemon by default for the [`1.5.0` release of pants](https://github.com/pantsbuild/pants/milestone/12).
+enable the daemon by default soon.
 
 Profiling Pants
 ---------------
