@@ -9,7 +9,7 @@ import sys
 import sysconfig
 import traceback
 from contextlib import closing
-from types import GeneratorType
+from types import CoroutineType, GeneratorType
 from typing import Any, NamedTuple, Tuple, Type
 
 import cffi
@@ -502,9 +502,18 @@ class _FFISpecification(object):
             c.identities_buf([c.identify(g.subject) for g in res]),
           )
       else:
+        # TODO: this will soon become obsolete when all @rules are fully mypy-annotated and must
+        # `return` instead of `yield` at the end!
         # Break.
         response.tag = self._lib.Broke
         response.broke = (c.to_value(res),)
+    except StopIteration as e:
+      if not e.args:
+        raise
+      # This was a `return` from a generator or coroutine, as opposed to a `StopIteration` raised
+      # by calling `next()` on an empty iterator.
+      response.tag = self._lib.Broke
+      response.broke = (c.to_value(e.value),)
     except Exception as e:
       # Throw.
       response.tag = self._lib.Throw
@@ -568,6 +577,7 @@ class EngineTypes(NamedTuple):
   multi_platform_process_request: TypeId
   process_result: TypeId
   generator: TypeId
+  coroutine: TypeId
   url_to_fetch: TypeId
   string: TypeId
   bytes: TypeId
@@ -925,6 +935,7 @@ class Native(metaclass=SingletonMetaclass):
         multi_platform_process_request=ti(MultiPlatformExecuteProcessRequest),
         process_result=ti(FallibleExecuteProcessResult),
         generator=ti(GeneratorType),
+        coroutine=ti(CoroutineType),
         url_to_fetch=ti(UrlToFetch),
         string=ti(str),
         bytes=ti(bytes),

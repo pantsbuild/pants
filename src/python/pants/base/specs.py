@@ -5,7 +5,7 @@ import os
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Optional, Tuple
+from typing import Any, Optional, Tuple, cast
 
 from pants.util.collections import assert_single_element
 from pants.util.dirutil import fast_relpath_optional, recursive_dirname
@@ -201,14 +201,14 @@ _specificity = {
 }
 
 
-def more_specific(spec1: Spec, spec2: Spec) -> Spec:
+def more_specific(spec1: Optional[Spec], spec2: Spec) -> Spec:
   """Returns which of the two specs is more specific.
 
   This is useful when a target matches multiple specs, and we want to associate it with
   the "most specific" one, which will make the most intuitive sense to the user.
   """
   # Note that if either of spec1 or spec2 is None, the other will be returned.
-  return spec1 if _specificity[type(spec1)] < _specificity[type(spec2)] else spec2
+  return cast(Spec, spec1) if _specificity[type(spec1)] < _specificity[type(spec2)] else spec2
 
 
 @frozen_after_init
@@ -255,11 +255,11 @@ class SpecsMatcher:
 @dataclass(unsafe_hash=True)
 class Specs:
   """A collection of Specs representing Spec subclasses, and a SpecsMatcher to filter results."""
-  dependencies: Tuple
+  dependencies: Tuple[Spec, ...]
   matcher: SpecsMatcher
 
   def __init__(
-    self, dependencies: Tuple, tags: Optional[Tuple] = None, exclude_patterns: Tuple = ()
+    self, dependencies: Tuple[Spec, ...], tags: Optional[Tuple] = None, exclude_patterns: Tuple = ()
   ) -> None:
     self.dependencies = tuple(dependencies)
     self.matcher = SpecsMatcher(tags=tags, exclude_patterns=exclude_patterns)
