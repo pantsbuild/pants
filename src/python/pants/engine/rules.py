@@ -337,11 +337,11 @@ def _ensure_type_annotation(
   return annotation
 
 
-PUBLIC_RULE_DECORATOR_ARGUMENTS = set(['name'])
+PUBLIC_RULE_DECORATOR_ARGUMENTS = {'name'}
 # We don't want @rule-writers to use 'cacheable' as a kwarg directly, but rather
 # set it implicitly based on whether the rule annotation is @rule or @console_rule.
 # So we leave it out of PUBLIC_RULE_DECORATOR_ARGUMENTS.
-IMPLICIT_PRIVATE_RULE_DECORATOR_ARGUMENTS = set(['cacheable'])
+IMPLICIT_PRIVATE_RULE_DECORATOR_ARGUMENTS = {'cacheable'}
 
 
 def rule_decorator(*args, **kwargs) -> Callable:
@@ -358,7 +358,7 @@ def rule_decorator(*args, **kwargs) -> Callable:
 
   func = args[0]
 
-  cacheable = kwargs['cacheable'] # type: bool
+  cacheable: bool = kwargs['cacheable']
   name = kwargs.get('name')
 
   signature = inspect.signature(func)

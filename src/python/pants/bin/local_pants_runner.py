@@ -320,7 +320,6 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     try:
       self._maybe_handle_help()
 
-      stream_workunits = self._options.for_scope('reporting').stream_workunits
       streaming_reporter = StreamingWorkunitHandler(self._scheduler_session, callback=None)
       with streaming_reporter.session():
         engine_result = self._maybe_run_v2()

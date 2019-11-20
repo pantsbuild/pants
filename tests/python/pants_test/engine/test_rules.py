@@ -124,14 +124,14 @@ class RuleArgumentAnnotationTest(unittest.TestCase):
   def test_console_rule_automatically_gets_name_from_goal(self):
     @console_rule
     def some_console_rule(console: Console) -> Example:
-      yield Example(exit_code=0)
+      return Example(exit_code=0)
 
     self.assertEqual(some_console_rule.rule.name, "example")
 
   def test_can_override_console_rule_name(self):
     @console_rule(name='example but **COOLER**')
     def some_console_rule(console: Console) -> Example:
-      yield Example(exit_code=0)
+      return Example(exit_code=0)
 
     self.assertEqual(some_console_rule.rule.name, "example but **COOLER**")
 
