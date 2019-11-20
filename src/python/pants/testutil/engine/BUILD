@@ -21,11 +21,13 @@ python_library(
     'src/python/pants/base:project_tree',
     'src/python/pants/binaries',
     'src/python/pants/engine:addressable',
+    'src/python/pants/engine:goal',
     'src/python/pants/engine:native',
     'src/python/pants/engine:parser',
     'src/python/pants/engine:rules',
     'src/python/pants/engine:scheduler',
     'src/python/pants/engine:struct',
+    'src/python/pants/option',
     'src/python/pants/util:objects',
   ],
 )

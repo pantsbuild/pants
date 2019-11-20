@@ -6,18 +6,20 @@ import re
 from dataclasses import dataclass
 from io import StringIO
 from types import GeneratorType
-from typing import Any, Callable, Optional, Sequence, Type
+from typing import Any, Callable, Dict, Optional, Sequence, Type
 
 from colors import blue, green, red
 
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.engine.addressable import addressable_list
+from pants.engine.goal import Goal
 from pants.engine.native import Native
 from pants.engine.parser import SymbolTable
 from pants.engine.scheduler import Scheduler
 from pants.engine.selectors import Get
 from pants.engine.struct import Struct
 from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS
+from pants.option.option_value_container import OptionValueContainer, RankedValue
 from pants.util.objects import SubclassesOf
 
 
@@ -197,3 +199,10 @@ class MockConsole:
 
   def red(self, text):
     return self._safe_color(text, red)
+
+
+def mock_goal_options(goal: Type[Goal], scoped_options: Dict[str, Any]) -> Goal.Options:
+  options_container = OptionValueContainer()
+  for option, val in scoped_options.items():
+    setattr(options_container, option, RankedValue(RankedValue.HARDCODED, val))
+  return goal.Options(scope=goal.name, scoped_options=options_container)
