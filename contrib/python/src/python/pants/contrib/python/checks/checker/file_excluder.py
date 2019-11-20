@@ -14,7 +14,7 @@ class FileExcluder(object):
     self.excludes = {}
     if excludes_path:
       if not os.path.exists(excludes_path):
-        raise ValueError(f'Excludes file does not exist: {excludes_path}')
+        raise ValueError('Excludes file does not exist: {0}'.format(excludes_path))
       with io.open(excludes_path, 'r') as fh:
         for line in fh.readlines():
           if line and not line.startswith('#') and '::' in line:
@@ -25,7 +25,7 @@ class FileExcluder(object):
               'regex': re.compile(pattern),
               'plugins': style_plugins
             }
-            log.debug(f'Exclude pattern: {pattern}')
+            log.debug('Exclude pattern: {pattern}'.format(pattern=pattern))
     else:
       log.debug('No excludes file specified. All python sources will be checked.')
 
