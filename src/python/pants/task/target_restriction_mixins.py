@@ -1,7 +1,7 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-
+from pants.base.deprecated import deprecated_conditional
 from pants.task.goal_options_mixin import GoalOptionsMixin, GoalOptionsRegistrar
 
 
@@ -23,6 +23,19 @@ class HasTransitiveOptionMixin:
 
   @property
   def act_transitively(self):
+    deprecated_conditional(
+      lambda: self.get_options().is_default("transitive"),
+      removal_version="1.25.0.dev2",
+      entity_description="Pants defaulting to `--fmt-transitive` and `--lint-transitive`",
+      hint_message="Pants will soon default to `--no-fmt-transitive` and `--no-lint-transitive`. "
+                   "Currently, Pants defaults to `--fmt-transitive` and `--lint-transitive`, which "
+                   "means that tools like isort and Scalafmt will work on transitive dependencies "
+                   "as well. This behavior is unexpected. Normally when running tools like isort, "
+                   "you'd expect them to only work on the files you specify.\n\nTo prepare, "
+                   "please add to your `pants.ini` under both the `fmt` and the `lint` "
+                   "sections the option `transitive: False`. If you want to keep the default, use "
+                   "`True`, although the option will be removed in Pants 1.27.0.dev2."
+    )
     return self.get_options().transitive
 
 
@@ -34,17 +47,7 @@ class TransitiveOptionRegistrar:
     super().register_options(register)
     register('--transitive', type=bool, default=True, fingerprint=True, recursive=True,
              help="If false, act only on the targets directly specified on the command line. "
-                  "If true, act on the transitive dependency closure of those targets.",
-             removal_version="1.25.0.dev2",
-             removal_hint="Pants will soon remove the --fmt-transitive and --lint-transitive "
-                          "options, which, when set, cause tools like isort and Scalafmt to work "
-                          "on the transitive dependencies of the targets you specify, rather than "
-                          "only the targets specified. Pants defaults to using this option, which "
-                          "is unexpected. Normally when running tools like isort, you'd "
-                          "expect them to only work on the files you specify.\n\nIf you "
-                          "still need the behavior of --fmt-transitive or --lint-transitive, you "
-                          "may use `./pants dependencies --transitive path/to:targets > out.txt`, "
-                          "followed by `./pants --target-spec-file=out.txt fmt`.")
+                  "If true, act on the transitive dependency closure of those targets.")
 
 
 class HasSkipOptionMixin:
