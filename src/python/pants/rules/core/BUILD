@@ -19,8 +19,15 @@ python_library(
 
 python_tests(
   name = "tests",
+  sources=globs('*_test.py', exclude=[globs('*_integration_test.py')]),
   dependencies = [
     ':core',
+    'src/python/pants/backend/codegen/thrift/java',
+    'src/python/pants/backend/jvm/targets:all',
+    'src/python/pants/backend/python/targets',
+    'src/python/pants/build_graph',
+    'src/python/pants/engine/legacy:graph',
+    'src/python/pants/engine/legacy:structs',
     'src/python/pants/testutil:test_base',
     'src/python/pants/testutil:console_rule_test_base',
     'src/python/pants/testutil/engine:util',
@@ -28,3 +35,15 @@ python_tests(
   ]
 )
 
+python_tests(
+  name='integration',
+  sources=globs('*_integration_test.py'),
+  dependencies=[
+    'src/python/pants/testutil:int-test',
+    'examples/src/java/org/pantsbuild/example:hello_directory',
+    'examples/src/scala/org/pantsbuild/example:hello_directory',
+    'examples/src/resources/org/pantsbuild/example:hello_directory',
+    'testprojects/tests/java/org/pantsbuild/testproject:dummies_directory',
+  ],
+  tags = {'integration'},
+)
