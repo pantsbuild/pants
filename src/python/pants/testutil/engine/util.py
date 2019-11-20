@@ -5,7 +5,7 @@ import os
 import re
 from dataclasses import dataclass
 from io import StringIO
-from types import GeneratorType
+from types import CoroutineType, GeneratorType
 from typing import Any, Callable, Optional, Sequence, Type
 
 from colors import blue, green, red
@@ -81,7 +81,7 @@ def run_rule(
       task_rule.input_gets, mock_gets))
 
   res = rule(*(rule_args or ()))
-  if not isinstance(res, GeneratorType):
+  if not isinstance(res, (CoroutineType, GeneratorType)):
     return res
 
   def get(product, subject):
@@ -98,13 +98,17 @@ def run_rule(
   rule_coroutine = res
   rule_input = None
   while True:
-    res = rule_coroutine.send(rule_input)
-    if isinstance(res, Get):
-      rule_input = get(res.product, res.subject)
-    elif type(res) in (tuple, list):
-      rule_input = [get(g.product, g.subject) for g in res]
-    else:
-      return res
+    try:
+      res = rule_coroutine.send(rule_input)
+      if isinstance(res, Get):
+        rule_input = get(res.product, res.subject)
+      elif type(res) in (tuple, list):
+        rule_input = [get(g.product, g.subject) for g in res]
+      else:
+        return res
+    except StopIteration as e:
+      if e.args:
+        return e.value
 
 
 def init_native():
