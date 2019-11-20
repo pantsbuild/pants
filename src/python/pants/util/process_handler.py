@@ -5,7 +5,6 @@ import io
 import multiprocessing
 import sys
 from abc import ABC, abstractmethod
-from typing import Optional, Tuple
 
 
 class ProcessHandler(ABC):
@@ -56,9 +55,7 @@ class SubprocessProcessHandler(ProcessHandler):
   def poll(self):
     return self._process.poll()
 
-  def communicate_teeing_stdout_and_stderr(
-    self, stdin: Optional[bytes] = None
-  ) -> Tuple[bytes, bytes]:
+  def communicate_teeing_stdout_and_stderr(self, stdin=None):
     """
     Just like subprocess.communicate, but tees stdout and stderr to both sys.std{out,err} and a
     buffer. Only operates on stdout/stderr if the Popen call send them to subprocess.PIPE.

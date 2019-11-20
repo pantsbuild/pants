@@ -57,7 +57,7 @@ class PantsJoinHandle:
 
     communicate_fn = self.process.communicate
     if tee_output:
-      communicate_fn = SubprocessProcessHandler(self.process).communicate_teeing_stdout_and_stderr  # type: ignore
+      communicate_fn = SubprocessProcessHandler(self.process).communicate_teeing_stdout_and_stderr
     if stdin_data is not None:
       stdin_data = ensure_binary(stdin_data)
     (stdout_data, stderr_data) = communicate_fn(stdin_data)
@@ -293,7 +293,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
 
   def run_pants_with_workdir_without_waiting(self, command, workdir, config=None, extra_env=None,
                                              build_root=None, print_exception_stacktrace=True,
-                                             **kwargs) -> PantsJoinHandle:
+                                             **kwargs):
     args = [
       '--no-pantsrc',
       f'--pants-workdir={workdir}',
@@ -350,9 +350,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
       hermetic_env = os.getenv('HERMETIC_ENV')
       if hermetic_env:
         for h in hermetic_env.strip(',').split(','):
-          val = os.getenv(h)
-          if val is not None:
-            env[h] = val
+          env[h] = os.getenv(h)
     else:
       env = os.environ.copy()
     if extra_env:
