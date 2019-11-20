@@ -10,17 +10,11 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd ../../.. && pwd -P)"
 source "${REPO_ROOT}/build-support/common.sh"
 
 KERNEL=$(uname -s | tr '[:upper:]' '[:lower:]')
-case "${KERNEL}" in
-  linux)
-    readonly LIB_EXTENSION=so
-    ;;
-  darwin)
-    readonly LIB_EXTENSION=dylib
-    ;;
-  *)
-    die "Unknown kernel ${KERNEL}, cannot bootstrap pants native code!"
-    ;;
-esac
+LIB_EXTENSION="so"
+if [ "${KERNEL}" = "darwin" ]
+then
+  LIB_EXTENSION="dylib"
+fi
 
 readonly NATIVE_ROOT="${REPO_ROOT}/src/rust/engine"
 readonly NATIVE_ENGINE_BINARY="native_engine.so"
