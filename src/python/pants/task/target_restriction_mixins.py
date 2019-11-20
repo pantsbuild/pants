@@ -34,7 +34,8 @@ class HasTransitiveOptionMixin:
                    "you'd expect them to only work on the files you specify.\n\nTo prepare, "
                    "please add to your `pants.ini` under both the `fmt` and the `lint` "
                    "sections the option `transitive: False`. If you want to keep the default, use "
-                   "`True`, although the option will be removed in Pants 1.27.0.dev2."
+                   "`True`, although we recommend setting to `False` as the `--transitive` option "
+                   "will be removed in a future Pants version."
     )
     return self.get_options().transitive
 
