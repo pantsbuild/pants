@@ -4,7 +4,7 @@
 import re
 from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Any, Iterable, Optional, Tuple
+from typing import Any, Dict, Iterable, Optional, Tuple
 
 from pants.build_graph.address import BuildFileAddress
 from pants.engine.objects import Serializable
@@ -94,7 +94,7 @@ class AddressFamily:
   objects_by_name: Any
 
   @classmethod
-  def create(cls, spec_path, address_maps):
+  def create(cls, spec_path, address_maps) -> 'AddressFamily':
     """Creates an address family from the given set of address maps.
 
     :param spec_path: The directory prefix shared by all address_maps.
@@ -113,7 +113,7 @@ class AddressFamily:
                                      .format(spec_path, address_map.path))
 
 
-    objects_by_name = {}
+    objects_by_name: Dict[str, Tuple[str, Any]] = {}
     for address_map in address_maps:
       current_path = address_map.path
       for name, obj in address_map.objects_by_name.items():
