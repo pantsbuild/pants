@@ -6,6 +6,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 
 from pants.cache.cache_setup import CacheSetup
+from pants.option.option_value_container import OptionValueContainer
 from pants.option.optionable import Optionable
 from pants.option.scope import ScopeInfo
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
@@ -67,7 +68,7 @@ class Goal(metaclass=ABCMeta):
 
       @classmethod
       def register_options(cls, register):
-        super(_Options, cls).register_options(register)
+        super().register_options(register)
         # Delegate to the outer class.
         outer_cls.register_options(register)
 
@@ -92,9 +93,9 @@ class Goal(metaclass=ABCMeta):
 
       options_scope_category = ScopeInfo.GOAL
 
-      def __init__(self, scope, scoped_options):
+      def __init__(self, scope: str, scoped_options: OptionValueContainer) -> None:
         # NB: This constructor is shaped to meet the contract of `Optionable(Factory).signature`.
-        super(_Options, self).__init__()
+        super().__init__()
         self._scope = scope
         self._scoped_options = scoped_options
 

@@ -21,6 +21,11 @@ python_tests(
   name = "tests",
   dependencies = [
     ':core',
+    'src/python/pants/engine:fs',
+    'src/python/pants/engine:rules',
+    'src/python/pants/engine/legacy:graph',
+    'src/python/pants/engine/legacy:structs',
+    'src/python/pants/option',
     'src/python/pants/testutil:test_base',
     'src/python/pants/testutil:console_rule_test_base',
     'src/python/pants/testutil/engine:util',
