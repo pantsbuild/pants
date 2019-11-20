@@ -34,7 +34,17 @@ class TransitiveOptionRegistrar:
     super().register_options(register)
     register('--transitive', type=bool, default=True, fingerprint=True, recursive=True,
              help="If false, act only on the targets directly specified on the command line. "
-                  "If true, act on the transitive dependency closure of those targets.")
+                  "If true, act on the transitive dependency closure of those targets.",
+             removal_version="1.25.0.dev2",
+             removal_hint="Pants will soon remove the --fmt-transitive and --lint-transitive "
+                          "options, which, when set, cause tools like isort and Scalafmt to work "
+                          "on the transitive dependencies of the targets you specify, rather than "
+                          "only the targets specified. Pants defaults to using this option, which "
+                          "is unexpected. Normally when running tools like isort, you'd "
+                          "expect them to only work on the files you specify.\n\nIf you "
+                          "still need the behavior of --fmt-transitive or --lint-transitive, you "
+                          "may use `./pants dependencies --transitive path/to:targets > out.txt`, "
+                          "followed by `./pants --target-spec-file=out.txt fmt`.")
 
 
 class HasSkipOptionMixin:
