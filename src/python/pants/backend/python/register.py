@@ -6,11 +6,11 @@ from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.python_requirements import PythonRequirements
 from pants.backend.python.rules import (
+  black,
   download_pex_bin,
   inject_init,
   pex,
   python_create_binary,
-  python_fmt,
   python_test_runner,
 )
 from pants.backend.python.subsystems.python_native_code import PythonNativeCode
@@ -98,12 +98,12 @@ def register_goals():
 
 def rules():
   return (
-    download_pex_bin.rules() +
-    inject_init.rules() +
-    python_fmt.rules() +
-    python_test_runner.rules() +
-    python_create_binary.rules() +
-    python_native_code_rules() +
-    pex.rules() +
-    subprocess_environment_rules()
+    *black.rules(),
+    *download_pex_bin.rules(),
+    *inject_init.rules(),
+    *python_test_runner.rules(),
+    *python_create_binary.rules(),
+    *python_native_code_rules(),
+    *pex.rules(),
+    *subprocess_environment_rules(),
   )

@@ -4,7 +4,7 @@
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Set, Tuple
+from typing import Set, Tuple
 
 from pants.backend.python.rules.pex import (
   CreatePex,
@@ -15,31 +15,20 @@ from pants.backend.python.rules.pex import (
 from pants.backend.python.subsystems.black import Black
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
+from pants.backend.python.targets.formattable_python_target import FormattablePythonTarget
+from pants.backend.python.targets.formattable_python_target import (
+  rules as formattable_python_target_rules,
+)
 from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
 from pants.engine.isolated_process import (
   ExecuteProcessRequest,
   ExecuteProcessResult,
   FallibleExecuteProcessResult,
 )
-from pants.engine.legacy.structs import (
-  PantsPluginAdaptor,
-  PythonAppAdaptor,
-  PythonBinaryAdaptor,
-  PythonTargetAdaptor,
-  PythonTestsAdaptor,
-)
-from pants.engine.rules import UnionRule, optionable_rule, rule
+from pants.engine.rules import optionable_rule, rule
 from pants.engine.selectors import Get
-from pants.rules.core.fmt import FmtResult, TargetWithSources
+from pants.rules.core.fmt import FmtResult
 from pants.rules.core.lint import LintResult
-
-
-# Note: this is a workaround until https://github.com/pantsbuild/pants/issues/8343 is addressed
-# We have to write this type which basically represents a union of all various kinds of targets
-# containing python files so we can have one single type used as an input in the run_black rule.
-@dataclass(frozen=True)
-class FormattablePythonTarget:
-  target: Any
 
 
 @dataclass(frozen=True)
@@ -87,7 +76,7 @@ def _generate_black_pex_args(files: Set[str], config_path: str, *, check_only: b
   dirs: Set[str] = set()
   for filename in files:
     dirs.add(f"{Path(filename).parent}")
-  pex_args= tuple(sorted(dirs))
+  pex_args = tuple(sorted(dirs))
   if check_only:
     pex_args += ("--check", )
   if config_path:
@@ -106,7 +95,7 @@ def _generate_black_request(
   check_only: bool,
   ):
   target = wrapped_target.target
-  pex_args = _generate_black_pex_args(target.sources.snapshot.files, black_input.config_path, check_only = check_only)
+  pex_args = _generate_black_pex_args(target.sources.snapshot.files, black_input.config_path, check_only=check_only)
 
   request = black_input.resolved_requirements_pex.create_execute_request(
     python_setup=python_setup,
@@ -128,7 +117,7 @@ def fmt_with_black(
   subprocess_encoding_environment: SubprocessEncodingEnvironment,
   ) -> FmtResult:
 
-  request = _generate_black_request(wrapped_target, black_input, python_setup, subprocess_encoding_environment, check_only = False)
+  request = _generate_black_request(wrapped_target, black_input, python_setup, subprocess_encoding_environment, check_only=False)
 
   result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, request)
 
@@ -147,7 +136,7 @@ def lint_with_black(
   subprocess_encoding_environment: SubprocessEncodingEnvironment,
   ) -> LintResult:
 
-  request = _generate_black_request(wrapped_target, black_input, python_setup, subprocess_encoding_environment, check_only = True)
+  request = _generate_black_request(wrapped_target, black_input, python_setup, subprocess_encoding_environment, check_only=True)
 
   result = yield Get(FallibleExecuteProcessResult, ExecuteProcessRequest, request)
 
@@ -158,51 +147,12 @@ def lint_with_black(
   )
 
 
-# TODO: remove this workaround once https://github.com/pantsbuild/pants/issues/8343 is addressed
-@rule
-def target_adaptor(target: PythonTargetAdaptor) -> FormattablePythonTarget:
-  yield FormattablePythonTarget(target)
-
-
-# TODO: remove this workaround once https://github.com/pantsbuild/pants/issues/8343 is addressed
-@rule
-def app_adaptor(target: PythonAppAdaptor) -> FormattablePythonTarget:
-  yield FormattablePythonTarget(target)
-
-
-# TODO: remove this workaround once https://github.com/pantsbuild/pants/issues/8343 is addressed
-@rule
-def binary_adaptor(target: PythonBinaryAdaptor) -> FormattablePythonTarget:
-  yield FormattablePythonTarget(target)
-
-
-# TODO: remove this workaround once https://github.com/pantsbuild/pants/issues/8343 is addressed
-@rule
-def tests_adaptor(target: PythonTestsAdaptor) -> FormattablePythonTarget:
-  yield FormattablePythonTarget(target)
-
-
-# TODO: remove this workaround once https://github.com/pantsbuild/pants/issues/8343 is addressed
-@rule
-def plugin_adaptor(target: PantsPluginAdaptor) -> FormattablePythonTarget:
-  yield FormattablePythonTarget(target)
-
-
 def rules():
   return [
-    target_adaptor,
-    app_adaptor,
-    binary_adaptor,
-    tests_adaptor,
-    plugin_adaptor,
+    *formattable_python_target_rules(),
     get_black_input,
     fmt_with_black,
     lint_with_black,
-    UnionRule(TargetWithSources, PythonTargetAdaptor),
-    UnionRule(TargetWithSources, PythonAppAdaptor),
-    UnionRule(TargetWithSources, PythonBinaryAdaptor),
-    UnionRule(TargetWithSources, PythonTestsAdaptor),
-    UnionRule(TargetWithSources, PantsPluginAdaptor),
     optionable_rule(Black),
     optionable_rule(PythonSetup),
   ]

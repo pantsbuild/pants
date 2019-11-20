@@ -37,7 +37,7 @@ def build_directory():
     yield root_dir
 
 
-class PythonFmtIntegrationTest(PantsRunIntegrationTest):
+class BlackIntegrationTest(PantsRunIntegrationTest):
   def test_black_one_python_source_should_leave_one_file_unchanged(self):
     with build_directory() as root_dir:
       code = write_consistently_formatted_file(root_dir, "hello.py")
