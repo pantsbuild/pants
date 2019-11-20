@@ -34,7 +34,7 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
     ]),
   }
 
-  _WARN_FMT = """[WARN] Globs did not match. Excludes were: {excludes}. Unmatched globs were: {unmatched}.\n\n"""
+  _WARN_FMT = """[WARN] Globs did not match. Excludes were: {excludes}. Unmatched globs were: {unmatched}."""
 
   _BUNDLE_ERR_MSGS = [
     ['*.aaaa'],
@@ -58,11 +58,13 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
 
     warning_msg = (
       self._WARN_FMT.format(
-        excludes = "[]",
-        unmatched = "[{}]".format(', '.join('"{}"'.format(os.path.join(self._SOURCES_TARGET_BASE, g)) for g in expected_globs))
+        excludes="[]",
+        unmatched="[{}]".format(', '.join(
+          f'"{os.path.join(self._SOURCES_TARGET_BASE, g)}"' for g in expected_globs)
+        )
       )
     )
-    self.assertTrue(warning_msg in pants_run.stderr_data)
+    self.assertIn(warning_msg, pants_run.stderr_data)
 
   _ERR_TARGETS = {
     'testprojects/src/python/sources:some-missing-some-not': [
