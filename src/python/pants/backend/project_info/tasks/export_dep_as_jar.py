@@ -203,7 +203,10 @@ class ExportDepAsJar(ConsoleTask):
       if runtime_classpath:
         info['libraries'].extend(self._jar_id(lib) for lib in target_libraries)
 
-      if current_target in target_roots_set:
+      # TODO(yic): use .pants.d/resources/ rather than the source root of the reources
+      _type = _get_target_type(current_target)
+      if current_target in target_roots_set or _type == SourceRootTypes.RESOURCE or \
+        _type == SourceRootTypes.TEST_RESOURCE:
         info['roots'] = [{
           'source_root': source_root_package_prefix[0],
           'package_prefix': source_root_package_prefix[1]
