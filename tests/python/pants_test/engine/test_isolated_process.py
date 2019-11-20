@@ -260,7 +260,7 @@ class TestInputFileCreation(TestBase):
 
   def test_not_executable(self):
     file_name = 'echo.sh'
-    file_contents = b'#!/bin/bash -eu\necho "Hello"\n'
+    file_contents = b'#!/bin/sh -eu\necho "Hello"\n'
 
     input_file = InputFilesContent((FileContent(path=file_name, content=file_contents, is_executable=False),))
     digest, = self.scheduler.product_request(Digest, [input_file])
@@ -276,7 +276,7 @@ class TestInputFileCreation(TestBase):
 
   def test_executable(self):
     file_name = 'echo.sh'
-    file_contents = b'#!/bin/bash -eu\necho "Hello"\n'
+    file_contents = b'#!/bin/sh -e\necho "Hello"\n'
 
     input_file = InputFilesContent((FileContent(path=file_name, content=file_contents, is_executable=True),))
     digest, = self.scheduler.product_request(Digest, [input_file])
@@ -320,7 +320,7 @@ class IsolatedProcessTest(TestBase, unittest.TestCase):
 
   def test_write_file(self):
     request = ExecuteProcessRequest(
-      argv=("/bin/bash", "-c", "echo -n 'European Burmese' > roland"),
+      argv=("/bin/sh", "-c", "echo -n 'European Burmese' > roland"),
       description="echo roland",
       output_files=("roland",),
       input_files=EMPTY_DIRECTORY_DIGEST,
@@ -351,7 +351,7 @@ class IsolatedProcessTest(TestBase, unittest.TestCase):
 
   def test_timeout(self):
     request = ExecuteProcessRequest(
-      argv=("/bin/bash", "-c", "/bin/sleep 0.2; /bin/echo -n 'European Burmese'"),
+      argv=("/bin/sh", "-c", "/bin/sleep 0.2; /bin/echo -n 'European Burmese'"),
       timeout_seconds=0.1,
       description='sleepy-cat',
       input_files=EMPTY_DIRECTORY_DIGEST,
@@ -422,7 +422,7 @@ class Broken {
 
   def test_fallible_failing_command_returns_exited_result(self):
     request = ExecuteProcessRequest(
-      argv=("/bin/bash", "-c", "exit 1"),
+      argv=("/bin/sh", "-c", "exit 1"),
       description='one-cat',
       input_files=EMPTY_DIRECTORY_DIGEST,
     )
@@ -433,7 +433,7 @@ class Broken {
 
   def test_non_fallible_failing_command_raises(self):
     request = ExecuteProcessRequest(
-      argv=("/bin/bash", "-c", "exit 1"),
+      argv=("/bin/sh", "-c", "exit 1"),
       description='one-cat',
       input_files=EMPTY_DIRECTORY_DIGEST,
     )

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 PANTS_BASE=$(dirname "$0")/../..
 rm -rf "${HOME}/.pex"

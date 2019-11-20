@@ -41,7 +41,7 @@ For most users, the following script would work well for a pull-request builder 
 
 <!-- TODO(#7346): Update this script to use --query! -->
 ```bash
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -x
 set -o
