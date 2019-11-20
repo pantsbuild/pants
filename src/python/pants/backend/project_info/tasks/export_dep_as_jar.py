@@ -193,7 +193,6 @@ class ExportDepAsJar(ConsoleTask):
       if isinstance(current_target, ScalaLibrary):
         for dep in current_target.java_sources:
           info['targets'].append(dep.address.spec)
-          process_target(dep)
 
       if isinstance(current_target, JvmTarget):
         info['excludes'] = [self._exclude_id(exclude) for exclude in current_target.excludes]
@@ -211,6 +210,13 @@ class ExportDepAsJar(ConsoleTask):
         } for source_root_package_prefix in self._source_roots_for_target(current_target)]
 
       targets_map[current_target.address.spec] = info
+
+    additional_java_targets = []
+    for t in targets:
+      if isinstance(t, ScalaLibrary):
+        additional_java_targets.extend(t.java_sources)
+
+    targets.extend(additional_java_targets)
 
     for target in targets:
       process_target(target)
