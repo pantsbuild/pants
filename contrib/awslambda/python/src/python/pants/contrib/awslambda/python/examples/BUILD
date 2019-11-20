@@ -4,7 +4,7 @@
 python_requirement_library(
   name = 'pycountry',
   requirements = [
-    python_requirement('pycountry==18.5.20'),
+    python_requirement('pycountry==19.8.18'),
   ],
 )
 
