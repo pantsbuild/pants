@@ -8,7 +8,7 @@ from pants.base.build_environment import get_buildroot
 from pants.engine.console import Console
 from pants.engine.fs import Digest, FilesContent
 from pants.engine.goal import Goal
-from pants.engine.legacy.graph import HydratedTargets
+from pants.engine.legacy.graph import TransitiveHydratedTargets
 from pants.engine.rules import UnionMembership, console_rule, union
 from pants.engine.selectors import Get
 
@@ -32,16 +32,33 @@ class Fmt(Goal):
   # Blocked on https://github.com/pantsbuild/pants/issues/8351
   name = 'fmt-v2'
 
+  @classmethod
+  def register_options(cls, register):
+    super().register_options(register)
+    register('--transitive', type=bool, default=True,
+             help="If false, act only on the targets directly specified on the command line. "
+                  "If true, act on the transitive dependency closure of those targets.")
+
 
 @console_rule
-def fmt(console: Console, targets: HydratedTargets, union_membership: UnionMembership) -> Fmt:
+def fmt(
+  console: Console,
+  fmt_options: Fmt.Options,
+  transitive_targets: TransitiveHydratedTargets,
+  union_membership: UnionMembership
+) -> Fmt:
+
+  transitive = fmt_options.values.transitive
+
+  targets = transitive_targets.closure if transitive else transitive_targets.roots
+
   results = yield [
-          Get(FmtResult, TargetWithSources, target.adaptor)
-          for target in targets
-          # TODO: make TargetAdaptor return a 'sources' field with an empty snapshot instead of
-          # raising to remove the hasattr() checks here!
-          if union_membership.is_member(TargetWithSources, target.adaptor) and hasattr(target.adaptor, "sources")
-          ]
+    Get(FmtResult, TargetWithSources, target.adaptor)
+    for target in targets
+    # TODO: make TargetAdaptor return a 'sources' field with an empty snapshot instead of
+    # raising to remove the hasattr() checks here!
+    if union_membership.is_member(TargetWithSources, target.adaptor) and hasattr(target.adaptor, "sources")
+  ]
 
   for result in results:
     files_content = yield Get(FilesContent, Digest, result.digest)
@@ -64,5 +81,5 @@ def fmt(console: Console, targets: HydratedTargets, union_membership: UnionMembe
 
 def rules():
   return [
-      fmt,
-    ]
+    fmt,
+  ]

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from pants.engine.console import Console
 from pants.engine.goal import Goal
-from pants.engine.legacy.graph import HydratedTargets
+from pants.engine.legacy.graph import TransitiveHydratedTargets
 from pants.engine.rules import UnionMembership, console_rule
 from pants.engine.selectors import Get
 from pants.rules.core.fmt import TargetWithSources
@@ -25,16 +25,32 @@ class Lint(Goal):
   # Blocked on https://github.com/pantsbuild/pants/issues/8351
   name = 'lint-v2'
 
+  @classmethod
+  def register_options(cls, register):
+    super().register_options(register)
+    register('--transitive', type=bool, default=True,
+             help="If false, act only on the targets directly specified on the command line. "
+                  "If true, act on the transitive dependency closure of those targets.")
+
 
 @console_rule
-def lint(console: Console, targets: HydratedTargets, union_membership: UnionMembership) -> Lint:
+def lint(
+  console: Console,
+  lint_options: Lint.Options,
+  transitive_targets: TransitiveHydratedTargets,
+  union_membership: UnionMembership,
+) -> Lint:
+
+  transitive = lint_options.values.transitive
+
+  targets = transitive_targets.closure if transitive else transitive_targets.roots
   results = yield [
-          Get(LintResult, TargetWithSources, target.adaptor)
-          for target in targets
-          # TODO: make TargetAdaptor return a 'sources' field with an empty snapshot instead of
-          # raising to remove the hasattr() checks here!
-          if union_membership.is_member(TargetWithSources, target.adaptor) and hasattr(target.adaptor, "sources")
-          ]
+    Get(LintResult, TargetWithSources, target.adaptor)
+    for target in targets
+    # TODO: make TargetAdaptor return a 'sources' field with an empty snapshot instead of
+    # raising to remove the hasattr() checks here!
+    if union_membership.is_member(TargetWithSources, target.adaptor) and hasattr(target.adaptor, "sources")
+  ]
 
   exit_code = 0
   for result in results:
@@ -50,5 +66,5 @@ def lint(console: Console, targets: HydratedTargets, union_membership: UnionMemb
 
 def rules():
   return [
-      lint,
-    ]
+    lint,
+  ]
