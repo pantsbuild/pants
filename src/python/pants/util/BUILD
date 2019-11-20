@@ -25,11 +25,6 @@ python_library(
 )
 
 python_library(
-  name = 'debug',
-  sources = ['debug.py'],
-)
-
-python_library(
   name = 'desktop',
   sources = ['desktop.py'],
   dependencies = [
