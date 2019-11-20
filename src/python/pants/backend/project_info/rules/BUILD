@@ -17,6 +17,7 @@ python_library(
 python_tests(
   name='rules_tests',
   dependencies=[
-    ':rules'
+    ':rules',
+    'src/python/pants/testutil:console_rule_test_base',
   ]
 )
