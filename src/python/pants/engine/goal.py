@@ -6,6 +6,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 
 from pants.cache.cache_setup import CacheSetup
+from pants.option.option_value_container import OptionValueContainer
 from pants.option.optionable import Optionable
 from pants.option.scope import ScopeInfo
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
@@ -32,7 +33,7 @@ class Goal(metaclass=ABCMeta):
 
   @classproperty
   @abstractmethod
-  def name(cls):
+  def name(cls) -> str:
     """The name used to select this Goal on the commandline, and for its options."""
 
   @classproperty
@@ -59,15 +60,17 @@ class Goal(metaclass=ABCMeta):
     # to get a reference to the outer class, which avoids implementers needing to subclass the inner
     # class in order to define their options values, while still allowing for the useful namespacing
     # of `Goal.Options`.
-    outer_cls = cls
+    outer_cls: Goal = cls
+
     class _Options(SubsystemClientMixin, Optionable, _GoalOptions):
       @classproperty
-      def options_scope(cls):
-        return outer_cls.name
+      def options_scope(cls) -> str:
+        name: str = outer_cls.name
+        return name
 
       @classmethod
       def register_options(cls, register):
-        super(_Options, cls).register_options(register)
+        super().register_options(register)
         # Delegate to the outer class.
         outer_cls.register_options(register)
 
@@ -92,9 +95,9 @@ class Goal(metaclass=ABCMeta):
 
       options_scope_category = ScopeInfo.GOAL
 
-      def __init__(self, scope, scoped_options):
+      def __init__(self, scope: str, scoped_options: OptionValueContainer) -> None:
         # NB: This constructor is shaped to meet the contract of `Optionable(Factory).signature`.
-        super(_Options, self).__init__()
+        super().__init__()
         self._scope = scope
         self._scoped_options = scoped_options
 
@@ -102,6 +105,7 @@ class Goal(metaclass=ABCMeta):
       def values(self):
         """Returns the option values for these Goal.Options."""
         return self._scoped_options
+
     _Options.__doc__ = outer_cls.__doc__
     return _Options
 
