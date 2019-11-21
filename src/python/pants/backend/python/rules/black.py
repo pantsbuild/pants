@@ -29,8 +29,8 @@ from pants.rules.core.lint import LintResult
 
 @dataclass(frozen=True)
 class BlackSetup:
-  """This abstraction allows us to set up everything Black needs and, crucially, to cache this setup
-  so that it may be reused when running `fmt` vs. `lint` on the same target."""
+  """This abstraction is used to deduplicate the implementations for the `fmt` and `lint` rules,
+  which only differ in whether or not to append `--check` to the Black CLI args."""
   config_path: Optional[Path]
   resolved_requirements_pex: Pex
   merged_input_files: Digest
@@ -81,17 +81,18 @@ async def setup_black(wrapped_target: FormattablePythonTarget, black: Black) -> 
       entry_point=black.get_entry_point(),
     )
   )
-  target = wrapped_target.target
-  sources_digest = target.sources.snapshot.directory_digest
 
-  all_input_digests = [
-    sources_digest,
-    resolved_requirements_pex.directory_digest,
-    config_snapshot.directory_digest,
-  ]
+  sources_digest = wrapped_target.target.sources.snapshot.directory_digest
+
   merged_input_files = await Get(
     Digest,
-    DirectoriesToMerge(directories=tuple(all_input_digests)),
+    DirectoriesToMerge(
+      directories=(
+        sources_digest,
+        resolved_requirements_pex.directory_digest,
+        config_snapshot.directory_digest,
+      )
+    ),
   )
   return BlackSetup(config_path, resolved_requirements_pex, merged_input_files)
 
