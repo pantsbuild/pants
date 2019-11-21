@@ -1,6 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Tuple
@@ -41,7 +42,13 @@ class BlackSetup:
       pex_args.append("--check")
     if self.config_path is not None:
       pex_args.extend(["--config", self.config_path])
-    pex_args.extend(files)
+    # NB: For some reason, Black's --exclude option only works on recursive invocations, meaning
+    # calling Black on a directory(s) and letting it auto-discover files. However, we don't want
+    # Black to run over everything recursively under the directory of our target, as Black should
+    # only touch files in the target's `sources`. We can use `--include` to ensure that Black only
+    # operates on the files we actually care about.
+    pex_args.extend(["--include", "|".join(re.escape(f) for f in files)])
+    pex_args.extend(str(Path(f).parent) for f in files)
     return tuple(pex_args)
 
   def create_execute_request(
@@ -68,9 +75,8 @@ class BlackSetup:
 
 @rule
 async def setup_black(wrapped_target: FormattablePythonTarget, black: Black) -> BlackSetup:
-  config_path = black.get_options().config
+  config_path: Optional[str] = black.get_options().config
   config_snapshot = await Get(Snapshot, PathGlobs(include=(config_path,)))
-
   resolved_requirements_pex = await Get(
     Pex, CreatePex(
       output_filename="black.pex",
