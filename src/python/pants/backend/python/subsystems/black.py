@@ -15,6 +15,6 @@ class Black(PythonToolBase):
   def register_options(cls, register):
     super().register_options(register)
     register(
-      '--config', type=file_option, default=None,
+      '--config', type=file_option, default=None, advanced=True,
       help="Path to Black's pyproject.toml config file"
     )
