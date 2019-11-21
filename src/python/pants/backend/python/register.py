@@ -13,12 +13,8 @@ from pants.backend.python.rules import (
   python_create_binary,
   python_test_runner,
 )
-from pants.backend.python.subsystems.python_native_code import PythonNativeCode
-from pants.backend.python.subsystems.python_native_code import rules as python_native_code_rules
-from pants.backend.python.subsystems.subprocess_environment import SubprocessEnvironment
-from pants.backend.python.subsystems.subprocess_environment import (
-  rules as subprocess_environment_rules,
-)
+from pants.backend.python.subsystems import python_native_code, subprocess_environment
+from pants.backend.python.targets import formattable_python_target
 from pants.backend.python.targets.python_app import PythonApp
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_distribution import PythonDistribution
@@ -51,7 +47,7 @@ from pants.goal.task_registrar import TaskRegistrar as task
 
 
 def global_subsystems():
-  return (SubprocessEnvironment, PythonNativeCode)
+  return python_native_code.PythonNativeCode, subprocess_environment.SubprocessEnvironment
 
 
 def build_file_aliases():
@@ -100,10 +96,11 @@ def rules():
   return (
     *black.rules(),
     *download_pex_bin.rules(),
+    *formattable_python_target.rules(),
     *inject_init.rules(),
+    *pex.rules(),
     *python_test_runner.rules(),
     *python_create_binary.rules(),
-    *python_native_code_rules(),
-    *pex.rules(),
-    *subprocess_environment_rules(),
+    *python_native_code.rules(),
+    *subprocess_environment.rules(),
   )

@@ -16,9 +16,6 @@ from pants.backend.python.subsystems.black import Black
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.backend.python.targets.formattable_python_target import FormattablePythonTarget
-from pants.backend.python.targets.formattable_python_target import (
-  rules as formattable_python_target_rules,
-)
 from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
 from pants.engine.isolated_process import (
   ExecuteProcessRequest,
@@ -150,7 +147,6 @@ async def lint(
 
 def rules():
   return [
-    *formattable_python_target_rules(),
     setup_black,
     fmt,
     lint,
