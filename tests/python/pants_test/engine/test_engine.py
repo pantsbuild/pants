@@ -44,7 +44,7 @@ class Fib:
   val: int
 
 
-@rule
+@rule(name="fib")
 def fib(n: int) -> Fib:
   if n < 2:
     yield Fib(n)
@@ -253,14 +253,13 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
     with async_reporter.session():
       scheduler.product_request(Fib, subjects=[0])
 
-    # One workunit should be coming from the `Select` intrinsic, and the other from the single execution
-    # of the `fib` rule, for two total workunits being appended during the run of this rule.
-    self.assertEquals(len(tracker.workunits), 2)
+    # The execution of the single named @rule "fib" should be providing this one workunit.
+    self.assertEquals(len(tracker.workunits), 1)
 
     tracker.workunits = []
     with async_reporter.session():
       scheduler.product_request(Fib, subjects=[10])
 
     # Requesting a bigger fibonacci number will result in more rule executions and thus more reported workunits.
-    # In this case, we expect 10 invocations of the `fib` rule + the one Select for a total of 11.
-    self.assertEquals(len(tracker.workunits), 11)
+    # In this case, we expect 10 invocations of the `fib` rule.
+    self.assertEquals(len(tracker.workunits), 10)

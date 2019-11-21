@@ -1217,6 +1217,7 @@ impl Node for NodeKey {
       let span_id = generate_random_64bit_string();
       let maybe_display_info: Option<String> = match self {
         NodeKey::Task(ref task) => task.get_display_info().map(|s| s.to_owned()),
+        NodeKey::Snapshot(_) => Some(format!("{}", self)),
         _ => None,
       };
 
