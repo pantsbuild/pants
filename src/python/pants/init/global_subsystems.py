@@ -7,6 +7,7 @@ from pants.goal.run_tracker import RunTracker
 from pants.init.repro import Reproducer
 from pants.process.subprocess import Subprocess
 from pants.reporting.reporting import Reporting
+from pants.reporting.workunits import Workunits
 from pants.scm.subsystems.changed import Changed
 from pants.source.source_root import SourceRootConfig
 
@@ -21,6 +22,7 @@ class GlobalSubsystems:
       Reproducer,
       RunTracker,
       Changed,
+      Workunits,
       BinaryUtil.Factory,
       Subprocess.Factory
     }

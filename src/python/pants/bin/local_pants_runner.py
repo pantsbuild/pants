@@ -22,6 +22,7 @@ from pants.option.arg_splitter import UnknownGoalHelp
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.reporting.reporting import Reporting
 from pants.reporting.streaming_workunit_handler import StreamingWorkunitHandler
+from pants.reporting.workunits import Workunits
 from pants.util.contextutil import maybe_profiled
 
 
@@ -320,7 +321,11 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     try:
       self._maybe_handle_help()
 
-      streaming_reporter = StreamingWorkunitHandler(self._scheduler_session, callback=None)
+      stream_workunits = self._options.for_scope('reporting').stream_workunits
+      workunits = Workunits.global_instance()
+      callback = workunits.make_http_request if stream_workunits else None
+
+      streaming_reporter = StreamingWorkunitHandler(self._scheduler_session, callback=callback)
       with streaming_reporter.session():
         engine_result = self._maybe_run_v2()
 
