@@ -36,12 +36,12 @@ class Fmt(Goal):
 @console_rule
 def fmt(console: Console, targets: HydratedTargets, union_membership: UnionMembership) -> Fmt:
   results = yield [
-          Get(FmtResult, TargetWithSources, target.adaptor)
-          for target in targets
-          # TODO: make TargetAdaptor return a 'sources' field with an empty snapshot instead of
-          # raising to remove the hasattr() checks here!
-          if union_membership.is_member(TargetWithSources, target.adaptor) and hasattr(target.adaptor, "sources")
-          ]
+    Get(FmtResult, TargetWithSources, target.adaptor)
+    for target in targets
+    # TODO: make TargetAdaptor return a 'sources' field with an empty snapshot instead of
+    # raising to remove the hasattr() checks here!
+    if union_membership.is_member(TargetWithSources, target.adaptor) and hasattr(target.adaptor, "sources")
+  ]
 
   for result in results:
     files_content = yield Get(FilesContent, Digest, result.digest)
@@ -64,5 +64,5 @@ def fmt(console: Console, targets: HydratedTargets, union_membership: UnionMembe
 
 def rules():
   return [
-      fmt,
-    ]
+    fmt,
+  ]
