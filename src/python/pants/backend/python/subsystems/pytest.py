@@ -3,6 +3,7 @@
 
 from typing import List, Tuple
 
+from pants.base.deprecated import deprecated_conditional
 from pants.subsystem.subsystem import Subsystem
 
 
@@ -12,28 +13,29 @@ class PyTest(Subsystem):
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--version', default='pytest>=3.0.7,<3.7', help="Requirement string for Pytest.")
+    register('--version', default='pytest>=4.6.6,<4.7', help="Requirement string for Pytest.")
     register(
       '--pytest-plugins',
       type=list,
       default=[
-        'pytest-timeout>=1.2,<1.3',
-        'pytest-cov>=2.4,<2.5',
-        "unittest2>=0.6.0,<=1.9.0 ; python_version<'3'"
+        'pytest-timeout>=1.3.3,<1.4',
+        'pytest-cov>=2.8.1,<3',
+        "unittest2>=1.1.0 ; python_version<'3'",
+        "more-itertools<6.0.0 ; python_version<'3'",
       ],
       help="Requirement strings for any plugins or additional requirements you'd like to use.",
     )
-    register('--requirements', advanced=True, default='pytest>=3.0.7,<3.7',
+    register('--requirements', advanced=True, default='pytest>=4.6.6,<4.7',
              help='Requirements string for the pytest library.',
              removal_version="1.25.0.dev0", removal_hint="Use --version instead.")
-    register('--timeout-requirements', advanced=True, default='pytest-timeout>=1.2,<1.3',
+    register('--timeout-requirements', advanced=True, default='pytest-timeout>=1.3.3,<1.4',
              help='Requirements string for the pytest-timeout library.',
              removal_version="1.25.0.dev0", removal_hint="Use --pytest-plugins instead.")
-    register('--cov-requirements', advanced=True, default='pytest-cov>=2.4,<2.5',
+    register('--cov-requirements', advanced=True, default='pytest-cov>=2.8.1,<3',
              help='Requirements string for the pytest-cov library.',
              removal_version="1.25.0.dev0", removal_hint="Use --pytest-plugins instead.")
     register('--unittest2-requirements', advanced=True,
-             default="unittest2>=0.6.0,<=1.9.0 ; python_version<'3'",
+             default="unittest2>=1.1.0 ; python_version<'3'",
              help='Requirements string for the unittest2 library, which some python versions '
                   'may need.',
              removal_version="1.25.0.dev0", removal_hint="Use --pytest-plugins instead.")
@@ -61,6 +63,19 @@ class PyTest(Subsystem):
         f"deprecated style: `{format_opts(configured_deprecated_option)}`.\nPlease use only one "
         f"approach (preferably the new approach of `--version` and `--pytest-plugins`)."
       )
+
+    deprecated_conditional(
+      lambda: opts.is_default("version") and opts.is_default("requirements"),
+      removal_version="1.25.0.dev2",
+      entity_description="Pants defaulting to a Python 2-compatible Pytest version",
+      hint_message="Pants will soon start defaulting to Pytest 5.x, which no longer supports "
+                   "running tests with Python 2. In preparation for this change, you should "
+                   "explicitly set what version of Pytest to use in your `pants.ini` under the "
+                   "section `pytest`.\n\nIf you need to keep running tests with Python 2, set "
+                   "`version` to `pytest>=4.6.6,<4.7` (the current default). If you don't have any "
+                   "tests with Python 2 and want the newest Pytest, set `version` to "
+                   "`pytest>=5.2.4`."
+    )
     if configured_deprecated_option:
       return (
         "more-itertools<6.0.0 ; python_version<'3'",
@@ -69,8 +84,4 @@ class PyTest(Subsystem):
         opts.cov_requirements,
         opts.unittest2_requirements,
       )
-    return (
-      "more-itertools<6.0.0 ; python_version<'3'",
-      opts.version,
-      *opts.pytest_plugins
-    )
+    return (opts.version, *opts.pytest_plugins)
