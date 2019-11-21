@@ -98,11 +98,15 @@ async def setup_black(wrapped_target: FormattablePythonTarget, black: Black) -> 
 
 @rule
 async def fmt(
+  black: Black,
   wrapped_target: FormattablePythonTarget,
   black_setup: BlackSetup,
   python_setup: PythonSetup,
   subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> FmtResult:
+  if not black.get_options().enable:
+    return FmtResult.noop()
+
   request = black_setup.create_execute_request(
     wrapped_target=wrapped_target,
     python_setup=python_setup,
@@ -119,11 +123,15 @@ async def fmt(
 
 @rule
 async def lint(
+  black: Black,
   wrapped_target: FormattablePythonTarget,
   black_setup: BlackSetup,
   python_setup: PythonSetup,
   subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> LintResult:
+  if not black.get_options().enable:
+    return LintResult.noop()
+
   request = black_setup.create_execute_request(
     wrapped_target=wrapped_target,
     python_setup=python_setup,

@@ -49,11 +49,7 @@ def run_python_test(
   )
 
   if not source_root_stripped_test_target_sources.snapshot.files:
-    yield TestResult(
-      status=Status.SUCCESS,
-      stdout="",
-      stderr="",
-    )
+    yield TestResult.noop()
 
   source_root_stripped_sources = yield [
     Get(SourceRootStrippedSources, HydratedTarget, target_adaptor)

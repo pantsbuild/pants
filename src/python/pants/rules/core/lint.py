@@ -17,6 +17,10 @@ class LintResult:
   stdout: str
   stderr: str
 
+  @staticmethod
+  def noop() -> "LintResult":
+    return LintResult(exit_code=0, stdout="", stderr="")
+
 
 class Lint(Goal):
   """Lint source code."""

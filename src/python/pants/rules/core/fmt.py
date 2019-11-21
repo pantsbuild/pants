@@ -6,7 +6,7 @@ from pathlib import Path
 
 from pants.base.build_environment import get_buildroot
 from pants.engine.console import Console
-from pants.engine.fs import Digest, FilesContent
+from pants.engine.fs import Digest, FilesContent, EMPTY_DIRECTORY_DIGEST
 from pants.engine.goal import Goal
 from pants.engine.legacy.graph import HydratedTargets
 from pants.engine.rules import UnionMembership, console_rule, union
@@ -18,6 +18,10 @@ class FmtResult:
   digest: Digest
   stdout: str
   stderr: str
+
+  @staticmethod
+  def noop() -> "FmtResult":
+    return FmtResult(digest=EMPTY_DIRECTORY_DIGEST, stdout="", stderr="")
 
 
 @union

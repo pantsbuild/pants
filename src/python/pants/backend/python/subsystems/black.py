@@ -15,6 +15,10 @@ class Black(PythonToolBase):
   def register_options(cls, register):
     super().register_options(register)
     register(
+      '--enable', type=bool, default=False,
+      help="Enable Black in the `fmt` and `lint` goals."
+    )
+    register(
       '--config', type=file_option, default=None,
       help="Path to Black's pyproject.toml config file"
     )

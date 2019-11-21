@@ -21,6 +21,10 @@ class TestResult:
   # Prevent this class from being detected by pytest as a test class.
   __test__ = False
 
+  @staticmethod
+  def noop() -> "TestResult":
+    return TestResult(status=Status.SUCCESS, stdout="", stderr="")
+
 
 @union
 class TestTarget:
