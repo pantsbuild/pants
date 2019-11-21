@@ -214,7 +214,7 @@ python_tests(
   tags = {'platform_specific_behavior', 'integration'},
   # NB: This frequently times out, but due to hanging. So, we want to fail eagerly. See
   # https://github.com/pantsbuild/pants/issues/8127.
-  timeout = 120,
+  timeout = 200,
 )
 
 python_tests(

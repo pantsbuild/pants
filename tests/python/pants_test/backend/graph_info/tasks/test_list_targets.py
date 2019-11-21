@@ -4,6 +4,8 @@
 import os
 from textwrap import dedent
 
+import pytest
+
 from pants.backend.jvm.artifact import Artifact
 from pants.backend.jvm.repository import Repository
 from pants.backend.jvm.scala_artifact import ScalaArtifact
@@ -106,6 +108,7 @@ class ListTargetsTest(ConsoleRuleTestBase):
         'a/b/e:e1',
         args=['a/b::'])
 
+  @pytest.mark.flaky(retries=1)  # https://github.com/pantsbuild/pants/issues/8678
   def test_list_all(self):
     self.assert_entries('\n',
         'a:a',
