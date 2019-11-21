@@ -31,6 +31,20 @@ def run_python_test(
 ) -> TestResult:
   """Runs pytest for one target."""
 
+  # Get the file names for the test_target, adjusted for the source root. This allows us to
+  # specify to Pytest which files to test and thus to avoid the test auto-discovery defined by
+  # https://pytest.org/en/latest/goodpractices.html#test-discovery. In addition to a performance
+  # optimization, this ensures that any transitive sources, such as a test project file named
+  # test_fail.py, do not unintentionally end up being run as tests.
+  #
+  # We run this code before anything else so that we may eagerly no-op if the target is empty.
+  source_root_stripped_test_target_sources = yield Get(
+    SourceRootStrippedSources, Address, test_target.address.to_address()
+  )
+
+  if not source_root_stripped_test_target_sources.snapshot.files:
+    yield TestResult.noop()
+
   # TODO(7726): replace this with a proper API to get the `closure` for a
   # TransitiveHydratedTarget.
   transitive_hydrated_targets = yield Get(
@@ -38,18 +52,6 @@ def run_python_test(
   )
   all_targets = transitive_hydrated_targets.closure
   all_target_adaptors = tuple(t.adaptor for t in all_targets)
-
-  # Get the file names for the test_target, adjusted for the source root. This allows us to
-  # specify to Pytest which files to test and thus to avoid the test auto-discovery defined by
-  # https://pytest.org/en/latest/goodpractices.html#test-discovery. In addition to a performance
-  # optimization, this ensures that any transitive sources, such as a test project file named
-  # test_fail.py, do not unintentionally end up being run as tests.
-  source_root_stripped_test_target_sources = yield Get(
-    SourceRootStrippedSources, Address, test_target.address.to_address()
-  )
-
-  if not source_root_stripped_test_target_sources.snapshot.files:
-    yield TestResult.noop()
 
   source_root_stripped_sources = yield [
     Get(SourceRootStrippedSources, HydratedTarget, target_adaptor)

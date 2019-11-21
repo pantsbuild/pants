@@ -36,14 +36,14 @@ class TestPythonTestRunner(TestBase):
       ],
       mock_gets=[
         MockGet(
-          product_type=TransitiveHydratedTargets,
-          subject_type=BuildFileAddresses,
-          mock=lambda _: TransitiveHydratedTargets(roots=(), closure=())
-        ),
-        MockGet(
           product_type=SourceRootStrippedSources,
           subject_type=Address,
           mock=lambda _: SourceRootStrippedSources(snapshot=EMPTY_SNAPSHOT),
+        ),
+        MockGet(
+          product_type=TransitiveHydratedTargets,
+          subject_type=BuildFileAddresses,
+          mock=unimplemented_mock,
         ),
         MockGet(
           product_type=SourceRootStrippedSources,
