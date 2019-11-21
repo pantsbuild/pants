@@ -212,7 +212,9 @@ python_tests(
     'testprojects:pants_plugins_directory',
   ],
   tags = {'platform_specific_behavior', 'integration'},
-  timeout = 540,
+  # NB: This frequently times out, but due to hanging. So, we want to fail eagerly. See
+  # https://github.com/pantsbuild/pants/issues/8127.
+  timeout = 200,
 )
 
 python_tests(

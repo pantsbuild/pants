@@ -6,11 +6,12 @@ import itertools
 import os
 import re
 import signal
-import sys
 import threading
 import time
 import unittest
 from textwrap import dedent
+
+import pytest
 
 from pants.testutil.pants_run_integration_test import read_pantsd_log
 from pants.testutil.process_test_util import no_lingering_process_by_command
@@ -120,6 +121,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         self.assert_success(self.run_pants_with_workdir(['help'], workdir, pantsd_config))
         checker.assert_running()
 
+  @pytest.mark.flaky(retries=1)  # https://github.com/pantsbuild/pants/issues/6114
   def test_pantsd_lifecycle_invalidation(self):
     """Runs pants commands with pantsd enabled, in a loop, alternating between options that
     should invalidate pantsd and incur a restart and then asserts for pid consistency.
@@ -392,13 +394,11 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       # Remove the pidfile so that the teardown script doesn't try to kill process 9.
       os.unlink(pidpath)
 
-  @unittest.skipIf(sys.version_info[0] == 2,
-                   reason='Increases by ~0.52 under python 2 as described in '
-                          'https://github.com/pantsbuild/pants/issues/7761.')
+  @pytest.mark.flaky(retries=1)  # https://github.com/pantsbuild/pants/issues/8193
   def test_pantsd_memory_usage(self):
     """Validates that after N runs, memory usage has increased by no more than X percent."""
     number_of_runs = 10
-    max_memory_increase_fraction = 0.40 # TODO https://github.com/pantsbuild/pants/issues/7647
+    max_memory_increase_fraction = 0.40  # TODO https://github.com/pantsbuild/pants/issues/7647
     with self.pantsd_successful_run_context() as (pantsd_run, checker, workdir, config):
       # NB: This doesn't actually run against all testprojects, only those that are in the chroot,
       # i.e. explicitly declared in this test file's BUILD.
