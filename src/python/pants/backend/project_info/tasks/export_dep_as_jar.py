@@ -208,7 +208,7 @@ class ExportDepAsJar(ConsoleTask):
       if current_target in target_roots_set or _type == SourceRootTypes.RESOURCE or \
         _type == SourceRootTypes.TEST_RESOURCE:
         info['roots'] = [{
-          'source_root': source_root_package_prefix[0],
+          'source_root': os.path.realpath(source_root_package_prefix[0]),
           'package_prefix': source_root_package_prefix[1]
         } for source_root_package_prefix in self._source_roots_for_target(current_target)]
 
