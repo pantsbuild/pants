@@ -49,7 +49,7 @@ class ParseAddressFamilyTest(unittest.TestCase):
         MockGet(
           product_type=FilesContent,
           subject_type=Digest,
-          mock=lambda _: FilesContent([FileContent('/dev/null/BUILD', b'', False)]),
+          mock=lambda _: FilesContent([FileContent(path='/dev/null/BUILD', content=b'')]),
         ),
       ],
     )

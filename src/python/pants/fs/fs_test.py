@@ -56,7 +56,7 @@ class WorkspaceInConsoleRuleTest(ConsoleRuleTestBase):
   def test(self):
     with temporary_dir() as tmp_dir:
       input_files_content = InputFilesContent((
-        FileContent(path='a.txt', content=b'hello', is_executable=False),
+        FileContent(path='a.txt', content=b'hello'),
       ))
 
       msg = MessageToConsoleRule(tmp_dir=tmp_dir, input_files_content=input_files_content)
@@ -75,8 +75,8 @@ class FileSystemTest(TestBase):
     workspace = Workspace(self.scheduler)
 
     input_files_content = InputFilesContent((
-      FileContent(path='a.txt', content=b'hello', is_executable=False),
-      FileContent(path='subdir/b.txt', content=b'goodbye', is_executable=False),
+      FileContent(path='a.txt', content=b'hello'),
+      FileContent(path='subdir/b.txt', content=b'goodbye'),
     ))
 
     digest, = self.scheduler.product_request(Digest, [input_files_content])

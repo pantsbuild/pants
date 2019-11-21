@@ -377,8 +377,8 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
 
   def test_add_prefix(self):
     input_files_content = InputFilesContent((
-      FileContent(path='main.py', content=b'print("from main")', is_executable=False),
-      FileContent(path='subdir/sub.py', content=b'print("from sub")', is_executable=False),
+      FileContent(path='main.py', content=b'print("from main")'),
+      FileContent(path='subdir/sub.py', content=b'print("from sub")'),
     ))
 
     digest, = self.scheduler.product_request(Digest, [input_files_content])
