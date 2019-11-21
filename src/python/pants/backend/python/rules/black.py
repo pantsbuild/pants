@@ -36,19 +36,13 @@ class BlackSetup:
   resolved_requirements_pex: Pex
   merged_input_files: Digest
 
-  def generate_pex_arg_list(self, *, files: Set[str], check_only: bool) -> Tuple[str, ...]:
+  def generate_pex_arg_list(self, *, files: Tuple[str, ...], check_only: bool) -> Tuple[str, ...]:
     pex_args = []
     if check_only:
       pex_args.append("--check")
     if self.config_path is not None:
       pex_args.extend(["--config", self.config_path])
-    if files:
-      pex_args.extend(["--include", "|".join(re.escape(f) for f in files)])
-    # Black normally operates on all passed folders/files and traverses them recursively. We pass
-    # the directories we want and, crucially, use --include to ensure that Black only runs on the
-    # actual files we care about.
-    dirs = {f"{Path(filename).parent}" for filename in files}
-    pex_args.extend(sorted(dirs))
+    pex_args.extend(files)
     return tuple(pex_args)
 
   def create_execute_request(
