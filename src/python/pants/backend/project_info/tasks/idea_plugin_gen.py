@@ -84,6 +84,8 @@ class IdeaPluginGen(ConsoleTask):
                                          'project-12.mustache')
     self.workspace_template = os.path.join(_TEMPLATE_BASEDIR,
                                            'workspace-12.mustache')
+    self.rootmodule_template = os.path.join(_TEMPLATE_BASEDIR,
+                                           'rootmodule-12.mustache')
     self.java_language_level = self.get_options().java_language_level
 
     if self.get_options().java_jdk_name:
@@ -102,6 +104,8 @@ class IdeaPluginGen(ConsoleTask):
                                            '{}.ipr'.format(project_name))
       self.workspace_filename = os.path.join(self.gen_project_workdir,
                                              '{}.iws'.format(project_name))
+      self.rootmodule_filename = os.path.join(self.gen_project_workdir,
+                                              'rootmodule.iml')
       self.intellij_output_dir = os.path.join(self.gen_project_workdir, 'out')
 
   @classmethod
@@ -147,9 +151,12 @@ class IdeaPluginGen(ConsoleTask):
 
     ipr = gen_file(self.project_template, project=configured_project)
     iws = gen_file(self.workspace_template, workspace=configured_workspace)
+    iml_root = gen_file(self.workspace_template)
 
     shutil.move(ipr, self.project_filename)
     shutil.move(iws, self.workspace_filename)
+    shutil.move(iml_root, self.rootmodule_filename)
+
     return self.project_filename
 
   def _generate_to_tempfile(self, generator):
