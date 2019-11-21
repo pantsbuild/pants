@@ -10,7 +10,7 @@ from pants.engine.fs import Digest, FilesContent
 from pants.engine.goal import Goal
 from pants.engine.legacy.graph import HydratedTargets
 from pants.engine.rules import UnionMembership, console_rule, union
-from pants.engine.selectors import Get
+from pants.engine.selectors import Get, MultiGet
 
 
 @dataclass(frozen=True)
@@ -34,17 +34,17 @@ class Fmt(Goal):
 
 
 @console_rule
-def fmt(console: Console, targets: HydratedTargets, union_membership: UnionMembership) -> Fmt:
-  results = yield [
+async def fmt(console: Console, targets: HydratedTargets, union_membership: UnionMembership) -> Fmt:
+  results = await MultiGet(
     Get(FmtResult, TargetWithSources, target.adaptor)
     for target in targets
     # TODO: make TargetAdaptor return a 'sources' field with an empty snapshot instead of
     # raising to remove the hasattr() checks here!
     if union_membership.is_member(TargetWithSources, target.adaptor) and hasattr(target.adaptor, "sources")
-  ]
+  )
 
   for result in results:
-    files_content = yield Get(FilesContent, Digest, result.digest)
+    files_content = await Get(FilesContent, Digest, result.digest)
     # TODO: This is hacky and inefficient, and should be replaced by using the Workspace type
     # once that is available on master.
     # Blocked on: https://github.com/pantsbuild/pants/pull/8329
@@ -59,7 +59,7 @@ def fmt(console: Console, targets: HydratedTargets, union_membership: UnionMembe
 
   # Since we ran an ExecuteRequest, any failure would already have interrupted our flow
   exit_code = 0
-  yield Fmt(exit_code)
+  return Fmt(exit_code)
 
 
 def rules():

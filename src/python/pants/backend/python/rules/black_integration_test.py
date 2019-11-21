@@ -3,11 +3,10 @@
 
 import os
 from contextlib import contextmanager
-from os.path import relpath
 from pathlib import Path
 
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
-from pants.util.contextutil import temporary_dir, temporary_file_path
+from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_file_dump
 
 
@@ -37,7 +36,7 @@ def build_directory():
     yield root_dir
 
 
-class PythonFmtIntegrationTest(PantsRunIntegrationTest):
+class BlackIntegrationTest(PantsRunIntegrationTest):
   def test_black_one_python_source_should_leave_one_file_unchanged(self):
     with build_directory() as root_dir:
       code = write_consistently_formatted_file(root_dir, "hello.py")
@@ -83,32 +82,19 @@ class PythonFmtIntegrationTest(PantsRunIntegrationTest):
     self.assertNotIn("reformatted", pants_run.stderr_data)
     self.assertIn("2 files left unchanged", pants_run.stderr_data)
 
-  def test_black_should_pickup_default_config(self):
-    # If the default config (pyproject.toml is picked up, the compilation_failure target will be skipped
+  def test_black_respects_config(self):
+    # If our config pyproject.toml is used, the compilation_failure target will be skipped.
+    # Otherwise, it will be used and Black will error out.
     command = [
       'fmt-v2',
-      'testprojects/src/python/unicode/compilation_failure::'
-      ]
+      'testprojects/src/python/unicode/compilation_failure::',
+      "--black-config=pyproject.toml",
+    ]
     pants_run = self.run_pants(command=command)
     self.assert_success(pants_run)
     self.assertNotIn("reformatted", pants_run.stderr_data)
     self.assertNotIn("unchanged", pants_run.stderr_data)
     self.assertIn("Nothing to do", pants_run.stderr_data)
-
-  def test_black_should_pickup_non_default_config(self):
-    # If a valid toml file without a black configuration section is picked up,
-    # Black won't skip the compilation_failure and will fail
-    with temporary_file_path(root_dir=".", suffix=".toml") as empty_config:
-      command = [
-        'fmt-v2',
-        'testprojects/src/python/unicode/compilation_failure::',
-        f'--black-config={relpath(empty_config)}'
-        ]
-      pants_run = self.run_pants(command=command)
-    self.assert_failure(pants_run)
-    self.assertNotIn("reformatted", pants_run.stderr_data)
-    self.assertNotIn("unchanged", pants_run.stderr_data)
-    self.assertIn("1 file failed to reformat", pants_run.stderr_data)
 
   def test_black_should_format_python_code(self):
     with build_directory() as root_dir:
