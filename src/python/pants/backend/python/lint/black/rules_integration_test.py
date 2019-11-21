@@ -3,10 +3,10 @@
 
 from typing import List, Optional, Tuple
 
-from pants.backend.python.rules.black import BlackSetup, fmt, lint, setup_black
+from pants.backend.python.lint.black.rules import BlackSetup, fmt, lint, setup_black
+from pants.backend.python.lint.black.subsystem import Black
 from pants.backend.python.rules.download_pex_bin import download_pex_bin
 from pants.backend.python.rules.pex import CreatePex, create_pex
-from pants.backend.python.subsystems.black import Black
 from pants.backend.python.subsystems.python_native_code import (
   PythonNativeCode,
   create_pex_native_build_environment,
