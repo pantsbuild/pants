@@ -4,7 +4,7 @@ use tempfile;
 use boxfuture::{try_future, BoxFuture, Boxable};
 use fs::{self, GlobExpansionConjunction, GlobMatching, PathGlobs, StrictGlobMatching};
 use futures::{future, Future, Stream};
-use log::info;
+use log::{debug, info};
 use nails::execution::{ChildOutput, ExitCode};
 
 use std::collections::{BTreeSet, HashSet};
@@ -290,6 +290,7 @@ pub trait CapturedWorkdir {
         "Error making tempdir for local process execution: {:?}",
         err
       )));
+    debug!("Created tempdir for captured hermetic work dir at: {:?}", workdir.path());
 
     let workdir_path = workdir.path().to_owned();
     let workdir_path2 = workdir_path.clone();

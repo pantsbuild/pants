@@ -408,7 +408,9 @@ class BaseZincCompile(JvmCompile):
   def _compile_hermetic(self, jvm_options, ctx, classes_dir, jar_file,
                         compiler_bridge_classpath_entry, dependency_classpath,
                         scalac_classpath_entries):
+    nailgun_classpath_entry = self._nailgun_server_classpath_entry()
     zinc_relpath = fast_relpath(self._zinc.zinc.path, get_buildroot())
+    nailgun_relpath = fast_relpath(nailgun_classpath_entry.path, get_buildroot())
 
     snapshots = [
       ctx.target.sources_snapshot(self.context._scheduler),
@@ -427,7 +429,8 @@ class BaseZincCompile(JvmCompile):
     # Ensure the dependencies and compiler bridge jars are available in the execution sandbox.
     relevant_classpath_entries = (dependency_classpath + [
       compiler_bridge_classpath_entry,
-      self._nailgun_server_classpath_entry(), # We include nailgun-server, to use it to start servers when needed from the hermetic execution case.
+      # We include nailgun-server, to use it to start servers when needed from the hermetic execution case.
+      nailgun_classpath_entry,
     ])
     directory_digests = [
       entry.directory_digest for entry in relevant_classpath_entries if entry.directory_digest
@@ -471,7 +474,7 @@ class BaseZincCompile(JvmCompile):
       native_image_snapshots = []
       # TODO: Lean on distribution for the bin/java appending here
       image_specific_argv =  ['.jdk/bin/java'] + jvm_options + [
-        '-cp', zinc_relpath,
+        '-cp', ":".join([nailgun_relpath, zinc_relpath]),
         Zinc.ZINC_COMPILE_MAIN
       ]
 

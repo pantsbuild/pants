@@ -1,19 +1,20 @@
 // Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std::io::BufReader;
 use std::collections::HashMap;
 use std::fs::{read_link, remove_file};
-use std::io;
-use std::io::BufRead;
 use std::os::unix::fs::symlink;
 use std::path::PathBuf;
-use std::process::Stdio;
 use std::sync::Arc;
+use std::time::Duration;
 
 use boxfuture::{try_future, BoxFuture, Boxable};
-use futures::future::Future;
+use futures::future::{self, Future, Loop};
+use futures::stream::Stream;
+use futures_locks::{self, Mutex, MutexGuard};
 use log::{debug, info};
-use parking_lot::Mutex;
+use parking_lot;
 use regex::Regex;
 
 use hashing::{Digest, Fingerprint};
@@ -25,23 +26,27 @@ use sha2::Sha256;
 use store::Store;
 use workunit_store::WorkUnitStore;
 
+use tokio::fs;
+use tokio::io::lines;
+use tokio_timer::sleep;
+
 lazy_static! {
   static ref NAILGUN_PORT_REGEX: Regex = Regex::new(r".*\s+port\s+(\d+)\.$").unwrap();
 }
 
 pub type NailgunProcessName = String;
-type NailgunProcessMap = HashMap<NailgunProcessName, NailgunProcess>;
+type NailgunProcessMap = HashMap<NailgunProcessName, Mutex<NailgunProcess>>;
 pub type Port = usize;
 
 #[derive(Clone)]
 pub struct NailgunPool {
-  processes: Arc<Mutex<NailgunProcessMap>>,
+  processes: Mutex<NailgunProcessMap>,
 }
 
 impl NailgunPool {
   pub fn new() -> Self {
     NailgunPool {
-      processes: Arc::new(Mutex::new(NailgunProcessMap::new())),
+      processes: Mutex::new(NailgunProcessMap::new()),
     }
   }
 
@@ -105,8 +110,7 @@ impl NailgunPool {
     store: Store,
     input_files: Digest,
     workunit_store: WorkUnitStore,
-  ) -> BoxFuture<Port, String> {
-    let processes = self.processes.clone();
+  ) -> BoxFuture<(Port, futures_locks::MutexGuard<NailgunProcess>), String> {
 
     let jdk_path = try_future!(startup_options.jdk_home.clone().ok_or_else(|| {
       format!(
@@ -119,139 +123,168 @@ impl NailgunPool {
       jdk_path.clone()
     ));
 
-    Self::materialize_workdir_for_server(
-      store, workdir_path.clone(), jdk_path, input_files, workunit_store
-    ).and_then(move |_| {
-      debug!("Locking nailgun process pool so that only one can be connecting at a time.");
-      let mut processes = processes.lock();
-      debug!("Locked!");
-      let connection_result = if let Some(process) = processes.get_mut(&name) {
-        // Clone some fields that we need for later
-        let (process_name, process_fingerprint, process_port, build_id_that_started_the_server) = (
-          process.name.clone(),
-          process.fingerprint.clone(),
-          process.port,
-          process.build_id.clone(),
-        );
-
-        debug!(
-          "Checking if nailgun server {} is still alive at port {}...",
-          &process_name, process_port
-        );
-
-        // If the process is in the map, check if it's alive using the handle.
-        let status = {
-          process
-              .handle
-              .lock()
-              .try_wait()
-              .map_err(|e| format!("Error getting the process status! {}", e))
-              .clone()
-        };
-        match status {
-          Ok(None) => {
-            // Process hasn't exited yet
-            debug!(
-              "Found nailgun process {}, with fingerprint {:?}",
-              &name, process_fingerprint
+    let processes = self.processes.clone();
+    processes.lock()
+      .map_err(|_| "Failed to lock processes Mutex".to_string())
+      .and_then(move |mut processes| {
+        let connection_result = if let Some(process) = processes.get_mut(&name) {
+          // Clone some fields that we need for later
+          process.lock()
+            .map_err(|_| "Failed to lock nailgun process Mutex".to_string())
+            .and_then(move |process| {
+            let (process_name, process_fingerprint, process_port, build_id_that_started_the_server) = (
+              process.name.clone(),
+              process.fingerprint.clone(),
+              process.port,
+              process.build_id.clone(),
             );
-            if requested_server_fingerprint == process_fingerprint {
-              debug!("The fingerprint of the running nailgun {:?} matches the requested fingerprint {:?}. Connecting to existing server.",
-                     requested_server_fingerprint, process_fingerprint);
-              Ok(process_port)
-            } else {
-              // The running process doesn't coincide with the options we want.
-              if build_id_that_started_the_server == build_id_requesting_connection {
-                Err(format!(
-                  "Trying to change the JVM options for a running nailgun server that was started this run, with name {}.\
-                    There is exactly one nailgun server per task, so it shouldn't be possible to change the options of a nailgun server mid-run.\
-                    This might be a problem with how we calculate the keys of nailgun servers (https://github.com/pantsbuild/pants/issues/8527).",
-                  &name)
-                )
-              } else {
-                // Restart it.
-                // Since the stored server was started in a different pants run,
-                // no client will be running on that server.
+
+            debug!(
+              "Checking if nailgun server {} is still alive at port {}...",
+              &process_name, process_port
+            );
+
+            // If the process is in the map, check if it's alive using the handle.
+            let status = process
+                .handle
+                .lock()
+                .try_wait()
+                .map_err(|e| format!("Error getting the process status! {}", e))
+                .clone();
+            match status {
+              Ok(None) => {
+                // Process hasn't exited yet
                 debug!(
-                  "The options for server process {} are different to the startup_options, \
-                 and the original process was started in a different pants run.\n\
-                 Startup Options: {:?}\n Process Cmd: {:?}",
-                  &process_name, startup_options, process_fingerprint
+                  "Found nailgun process {}, with fingerprint {:?}",
+                  &name, process_fingerprint
                 );
-                debug!("Restarting the server...");
+                if requested_server_fingerprint == process_fingerprint {
+                  debug!("The fingerprint of the running nailgun {:?} matches the requested fingerprint {:?}. Connecting to existing server.",
+                          requested_server_fingerprint, process_fingerprint);
+                  future::ok((process_port, process)).to_boxed()
+                } else {
+                  // The running process doesn't coincide with the options we want.
+                  if build_id_that_started_the_server == build_id_requesting_connection {
+                    future::err(format!(
+                      "Trying to change the JVM options for a running nailgun server that was started this run, with name {}.\
+                        There is exactly one nailgun server per task, so it shouldn't be possible to change the options of a nailgun server mid-run.\
+                        This might be a problem with how we calculate the keys of nailgun servers (https://github.com/pantsbuild/pants/issues/8527).",
+                      &name)
+                    ).to_boxed()
+                  } else {
+                    // Restart it.
+                    // Since the stored server was started in a different pants run,
+                    // no client will be running on that server.
+                    debug!(
+                      "The options for server process {} are different to the startup_options, \
+                      and the original process was started in a different pants run.\n\
+                      Startup Options: {:?}\n Process Cmd: {:?}",
+                      &process_name, startup_options, process_fingerprint
+                    );
+                    debug!("Restarting the server...");
+                    Self::start_new_nailgun(
+                      processes,
+                      name,
+                      startup_options,
+                      workdir_path,
+                      requested_server_fingerprint,
+                      build_id_requesting_connection,
+                      store,
+                      input_files,
+                      workunit_store,
+                      jdk_path,
+                    ).to_boxed()
+                  }
+                }
+              }
+              Ok(_) => {
+                // The process has exited with some exit code
+                debug!("The requested nailgun server was not running anymore. Restarting process...");
                 Self::start_new_nailgun(
-                  &mut *processes,
+                  processes,
                   name,
                   startup_options,
-                  &workdir_path,
+                  workdir_path,
                   requested_server_fingerprint,
                   build_id_requesting_connection,
-                )
+                  store,
+                  input_files,
+                  workunit_store,
+                  jdk_path,
+                ).to_boxed()
               }
+              Err(e) => future::err(e).to_boxed(),
             }
-          }
-          Ok(_) => {
-            // The process has exited with some exit code
-            debug!("The requested nailgun server was not running anymore. Restarting process...");
-            Self::start_new_nailgun(
-              &mut *processes,
-              name,
-              startup_options,
-              &workdir_path,
-              requested_server_fingerprint,
-              build_id_requesting_connection,
-            )
-          }
-          Err(e) => Err(e),
-        }
-      } else {
-        // We don't have a running nailgun registered in the map.
-        debug!(
-          "No nailgun server is running with name {}. Starting one...",
-          &name
-        );
-        Self::start_new_nailgun(
-          &mut *processes,
-          name,
-          startup_options,
-          &workdir_path,
-          requested_server_fingerprint,
-          build_id_requesting_connection,
-        )
-      };
-      debug!("Unlocking nailgun process pool.");
-      connection_result
-    })
-    .to_boxed()
+          }).to_boxed()
+        } else {
+          // We don't have a running nailgun registered in the map.
+          debug!(
+            "No nailgun server is running with name {}. Starting one...",
+            &name
+          );
+          Self::start_new_nailgun(
+            processes,
+            name,
+            startup_options,
+            workdir_path,
+            requested_server_fingerprint,
+            build_id_requesting_connection,
+            store,
+            input_files,
+            workunit_store,
+            jdk_path,
+          ).to_boxed()
+        };
+        debug!("Unlocking nailgun process pool.");
+        connection_result
+    }).to_boxed()
   }
 
   //
   // This is a blocking method that is being called under the NailgunProcessMap's lock (see #8543)
   //
   fn start_new_nailgun(
-    processes: &mut NailgunProcessMap,
+    mut processes: MutexGuard<NailgunProcessMap>,
     name: String,
     startup_options: ExecuteProcessRequest,
-    workdir_path: &PathBuf,
+    workdir_path: PathBuf,
     nailgun_server_fingerprint: NailgunProcessFingerprint,
     build_id: String,
-  ) -> Result<Port, String> {
+    store: Store,
+    input_files: Digest,
+    workunit_store: WorkUnitStore,
+    jdk_path: PathBuf,
+  ) -> BoxFuture<(Port, MutexGuard<NailgunProcess>), String> {
     debug!(
       "Starting new nailgun server for {}, with options {:?}",
       &name, &startup_options
     );
-    NailgunProcess::start_new(
-      name.clone(),
-      startup_options,
-      workdir_path,
-      nailgun_server_fingerprint,
-      build_id,
-    )
-    .and_then(move |process| {
-      let port = process.port;
-      processes.insert(name.clone(), process);
-      Ok(port)
+    // TODO materialize workdir for server here.
+    Self::materialize_workdir_for_server(
+      store, workdir_path.clone(), jdk_path, input_files, workunit_store
+    ).and_then({
+      let name = name.clone();
+      |_| {
+        NailgunProcess::start_new(
+          name,
+          startup_options,
+          workdir_path,
+          nailgun_server_fingerprint,
+          build_id,
+        )
+      }
     })
+    .map({
+      let name = name.clone();
+      move |process| {
+        let port = process.port;
+        let new_nailgun = Mutex::new(process);
+        let nailgun_guard = new_nailgun.try_lock().expect("We just created this nailgun, no one else can have locked it");
+        processes.insert(name, new_nailgun);
+        (port, nailgun_guard)
+      }
+    })
+    .to_boxed()
   }
 }
 
@@ -262,39 +295,73 @@ pub struct NailgunProcess {
   pub fingerprint: NailgunProcessFingerprint,
   pub build_id: String,
   pub port: Port,
-  pub handle: Arc<Mutex<std::process::Child>>,
+  pub handle: Arc<parking_lot::Mutex<std::process::Child>>,
 }
 
-fn read_port(child: &mut std::process::Child) -> Result<Port, String> {
-  let stdout = child
-    .stdout
-    .as_mut()
-    .ok_or_else(|| "No Stdout found!".to_string());
-  stdout.and_then(|stdout| {
-    let reader = io::BufReader::new(stdout);
-    let line = reader
-      .lines()
-      .next()
-      .ok_or("There is no line ready in the child's output")?
-      .map_err(|err| format!("{}", err))?;
-    let port = &NAILGUN_PORT_REGEX
-      .captures_iter(&line)
-      .next()
-      .ok_or("Output for nailgun server didn't match the regex!")?[1];
-    port
-      .parse::<Port>()
-      .map_err(|e| format!("Error parsing port {}! {}", &port, e))
+fn read_port(stdout: PathBuf) -> BoxFuture<Port, String> {
+  future::loop_fn(10, move |mut loops| {
+    let stdout = stdout.clone();
+    let wait_period = Duration::from_millis(100);
+    sleep(wait_period)
+      .map_err(|_| "sleep failed for some reason!".to_string())
+      .and_then(move |_| fs::File::open(stdout.clone()).map_err(move |_| format!("Could not open file {:?}", stdout)))
+      .and_then(|log| {
+        lines(BufReader::new(log))
+          .take(1)
+          .into_future()
+          .map_err(|(err, _s)| format!("Error getting file line in read port {}", err))
+      })
+      .and_then(move |(line, _)| {
+        info!("DEBUG_NAILGUN start output is {:?}", line);
+        match line {
+          Some(s) => Ok(Loop::Break(Ok(s))),
+          None => {
+            loops -= 1;
+            if loops == 0 {
+              Ok(Loop::Break(Err("Couldn't read a line from nailgun".to_string())))
+            } else {
+              Ok(Loop::Continue(loops))
+            }
+          }
+        }
+      })
   })
+  .and_then(|line| {
+    info!("DEBUG_NAILGUN start output is {:?}", line);
+    match line {
+      Ok(s) => {
+        let port = &NAILGUN_PORT_REGEX.captures_iter(s.trim()).next();
+        match port {
+          Some(port) => port[1].parse::<Port>().map_err(|e| format!("Error parsing port {}! {}", &port[1], e)),
+          None => Err("Output for nailgun server didn't match the regex!".to_string()),
+        }
+      }
+      Err(e) => Err(format!("Error reading nailgun startup stdout: {:?}.", e))
+    }
+  })
+  .to_boxed()
 }
 
 impl NailgunProcess {
+  fn create_output_file(server_workdir: PathBuf, name: String) -> BoxFuture<fs::File, String> {
+    let fname = Self::log_path(server_workdir, name);
+    info!("CREATED NAILGUN output {:?}", fname);
+    tokio::fs::File::create(fname.clone())
+      .map_err(move |e| format!("Failed to open file {:?} for reading {:?}", fname, e))
+      .to_boxed()
+  }
+
+  fn log_path(server_workdir: PathBuf, name: String) -> PathBuf {
+    server_workdir.clone().join(name)
+  }
+
   fn start_new(
     name: NailgunProcessName,
     startup_options: ExecuteProcessRequest,
-    workdir_path: &PathBuf,
+    workdir_path: PathBuf,
     nailgun_server_fingerprint: NailgunProcessFingerprint,
     build_id: String,
-  ) -> Result<NailgunProcess, String> {
+  ) -> BoxFuture<NailgunProcess, String> {
     let cmd = startup_options.argv[0].clone();
     // TODO: This is an expensive operation, and thus we info! it.
     //       If it becomes annoying, we can downgrade the logging to just debug!
@@ -304,22 +371,29 @@ impl NailgunProcess {
       &startup_options.argv[1..],
       &workdir_path
     );
-    let handle = std::process::Command::new(&cmd)
-      .args(&startup_options.argv[1..])
-      .stdout(Stdio::piped())
-      .stderr(Stdio::piped())
-      .current_dir(&workdir_path)
-      .spawn();
-    handle
-      .map_err(|e| {
-        format!(
-          "Failed to create child handle with cmd: {} options {:#?}: {}",
-          &cmd, &startup_options, e
-        )
+    Self::create_output_file(workdir_path.clone(), "stdout.log".to_string())
+      .join(Self::create_output_file(workdir_path.clone(), "stderr.log".to_string()))
+      .and_then({
+        let workdir_path = workdir_path.clone();
+        move |(stdout, stderr)| {
+          let handle = std::process::Command::new(&cmd)
+            .args(&startup_options.argv[1..])
+            .stdout(stdout.into_std())
+            .stderr(stderr.into_std())
+            .current_dir(workdir_path)
+            .spawn();
+          handle
+            .map_err(|e| {
+              format!(
+                "Failed to create child handle with cmd: {} options {:#?}: {}",
+                &cmd, &startup_options, e
+              )
+            })
+        }
       })
-      .and_then(|mut child| {
-        let port = read_port(&mut child);
-        port.map(|port| (child, port))
+      .and_then(move |child| {
+        let stdout_log = Self::log_path(workdir_path.clone(), "stdout.log".to_string());
+        read_port(stdout_log).map(|port| (child, port))
       })
       .and_then(|(child, port)| {
         debug!(
@@ -331,16 +405,17 @@ impl NailgunProcess {
           port: port,
           fingerprint: nailgun_server_fingerprint,
           name: name,
-          handle: Arc::new(Mutex::new(child)),
+          handle: Arc::new(parking_lot::Mutex::new(child)),
           build_id: build_id,
         })
       })
+      .to_boxed()
   }
 }
 
 impl Drop for NailgunProcess {
   fn drop(&mut self) {
-    debug!("Exiting nailgun server process {:?}", self);
+    info!("DROP Exiting nailgun server process {:?}", self);
     let _ = self.handle.lock().kill();
   }
 }

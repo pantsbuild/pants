@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
-use boxfuture::{try_future, BoxFuture, Boxable};
+use boxfuture::BoxFuture;
 use futures::future::Future;
 use futures::stream::Stream;
 use log::{debug, trace};
@@ -27,7 +27,6 @@ mod parsed_jvm_command_lines;
 #[cfg(test)]
 mod parsed_jvm_command_lines_tests;
 
-use async_semaphore::AsyncSemaphore;
 pub use nailgun_pool::NailgunPool;
 use parsed_jvm_command_lines::ParsedJVMCommandLines;
 use std::net::SocketAddr;
@@ -71,7 +70,8 @@ fn construct_nailgun_client_request(
   original_req: ExecuteProcessRequest,
   client_main_class: String,
   mut client_args: Vec<String>,
-) -> ExecuteProcessRequest {
+  client_workdir: PathBuf,
+) -> Result<ExecuteProcessRequest, String> {
   let ExecuteProcessRequest {
     argv: _argv,
     input_files,
@@ -86,7 +86,20 @@ fn construct_nailgun_client_request(
     is_nailgunnable,
   } = original_req;
   client_args.insert(0, client_main_class);
-  ExecuteProcessRequest {
+  // arg file is only materialized to the client workdir but java is running in the
+  // nailgun dir so we have to adjust the path to point to the correct spot, which is in the 
+  // client workdir.
+  let maybe_arg_file = client_args.last().unwrap();
+  if maybe_arg_file.starts_with("@") {
+    if let Ok(arg_file_path) = maybe_arg_file[1..].parse::<PathBuf>() {
+      client_args.pop();
+      let mut full_arg_file_path = client_workdir.as_path().join(arg_file_path).into_os_string().into_string().map_err(|_| "Couldn't convert path into String, does it contain valid unicode?".to_string())?;
+      // turn the path back into a java arguments file.
+      full_arg_file_path.insert(0, '@');
+      client_args.push(full_arg_file_path);
+    }
+  }
+  Ok(ExecuteProcessRequest {
     argv: client_args,
     input_files,
     description,
@@ -98,7 +111,7 @@ fn construct_nailgun_client_request(
     jdk_home: None,
     target_platform,
     is_nailgunnable,
-  }
+  })
 }
 
 ///
@@ -113,7 +126,6 @@ fn construct_nailgun_client_request(
 pub struct CommandRunner {
   inner: Arc<super::local::CommandRunner>,
   nailgun_pool: NailgunPool,
-  async_semaphore: async_semaphore::AsyncSemaphore,
   metadata: ExecuteProcessRequestMetadata,
   workdir_base: PathBuf,
   executor: task_executor::Executor,
@@ -129,7 +141,6 @@ impl CommandRunner {
     CommandRunner {
       inner: Arc::new(runner),
       nailgun_pool: NailgunPool::new(),
-      async_semaphore: AsyncSemaphore::new(1),
       metadata: metadata,
       workdir_base: workdir_base,
       executor: executor,
@@ -174,21 +185,13 @@ impl super::CommandRunner for CommandRunner {
 
     let executor = self.executor.clone();
     let store = self.inner.store.clone();
-    let ParsedJVMCommandLines {
-      client_main_class, ..
-    } = try_future!(ParsedJVMCommandLines::parse_command_lines(
-      &original_request.argv
-    ));
-    let nailgun_name = CommandRunner::calculate_nailgun_name(&client_main_class);
-    let workdir_for_this_nailgun = try_future!(self.get_nailgun_workdir(&nailgun_name));
-
     self.run_and_capture_workdir(
       original_request,
       context,
       store,
       executor,
-      true,
-      &workdir_for_this_nailgun,
+      false,
+      &self.workdir_base,
     )
   }
 
@@ -248,12 +251,10 @@ impl CapturedWorkdir for CommandRunner {
     // Streams to read child output from
     let (stdio_write, stdio_read) = child_channel::<ChildOutput>();
     let (_stdin_write, stdin_read) = child_channel::<ChildInput>();
+    let client_req = construct_nailgun_client_request(req2, client_main_class, client_args, client_workdir.clone())?;
 
-    let nails_command = self
-      .async_semaphore
-      .with_acquired(move || {
-        // Get the port of a running nailgun server (or a new nailgun server if it doesn't exist)
-        nailgun_pool.connect(
+    // Get the port of a running nailgun server (or a new nailgun server if it doesn't exist)
+    let nails_command = nailgun_pool.connect(
           nailgun_name.clone(),
           nailgun_req,
           workdir_for_this_nailgun1,
@@ -262,14 +263,12 @@ impl CapturedWorkdir for CommandRunner {
           store,
           req.input_files,
           workunit_store,
-        )
-      })
+      )
       .map_err(|e| format!("Failed to connect to nailgun! {}", e))
       .inspect(move |_| debug!("Connected to nailgun instance {}", &nailgun_name3))
-      .and_then(move |nailgun_port| {
+      .and_then(move |(nailgun_port, nailgun_guard)| {
         // Run the client request in the nailgun we have active.
         debug!("Got nailgun port {} for {}", nailgun_port, nailgun_name2);
-        let client_req = construct_nailgun_client_request(req2, client_main_class, client_args);
         let cmd = Command {
           command: client_req.argv[0].clone(),
           args: client_req.argv[1..].to_vec(),
@@ -289,6 +288,10 @@ impl CapturedWorkdir for CommandRunner {
           })
           .map_err(|e| format!("Error communicating with server: {}", e))
           .map(ChildOutput::Exit)
+          .map(move |exit| {
+            drop(nailgun_guard);
+            exit
+          })
       });
 
     Ok(Box::new(
