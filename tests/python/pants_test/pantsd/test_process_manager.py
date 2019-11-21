@@ -10,6 +10,7 @@ import unittest.mock
 from contextlib import contextmanager
 
 import psutil
+import pytest
 
 from pants.pantsd.process_manager import (
   ProcessGroup,
@@ -140,6 +141,7 @@ class TestProcessMetadataManager(TestBase):
         self.TEST_VALUE_INT
       )
 
+  @pytest.mark.flaky(retries=1)  # https://github.com/pantsbuild/pants/issues/6836
   def test_deadline_until(self):
     with self.assertRaises(ProcessMetadataManager.Timeout):
       with self.captured_logging(logging.INFO) as captured:
