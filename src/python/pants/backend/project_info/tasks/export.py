@@ -29,6 +29,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
+from pants.help.build_dictionary_info_extracter import BuildDictionaryInfoExtracter
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
@@ -94,6 +95,9 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
              help='Causes libraries with sources to be output.')
     register('--libraries-javadocs', type=bool,
              help='Causes libraries with javadocs to be output.')
+    register('--available-target-types', type=bool,
+             default=False,
+             help='Causes a list of available target types to be output.')
     register('--sources', type=bool,
              help='Causes sources to be output.')
     register('--formatted', type=bool, implicit_value=False,
@@ -111,6 +115,11 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
   @memoized_property
   def _interpreter_cache(self):
     return PythonInterpreterCache.global_instance()
+
+  def _target_types(self):
+    buildfile_aliases = self.context.build_configuration.registered_aliases()
+    extracter = BuildDictionaryInfoExtracter(buildfile_aliases)
+    return [ x.symbol for x in extracter.get_target_type_info()]
 
   def check_artifact_cache_for(self, invalidation_check):
     # Export is an output dependent on the entire target set, and is not divisible
@@ -348,7 +357,10 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
         'default_interpreter': str(default_interpreter.identity),
         'interpreters': interpreters_info
       }
-
+    
+    if self.get_options().available_target_types:
+      graph_info['available_target_types'] = self._target_types()
+    
     return graph_info
 
   def _resolve_jars_info(self, targets, classpath_products):
