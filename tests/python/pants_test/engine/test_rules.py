@@ -1,10 +1,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import re
-import sys
 import unittest
-from dataclasses import dataclass
 from textwrap import dedent
 
 from pants.engine.build_files import create_graph_rules
@@ -18,7 +15,6 @@ from pants.engine.rules import (
   RootRule,
   RuleIndex,
   UnrecognizedRuleArgument,
-  _RuleVisitor,
   console_rule,
   rule,
 )
@@ -842,93 +838,6 @@ Expected a `type` constructor for `_this_is_not_a_type`, but got: 3 (type `int`)
       def g() -> A:
         a = await Get(A, _this_is_not_a_type, 3)
         yield a
-
-  def test_validate_yield_statements_in_rule_body(self):
-    with self.assertRaisesRegexp(_RuleVisitor.YieldVisitError, re.escape('yield A()')):
-      @rule
-      def f() -> A:
-        yield A()
-        # The yield statement isn't at the end of this series of statements.
-        return
-
-    with self.assertRaises(_RuleVisitor.YieldVisitError) as cm:
-      @rule
-      def h() -> A:
-        yield A(
-          1 + 2
-        )
-        return
-    # Test that the full indentation of multiple-line yields are represented in the output.
-    self.assertIn("""\
-        yield A(
-          1 + 2
-        )
-""", str(cm.exception))
-
-    with self.assertRaises(_RuleVisitor.YieldVisitError) as cm:
-      @rule
-      def g() -> A:
-        # This is a yield statement without an assignment, and not at the end.
-        await Get(B, D, D())
-        yield A()
-    exc_msg = str(cm.exception)
-    exc_msg_trimmed = re.sub(r'^.*?(test_rules\.py)', r'\1', exc_msg, flags=re.MULTILINE)
-    self.assertEquals(exc_msg_trimmed, """\
-In function g: yield in @rule without assignment must come at the end of a series of statements.
-
-A yield in an @rule without an assignment is equivalent to a return, and we
-currently require that no statements follow such a yield at the same level of nesting.
-Use `_ = await Get(...)` if you wish to yield control to the engine and discard the
-result.
-
-Note that any `await Get(...)` in an @rule without assignment is also currently not
-supported. See https://github.com/pantsbuild/pants/pull/8227 for progress.
-
-The invalid statement was:
-test_rules.py:{lineno}:{col}
-        await Get(B, D, D())
-
-The rule defined by function `g` begins at:
-test_rules.py:{rule_lineno}:{rule_col}
-      @rule
-      def g() -> A:
-        # This is a yield statement without an assignment, and not at the end.
-        await Get(B, D, D())
-        yield A()
-""".format(lineno=(sys._getframe().f_lineno - 26),
-           col=8,
-           rule_lineno=(sys._getframe().f_lineno - 31),
-           rule_col=6))
-
-  def test_final_yield(self):
-    @dataclass(frozen=True)
-    class Y:
-      none_value: type(None)
-
-    @dataclass(frozen=True)
-    class X:
-      y_value: Y
-
-    with self.assertRaisesWithMessageContaining(_RuleVisitor.YieldVisitError, '`await Get(...)` in @rule is currently not allowed without an assignment.'):
-      @rule
-      def final_yield(n: type(None)) -> X:
-        await Get(X, Y(n))
-
-    # Try a more complex example.
-    with self.assertRaises(_RuleVisitor.YieldVisitError) as cm:
-      @rule
-      def final_yield_within_if(n: type(None)) -> X:
-        if n is None:
-          await Get(X, Y(n))
-    exc_msg = str(cm.exception)
-    exc_msg_trimmed = re.sub(r'^.*?(test_rules\.py)', r'\1', exc_msg, flags=re.MULTILINE)
-    self.assertIn('`await Get(...)` in @rule is currently not allowed without an assignment.',
-                  exc_msg_trimmed)
-    self.assertIn(f"""\
-The invalid statement was:
-test_rules.py:{sys._getframe().f_lineno - 9}:10
-          await Get(X, Y(n))
-""", exc_msg_trimmed)
 
   def create_full_graph(self, rules, validate=True):
     scheduler = create_scheduler(rules, validate=validate)

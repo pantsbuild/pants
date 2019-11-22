@@ -152,7 +152,7 @@ class CollectionType:
 
 @rule
 async def c_unhashable_dataclass(_: CollectionType) -> C:
-  # This `yield` would use the `nested_raise` rule, but it won't get to the point of raising since
+  # This `await` would use the `nested_raise` rule, but it won't get to the point of raising since
   # the hashability check will fail.
   _ = await Get(A, B, list()) # noqa: F841
   return C()
