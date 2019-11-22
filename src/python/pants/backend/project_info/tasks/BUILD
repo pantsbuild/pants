@@ -70,8 +70,6 @@ python_library(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/backend/jvm/tasks:classpath_products',
-    'src/python/pants/backend/jvm/tasks:ivy_task_mixin',
-    'src/python/pants/backend/jvm:ivy_utils',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:revision',

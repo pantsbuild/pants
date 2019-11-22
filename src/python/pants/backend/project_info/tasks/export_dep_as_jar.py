@@ -276,9 +276,9 @@ class ExportDepAsJar(ConsoleTask):
           # yic assumed that the cost to fingerprint the target may not be that lower than
           # just zipping up the resources anyway.
           with temporary_file(root_dir=resource_jar_root, cleanup=False, suffix='.jar') as f:
-            with zipfile.ZipFile(f, 'a') as zip:
-              for src_relative_path in t.sources_relative_to_source_root():
-                zip.write(os.path.join(t.target_base, src_relative_path), src_relative_path)
+            with zipfile.ZipFile(f, 'a') as zip_file:
+              for src_from_source_root, src_from_build_root in zip(t.sources_relative_to_source_root(), t.sources_relative_to_buildroot()):
+                zip_file.write(os.path.join(get_buildroot(), src_from_build_root), src_from_source_root)
           targets_map[t.address.spec]['pants_target_type'] = 'jar_library'
           targets_map[t.address.spec]['libraries'] = [t.id]
           graph_info['libraries'][t.id]['default'] = f.name

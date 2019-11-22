@@ -216,6 +216,9 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
       dependencies=[jvm_binary],
     )
 
+    self.create_file('project_info/a_resource', contents='a')
+    self.create_file('project_info/b_resource', contents='b')
+
     src_resource = self.make_target(
       'project_info:resource',
       target_type=Resources,
