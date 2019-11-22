@@ -14,7 +14,7 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
-from pants.backend.project_info.tasks.export import SourceRootTypes
+from pants.backend.project_info.tasks.export import SourceRootTypes, ExportTask
 from pants.base.build_environment import get_buildroot
 from pants.build_graph.resources import Resources
 from pants.java.distribution.distribution import DistributionLocator
@@ -30,11 +30,6 @@ class ExportDepAsJar(ConsoleTask):
   This is an experimental task that mimics export but uses the jars for
   jvm dependencies instead of sources.
   """
-
-  # TODO(yic):
-  # 1) Consolidate the version number with export task
-  # 2) Refactor the code further to minimize code duplication with export.
-  DEFAULT_EXPORT_VERSION = '1.0.11'
 
   @classmethod
   def register_options(cls, register):
@@ -245,7 +240,7 @@ class ExportDepAsJar(ConsoleTask):
     }
 
     graph_info = {
-      'version': self.DEFAULT_EXPORT_VERSION,
+      'version': ExportTask.DEFAULT_EXPORT_VERSION,
       'targets': targets_map,
       'jvm_platforms': jvm_platforms_map,
       'scala_platform': scala_platform_map,
