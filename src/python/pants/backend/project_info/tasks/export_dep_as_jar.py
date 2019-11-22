@@ -3,6 +3,7 @@
 
 import json
 import os
+import zipfile
 from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
@@ -19,6 +20,7 @@ from pants.build_graph.resources import Resources
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.jar.jar_dependency_utils import M2Coordinate
 from pants.task.console_task import ConsoleTask
+from pants.util.contextutil import temporary_file
 from pants.util.memo import memoized_property
 
 
@@ -205,8 +207,7 @@ class ExportDepAsJar(ConsoleTask):
 
       # TODO(yic): use .pants.d/resources/ rather than the source root of the reources
       _type = _get_target_type(current_target)
-      if current_target in target_roots_set or _type == SourceRootTypes.RESOURCE or \
-        _type == SourceRootTypes.TEST_RESOURCE:
+      if current_target in target_roots_set:
         info['roots'] = [{
           'source_root': os.path.realpath(source_root_package_prefix[0]),
           'package_prefix': source_root_package_prefix[1]
@@ -270,9 +271,22 @@ class ExportDepAsJar(ConsoleTask):
       graph_info['libraries'] = self._resolve_jars_info(targets, runtime_classpath)
       for t in targets:
         target_type = _get_target_type(t)
-        if t in target_roots_set or target_type == SourceRootTypes.RESOURCE or \
-          target_type == SourceRootTypes.TEST_RESOURCE or \
-          targets_map[t.address.spec]['pants_target_type'] == 'jar_library':
+        # If it is a target root or it is already a jar_library target, then no-op.
+        if t in target_roots_set or targets_map[t.address.spec]['pants_target_type'] == 'jar_library':
+          continue
+
+        if target_type == SourceRootTypes.RESOURCE or target_type == SourceRootTypes.TEST_RESOURCE:
+          # Using resolved path in preparation for VCFS.
+          resource_jar_root = os.path.realpath(self.versioned_workdir)
+          # yic assumes that the cost to fingerprint the target may not be that lower than
+          # just zipping up the resources anyway.
+          with temporary_file(root_dir=resource_jar_root, cleanup=False, suffix='.jar') as f:
+            with zipfile.ZipFile(f, 'a') as zip:
+              for src_relative_path in t.sources_relative_to_source_root():
+                zip.write(os.path.join(t.target_base, src_relative_path), src_relative_path)
+          targets_map[t.address.spec]['pants_target_type'] = 'jar_library'
+          targets_map[t.address.spec]['libraries'] = [t.id]
+          graph_info['libraries'][t.id]['default'] = f.name
           continue
 
         targets_map[t.address.spec]['pants_target_type'] = 'jar_library'
