@@ -13,7 +13,12 @@ from typing import TYPE_CHECKING, Any, Dict, Tuple
 
 from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE
-from pants.engine.fs import Digest, DirectoryToMaterialize, PathGlobsAndRoot
+from pants.engine.fs import (
+  Digest,
+  DirectoryToMaterialize,
+  MaterializeDirectoriesResult,
+  PathGlobsAndRoot,
+)
 from pants.engine.native import Function, TypeId
 from pants.engine.nodes import Return, Throw
 from pants.engine.objects import Collection
@@ -565,29 +570,30 @@ class SchedulerSession:
   ) -> 'InteractiveProcessResult':
     sched_pointer = self._scheduler._scheduler
 
-    wrapped_result  = self._scheduler._native.lib.run_local_interactive_process(
+    wrapped_result = self._scheduler._native.lib.run_local_interactive_process(
       sched_pointer,
       self._scheduler._to_value(request)
     )
     result: 'InteractiveProcessResult' = self._scheduler._raise_or_return(wrapped_result)
     return result
 
-  def materialize_directories(self, directories_paths_and_digests):
-    """Creates the specified directories on the file system.
-    :param directories_paths_and_digests tuple<DirectoryToMaterialize>: Tuple of the path and
-           digest of the directories to materialize.
-    :returns: Nothing or an error.
-    """
-    # Ensure there isn't more than one of the same directory paths and paths do not have the same prefix.
-    dir_list = [dpad.path for dpad in directories_paths_and_digests]
+  def materialize_directories(
+    self,
+    directories_to_materialize: Tuple[DirectoryToMaterialize, ...]
+  ) -> MaterializeDirectoriesResult:
+    """Creates the specified directories on the file system."""
+    # Ensure that there isn't more than one of the same directory paths and paths do not have
+    # the same prefix.
+    dir_list = [dtm.path for dtm in directories_to_materialize]
     check_no_overlapping_paths(dir_list)
 
-    result = self._scheduler._native.lib.materialize_directories(
+    wrapped_result = self._scheduler._native.lib.materialize_directories(
       self._scheduler._scheduler,
       self._session,
-      self._scheduler._to_value(_DirectoriesToMaterialize(directories_paths_and_digests)),
+      self._scheduler._to_value(_DirectoriesToMaterialize(directories_to_materialize)),
     )
-    return self._scheduler._raise_or_return(result)
+    result: MaterializeDirectoriesResult = self._scheduler._raise_or_return(wrapped_result)
+    return result
 
   def lease_files_in_graph(self):
     self._scheduler.lease_files_in_graph()

@@ -3,7 +3,7 @@
 
 import os
 from dataclasses import dataclass
-from typing import Any, Iterable, Optional, Tuple
+from typing import TYPE_CHECKING, Iterable, Optional, Tuple
 
 from pants.engine.objects import Collection
 from pants.engine.rules import RootRule
@@ -11,6 +11,10 @@ from pants.option.custom_types import GlobExpansionConjunction as GlobExpansionC
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.util.dirutil import maybe_read_file, safe_delete, safe_file_dump
 from pants.util.meta import frozen_after_init
+
+
+if TYPE_CHECKING:
+  from pants.engine.scheduler import SchedulerSession
 
 
 @dataclass(frozen=True)
@@ -194,11 +198,12 @@ class UrlToFetch:
 @dataclass(frozen=True)
 class Workspace:
   """Abstract handle for operations that touch the real local filesystem."""
-  _scheduler: Any
+  _scheduler: "SchedulerSession"
 
-  def materialize_directories(self, directories_to_materialize: Tuple[DirectoryToMaterialize, ...]) -> MaterializeDirectoriesResult:
-    result: MaterializeDirectoriesResult = self._scheduler.materialize_directories(directories_to_materialize)
-    return result
+  def materialize_directories(
+    self, directories_to_materialize: Tuple[DirectoryToMaterialize, ...]
+  ) -> MaterializeDirectoriesResult:
+    return self._scheduler.materialize_directories(directories_to_materialize)
 
 
 # TODO: don't recreate this in python, get this from fs::EMPTY_DIGEST somehow.
