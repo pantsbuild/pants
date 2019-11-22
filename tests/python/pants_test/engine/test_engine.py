@@ -8,7 +8,7 @@ from typing import List
 
 from pants.engine.rules import RootRule, rule
 from pants.engine.scheduler import ExecutionError
-from pants.engine.selectors import Get
+from pants.engine.selectors import Get, MultiGet
 from pants.reporting.streaming_workunit_handler import StreamingWorkunitHandler
 from pants.testutil.engine.util import assert_equal_with_printing, remove_locations_from_traceback
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
@@ -48,7 +48,7 @@ class Fib:
 async def fib(n: int) -> Fib:
   if n < 2:
     return Fib(n)
-  x, y = await Get(Fib, int(n-2)), Get(Fib, int(n-1))
+  x, y = tuple(await MultiGet([Get(Fib, int(n-2)), Get(Fib, int(n-1))]))
   return Fib(x.val + y.val)
 
 

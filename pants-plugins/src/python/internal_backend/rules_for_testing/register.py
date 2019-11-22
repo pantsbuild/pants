@@ -19,7 +19,7 @@ def fast_list_and_die_for_testing(
 ) -> ListAndDieForTesting:
   for address in addresses.dependencies:
     console.print_stdout(address.spec)
-  yield ListAndDieForTesting(exit_code=42)
+  return ListAndDieForTesting(exit_code=42)
 
 
 def rules():

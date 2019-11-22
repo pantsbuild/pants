@@ -80,7 +80,7 @@ class Example(Goal):
 async def a_console_rule_generator(console: Console) -> Example:
   a = await Get(A, str('a str!'))
   console.print_stdout(str(a))
-  return await Example(exit_code=0)
+  return Example(exit_code=0)
 
 
 class RuleTest(unittest.TestCase):
