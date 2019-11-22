@@ -8,6 +8,7 @@ import sys
 import time
 import traceback
 from dataclasses import dataclass
+from pathlib import Path
 from textwrap import dedent
 from typing import TYPE_CHECKING, Any, Dict, Tuple
 
@@ -25,7 +26,7 @@ from pants.engine.objects import Collection
 from pants.engine.rules import RuleIndex, TaskRule
 from pants.engine.selectors import Params
 from pants.util.contextutil import temporary_file_path
-from pants.util.dirutil import check_no_overlapping_paths
+from pants.util.dirutil import check_all_relative, check_no_overlapping_paths
 from pants.util.strutil import pluralize
 
 
@@ -582,10 +583,12 @@ class SchedulerSession:
     directories_to_materialize: Tuple[DirectoryToMaterialize, ...]
   ) -> MaterializeDirectoriesResult:
     """Creates the specified directories on the file system."""
-    # Ensure that there isn't more than one of the same directory paths and paths do not have
-    # the same prefix.
+    # Ensure that there isn't more than one of the same directory paths, that paths do not have
+    # the same prefix, and that all paths are relative (the engine materializes relative to the
+    # build root).
     dir_list = [dtm.path for dtm in directories_to_materialize]
     check_no_overlapping_paths(dir_list)
+    check_all_relative(*[Path(d) for d in dir_list])
 
     wrapped_result = self._scheduler._native.lib.materialize_directories(
       self._scheduler._scheduler,

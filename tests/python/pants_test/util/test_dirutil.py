@@ -8,6 +8,7 @@ import unittest
 import unittest.mock
 from contextlib import contextmanager
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Iterator, Tuple, Union
 
 from pants.util import dirutil
@@ -17,6 +18,7 @@ from pants.util.dirutil import (
   ExistingFileError,
   _mkdtemp_unregister_cleaner,
   absolute_symlink,
+  check_all_relative,
   check_no_overlapping_paths,
   fast_relpath,
   get_basedir,
@@ -589,3 +591,11 @@ class AbsoluteSymlinkTest(unittest.TestCase):
     paths = ["/he/went/to/the/store", "/she/saw/a/movie", "/no/one/knew/where/to/go"]
     # This test is successful if nothing happens when calling check_no_overlapping_paths(paths)
     check_no_overlapping_paths(paths)
+
+  def test_check_all_relative(self) -> None:
+    valid_paths = ["", "./", "./test", "../", "test", "test/nested", "./f.txt", "f.txt", "test/f.txt"]
+    invalid_paths = ["/", "/usr/lib", "/User/f.txt"]
+    check_all_relative(*[Path(fp) for fp in valid_paths])
+    with self.assertRaises(ValueError) as e:
+      check_all_relative(*[Path(fp) for fp in invalid_paths])
+      assert ", ".join(invalid_paths) in str(e)

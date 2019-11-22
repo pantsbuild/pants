@@ -1000,12 +1000,17 @@ pub extern "C" fn materialize_directories(
       dir_and_digests
         .into_iter()
         .map(|(dir, digest)| {
+          // NB: all DirectoryToMaterialize paths are validated in Python to be relative paths.
+          // Here, we join them with the build root.
+          let mut destination = PathBuf::new();
+          destination.push(scheduler.core.build_root.clone());
+          destination.push(dir);
           let metadata = scheduler.core.store().materialize_directory(
-            dir.clone(),
+            destination.clone(),
             digest,
             workunit_store.clone(),
           );
-          metadata.map(|m| (dir, m))
+          metadata.map(|m| (destination, m))
         })
         .collect::<Vec<_>>(),
     )

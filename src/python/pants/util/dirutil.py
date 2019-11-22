@@ -11,6 +11,7 @@ import threading
 import uuid
 from collections import defaultdict
 from contextlib import contextmanager
+from pathlib import PurePath
 from typing import (
   Any,
   Callable,
@@ -593,7 +594,7 @@ def split_basename_and_dirname(path: str) -> Tuple[str, str]:
   return os.path.dirname(path), os.path.basename(path)
 
 
-def check_no_overlapping_paths(paths: Sequence[str]) -> None:
+def check_no_overlapping_paths(paths: Iterable[str]) -> None:
   """Given a list of paths, ensure that all are unique and do not have the same prefix."""
   for path in paths:
     list_copy_without_path = list(paths)
@@ -603,6 +604,12 @@ def check_no_overlapping_paths(paths: Sequence[str]) -> None:
     for p in list_copy_without_path:
       if path in p:
         raise ValueError('{} and {} have the same prefix. All paths must be unique and cannot overlap.'.format(path, p))
+
+
+def check_all_relative(*paths: PurePath) -> None:
+  absolute_paths = [p for p in paths if p.is_absolute()]
+  if absolute_paths:
+    raise ValueError(f"Not all paths are relative: {', '.join(str(p) for p in absolute_paths)}")
 
 
 def is_executable(path: str) -> bool:
