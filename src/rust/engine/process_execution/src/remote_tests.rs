@@ -1081,6 +1081,7 @@ fn timeout_after_sufficiently_delayed_getoperations() {
 }
 
 #[test]
+#[ignore] // https://github.com/pantsbuild/pants/issues/8405
 fn dropped_request_cancels() {
   let request_timeout = Duration::new(10, 0);
   let delayed_operation_time = Duration::new(5, 0);
