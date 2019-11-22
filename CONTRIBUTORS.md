@@ -194,6 +194,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Todd Stumpf
 + Tom Dyas
 + Tom Howland
++ Tomasz Pasternak
 + Travis Crawford
 + Troy Howard
 + Ugo Di Girolamo

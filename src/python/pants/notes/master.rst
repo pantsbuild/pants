@@ -4,6 +4,118 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.23.0rc0 (11/22/2019)
+----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Move Black into a plugin to enable turning it on and off via `backend_plugins` (#8683)
+  `Issue #8346 <https://github.com/pantsbuild/pants/issues/8346>`_
+  `PR #8683 <https://github.com/pantsbuild/pants/pull/8683>`_
+
+* Bump default Pytest to 4.6 and add warning for future change to Pytest 5 (#8648)
+  `PR #8648 <https://github.com/pantsbuild/pants/pull/8648>`_
+
+* Deprecate using default `--fmt-transitive` and `--lint-transitive` in preparation for switching default to `--no-{fmt,lint}-transitive` (#8666)
+  `Issue #8345 <https://github.com/pantsbuild/pants/issues/8345>`_
+  `PR #8666 <https://github.com/pantsbuild/pants/pull/8666>`_
+
+* Allow async/await syntax in @rules to enable mypy type checking (#8639)
+  `PR #8639 <https://github.com/pantsbuild/pants/pull/8639>`_
+
+* Deprecate not setting `--python-setup-interpreter-constraints` in preparation for default changing to Python 3.6+ (#8655)
+  `PR #8655 <https://github.com/pantsbuild/pants/pull/8655>`_
+
+* Add flags to differentiate thrift py namespace lint issues (#8622)
+  `PR #8622 <https://github.com/pantsbuild/pants/pull/8622>`_
+
+* Deprecate not explicitly setting `--chroot` and `--fast` for test goal (#8644)
+  `PR #8644 <https://github.com/pantsbuild/pants/pull/8644>`_
+
+* Add `--version` and `--pytest-plugins` options to Pytest and deprecate old options (#8619)
+  `PR #8619 <https://github.com/pantsbuild/pants/pull/8619>`_
+
+* Improve signature of `run_rule()` test util to be more explicit (#8633)
+  `PR #8633 <https://github.com/pantsbuild/pants/pull/8633>`_
+
+* Update cfii to 1.13.2 (#8641)
+  `PR #8641 <https://github.com/pantsbuild/pants/pull/8641>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Async workunits (#8561)
+  `PR #8561 <https://github.com/pantsbuild/pants/pull/8561>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix ant compatible xml reporting for scala tests (#8674)
+  `PR #8674 <https://github.com/pantsbuild/pants/pull/8674>`_
+
+* Ensure idea-plugin projects contain at least one module (#8676)
+  `IntelliJ Plugin Issue #433 <https://github.com/pantsbuild/intellij-pants-plugin/issues/433>`_
+  `Issue #8631 <https://github.com/pantsbuild/pants/issues/8631>`_
+  `PR #8676 <https://github.com/pantsbuild/pants/pull/8676>`_
+
+* Fix #8666 deprecating using the default --transitive for _all_ goals (e.g. `./pants dependees`) (#8673)
+  `PR #8673 <https://github.com/pantsbuild/pants/pull/8673>`_
+  `PR #8666 <https://github.com/pantsbuild/pants/pull/8666>`_
+
+* Return success if V2 test runner is passed an empty target (#8630)
+  `PR #8630 <https://github.com/pantsbuild/pants/pull/8630>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Skip two flaky tests and tweak more test timeouts (#8687)
+  `Issue #8127 <https://github.com/pantsbuild/pants/issues/8127>`_
+  `Issue #8405 <https://github.com/pantsbuild/pants/issues/8405>`_
+  `PR #8687 <https://github.com/pantsbuild/pants/pull/8687>`_
+
+* Rewrite Black tests from `PantsRunIntegrationTest` to rules-style integration tests (#8684)
+  `PR #8684 <https://github.com/pantsbuild/pants/pull/8684>`_
+  `PR #8683 <https://github.com/pantsbuild/pants/pull/8683>`_
+
+* Refactor `FileContent` to use default argument for `is_executable` (#8682)
+  `PR #8682 <https://github.com/pantsbuild/pants/pull/8682>`_
+
+* Improve stability of CI through retries and tweaked timeouts (#8677)
+  `PR #8677 <https://github.com/pantsbuild/pants/pull/8677>`_
+
+* Refactor V2 Black implementation (#8671)
+  `PR #8671 <https://github.com/pantsbuild/pants/pull/8671>`_
+
+* Add tests to `lint-v2` and `fmt-v2` (#8668)
+  `PR #8668 <https://github.com/pantsbuild/pants/pull/8668>`_
+
+* Move V2 rules tests from `tests` to `src` (#8667)
+  `PR #8667 <https://github.com/pantsbuild/pants/pull/8667>`_
+
+* Remove some outdated pantsd info + utils (#8653)
+  `PR #8653 <https://github.com/pantsbuild/pants/pull/8653>`_
+
+* Rewrite `test_base.py` to use per-test setup instead of per-class (#8621)
+  `Issue #6282 <https://github.com/pantsbuild/pants/issues/6282>`_
+  `PR #8621 <https://github.com/pantsbuild/pants/pull/8621>`_
+
+* Rename some test files from `test_foo.py` to `foo_test.py` (#8659)
+  `Issue #7489 <https://github.com/pantsbuild/pants/issues/7489>`_
+  `PR #8659 <https://github.com/pantsbuild/pants/pull/8659>`_
+
+* Convert `tests/python` to use f-strings (#8617)
+  `PR #8617 <https://github.com/pantsbuild/pants/pull/8617>`_
+
+* Retry more remote execution internal errors (#8650)
+  `PR #8650 <https://github.com/pantsbuild/pants/pull/8650>`_
+
+* Try RBE's Maven mirror before going to Maven Central. (#8647)
+  `PR #8647 <https://github.com/pantsbuild/pants/pull/8647>`_
+
+* Partially type check `help`, `ivy`, `task`, and backend `target` and `subsystem` folders (#8635)
+  `PR #8635 <https://github.com/pantsbuild/pants/pull/8635>`_
+
 1.23.0.dev2 (11/18/2019)
 ------------------------
 
