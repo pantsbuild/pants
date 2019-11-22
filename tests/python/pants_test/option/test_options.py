@@ -1517,5 +1517,5 @@ class OptionsTestStringPayloads(OptionsTest):
       fp.seek(0)
       payload = fp.read()
       return Config.load_file_contents(
-        config_payloads=[FileContent('blah', payload, is_executable=False)],
+        config_payloads=[FileContent(path='blah', content=payload)],
       )

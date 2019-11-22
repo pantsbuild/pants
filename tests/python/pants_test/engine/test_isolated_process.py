@@ -213,7 +213,7 @@ class TestInputFileCreation(TestBase):
     file_name = 'some.filename'
     file_contents = b'some file contents'
 
-    input_file = InputFilesContent((FileContent(path=file_name, content=file_contents, is_executable=False),))
+    input_file = InputFilesContent((FileContent(path=file_name, content=file_contents),))
     digest, = self.scheduler.product_request(Digest, [input_file])
 
     req = ExecuteProcessRequest(
@@ -227,8 +227,8 @@ class TestInputFileCreation(TestBase):
 
   def test_multiple_file_creation(self):
     input_files_content = InputFilesContent((
-      FileContent(path='a.txt', content=b'hello', is_executable=False),
-      FileContent(path='b.txt', content=b'goodbye', is_executable=False),
+      FileContent(path='a.txt', content=b'hello'),
+      FileContent(path='b.txt', content=b'goodbye'),
     ))
 
     digest, = self.scheduler.product_request(Digest, [input_files_content])
@@ -246,7 +246,7 @@ class TestInputFileCreation(TestBase):
     path = 'somedir/filename'
     content = b'file contents'
 
-    input_file = InputFilesContent((FileContent(path=path, content=content, is_executable=False),))
+    input_file = InputFilesContent((FileContent(path=path, content=content),))
     digest, = self.scheduler.product_request(Digest, [input_file])
 
     req = ExecuteProcessRequest(
@@ -262,7 +262,7 @@ class TestInputFileCreation(TestBase):
     file_name = 'echo.sh'
     file_contents = b'#!/bin/bash -eu\necho "Hello"\n'
 
-    input_file = InputFilesContent((FileContent(path=file_name, content=file_contents, is_executable=False),))
+    input_file = InputFilesContent((FileContent(path=file_name, content=file_contents),))
     digest, = self.scheduler.product_request(Digest, [input_file])
 
     req = ExecuteProcessRequest(

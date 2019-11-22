@@ -83,7 +83,7 @@ def run_cloc(console: Console, options: CountLinesOfCode.Options, cloc_script: D
   report_filename = 'report.txt'
   ignore_filename = 'ignored.txt'
 
-  input_file_list = InputFilesContent(FilesContent((FileContent(path=input_files_filename, content=file_content, is_executable=False),)))
+  input_file_list = InputFilesContent(FilesContent((FileContent(path=input_files_filename, content=file_content),)))
   input_file_digest = yield Get(Digest, InputFilesContent, input_file_list)
   cloc_script_digest = cloc_script.digest
   digests_to_merge.extend([cloc_script_digest, input_file_digest])
