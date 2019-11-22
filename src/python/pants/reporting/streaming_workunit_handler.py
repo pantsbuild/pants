@@ -9,7 +9,7 @@ from typing import Any, Callable, Iterator, Optional
 DEFAULT_REPORT_INTERVAL_SECONDS = 10
 
 
-class AsyncWorkunitHandler:
+class StreamingWorkunitHandler:
   def __init__(self, scheduler: Any, callback: Optional[Callable], report_interval_seconds: float = DEFAULT_REPORT_INTERVAL_SECONDS):
     self.scheduler = scheduler
     self.report_interval = report_interval_seconds

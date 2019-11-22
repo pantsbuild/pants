@@ -215,7 +215,8 @@ def _get_starting_indent(source):
 
 
 def _make_rule(
-  return_type: type, parameter_types: typing.Iterable[type], cacheable: bool = True
+  return_type: type, parameter_types: typing.Iterable[type], cacheable: bool = True,
+  name: Optional[bool] = None
 ) -> Callable[[Callable], Callable]:
   """A @decorator that declares that a particular static function may be used as a TaskRule.
 
@@ -285,6 +286,12 @@ def _make_rule(
     # Register dependencies for @console_rule/Goal.
     dependency_rules = (optionable_rule(return_type.Options),) if is_goal_cls else None
 
+    # Set a default name for Goal classes if one is not explicitly provided
+    if is_goal_cls and name is None:
+      effective_name = return_type.name
+    else:
+      effective_name = name
+
     func.rule = TaskRule(
         return_type,
         tuple(parameter_types),
@@ -292,6 +299,7 @@ def _make_rule(
         input_gets=tuple(gets),
         dependency_rules=dependency_rules,
         cacheable=cacheable,
+        name=effective_name,
       )
 
     return func
@@ -300,6 +308,14 @@ def _make_rule(
 
 class InvalidTypeAnnotation(TypeError):
   """Indicates an incorrect type annotation for an `@rule`."""
+
+
+class UnrecognizedRuleArgument(TypeError):
+  """Indicates an unrecognized keyword argument to a `@rule`."""
+
+
+class MissingTypeAnnotation(TypeError):
+  """Indicates a missing type annotation for an `@rule`."""
 
 
 class MissingReturnTypeAnnotation(InvalidTypeAnnotation):
@@ -321,14 +337,30 @@ def _ensure_type_annotation(
   return annotation
 
 
-def rule(*args, cacheable=True) -> Callable:
+PUBLIC_RULE_DECORATOR_ARGUMENTS = {'name'}
+# We don't want @rule-writers to use 'cacheable' as a kwarg directly, but rather
+# set it implicitly based on whether the rule annotation is @rule or @console_rule.
+# So we leave it out of PUBLIC_RULE_DECORATOR_ARGUMENTS.
+IMPLICIT_PRIVATE_RULE_DECORATOR_ARGUMENTS = {'cacheable'}
+
+
+def rule_decorator(*args, **kwargs) -> Callable:
   if len(args) != 1 and not inspect.isfunction(args[0]):
     raise ValueError(
       'The @rule decorator expects no arguments and for the function it decorates to be '
       f'type-annotated. Given {args}.'
     )
 
+  if len(set(kwargs) - PUBLIC_RULE_DECORATOR_ARGUMENTS - IMPLICIT_PRIVATE_RULE_DECORATOR_ARGUMENTS) != 0:
+    raise UnrecognizedRuleArgument(
+      f"`@rule`s and `@console_rule`s only accept the following keyword arguments: {PUBLIC_RULE_DECORATOR_ARGUMENTS}"
+    )
+
   func = args[0]
+
+  cacheable: bool = kwargs['cacheable']
+  name = kwargs.get('name')
+
   signature = inspect.signature(func)
   func_id = f'@rule {func.__module__}:{func.__name__}'
   return_type = _ensure_type_annotation(
@@ -346,11 +378,24 @@ def rule(*args, cacheable=True) -> Callable:
     )
     for name, parameter in signature.parameters.items()
   )
-  return _make_rule(return_type, parameter_types, cacheable=cacheable)(func)
+  return _make_rule(return_type, parameter_types, cacheable=cacheable, name=name)(func)
 
 
-def console_rule(*args) -> Callable:
-  return rule(*args, cacheable=False)
+def inner_rule(*args, **kwargs) -> Callable:
+  if len(args) == 1 and inspect.isfunction(args[0]):
+    return rule_decorator(*args, **kwargs)
+  else:
+    def wrapper(*args):
+      return rule_decorator(*args, **kwargs)
+    return wrapper
+
+
+def rule(*args, **kwargs) -> Callable:
+  return inner_rule(*args, **kwargs, cacheable=True)
+
+
+def console_rule(*args, **kwargs) -> Callable:
+  return inner_rule(*args, **kwargs, cacheable=False)
 
 
 def union(cls):
@@ -460,6 +505,7 @@ class TaskRule(Rule):
   _dependency_rules: Tuple
   _dependency_optionables: Tuple
   cacheable: bool
+  name: Optional[str]
 
   def __init__(
     self,
@@ -470,6 +516,7 @@ class TaskRule(Rule):
     dependency_rules: Optional[Tuple] = None,
     dependency_optionables: Optional[Tuple] = None,
     cacheable: bool = True,
+    name: Optional[str] = None,
   ):
     self._output_type = output_type
     self.input_selectors = input_selectors
@@ -478,14 +525,17 @@ class TaskRule(Rule):
     self._dependency_rules = dependency_rules or ()
     self._dependency_optionables = dependency_optionables or ()
     self.cacheable = cacheable
+    self.name = name
 
   def __str__(self):
-    return ('({}, {!r}, {}, gets={}, opts={})'
-            .format(self.output_type.__name__,
+    return ('(name={}, {!r}, {}, gets={}, opts={})'
+            .format(self.name or '<not defined>',
+                    self.output_type.__name__,
                     self.input_selectors,
                     self.func.__name__,
                     self.input_gets,
-                    self.dependency_optionables))
+                    self.dependency_optionables,
+                    ))
 
   @property
   def output_type(self):

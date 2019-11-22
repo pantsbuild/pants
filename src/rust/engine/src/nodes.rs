@@ -932,6 +932,10 @@ pub struct Task {
 }
 
 impl Task {
+  fn get_display_info(&self) -> Option<&String> {
+    self.task.display_info.as_ref()
+  }
+
   fn gen_get(
     context: &Context,
     params: &Params,
@@ -1206,20 +1210,34 @@ impl Node for NodeKey {
   type Error = Failure;
 
   fn run(self, context: Context) -> NodeFuture<NodeResult> {
-    let span_id = generate_random_64bit_string();
-
     let handle_workunits =
       context.session.should_report_workunits() || context.session.should_record_zipkin_spans();
-    let node_workunit_params = if handle_workunits {
-      let node_name = format!("{}", self);
-      let start_time = std::time::SystemTime::now();
-      Some((node_name, start_time, span_id.clone()))
+
+    let (node_workunit_params, maybe_span_id) = if handle_workunits {
+      let span_id = generate_random_64bit_string();
+      let maybe_display_info: Option<String> = match self {
+        NodeKey::Task(ref task) => task.get_display_info().map(|s| s.to_owned()),
+        NodeKey::Snapshot(_) => Some(format!("{}", self)),
+        _ => None,
+      };
+
+      let node_workunit_params = match maybe_display_info {
+        Some(ref node_name) => {
+          let start_time = std::time::SystemTime::now();
+          Some((node_name.clone(), start_time, span_id.clone()))
+        }
+        _ => None,
+      };
+      (node_workunit_params, Some(span_id))
     } else {
-      None
+      (None, None)
     };
+
     let context2 = context.clone();
     futures::future::lazy(|| {
-      set_parent_id(span_id);
+      if let Some(span_id) = maybe_span_id {
+        set_parent_id(span_id);
+      }
       match self {
         NodeKey::DigestFile(n) => n.run(context).map(NodeResult::from).to_boxed(),
         NodeKey::DownloadedFile(n) => n.run(context).map(NodeResult::from).to_boxed(),
@@ -1232,9 +1250,9 @@ impl Node for NodeKey {
       }
     })
     .inspect(move |_: &NodeResult| {
-      if let Some((node_name, start_time, span_id)) = node_workunit_params {
+      if let Some((name, start_time, span_id)) = node_workunit_params {
         let workunit = WorkUnit {
-          name: node_name,
+          name,
           time_span: TimeSpan::since(&start_time),
           span_id,
           // TODO: set parent_id with the proper value, issue #7969

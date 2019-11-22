@@ -552,6 +552,16 @@ pub extern "C" fn tasks_add_select(tasks_ptr: *mut Tasks, product: TypeId) {
 }
 
 #[no_mangle]
+pub extern "C" fn tasks_add_display_info(tasks_ptr: *mut Tasks, name_ptr: *const raw::c_char) {
+  let name: String = unsafe { CStr::from_ptr(name_ptr) }
+    .to_string_lossy()
+    .into_owned();
+  with_tasks(tasks_ptr, |tasks| {
+    tasks.add_display_info(name);
+  })
+}
+
+#[no_mangle]
 pub extern "C" fn tasks_task_end(tasks_ptr: *mut Tasks) {
   with_tasks(tasks_ptr, |tasks| {
     tasks.task_end();

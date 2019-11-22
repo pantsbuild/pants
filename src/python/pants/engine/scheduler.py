@@ -167,12 +167,15 @@ class Scheduler:
         else:
           raise ValueError('Unexpected Rule type: {}'.format(rule))
 
-  def _register_task(self, output_type, rule, union_rules):
+  def _register_task(self, output_type, rule: TaskRule, union_rules):
     """Register the given TaskRule with the native scheduler."""
     func = Function(self._to_key(rule.func))
     self._native.lib.tasks_task_begin(self._tasks, func, self._to_type(output_type), rule.cacheable)
     for selector in rule.input_selectors:
       self._native.lib.tasks_add_select(self._tasks, self._to_type(selector))
+
+    if rule.name:
+      self._native.lib.tasks_add_display_info(self._tasks, rule.name.encode())
 
     def add_get_edge(product, subject):
       self._native.lib.tasks_add_get(self._tasks, self._to_type(product), self._to_type(subject))
