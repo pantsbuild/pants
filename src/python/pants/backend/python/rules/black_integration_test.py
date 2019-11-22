@@ -30,7 +30,7 @@ from pants.testutil.test_base import TestBase
 from pants.util.collections import assert_single_element
 
 
-class TestBlack(TestBase):
+class BlackIntegrationTest(TestBase):
 
   good_source = FileContent(path="test/good.py", content=b'name = "Anakin"\n')
   bad_source = FileContent(path="test/bad.py", content=b'name=    "Anakin"\n')
