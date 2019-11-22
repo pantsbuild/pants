@@ -22,6 +22,7 @@ python_tests(
   dependencies=[
     ':rules',
     'src/python/pants/backend/python/subsystems',
+    'src/python/pants/backend/python/targets',
     'src/python/pants/build_graph',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:isolated_process',
@@ -30,12 +31,14 @@ python_tests(
     'src/python/pants/engine/legacy:graph',
     'src/python/pants/engine/legacy:structs',
     'src/python/pants/rules/core',
+    'src/python/pants/source',
     'src/python/pants/testutil:test_base',
     'src/python/pants/testutil/engine:util',
     'src/python/pants/testutil/subsystem',
     'src/python/pants/util:collections',
     'src/python/pants/util:contextutil',
   ],
+  timeout = 120,
 )
 
 
@@ -44,10 +47,8 @@ python_tests(
   sources=globs('*_integration_test.py'),
   dependencies=[
     'src/python/pants/testutil:int-test',
-    'examples/src/python/example:hello_directory',
-    'testprojects/src/python:unicode_directory',
     'testprojects/tests/python/pants:dummies_directory',
   ],
   tags = {'integration'},
-  timeout = 180,
+  timeout = 90,
 )
