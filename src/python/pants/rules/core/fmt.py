@@ -2,11 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from pathlib import Path
 
-from pants.base.build_environment import get_buildroot
 from pants.engine.console import Console
-from pants.engine.fs import Digest, FilesContent
+from pants.engine.fs import Digest, DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal
 from pants.engine.legacy.graph import HydratedTargets
 from pants.engine.rules import UnionMembership, console_rule, union
@@ -34,7 +32,12 @@ class Fmt(Goal):
 
 
 @console_rule
-async def fmt(console: Console, targets: HydratedTargets, union_membership: UnionMembership) -> Fmt:
+async def fmt(
+  console: Console,
+  targets: HydratedTargets,
+  workspace: Workspace,
+  union_membership: UnionMembership
+) -> Fmt:
   results = await MultiGet(
     Get[FmtResult](TargetWithSources, target.adaptor)
     for target in targets
@@ -44,20 +47,19 @@ async def fmt(console: Console, targets: HydratedTargets, union_membership: Unio
   )
 
   for result in results:
-    files_content = await Get[FilesContent](Digest, result.digest)
-    # TODO: This is hacky and inefficient, and should be replaced by using the Workspace type
-    # once that is available on master.
-    # Blocked on: https://github.com/pantsbuild/pants/pull/8329
-    for file_content in files_content:
-      with Path(get_buildroot(), file_content.path).open('wb') as f:
-        f.write(file_content.content)
-
+    # NB: we cannot call `workspace.materialize_directories()` in one single call with all of the
+    # results because results can override each other—they share the same path prefix of `./` and
+    # are capable of changing the same files. We must instead call
+    # `workspace.materialize_directory()` for every result. If two results make conflicting
+    # changes, one will get overridden by the other.
+    workspace.materialize_directory(DirectoryToMaterialize(result.digest))
     if result.stdout:
       console.print_stdout(result.stdout)
     if result.stderr:
       console.print_stderr(result.stderr)
 
-  # Since we ran an ExecuteRequest, any failure would already have interrupted our flow
+  # Since the rules to produce FmtResult should use ExecuteRequest, rather than
+  # FallibleExecuteProcessRequest, we assume that there were no failures.
   exit_code = 0
   return Fmt(exit_code)
 
