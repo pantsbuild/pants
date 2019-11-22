@@ -22,7 +22,7 @@ from pants.rules.core.core_test_model import Status, TestResult, TestTarget
 from pants.rules.core.strip_source_root import SourceRootStrippedSources
 
 
-@rule
+@rule(name="Run pytest")
 async def run_python_test(
   test_target: PythonTestsAdaptor,
   pytest: PyTest,
