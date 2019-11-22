@@ -77,10 +77,10 @@ class Example(Goal):
 
 
 @console_rule
-def a_console_rule_generator(console: Console) -> Example:
+async def a_console_rule_generator(console: Console) -> Example:
   a = await Get(A, str('a str!'))
   console.print_stdout(str(a))
-  yield Example(exit_code=0)
+  return await Example(exit_code=0)
 
 
 class RuleTest(unittest.TestCase):
@@ -99,7 +99,7 @@ class RuleIndexTest(TestBase):
       TypeError,
       "Rule entry A() had an unexpected type: <class "
       "'pants_test.engine.test_rules.A'>. Rules either extend Rule or UnionRule, or "
-      "are static functions decorated with @rule."""):
+      "are static functions decorated with @rule."):
       RuleIndex.create([A()])
 
 
@@ -306,7 +306,7 @@ class RuleGraphTest(TestBase):
       pass
 
     @rule
-    def d_from_a_and_suba(a: A, suba: SubA) -> D:
+    async def d_from_a_and_suba(a: A, suba: SubA) -> D:
       _ = await Get(A, C, C())  # noqa: F841
 
     @rule
@@ -337,11 +337,11 @@ class RuleGraphTest(TestBase):
     """Test that when one rule "shadows" another, we get an error."""
     @rule
     def d_singleton() -> D:
-      yield D()
+      return D()
 
     @rule
     def d_for_b(b: B) -> D:
-      yield D()
+      return D()
 
     rules = [
       d_singleton,
@@ -507,7 +507,7 @@ class RuleGraphTest(TestBase):
     # they intend for the Get's parameter to be consumed in the subgraph. Anything else would
     # be surprising.
     @rule
-    def a(sub_a: SubA) -> A:
+    async def a(sub_a: SubA) -> A:
       _ = await Get(B, C())  # noqa: F841
 
     @rule
@@ -796,11 +796,11 @@ class RuleGraphTest(TestBase):
 
   def test_get_simple(self):
     @rule
-    def a() -> A:
+    async def a() -> A:
       _ = await Get(B, D, D())  # noqa: F841
 
     @rule
-    def b_from_d(d: D) -> B:
+    async def b_from_d(d: D) -> B:
       pass
 
     rules = [
@@ -827,17 +827,15 @@ class RuleGraphTest(TestBase):
 Could not resolve type `XXX` in top level of module pants_test.engine.test_rules"""):
       class XXX: pass
       @rule
-      def f() -> A:
-        a = await Get(A, XXX, 3)
-        yield a
+      async def f() -> A:
+        return await Get(A, XXX, 3)
 
     # This fails because the argument is defined in this file's module, but it is not a type.
     with self.assertRaisesWithMessage(ValueError, """\
 Expected a `type` constructor for `_this_is_not_a_type`, but got: 3 (type `int`)"""):
       @rule
-      def g() -> A:
-        a = await Get(A, _this_is_not_a_type, 3)
-        yield a
+      async def g() -> A:
+        return await Get(A, _this_is_not_a_type, 3)
 
   def create_full_graph(self, rules, validate=True):
     scheduler = create_scheduler(rules, validate=validate)
