@@ -210,6 +210,12 @@ impl ChildResults {
   }
 }
 
+pub enum ExecutionDir {
+  TempDir(tempfile::TempDir),
+  StaticDir(PathBuf),
+}
+
+
 impl super::CommandRunner for CommandRunner {
   fn extract_compatible_request(
     &self,
@@ -247,6 +253,7 @@ impl super::CommandRunner for CommandRunner {
       self.executor.clone(),
       self.cleanup_local_dirs,
       &self.work_dir,
+      None,
     )
   }
 }
@@ -279,20 +286,47 @@ pub trait CapturedWorkdir {
     executor: task_executor::Executor,
     cleanup_local_dirs: bool,
     workdir_base: &Path,
+    static_client_workdir: Option<PathBuf>,
   ) -> BoxFuture<FallibleExecuteProcessResult, String>
   where
     Self: Send + Sync + Clone + 'static,
   {
-    let workdir = try_future!(tempfile::Builder::new()
-      .prefix("process-execution")
-      .tempdir_in(workdir_base)
-      .map_err(|err| format!(
-        "Error making tempdir for local process execution: {:?}",
-        err
-      )));
-    debug!("Created tempdir for captured hermetic work dir at: {:?}", workdir.path());
+    let workdir = if let Some(client_dir) = static_client_workdir {
+      if !client_dir.exists() {
+        try_future!(fs::safe_create_dir_all(&client_dir)
+          .map_err(|err| format!("Error creating the nailgun workdir! {}", err))
+        );
+        debug!("Static client dir didn't exist so it was created {:?}", client_dir);
+      }
+      ExecutionDir::StaticDir(client_dir)
+    } else {
+      ExecutionDir::TempDir(try_future!(tempfile::Builder::new()
+        .prefix("process-execution")
+        .tempdir_in(workdir_base)
+        .map_err(|err| format!(
+          "Error making tempdir for local process execution: {:?}",
+          err
+        ))
+      ))
+    };
 
-    let workdir_path = workdir.path().to_owned();
+    let workdir_path = match workdir {
+      ExecutionDir::TempDir(ref td) => {
+        debug!(
+          "Created tempdir for captured hermetic work dir at: {:?}",
+          td.path()
+        );
+        td.path().to_owned()
+      },
+      ExecutionDir::StaticDir(ref pb) => {
+        debug!(
+          "Created tempdir for captured hermetic work dir at: {:?}",
+          pb.as_path()
+        );
+        pb.as_path().to_owned()
+      }
+    };
+
     let workdir_path2 = workdir_path.clone();
     let workdir_path3 = workdir_path.clone();
     let workdir_path4 = workdir_path.clone();
@@ -331,7 +365,13 @@ pub trait CapturedWorkdir {
       .and_then(move |_metadata| {
         maybe_jdk_home.map_or(Ok(()), |jdk_home| {
           symlink(jdk_home, workdir_path3.clone().join(".jdk"))
-            .map_err(|err| format!("Error making symlink for local execution: {:?}", err))
+            .or_else(|e| {
+              let kind = e.kind();
+              match kind {
+                std::io::ErrorKind::AlreadyExists => Ok(()),
+                _ => Err(format!("Error making symlink for local execution: {:?}", e))
+              }
+            })
         })?;
         // The bazel remote execution API specifies that the parent directories for output files and
         // output directories should be created before execution completes: see
@@ -406,11 +446,14 @@ pub trait CapturedWorkdir {
         if !cleanup_local_dirs {
           // This consumes the `TempDir` without deleting directory on the filesystem, meaning
           // that the temporary directory will no longer be automatically deleted when dropped.
-          let preserved_path = workdir.into_path();
-          info!(
-            "preserved local process execution dir `{:?}` for {:?}",
-            preserved_path, req_description
-          );
+          if let ExecutionDir::TempDir(td) = workdir {
+            let preserved_path = td.into_path();
+            info!(
+              "preserved local process execution dir `{:?}` for {:?}",
+              preserved_path, req_description
+            );
+          }
+
         } // Else, workdir gets dropped here
         match result {
           Ok(fallible_execute_process_result) => Ok(fallible_execute_process_result),

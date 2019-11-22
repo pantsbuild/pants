@@ -10,6 +10,7 @@ use futures::stream::Stream;
 use log::{debug, trace};
 use nails::execution::{child_channel, ChildInput, ChildOutput, Command};
 use tokio::net::TcpStream;
+use tempfile;
 
 use crate::local::CapturedWorkdir;
 use crate::nailgun::nailgun_pool::NailgunProcessName;
@@ -87,13 +88,20 @@ fn construct_nailgun_client_request(
   } = original_req;
   client_args.insert(0, client_main_class);
   // arg file is only materialized to the client workdir but java is running in the
-  // nailgun dir so we have to adjust the path to point to the correct spot, which is in the 
+  // nailgun dir so we have to adjust the path to point to the correct spot, which is in the
   // client workdir.
   let maybe_arg_file = client_args.last().unwrap();
-  if maybe_arg_file.starts_with("@") {
+  if maybe_arg_file.starts_with('@') {
     if let Ok(arg_file_path) = maybe_arg_file[1..].parse::<PathBuf>() {
       client_args.pop();
-      let mut full_arg_file_path = client_workdir.as_path().join(arg_file_path).into_os_string().into_string().map_err(|_| "Couldn't convert path into String, does it contain valid unicode?".to_string())?;
+      let mut full_arg_file_path = client_workdir
+        .as_path()
+        .join(arg_file_path)
+        .into_os_string()
+        .into_string()
+        .map_err(|_| {
+          "Couldn't convert path into String, does it contain valid unicode?".to_string()
+        })?;
       // turn the path back into a java arguments file.
       full_arg_file_path.insert(0, '@');
       client_args.push(full_arg_file_path);
@@ -129,6 +137,7 @@ pub struct CommandRunner {
   metadata: ExecuteProcessRequestMetadata,
   workdir_base: PathBuf,
   executor: task_executor::Executor,
+  client_workdir: PathBuf,
 }
 
 impl CommandRunner {
@@ -142,8 +151,13 @@ impl CommandRunner {
       inner: Arc::new(runner),
       nailgun_pool: NailgunPool::new(),
       metadata: metadata,
-      workdir_base: workdir_base,
+      workdir_base: workdir_base.clone(),
       executor: executor,
+      client_workdir: tempfile::Builder::new()
+        .prefix("process-execution")
+        .tempdir_in(workdir_base)
+        .expect("Error making client tempdir for process execution")
+        .into_path()
     }
   }
 
@@ -190,8 +204,9 @@ impl super::CommandRunner for CommandRunner {
       context,
       store,
       executor,
-      false,
+      true,
       &self.workdir_base,
+      Some(self.client_workdir.clone())
     )
   }
 
@@ -251,18 +266,24 @@ impl CapturedWorkdir for CommandRunner {
     // Streams to read child output from
     let (stdio_write, stdio_read) = child_channel::<ChildOutput>();
     let (_stdin_write, stdin_read) = child_channel::<ChildInput>();
-    let client_req = construct_nailgun_client_request(req2, client_main_class, client_args, client_workdir.clone())?;
+    let client_req = construct_nailgun_client_request(
+      req2,
+      client_main_class,
+      client_args,
+      client_workdir.clone(),
+    )?;
 
     // Get the port of a running nailgun server (or a new nailgun server if it doesn't exist)
-    let nails_command = nailgun_pool.connect(
-          nailgun_name.clone(),
-          nailgun_req,
-          workdir_for_this_nailgun1,
-          nailgun_req_digest,
-          build_id,
-          store,
-          req.input_files,
-          workunit_store,
+    let nails_command = nailgun_pool
+      .connect(
+        nailgun_name.clone(),
+        nailgun_req,
+        workdir_for_this_nailgun1,
+        nailgun_req_digest,
+        build_id,
+        store,
+        req.input_files,
+        workunit_store,
       )
       .map_err(|e| format!("Failed to connect to nailgun! {}", e))
       .inspect(move |_| debug!("Connected to nailgun instance {}", &nailgun_name3))

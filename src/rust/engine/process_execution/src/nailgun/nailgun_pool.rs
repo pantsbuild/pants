@@ -1,9 +1,9 @@
 // Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::io::BufReader;
 use std::collections::HashMap;
 use std::fs::{read_link, remove_file};
+use std::io::BufReader;
 use std::os::unix::fs::symlink;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -111,7 +111,6 @@ impl NailgunPool {
     input_files: Digest,
     workunit_store: WorkUnitStore,
   ) -> BoxFuture<(Port, futures_locks::MutexGuard<NailgunProcess>), String> {
-
     let jdk_path = try_future!(startup_options.jdk_home.clone().ok_or_else(|| {
       format!(
         "jdk_home is not set for nailgun server startup request {:#?}",
@@ -261,8 +260,13 @@ impl NailgunPool {
     );
     // TODO materialize workdir for server here.
     Self::materialize_workdir_for_server(
-      store, workdir_path.clone(), jdk_path, input_files, workunit_store
-    ).and_then({
+      store,
+      workdir_path.clone(),
+      jdk_path,
+      input_files,
+      workunit_store,
+    )
+    .and_then({
       let name = name.clone();
       |_| {
         NailgunProcess::start_new(
@@ -279,7 +283,9 @@ impl NailgunPool {
       move |process| {
         let port = process.port;
         let new_nailgun = Mutex::new(process);
-        let nailgun_guard = new_nailgun.try_lock().expect("We just created this nailgun, no one else can have locked it");
+        let nailgun_guard = new_nailgun
+          .try_lock()
+          .expect("We just created this nailgun, no one else can have locked it");
         processes.insert(name, new_nailgun);
         (port, nailgun_guard)
       }
@@ -304,7 +310,9 @@ fn read_port(stdout: PathBuf) -> BoxFuture<Port, String> {
     let wait_period = Duration::from_millis(100);
     sleep(wait_period)
       .map_err(|_| "sleep failed for some reason!".to_string())
-      .and_then(move |_| fs::File::open(stdout.clone()).map_err(move |_| format!("Could not open file {:?}", stdout)))
+      .and_then(move |_| {
+        fs::File::open(stdout.clone()).map_err(move |_| format!("Could not open file {:?}", stdout))
+      })
       .and_then(|log| {
         lines(BufReader::new(log))
           .take(1)
@@ -313,15 +321,16 @@ fn read_port(stdout: PathBuf) -> BoxFuture<Port, String> {
       })
       .and_then(move |(line, _)| {
         info!("DEBUG_NAILGUN start output is {:?}", line);
-        match line {
-          Some(s) => Ok(Loop::Break(Ok(s))),
-          None => {
-            loops -= 1;
-            if loops == 0 {
-              Ok(Loop::Break(Err("Couldn't read a line from nailgun".to_string())))
-            } else {
-              Ok(Loop::Continue(loops))
-            }
+        if let Some(s) = line {
+          Ok(Loop::Break(Ok(s)))
+        } else {
+          loops -= 1;
+          if loops == 0 {
+            Ok(Loop::Break(Err(
+              "Couldn't read a line from nailgun".to_string(),
+            )))
+          } else {
+            Ok(Loop::Continue(loops))
           }
         }
       })
@@ -332,11 +341,13 @@ fn read_port(stdout: PathBuf) -> BoxFuture<Port, String> {
       Ok(s) => {
         let port = &NAILGUN_PORT_REGEX.captures_iter(s.trim()).next();
         match port {
-          Some(port) => port[1].parse::<Port>().map_err(|e| format!("Error parsing port {}! {}", &port[1], e)),
+          Some(port) => port[1]
+            .parse::<Port>()
+            .map_err(|e| format!("Error parsing port {}! {}", &port[1], e)),
           None => Err("Output for nailgun server didn't match the regex!".to_string()),
         }
       }
-      Err(e) => Err(format!("Error reading nailgun startup stdout: {:?}.", e))
+      Err(e) => Err(format!("Error reading nailgun startup stdout: {:?}.", e)),
     }
   })
   .to_boxed()
@@ -345,7 +356,6 @@ fn read_port(stdout: PathBuf) -> BoxFuture<Port, String> {
 impl NailgunProcess {
   fn create_output_file(server_workdir: PathBuf, name: String) -> BoxFuture<fs::File, String> {
     let fname = Self::log_path(server_workdir, name);
-    info!("CREATED NAILGUN output {:?}", fname);
     tokio::fs::File::create(fname.clone())
       .map_err(move |e| format!("Failed to open file {:?} for reading {:?}", fname, e))
       .to_boxed()
@@ -372,7 +382,10 @@ impl NailgunProcess {
       &workdir_path
     );
     Self::create_output_file(workdir_path.clone(), "stdout.log".to_string())
-      .join(Self::create_output_file(workdir_path.clone(), "stderr.log".to_string()))
+      .join(Self::create_output_file(
+        workdir_path.clone(),
+        "stderr.log".to_string(),
+      ))
       .and_then({
         let workdir_path = workdir_path.clone();
         move |(stdout, stderr)| {
@@ -382,13 +395,12 @@ impl NailgunProcess {
             .stderr(stderr.into_std())
             .current_dir(workdir_path)
             .spawn();
-          handle
-            .map_err(|e| {
-              format!(
-                "Failed to create child handle with cmd: {} options {:#?}: {}",
-                &cmd, &startup_options, e
-              )
-            })
+          handle.map_err(|e| {
+            format!(
+              "Failed to create child handle with cmd: {} options {:#?}: {}",
+              &cmd, &startup_options, e
+            )
+          })
         }
       })
       .and_then(move |child| {
@@ -415,7 +427,7 @@ impl NailgunProcess {
 
 impl Drop for NailgunProcess {
   fn drop(&mut self) {
-    info!("DROP Exiting nailgun server process {:?}", self);
+    // TODO we should probaly use the nails client to call the ng-kill nail?
     let _ = self.handle.lock().kill();
   }
 }
