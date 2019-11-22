@@ -269,6 +269,8 @@ class ExportDepAsJar(ConsoleTask):
 
     if runtime_classpath:
       graph_info['libraries'] = self._resolve_jars_info(targets, runtime_classpath)
+      # Using resolved path in preparation for VCFS.
+      resource_jar_root = os.path.realpath(self.versioned_workdir)
       for t in targets:
         target_type = _get_target_type(t)
         # If it is a target root or it is already a jar_library target, then no-op.
@@ -276,9 +278,7 @@ class ExportDepAsJar(ConsoleTask):
           continue
 
         if target_type == SourceRootTypes.RESOURCE or target_type == SourceRootTypes.TEST_RESOURCE:
-          # Using resolved path in preparation for VCFS.
-          resource_jar_root = os.path.realpath(self.versioned_workdir)
-          # yic assumes that the cost to fingerprint the target may not be that lower than
+          # yic assumed that the cost to fingerprint the target may not be that lower than
           # just zipping up the resources anyway.
           with temporary_file(root_dir=resource_jar_root, cleanup=False, suffix='.jar') as f:
             with zipfile.ZipFile(f, 'a') as zip:
