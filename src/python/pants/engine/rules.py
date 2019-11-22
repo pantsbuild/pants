@@ -12,7 +12,7 @@ from collections import OrderedDict
 from collections.abc import Iterable
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import Any, Callable, Dict, Optional, Tuple, Type
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type
 
 import asttokens
 from twitter.common.collections import OrderedSet
@@ -28,11 +28,11 @@ logger = logging.getLogger(__name__)
 
 
 class _RuleVisitor(ast.NodeVisitor):
-  """Pull `Get` calls out of an @rule body and validate `yield` statements."""
+  """Pull `Get` calls out of an @rule body and validate `yield` or `await` statements."""
 
   def __init__(self, func, func_node, func_source, orig_indent, parents_table):
     super().__init__()
-    self._gets = []
+    self._gets: List[Get] = []
     self._func = func
     self._func_node = func_node
     self._func_source = func_source
@@ -41,10 +41,10 @@ class _RuleVisitor(ast.NodeVisitor):
     self._yields_in_assignments = set()
 
   @property
-  def gets(self):
+  def gets(self) -> List[Get]:
     return self._gets
 
-  def _generate_ast_error_message(self, node, msg):
+  def _generate_ast_error_message(self, node, msg) -> str:
     # This is the location info of the start of the decorated @rule.
     filename = inspect.getsourcefile(self._func)
     source_lines, line_number = inspect.getsourcelines(self._func)
@@ -90,7 +90,7 @@ The rule defined by function `{func_name}` begins at:
   class YieldVisitError(Exception): pass
 
   @staticmethod
-  def _maybe_end_of_stmt_list(attr_value):
+  def _maybe_end_of_stmt_list(attr_value: Optional[Any]) -> Optional[Any]:
     """If `attr_value` is a non-empty iterable, return its final element."""
     if (attr_value is not None) and isinstance(attr_value, Iterable):
       result = list(attr_value)
@@ -98,7 +98,7 @@ The rule defined by function `{func_name}` begins at:
         return result[-1]
     return None
 
-  def _stmt_is_at_end_of_parent_list(self, stmt):
+  def _stmt_is_at_end_of_parent_list(self, stmt) -> bool:
     """Determine if `stmt` is at the end of a list of statements (i.e. can be an implicit `return`).
 
     If there are any statements following `stmt` at the same level of nesting, this method returns
@@ -145,18 +145,19 @@ The rule defined by function `{func_name}` begins at:
   def _is_get(self, node):
     return isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == Get.__name__
 
-  def visit_Call(self, node):
+  def visit_Call(self, node) -> None:
+    self.generic_visit(node)
     if self._is_get(node):
       self._gets.append(Get.extract_constraints(node))
 
-  def visit_Assign(self, node):
-    if isinstance(node.value, ast.Yield):
+  def visit_Assign(self, node) -> None:
+    if isinstance(node.value, (ast.Yield, ast.Await)):
       self._yields_in_assignments.add(node.value)
     self.generic_visit(node)
 
-  def visit_Yield(self, node):
+  def _visit_await_or_yield_compat(self, node, *, is_yield: bool) -> None:
     self.generic_visit(node)
-    if node not in self._yields_in_assignments:
+    if is_yield and (node not in self._yields_in_assignments):
       # The current yield "expr" is the child of an "Expr" "stmt".
       expr_for_yield = self._parents_table[node]
 
@@ -185,6 +186,12 @@ The rule defined by function `{func_name}` begins at:
           Note that any `yield Get(...)` in an @rule without assignment is also currently not
           supported. See https://github.com/pantsbuild/pants/pull/8227 for progress.
           """)))
+
+  def visit_Await(self, node) -> None:
+    self._visit_await_or_yield_compat(node, is_yield=False)
+
+  def visit_Yield(self, node) -> None:
+    self._visit_await_or_yield_compat(node, is_yield=True)
 
 
 @memoized
@@ -256,7 +263,7 @@ def _make_rule(
     gets = OrderedSet()
     rule_func_node = assert_single_element(
       node for node in ast.iter_child_nodes(module_ast)
-      if isinstance(node, ast.FunctionDef) and node.name == func.__name__)
+      if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == func.__name__)
 
     parents_table = {}
     for parent in ast.walk(rule_func_node):
@@ -276,10 +283,7 @@ def _make_rule(
       for p, s in rule_visitor.gets)
 
     # Register dependencies for @console_rule/Goal.
-    if is_goal_cls:
-      dependency_rules = (optionable_rule(return_type.Options),)
-    else:
-      dependency_rules = None
+    dependency_rules = (optionable_rule(return_type.Options),) if is_goal_cls else None
 
     func.rule = TaskRule(
         return_type,
@@ -294,20 +298,20 @@ def _make_rule(
   return wrapper
 
 
-class MissingTypeAnnotation(TypeError):
-  """Indicates a missing type annotation for an `@rule`."""
+class InvalidTypeAnnotation(TypeError):
+  """Indicates an incorrect type annotation for an `@rule`."""
 
 
-class MissingReturnTypeAnnotation(MissingTypeAnnotation):
+class MissingReturnTypeAnnotation(InvalidTypeAnnotation):
   """Indicates a missing return type annotation for an `@rule`."""
 
 
-class MissingParameterTypeAnnotation(MissingTypeAnnotation):
+class MissingParameterTypeAnnotation(InvalidTypeAnnotation):
   """Indicates a missing parameter type annotation for an `@rule`."""
 
 
 def _ensure_type_annotation(
-  annotation: Any, name: str, empty_value: Any, raise_type: Type[MissingTypeAnnotation]
+  annotation: Any, name: str, empty_value: Any, raise_type: Type[InvalidTypeAnnotation],
 ) -> type:
   if annotation == empty_value:
     raise raise_type(f'{name} is missing a type annotation.')

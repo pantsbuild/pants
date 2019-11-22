@@ -796,7 +796,7 @@ class IvyUtils:
 
     runner = ivy.runner(jvm_options=ivy_jvm_options, args=ivy_args, executor=executor)
     try:
-      with ivy.resolution_lock:
+      with ivy.resolution_lock():
         result = execute_runner(runner, workunit_factory=workunit_factory,
                                 workunit_name=workunit_name)
       if result != 0:

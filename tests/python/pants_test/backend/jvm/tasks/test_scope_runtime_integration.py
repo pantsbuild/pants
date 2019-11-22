@@ -16,7 +16,7 @@ class ScopeRuntimeIntegrationTest(PantsRunIntegrationTest):
 
   @classmethod
   def _spec(cls, name):
-    return 'testprojects/src/java/org/pantsbuild/testproject/runtime:{}'.format(name)
+    return f'testprojects/src/java/org/pantsbuild/testproject/runtime:{name}'
 
   def test_run_runtime_pass(self):
     self.assert_success(self.run_pants([
@@ -46,7 +46,7 @@ class ScopeRuntimeIntegrationTest(PantsRunIntegrationTest):
   def test_runtime_binary_has_correct_contents_and_runs(self):
     with temporary_dir() as distdir:
       run = self.run_pants([
-        '--pants-distdir={}'.format(distdir),
+        f'--pants-distdir={distdir}',
         '--no-java-strict-deps',
         'binary',
         self._spec('runtime-pass'),
@@ -63,7 +63,7 @@ class ScopeRuntimeIntegrationTest(PantsRunIntegrationTest):
   def test_compile_binary_has_correct_contents_and_runs(self):
     with temporary_dir() as distdir:
       run = self.run_pants([
-        '--pants-distdir={}'.format(distdir),
+        f'--pants-distdir={distdir}',
         '--no-java-strict-deps',
         'binary',
         self._spec('compile-pass'),
@@ -81,13 +81,13 @@ class ScopeRuntimeIntegrationTest(PantsRunIntegrationTest):
     spec = self._spec('runtime-pass')
     with temporary_dir() as distdir:
       with self.pants_results([
-        '--pants-distdir={}'.format(distdir),
+        f'--pants-distdir={distdir}',
         '--no-java-strict-deps',
         'bundle',
         spec,
       ]) as run:
         self.assert_success(run)
-        bundle_dir = os.path.join(distdir, '{}-bundle'.format(re.sub(r'[:/]', '.', spec)))
+        bundle_dir = os.path.join(distdir, f"{re.sub('[:/]', '.', spec)}-bundle")
         binary = os.path.join(bundle_dir, 'runtime-pass.jar')
         self.assertTrue(os.path.exists(binary))
         self.assertTrue(any(name.startswith('3rdparty.gson')
@@ -97,13 +97,13 @@ class ScopeRuntimeIntegrationTest(PantsRunIntegrationTest):
     spec = self._spec('compile-pass')
     with temporary_dir() as distdir:
       with self.pants_results([
-        '--pants-distdir={}'.format(distdir),
+        f'--pants-distdir={distdir}',
         '--no-java-strict-deps',
         'bundle',
         spec,
       ]) as run:
         self.assert_success(run)
-        bundle_dir = os.path.join(distdir, '{}-bundle'.format(re.sub(r'[:/]', '.', spec)))
+        bundle_dir = os.path.join(distdir, f"{re.sub('[:/]', '.', spec)}-bundle")
         binary = os.path.join(bundle_dir, 'compile-pass.jar')
         self.assertTrue(os.path.exists(binary))
         self.assertFalse(any(name.startswith('3rdparty.gson')
@@ -123,7 +123,7 @@ class ScopeChangesCacheInvalidationIntegrationTest(PantsRunIntegrationTest):
           f.write('public class Bar extends Foo {}')
 
         def spec(name):
-          return '{}:{}'.format(os.path.basename(tmp_project), name)
+          return f'{os.path.basename(tmp_project)}:{name}'
 
         def write_build(scope):
           with open(os.path.join(tmp_project, 'BUILD'), 'w') as f:

@@ -38,7 +38,7 @@ class JarDependencyTest(unittest.TestCase):
 
   def test_get_url(self):
     """Test using relative url and absolute url are equivalent."""
-    abs_url = 'file://{}/a/b/c'.format(get_buildroot())
+    abs_url = f'file://{get_buildroot()}/a/b/c'
     rel_url = 'file:c'
     base_path = 'a/b'
 

@@ -29,12 +29,12 @@ class Lint(Goal):
 @console_rule
 def lint(console: Console, targets: HydratedTargets, union_membership: UnionMembership) -> Lint:
   results = yield [
-          Get(LintResult, TargetWithSources, target.adaptor)
-          for target in targets
-          # TODO: make TargetAdaptor return a 'sources' field with an empty snapshot instead of
-          # raising to remove the hasattr() checks here!
-          if union_membership.is_member(TargetWithSources, target.adaptor) and hasattr(target.adaptor, "sources")
-          ]
+    Get(LintResult, TargetWithSources, target.adaptor)
+    for target in targets
+    # TODO: make TargetAdaptor return a 'sources' field with an empty snapshot instead of
+    # raising to remove the hasattr() checks here!
+    if union_membership.is_member(TargetWithSources, target.adaptor) and hasattr(target.adaptor, "sources")
+  ]
 
   exit_code = 0
   for result in results:
@@ -50,5 +50,5 @@ def lint(console: Console, targets: HydratedTargets, union_membership: UnionMemb
 
 def rules():
   return [
-      lint,
-    ]
+    lint,
+  ]

@@ -38,7 +38,7 @@ class IvyImportsTest(NailgunTaskTestBase):
     return self.make_target(spec='unpack/jars:foo-jars',
                             target_type=JarLibrary,
                             jars=[JarDependency(coordinate.org, coordinate.name, coordinate.rev,
-                                                url='file:{}'.format(jar_filename))])
+                                                url=f'file:{jar_filename}')])
 
   def test_products(self):
     expected_coordinate = M2Coordinate(org='com.example', name='bar', rev='0.0.1')

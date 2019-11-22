@@ -38,7 +38,7 @@ class ClocTest(ConsoleTaskTestBase):
             self.assertEqual(comment, int(fields[3]))
             self.assertEqual(code, int(fields[4]))
             return
-      self.fail('Found no output line for {}'.format(lang))
+      self.fail(f'Found no output line for {lang}')
 
     res = self.execute_console_task(
       targets=[py_tgt, java_tgt],

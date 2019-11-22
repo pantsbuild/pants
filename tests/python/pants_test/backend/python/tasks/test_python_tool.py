@@ -62,7 +62,7 @@ class PythonToolPrepTest(PythonTaskTestBase):
   def _assert_tool_execution_for_python_version(self, use_py3=True):
     scope_string = '3' if use_py3 else '2'
     constraint_string = 'CPython>=3' if use_py3 else 'CPython<3'
-    tool_prep_type = self.synthesize_task_subtype(ToolPrep, 'tp_scope_py{}'.format(scope_string))
+    tool_prep_type = self.synthesize_task_subtype(ToolPrep, f'tp_scope_py{scope_string}')
     with temporary_dir() as tmp_dir:
       context = self.context(for_task_types=[tool_prep_type], for_subsystems=[Tool], options={
         '': {
@@ -73,7 +73,7 @@ class PythonToolPrepTest(PythonTaskTestBase):
         },
       })
       tool_prep_task = tool_prep_type(context, os.path.join(
-        self.pants_workdir, 'tp_py{}'.format(scope_string)))
+        self.pants_workdir, f'tp_py{scope_string}'))
       tool_prep_task.execute()
       pex_tool = context.products.get_data(ToolPrep.tool_instance_cls)
       self.assertIsNotNone(pex_tool)

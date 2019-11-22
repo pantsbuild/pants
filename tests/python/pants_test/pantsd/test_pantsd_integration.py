@@ -6,11 +6,12 @@ import itertools
 import os
 import re
 import signal
-import sys
 import threading
 import time
 import unittest
 from textwrap import dedent
+
+import pytest
 
 from pants.testutil.pants_run_integration_test import read_pantsd_log
 from pants.testutil.process_test_util import no_lingering_process_by_command
@@ -83,7 +84,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
         # Check if the line begins with W or E to check if it is a warning or error line.
         self.assertNotRegex(line, r'^[WE].*',
-                       'error message detected in log:\n{}'.format(full_log))
+                       f'error message detected in log:\n{full_log}')
 
   def test_pantsd_broken_pipe(self):
     with self.pantsd_test_context() as (workdir, pantsd_config, checker):
@@ -120,6 +121,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         self.assert_success(self.run_pants_with_workdir(['help'], workdir, pantsd_config))
         checker.assert_running()
 
+  @pytest.mark.flaky(retries=1)  # https://github.com/pantsbuild/pants/issues/6114
   def test_pantsd_lifecycle_invalidation(self):
     """Runs pants commands with pantsd enabled, in a loop, alternating between options that
     should invalidate pantsd and incur a restart and then asserts for pid consistency.
@@ -132,7 +134,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       last_pid = None
       for cmd in itertools.chain(*itertools.repeat(variants, 3)):
         # Run with a CLI flag.
-        pantsd_run(['-l{}'.format(cmd[0]), cmd[1]])
+        pantsd_run([f'-l{cmd[0]}', cmd[1]])
         next_pid = checker.assert_started()
         if last_pid is not None:
           self.assertNotEqual(last_pid, next_pid)
@@ -161,19 +163,19 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
   def test_pantsd_lifecycle_non_invalidation_on_config_string(self):
     with temporary_dir() as dist_dir_root, temporary_dir() as config_dir:
       config_files = [
-        os.path.abspath(os.path.join(config_dir, 'pants.ini.{}'.format(i))) for i in range(2)
+        os.path.abspath(os.path.join(config_dir, f'pants.ini.{i}')) for i in range(2)
       ]
       for config_file in config_files:
-        print('writing {}'.format(config_file))
+        print(f'writing {config_file}')
         with open(config_file, 'w') as fh:
-          fh.write('[GLOBAL]\npants_distdir: {}\n'.format(os.path.join(dist_dir_root, 'v1')))
+          fh.write(f"[GLOBAL]\npants_distdir: {os.path.join(dist_dir_root, 'v1')}\n")
 
       invalidating_config = os.path.join(config_dir, 'pants.ini.invalidates')
       with open(invalidating_config, 'w') as fh:
-        fh.write('[GLOBAL]\npants_distdir: {}\n'.format(os.path.join(dist_dir_root, 'v2')))
+        fh.write(f"[GLOBAL]\npants_distdir: {os.path.join(dist_dir_root, 'v2')}\n")
 
       with self.pantsd_successful_run_context() as (pantsd_run, checker, _, _):
-        variants = [['--pants-config-files={}'.format(f), 'help'] for f in config_files]
+        variants = [[f'--pants-config-files={f}', 'help'] for f in config_files]
         pantsd_pid = None
         for cmd in itertools.chain(*itertools.repeat(variants, 2)):
           pantsd_run(cmd)
@@ -182,7 +184,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
           else:
             checker.assert_running()
 
-        pantsd_run(['--pants-config-files={}'.format(invalidating_config), 'help'])
+        pantsd_run([f'--pants-config-files={invalidating_config}', 'help'])
         self.assertNotEqual(pantsd_pid, checker.assert_started())
 
   def test_pantsd_stray_runners(self):
@@ -218,8 +220,8 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       checker.assert_started()
 
     for cmd, run in zip(cmds, daemon_runs):
-      print("(cmd, run) = ({}, {}, {})".format(cmd, run.stdout_data, run.stderr_data))
-      self.assertNotEqual(run.stdout_data, '', 'Empty stdout for {}'.format(cmd))
+      print(f"(cmd, run) = ({cmd}, {run.stdout_data}, {run.stderr_data})")
+      self.assertNotEqual(run.stdout_data, '', f'Empty stdout for {cmd}')
 
     for run_pairs in zip(non_daemon_runs, daemon_runs):
       self.assertEqual(*(run.stdout_data for run in run_pairs))
@@ -310,7 +312,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
   def test_pantsd_invalidation_file_tracking(self):
     test_dir = 'testprojects/src/python/print_env'
-    config = {'GLOBAL': {'pantsd_invalidation_globs': '["%s/*"]' %(test_dir)}}
+    config = {'GLOBAL': {'pantsd_invalidation_globs': f'["{test_dir}/*"]'}}
     with self.pantsd_successful_run_context(extra_config=config) as (
       pantsd_run, checker, workdir, _
     ):
@@ -347,7 +349,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       f.write("[DEFAULT]\n")
 
     with self.pantsd_successful_run_context() as (pantsd_run, checker, _, _):
-      pantsd_run(['--pants-config-files={}'.format(tmp_pants_ini), 'help'])
+      pantsd_run([f'--pants-config-files={tmp_pants_ini}', 'help'])
       checker.assert_started()
       time.sleep(5)
 
@@ -392,13 +394,11 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       # Remove the pidfile so that the teardown script doesn't try to kill process 9.
       os.unlink(pidpath)
 
-  @unittest.skipIf(sys.version_info[0] == 2,
-                   reason='Increases by ~0.52 under python 2 as described in '
-                          'https://github.com/pantsbuild/pants/issues/7761.')
+  @pytest.mark.flaky(retries=1)  # https://github.com/pantsbuild/pants/issues/8193
   def test_pantsd_memory_usage(self):
     """Validates that after N runs, memory usage has increased by no more than X percent."""
     number_of_runs = 10
-    max_memory_increase_fraction = 0.40 # TODO https://github.com/pantsbuild/pants/issues/7647
+    max_memory_increase_fraction = 0.40  # TODO https://github.com/pantsbuild/pants/issues/7647
     with self.pantsd_successful_run_context() as (pantsd_run, checker, workdir, config):
       # NB: This doesn't actually run against all testprojects, only those that are in the chroot,
       # i.e. explicitly declared in this test file's BUILD.
@@ -467,7 +467,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
     try:
       safe_mkdir(test_path, clean=True)
-      safe_file_dump(test_build_file, "{}()".format(invalid_symbol))
+      safe_file_dump(test_build_file, f"{invalid_symbol}()")
       for _ in range(3):
         with self.pantsd_run_context(success=False) as (pantsd_run, checker, _, _):
           result = pantsd_run(['list', 'testprojects::'])
@@ -514,7 +514,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       file_to_make = os.path.join(workdir, 'some_magic_file')
 
       if quit_timeout is not None:
-        timeout_args = ['--pantsd-pailgun-quit-timeout={}'.format(quit_timeout)]
+        timeout_args = [f'--pantsd-pailgun-quit-timeout={quit_timeout}']
       else:
         timeout_args = []
       argv = timeout_args + [
@@ -719,10 +719,10 @@ Interrupted by user over pailgun client!
           directory = directory[2:]
 
         def list_and_verify():
-          result = pantsd_run(['list', '{}:'.format(directory)])
+          result = pantsd_run(['list', f'{directory}:'])
           checker.assert_started()
           self.assert_success(result)
-          expected_targets = {'{}:{}'.format(directory, target) for target in ('A', 'B')}
+          expected_targets = {f'{directory}:{target}' for target in ('A', 'B')}
           self.assertEqual(expected_targets, set(result.stdout_data.strip().split('\n')))
 
         with open(os.path.join(directory, 'BUILD'), 'w') as f:

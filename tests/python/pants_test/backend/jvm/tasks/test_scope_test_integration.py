@@ -20,7 +20,7 @@ class ScopeTestIntegrationTest(PantsRunIntegrationTest):
 
   @classmethod
   def _spec(cls, name):
-    return 'testprojects/src/java/org/pantsbuild/testproject/junit/testscope:{}'.format(name)
+    return f'testprojects/src/java/org/pantsbuild/testproject/junit/testscope:{name}'
 
   def test_tests_pass(self):
     """This junit_tests() target tests for the presence of a particular class at runtime.

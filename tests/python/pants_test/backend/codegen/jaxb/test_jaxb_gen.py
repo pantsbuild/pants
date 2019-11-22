@@ -60,19 +60,19 @@ class JaxbGenJavaTest(NailgunTaskTestBase):
       return result
     supported_prefixes = ('com', 'org', 'net',)
     for prefix in supported_prefixes:
-      self.assertEqual(guess('.pants.d/foo.bar/{0}/pantsbuild/potato/Potato.java'.format(prefix)),
-                       '{0}.pantsbuild.potato'.format(prefix),
-                       'Failed for prefix {0}: {1}.'.format(prefix, guess_history[-1]))
-      self.assertEqual(guess('{0}/pantsbuild/potato/Potato.java'.format(prefix)),
-                       '{0}.pantsbuild.potato'.format(prefix),
-                       'Failed for prefix {0}: {1}.'.format(prefix, guess_history[-1]))
+      self.assertEqual(guess(f'.pants.d/foo.bar/{prefix}/pantsbuild/potato/Potato.java'),
+                       f'{prefix}.pantsbuild.potato',
+                       f'Failed for prefix {prefix}: {guess_history[-1]}.')
+      self.assertEqual(guess(f'{prefix}/pantsbuild/potato/Potato.java'),
+                       f'{prefix}.pantsbuild.potato',
+                       f'Failed for prefix {prefix}: {guess_history[-1]}.')
       self.assertEqual(guess('/User/foo/bar/.pants.d/gen/jaxb/foo/bar/'
                              '{0}/company/project/a/File.java'.format(prefix)),
-                             '{0}.company.project.a'.format(prefix),
-                             'Failed for prefix {0}: {1}.'.format(prefix, guess_history[-1]))
+                             f'{prefix}.company.project.a',
+                             f'Failed for prefix {prefix}: {guess_history[-1]}.')
     self.assertEqual(guess('pantsbuild/potato/Potato.java'),
                      'pantsbuild.potato',
-                     'Failed with no prefix: {0}'.format(guess_history[-1]))
+                     f'Failed with no prefix: {guess_history[-1]}')
 
   def test_simple(self):
     self.create_file('foo/vegetable.xml', self.create_schema('Vegetable'))

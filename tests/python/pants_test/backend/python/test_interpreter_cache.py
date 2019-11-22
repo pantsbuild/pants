@@ -28,7 +28,7 @@ class TestInterpreterCache(TestBase):
     """
     requirement_major_version = '3'
     return str(requirement).replace(
-      '=={}'.format(requirement_major_version), '==99'
+      f'=={requirement_major_version}', '==99'
     )
 
   def setUp(self):

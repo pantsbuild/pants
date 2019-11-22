@@ -41,7 +41,7 @@ class PythonBinaryCreateTest(PythonTaskTestBase):
     self._check_products(task_context, binary, expected_output=expected_output, expected_shebang=expected_shebang)
 
   def _check_products(self, context, binary, expected_output=None, expected_shebang=None):
-    pex_name = '{}.pex'.format(binary.address.target_name)
+    pex_name = f'{binary.address.target_name}.pex'
     products = context.products.get('deployable_archives')
     self.assertIsNotNone(products)
     product_data = products.get(binary)

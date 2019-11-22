@@ -59,7 +59,6 @@ class Ivy:
     """Returns the ivy cache dir used by this `Ivy` instance."""
     return self._ivy_resolution_cache_dir
 
-  @property
   @contextmanager
   def resolution_lock(self):
     safe_mkdir(self._ivy_resolution_cache_dir)
@@ -80,7 +79,7 @@ class Ivy:
     executor = executor or SubprocessExecutor(DistributionLocator.cached())
     runner = self.runner(jvm_options=jvm_options, args=args, executor=executor)
     try:
-      with self.resolution_lock:
+      with self.resolution_lock():
         result = util.execute_runner(runner, workunit_factory, workunit_name, workunit_labels)
       if result != 0:
         raise self.Error('Ivy command failed with exit code {}{}'.format(

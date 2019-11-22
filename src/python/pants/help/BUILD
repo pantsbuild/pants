@@ -10,7 +10,8 @@ python_library(
     'src/python/pants/option',
     'src/python/pants/subsystem',
     'src/python/pants/util:memo',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(

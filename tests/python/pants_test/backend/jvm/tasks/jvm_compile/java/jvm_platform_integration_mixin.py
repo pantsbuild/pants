@@ -34,14 +34,14 @@ class JvmPlatformIntegrationMixin:
     }
     p = Popen(['file', path], stdout=PIPE, stderr=PIPE)
     out, err = p.communicate()
-    self.assertEqual(0, p.returncode, 'Failed to run file on {}.'.format(path))
+    self.assertEqual(0, p.returncode, f'Failed to run file on {path}.')
     match = re.search(r'version (\d+[.]\d+)', out.decode())
-    self.assertTrue(match is not None, 'Could not determine version for {}'.format(path))
+    self.assertTrue(match is not None, f'Could not determine version for {path}')
     return version_map[match.group(1)]
 
   def _get_jar_class_versions(self, jarname):
     path = os.path.join('dist', jarname)
-    self.assertTrue(os.path.exists(path), '{} does not exist.'.format(path))
+    self.assertTrue(os.path.exists(path), f'{path} does not exist.')
 
     class_to_version = {}
     with temporary_dir() as tempdir:
@@ -68,7 +68,7 @@ class JvmPlatformIntegrationMixin:
           + more_args,
           workdir, config)
         self.assert_success(pants_run)
-        return self._get_jar_class_versions('{}.jar'.format(jar_name))
+        return self._get_jar_class_versions(f'{jar_name}.jar')
 
   def assert_class_versions(self, expected, received):
     def format_dict(d):
@@ -117,7 +117,7 @@ class JvmPlatformIntegrationMixin:
         '''.format(target_name=os.path.basename(tmpdir),
                    class_name=class_name,
                    target_level=target_level)))
-      with open(os.path.join(tmpdir, '{}.java'.format(class_name)), 'w') as f:
+      with open(os.path.join(tmpdir, f'{class_name}.java'), 'w') as f:
         f.write(source_contents)
       platforms = str({
         str(target_level): {
@@ -127,8 +127,8 @@ class JvmPlatformIntegrationMixin:
         }
       })
       command = []
-      command.extend(['--jvm-platform-platforms={}'.format(platforms),
-                      '--jvm-platform-default-platform={}'.format(target_level)])
+      command.extend([f'--jvm-platform-platforms={platforms}',
+                      f'--jvm-platform-default-platform={target_level}'])
       command.extend(self.get_pants_compile_args())
       command.extend([tmpdir])
 
@@ -192,11 +192,11 @@ class JvmPlatformIntegrationMixin:
       with self.temporary_workdir() as workdir:
 
         def compile_diamond(platform):
-          return self.run_pants_with_workdir(['--jvm-platform-platforms={}'.format(platforms),
-                                              '--jvm-platform-default-platform={}'.format(platform),
+          return self.run_pants_with_workdir([f'--jvm-platform-platforms={platforms}',
+                                              f'--jvm-platform-default-platform={platform}',
                                               '-ldebug',
                                               'compile'] + self.get_pants_compile_args() +
-                                              ['{}:diamond'.format(tmpdir)], workdir=workdir)
+                                              [f'{tmpdir}:diamond'], workdir=workdir)
 
         # We shouldn't be able to compile this with -source=6.
         self.assert_failure(compile_diamond('java6'), 'Diamond.java was compiled successfully with '

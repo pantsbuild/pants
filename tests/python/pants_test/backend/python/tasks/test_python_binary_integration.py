@@ -127,10 +127,10 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
       return [d for d in deps if 'numpy' in d]
     def assertInAny(substring, collection):
       self.assertTrue(any(substring in d for d in collection),
-        'Expected an entry matching "{}" in {}'.format(substring, collection))
+        f'Expected an entry matching "{substring}" in {collection}')
     def assertNotInAny(substring, collection):
       self.assertTrue(all(substring not in d for d in collection),
-        'Expected an entry matching "{}" in {}'.format(substring, collection))
+        f'Expected an entry matching "{substring}" in {collection}')
 
     test_project = 'testprojects/src/python/cache_fields'
     test_build = os.path.join(test_project, 'BUILD')

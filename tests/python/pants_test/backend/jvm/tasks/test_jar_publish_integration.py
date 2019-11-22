@@ -11,13 +11,13 @@ from pants.util.dirutil import safe_rmtree
 
 
 def shared_artifacts(version, extra_jar=None):
-  published_file_list = ['ivy-{0}.xml'.format(version),
-                         'hello-greet-{0}.jar'.format(version),
-                         'hello-greet-{0}.pom'.format(version),
-                         'hello-greet-{0}-sources.jar'.format(version)]
+  published_file_list = [f'ivy-{version}.xml',
+                         f'hello-greet-{version}.jar',
+                         f'hello-greet-{version}.pom',
+                         f'hello-greet-{version}-sources.jar']
   if extra_jar:
     published_file_list.append(extra_jar)
-  return {'org/pantsbuild/testproject/publish/hello-greet/{0}'.format(version): published_file_list}
+  return {f'org/pantsbuild/testproject/publish/hello-greet/{version}': published_file_list}
 
 
 # TODO: Right now some options are set via config and some via cmd-line flags. Normalize this?
@@ -111,14 +111,14 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
     self.publish_test('testprojects/src/java/org/pantsbuild/testproject/publish/hello/greet',
                       shared_artifacts(name),
                       ['org.pantsbuild.testproject.publish/hello-greet/publish.properties'],
-                      extra_options=['--named-snapshot={}'.format(name)])
+                      extra_options=[f'--named-snapshot={name}'])
 
   def test_publish_override_flag_succeeds(self):
     override = "com.twitter.foo#baz=0.1.0"
     self.publish_test('testprojects/src/java/org/pantsbuild/testproject/publish/hello/greet',
                       shared_artifacts('0.0.1-SNAPSHOT'),
                       ['org.pantsbuild.testproject.publish/hello-greet/publish.properties'],
-                      extra_options=['--override={}'.format(override)])
+                      extra_options=[f'--override={override}'])
 
   # Collect all the common factors for running a publish_extras test, and execute the test.
   def publish_extras_runner(self, extra_config=None, artifact_name=None, success_expected=True):
@@ -210,7 +210,7 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
         'ivy-1.2.3-SNAPSHOT.xml',
       ]}),
       pushdb_files=[],
-      extra_options=['--override={}=1.2.3'.format(target)],
+      extra_options=[f'--override={target}=1.2.3'],
       assert_publish_config_contents=True)
 
   def test_invalidate_resources(self):
@@ -229,7 +229,7 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
             self.assertIn(resource, self.run_pants(['filedeps', target]).stdout_data)
 
             pants_run = self.run_pants_with_workdir(['publish.jar',
-                                                     '--local={}'.format(publish_dir),
+                                                     f'--local={publish_dir}',
                                                      '--named-snapshot=X',
                                                      '--no-dryrun',
                                                      target
@@ -263,7 +263,7 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
     """
 
     with temporary_dir() as publish_dir:
-      options = ['--local={}'.format(publish_dir),
+      options = [f'--local={publish_dir}',
                  '--no-dryrun',
                  '--force']
       if extra_options:

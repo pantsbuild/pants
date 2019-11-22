@@ -23,14 +23,14 @@ class BootstrapOptionsTest(unittest.TestCase):
     if path is None:
       return ["--pants-config-files=[]"]
     else:
-      return ["--pants-config-files=['{}']".format(path)]
+      return [f"--pants-config-files=['{path}']"]
 
   def _test_bootstrap_options(self, config, env, args, **expected_entries):
     with temporary_file(binary_mode=False) as fp:
       fp.write('[DEFAULT]\n')
       if config:
         for k, v in config.items():
-          fp.write('{0}: {1}\n'.format(k, v))
+          fp.write(f'{k}: {v}\n')
       fp.close()
 
       args = args + self._config_path(fp.name)
@@ -197,13 +197,13 @@ class BootstrapOptionsTest(unittest.TestCase):
 
   def test_create_bootstrapped_multiple_pants_config_files(self):
     def create_options_bootstrapper(*config_paths):
-      return OptionsBootstrapper.create(args=['--pants-config-files={}'.format(cp) for cp in config_paths])
+      return OptionsBootstrapper.create(args=[f'--pants-config-files={cp}' for cp in config_paths])
 
     self.do_test_create_bootstrapped_multiple_config(create_options_bootstrapper)
 
   def test_options_pantsrc_files(self):
     def create_options_bootstrapper(*config_paths):
-      return OptionsBootstrapper.create(args=['--pantsrc-files={}'.format(cp) for cp in config_paths])
+      return OptionsBootstrapper.create(args=[f'--pantsrc-files={cp}' for cp in config_paths])
     with temporary_file(binary_mode=False) as fp:
       fp.write(dedent("""
       [resolver]
@@ -288,7 +288,7 @@ class BootstrapOptionsTest(unittest.TestCase):
                                  'goal', '--other-flag', PANTS_CONFIG_FILES="['/from/env']"))
 
     # Test appending to the default.
-    self.assertEqual(['{}/pants.ini'.format(get_buildroot()), '/from/env', '/from/flag'],
+    self.assertEqual([f'{get_buildroot()}/pants.ini', '/from/env', '/from/flag'],
                      config_path('main', 'args', '-x', "--pants-config-files=+['/from/flag']",
                                  'goal', '--other-flag', PANTS_CONFIG_FILES="+['/from/env']"))
 
@@ -307,10 +307,10 @@ class BootstrapOptionsTest(unittest.TestCase):
       config1 = os.path.join(tmpdir, 'config1')
       config2 = os.path.join(tmpdir, 'config2')
       with open(config1, 'w') as out1:
-        out1.write("[DEFAULT]\npants_config_files: ['{}']\nlogdir: logdir1\n".format(config2))
+        out1.write(f"[DEFAULT]\npants_config_files: ['{config2}']\nlogdir: logdir1\n")
       with open(config2, 'w') as out2:
         out2.write('[DEFAULT]\nlogdir: logdir2\n')
 
-      ob = OptionsBootstrapper.create(env={}, args=["--pants-config-files=['{}']".format(config1)])
+      ob = OptionsBootstrapper.create(env={}, args=[f"--pants-config-files=['{config1}']"])
       logdir = ob.get_bootstrap_options().for_global_scope().logdir
       self.assertEqual('logdir1', logdir)

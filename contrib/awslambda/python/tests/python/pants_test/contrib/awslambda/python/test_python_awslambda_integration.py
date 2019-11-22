@@ -34,7 +34,12 @@ class PythonAWSLambdaIntegrationTest(PantsRunIntegrationTest):
       # is distinct from the pex's entry point - a handler must be a function with two arguments,
       # whereas the pex entry point is a module).
       awslambda = os.path.join(distdir, 'hello-lambda.pex')
-      output = subprocess.check_output(env={'PEX_INTERPRETER': '1'}, args=[
-        '{} -c "from lambdex_handler import handler; handler(None, None)"'.format(awslambda)
-      ], shell=True)
-      self.assertEquals(b'Hello from the United States!', output.strip())
+      result = subprocess.run(
+        f'{awslambda} -c "from lambdex_handler import handler; handler(None, None)"',
+        shell=True,
+        env={'PEX_INTERPRETER': '1', 'PATH': os.environ["PATH"]},
+        stdout=subprocess.PIPE,
+        encoding="utf-8",
+        check=True,
+      )
+      self.assertEquals('Hello from the United States!', result.stdout.strip())

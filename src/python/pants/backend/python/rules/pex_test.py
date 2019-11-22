@@ -94,8 +94,8 @@ class TestResolveRequirements(TestBase):
 
   def test_generic_pex_creation(self) -> None:
     input_files_content = InputFilesContent((
-      FileContent(path='main.py', content=b'print("from main")', is_executable=False),
-      FileContent(path='subdir/sub.py', content=b'print("from sub")', is_executable=False),
+      FileContent(path='main.py', content=b'print("from main")'),
+      FileContent(path='subdir/sub.py', content=b'print("from sub")'),
     ))
 
     input_files, = self.scheduler.product_request(Digest, [input_files_content])

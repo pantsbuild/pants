@@ -37,10 +37,12 @@ class TestContext(Context):
    """
 
     def output(self, name):
-      return sys.stderr
+      return sys.stderr.buffer
 
     def set_outcome(self, outcome):
-      return sys.stderr.write('\nWorkUnit outcome: {}\n'.format(WorkUnit.outcome_string(outcome)))
+      return sys.stderr.buffer.write(
+        f'\nWorkUnit outcome: {WorkUnit.outcome_string(outcome)}\n'.encode()
+      )
 
   class DummyRunTracker:
     """A runtracker stand-in that does no actual tracking."""

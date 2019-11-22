@@ -138,11 +138,11 @@ class TestCacheSetup(TestBase):
     cache_factory = self.cache_factory()
 
     self.assertEqual(CacheSpec(local=None,
-                                remote='{}|{}'.format(self.REMOTE_URI_1, self.REMOTE_URI_2)),
+                                remote=f'{self.REMOTE_URI_1}|{self.REMOTE_URI_2}'),
                       cache_factory._resolve(self.CACHE_SPEC_RESOLVE_ONLY))
 
     self.assertEqual(CacheSpec(local=self.LOCAL_URI,
-                                remote='{}|{}'.format(self.REMOTE_URI_1, self.REMOTE_URI_2)),
+                                remote=f'{self.REMOTE_URI_1}|{self.REMOTE_URI_2}'),
                       cache_factory._resolve(self.CACHE_SPEC_LOCAL_RESOLVE))
 
     self.resolver.resolve.side_effect = Resolver.ResolverError()

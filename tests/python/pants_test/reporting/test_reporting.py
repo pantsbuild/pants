@@ -118,7 +118,7 @@ class ReportingTest(TestBase):
 
     self.assertTrue(
       "Value of the flag zipkin-parent-id must be a 16-character hex string. "
-      + "Got {}.".format(parent_id)
+      + f"Got {parent_id}."
       in str(result.exception)
     )
 
@@ -139,7 +139,7 @@ class ReportingTest(TestBase):
 
     self.assertTrue(
       "Value of the flag zipkin-trace-id must be a 16-character or 32-character hex string. "
-      + "Got {}.".format(trace_id)
+      + f"Got {trace_id}."
       in str(result.exception)
     )
 
@@ -160,7 +160,7 @@ class ReportingTest(TestBase):
 
     self.assertTrue(
       "Value of the flag zipkin-parent-id must be a 16-character hex string. "
-      + "Got {}.".format(parent_id)
+      + f"Got {parent_id}."
       in str(result.exception)
     )
 
@@ -181,7 +181,7 @@ class ReportingTest(TestBase):
 
     self.assertTrue(
       "Value of the flag zipkin-trace-id must be a 16-character or 32-character hex string. "
-      + "Got {}.".format(trace_id)
+      + f"Got {trace_id}."
       in str(result.exception)
     )
 

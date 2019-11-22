@@ -12,13 +12,13 @@ from pants_test.backend.python.pants_requirement_integration_test_base import (
 class SetupPyIntegrationTest(PantsRequirementIntegrationTestBase):
 
   def assert_sdist(self, pants_run, key, files):
-    sdist_path = 'dist/{}-0.0.1.tar.gz'.format(key)
+    sdist_path = f'dist/{key}-0.0.1.tar.gz'
     self.assertTrue(re.search(r'Writing .*/{}'.format(sdist_path), pants_run.stdout_data))
 
-    src_entries = ['src/{}'.format(f) for f in files]
+    src_entries = [f'src/{f}' for f in files]
 
     egg_info_entries = [
-      'src/{}.egg-info/{}'.format(key.replace('-', '_'), relpath) for relpath in [
+      f"src/{key.replace('-', '_')}.egg-info/{relpath}" for relpath in [
         '',
         'dependency_links.txt',
         'PKG-INFO',
@@ -30,7 +30,7 @@ class SetupPyIntegrationTest(PantsRequirementIntegrationTestBase):
     ]
 
     expected_entries = [
-      '{}-0.0.1/{}'.format(key, relpath) for relpath in [
+      f'{key}-0.0.1/{relpath}' for relpath in [
         '',
         'MANIFEST.in',
         'PKG-INFO',
@@ -142,7 +142,7 @@ class SetupPyIntegrationTest(PantsRequirementIntegrationTestBase):
     self.maxDiff = None
 
     with self.create_unstable_pants_distribution() as repo:
-      command = ['--python-repos-repos={}'.format(repo),
+      command = [f'--python-repos-repos={repo}',
                  'setup-py',
                  'testprojects/pants-plugins/src/python/test_pants_plugin']
       pants_run = self.run_pants(command=command)

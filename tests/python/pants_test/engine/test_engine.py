@@ -2,12 +2,14 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import unittest
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from textwrap import dedent
+from typing import List
 
 from pants.engine.rules import RootRule, rule
 from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Get
+from pants.reporting.async_workunit_handler import AsyncWorkunitHandler
 from pants.testutil.engine.util import assert_equal_with_printing, remove_locations_from_traceback
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
 
@@ -234,3 +236,31 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
         ''').strip(),
       str(cm.exception)
     )
+
+  def test_async_reporting(self):
+    rules = [ fib, RootRule(int)]
+    scheduler = self.mk_scheduler(rules, include_trace_on_error=False, should_report_workunits=True)
+
+    @dataclass
+    class Tracker:
+      workunits: List[dict] = field(default_factory=list)
+
+      def add(self, workunits) -> None:
+        self.workunits.extend(workunits)
+
+    tracker = Tracker()
+    async_reporter = AsyncWorkunitHandler(scheduler, callback=tracker.add, report_interval_seconds=0.01)
+    with async_reporter.session():
+      scheduler.product_request(Fib, subjects=[0])
+
+    # One workunit should be coming from the `Select` intrinsic, and the other from the single execution
+    # of the `fib` rule, for two total workunits being appended during the run of this rule.
+    self.assertEquals(len(tracker.workunits), 2)
+
+    tracker.workunits = []
+    with async_reporter.session():
+      scheduler.product_request(Fib, subjects=[10])
+
+    # Requesting a bigger fibonacci number will result in more rule executions and thus more reported workunits.
+    # In this case, we expect 10 invocations of the `fib` rule + the one Select for a total of 11.
+    self.assertEquals(len(tracker.workunits), 11)

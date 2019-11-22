@@ -10,41 +10,41 @@ class IntermediateTargetIntegrationTest(PantsRunIntegrationTest):
   def test_scoped(self):
     test_path = 'testprojects/src/java/org/pantsbuild/testproject/runtime'
     scoped_address = '3rdparty:gson'
-    stdout_list = self.run_pants(['-q', 'list', '{}:'.format(test_path)]).stdout_data.strip().split()
+    stdout_list = self.run_pants(['-q', 'list', f'{test_path}:']).stdout_data.strip().split()
 
     hash_1 = hash_target(scoped_address, 'compile')
     hash_2 = hash_target(scoped_address, 'runtime')
     self.assertIn(
-      'testprojects/src/java/org/pantsbuild/testproject/runtime:gson-unstable-compile-{}'.format(hash_1),
+      f'testprojects/src/java/org/pantsbuild/testproject/runtime:gson-unstable-compile-{hash_1}',
       stdout_list
     )
 
     self.assertIn(
-      'testprojects/src/java/org/pantsbuild/testproject/runtime:gson-unstable-runtime-{}'.format(hash_2),
+      f'testprojects/src/java/org/pantsbuild/testproject/runtime:gson-unstable-runtime-{hash_2}',
       stdout_list
     )
 
   def test_intransitive(self):
     test_path = 'testprojects/src/java/org/pantsbuild/testproject/intransitive'
-    stdout_list = self.run_pants(['-q', 'list', '{}:'.format(test_path)]).stdout_data.strip().split()
+    stdout_list = self.run_pants(['-q', 'list', f'{test_path}:']).stdout_data.strip().split()
     suffix = 'intransitive'
 
-    hash_b = hash_target('{}:b'.format(test_path), suffix)
-    hash_c = hash_target('{}:c'.format(test_path), suffix)
+    hash_b = hash_target(f'{test_path}:b', suffix)
+    hash_c = hash_target(f'{test_path}:c', suffix)
 
     self.assertIn(
-      'testprojects/src/java/org/pantsbuild/testproject/intransitive:b-unstable-{}-{}'.format(suffix, hash_b),
+      f'testprojects/src/java/org/pantsbuild/testproject/intransitive:b-unstable-{suffix}-{hash_b}',
       stdout_list
     )
 
     self.assertIn(
-      'testprojects/src/java/org/pantsbuild/testproject/intransitive:c-unstable-{}-{}'.format(suffix, hash_c),
+      f'testprojects/src/java/org/pantsbuild/testproject/intransitive:c-unstable-{suffix}-{hash_c}',
       stdout_list
     )
 
   def test_provided(self):
     test_path = 'testprojects/maven_layout/provided_patching'
-    stdout_list = self.run_pants(['-q', 'list', '{}::'.format(test_path)]).stdout_data.strip().split()
+    stdout_list = self.run_pants(['-q', 'list', f'{test_path}::']).stdout_data.strip().split()
     suffix = 'provided'
 
     hash_1 = hash_target('testprojects/maven_layout/provided_patching/one/src/main/java:shadow', suffix)
@@ -52,22 +52,22 @@ class IntermediateTargetIntegrationTest(PantsRunIntegrationTest):
     hash_3 = hash_target('testprojects/maven_layout/provided_patching/three/src/main/java:shadow', suffix)
 
     self.assertIn(
-      'testprojects/maven_layout/provided_patching/one/src/main/java:shadow-unstable-{}-{}'.format(suffix, hash_1),
+      f'testprojects/maven_layout/provided_patching/one/src/main/java:shadow-unstable-{suffix}-{hash_1}',
       stdout_list
     )
 
     self.assertIn(
-      'testprojects/maven_layout/provided_patching/two/src/main/java:shadow-unstable-{}-{}'.format(suffix, hash_2),
+      f'testprojects/maven_layout/provided_patching/two/src/main/java:shadow-unstable-{suffix}-{hash_2}',
       stdout_list
     )
 
     self.assertIn(
-      'testprojects/maven_layout/provided_patching/three/src/main/java:shadow-unstable-{}-{}'.format(suffix, hash_3),
+      f'testprojects/maven_layout/provided_patching/three/src/main/java:shadow-unstable-{suffix}-{hash_3}',
       stdout_list
     )
 
     self.assertIn(
-      'testprojects/maven_layout/provided_patching/leaf:shadow-unstable-{}-{}'.format(suffix, hash_2),
+      f'testprojects/maven_layout/provided_patching/leaf:shadow-unstable-{suffix}-{hash_2}',
       stdout_list
     )
 
@@ -75,11 +75,11 @@ class IntermediateTargetIntegrationTest(PantsRunIntegrationTest):
     # TODO: Create another BUILD.other file with same provided scope,
     # once we resolve https://github.com/pantsbuild/pants/issues/3933
     test_path = 'testprojects/maven_layout/provided_patching/one/src/main/java'
-    stdout_list = self.run_pants(['-q', 'list', '{}::'.format(test_path)]).stdout_data.strip().split()
+    stdout_list = self.run_pants(['-q', 'list', f'{test_path}::']).stdout_data.strip().split()
     suffix = 'provided'
 
-    hash = hash_target('{}:shadow'.format(test_path), suffix)
-    synthetic_target = '{}:shadow-unstable-{}-{}'.format(test_path, suffix, hash)
+    hash = hash_target(f'{test_path}:shadow', suffix)
+    synthetic_target = f'{test_path}:shadow-unstable-{suffix}-{hash}'
     self.assertEqual(
       stdout_list.count(synthetic_target),
       1

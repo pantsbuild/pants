@@ -22,6 +22,7 @@ python_library(
     'src/python/pants/java/distribution',
     'src/python/pants/option',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -34,6 +35,7 @@ python_library(
     'src/python/pants/option',
     'src/python/pants/subsystem',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -46,6 +48,7 @@ python_library(
     'src/python/pants/option',
     'src/python/pants/subsystem',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -59,6 +62,7 @@ python_library(
     'src/python/pants/build_graph',
     'src/python/pants/subsystem',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -69,6 +73,7 @@ python_library(
     'src/python/pants/subsystem',
     'src/python/pants/util:strutil',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -82,6 +87,7 @@ python_library(
     'src/python/pants/util:memo',
     'src/python/pants/java/distribution',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -109,6 +115,7 @@ python_library(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/util:memo',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -120,6 +127,7 @@ python_library(
     'src/python/pants/java/jar',
     'src/python/pants/backend/jvm/targets:jvm',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -133,7 +141,8 @@ python_library(
     'src/python/pants/java/jar',
     'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -154,7 +163,8 @@ python_library(
   dependencies = [
     'src/python/pants/build_graph',
     'src/python/pants/subsystem',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(

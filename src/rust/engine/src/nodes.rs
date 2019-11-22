@@ -1067,7 +1067,9 @@ impl WrappedNode for Task {
       })
       .then(move |task_result| match task_result {
         Ok(val) => match externs::get_type_for(&val) {
-          t if t == context.core.types.generator => Self::generate(context, params, entry, val),
+          t if t == context.core.types.generator || t == context.core.types.coroutine => {
+            Self::generate(context, params, entry, val)
+          }
           t if t == product => ok(val),
           _ => err(throw(&format!(
             "{:?} returned a result value that did not satisfy its constraints: {:?}",
@@ -1205,7 +1207,10 @@ impl Node for NodeKey {
 
   fn run(self, context: Context) -> NodeFuture<NodeResult> {
     let span_id = generate_random_64bit_string();
-    let node_workunit_params = if context.session.should_record_zipkin_spans() {
+
+    let handle_workunits =
+      context.session.should_report_workunits() || context.session.should_record_zipkin_spans();
+    let node_workunit_params = if handle_workunits {
       let node_name = format!("{}", self);
       let start_time = std::time::SystemTime::now();
       Some((node_name, start_time, span_id.clone()))

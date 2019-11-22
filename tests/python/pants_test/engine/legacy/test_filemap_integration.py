@@ -30,7 +30,7 @@ class FilemapIntegrationTest(PantsRunIntegrationTest):
     self.assertEqual(scan_set, self.TEST_EXCLUDE_FILES)
 
   def _mk_target(self, test_name):
-    return '{}:{}'.format(self.PATH_PREFIX, test_name)
+    return f'{self.PATH_PREFIX}:{test_name}'
 
   def _extract_exclude_output(self, test_name):
     stdout_data = self.do_command(

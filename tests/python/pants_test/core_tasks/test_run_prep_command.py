@@ -47,7 +47,7 @@ class RunPrepCommandTest(TaskTestBase):
   def test_prep_order(self):
     with temporary_dir() as workdir:
       with temporary_dir() as tmp:
-        files = [os.path.join(tmp, 'file%s' % i) for i in range(3)]
+        files = [os.path.join(tmp, f'file{i}') for i in range(3)]
         touch(files[0])
         a = self.make_target('a', dependencies=[], target_type=PrepCommand,
                              prep_executable='mv', prep_args=[files[0], files[1]])

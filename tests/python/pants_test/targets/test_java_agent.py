@@ -20,9 +20,9 @@ class JavaAgentTest(TestBase):
     args = {'name': name, 'sources': []}
     args.update(**kwargs)
     formatted_args = ', '.join('{name}={value!r}'.format(name=k, value=v) for k, v in args.items())
-    target = 'java_agent({args})'.format(args=formatted_args)
-    self.add_to_build_file('{path}'.format(path=name), target)
-    return self.target('{path}:{name}'.format(path=name, name=name))
+    target = f'java_agent({formatted_args})'
+    self.add_to_build_file(f'{name}', target)
+    return self.target(f'{name}:{name}')
 
   def test_required(self):
     with self.assertRaises(TargetDefinitionException):

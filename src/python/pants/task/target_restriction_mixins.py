@@ -1,7 +1,7 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-
+from pants.base.deprecated import deprecated_conditional
 from pants.task.goal_options_mixin import GoalOptionsMixin, GoalOptionsRegistrar
 
 
@@ -69,7 +69,24 @@ class HasSkipAndTransitiveOptionsMixin(HasSkipOptionMixin, HasTransitiveOptionMi
 
 class HasSkipAndTransitiveGoalOptionsMixin(GoalOptionsMixin, HasSkipAndTransitiveOptionsMixin):
   """A mixin for tasks that have a --transitive and a --skip option registered at the goal level."""
-  pass
+
+  @property
+  def act_transitively(self):
+    deprecated_conditional(
+      lambda: self.get_options().is_default("transitive"),
+      removal_version="1.25.0.dev2",
+      entity_description="Pants defaulting to `--fmt-transitive` and `--lint-transitive`",
+      hint_message="Pants will soon default to `--no-fmt-transitive` and `--no-lint-transitive`. "
+                   "Currently, Pants defaults to `--fmt-transitive` and `--lint-transitive`, which "
+                   "means that tools like isort and Scalafmt will work on transitive dependencies "
+                   "as well. This behavior is unexpected. Normally when running tools like isort, "
+                   "you'd expect them to only work on the files you specify.\n\nTo prepare, "
+                   "please add to your `pants.ini` under both the `fmt` and the `lint` "
+                   "sections the option `transitive: False`. If you want to keep the default, use "
+                   "`True`, although we recommend setting to `False` as the `--transitive` option "
+                   "will be removed in a future Pants version."
+    )
+    return self.get_options().transitive
 
 
 class SkipAndTransitiveOptionsRegistrar(SkipOptionRegistrar, TransitiveOptionRegistrar):

@@ -126,7 +126,7 @@ class IvySubsystem(Script):
 class IvyUrlGenerator(BinaryToolUrlGenerator):
 
   def __init__(self, template_urls):
-    super(IvyUrlGenerator, self).__init__()
+    super().__init__()
     self._template_urls = template_urls
 
   def generate_urls(self, version, host_platform):

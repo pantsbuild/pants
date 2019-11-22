@@ -45,7 +45,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
         pants_run = self.run_test_compile(
           workdir, cachedir, target,
           extra_args=[
-            '--cache-compile-rsc-write-to=["{}/dummy_artifact_cache_dir"]'.format(cachedir),
+            f'--cache-compile-rsc-write-to=["{cachedir}/dummy_artifact_cache_dir"]',
           ],
           clean_all=True,
         )
@@ -58,7 +58,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
           pants_run = self.run_test_compile(
               workdir,
               cachedir,
-              'testprojects/src/java/org/pantsbuild/testproject/compilation_warnings:{}'.format(target),
+              f'testprojects/src/java/org/pantsbuild/testproject/compilation_warnings:{target}',
               extra_args=['--compile-rsc-warning-args=-C-Xlint:all'])
 
           if expect_success:
@@ -77,7 +77,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
       'ten-thousand']:
       target_id = Target.compute_target_id(Address.parse('{}{}'
         .format(target_rel_spec, target_name)))
-      classpath_file_by_target_id[target_id] = '{}.txt'.format(target_id)
+      classpath_file_by_target_id[target_id] = f'{target_id}.txt'
 
     with self.do_test_compile(target_rel_spec,
       expected_files = list(classpath_file_by_target_id.values()),
@@ -96,7 +96,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
   def test_record_classpath(self):
     target_spec = 'testprojects/src/java/org/pantsbuild/testproject/printversion:printversion'
     target_id = Target.compute_target_id(Address.parse(target_spec))
-    classpath_filename = '{}.txt'.format(target_id)
+    classpath_filename = f'{target_id}.txt'
     with self.do_test_compile(target_spec,
                               expected_files=[classpath_filename, 'PrintVersion.class'],
                               extra_args=['--compile-rsc-capture-classpath']) as found:
@@ -109,7 +109,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
   def test_no_record_classpath(self):
     target_spec = 'testprojects/src/java/org/pantsbuild/testproject/printversion:printversion'
     target_id = Target.compute_target_id(Address.parse(target_spec))
-    classpath_filename = '{}.txt'.format(target_id)
+    classpath_filename = f'{target_id}.txt'
     with self.do_test_compile(target_spec,
                               expected_files=['PrintVersion.class'],
                               extra_args=['--no-compile-rsc-capture-classpath']) as found:
@@ -313,7 +313,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
           'examples.src.scala.org.pantsbuild.example.hello.welcome.welcome/current/zinc/classes/org/pantsbuild/example/hello/welcome/WelcomeEverybody.class',
         ]:
           path = os.path.join(compile_dir, path_suffix)
-          self.assertTrue(os.path.exists(path), "Want path {} to exist".format(path))
+          self.assertTrue(os.path.exists(path), f"Want path {path} to exist")
 
   def test_hermetic_binary_cache_with_dependencies(self):
     file_abs_path = os.path.join(get_buildroot(),
@@ -352,7 +352,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
           'examples.src.scala.org.pantsbuild.example.hello.welcome.welcome/current/zinc/classes/org/pantsbuild/example/hello/welcome/WelcomeEverybody.class',
         ]:
           path = os.path.join(compile_dir, path_suffix)
-          self.assertTrue(os.path.exists(path), "Want path {} to exist".format(path))
+          self.assertTrue(os.path.exists(path), f"Want path {path} to exist")
         with self.with_overwritten_file_content(file_abs_path):
 
           new_temp_test = '''package org.pantsbuild.example.hello.exe
@@ -413,4 +413,4 @@ class ZincCompileIntegrationTest(BaseCompileIT):
             'examples.src.scala.org.pantsbuild.example.hello.welcome.welcome/current/zinc/classes/org/pantsbuild/example/hello/welcome/WelcomeEverybody.class',
           ]:
             path = os.path.join(compile_dir, path_suffix)
-            self.assertTrue(os.path.exists(path), "Want path {} to exist".format(path))
+            self.assertTrue(os.path.exists(path), f"Want path {path} to exist")

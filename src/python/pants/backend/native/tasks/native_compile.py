@@ -208,10 +208,10 @@ class NativeCompile(NativeTask, metaclass=ABCMeta):
     # TODO: add -v to every compiler and linker invocation!
     argv = (
       [compiler.exe_filename] +
-      compiler.extra_args +
+      list(compiler.extra_args) +
       # TODO: If we need to produce static libs, don't add -fPIC! (could use Variants -- see #5788).
       ['-c', '-fPIC'] +
-      compiler_options +
+      list(compiler_options) +
       [
         '-I{}'.format(os.path.join(buildroot, inc_dir))
         for inc_dir in compile_request.include_dirs

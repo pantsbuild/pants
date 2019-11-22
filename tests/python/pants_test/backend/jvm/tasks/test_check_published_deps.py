@@ -15,6 +15,8 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
 from pants.java.jar.jar_dependency import JarDependency
 from pants.testutil.task_test_base import ConsoleTaskTestBase
+from pants.util.dirutil import safe_mkdir, safe_mkdtemp, safe_open
+from pants.util.memo import memoized_classproperty
 
 
 class CheckPublishedDepsTest(ConsoleTaskTestBase):
@@ -32,15 +34,21 @@ class CheckPublishedDepsTest(ConsoleTaskTestBase):
         'jar': JarDependency,
         'scala_artifact': ScalaArtifact,
         'scala_jar': ScalaJarDependency,
-        'repo': Repository(name='repo',
-                           url='http://www.www.com',
-                           push_db_basedir=os.path.join(cls._build_root(), 'repo')),
-      }
+      },
+      context_aware_object_factories={
+        'repo': lambda _: Repository(
+          name='repo', url='http://www.www.com', push_db_basedir=cls.push_db_basedir
+        ),
+      },
     )
 
   @classmethod
   def task_type(cls):
     return CheckPublishedDeps
+
+  @memoized_classproperty
+  def push_db_basedir(cls):
+    return safe_mkdtemp()
 
   def assert_console_output(self, *args, **kwargs):
     # Ensure that JarPublish's repos option is set, as CheckPublishedDeps consults it.
@@ -50,13 +58,19 @@ class CheckPublishedDepsTest(ConsoleTaskTestBase):
   def setUp(self):
     super().setUp()
 
-    self.create_file('repo/org.name/lib1/publish.properties', dedent("""
+    safe_mkdir(self.push_db_basedir, clean=True)
+
+    def write_db_file(relpath, contents):
+      with safe_open(os.path.join(self.push_db_basedir, relpath), 'w') as fp:
+        fp.write(contents)
+
+    write_db_file('org.name/lib1/publish.properties', dedent("""
         revision.major.org.name%lib1=2
         revision.minor.org.name%lib1=0
         revision.patch.org.name%lib1=0
         revision.sha.org.name%lib1=12345
         """))
-    self.create_file('repo/org.name/lib2/publish.properties', dedent("""
+    write_db_file('org.name/lib2/publish.properties', dedent("""
         revision.major.org.name%lib2=2
         revision.minor.org.name%lib2=0
         revision.patch.org.name%lib2=0

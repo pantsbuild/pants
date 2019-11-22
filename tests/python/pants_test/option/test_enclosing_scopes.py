@@ -30,7 +30,7 @@ class TestEnclosingScopeTraversal(TestBase):
     self.assertEqual(base_scope_closure, [base_scope, GLOBAL_SCOPE])
 
     subscope = 'subscope'
-    compound_scope = '{}.{}'.format(base_scope, subscope)
+    compound_scope = f'{base_scope}.{subscope}'
     compound_scope_closure = list(all_enclosing_scopes(compound_scope))
     self.assertEqual(compound_scope_closure, [compound_scope, base_scope, GLOBAL_SCOPE])
 
@@ -46,7 +46,7 @@ class TestEnclosingScopeTraversal(TestBase):
     subscope_underscore = 'sub_scope'
     self.assertEqual(enclosing_scope(subscope_underscore), GLOBAL_SCOPE)
 
-    compound_scope = '{}.{}'.format(base_dashed_scope, subscope_underscore)
+    compound_scope = f'{base_dashed_scope}.{subscope_underscore}'
     self.assertEqual(enclosing_scope(compound_scope), base_dashed_scope)
     self.assertEqual(list(all_enclosing_scopes(compound_scope)), [
       compound_scope,

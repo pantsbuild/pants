@@ -111,7 +111,7 @@ class TestPailgunServer(unittest.TestCase):
       """Mark a thread as finished, and block until there are no more threads running."""
       self.threads_running_cond.acquire()
       self.threads_running -= 1
-      print("Handle_thread_finished, threads_running are {}".format(self.threads_running))
+      print(f"Handle_thread_finished, threads_running are {self.threads_running}")
       if self.threads_running == 0:
         self.threads_running_cond.notify_all()
       else:
@@ -171,17 +171,17 @@ class TestPailgunServer(unittest.TestCase):
     def create_request_thread(port):
       return threading.Thread(target = self.server.process_request_thread,
                               args = (mock_request, ('1.2.3.4', port)),
-                              name="MockThread-{}".format(port))
+                              name=f"MockThread-{port}")
 
     threads = [create_request_thread(0) for _ in range(0, self.threads_to_start)]
     for thread in threads:
       thread.start()
-      self.assertTrue(self.thread_errors.empty(), "There were some errors in the threads:\n {}".format(self.thread_errors))
+      self.assertTrue(self.thread_errors.empty(), f"There were some errors in the threads:\n {self.thread_errors}")
 
     for thread in threads:
       # If this fails because it times out, it's definitely a legitimate error.
       thread.join(10)
-      self.assertTrue(self.thread_errors.empty(), "There were some errors in the threads:\n {}".format(self.thread_errors))
+      self.assertTrue(self.thread_errors.empty(), f"There were some errors in the threads:\n {self.thread_errors}")
 
 
 class TestPailgunHandler(unittest.TestCase):

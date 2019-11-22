@@ -6,17 +6,25 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from pants.init.logging import get_numeric_level, setup_logging
+from pants.testutil.engine.util import init_native
 from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir
 
 
 class LoggingTest(TestBase):
 
-  def post_scheduler_init(self):
-    self.native = self.scheduler._scheduler._native
-    # Initialize it with the least verbose level.
-    # Individual loggers will increase verbosity as needed.
-    self.native.init_rust_logging(get_numeric_level("ERROR"), False)
+  @classmethod
+  def setUpClass(cls) -> None:
+    super().setUpClass()
+    # NB: We must set this up at the class level, rather than per-test level, because
+    # `init_rust_logging` must never be called more than once. The Rust logger is global and static,
+    # and initializing it twice in the same test class results in a SIGABRT.
+    init_native().init_rust_logging(
+      # We set the level to the least verbose possible, as individual tests will increase the
+      # verbosity as necessary.
+      level=get_numeric_level("ERROR"),
+      log_show_rust_3rdparty=False,
+    )
 
   @contextmanager
   def logger(self, level):

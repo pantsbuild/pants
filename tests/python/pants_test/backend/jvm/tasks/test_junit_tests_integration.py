@@ -14,10 +14,10 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
       return os.path.join(basedir, 'test', 'junit')
 
     def get_stdout_file(basedir):
-      return os.path.join(basedir, '{}.out.txt'.format(classname))
+      return os.path.join(basedir, f'{classname}.out.txt')
 
     def get_stderr_file(basedir):
-      return os.path.join(basedir, '{}.err.txt'.format(classname))
+      return os.path.join(basedir, f'{classname}.err.txt')
 
     outdir = get_outdir(os.path.join(get_buildroot(), 'dist'))
     self.assertTrue(os.path.exists(get_stdout_file(outdir)))

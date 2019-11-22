@@ -1,8 +1,9 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from colors import red, strip_color
+from typing_extensions import Literal
 
 
 def test_f():
-  assert strip_color(red("foo")) == "foo"
+  assert Literal[1] == Literal[1]
+  assert Literal[1] != Literal[2]

@@ -29,14 +29,14 @@ class OsutilTest(TestBase):
       with self.captured_logging(logging.WARNING) as captured:
         normalize_os_name(name)
         self.assertEqual(0, len(captured.warnings()),
-                         'Recieved unexpected warnings: {}'.format(captured.warnings()))
+                         f'Recieved unexpected warnings: {captured.warnings()}')
 
   def test_warnings_on_unknown_names(self) -> None:
     name = 'I really hope no one ever names an operating system with this string.'
     with self.captured_logging(logging.WARNING) as captured:
       normalize_os_name(name)
       self.assertEqual(1, len(captured.warnings()),
-                       'Expected exactly one warning, but got: {}'.format(captured.warnings()))
+                       f'Expected exactly one warning, but got: {captured.warnings()}')
 
   def test_get_closest_mac_host_platform_pair(self) -> None:
     # Note the gaps in darwin versions.

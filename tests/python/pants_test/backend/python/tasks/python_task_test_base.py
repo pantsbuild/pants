@@ -56,7 +56,7 @@ class PythonTaskTestBase(TaskTestBase):
     :API: public
     """
     sources = None if source_contents_map is None else ['__init__.py'] + list(source_contents_map.keys())
-    sources_strs = ["'{0}'".format(s) for s in sources] if sources else None
+    sources_strs = [f"'{s}'" for s in sources] if sources else None
     self.add_to_build_file(relpath=relpath, target=dedent("""
     python_library(
       name='{name}',
@@ -68,9 +68,9 @@ class PythonTaskTestBase(TaskTestBase):
     )
     """).format(
       name=name,
-      sources_clause='sources=[{0}],'.format(','.join(sources_strs)) if sources_strs else '',
+      sources_clause=f"sources=[{','.join(sources_strs)}]," if sources_strs else '',
       dependencies=','.join(map(repr, dependencies)),
-      provides_clause='provides={0},'.format(provides) if provides else ''))
+      provides_clause=f'provides={provides},' if provides else ''))
     if source_contents_map:
       self.create_file(relpath=os.path.join(relpath, '__init__.py'))
       for source, contents in source_contents_map.items():
@@ -92,8 +92,8 @@ class PythonTaskTestBase(TaskTestBase):
       {shebang_clause}
     )
     """).format(name=name, entry_point=entry_point, dependencies=','.join(map(repr, dependencies)),
-                provides_clause='provides={0},'.format(provides) if provides else '',
-                shebang_clause='shebang={!r},'.format(shebang) if shebang else ''))
+                provides_clause=f'provides={provides},' if provides else '',
+                shebang_clause=f'shebang={shebang!r},' if shebang else ''))
     return self.target(Address(relpath, name).spec)
 
   def create_python_requirement_library(self, relpath, name, requirements):
@@ -101,7 +101,7 @@ class PythonTaskTestBase(TaskTestBase):
     :API: public
     """
     def make_requirement(req):
-      return 'python_requirement("{}")'.format(req)
+      return f'python_requirement("{req}")'
 
     self.add_to_build_file(relpath=relpath, target=dedent("""
     python_requirement_library(

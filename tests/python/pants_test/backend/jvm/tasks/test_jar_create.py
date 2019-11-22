@@ -51,8 +51,8 @@ class JarCreateMiscTest(JarCreateTestBase):
   def test_resources_with_scala_java_files(self):
     for ftype in ('java', 'scala'):
       target = self.create_resources(os.path.join('project', ftype),
-                                     'target_%s' % ftype,
-                                     'hello.%s' % ftype)
+                                     f'target_{ftype}',
+                                     f'hello.{ftype}')
       self.assertFalse(is_jvm_library(target))
 
 
@@ -72,7 +72,7 @@ class JarCreateExecuteTest(JarCreateTestBase):
             dependencies=[%(dependencies)r],
           )
         """ % dict(name=name, source=source, dependencies=dependencies)))
-    return self.target('%s:%s' % (path, name))
+    return self.target(f'{path}:{name}')
 
   def java_thrift_library(self, path, name, *sources):
     return self.create_library(path, 'java_thrift_library', name, sources)

@@ -28,14 +28,14 @@ class LinkifyTest(unittest.TestCase):
 
   def _do_test_linkify(self, expected_link, url, memo=None):
     memo = {} if memo is None else memo
-    s = 'foo {} bar'.format(url)
-    expected = 'foo <a target="_blank" href="{}">{}</a> bar'.format(expected_link, url)
+    s = f'foo {url} bar'
+    expected = f'foo <a target="_blank" href="{expected_link}">{url}</a> bar'
     linkified = linkify(self._buildroot, s, memo)
     self.assertEqual(expected, linkified)
 
   def _do_test_not_linkified(self, url, memo=None):
     memo = {} if memo is None else memo
-    s = 'foo {} bar'.format(url)
+    s = f'foo {url} bar'
     linkified = linkify(self._buildroot, s, memo)
     self.assertEqual(s, linkified)
 
@@ -43,13 +43,13 @@ class LinkifyTest(unittest.TestCase):
     relpath = 'underscore_and.dot/and-dash/baz'
     path = os.path.join(self._buildroot, relpath)
     ensure_file_exists(path)
-    self._do_test_linkify('/browse/{}'.format(relpath), path)
+    self._do_test_linkify(f'/browse/{relpath}', path)
 
   def test_linkify_relative_paths(self):
     relpath = 'underscore_and.dot/and-dash/baz'
     path = os.path.join(self._buildroot, relpath)
     ensure_file_exists(path)
-    self._do_test_linkify('/browse/{}'.format(relpath), relpath)
+    self._do_test_linkify(f'/browse/{relpath}', relpath)
 
   def test_linkify_relative_path_outside_buildroot(self):
     self._do_test_not_linkified('../definitely/outside/baz')

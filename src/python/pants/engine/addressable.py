@@ -5,6 +5,7 @@ import inspect
 from collections.abc import MutableMapping, MutableSequence
 from dataclasses import dataclass
 from functools import update_wrapper
+from typing import Any, Set, Tuple, Type
 
 from pants.base.specs import Spec
 from pants.build_graph.address import Address, BuildFileAddress
@@ -96,14 +97,14 @@ class AddressableDescriptor:
      Here the `Thing.parent` property is re-assigned with a type-constrained addressable descriptor
      after the class is defined so the class can be referred to in the type constraint.
   """
-  _descriptors = set()
+  _descriptors: Set[Tuple[Type, str]] = set()
 
   @classmethod
-  def is_addressable(cls, obj, key):
+  def is_addressable(cls, obj: Any, key: str) -> bool:
     """Return `True` if the given attribute of `obj` is an addressable attribute.
 
     :param obj: The object to inspect.
-    :param string key: The name of the property on `obj` to check.
+    :param key: The name of the property on `obj` to check.
     """
     return (type(obj), key) in cls._descriptors
 

@@ -16,7 +16,7 @@ from pants.util.dirutil import chmod_plus_x, safe_mkdir, safe_mkdtemp, safe_open
 
 
 @skipIf(git_version() < MIN_REQUIRED_GIT_VERSION,
-        'The GitTest requires git >= {}.'.format(MIN_REQUIRED_GIT_VERSION))
+        f'The GitTest requires git >= {MIN_REQUIRED_GIT_VERSION}.')
 class GitTest(unittest.TestCase):
 
   @staticmethod
@@ -347,7 +347,7 @@ class GitTest(unittest.TestCase):
           with safe_open(os.path.join(self.worktree, path), 'w') as fp:
             fp.write(content)
         subprocess.check_call(['git', 'add', '.'])
-        subprocess.check_call(['git', 'commit', '-m', 'change {}'.format(files)])
+        subprocess.check_call(['git', 'commit', '-m', f'change {files}'])
         return subprocess.check_output(['git', 'rev-parse', 'HEAD']).strip()
 
       # We can get changes in HEAD or by SHA
@@ -368,7 +368,7 @@ class GitTest(unittest.TestCase):
 
       # Files changed in multiple diffs within a range
       c3 = commit_contents_to_files('3', 'foo')
-      self.assertEqual({'foo', 'bar'}, self.git.changes_in('{}..{}'.format(c1, c3)))
+      self.assertEqual({'foo', 'bar'}, self.git.changes_in(f'{c1}..{c3}'))
 
       # Changes in a tag
       subprocess.check_call(['git', 'tag', 'v1'])
@@ -379,14 +379,14 @@ class GitTest(unittest.TestCase):
       self.assertEqual({'baz'}, self.git.changes_in('HEAD'))
 
       # Tag-to-sha
-      self.assertEqual({'baz'}, self.git.changes_in('{}..{}'.format('v1', c4)))
+      self.assertEqual({'baz'}, self.git.changes_in(f"v1..{c4}"))
 
       # We can get multiple changes from one ref
       commit_contents_to_files('5', 'foo', 'bar')
       self.assertEqual({'foo', 'bar'}, self.git.changes_in('HEAD'))
       self.assertEqual({'foo', 'bar', 'baz'}, self.git.changes_in('HEAD~4..HEAD'))
-      self.assertEqual({'foo', 'bar', 'baz'}, self.git.changes_in('{}..HEAD'.format(c1)))
-      self.assertEqual({'foo', 'bar', 'baz'}, self.git.changes_in('{}..{}'.format(c1, c4)))
+      self.assertEqual({'foo', 'bar', 'baz'}, self.git.changes_in(f'{c1}..HEAD'))
+      self.assertEqual({'foo', 'bar', 'baz'}, self.git.changes_in(f'{c1}..{c4}'))
 
   def test_changelog_utf8(self):
     with environment_as(GIT_DIR=self.gitdir, GIT_WORK_TREE=self.worktree):
