@@ -1,6 +1,8 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import pytest
+
 from pants_test.backend.jvm.tasks.jvm_compile.rsc.rsc_compile_integration_base import (
   RscCompileIntegrationBase,
   ensure_compile_rsc_execution_strategy,
@@ -13,6 +15,7 @@ class RscCompileIntegrationYoutline(RscCompileIntegrationBase):
   def test_basic_binary(self):
     self._testproject_compile("mutual", "bin", "A")
 
+  @pytest.mark.flaky(retries=1)
   @ensure_compile_rsc_execution_strategy(RscCompileIntegrationBase.outline_and_zinc)
   def test_public_inference(self):
     self._testproject_compile("public_inference", "public_inference", "PublicInference")

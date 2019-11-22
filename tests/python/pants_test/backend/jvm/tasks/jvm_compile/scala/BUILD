@@ -9,6 +9,6 @@ python_tests(
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
     'examples/src/scala/org/pantsbuild/example:scalac_directory',
   ],
-  timeout = 600,
+  timeout = 640,
   tags = {'integration'},
 )
