@@ -40,6 +40,7 @@ mod scheduler;
 mod selectors;
 mod tasks;
 mod types;
+mod watch;
 
 pub use crate::context::Core;
 pub use crate::core::{Function, Key, Params, TypeId, Value};

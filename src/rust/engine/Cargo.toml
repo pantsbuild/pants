@@ -84,6 +84,7 @@ default-members = [
 boxfuture = { path = "boxfuture" }
 bytes = "0.4.5"
 concrete_time = { path = "concrete_time" }
+crossbeam-channel = "0.3"
 fnv = "1.0.5"
 fs = { path = "fs" }
 futures = "0.1.27"
@@ -95,6 +96,7 @@ lazy_static = "1"
 log = "0.4"
 logging = { path = "logging" }
 num_enum = "0.1.1"
+notify = "5.0.0-pre.1"
 parking_lot = "0.6"
 process_execution = { path = "process_execution" }
 rand = "0.6"
