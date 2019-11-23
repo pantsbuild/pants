@@ -15,6 +15,7 @@ use crate::nodes::{NodeKey, WrappedNode};
 use crate::scheduler::Session;
 use crate::tasks::{Rule, Tasks};
 use crate::types::Types;
+use crate::watch::InvalidationWatcher;
 use boxfuture::{BoxFuture, Boxable};
 use core::clone::Clone;
 use fs::{safe_create_dir_all_ioerror, PosixFS};
@@ -41,7 +42,7 @@ const GIGABYTES: usize = 1024 * 1024 * 1024;
 /// https://github.com/tokio-rs/tokio/issues/369 is resolved.
 ///
 pub struct Core {
-  pub graph: Graph<NodeKey>,
+  pub graph: Arc<Graph<NodeKey>>,
   pub tasks: Tasks,
   pub rule_graph: RuleGraph<Rule>,
   pub types: Types,
@@ -50,6 +51,7 @@ pub struct Core {
   pub command_runner: Box<dyn process_execution::CommandRunner>,
   pub http_client: reqwest::r#async::Client,
   pub vfs: PosixFS,
+  pub watcher: InvalidationWatcher,
   pub build_root: PathBuf,
 }
 
@@ -218,24 +220,27 @@ impl Core {
         process_execution_metadata,
       ));
     }
+    let graph = Arc::new(Graph::new());
+    let watcher = InvalidationWatcher::new(Arc::downgrade(&graph))?;
 
     let http_client = reqwest::r#async::Client::new();
     let rule_graph = RuleGraph::new(tasks.as_map(), root_subject_types);
 
     Ok(Core {
-      graph: Graph::new(),
-      tasks: tasks,
-      rule_graph: rule_graph,
-      types: types,
+      graph,
+      tasks,
+      rule_graph,
+      types,
       executor: executor.clone(),
       store,
       command_runner,
       http_client,
+      watcher,
       // TODO: Errors in initialization should definitely be exposed as python
       // exceptions, rather than as panics.
       vfs: PosixFS::new(&build_root, &ignore_patterns, executor)
         .map_err(|e| format!("Could not initialize VFS: {:?}", e))?,
-      build_root: build_root,
+      build_root,
     })
   }
 

@@ -84,6 +84,7 @@ default-members = [
 boxfuture = { path = "boxfuture" }
 bytes = "0.4.5"
 concrete_time = { path = "concrete_time" }
+crossbeam-channel = "0.3"
 fnv = "1.0.5"
 fs = { path = "fs" }
 futures01 = { package = "futures", version = "0.1" }
@@ -95,6 +96,7 @@ lazy_static = "1"
 log = "0.4"
 logging = { path = "logging" }
 num_enum = "0.4"
+notify = { git = "https://github.com/notify-rs/notify", rev = "fba00891d9105e2f581c69fbe415a58cb7966fdd" }
 parking_lot = "0.6"
 process_execution = { path = "process_execution" }
 rand = "0.6"

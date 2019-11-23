@@ -1033,6 +1033,10 @@ impl Node for NodeKey {
   type Error = Failure;
 
   fn run(self, context: Context) -> NodeFuture<NodeResult> {
+    if let Some(path) = self.fs_subject() {
+      let abs_path = context.core.build_root.join(path);
+      try_future!(context.core.watcher.watch(abs_path).map_err(|e| throw(&e)));
+    }
     let (maybe_started_workunit, maybe_span_id) = if context.session.should_handle_workunits() {
       let user_facing_name = self.user_facing_name();
       let span_id = generate_random_64bit_string();
