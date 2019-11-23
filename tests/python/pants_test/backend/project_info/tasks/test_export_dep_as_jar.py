@@ -22,6 +22,7 @@ from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.project_info.tasks.export_dep_as_jar import ExportDepAsJar
+from pants.backend.project_info.tasks.export_version import DEFAULT_EXPORT_VERSION
 from pants.base.exceptions import TaskError
 from pants.build_graph.register import build_file_aliases as register_core
 from pants.build_graph.resources import Resources
@@ -285,7 +286,7 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
   def test_version(self):
     result = self.execute_export_json('project_info:first')
     # If you have to update this test, make sure export.md is updated with changelog notes
-    self.assertEqual('1.0.11', result['version'])
+    self.assertEqual(DEFAULT_EXPORT_VERSION, result['version'])
 
   def test_scala_platform_custom(self):
     result = self.execute_export_json('project_info:first')
