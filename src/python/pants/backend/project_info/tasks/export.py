@@ -18,6 +18,7 @@ from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.coursier_resolve import CoursierMixin
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
+from pants.backend.project_info.tasks.export_version import DEFAULT_EXPORT_VERSION
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.subsystems.pex_build_util import has_python_requirements
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
@@ -54,19 +55,6 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
   Subclasses can invoke the generate_targets_map method to get a dictionary of plain datastructures
   (dicts, lists, strings) that can be easily read and exported to various formats.
   """
-
-  # FORMAT_VERSION_NUMBER: Version number for identifying the export file format output. This
-  # version number should change when there is a change to the output format.
-  #
-  # Major Version 1.x.x : Increment this field when there is a major format change
-  # Minor Version x.1.x : Increment this field when there is a minor change that breaks backward
-  #   compatibility for an existing field or a field is removed.
-  # Patch version x.x.1 : Increment this field when a minor format change that just adds information
-  #   that an application can safely ignore.
-  #
-  # Note format changes in src/docs/export.md and update the Changelog section.
-  #
-  DEFAULT_EXPORT_VERSION = '1.0.11'
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -304,7 +292,7 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
     }
 
     graph_info = {
-      'version': self.DEFAULT_EXPORT_VERSION,
+      'version': DEFAULT_EXPORT_VERSION,
       'targets': targets_map,
       'jvm_platforms': jvm_platforms_map,
       'scala_platform': scala_platform_map,

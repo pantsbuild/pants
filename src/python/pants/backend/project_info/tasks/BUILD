@@ -39,6 +39,7 @@ python_library(
   name = 'export',
   sources = ['export.py'],
   dependencies = [
+    ':export_version',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/jvm/subsystems:jvm_platform',
     'src/python/pants/backend/jvm/targets:jvm',
@@ -65,6 +66,7 @@ python_library(
   name = 'export_dep_as_jar',
   sources = ['export_dep_as_jar.py'],
   dependencies = [
+    ':export_version',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/jvm/subsystems:jvm_platform',
     'src/python/pants/backend/jvm/targets:jvm',
@@ -79,6 +81,11 @@ python_library(
     'src/python/pants/task',
     'src/python/pants/util:memo',
   ],
+)
+
+python_library(
+  name = 'export_version',
+  sources = ['export_version.py'],
 )
 
 python_library(
