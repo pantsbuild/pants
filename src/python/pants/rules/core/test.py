@@ -32,6 +32,20 @@ class AddressAndTestResult:
   address: BuildFileAddress
   test_result: Optional[TestResult]  # If None, target was not a test target.
 
+  @staticmethod
+  def valid_target(
+    target: HydratedTarget,
+    *,
+    union_membership: UnionMembership,
+    provenance_map: AddressProvenanceMap
+  ) -> bool:
+    is_valid_target_type = (
+      provenance_map.is_single_address(target.address)
+      or union_membership.is_member(TestTarget, target.adaptor)
+    )
+    has_sources = hasattr(target.adaptor, "sources") and target.adaptor.sources.snapshot.files
+    return is_valid_target_type and has_sources
+
 
 @console_rule
 async def fast_test(console: Console, addresses: BuildFileAddresses) -> Test:
@@ -77,25 +91,29 @@ async def fast_test(console: Console, addresses: BuildFileAddresses) -> Test:
 
 
 @rule
-async def coordinator_of_tests(target: HydratedTarget,
-                         union_membership: UnionMembership,
-                         provenance_map: AddressProvenanceMap) -> AddressAndTestResult:
+async def coordinator_of_tests(
+  target: HydratedTarget,
+  union_membership: UnionMembership,
+  provenance_map: AddressProvenanceMap
+) -> AddressAndTestResult:
+
+  if not AddressAndTestResult.valid_target(
+    target, union_membership=union_membership, provenance_map=provenance_map
+  ):
+    return AddressAndTestResult(target.address, None)
+
   # TODO(#6004): when streaming to live TTY, rely on V2 UI for this information. When not a
   # live TTY, periodically dump heavy hitters to stderr. See
   # https://github.com/pantsbuild/pants/issues/6004#issuecomment-492699898.
-  if (provenance_map.is_single_address(target.address) or
-      union_membership.is_member(TestTarget, target.adaptor)):
-    logger.info("Starting tests: {}".format(target.address.reference()))
-    # NB: This has the effect of "casting" a TargetAdaptor to a member of the TestTarget union.
-    # The adaptor will always be a member because of the union membership check above, but if
-    # it were not it would fail at runtime with a useful error message.
-    result = await Get(TestResult, TestTarget, target.adaptor)
-    logger.info("Tests {}: {}".format(
-      "succeeded" if result.status == Status.SUCCESS else "failed",
-      target.address.reference(),
-    ))
-  else:
-    result = None  # Not a test target.
+  logger.info("Starting tests: {}".format(target.address.reference()))
+  # NB: This has the effect of "casting" a TargetAdaptor to a member of the TestTarget union.
+  # The adaptor will always be a member because of the union membership check above, but if
+  # it were not it would fail at runtime with a useful error message.
+  result = await Get(TestResult, TestTarget, target.adaptor)
+  logger.info("Tests {}: {}".format(
+    "succeeded" if result.status == Status.SUCCESS else "failed",
+    target.address.reference(),
+  ))
   return AddressAndTestResult(target.address, result)
 
 

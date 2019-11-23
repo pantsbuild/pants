@@ -24,7 +24,7 @@ class TargetWithSources:
   """A union for registration of a formattable target type."""
 
   @staticmethod
-  def is_valid(target_adaptor: TargetAdaptor, *, union_membership: UnionMembership) -> bool:
+  def valid_target(target_adaptor: TargetAdaptor, *, union_membership: UnionMembership) -> bool:
     return (
       union_membership.is_member(TargetWithSources, target_adaptor)
       # TODO: make TargetAdaptor return a 'sources' field with an empty snapshot instead of
@@ -52,7 +52,7 @@ async def fmt(
   results = await MultiGet(
     Get[FmtResult](TargetWithSources, target.adaptor)
     for target in targets
-    if TargetWithSources.is_valid(target.adaptor, union_membership=union_membership)
+    if TargetWithSources.valid_target(target.adaptor, union_membership=union_membership)
   )
 
   if not results:
