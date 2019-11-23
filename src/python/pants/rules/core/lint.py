@@ -31,9 +31,7 @@ async def lint(console: Console, targets: HydratedTargets, union_membership: Uni
   results = await MultiGet(
     Get(LintResult, TargetWithSources, target.adaptor)
     for target in targets
-    # TODO: make TargetAdaptor return a 'sources' field with an empty snapshot instead of
-    # raising to remove the hasattr() checks here!
-    if union_membership.is_member(TargetWithSources, target.adaptor) and hasattr(target.adaptor, "sources")
+    if TargetWithSources.valid_target(target.adaptor, union_membership=union_membership)
   )
 
   if not results:
