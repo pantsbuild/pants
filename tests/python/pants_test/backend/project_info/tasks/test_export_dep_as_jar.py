@@ -390,11 +390,24 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
     # confirms only one line of output, which is what -format should produce
     self.assertEqual(1, len(result))
 
-  def test_target_types(self):
+  def test_target_types_with_resource_as_deps(self):
     result = self.execute_export_json('project_info:target_type')
     self.assertEqual('SOURCE',
                      result['targets']['project_info:target_type']['target_type'])
     self.assertEqual('RESOURCE', result['targets']['project_info:resource']['target_type'])
+    self.assertEqual([], result['targets']['project_info:resource']['roots'])
+    self.assertEqual(['project_info.resource'], result['targets']['project_info:resource']['libraries'])
+    self.assertTrue(result['libraries']['project_info.resource']['default'].endswith('.jar'))
+
+  def test_target_types_with_resource_as_root(self):
+    result = self.execute_export_json(*['project_info:target_type', 'project_info:resource'])
+    self.assertEqual('SOURCE',
+      result['targets']['project_info:target_type']['target_type'])
+    self.assertEqual('RESOURCE', result['targets']['project_info:resource']['target_type'])
+    self.assertEqual([], result['targets']['project_info:resource']['libraries'])
+    roots = result['targets']['project_info:resource']['roots']
+    self.assertEqual(1, len(roots))
+    self.assertEqual(os.path.join(self.build_root, 'project_info'), roots[0]['source_root'])
 
   def test_target_platform(self):
     result = self.execute_export_json('project_info:target_type')
