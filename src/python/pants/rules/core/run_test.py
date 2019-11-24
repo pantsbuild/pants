@@ -1,6 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from pants.base.build_root import BuildRoot
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.fs import Digest, FileContent, InputFilesContent, Workspace
 from pants.engine.interactive_runner import InteractiveRunner
@@ -32,9 +33,10 @@ class RunTest(ConsoleRuleTestBase):
       target_name=address.target_name,
       rel_path=f'{address.spec_path}/BUILD'
     )
+    BuildRoot.path = self.build_root
     res = run_rule(
       run.run,
-      rule_args=[console, workspace, interactive_runner, bfa],
+      rule_args=[console, workspace, interactive_runner, BuildRoot, bfa],
       mock_gets=[
         MockGet(
           product_type=CreatedBinary,
