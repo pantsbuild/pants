@@ -402,7 +402,7 @@ async def find_owners(
 
   # Walk up the buildroot looking for targets that would conceivably claim changed sources.
   candidate_specs = tuple(AscendantAddresses(directory=d) for d in dirs_set)
-  candidate_targets = await Get(HydratedTargets, Specs(candidate_specs))
+  candidate_targets = await Get[HydratedTargets](Specs(candidate_specs))
 
   # Match the source globs against the expanded candidate targets.
   def owns_any_source(legacy_target):
@@ -431,10 +431,10 @@ async def find_owners(
     return BuildFileAddresses(direct_owners)
   else:
     # Otherwise: find dependees.
-    all_addresses = await Get(BuildFileAddresses, Specs((DescendantAddresses(''),)))
+    all_addresses = await Get[BuildFileAddresses](Specs((DescendantAddresses(''),)))
     all_structs = [
       s.value for s in
-      await MultiGet(Get(HydratedStruct, Address, a.to_address()) for a in all_addresses)
+      await MultiGet(Get[HydratedStruct](Address, a.to_address()) for a in all_addresses)
     ]
 
     bfa = build_configuration.registered_aliases()
@@ -461,7 +461,7 @@ async def transitive_hydrated_targets(
   """
 
   transitive_hydrated_targets = await MultiGet(
-    Get(TransitiveHydratedTarget, Address, a) for a in build_file_addresses.addresses
+    Get[TransitiveHydratedTarget](Address, a) for a in build_file_addresses.addresses
   )
 
   closure = OrderedSet()
@@ -479,14 +479,14 @@ async def transitive_hydrated_targets(
 
 @rule
 async def transitive_hydrated_target(root: HydratedTarget) -> TransitiveHydratedTarget:
-  dependencies = await MultiGet(Get(TransitiveHydratedTarget, Address, d) for d in root.dependencies)
+  dependencies = await MultiGet(Get[TransitiveHydratedTarget](Address, d) for d in root.dependencies)
   return TransitiveHydratedTarget(root, dependencies)
 
 
 @rule
 async def hydrated_targets(build_file_addresses: BuildFileAddresses) -> HydratedTargets:
   """Requests HydratedTarget instances for BuildFileAddresses."""
-  targets = await MultiGet(Get(HydratedTarget, Address, a) for a in build_file_addresses.addresses)
+  targets = await MultiGet(Get[HydratedTarget](Address, a) for a in build_file_addresses.addresses)
   return HydratedTargets(targets)
 
 
@@ -502,7 +502,7 @@ async def hydrate_target(hydrated_struct: HydratedStruct) -> HydratedTarget:
   target_adaptor = hydrated_struct.value
   """Construct a HydratedTarget from a TargetAdaptor and hydrated versions of its adapted fields."""
   # Hydrate the fields of the adaptor and re-construct it.
-  hydrated_fields = await MultiGet(Get(HydratedField, HydrateableField, fa)
+  hydrated_fields = await MultiGet(Get[HydratedField](HydrateableField, fa)
                                    for fa in target_adaptor.field_adaptors)
   kwargs = target_adaptor.kwargs()
   for field in hydrated_fields:
@@ -537,7 +537,7 @@ async def hydrate_sources(
   path_globs = dataclasses.replace(
     sources_field.path_globs, glob_match_error_behavior=glob_match_error_behavior
   )
-  snapshot = await Get(Snapshot, PathGlobs, path_globs)
+  snapshot = await Get[Snapshot](PathGlobs, path_globs)
   fileset_with_spec = _eager_fileset_with_spec(
     sources_field.address.spec_path,
     sources_field.filespecs,
@@ -555,7 +555,7 @@ async def hydrate_bundles(
     dataclasses.replace(pg, glob_match_error_behavior=glob_match_error_behavior)
     for pg in bundles_field.path_globs_list
   ]
-  snapshot_list = await MultiGet(Get(Snapshot, PathGlobs, pg) for pg in path_globs_with_match_errors)
+  snapshot_list = await MultiGet(Get[Snapshot](PathGlobs, pg) for pg in path_globs_with_match_errors)
 
   spec_path = bundles_field.address.spec_path
 

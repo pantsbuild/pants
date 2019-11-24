@@ -36,7 +36,7 @@ class Fmt(Goal):
 @console_rule
 async def fmt(console: Console, targets: HydratedTargets, union_membership: UnionMembership) -> Fmt:
   results = await MultiGet(
-    Get(FmtResult, TargetWithSources, target.adaptor)
+    Get[FmtResult](TargetWithSources, target.adaptor)
     for target in targets
     # TODO: make TargetAdaptor return a 'sources' field with an empty snapshot instead of
     # raising to remove the hasattr() checks here!
@@ -44,7 +44,7 @@ async def fmt(console: Console, targets: HydratedTargets, union_membership: Unio
   )
 
   for result in results:
-    files_content = await Get(FilesContent, Digest, result.digest)
+    files_content = await Get[FilesContent](Digest, result.digest)
     # TODO: This is hacky and inefficient, and should be replaced by using the Workspace type
     # once that is available on master.
     # Blocked on: https://github.com/pantsbuild/pants/pull/8329

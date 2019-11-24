@@ -35,8 +35,17 @@ class _RuleVisitor(ast.NodeVisitor):
   def gets(self) -> List[Get]:
     return self._gets
 
-  def _is_get(self, node: ast.Call):
-    return isinstance(node.func, ast.Name) and node.func.id == Get.__name__
+  def _matches_get_name(self, node: Any) -> bool:
+    return isinstance(node, ast.Name) and node.id == Get.__name__
+
+  def _is_get(self, node: Any) -> bool:
+    if isinstance(node, ast.Call):
+      if self._matches_get_name(node.func):
+        return True
+      if isinstance(node.func, ast.Subscript) and self._matches_get_name(node.func.value):
+        return True
+      return False
+    return False
 
   def visit_Call(self, node: ast.Call) -> None:
     self.generic_visit(node)
