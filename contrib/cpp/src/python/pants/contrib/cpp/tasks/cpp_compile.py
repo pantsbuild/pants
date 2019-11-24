@@ -80,7 +80,7 @@ class CppCompile(CppTask):
 
     cmd = [self.cpp_toolchain.compiler]
     cmd.extend(['-c'])
-    cmd.extend(('-I{0}'.format(i) for i in include_dirs))
+    cmd.extend((f'-I{i}' for i in include_dirs))
     cmd.extend(['-o' + obj, abs_source])
     cmd.extend(self.get_options().cc_options)
 
@@ -88,4 +88,4 @@ class CppCompile(CppTask):
     with self.context.new_workunit(name='cpp-compile', labels=[WorkUnitLabel.COMPILER]) as workunit:
       self.run_command(cmd, workunit)
 
-    self.context.log.info('Built c++ object: {0}'.format(obj))
+    self.context.log.info(f'Built c++ object: {obj}')
