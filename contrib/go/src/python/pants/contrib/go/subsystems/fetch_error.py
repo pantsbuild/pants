@@ -7,4 +7,4 @@ class FetchError(Exception):
 
   def add_message_prefix(self, prefix):
     # Note: Assumes that this object was created with a single string argument.
-    self.args = ('{}{}'.format(prefix, self.args[0]), )
+    self.args = (f'{prefix}{self.args[0]}', )

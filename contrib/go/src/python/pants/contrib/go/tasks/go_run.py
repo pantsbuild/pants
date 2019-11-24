@@ -28,5 +28,4 @@ class GoRun(GoTask):
       # TODO(cgibb): Wrap with workunit and stdout/stderr plumbing.
       res = Xargs.subprocess([binary_path]).execute(self.get_passthru_args())
       if res != 0:
-        raise TaskError('{bin} exited non-zero ({res})'
-                        .format(bin=os.path.basename(binary_path), res=res))
+        raise TaskError(f'{os.path.basename(binary_path)} exited non-zero ({res})')

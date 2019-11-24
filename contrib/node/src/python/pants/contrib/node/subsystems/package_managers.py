@@ -176,7 +176,7 @@ class PackageManagerYarnpkg(PackageManager):
       PackageInstallationTypeOption.NO_SAVE: None,
     }.get(type_option)
     if package_type_option is None:
-      LOG.warning('{} does not support {} packages, ignored.'.format(self.name, type_option))
+      LOG.warning(f'{self.name} does not support {type_option} packages, ignored.')
     elif package_type_option:  # Skip over '' entries
       return_args.append(package_type_option)
     package_version_option = {
@@ -185,7 +185,7 @@ class PackageManagerYarnpkg(PackageManager):
     }.get(version_option)
     if package_version_option is None:
       LOG.warning(
-        '{} does not support install with {} version, ignored'.format(self.name, version_option))
+        f'{self.name} does not support install with {version_option} version, ignored')
     elif package_version_option: # Skip over '' entries
       return_args.append(package_version_option)
     return return_args
@@ -208,7 +208,7 @@ class PackageManagerNpm(PackageManager):
     if force:
       return_args.append('--force')
     if frozen_lockfile:
-      LOG.warning('{} does not support frozen lockfile option. Ignored.'.format(self.name))
+      LOG.warning(f'{self.name} does not support frozen lockfile option. Ignored.')
     return return_args
 
   def _get_add_package_args(self, package, type_option, version_option):
@@ -222,7 +222,7 @@ class PackageManagerNpm(PackageManager):
       PackageInstallationTypeOption.NO_SAVE: '--no-save',
     }.get(type_option)
     if package_type_option is None:
-      LOG.warning('{} does not support {} packages, ignored.'.format(self.name, type_option))
+      LOG.warning(f'{self.name} does not support {type_option} packages, ignored.')
     elif package_type_option:  # Skip over '' entries
       return_args.append(package_type_option)
     package_version_option = {
@@ -231,7 +231,7 @@ class PackageManagerNpm(PackageManager):
     }.get(version_option)
     if package_version_option is None:
       LOG.warning(
-        '{} does not support install with {} version, ignored.'.format(self.name, version_option))
+        f'{self.name} does not support install with {version_option} version, ignored.')
     elif package_version_option:  # Skip over '' entries
       return_args.append(package_version_option)
     return return_args

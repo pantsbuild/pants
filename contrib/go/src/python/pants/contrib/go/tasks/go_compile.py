@@ -99,10 +99,10 @@ class GoCompile(GoWorkspaceTask):
     result, go_cmd = self.go_dist.execute_go_cmd(
       'install', gopath=gopath, args=args,
       workunit_factory=self.context.new_workunit,
-      workunit_name='install {}'.format(target.import_path),
+      workunit_name=f'install {target.import_path}',
       workunit_labels=[WorkUnitLabel.COMPILER])
     if result != 0:
-      raise TaskError('{} failed with exit code {}'.format(go_cmd, result))
+      raise TaskError(f'{go_cmd} failed with exit code {result}')
 
   def _sync_binary_dep_links(self, target, gopath, lib_binary_map):
     """Syncs symlinks under gopath to the library binaries of target's transitive dependencies.
@@ -149,8 +149,8 @@ class GoCompile(GoWorkspaceTask):
     host_arch = self.go_dist.create_go_cmd('env', gopath=gopath, args=["GOARCH"]).check_output().decode().strip()
     target_arch = self.go_dist.create_go_cmd('env', gopath=gopath, args=["GOHOSTARCH"]).check_output().decode().strip()
 
-    host_pair = "{}_{}".format(host_goos, host_arch)
-    target_pair = "{}_{}".format(target_goos, target_arch)
+    host_pair = f"{host_goos}_{host_arch}"
+    target_pair = f"{target_goos}_{target_arch}"
 
     ext = ".exe" if target_goos == "windows" else ""
 
