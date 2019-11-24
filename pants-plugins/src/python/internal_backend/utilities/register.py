@@ -152,6 +152,7 @@ class PantsPlugin(PythonLibrary):
                build_file_aliases=False,
                global_subsystems=False,
                register_goals=False,
+               rules=False,
                **kwargs):
     """
     :param str distribution_name: The name of the plugin package; must start with
@@ -166,6 +167,8 @@ class PantsPlugin(PythonLibrary):
                                    registers the 'global_subsystems' 'pantsbuild.plugin' entrypoint.
     :param bool register_goals: If `True`, register.py:register_goals must be defined and
                                 registers the 'register_goals' 'pantsbuild.plugin' entrypoint.
+    :param bool rules: If `True`, register.py:rules must be defined and registers the 'rules'
+                       'pantsbuild.plugin' entrypoint.
     """
     if not distribution_name.startswith('pantsbuild.pants.'):
       raise ValueError(
@@ -185,7 +188,7 @@ class PantsPlugin(PythonLibrary):
 
     super().__init__(address, payload, provides=setup_py, **kwargs)
 
-    if build_file_aliases or register_goals or global_subsystems:
+    if build_file_aliases or register_goals or global_subsystems or rules:
       module = os.path.relpath(address.spec_path, self.target_base).replace(os.sep, '.')
       entrypoints = []
       if build_file_aliases:
@@ -194,6 +197,8 @@ class PantsPlugin(PythonLibrary):
         entrypoints.append(f'register_goals = {module}.register:register_goals')
       if global_subsystems:
         entrypoints.append(f'global_subsystems = {module}.register:global_subsystems')
+      if rules:
+        entrypoints.append(f'rules = {module}.register:rules')
       entry_points = {'pantsbuild.plugin': entrypoints}
 
       setup_py.setup_py_keywords['entry_points'] = entry_points
