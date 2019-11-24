@@ -27,7 +27,7 @@ class FilespecTest(TestBase):
         self.create_dir(expected)
       else:
         self.create_file(expected)
-    snapshot, = self.scheduler.product_request(Snapshot, [PathGlobs([glob])])
+    snapshot = self.request_single_product(Snapshot, PathGlobs([glob]))
     if negate:
       subset = set(expected_matches).intersection(set(snapshot.files))
       self.assertEquals(subset, set(), f'{glob} {match_state} path(s) {subset}')

@@ -11,6 +11,7 @@ from collections import defaultdict
 from contextlib import contextmanager
 from tempfile import mkdtemp
 from textwrap import dedent
+from typing import Any, Type, TypeVar, Union, cast
 
 from pants.base.build_root import BuildRoot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
@@ -24,6 +25,8 @@ from pants.engine.fs import PathGlobs, PathGlobsAndRoot
 from pants.engine.legacy.graph import HydratedField
 from pants.engine.legacy.structs import SourcesField
 from pants.engine.rules import RootRule
+from pants.engine.scheduler import SchedulerSession
+from pants.engine.selectors import Params
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.util import clean_global_runtime_state
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -376,7 +379,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
   def _pants_workdir(self):
     return os.path.join(self._build_root(), '.pants.d')
 
-  def _init_engine(self):
+  def _init_engine(self) -> None:
     if self._scheduler is not None:
       return
 
@@ -400,7 +403,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
       )
 
   @property
-  def scheduler(self):
+  def scheduler(self) -> SchedulerSession:
     if self._scheduler is None:
       self._init_engine()
       self.post_scheduler_init()
@@ -432,6 +435,16 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
       self.invalidate_for(*files)
     if self._build_graph is not None:
       self._build_graph.reset()
+
+  _P = TypeVar("_P")
+
+  def request_single_product(
+    self, product_type: Type["TestBase._P"], subject: Union[Params, Any]
+  ) -> "TestBase._P":
+    result = assert_single_element(
+      self.scheduler.product_request(product_type, [subject])
+    )
+    return cast(TestBase._P, result)
 
   def set_options_for_scope(self, scope, **kwargs):
     self.options[scope].update(kwargs)

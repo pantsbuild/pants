@@ -47,7 +47,7 @@ class TestEngineOptionsParsing(TestBase):
       return self._ob(args=['./pants', '-ldebug', 'binary', 'src/python::'])
     def parse(ob):
       params = Params(Scope(str(GLOBAL_SCOPE)), ob)
-      return self.scheduler.product_request(ScopedOptions, [params])
+      return self.request_single_product(ScopedOptions, params)
 
     # If two OptionsBootstrapper instances are not equal, memoization will definitely not kick in.
     one_opts = ob()
@@ -56,7 +56,7 @@ class TestEngineOptionsParsing(TestBase):
     self.assertEquals(hash(one_opts), hash(two_opts))
 
     # If they are equal, executing parsing on them should result in a memoized object.
-    one, = parse(one_opts)
-    two, = parse(two_opts)
+    one = parse(one_opts)
+    two = parse(two_opts)
     self.assertEqual(one, two)
     self.assertIs(one, two)

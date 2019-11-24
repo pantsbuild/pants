@@ -79,7 +79,7 @@ class FileSystemTest(TestBase):
       FileContent(path='subdir/b.txt', content=b'goodbye'),
     ))
 
-    digest, = self.scheduler.product_request(Digest, [input_files_content])
+    digest = self.request_single_product(Digest, input_files_content)
 
     with temporary_dir() as tmp_dir:
       path1 = Path(tmp_dir, 'a.txt')

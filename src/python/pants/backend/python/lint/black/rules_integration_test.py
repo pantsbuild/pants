@@ -27,7 +27,6 @@ from pants.rules.core.lint import LintResult
 from pants.source.wrapped_globs import EagerFilesetWithSpec
 from pants.testutil.subsystem.util import global_subsystem_instance, init_subsystems
 from pants.testutil.test_base import TestBase
-from pants.util.collections import assert_single_element
 
 
 class BlackIntegrationTest(TestBase):
@@ -65,9 +64,7 @@ class BlackIntegrationTest(TestBase):
   ) -> Tuple[LintResult, FmtResult]:
     if config is not None:
       self.create_file(relpath="pyproject.toml", contents=config)
-    input_snapshot = assert_single_element(
-      self.scheduler.product_request(Snapshot, [InputFilesContent(source_files)])
-    )
+    input_snapshot = self.request_single_product(Snapshot, InputFilesContent(source_files))
     target = FormattablePythonTarget(
       TargetAdaptor(
         sources=EagerFilesetWithSpec('test', {'globs': []}, snapshot=input_snapshot),
@@ -77,33 +74,25 @@ class BlackIntegrationTest(TestBase):
     black_subsystem = global_subsystem_instance(
       Black, options={Black.options_scope: {"config": "pyproject.toml" if config else None}}
     )
-    black_setup = assert_single_element(
-      self.scheduler.product_request(
-        BlackSetup,
-        [Params(
-          target,
-          black_subsystem,
-          PythonNativeCode.global_instance(),
-          PythonSetup.global_instance(),
-          SubprocessEnvironment.global_instance(),
-        )]
+    black_setup = self.request_single_product(
+      BlackSetup,
+      Params(
+        target,
+        black_subsystem,
+        PythonNativeCode.global_instance(),
+        PythonSetup.global_instance(),
+        SubprocessEnvironment.global_instance(),
       )
     )
     fmt_and_lint_params = Params(
       target, black_setup, PythonSetup.global_instance(), SubprocessEnvironment.global_instance()
     )
-    lint_result: LintResult = assert_single_element(
-      self.scheduler.product_request(LintResult, [fmt_and_lint_params])
-    )
-    fmt_result: FmtResult = assert_single_element(
-      self.scheduler.product_request(FmtResult, [fmt_and_lint_params])
-    )
+    lint_result = self.request_single_product(LintResult, fmt_and_lint_params)
+    fmt_result = self.request_single_product(FmtResult, fmt_and_lint_params)
     return lint_result, fmt_result
 
   def get_digest(self, source_files: List[FileContent]) -> Digest:
-    return assert_single_element(
-      self.scheduler.product_request(Digest, [InputFilesContent(source_files)])
-    )
+    return self.request_single_product(Digest, InputFilesContent(source_files))
 
   def test_single_passing_source(self) -> None:
     lint_result, fmt_result = self.run_black([self.good_source])
