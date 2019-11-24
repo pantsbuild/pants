@@ -231,7 +231,7 @@ class GoBuildgen(GoTask):
 
     def __str__(self):
       import_paths = ' '.join(sorted(self.import_paths))
-      rev = '' if self.local else f" {(self.rev or 'FLOATING')}"
+      rev = '' if self.local else f" {self.rev or 'FLOATING'}"
       return (f'{self.build_file_path} ({import_paths}){rev}')
 
   class FloatingRemoteError(TaskError):
