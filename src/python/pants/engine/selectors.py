@@ -2,12 +2,16 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import ast
+import logging
 from dataclasses import dataclass
 from textwrap import dedent
 from typing import Any, Generator, Generic, Iterable, Optional, Tuple, Type, TypeVar, cast
 
 from pants.util.meta import frozen_after_init
 from pants.util.objects import TypeConstraint
+
+
+logger = logging.getLogger(__name__)
 
 
 _Product = TypeVar("_Product")
@@ -52,7 +56,11 @@ class Get(Generic[_Product]):
   @classmethod
   def __class_getitem__(cls, product_type):
     """Override the behavior of Get[T] to shuffle over the product T into the constructor args."""
-    return lambda *args: cls(product_type, *args)
+    def f(*args):
+      logger.info(f'product_type: {product_type}')
+      logger.info(f'args: {args}')
+      return cls(product_type, *args)
+    return f
 
   def __init__(self, *args: Any) -> None:
     if len(args) not in (2, 3):
@@ -113,6 +121,9 @@ class Get(Generic[_Product]):
 
     # Shuffle over the type parameter to be the first argument, if provided.
     combined_args = subscript_args + tuple(call_node.args)
+
+    logger.info(f'call_node: {ast.dump(call_node)}')
+    logger.info(f'combined_args: {combined_args}')
 
     if len(combined_args) == 2:
       product_type, subject_constructor = combined_args
