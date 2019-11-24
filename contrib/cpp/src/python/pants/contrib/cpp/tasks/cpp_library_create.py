@@ -43,7 +43,7 @@ class CppLibraryCreate(CppTask):
       objects = [os.path.join(basedir, obj) for obj in objs]
     # TODO: copy public headers to work dir.
     output = self._link_library(target, results_dir, objects)
-    self.context.log.info('Built c++ library: {0}'.format(output))
+    self.context.log.info(f'Built c++ library: {output}')
     return output
 
   def _libpath(self, target, results_dir):
