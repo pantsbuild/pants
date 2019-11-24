@@ -37,7 +37,7 @@ class ArchiveRetriever(Subsystem):
     try:
       archiver = archiver_for_path(archive_url)
     except ValueError:
-      raise FetchError("Don't know how to unpack archive at url {}".format(archive_url))
+      raise FetchError(f"Don't know how to unpack archive at url {archive_url}")
 
     with self._fetch(archive_url) as archive:
       if strip_level == 0:
@@ -68,10 +68,10 @@ class ArchiveRetriever(Subsystem):
   @contextmanager
   def _download(self, url):
     # TODO(jsirois): Wrap with workunits, progress meters, checksums.
-    logger.info('Downloading {}...'.format(url))
+    logger.info(f'Downloading {url}...')
     with closing(self._session().get(url, stream=True)) as res:
       if res.status_code != requests.codes.ok:
-        raise FetchError('Failed to download {} ({} error)'.format(url, res.status_code))
+        raise FetchError(f'Failed to download {url} ({res.status_code} error)')
       with temporary_file() as archive_fp:
         # NB: Archives might be very large so we play it safe and buffer them to disk instead of
         # memory before unpacking.

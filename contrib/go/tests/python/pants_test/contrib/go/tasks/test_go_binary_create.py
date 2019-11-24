@@ -32,7 +32,7 @@ class GoBinaryCreateTest(TaskTestBase):
     with temporary_dir() as bin_source_dir:
       def create_binary(name):
         target = self.make_target(name, GoBinary)
-        executable = os.path.join(bin_source_dir, '{}.exe'.format(name))
+        executable = os.path.join(bin_source_dir, f'{name}.exe')
         touch(executable)
         return target, executable
 

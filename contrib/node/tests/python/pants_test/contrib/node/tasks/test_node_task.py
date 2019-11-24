@@ -105,7 +105,7 @@ class NodeTaskTest(TaskTestBase):
         'name': 'pantsbuild.pants.test',
         'version': '0.0.0',
         'scripts': {
-          'proof': 'echo "42" > {}'.format(proof)
+          'proof': f'echo "42" > {proof}'
         }
       }
       with open(os.path.join(chroot, 'package.json'), 'w') as fp:
@@ -130,7 +130,7 @@ class NodeTaskTest(TaskTestBase):
         'name': 'pantsbuild.pants.test',
         'version': '0.0.0',
         'scripts': {
-          'proof': 'echo "42" > {}'.format(proof)
+          'proof': f'echo "42" > {proof}'
         }
       }
       with open(os.path.join(chroot, 'package.json'), 'w') as fp:

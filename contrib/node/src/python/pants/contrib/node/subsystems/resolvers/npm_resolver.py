@@ -163,12 +163,12 @@ class NpmResolver(Subsystem, NodeResolverBase):
     scoped_package_name = package_name
     chunk = package_name.split('/', 1)
     if len(chunk) > 1 and chunk[0].startswith('@'):
-      scoped_package_name = os.path.join('@{}'.format(node_scope), chunk[1:])
+      scoped_package_name = os.path.join(f'@{node_scope}', chunk[1:])
     else:
-      scoped_package_name = os.path.join('@{}'.format(node_scope), package_name)
+      scoped_package_name = os.path.join(f'@{node_scope}', package_name)
 
     node_task.context.log.debug(
-      'Node package "{}" will be resolved with scope "{}".'.format(package_name, scoped_package_name))
+      f'Node package "{package_name}" will be resolved with scope "{scoped_package_name}".')
     return scoped_package_name
 
   @staticmethod
@@ -205,12 +205,12 @@ class NpmResolver(Subsystem, NodeResolverBase):
       'dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'
     ]
     node_task.context.log.debug(
-      'Removing {} from package.json for {}'.format(dependencies_to_remove, package['name']))
+      f"Removing {dependencies_to_remove} from package.json for {package['name']}")
     for dependencyType in dependencies_to_remove:
       package.pop(dependencyType, None)
 
     node_task.context.log.debug(
-      'Adding {} to package.json for {}'.format(dependencies, package['name']))
+      f"Adding {dependencies} to package.json for {package['name']}")
     package['dependencies'] = dependencies
 
     with open(package_json_path, 'w') as fp:

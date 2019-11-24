@@ -69,8 +69,7 @@ class GoTask(Task):
 
     :rtype: string
     """
-    return '{goos}_{goarch}'.format(goos=self._lookup_go_env_var('GOOS'),
-                                    goarch=self._lookup_go_env_var('GOARCH'))
+    return f"{self._lookup_go_env_var('GOOS')}_{self._lookup_go_env_var('GOARCH')}"
 
   def _lookup_go_env_var(self, var):
     return self.go_dist.create_go_cmd('env', args=[var]).check_output().decode().strip()
@@ -143,7 +142,7 @@ class ImportOracle:
              of `pkg`.
     """
     go_cmd = self._go_dist.create_go_cmd('list', args=['-json', pkg], gopath=gopath)
-    with self._workunit_factory('list {}'.format(pkg), cmd=str(go_cmd),
+    with self._workunit_factory(f'list {pkg}', cmd=str(go_cmd),
                                 labels=[WorkUnitLabel.TOOL]) as workunit:
       # TODO(John Sirois): It would be nice to be able to tee the stdout to the workunit to we have
       # a capture of the json available for inspection in the server console.
