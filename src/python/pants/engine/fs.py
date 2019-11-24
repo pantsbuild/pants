@@ -3,6 +3,7 @@
 
 import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Iterable, Optional, Tuple
 
 from pants.engine.objects import Collection
@@ -173,6 +174,13 @@ class DirectoryToMaterialize:
   """A request to materialize the contents of a directory digest at the provided path."""
   path: str
   directory_digest: Digest
+
+  def __post_init__(self) -> None:
+    if Path(self.path).is_absolute():
+      raise ValueError(
+        f"The path must be relative for {self}, as the engine materializes directories relative to "
+        f"the build root."
+      )
 
 
 class DirectoriesToMaterialize(Collection[DirectoryToMaterialize]):
