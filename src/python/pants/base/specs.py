@@ -201,14 +201,16 @@ _specificity = {
 }
 
 
-def more_specific(spec1: Optional[Spec], spec2: Spec) -> Spec:
+def more_specific(spec1: Optional[Spec], spec2: Optional[Spec]) -> Spec:
   """Returns which of the two specs is more specific.
 
   This is useful when a target matches multiple specs, and we want to associate it with
   the "most specific" one, which will make the most intuitive sense to the user.
   """
   # Note that if either of spec1 or spec2 is None, the other will be returned.
-  return cast(Spec, spec1) if _specificity[type(spec1)] < _specificity[type(spec2)] else spec2
+  if spec1 is None and spec2 is None:
+    raise ValueError('internal error: both specs provided to more_specific() were None')
+  return cast(Spec, spec1 if _specificity[type(spec1)] < _specificity[type(spec2)] else spec2)
 
 
 @frozen_after_init

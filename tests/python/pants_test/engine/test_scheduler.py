@@ -57,9 +57,9 @@ class D:
 
 
 @rule
-def transitive_coroutine_rule(c: C) -> D:
-  b = yield Get(B, C, c)
-  yield D(b)
+async def transitive_coroutine_rule(c: C) -> D:
+  b = await Get(B, C, c)
+  return D(b)
 
 
 @union
@@ -104,9 +104,9 @@ def select_union_b(union_b: UnionB) -> A:
 
 # TODO: add GetMulti testing for unions!
 @rule
-def a_union_test(union_wrapper: UnionWrapper) -> A:
-  union_a = yield Get(A, UnionBase, union_wrapper.inner)
-  yield union_a
+async def a_union_test(union_wrapper: UnionWrapper) -> A:
+  union_a = await Get(A, UnionBase, union_wrapper.inner)
+  return union_a
 
 
 class UnionX:
@@ -114,15 +114,15 @@ class UnionX:
 
 
 @rule
-def error_msg_test_rule(union_wrapper: UnionWrapper) -> UnionX:
-  union_x = yield Get(UnionX, UnionWithNonMemberErrorMsg, union_wrapper.inner)
-  yield union_x
+async def error_msg_test_rule(union_wrapper: UnionWrapper) -> UnionX:
+  union_x = await Get(UnionX, UnionWithNonMemberErrorMsg, union_wrapper.inner)
+  return union_x
 
 
 class TypeCheckFailWrapper:
   """
   This object wraps another object which will be used to demonstrate a type check failure when the
-  engine processes a `yield Get(...)` statement.
+  engine processes an `await Get(...)` statement.
   """
 
   def __init__(self, inner):
@@ -130,19 +130,19 @@ class TypeCheckFailWrapper:
 
 
 @rule
-def a_typecheck_fail_test(wrapper: TypeCheckFailWrapper) -> A:
-  # This `yield` would use the `nested_raise` rule, but it won't get to the point of raising since
+async def a_typecheck_fail_test(wrapper: TypeCheckFailWrapper) -> A:
+  # This `await` would use the `nested_raise` rule, but it won't get to the point of raising since
   # the type check will fail at the Get.
-  _ = yield Get(A, B, wrapper.inner) # noqa: F841
-  yield A()
+  _ = await Get(A, B, wrapper.inner) # noqa: F841
+  return A()
 
 
 @rule
-def c_unhashable(_: TypeCheckFailWrapper) -> C:
-  # This `yield` would use the `nested_raise` rule, but it won't get to the point of raising since
+async def c_unhashable(_: TypeCheckFailWrapper) -> C:
+  # This `await` would use the `nested_raise` rule, but it won't get to the point of raising since
   # the hashability check will fail.
-  _ = yield Get(A, B, list()) # noqa: F841
-  yield C()
+  _ = await Get(A, B, list()) # noqa: F841
+  return C()
 
 
 @dataclass(frozen=True)
@@ -151,11 +151,11 @@ class CollectionType:
 
 
 @rule
-def c_unhashable_dataclass(_: CollectionType) -> C:
-  # This `yield` would use the `nested_raise` rule, but it won't get to the point of raising since
+async def c_unhashable_dataclass(_: CollectionType) -> C:
+  # This `await` would use the `nested_raise` rule, but it won't get to the point of raising since
   # the hashability check will fail.
-  _ = yield Get(A, B, list()) # noqa: F841
-  yield C()
+  _ = await Get(A, B, list()) # noqa: F841
+  return C()
 
 
 @contextmanager

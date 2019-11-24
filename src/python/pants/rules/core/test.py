@@ -13,7 +13,7 @@ from pants.engine.console import Console
 from pants.engine.goal import Goal
 from pants.engine.legacy.graph import HydratedTarget
 from pants.engine.rules import UnionMembership, console_rule, rule
-from pants.engine.selectors import Get
+from pants.engine.selectors import Get, MultiGet
 from pants.rules.core.core_test_model import Status, TestResult, TestTarget
 
 
@@ -34,8 +34,8 @@ class AddressAndTestResult:
 
 
 @console_rule
-def fast_test(console: Console, addresses: BuildFileAddresses) -> Test:
-  results = yield [Get(AddressAndTestResult, Address, addr.to_address()) for addr in addresses]
+async def fast_test(console: Console, addresses: BuildFileAddresses) -> Test:
+  results = await MultiGet(Get(AddressAndTestResult, Address, addr.to_address()) for addr in addresses)
   did_any_fail = False
   filtered_results = [(x.address, x.test_result) for x in results if x.test_result is not None]
 
@@ -73,11 +73,11 @@ def fast_test(console: Console, addresses: BuildFileAddresses) -> Test:
   else:
     exit_code = PANTS_SUCCEEDED_EXIT_CODE
 
-  yield Test(exit_code)
+  return Test(exit_code)
 
 
 @rule
-def coordinator_of_tests(target: HydratedTarget,
+async def coordinator_of_tests(target: HydratedTarget,
                          union_membership: UnionMembership,
                          provenance_map: AddressProvenanceMap) -> AddressAndTestResult:
   # TODO(#6004): when streaming to live TTY, rely on V2 UI for this information. When not a
@@ -89,14 +89,14 @@ def coordinator_of_tests(target: HydratedTarget,
     # NB: This has the effect of "casting" a TargetAdaptor to a member of the TestTarget union.
     # The adaptor will always be a member because of the union membership check above, but if
     # it were not it would fail at runtime with a useful error message.
-    result = yield Get(TestResult, TestTarget, target.adaptor)
+    result = await Get(TestResult, TestTarget, target.adaptor)
     logger.info("Tests {}: {}".format(
       "succeeded" if result.status == Status.SUCCESS else "failed",
       target.address.reference(),
     ))
   else:
     result = None  # Not a test target.
-  yield AddressAndTestResult(target.address, result)
+  return AddressAndTestResult(target.address, result)
 
 
 def rules():

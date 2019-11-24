@@ -20,9 +20,9 @@ class Run(Goal):
 
 
 @console_rule
-def run(console: Console, workspace: Workspace, runner: InteractiveRunner, bfa: BuildFileAddress) -> Run:
+async def run(console: Console, workspace: Workspace, runner: InteractiveRunner, bfa: BuildFileAddress) -> Run:
   target = bfa.to_address()
-  binary = yield Get(CreatedBinary, Address, target)
+  binary = await Get(CreatedBinary, Address, target)
 
   with temporary_dir(cleanup=True) as tmpdir:
     dirs_to_materialize = (DirectoryToMaterialize(path=str(tmpdir), directory_digest=binary.digest),)
@@ -47,7 +47,7 @@ def run(console: Console, workspace: Workspace, runner: InteractiveRunner, bfa: 
       console.write_stderr(f"Exception when attempting to run {target} : {e}\n")
       exit_code = -1
 
-  yield Run(exit_code)
+  return Run(exit_code)
 
 
 def rules():

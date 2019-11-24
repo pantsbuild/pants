@@ -22,7 +22,7 @@ from pants.engine.mapper import (
 from pants.engine.objects import Collection
 from pants.engine.parser import HydratedStruct, SymbolTable
 from pants.engine.rules import rule
-from pants.engine.selectors import Get
+from pants.engine.selectors import Get, MultiGet
 from pants.engine.struct import Struct
 from pants.testutil.engine.util import TARGET_TABLE, Target
 from pants.util.dirutil import safe_open
@@ -136,9 +136,9 @@ HydratedStructs = Collection[HydratedStruct]
 
 
 @rule
-def unhydrated_structs(build_file_addresses: BuildFileAddresses) -> HydratedStructs:
-  tacs = yield [Get(HydratedStruct, Address, a) for a in build_file_addresses.addresses]
-  yield HydratedStructs(tacs)
+async def unhydrated_structs(build_file_addresses: BuildFileAddresses) -> HydratedStructs:
+  tacs = await MultiGet(Get(HydratedStruct, Address, a) for a in build_file_addresses.addresses)
+  return HydratedStructs(tacs)
 
 
 class AddressMapperTest(unittest.TestCase, SchedulerTestBase):

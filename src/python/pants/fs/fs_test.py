@@ -33,14 +33,14 @@ class MockWorkspaceGoal(Goal):
 
 
 @console_rule
-def workspace_console_rule(console: Console, workspace: Workspace, msg: MessageToConsoleRule) -> MockWorkspaceGoal:
-  digest = yield Get(Digest, InputFilesContent, msg.input_files_content)
+async def workspace_console_rule(console: Console, workspace: Workspace, msg: MessageToConsoleRule) -> MockWorkspaceGoal:
+  digest = await Get(Digest, InputFilesContent, msg.input_files_content)
   output = workspace.materialize_directories((
     DirectoryToMaterialize(path=msg.tmp_dir, directory_digest=digest),
   ))
   output_path = output.dependencies[0].output_paths[0]
   console.print_stdout(str(Path(msg.tmp_dir, output_path)), end='')
-  yield MockWorkspaceGoal(exit_code=0)
+  return MockWorkspaceGoal(exit_code=0)
 
 
 class WorkspaceInConsoleRuleTest(ConsoleRuleTestBase):

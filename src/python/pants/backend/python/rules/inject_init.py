@@ -17,7 +17,7 @@ class InjectedInitDigest:
 
 
 @rule
-def inject_init(snapshot: Snapshot) -> InjectedInitDigest:
+async def inject_init(snapshot: Snapshot) -> InjectedInitDigest:
   """Ensure that every package has an __init__.py file in it."""
   missing_init_files = tuple(sorted(identify_missing_init_files(snapshot.files)))
   if not missing_init_files:
@@ -31,11 +31,11 @@ def inject_init(snapshot: Snapshot) -> InjectedInitDigest:
       description="Inject missing __init__.py files: {}".format(", ".join(missing_init_files)),
       input_files=snapshot.directory_digest,
     )
-    touch_init_result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, touch_init_request)
+    touch_init_result = await Get(ExecuteProcessResult, ExecuteProcessRequest, touch_init_request)
     new_init_files_digest = touch_init_result.output_directory_digest
   # TODO(#7710): Once this gets fixed, merge the original source digest and the new init digest
   # into one unified digest.
-  yield InjectedInitDigest(directory_digest=new_init_files_digest)
+  return InjectedInitDigest(directory_digest=new_init_files_digest)
 
 
 def rules():

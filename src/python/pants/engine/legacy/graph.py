@@ -432,10 +432,10 @@ async def find_owners(
   else:
     # Otherwise: find dependees.
     all_addresses = await Get(BuildFileAddresses, Specs((DescendantAddresses(''),)))
-    all_hydrated_structs = await MultiGet(
-      Get(HydratedStruct, Address, a.to_address()) for a in all_addresses
-    )
-    all_structs = [hs.value for hs in all_hydrated_structs]
+    all_structs = [
+      s.value for s in
+      await MultiGet(Get(HydratedStruct, Address, a.to_address()) for a in all_addresses)
+    ]
 
     bfa = build_configuration.registered_aliases()
     graph = _DependentGraph.from_iterable(target_types_from_build_file_aliases(bfa),
@@ -502,15 +502,14 @@ async def hydrate_target(hydrated_struct: HydratedStruct) -> HydratedTarget:
   target_adaptor = hydrated_struct.value
   """Construct a HydratedTarget from a TargetAdaptor and hydrated versions of its adapted fields."""
   # Hydrate the fields of the adaptor and re-construct it.
-  hydrated_fields = await MultiGet(
-    Get(HydratedField, HydrateableField, fa) for fa in target_adaptor.field_adaptors
-  )
+  hydrated_fields = await MultiGet(Get(HydratedField, HydrateableField, fa)
+                                   for fa in target_adaptor.field_adaptors)
   kwargs = target_adaptor.kwargs()
   for field in hydrated_fields:
     kwargs[field.name] = field.value
-  return HydratedTarget(
-    target_adaptor.address, type(target_adaptor)(**kwargs), tuple(target_adaptor.dependencies)
-  )
+  return HydratedTarget(target_adaptor.address,
+                       type(target_adaptor)(**kwargs),
+                       tuple(target_adaptor.dependencies))
 
 
 def _eager_fileset_with_spec(spec_path, filespec, snapshot, include_dirs=False):
