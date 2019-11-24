@@ -72,7 +72,7 @@ class GoFetchTest(TaskTestBase):
 
   def _create_package(self, dirpath, name, deps):
     """Creates a Go package inside dirpath named 'name' importing deps."""
-    imports = ['import "localzip/{}"'.format(d) for d in deps]
+    imports = [f'import "localzip/{d}"' for d in deps]
     f = os.path.join(dirpath, '{name}/{name}.go'.format(name=name))
     self.create_file(f, contents=
       """package {name}
@@ -84,7 +84,7 @@ class GoFetchTest(TaskTestBase):
     shutil.make_archive(os.path.join(dest, name), 'zip', root_dir=src)
 
   def _create_remote_lib(self, name):
-    self.make_target(spec='3rdparty/go/localzip/{name}'.format(name=name),
+    self.make_target(spec=f'3rdparty/go/localzip/{name}',
                      target_type=GoRemoteLibrary,
                      pkg=name)
 
@@ -113,7 +113,7 @@ class GoFetchTest(TaskTestBase):
     if root_target.name not in dep_map:
       return
 
-    expected_spec_paths = {'3rdparty/go/localzip/{}'.format(name)
+    expected_spec_paths = {f'3rdparty/go/localzip/{name}'
                            for name in dep_map[root_target.name]}
     actual_spec_paths = {dep.address.spec_path for dep in root_target.dependencies}
     self.assertEqual(actual_spec_paths, expected_spec_paths)

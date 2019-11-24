@@ -37,7 +37,7 @@ class GoFmtTaskBase(GoWorkspaceTask):
         try:
           output = subprocess.check_output(args).decode()
         except subprocess.CalledProcessError as e:
-          raise TaskError('{} failed with exit code {}'.format(' '.join(args), e.returncode),
+          raise TaskError(f"{' '.join(args)} failed with exit code {e.returncode}",
                           exit_code=e.returncode)
         yield output
       else:
