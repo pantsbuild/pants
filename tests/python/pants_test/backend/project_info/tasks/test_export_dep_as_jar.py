@@ -5,7 +5,6 @@ import json
 import os
 import textwrap
 from contextlib import contextmanager
-from textwrap import dedent
 
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.jvm.subsystems.junit import JUnit
@@ -22,9 +21,8 @@ from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
-from pants.backend.project_info.tasks.export import Export
+from pants.backend.project_info.tasks.export_dep_as_jar import ExportDepAsJar
 from pants.backend.project_info.tasks.export_version import DEFAULT_EXPORT_VERSION
-from pants.backend.python.register import build_file_aliases as register_python
 from pants.base.exceptions import TaskError
 from pants.build_graph.register import build_file_aliases as register_core
 from pants.build_graph.resources import Resources
@@ -38,14 +36,14 @@ from pants.util.dirutil import chmod_plus_x, safe_open
 from pants.util.osutil import get_os_name, normalize_os_name
 
 
-class ExportTest(ConsoleTaskTestBase):
+class ExportDepAsJarTest(ConsoleTaskTestBase):
   @classmethod
   def task_type(cls):
-    return Export
+    return ExportDepAsJar
 
   @classmethod
   def alias_groups(cls):
-    return register_core().merge(register_jvm()).merge(register_python())
+    return register_core().merge(register_jvm())
 
   # Version of the scala compiler and libraries used for this test.
   _scala_toolchain_version = '2.10.5'
@@ -219,6 +217,9 @@ class ExportTest(ConsoleTaskTestBase):
       dependencies=[jvm_binary],
     )
 
+    self.create_file('project_info/a_resource', contents='a')
+    self.create_file('project_info/b_resource', contents='b')
+
     src_resource = self.make_target(
       'project_info:resource',
       target_type=Resources,
@@ -236,39 +237,6 @@ class ExportTest(ConsoleTaskTestBase):
       'project_info:unrecognized_target_type',
       target_type=JvmTarget,
     )
-
-    self.add_to_build_file('src/python/x/BUILD', """
-       python_library(name="x", sources=globs("*.py"))
-    """.strip())
-
-    self.add_to_build_file('src/python/y/BUILD', dedent("""
-      python_library(name="y", sources=rglobs("*.py"))
-      python_library(name="y2", sources=rglobs("subdir/*.py"))
-      python_library(name="y3", sources=rglobs("Test*.py"))
-    """))
-
-    self.add_to_build_file('src/python/z/BUILD', """
-      python_library(name="z", sources=zglobs("**/*.py"))
-    """.strip())
-
-    self.add_to_build_file('src/python/exclude/BUILD', """
-      python_library(name="exclude", sources=globs("*.py", exclude=[['foo.py']]))
-    """.strip())
-
-    self.add_to_build_file('src/BUILD', """
-      target(name="alias")
-    """.strip())
-
-    self.add_to_build_file('src/python/has_reqs/BUILD', textwrap.dedent("""
-       python_library(name="has_reqs", sources=globs("*.py"), dependencies=[':six'])
-
-       python_requirement_library(
-         name='six',
-         requirements=[
-           python_requirement('six==1.9.0')
-         ]
-       )
-    """))
 
   def execute_export(self, *specs, **options_overrides):
     options = {
@@ -291,25 +259,16 @@ class ExportTest(ConsoleTaskTestBase):
     context = self.context(options=options, target_roots=[self.target(spec) for spec in specs],
                            for_subsystems=[JvmPlatform],
                            for_task_types=[BootstrapJvmTools])
-    context.products.safe_create_data('compile_classpath',
+    context.products.safe_create_data('runtime_classpath',
                                       init_func=ClasspathProducts.init_func(self.pants_workdir))
     bootstrap_task = BootstrapJvmTools(context, self.pants_workdir)
     bootstrap_task.execute()
     task = self.create_task(context)
     return list(task.console_output(list(task.context.targets()),
-                                    context.products.get_data('compile_classpath')))
+                                    context.products.get_data('runtime_classpath')))
 
   def execute_export_json(self, *specs, **options):
     return json.loads(''.join(self.execute_export(*specs, **options)))
-
-  def test_source_globs_py(self):
-    self.set_options(globs=True)
-    result = self.execute_export_json('src/python/x')
-
-    self.assertEqual(
-      {'globs': ['src/python/x/*.py']},
-      result['targets']['src/python/x:x']['globs']
-    )
 
   def test_source_globs_java(self):
     self.set_options(globs=True)
@@ -318,15 +277,6 @@ class ExportTest(ConsoleTaskTestBase):
     self.assertEqual(
       {'globs' : ['project_info/com/foo/*.scala']},
       result['targets']['project_info:globular']['globs']
-    )
-
-  def test_source_globs_alias(self):
-    self.set_options(globs=True)
-    result = self.execute_export_json('src:alias')
-
-    self.assertEqual(
-        {'globs': []},
-      result['targets']['src:alias']['globs']
     )
 
   def test_without_dependencies(self):
@@ -358,17 +308,6 @@ class ExportTest(ConsoleTaskTestBase):
     scala_jars = scala_platform['compiler_classpath']
     self.assertTrue(any('2.12' in jar_path for jar_path in scala_jars))
 
-  def test_sources(self):
-    self.set_options(sources=True)
-    result = self.execute_export_json('project_info:third')
-
-    self.assertEqual(
-      ['project_info/com/foo/Bar.scala',
-       'project_info/com/foo/Baz.scala',
-      ],
-      sorted(result['targets']['project_info:third']['sources'])
-    )
-
   def test_with_dependencies(self):
     result = self.execute_export_json('project_info:third')
 
@@ -388,7 +327,7 @@ class ExportTest(ConsoleTaskTestBase):
     source_root = result['targets']['project_info:third']['roots'][0]
     self.assertEqual('com.foo', source_root['package_prefix'])
     self.assertEqual(
-      f'{self.build_root}/project_info/com/foo',
+      '{0}/project_info/com/foo'.format(self.build_root),
       source_root['source_root']
     )
 
@@ -407,13 +346,13 @@ class ExportTest(ConsoleTaskTestBase):
                           'project_info/this/is/a/source/Bar.scala']},
       'libraries': ['org.apache:apache-jar:12.12.2012', 'org.scala-lang:scala-library:2.10.5'],
       'id': 'project_info.jvm_target',
-      'is_code_gen': False,
+      # 'is_code_gen': False,
       'targets': ['project_info:jar_lib', '//:scala-library'],
       'is_synthetic': False,
       'is_target_root': True,
       'roots': [
          {
-           'source_root': f'{self.build_root}/project_info/this/is/a/source',
+           'source_root': '{root}/project_info/this/is/a/source'.format(root=self.build_root),
            'package_prefix': 'this.is.a.source'
          },
       ],
@@ -425,18 +364,12 @@ class ExportTest(ConsoleTaskTestBase):
     }
     self.assertEqual(jvm_target, expected_jvm_target)
 
-  def test_no_libraries(self):
-    self.set_options(libraries=False)
-    result = self.execute_export_json('project_info:java_test')
-    self.assertEqual([],
-                     result['targets']['project_info:java_test']['libraries'])
-
   def test_java_test(self):
     result = self.execute_export_json('project_info:java_test')
     self.assertEqual('TEST', result['targets']['project_info:java_test']['target_type'])
     # Note that the junit dep gets auto-injected via the JUnit subsystem.
     self.assertEqual(['org.apache:apache-jar:12.12.2012',
-                      f'junit:junit:{JUnit.LIBRARY_REV}'],
+                      'junit:junit:{}'.format(JUnit.LIBRARY_REV)],
                      result['targets']['project_info:java_test']['libraries'])
     self.assertEqual('TEST_RESOURCE',
                      result['targets']['project_info:test_resource']['target_type'])
@@ -458,11 +391,24 @@ class ExportTest(ConsoleTaskTestBase):
     # confirms only one line of output, which is what -format should produce
     self.assertEqual(1, len(result))
 
-  def test_target_types(self):
+  def test_target_types_with_resource_as_deps(self):
     result = self.execute_export_json('project_info:target_type')
     self.assertEqual('SOURCE',
                      result['targets']['project_info:target_type']['target_type'])
     self.assertEqual('RESOURCE', result['targets']['project_info:resource']['target_type'])
+    self.assertEqual([], result['targets']['project_info:resource']['roots'])
+    self.assertEqual(['project_info.resource'], result['targets']['project_info:resource']['libraries'])
+    self.assertTrue(result['libraries']['project_info.resource']['default'].endswith('.jar'))
+
+  def test_target_types_with_resource_as_root(self):
+    result = self.execute_export_json(*['project_info:target_type', 'project_info:resource'])
+    self.assertEqual('SOURCE',
+      result['targets']['project_info:target_type']['target_type'])
+    self.assertEqual('RESOURCE', result['targets']['project_info:resource']['target_type'])
+    self.assertEqual([], result['targets']['project_info:resource']['libraries'])
+    roots = result['targets']['project_info:resource']['roots']
+    self.assertEqual(1, len(roots))
+    self.assertEqual(os.path.join(self.build_root, 'project_info'), roots[0]['source_root'])
 
   def test_target_platform(self):
     result = self.execute_export_json('project_info:target_type')
@@ -479,66 +425,6 @@ class ExportTest(ConsoleTaskTestBase):
     self.set_options(output_file=self.build_root)
     with self.assertRaises(TaskError):
       self.execute_export('project_info:target_type')
-
-  def test_source_exclude(self):
-    self.set_options(globs=True)
-    result = self.execute_export_json('src/python/exclude')
-
-    self.assertEqual(
-      {'globs': ['src/python/exclude/*.py'],
-       'exclude': [{
-         'globs': ['src/python/exclude/foo.py']
-       }],
-     },
-      result['targets']['src/python/exclude:exclude']['globs']
-    )
-
-  def test_source_rglobs(self):
-    self.set_options(globs=True)
-    result = self.execute_export_json('src/python/y')
-
-    self.assertEqual(
-      {'globs': ['src/python/y/**/*.py']},
-      result['targets']['src/python/y:y']['globs']
-    )
-
-  def test_source_rglobs_subdir(self):
-    self.set_options(globs=True)
-    result = self.execute_export_json('src/python/y:y2')
-
-    self.assertEqual(
-      {'globs': ['src/python/y/subdir/**/*.py']},
-      result['targets']['src/python/y:y2']['globs']
-    )
-
-  def test_source_rglobs_noninitial(self):
-    self.set_options(globs=True)
-    result = self.execute_export_json('src/python/y:y3')
-
-    self.assertEqual(
-      {'globs': ['src/python/y/Test*.py']},
-      result['targets']['src/python/y:y3']['globs']
-    )
-
-  def test_source_zglobs(self):
-    self.set_options(globs=True)
-    result = self.execute_export_json('src/python/z')
-
-    self.assertEqual(
-      {'globs': ['src/python/z/**/*.py']},
-      result['targets']['src/python/z:z']['globs']
-    )
-
-  def test_has_python_requirements(self):
-    result = self.execute_export_json('src/python/has_reqs')
-    interpreters = result['python_setup']['interpreters']
-    self.assertEqual(1, len(interpreters))
-    chroot = list(interpreters.values())[0]['chroot']
-    deps = os.listdir(os.path.join(chroot, '.deps'))
-    self.assertEqual(1, len(deps))
-    six_whl = deps[0]
-    self.assertTrue(six_whl.startswith('six-1.9.0'))
-    self.assertTrue(six_whl.endswith('.whl'))
 
   @contextmanager
   def fake_distribution(self, version):

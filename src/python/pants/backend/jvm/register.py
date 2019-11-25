@@ -74,6 +74,7 @@ from pants.backend.jvm.tasks.scalafix import ScalaFixCheck, ScalaFixFix
 from pants.backend.jvm.tasks.scalafmt import ScalaFmtCheckFormat, ScalaFmtFormat
 from pants.backend.jvm.tasks.scalastyle import Scalastyle
 from pants.backend.jvm.tasks.unpack_jars import UnpackJars
+from pants.backend.project_info.tasks.export_dep_as_jar import ExportDepAsJar
 from pants.build_graph.app_base import Bundle, DirectoryReMapper
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.goal import Goal
@@ -174,6 +175,7 @@ def register_goals():
   task(name='services', action=PrepareServices).install('resources')
 
   task(name='export-classpath', action=RuntimeClasspathPublisher).install()
+  task(name='export-dep-as-jar', action=ExportDepAsJar).install()
 
   task(name='jvm', action=JvmDependencyUsage).install('dep-usage')
 
