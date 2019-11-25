@@ -212,9 +212,9 @@ class TestStrategy(Enum):
     shard: Optional[str] = None,
     oauth_token_path: Optional[str] = None
   ) -> List[str]:
-    if self == self.v2_remote and oauth_token_path is None:  # type: ignore[comparison-overlap]
+    if self == self.v2_remote and oauth_token_path is None:  # type: ignore[comparison-overlap]  # issues with understanding `self`
       raise ValueError("Must specify oauth_token_path.")
-    result: List[str] = {
+    result = {
       self.v1_no_chroot: ["./pants.pex", "test.pytest", "--no-chroot", *sorted(targets), *PYTEST_PASSTHRU_ARGS],
       self.v1_chroot: ["./pants.pex", "test.pytest", *sorted(targets), *PYTEST_PASSTHRU_ARGS],
       self.v2_local: ["./pants.pex", "--no-v1", "--v2", "test", *sorted(targets)],
@@ -227,8 +227,8 @@ class TestStrategy(Enum):
                         "test",
                         *sorted(targets),
                       ]
-    }[self]  # type: ignore[index]
-    if shard is not None and self in [self.v1_no_chroot, self.v1_chroot]:  # type: ignore[comparison-overlap]
+    }[self]  # type: ignore[index]  # issues with understanding `self`
+    if shard is not None and self in [self.v1_no_chroot, self.v1_chroot]:  # type: ignore[comparison-overlap]  # issues with understanding `self`
       result.insert(2, f"--test-pytest-test-shard={shard}")
     return result
 

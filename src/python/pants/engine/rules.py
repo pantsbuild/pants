@@ -80,6 +80,9 @@ def _make_rule(
                     its inputs.
   """
 
+  # NB: the left operand is always true, according to MyPy, because we annotate `return_type` as
+  # `Type`. We keep it for now until we have higher type coverage because we should not be removing
+  # runtime checks yet.
   is_goal_cls = isinstance(return_type, type) and issubclass(return_type, Goal)  # type: ignore[misc]
   if is_goal_cls == cacheable:
     raise TypeError(
@@ -365,7 +368,7 @@ class TaskRule(Rule):
     self._output_type = output_type
     self.input_selectors = input_selectors
     self.input_gets = input_gets
-    self.func = func  # type: ignore[assignment]
+    self.func = func  # type: ignore[assignment] # cannot assign to a method
     self._dependency_rules = dependency_rules or ()
     self._dependency_optionables = dependency_optionables or ()
     self.cacheable = cacheable

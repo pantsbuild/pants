@@ -84,6 +84,8 @@ class Subsystem(SubsystemClientMixin, Optionable):
     return cls._options is not None
 
   # A cache of (cls, scope) -> the instance of cls tied to that scope.
+  # NB: it would be ideal to use `_S` rather than `Subsystem`, but we can't do this because
+  # MyPy complains that `_S` would not be properly constrained.
   _scoped_instances: Dict[Tuple[Type["Subsystem"], str], "Subsystem"] = {}
 
   @classmethod
@@ -94,7 +96,7 @@ class Subsystem(SubsystemClientMixin, Optionable):
 
     :returns: The global subsystem instance.
     """
-    return cls._instance_for_scope(cls.options_scope)  # type: ignore[arg-type]
+    return cls._instance_for_scope(cls.options_scope)  # type: ignore[arg-type]  # MyPy is treating cls.options_scope as a Callable, rather than `str`
 
   @classmethod
   def scoped_instance(cls: Type[_S], optionable: Optionable) -> _S:
@@ -105,7 +107,7 @@ class Subsystem(SubsystemClientMixin, Optionable):
     :param optionable: An optionable type or instance to scope this subsystem under.
     :returns: The scoped subsystem instance.
     """
-    if not isinstance(optionable, Optionable) and not issubclass(optionable, Optionable):  # type: ignore[misc]
+    if not isinstance(optionable, Optionable) and not issubclass(optionable, Optionable):  # type: ignore[misc] # MyPy thinks the RHS never evaluates, but it somehow does
       raise TypeError('Can only scope an instance against an Optionable, given {} of type {}.'
                       .format(optionable, type(optionable)))
     return cls._instance_for_scope(cls.subscope(optionable.options_scope))
