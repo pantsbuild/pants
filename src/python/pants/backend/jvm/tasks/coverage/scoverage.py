@@ -9,8 +9,9 @@ from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.tasks.coverage.engine import CoverageEngine
 from pants.base.exceptions import TaskError
 from pants.java.jar.jar_dependency import JarDependency
+from pants.option.custom_types import dir_option
 from pants.subsystem.subsystem import Subsystem
-from pants.util.dirutil import safe_mkdir, safe_walk
+from pants.util.dirutil import mergetree, safe_mkdir, safe_walk
 
 
 class Scoverage(CoverageEngine):
@@ -49,13 +50,19 @@ class Scoverage(CoverageEngine):
         ]
       )
 
-      register('--target-filters', type=list, default=[],
+      register(
+        '--target-filters', type=list, default=[], fingerprint=True,
         help='Regex patterns passed to scoverage report generator, specifying which targets '
              'should be '
              'included in reports. All targets matching any of the patterns will be '
              'included when generating reports. If no targets are specified, all '
              'targets are included, which would be the same as specifying ".*" as a '
              'filter.')
+
+      register(
+        '--coverage-output-dir', type=dir_option, default=None, fingerprint=False,
+        help='Directory to copy coverage output to.'
+      )
 
     def create(self, settings, targets, execute_java_for_targets):
       """
@@ -72,11 +79,15 @@ class Scoverage(CoverageEngine):
       report_path = self.tool_classpath_from_products(settings.context.products, 'scoverage-report',
         scope='scoverage-report')
 
-      target_filters = Scoverage.Factory.global_instance().get_options().target_filters
+      opts = Scoverage.Factory.global_instance().get_options()
+      target_filters = opts.target_filters
+      coverage_output_dir = opts.coverage_output_dir
 
-      return Scoverage(report_path, target_filters, settings, targets, execute_java_for_targets)
+      return Scoverage(report_path, target_filters, settings, targets, execute_java_for_targets,
+                       coverage_output_dir=coverage_output_dir)
 
-  def __init__(self, report_path, target_filters, settings, targets, execute_java_for_targets):
+  def __init__(self, report_path, target_filters, settings, targets, execute_java_for_targets,
+               coverage_output_dir=None):
     """
     :param settings: Generic code coverage settings.
     :type settings: :class:`CodeCoverageSettings`
@@ -86,6 +97,7 @@ class Scoverage(CoverageEngine):
                                      should also accept `*args` and `**kwargs` compatible with the
                                      remaining parameters accepted by
                                      `pants.java.util.execute_java`.
+    :param str coverage_output_dir: An optional output directory to copy coverage reports to.
     """
     self._settings = settings
     self._context = settings.context
@@ -94,6 +106,7 @@ class Scoverage(CoverageEngine):
     self._execute_java = functools.partial(execute_java_for_targets, targets)
     self._coverage_force = settings.options.coverage_force
     self._report_path = report_path
+    self._coverage_output_dir = coverage_output_dir
 
   #
   def _iter_datafiles(self, output_dir):
@@ -172,6 +185,11 @@ class Scoverage(CoverageEngine):
 
     self._settings.log.info(f"Scoverage html reports available at {html_report_path}")
     self._settings.log.info(f"Scoverage xml reports available at {xml_report_path}")
+
+    if self._coverage_output_dir:
+      self._settings.log.debug(f'Scoverage output also written to: {self._coverage_output_dir}!')
+      mergetree(output_dir, self._coverage_output_dir)
+
     if self._settings.coverage_open:
       return os.path.join(html_report_path, 'index.html')
 
