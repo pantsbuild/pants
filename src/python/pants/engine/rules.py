@@ -4,7 +4,6 @@
 import ast
 import inspect
 import itertools
-import logging
 import sys
 import typing
 from abc import ABC, abstractmethod
@@ -19,9 +18,6 @@ from pants.engine.selectors import Get
 from pants.util.collections import assert_single_element
 from pants.util.memo import memoized
 from pants.util.meta import frozen_after_init
-
-
-logger = logging.getLogger(__name__)
 
 
 class _RuleVisitor(ast.NodeVisitor):

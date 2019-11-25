@@ -1,7 +1,6 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import logging
 from collections.abc import MutableMapping, MutableSequence
 from dataclasses import dataclass
 from os.path import dirname, join
@@ -27,9 +26,6 @@ from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.struct import Struct
 from pants.util.objects import TypeConstraintError
-
-
-logger = logging.getLogger(__name__)
 
 
 class ResolvedTypeMismatchError(ResolveError):
@@ -213,7 +209,7 @@ async def provenanced_addresses_from_address_families(
   :raises: :class:`AddressLookupError` if no targets are matched for non-SingleAddress specs.
   """
   # Capture a Snapshot covering all paths for these Specs, then group by directory.
-  snapshot: Snapshot = await Get(Snapshot, PathGlobs, _spec_to_globs(address_mapper, specs))
+  snapshot = await Get[Snapshot](PathGlobs, _spec_to_globs(address_mapper, specs))
   dirnames = {dirname(f) for f in snapshot.files}
   address_families = await MultiGet(Get[AddressFamily](Dir(d)) for d in dirnames)
   address_family_by_directory = {af.namespace: af for af in address_families}
