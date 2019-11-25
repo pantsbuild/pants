@@ -33,11 +33,10 @@ class TestExceptionSink(TestBase):
   def test_set_invalid_log_location(self):
     self.assertFalse(os.path.isdir('/does/not/exist'))
     sink = self._gen_sink_subclass()
-    err_rx = re.escape(
-      "The provided exception sink path at '/does/not/exist' is not writable or could not be created: [Errno 13]")
-    with self.assertRaisesRegexp(ExceptionSink.ExceptionSinkError, err_rx):
+    with self.assertRaisesWithMessageContaining(
+        ExceptionSink.ExceptionSinkError,
+        "The provided exception sink path at '/does/not/exist' is not writable or could not be created"):
       sink.reset_log_location('/does/not/exist')
-
 
     # NB: This target is marked with 'platform_specific_behavior' because OSX errors out here at
     # creating a new directory with safe_mkdir(), Linux errors out trying to create the directory
@@ -69,7 +68,7 @@ class TestExceptionSink(TestBase):
         getproctitle_mock.assert_called_once()
 
       # This should have created two log files, one specific to the current pid.
-      self.assertEqual(os.listdir(tmpdir), ['.pants-fatal-exception-logs'])
+      self.assertEqual(os.listdir(tmpdir), ['.pids'])
 
       cur_process_error_log_path = ExceptionSink.exceptions_log_path(for_pid=pid, in_dir=tmpdir)
       self.assertTrue(os.path.isfile(cur_process_error_log_path))
