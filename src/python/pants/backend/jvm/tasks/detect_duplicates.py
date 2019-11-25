@@ -96,7 +96,7 @@ class DuplicateDetector(JvmBinaryTask):
     if len(conflicts_by_artifacts) > 0:
       self._log_conflicts(conflicts_by_artifacts, binary_target)
       if self.get_options().fail_fast:
-        raise TaskError('Failing build for target {}.'.format(binary_target))
+        raise TaskError(f'Failing build for target {binary_target}.')
     return conflicts_by_artifacts
 
   def _get_internal_dependencies(self, binary_target):
@@ -116,7 +116,7 @@ class DuplicateDetector(JvmBinaryTask):
   def _get_external_dependencies(self, binary_target):
     artifacts_by_file_name = defaultdict(set)
     for external_dep, coordinate in self.list_external_jar_dependencies(binary_target):
-      self.context.log.debug('  scanning {} from {}'.format(coordinate, external_dep))
+      self.context.log.debug(f'  scanning {coordinate} from {external_dep}')
       for qualified_file_name in ClasspathUtil.classpath_entries_contents([external_dep]):
         artifacts_by_file_name[qualified_file_name].add(coordinate.artifact_filename)
     return artifacts_by_file_name
@@ -152,15 +152,14 @@ class DuplicateDetector(JvmBinaryTask):
     return conflicts_by_artifacts
 
   def _log_conflicts(self, conflicts_by_artifacts, target):
-    self.context.log.warn('\n ===== For target {}:'.format(target))
+    self.context.log.warn(f'\n ===== For target {target}:')
     for artifacts, duplicate_files in conflicts_by_artifacts.items():
       if len(artifacts) < 2:
         continue
       self.context.log.warn(
-        'Duplicate classes and/or resources detected in artifacts: {}'.format(artifacts))
+        f'Duplicate classes and/or resources detected in artifacts: {artifacts}')
       dup_list = list(duplicate_files)
       for duplicate_file in dup_list[:self.max_dups]:
-        self.context.log.warn('     {}'.format(duplicate_file))
+        self.context.log.warn(f'     {duplicate_file}')
       if len(dup_list) > self.max_dups:
-        self.context.log.warn('     ... {remaining} more ...'
-                              .format(remaining=(len(dup_list) - self.max_dups)))
+        self.context.log.warn(f'     ... {(len(dup_list) - self.max_dups)} more ...')

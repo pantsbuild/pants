@@ -60,7 +60,7 @@ class BaseZincCompile(JvmCompile):
       for pattern, has_argument in valid_patterns.items():
         if pattern.match(arg):
           return 2 if has_argument else 1
-      log.warn("Zinc argument '{}' is not supported, and is subject to change/removal!".format(arg))
+      log.warn(f"Zinc argument '{arg}' is not supported, and is subject to change/removal!")
       return 1
 
     arg_index = 0
@@ -82,8 +82,8 @@ class BaseZincCompile(JvmCompile):
     :type settings: :class:`JvmPlatformSettings`
     """
     zinc_args = [
-      '-C-source', '-C{}'.format(settings.source_level),
-      '-C-target', '-C{}'.format(settings.target_level),
+      '-C-source', f'-C{settings.source_level}',
+      '-C-target', f'-C{settings.target_level}',
     ]
     if settings.args:
       settings_args = settings.args
@@ -355,7 +355,7 @@ class BaseZincCompile(JvmCompile):
       # That classloader will first delegate to its parent classloader, which will search the
       # regular classpath.  However it's harder to guarantee that our javac will preceed any others
       # on the classpath, so it's safer to prefix it to the bootclasspath.
-      jvm_options.extend(['-Xbootclasspath/p:{}'.format(':'.join(self.javac_classpath()))])
+      jvm_options.extend([f"-Xbootclasspath/p:{':'.join(self.javac_classpath())}"])
 
     jvm_options.extend(self._jvm_options)
 
@@ -385,7 +385,7 @@ class BaseZincCompile(JvmCompile):
     exit_code = self.runjava(classpath=self.get_zinc_compiler_classpath(),
                              main=Zinc.ZINC_COMPILE_MAIN,
                              jvm_options=jvm_options,
-                             args=['@{}'.format(ctx.args_file)],
+                             args=[f'@{ctx.args_file}'],
                              workunit_name=self.name(),
                              workunit_labels=[WorkUnitLabel.COMPILER],
                              dist=self._zinc.dist)
@@ -464,7 +464,7 @@ class BaseZincCompile(JvmCompile):
       image_specific_argv =  [
         native_image_path,
         '-java-home', '.jdk',
-        '-Dscala.boot.class.path={}'.format(os.pathsep.join(scala_boot_classpath)),
+        f'-Dscala.boot.class.path={os.pathsep.join(scala_boot_classpath)}',
         '-Dscala.usejavacp=true',
       ]
     else:
@@ -486,7 +486,7 @@ class BaseZincCompile(JvmCompile):
     merged_local_only_scratch_inputs = self._compute_local_only_inputs(classes_dir, relpath_to_analysis, jar_file)
 
     # TODO: Extract something common from Executor._create_command to make the command line
-    argv = image_specific_argv + ['@{}'.format(argfile_snapshot.files[0])]
+    argv = image_specific_argv + [f'@{argfile_snapshot.files[0]}']
 
     merged_input_digest = self.context._scheduler.merge_directories(
       [self._zinc.zinc.directory_digest] +
@@ -507,7 +507,7 @@ class BaseZincCompile(JvmCompile):
       input_files=merged_input_digest,
       output_files=(jar_file, relpath_to_analysis),
       output_directories=output_directories,
-      description="zinc compile for {}".format(ctx.target.address.spec),
+      description=f"zinc compile for {ctx.target.address.spec}",
       unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule=merged_local_only_scratch_inputs,
       jdk_home=self._zinc.underlying_dist.home,
       is_nailgunnable=True,
@@ -610,7 +610,7 @@ class BaseZincCompile(JvmCompile):
           # javac's Main does a simple split on these strings.
           raise TaskError('javac plugin args must not contain spaces '
                           '(arg {} for plugin {})'.format(arg, plugin))
-      ret.append('-C-Xplugin:{} {}'.format(plugin, ' '.join(args)))
+      ret.append(f"-C-Xplugin:{plugin} {' '.join(args)}")
     return ret
 
   def _scalac_plugin_args(self, scalac_plugin_map, classpath):
@@ -623,9 +623,9 @@ class BaseZincCompile(JvmCompile):
       # Note that the first element in cp_entries is the one containing the plugin's metadata,
       # meaning that this is the plugin that will be loaded, even if there happen to be other
       # plugins in the list of entries (e.g., because this plugin depends on another plugin).
-      ret.append('-S-Xplugin:{}'.format(':'.join(cp_entries)))
+      ret.append(f"-S-Xplugin:{':'.join(cp_entries)}")
       for arg in scalac_plugin_map[name]:
-        ret.append('-S-P:{}:{}'.format(name, arg))
+        ret.append(f'-S-P:{name}:{arg}')
     return ret
 
   def _find_scalac_plugins(self, scalac_plugins, classpath):
@@ -677,7 +677,7 @@ class BaseZincCompile(JvmCompile):
 
     # If we get here we must have unresolved plugins.
     unresolved_plugins = plugin_names - set(active_plugins.keys())
-    raise TaskError('Could not find requested plugins: {}'.format(list(unresolved_plugins)))
+    raise TaskError(f'Could not find requested plugins: {list(unresolved_plugins)}')
 
   @classmethod
   @memoized_method

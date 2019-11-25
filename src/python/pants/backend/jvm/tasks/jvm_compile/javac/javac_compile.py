@@ -153,7 +153,7 @@ class JavacCompile(JvmCompile):
     safe_javac_args = list(filter(lambda x: x not in j_args, javac_args))
 
     with argfile.safe_args(safe_javac_args, self.get_options()) as batched_args:
-      javac_cmd = ['{}/bin/javac'.format(distribution.real_home)]
+      javac_cmd = [f'{distribution.real_home}/bin/javac']
       javac_cmd.extend(j_args)
       javac_cmd.extend(batched_args)
 
@@ -163,12 +163,12 @@ class JavacCompile(JvmCompile):
         with self.context.new_workunit(name='javac',
                                        cmd=' '.join(javac_cmd),
                                        labels=[WorkUnitLabel.COMPILER]) as workunit:
-          self.context.log.debug('Executing {}'.format(' '.join(javac_cmd)))
+          self.context.log.debug(f"Executing {' '.join(javac_cmd)}")
           p = subprocess.Popen(javac_cmd, stdout=workunit.output('stdout'), stderr=workunit.output('stderr'))
           return_code = p.wait()
           workunit.set_outcome(WorkUnit.FAILURE if return_code else WorkUnit.SUCCESS)
           if return_code:
-            raise TaskError('javac exited with return code {rc}'.format(rc=return_code))
+            raise TaskError(f'javac exited with return code {return_code}')
         self.context._scheduler.materialize_directories((
           DirectoryToMaterialize(
             ctx.classes_dir.path,
@@ -197,7 +197,7 @@ class JavacCompile(JvmCompile):
           # javac's Main does a simple split on these strings.
           raise TaskError('javac plugin args must not contain spaces '
                           '(arg {} for plugin {})'.format(arg, plugin))
-      ret.append('-Xplugin:{} {}'.format(plugin, ' '.join(args)))
+      ret.append(f"-Xplugin:{plugin} {' '.join(args)}")
     return ret
 
   def _execute_hermetic_compile(self, cmd, ctx):
@@ -217,7 +217,7 @@ class JavacCompile(JvmCompile):
       argv=tuple(cmd),
       input_files=input_snapshot.directory_digest,
       output_files=output_files,
-      description='Compiling {} with javac'.format(ctx.target.address.spec),
+      description=f'Compiling {ctx.target.address.spec} with javac',
     )
     exec_result = self.context.execute_process_synchronously_without_raising(
       exec_process_request,

@@ -418,7 +418,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
       JvmPlatform.global_instance().get_options().compiler = RankedValue(0, self.compiler_name)
     elif requested_compiler != self.compiler_name:
       # If the requested compiler is not the one supported by this task, log and abort
-      self.context.log.debug('Requested an unsupported compiler [{}], aborting'.format(requested_compiler))
+      self.context.log.debug(f'Requested an unsupported compiler [{requested_compiler}], aborting')
       return
 
     # In case we have no relevant targets and return early, create the requested product maps.
@@ -497,7 +497,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
       return
 
     # This ensures the workunit for the worker pool is set before attempting to compile.
-    with self.context.new_workunit('isolation-{}-pool-bootstrap'.format(self.name())) \
+    with self.context.new_workunit(f'isolation-{self.name()}-pool-bootstrap') \
             as workunit:
       # This uses workunit.parent as the WorkerPool's parent so that child workunits
       # of different pools will show up in order in the html output. This way the current running
@@ -523,12 +523,12 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     try:
       exec_graph.execute(worker_pool, self.context.log)
     except ExecutionFailure as e:
-      raise TaskError("Compilation failure: {}".format(e))
+      raise TaskError(f"Compilation failure: {e!r}")
 
   def _record_compile_classpath(self, classpath, target, outdir):
     relative_classpaths = [fast_relpath(path, self.get_options().pants_workdir) for path in classpath]
     text = '\n'.join(relative_classpaths)
-    path = os.path.join(outdir, 'compile_classpath', '{}.txt'.format(target.id))
+    path = os.path.join(outdir, 'compile_classpath', f'{target.id}.txt')
     safe_mkdir(os.path.dirname(path), clean=False)
     with open(path, 'w') as f:
       f.write(text)
@@ -573,12 +573,12 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
                             .format(self.name(), vts.targets))
     else:
       counter_val = str(counter()).rjust(counter.format_length(), ' ')
-      counter_str = '[{}/{}] '.format(counter_val, counter.size)
+      counter_str = f'[{counter_val}/{counter.size}] '
       # Do some reporting.
       self.context.log.info(
         counter_str,
         'Compiling ',
-        items_to_report_element(ctx.sources, '{} source'.format(self.name())),
+        items_to_report_element(ctx.sources, f'{self.name()} source'),
         ' in ',
         items_to_report_element([t.address.reference() for t in vts.targets], 'target'),
         ' (',
@@ -611,7 +611,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
   def _capture_logs(self, workunit, destination):
     safe_mkdir(destination, clean=True)
     for idx, name, output_name, path in self._find_logs(workunit):
-      os.link(path, os.path.join(destination, '{}-{}-{}.log'.format(name, idx, output_name)))
+      os.link(path, os.path.join(destination, f'{name}-{idx}-{output_name}.log'))
 
   def _get_plugin_map(self, compiler, options_src, target):
     """Returns a map of plugin to args, for the given compiler.
@@ -637,7 +637,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     """
     # Note that we get() options and getattr() target fields and task methods,
     # so we're robust when those don't exist (or are None).
-    plugins_key = '{}_plugins'.format(compiler)
+    plugins_key = f'{compiler}_plugins'
 
     dep_context = DependencyContext.global_instance()
     compiler_option_sets = dep_context.defaulted_property(target, 'compiler_option_sets')
@@ -655,7 +655,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     # Allow multiple flags and also comma-separated values in a single flag.
     requested_plugins = {p for val in requested_plugins for p in val.split(',')}
 
-    plugin_args_key = '{}_plugin_args'.format(compiler)
+    plugin_args_key = f'{compiler}_plugin_args'
     available_plugin_args = {}
     available_plugin_args.update(getattr(self, plugin_args_key, {}) or {})
     available_plugin_args.update(options_src.get_options().get(plugin_args_key, {}) or {})
@@ -691,11 +691,11 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
         suggested_deps = set()
         for classname, candidates in missing_dep_suggestions.items():
           suggested_deps.add(list(candidates)[0])
-          self.context.log.info('  {}: {}'.format(classname, ', '.join(candidates)))
+          self.context.log.info(f"  {classname}: {', '.join(candidates)}")
 
         # We format the suggested deps with single quotes and commas so that
         # they can be easily cut/pasted into a BUILD file.
-        formatted_suggested_deps = ["'%s'," % dep for dep in suggested_deps]
+        formatted_suggested_deps = [f"'{dep}'," for dep in suggested_deps]
         suggestion_msg = (
           '\nIf the above information is correct, '
           'please add the following to the dependencies of ({}):\n  {}\n'
@@ -717,7 +717,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
         self.context.log.warn('Unable to find any deps from target\'s transitive '
                                'dependencies that provide the following missing classes:')
         no_suggestion_msg = '\n   '.join(sorted(list(no_suggestions)))
-        self.context.log.warn('  {}'.format(no_suggestion_msg))
+        self.context.log.warn(f'  {no_suggestion_msg}')
         self.context.log.warn(self.get_options().missing_deps_not_found_msg)
 
   def _upstream_analysis(self, compile_contexts, classpath_entries):
@@ -733,15 +733,15 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
       if not path.endswith('.jar'):
         compile_context = compile_contexts_by_directory.get(path)
         if not compile_context:
-          self.context.log.debug('Missing upstream analysis for {}'.format(path))
+          self.context.log.debug(f'Missing upstream analysis for {path}')
         else:
           yield compile_context.classes_dir.path, compile_context.analysis_file
 
   def exec_graph_double_check_cache_key_for_target(self, target):
-    return 'double_check_cache({})'.format(target.address.spec)
+    return f'double_check_cache({target.address.spec})'
 
   def exec_graph_key_for_target(self, compile_target):
-    return "compile({})".format(compile_target.address.spec)
+    return f"compile({compile_target.address.spec})"
 
   def _create_compile_jobs(self, compile_contexts, invalid_targets, invalid_vts, classpath_product):
     class Counter:
@@ -830,9 +830,9 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
         .format(vts.target.address.spec))
       return False
     assert cached_vts == [vts], (
-      'Cache returned unexpected target: {} vs {}'.format(cached_vts, [vts])
+      f'Cache returned unexpected target: {cached_vts} vs {[vts]}'
     )
-    self.context.log.info('Hit cache during double check for {}'.format(vts.target.address.spec))
+    self.context.log.info(f'Hit cache during double check for {vts.target.address.spec}')
     return True
 
   def should_compile_incrementally(self, vts, ctx):
@@ -853,7 +853,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     # that, though (as well as the source files?).
     def record(k, v):
       self.context.run_tracker.report_target_info(self.options_scope, target, [stats_key, k], v)
-    self.context.log.debug("self.options_scope:{}, target:{}, stats_key:{}".format(self.options_scope, target, stats_key))
+    self.context.log.debug(f"self.options_scope:{self.options_scope}, target:{target}, stats_key:{stats_key}")
     self.context.log.debug(
       '[Timing({})] {}: {} sec; {} sources; {} classpath elements'
       .format(stats_key, target.address.spec, compiletime, sources_len, classpath_len))
@@ -899,7 +899,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     elif compiler == 'scalac':
       plugin_cls = ScalacPlugin
     else:
-      raise TaskError('Unknown JVM compiler: {}'.format(compiler))
+      raise TaskError(f'Unknown JVM compiler: {compiler}')
     plugin_tgts = self.context.targets(predicate=lambda t: isinstance(t, plugin_cls))
     return {t.plugin: t.closure() for t in plugin_tgts}
 

@@ -79,7 +79,7 @@ class RunJvmPrepCommandBase(Task):
         if not cp:
           raise TaskError('target {} has no classpath. (Add dependencies= parameter?'
                           .format(target.address.spec))
-        self.context.log.info('Running prep command for {}'.format(target.address.spec))
+        self.context.log.info(f'Running prep command for {target.address.spec}')
         returncode = distribution.execute_java(
           executor=executor,
           classpath=cp,
@@ -93,7 +93,7 @@ class RunJvmPrepCommandBase(Task):
 
         workunit.set_outcome(WorkUnit.FAILURE if returncode else WorkUnit.SUCCESS)
         if returncode:
-          raise TaskError('RunJvmPrepCommand failed to run {}'.format(mainclass))
+          raise TaskError(f'RunJvmPrepCommand failed to run {mainclass}')
 
 
 class RunBinaryJvmPrepCommand(RunJvmPrepCommandBase):

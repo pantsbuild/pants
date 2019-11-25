@@ -51,7 +51,7 @@ class IvyOutdated(NailgunTask):
     for pattern in self._exclude_patterns:
       if pattern.search(str(coordinate)):
         self.context.log.debug(
-          "Skipping [{}] because it matches exclude pattern '{}'".format(coordinate, pattern.pattern))
+          f"Skipping [{coordinate}] because it matches exclude pattern '{pattern.pattern}'")
         return False
     return True
 

@@ -23,7 +23,7 @@ class UnaryRule(namedtuple('UnaryRule', ['name', 'pattern'])):
   """Base class for shading keep and zap rules specifiable in BUILD files."""
 
   def render(self):
-    return '{name} {pattern}\n'.format(name=self.name, pattern=self.pattern)
+    return f'{self.name} {self.pattern}\n'
 
 
 class RelocateRule(namedtuple('Rule', ['from_pattern', 'to_pattern'])):
@@ -40,7 +40,7 @@ class RelocateRule(namedtuple('Rule', ['from_pattern', 'to_pattern'])):
     last = 0
     for i, match in enumerate(cls._wildcard_pattern.finditer(from_pattern)):
       yield from_pattern[last:match.start()]
-      yield '@{}'.format(i+1)
+      yield f'@{(i + 1)}'
       last = match.end()
     yield from_pattern[last:]
 
@@ -51,7 +51,7 @@ class RelocateRule(namedtuple('Rule', ['from_pattern', 'to_pattern'])):
     return cls(from_pattern, shade_pattern)
 
   def render(self):
-    return 'rule {0} {1}\n'.format(self.from_pattern, self.to_pattern)
+    return f'rule {self.from_pattern} {self.to_pattern}\n'
 
 
 class Shading:
@@ -212,7 +212,7 @@ class Shading:
 
   @classmethod
   def _format_package_glob(cls, package_name, recursive=True):
-    return '{package}.{capture}'.format(package=package_name, capture='**' if recursive else '*')
+    return f"{package_name}.{('**' if recursive else '*')}"
 
 
 class Shader:
@@ -417,7 +417,7 @@ class Shader:
     :rtype: :class:`pants.java.executor.Executor.Runner`
     """
     with self.temporary_rules_file(rules) as rules_file:
-      logger.debug('Running jarjar with rules:\n{}'.format(' '.join(rule.render() for rule in rules)))
+      logger.debug(f"Running jarjar with rules:\n{' '.join(rule.render() for rule in rules)}")
       yield self._executor.runner(classpath=self._jarjar_classpath,
                                   main='org.pantsbuild.jarjar.Main',
                                   jvm_options=jvm_options,

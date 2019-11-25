@@ -87,17 +87,17 @@ class ScalaFix(RewriteBase):
     args = []
     tool_classpath = self.tool_classpath('scalafix-tool-classpath')
     if tool_classpath:
-      args.append('--tool-classpath={}'.format(os.pathsep.join(tool_classpath)))
+      args.append(f'--tool-classpath={os.pathsep.join(tool_classpath)}')
     if self.get_options().semantic:
       # If semantic checks are enabled, we need the full classpath for these targets.
       runtime_classpath = self.context.products.get_data('runtime_classpath')
       classpath = ScalaFix._compute_classpath(runtime_classpath, {target for target, _ in target_sources})
-      args.append('--sourceroot={}'.format(absolute_root))
-      args.append('--classpath={}'.format(os.pathsep.join(classpath)))
+      args.append(f'--sourceroot={absolute_root}')
+      args.append(f'--classpath={os.pathsep.join(classpath)}')
     if self.get_options().configuration:
-      args.append('--config={}'.format(self.get_options().configuration))
+      args.append(f'--config={self.get_options().configuration}')
     if self.get_options().rules:
-      args.append('--rules={}'.format(self.get_options().rules))
+      args.append(f'--rules={self.get_options().rules}')
     if self.get_options().level == 'debug':
       args.append('--verbose')
 
@@ -132,9 +132,7 @@ class ScalaFixFix(FmtTaskMixin, ScalaFix):
   def process_result(self, result):
     if result != 0:
       raise TaskError(
-          '{main} ... failed to fix ({result}) targets.'.format(
-            main=self._SCALAFIX_MAIN,
-            result=result))
+          f'{self._SCALAFIX_MAIN} ... failed to fix ({result}) targets.')
 
 
 class ScalaFixCheck(LintTaskMixin, ScalaFix):
@@ -145,4 +143,4 @@ class ScalaFixCheck(LintTaskMixin, ScalaFix):
 
   def process_result(self, result):
     if result != 0:
-      raise TaskError('Targets failed scalafix checks.'.format())
+      raise TaskError(f'Targets failed scalafix checks.')

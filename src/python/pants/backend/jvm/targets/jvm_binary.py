@@ -50,7 +50,7 @@ class Skip(JarRule):
   """A rule that skips adding matched entries to a jar."""
 
   def __repr__(self):
-    return "Skip(apply_pattern={})".format(self.payload.apply_pattern)
+    return f"Skip(apply_pattern={self.payload.apply_pattern})"
 
 
 class Duplicate(JarRule):
@@ -65,7 +65,7 @@ class Duplicate(JarRule):
       :param string path: The path of the duplicate entry.
       """
       assert path and isinstance(path, str), 'A non-empty path must be supplied.'
-      super(Duplicate.Error, self).__init__('Duplicate entry encountered for path {}'.format(path))
+      super(Duplicate.Error, self).__init__(f'Duplicate entry encountered for path {path}')
       self._path = path
 
     @property

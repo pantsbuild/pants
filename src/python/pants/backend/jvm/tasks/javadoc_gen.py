@@ -64,16 +64,16 @@ class JavadocGen(JvmdocGen):
 
     args.extend(self.args)
 
-    javadoc_classpath_file = os.path.join(self.workdir, '{}.classpath'.format(os.path.basename(gendir)))
+    javadoc_classpath_file = os.path.join(self.workdir, f'{os.path.basename(gendir)}.classpath')
     with open(javadoc_classpath_file, 'w') as f:
       f.write('-classpath ')
       f.write(':'.join(classpath))
-    args.extend(['@{}'.format(javadoc_classpath_file)])
+    args.extend([f'@{javadoc_classpath_file}'])
 
-    javadoc_sources_file = os.path.join(self.workdir, '{}.source.files'.format(os.path.basename(gendir)))
+    javadoc_sources_file = os.path.join(self.workdir, f'{os.path.basename(gendir)}.source.files')
     with open(javadoc_sources_file, 'w') as f:
       f.write('\n'.join(sources))
-    args.extend(['@{}'.format(javadoc_sources_file)])
+    args.extend([f'@{javadoc_sources_file}'])
 
     java_executor = SubprocessExecutor(jdk)
     runner = java_executor.runner(jvm_options=self.jvm_options,

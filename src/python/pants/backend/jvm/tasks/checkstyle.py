@@ -113,7 +113,7 @@ class Checkstyle(LintTaskMixin, NailgunTask):
       properties_file = os.path.join(self.workdir, 'checkstyle.properties')
       with safe_open(properties_file, 'w') as pf:
         for k, v in self.get_options().properties.items():
-          pf.write('{key}={value}\n'.format(key=k, value=v))
+          pf.write(f'{k}={v}\n')
       args.extend(['-p', properties_file])
 
     # We've hit known cases of checkstyle command lines being too long for the system so we guard

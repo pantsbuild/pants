@@ -362,7 +362,7 @@ class CoursierMixin(JvmResolverBase):
     return_code = util.execute_runner(runner, self.context.new_workunit, 'coursier', labels)
 
     if return_code:
-      raise TaskError('The coursier process exited non-zero: {0}'.format(return_code))
+      raise TaskError(f'The coursier process exited non-zero: {return_code}')
 
     with open(output_fn, 'r') as f:
       return json.loads(f.read())
@@ -383,11 +383,11 @@ class CoursierMixin(JvmResolverBase):
 
       module = j.coordinate.simple_coord
       if j.coordinate.classifier:
-        module += ',classifier={}'.format(j.coordinate.classifier)
+        module += f',classifier={j.coordinate.classifier}'
 
       if j.get_url():
         jar_url = j.get_url()
-        module += ',url={}'.format(parse.quote_plus(jar_url))
+        module += f',url={parse.quote_plus(jar_url)}'
 
       if j.intransitive:
         cmd_args.append('--intransitive')
@@ -410,7 +410,7 @@ class CoursierMixin(JvmResolverBase):
       for ex in jar.excludes:
         # `--` means exclude. See --local-exclude-file in `coursier fetch --help`
         # If ex.name does not exist, that means the whole org needs to be excluded.
-        ex_arg = "{}:{}--{}:{}".format(jar.org, jar.name, ex.org, ex.name or '*')
+        ex_arg = f"{jar.org}:{jar.name}--{ex.org}:{(ex.name or '*')}"
         local_exclude_args.append(ex_arg)
 
     if local_exclude_args:
@@ -424,7 +424,7 @@ class CoursierMixin(JvmResolverBase):
 
     for ex in global_excludes:
       cmd_args.append('-E')
-      cmd_args.append('{}:{}'.format(ex.org, ex.name or '*'))
+      cmd_args.append(f"{ex.org}:{(ex.name or '*')}")
 
     return cmd_args
 
@@ -450,7 +450,7 @@ class CoursierMixin(JvmResolverBase):
     # was resolved in pants.
     org_name_to_org_name_rev = {}
     for coord in coord_to_resolved_jars.keys():
-      org_name_to_org_name_rev['{}:{}'.format(coord.org, coord.name)] = coord
+      org_name_to_org_name_rev[f'{coord.org}:{coord.name}'] = coord
 
     jars_per_target = []
 
@@ -484,8 +484,8 @@ class CoursierMixin(JvmResolverBase):
             parsed_conflict = self.to_m2_coord(
               result['conflict_resolution'][jar.coordinate.simple_coord])
             coord_candidates = [c.copy(rev=parsed_conflict.rev) for c in coord_candidates]
-          elif '{}:{}'.format(jar.coordinate.org, jar.coordinate.name) in org_name_to_org_name_rev:
-            parsed_conflict = org_name_to_org_name_rev['{}:{}'.format(jar.coordinate.org, jar.coordinate.name)]
+          elif f'{jar.coordinate.org}:{jar.coordinate.name}' in org_name_to_org_name_rev:
+            parsed_conflict = org_name_to_org_name_rev[f'{jar.coordinate.org}:{jar.coordinate.name}']
             coord_candidates = [c.copy(rev=parsed_conflict.rev) for c in coord_candidates]
 
           for coord in coord_candidates:
@@ -628,7 +628,7 @@ class CoursierMixin(JvmResolverBase):
         continue
 
       if not os.path.exists(jar_path):
-        raise CoursierResultNotFound("Jar path not found: {}".format(jar_path))
+        raise CoursierResultNotFound(f"Jar path not found: {jar_path}")
 
       pants_path = cls._get_path_to_jar(coursier_cache_path, pants_jar_path_base, jar_path)
 

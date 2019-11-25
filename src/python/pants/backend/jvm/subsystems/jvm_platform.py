@@ -98,7 +98,7 @@ class JvmPlatform(Subsystem):
     logger.warning('No default jvm platform is defined.')
     source_level = JvmPlatform.parse_java_version(DistributionLocator.cached().version)
     target_level = source_level
-    platform_name = '(DistributionLocator.cached().version {})'.format(source_level)
+    platform_name = f'(DistributionLocator.cached().version {source_level})'
     return JvmPlatformSettings(source_level, target_level, [], name=platform_name)
 
   @memoized_property
@@ -160,7 +160,7 @@ class JvmPlatform(Subsystem):
     :return: the parsed and cleaned version, suitable as a javac -source or -target argument.
     :rtype: Revision
     """
-    conversion = {str(i): '1.{}'.format(i) for i in cls.SUPPORTED_CONVERSION_VERSIONS}
+    conversion = {str(i): f'1.{i}' for i in cls.SUPPORTED_CONVERSION_VERSIONS}
     if str(version) in conversion:
       return Revision.lenient(conversion[str(version)])
 
@@ -196,7 +196,7 @@ class JvmPlatformSettings:
   def _validate_source_target(self):
     if self.source_level > self.target_level:
       if self.by_default:
-        name = "{} (by default)".format(self.name)
+        name = f"{self.name} (by default)"
       else:
         name = self.name
       raise self.IllegalSourceTargetCombination(

@@ -47,6 +47,6 @@ class PrepareServices(ResourcesTask):
         with safe_open(service_provider_configuration_file, 'w') as fp:
           def write_line(line):
             fp.write((line + '\n'))
-          write_line('# Generated from pants target {}'.format(target.address.spec))
+          write_line(f'# Generated from pants target {target.address.spec}')
           for impl in impls:
             write_line(impl)

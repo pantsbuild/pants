@@ -181,7 +181,7 @@ class ClasspathUtil:
           return fast_relpath(os.path.join(abs_sub_dir, name), entry)
         for abs_sub_dir, dirnames, filenames in safe_walk(entry):
           for name in dirnames:
-            yield '{}/'.format(rel_walk_name(abs_sub_dir, name))
+            yield f'{rel_walk_name(abs_sub_dir, name)}/'
           for name in filenames:
             yield rel_walk_name(abs_sub_dir, name)
       else:

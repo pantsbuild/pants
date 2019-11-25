@@ -98,7 +98,7 @@ class JvmBinaryTask(JarBuilderTask):
           with self.context.new_workunit(name='add-dependency-jars'):
             dependencies = self.list_external_jar_dependencies(binary)
             for jar, coordinate in dependencies:
-              self.context.log.debug('  dumping {} from {}'.format(coordinate, jar))
+              self.context.log.debug(f'  dumping {coordinate} from {jar}')
               monolithic_jar.writejar(jar)
 
         yield monolithic_jar
@@ -119,7 +119,7 @@ class JvmBinaryTask(JarBuilderTask):
     :param shading_rules: predefined rules for shading
     :param jar_path: The filepath to the jar that should be shaded.
     """
-    self.context.log.debug('Shading {}.'.format(jar_path))
+    self.context.log.debug(f'Shading {jar_path}.')
     with temporary_dir() as tempdir:
       output_jar = os.path.join(tempdir, os.path.basename(jar_path))
       with self.shader.binary_shader_for_rules(output_jar, jar_path, shading_rules) as shade_runner:

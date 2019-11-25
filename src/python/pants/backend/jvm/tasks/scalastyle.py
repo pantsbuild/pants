@@ -20,13 +20,13 @@ class FileExcluder:
     self.excludes = set()
     if excludes_path:
       if not os.path.exists(excludes_path):
-        raise TaskError('Excludes file does not exist: {0}'.format(excludes_path))
+        raise TaskError(f'Excludes file does not exist: {excludes_path}')
       with open(excludes_path, 'r') as fh:
         for line in fh.readlines():
           pattern = line.strip()
           if pattern and not pattern.startswith('#'):
             self.excludes.add(re.compile(pattern))
-            log.debug('Exclude pattern: {pattern}'.format(pattern=pattern))
+            log.debug(f'Exclude pattern: {pattern}')
     else:
       log.debug('No excludes file specified. All scala sources will be checked.')
 
@@ -53,7 +53,7 @@ class Scalastyle(LintTaskMixin, NailgunTask):
   class MissingConfig(TaskError):
     def __init__(self, path):
       super(Scalastyle.MissingConfig, self).__init__(
-        'Scalastyle config file does not exist: {0}.'.format(path))
+        f'Scalastyle config file does not exist: {path}.')
 
   _SCALA_SOURCE_EXTENSION = '.scala'
 
@@ -129,12 +129,12 @@ class Scalastyle(LintTaskMixin, NailgunTask):
 
       self.context.log.debug('Non synthetic scala targets to be checked:')
       for target in invalid_targets:
-        self.context.log.debug('  {address_spec}'.format(address_spec=target.address.spec))
+        self.context.log.debug(f'  {target.address.spec}')
 
       scala_sources = self.get_non_excluded_scala_sources(scalastyle_excluder, invalid_targets)
       self.context.log.debug('Non excluded scala sources to be checked:')
       for source in scala_sources:
-        self.context.log.debug('  {source}'.format(source=source))
+        self.context.log.debug(f'  {source}')
 
       if scala_sources:
         def call(srcs):
@@ -154,8 +154,7 @@ class Scalastyle(LintTaskMixin, NailgunTask):
 
         result = Xargs(call).execute(scala_sources)
         if result != 0:
-          raise TaskError('java {entry} ... exited non-zero ({exit_code})'.format(
-            entry=Scalastyle._MAIN, exit_code=result))
+          raise TaskError(f'java {Scalastyle._MAIN} ... exited non-zero ({result})')
 
   def validate_scalastyle_config(self):
     scalastyle_config = self.get_options().config

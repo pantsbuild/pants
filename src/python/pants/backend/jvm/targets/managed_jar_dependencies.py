@@ -139,7 +139,7 @@ class ManagedJarLibraries:
       self._parse_context.create_object('jar_library',
                                         name=library_name,
                                         jars=[copy.deepcopy(dep)],
-                                        managed_dependencies=':{}'.format(name))
+                                        managed_dependencies=f':{name}')
 
   @classmethod
   def _jars_by_name(cls, management, jars):

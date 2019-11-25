@@ -116,6 +116,6 @@ class ScalaLibrary(ExportableJvmLibrary):
       address = Address.parse(spec, relative_to=self.address.spec_path)
       target = self._build_graph.get_target(address)
       if target is None:
-        raise TargetDefinitionException(self, 'No such java target: {}'.format(spec))
+        raise TargetDefinitionException(self, f'No such java target: {spec}')
       targets.append(target)
     return targets

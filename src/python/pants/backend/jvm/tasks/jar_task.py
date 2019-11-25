@@ -170,7 +170,7 @@ class Jar:
       raise ValueError('The dest entry path must be a non-empty string, got {} of type {}.'.format(
         dest, type(dest)))
     if not os.path.isdir(src) and not dest:
-      raise self.Error('Source file {} must have a jar destination specified'.format(src))
+      raise self.Error(f'Source file {src} must have a jar destination specified')
 
     self._add_entry(self.FileSystemEntry(src, dest))
 
@@ -222,7 +222,7 @@ class Jar:
 
       def as_cli_entry(entry):
         src = entry.materialize(manifest_stage_dir)
-        return '{}={}'.format(src, entry.dest) if entry.dest else src
+        return f'{src}={entry.dest}' if entry.dest else src
       files = [as_cli_entry(entry) for entry in self._entries] if self._entries else []
 
       jars = self._jars or []
@@ -240,24 +240,24 @@ class Jar:
             if self._main and manifest_file:
               main_arg = None
               with open(manifest_file, 'a') as f:
-                f.write("Main-Class: {}\n".format(self._main))
+                f.write(f"Main-Class: {self._main}\n")
             else:
               main_arg = self._main
 
             if main_arg:
-              args.append('-main={}'.format(self._main))
+              args.append(f'-main={self._main}')
 
             if classpath_args:
-              args.append('-classpath={}'.format(','.join(classpath_args)))
+              args.append(f"-classpath={','.join(classpath_args)}")
 
             if manifest_file:
-              args.append('-manifest={}'.format(manifest_file))
+              args.append(f'-manifest={manifest_file}')
 
             if files_args:
-              args.append('-files={}'.format(','.join(files_args)))
+              args.append(f"-files={','.join(files_args)}")
 
             if jars_args:
-              args.append('-jars={}'.format(','.join(jars_args)))
+              args.append(f"-jars={','.join(jars_args)}")
 
             yield args
 
@@ -296,7 +296,7 @@ class JarTask(NailgunTask):
   def _action_name(cls, action):
     name = cls._DUPLICATE_ACTION_TO_NAME.get(action)
     if name is None:
-      raise ValueError('Unrecognized duplicate action: {}'.format(action))
+      raise ValueError(f'Unrecognized duplicate action: {action}')
     return name
 
   def __init__(self, *args, **kwargs):
@@ -321,15 +321,15 @@ class JarTask(NailgunTask):
     try:
       yield jar
     except jar.Error as e:
-      raise TaskError('Failed to write to jar at {}: {}'.format(path, e))
+      raise TaskError(f'Failed to write to jar at {path}: {e!r}')
 
     with jar._render_jar_tool_args(self.get_options()) as args:
       if args:  # Don't build an empty jar
-        args.append('-update={}'.format(self._flag(not overwrite)))
-        args.append('-compress={}'.format(self._flag(compressed)))
+        args.append(f'-update={self._flag(not overwrite)}')
+        args.append(f'-compress={self._flag(compressed)}')
 
         jar_rules = jar_rules or JarRules.default()
-        args.append('-default_action={}'.format(self._action_name(jar_rules.default_dup_action)))
+        args.append(f'-default_action={self._action_name(jar_rules.default_dup_action)}')
 
         skip_patterns = []
         duplicate_actions = []
@@ -341,13 +341,13 @@ class JarTask(NailgunTask):
             duplicate_actions.append('{}={}'.format(
               rule.apply_pattern.pattern, self._action_name(rule.action)))
           else:
-            raise ValueError('Unrecognized rule: {}'.format(rule))
+            raise ValueError(f'Unrecognized rule: {rule}')
 
         if skip_patterns:
-          args.append('-skip={}'.format(','.join(p.pattern for p in skip_patterns)))
+          args.append(f"-skip={','.join(p.pattern for p in skip_patterns)}")
 
         if duplicate_actions:
-          args.append('-policies={}'.format(','.join(duplicate_actions)))
+          args.append(f"-policies={','.join(duplicate_actions)}")
 
         args.append(path)
 

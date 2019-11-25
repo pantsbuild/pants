@@ -121,31 +121,31 @@ class JarDependencyManagement(Subsystem):
 
     if strategy == 'USE_DIRECT':
       log(message)
-      log('[{}] Using direct version: {}'.format(strategy, direct_coord))
+      log(f'[{strategy}] Using direct version: {direct_coord}')
       return direct_coord
 
     if strategy == 'USE_DIRECT_IF_FORCED':
       log(message)
       if force:
-        log('[{}] Using direct version, because force=True: {}'.format(strategy, direct_coord))
+        log(f'[{strategy}] Using direct version, because force=True: {direct_coord}')
         return direct_coord
       else:
-        log('[{}] Using managed version, because force=False: {}'.format(strategy, managed_coord))
+        log(f'[{strategy}] Using managed version, because force=False: {managed_coord}')
         return managed_coord
 
     if strategy == 'USE_MANAGED':
       log(message)
-      log('[{}] Using managed version: {}'.format(strategy, managed_coord))
+      log(f'[{strategy}] Using managed version: {managed_coord}')
       return managed_coord
 
     if strategy == 'USE_NEWER':
       newer = max([managed_coord, direct_coord],
                   key=lambda coord: Revision.lenient(coord.rev))
       log(message)
-      log('[{}] Using newer version: {}'.format(strategy, newer))
+      log(f'[{strategy}] Using newer version: {newer}')
       return newer
 
-    raise TaskError('Unknown value for --conflict-strategy: {}'.format(strategy))
+    raise TaskError(f'Unknown value for --conflict-strategy: {strategy}')
 
   @property
   def default_artifact_set(self):
@@ -224,7 +224,7 @@ class PinnedJarArtifactSet:
     """
     artifact = M2Coordinate.create(artifact)
     if artifact.rev is None:
-      raise self.MissingVersion('Cannot pin an artifact to version "None"! {}'.format(artifact))
+      raise self.MissingVersion(f'Cannot pin an artifact to version "None"! {artifact}')
     key = self._key(artifact)
     previous = self._artifacts_to_versions.get(key)
     self._artifacts_to_versions[key] = artifact
@@ -270,15 +270,15 @@ class PinnedJarArtifactSet:
     return not self.__eq__(other)
 
   def __repr__(self):
-    return 'PinnedJarArtifactSet({})'.format(', '.join(self.id))
+    return f"PinnedJarArtifactSet({', '.join(self.id)})"
 
   def __str__(self):
     if len(self) == 0:
       return 'PinnedJarArtifactSet()'
     first = next(iter(self))
     if len(self) == 1:
-      return 'PinnedJarArtifactSet({})'.format(first)
-    return 'PinnedJarArtifactSet({}, ... {} artifacts)'.format(first, len(self)-1)
+      return f'PinnedJarArtifactSet({first})'
+    return f'PinnedJarArtifactSet({first}, ... {(len(self) - 1)} artifacts)'
 
 
 class JarDependencyManagementSetup(Task):
@@ -311,7 +311,7 @@ class JarDependencyManagementSetup(Task):
     def __init__(self, target, coord):
       super(JarDependencyManagementSetup.MissingVersion, self).__init__(
         target,
-        'The jar {} specified in {} is missing a version (rev).'.format(coord, target.address.spec)
+        f'The jar {coord} specified in {target.address.spec} is missing a version (rev).'
       )
 
   @classmethod
@@ -338,7 +338,7 @@ class JarDependencyManagementSetup(Task):
       targets = list(self.context.resolve(spec))
     except AddressLookupError:
       raise self.InvalidDefaultTarget(
-        'Unable to resolve default managed_jar_dependencies target: {}'.format(spec))
+        f'Unable to resolve default managed_jar_dependencies target: {spec}')
     target = targets[0]
     if not isinstance(target, ManagedJarDependencies):
       if not any(isinstance(t, ManagedJarDependencies) for t in target.closure()):
