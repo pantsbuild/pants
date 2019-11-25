@@ -207,13 +207,13 @@ async def provenanced_addresses_from_address_families(
 ) -> ProvenancedBuildFileAddresses:
   """Given an AddressMapper and list of Specs, return matching ProvenancedBuildFileAddresses.
 
-:raises: :class:`ResolveError` if:
-   - there were no matching AddressFamilies, or
-   - the Spec matches no addresses for SingleAddresses.
-:raises: :class:`AddressLookupError` if no targets are matched for non-SingleAddress specs.
-"""
+  :raises: :class:`ResolveError` if:
+     - there were no matching AddressFamilies, or
+     - the Spec matches no addresses for SingleAddresses.
+  :raises: :class:`AddressLookupError` if no targets are matched for non-SingleAddress specs.
+  """
   # Capture a Snapshot covering all paths for these Specs, then group by directory.
-  snapshot = await Get[Snapshot](PathGlobs, _spec_to_globs(address_mapper, specs))
+  snapshot: Snapshot = await Get(Snapshot, PathGlobs, _spec_to_globs(address_mapper, specs))
   dirnames = {dirname(f) for f in snapshot.files}
   address_families = await MultiGet(Get[AddressFamily](Dir(d)) for d in dirnames)
   address_family_by_directory = {af.namespace: af for af in address_families}
