@@ -177,6 +177,11 @@ The following is an abbreviated export file from a command in the pants repo:
 
 # Export Format Changes
 
+## 1.0.12
+
+Add `export-dep-as-jar` task, which exports target roots as sources and dependencies as jars.
+The format remains the same.
+
 ## 1.0.11
 
 The 'scala_platform' field is added to the top-level keys, containing the 'scala_version' string (without patch version, e.g. "2.12") and the 'compiler_classpath' jars (a list of absolute paths to jar files).
