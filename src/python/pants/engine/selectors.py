@@ -65,6 +65,7 @@ class Get(Generic[_Product]):
     return f
 
   def __init__(self, *args: Any) -> None:
+    logger.info(f'get args: {args}')
     if len(args) not in (2, 3):
       raise ValueError(
         f'Expected either two or three arguments to {Get.__name__}; got {args}.'
@@ -89,6 +90,8 @@ class Get(Generic[_Product]):
     else:
       product, subject_declared_type, subject = args
 
+    if product == subject_declared_type:
+      raise ValueError(f'product: {product}, subj_d: {subject_declared_type}, s: {subject}: product and subject are the same?')
     self.product = product
     self.subject_declared_type = subject_declared_type
     self.subject = subject
@@ -125,7 +128,7 @@ class Get(Generic[_Product]):
     combined_args = subscript_args + tuple(call_node.args)
 
     logger.info(f'call_node: {ast.dump(call_node)}')
-    logger.info(f'combined_args: {combined_args}')
+    logger.info(f'combined_args: {[ast.dump(n) for n in combined_args]}')
 
     if len(combined_args) == 2:
       product_type, subject_constructor = combined_args
