@@ -8,7 +8,7 @@ from collections import namedtuple
 from collections.abc import Iterable
 from typing import Generic, Iterator, TypeVar
 
-from pants.util.meta import sentinel_attribute
+from pants.util.meta import decorated_type_checkable
 
 
 class SerializationError(Exception):
@@ -171,7 +171,7 @@ class Collection(Generic[_C], Iterable):
     return bool(self.dependencies)
 
 
-@sentinel_attribute
+@decorated_type_checkable
 def union(cls):
   """A class decorator which other classes can specify that they can resolve to with `UnionRule`.
 

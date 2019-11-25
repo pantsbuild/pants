@@ -126,7 +126,7 @@ def staticproperty(func: Callable[..., T]) -> T:
 class _ClassDecoratorWithSentinelAttribute(ABC):
   """Base class to wrap a class decorator which sets a "sentinel attribute".
 
-  This functionality is exposed via the `@sentinel_attribute` decorator.
+  This functionality is exposed via the `@decorated_type_checkable` decorator.
   """
 
   @abstractmethod
@@ -134,15 +134,15 @@ class _ClassDecoratorWithSentinelAttribute(ABC):
 
   def define_instance_of(self, obj: Type, **kwargs) -> Type:
     return type(obj.__name__, (obj,), {
-      '_sentinel_attribute_type': type(self),
+      '_decorated_type_checkable_type': type(self),
       **kwargs
     })
 
   def is_instance(self, obj: Type) -> bool:
-    return getattr(obj, '_sentinel_attribute_type', None) is type(self)
+    return getattr(obj, '_decorated_type_checkable_type', None) is type(self)
 
 
-def sentinel_attribute(decorator: Callable[[Type], Type]) -> _ClassDecoratorWithSentinelAttribute:
+def decorated_type_checkable(decorator: Callable[[Type], Type]) -> _ClassDecoratorWithSentinelAttribute:
   """Wraps a class decorator to add a "sentinel attribute" to decorated classes.
 
   A "sentinel attribute" is an attribute added to the wrapped class decorator's result with
@@ -162,7 +162,7 @@ def sentinel_attribute(decorator: Callable[[Type], Type]) -> _ClassDecoratorWith
   return WrappedFunction()
 
 
-@sentinel_attribute
+@decorated_type_checkable
 def frozen_after_init(cls: C) -> C:
   """Class decorator to freeze any modifications to the object after __init__() is done.
 

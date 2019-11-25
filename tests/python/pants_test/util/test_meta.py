@@ -9,8 +9,8 @@ from pants.testutil.test_base import TestBase
 from pants.util.meta import (
   SingletonMetaclass,
   classproperty,
+  decorated_type_checkable,
   frozen_after_init,
-  sentinel_attribute,
   staticproperty,
 )
 
@@ -254,8 +254,8 @@ with an @classproperty decorator."""):
 
 class SentinelAttributeTest(unittest.TestCase):
 
-  def test_sentinel_attribute(self):
-    @sentinel_attribute
+  def test_decorated_type_checkable(self):
+    @decorated_type_checkable
     def f(cls):
       return f.define_instance_of(cls)
 
@@ -263,7 +263,7 @@ class SentinelAttributeTest(unittest.TestCase):
     class C:
       pass
 
-    self.assertEqual(C._sentinel_attribute_type, type(f))
+    self.assertEqual(C._decorated_type_checkable_type, type(f))
     self.assertTrue(f.is_instance(C))
 
 
