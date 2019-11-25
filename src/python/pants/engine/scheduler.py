@@ -54,8 +54,14 @@ class ExecutionRequest:
 
 class ExecutionError(Exception):
     def __init__(self, message, wrapped_exceptions=None):
-        super().__init__(message)
         self.wrapped_exceptions = wrapped_exceptions or ()
+        all_wrapped_exceptions = "\n\n".join(
+            "\n".join(
+                traceback.format_tb(e.traceback) if hasattr(e, "traceback") else e._tb.format()
+            )
+            for e in self.wrapped_exceptions
+        )
+        super().__init__(f"{all_wrapped_exceptions}\n\n{message}")
 
     def end_user_messages(self):
         return [str(exc) for exc in self.wrapped_exceptions]
@@ -312,8 +318,9 @@ class Scheduler:
 
         if remaining_runtime_exceptions_to_capture:
             raise ExecutionError(
-                "Internal logic error in scheduler: expected elements in "
-                "`self._native._peek_cffi_extern_method_runtime_exceptions()`."
+                "Internal logic error in scheduler: expected any elements in "
+                "`self._native._peek_cffi_extern_method_runtime_exceptions()`. "
+                f"Errors were: {remaining_runtime_exceptions_to_capture}."
             )
         return roots
 

@@ -260,12 +260,54 @@ pub fn call(func: &Value, args: &[Value]) -> Result<Value, Failure> {
   .into()
 }
 
-pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorResponse, Failure> {
-  let response =
-    with_externs(|e| (e.generator_send)(e.context, generator as &Handle, arg as &Handle));
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub enum InvocationResult {
+  SuccessfulReturn(Value),
+  Exception(Value),
+}
+
+impl InvocationResult {
+  pub fn unsafe_extract(self) -> Result<Value, Failure> {
+    match self {
+      InvocationResult::SuccessfulReturn(val) => Ok(val),
+      InvocationResult::Exception(val) => Err(PyResult::failure_from(val)),
+    }
+  }
+}
+
+pub fn call_catching_error(func: &Value, args: &[Value]) -> InvocationResult {
+  let arg_handles: Vec<_> = args.iter().map(|v| v as &Handle as *const Handle).collect();
+  let py_result: PyResult = with_externs(|e| {
+    (e.call)(
+      e.context,
+      func as &Handle,
+      arg_handles.as_ptr(),
+      args.len() as u64,
+    )
+  });
+  let value = py_result.handle.into();
+  if py_result.is_throw {
+    InvocationResult::Exception(value)
+  } else {
+    InvocationResult::SuccessfulReturn(value)
+  }
+}
+
+pub fn generator_send_or_throw(
+  generator: &Value,
+  arg: InvocationResult,
+) -> Result<GeneratorResponse, Failure> {
+  let response = match arg {
+    InvocationResult::Exception(val) => {
+      with_externs(|e| (e.generator_throw)(e.context, generator as &Handle, &val as &Handle))
+    }
+    InvocationResult::SuccessfulReturn(val) => {
+      with_externs(|e| (e.generator_send)(e.context, generator as &Handle, &val as &Handle))
+    }
+  };
   match response {
     PyGeneratorResponse::Broke(h) => Ok(GeneratorResponse::Break(Value::new(h))),
-    PyGeneratorResponse::Throw(h) => Err(PyResult::failure_from(Value::new(h))),
+    PyGeneratorResponse::Throw(h) => Ok(GeneratorResponse::Throw(Value::new(h))),
     PyGeneratorResponse::Get(product, handle, ident, declared_subject) => {
       let mut interns = INTERNS.write();
       let g = Get {
@@ -370,6 +412,7 @@ pub struct Externs {
   pub none: Handle,
   pub call: CallExtern,
   pub generator_send: GeneratorSendExtern,
+  pub generator_throw: GeneratorThrowExtern,
   pub get_type_for: GetTypeForExtern,
   pub get_handle_from_type_id: GetHandleFromTypeIdExtern,
   pub is_union: IsUnionExtern,
@@ -439,7 +482,7 @@ pub struct PyResult {
 }
 
 impl PyResult {
-  fn failure_from(v: Value) -> Failure {
+  pub fn failure_from(v: Value) -> Failure {
     let traceback = project_str(&v, "_formatted_exc");
     Failure::Throw(v, traceback)
   }
@@ -538,6 +581,7 @@ impl fmt::Display for Get {
 
 pub enum GeneratorResponse {
   Break(Value),
+  Throw(Value),
   Get(Get),
   GetMulti(Vec<Get>),
 }
@@ -757,6 +801,9 @@ pub type CallExtern =
   extern "C" fn(*const ExternContext, *const Handle, *const *const Handle, u64) -> PyResult;
 
 pub type GeneratorSendExtern =
+  extern "C" fn(*const ExternContext, *const Handle, *const Handle) -> PyGeneratorResponse;
+
+pub type GeneratorThrowExtern =
   extern "C" fn(*const ExternContext, *const Handle, *const Handle) -> PyGeneratorResponse;
 
 pub fn with_vec<F, C, T>(c_ptr: *mut C, c_len: usize, f: F) -> T

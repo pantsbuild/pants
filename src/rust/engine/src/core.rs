@@ -291,6 +291,15 @@ pub enum Failure {
   Throw(Value, String),
 }
 
+impl Failure {
+  pub fn extract_exception(&self) -> Option<&Value> {
+    match self {
+      Failure::Invalidated => None,
+      Failure::Throw(value, _) => Some(value),
+    }
+  }
+}
+
 impl fmt::Display for Failure {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     match self {

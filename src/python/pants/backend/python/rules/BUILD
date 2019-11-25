@@ -12,6 +12,7 @@ python_library(
     'src/python/pants/engine/legacy:graph',
     'src/python/pants/engine:build_files',
     'src/python/pants/engine:fs',
+    'src/python/pants/engine:generators',
     'src/python/pants/engine:isolated_process',
     'src/python/pants/engine:rules',
     'src/python/pants/engine:selectors',

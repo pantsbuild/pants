@@ -9,6 +9,8 @@ import sys
 import sysconfig
 import traceback
 from contextlib import closing
+from enum import Enum
+from traceback import TracebackException
 from types import CoroutineType
 from typing import Any, Iterable, NamedTuple, Tuple, Type, cast
 
@@ -42,6 +44,7 @@ from pants.engine.platform import Platform
 from pants.engine.selectors import Get
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import read_file, safe_mkdir, safe_mkdtemp
+from pants.util.enums import match
 from pants.util.memo import memoized_classproperty, memoized_property
 from pants.util.meta import SingletonMetaclass
 from pants.util.ordered_set import FrozenOrderedSet
@@ -291,6 +294,7 @@ class _FFISpecification(object):
         except Exception as e:
             val = e
             is_throw = True
+            e._tb = TracebackException.from_exception(e)
             e._formatted_exc = traceback.format_exc()
 
         return PyResult(is_throw, c.to_value(val))
@@ -481,13 +485,36 @@ class _FFISpecification(object):
         msg = self.to_py_str(msg_ptr, msg_len)
         return c.to_value(Exception(msg))
 
+    class _GeneratorActions(Enum):
+        send = "send"
+        throw = "throw"
+
+    @_extern_decl("PyGeneratorResponse", ["ExternContext*", "Handle*", "Handle*"])
+    def extern_generator_throw(self, context_handle, func, arg):
+        """Given a generator, throw the given value at it, and return a response."""
+        return self._extern_generator_send_impl(
+            context_handle, func, arg, coroutine_method=self._GeneratorActions.throw
+        )
+
     @_extern_decl("PyGeneratorResponse", ["ExternContext*", "Handle*", "Handle*"])
     def extern_generator_send(self, context_handle, func, arg):
         """Given a generator, send it the given value and return a response."""
+        return self._extern_generator_send_impl(
+            context_handle, func, arg, coroutine_method=self._GeneratorActions.send
+        )
+
+    def _extern_generator_send_impl(self, context_handle, func, arg, coroutine_method):
         c = self._ffi.from_handle(context_handle)
         response = self._ffi.new("PyGeneratorResponse*")
+        coroutine = c.from_value(func[0])
         try:
-            res = c.from_value(func[0]).send(c.from_value(arg[0]))
+            res = match(
+                coroutine_method,
+                {
+                    self._GeneratorActions.send: lambda: coroutine.send(c.from_value(arg[0])),
+                    self._GeneratorActions.throw: lambda: coroutine.throw(c.from_value(arg[0])),
+                },
+            )()
 
             if isinstance(res, Get):
                 # Get.
@@ -520,6 +547,7 @@ class _FFISpecification(object):
             response.tag = self._lib.Throw
             val = e
             val._formatted_exc = traceback.format_exc()
+            val._tb = TracebackException.from_exception(e)
             response.throw = (c.to_value(val),)
 
         return response[0]
@@ -805,6 +833,7 @@ class Native(metaclass=SingletonMetaclass):
                 none,
                 self.ffi_lib.extern_call,
                 self.ffi_lib.extern_generator_send,
+                self.ffi_lib.extern_generator_throw,
                 self.ffi_lib.extern_get_type_for,
                 self.ffi_lib.extern_get_handle_from_type_id,
                 self.ffi_lib.extern_is_union,

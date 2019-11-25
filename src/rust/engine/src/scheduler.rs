@@ -13,6 +13,7 @@ use futures01::future::{self, Future};
 
 use crate::context::{Context, Core};
 use crate::core::{Failure, Params, TypeId, Value};
+use crate::externs::{InvocationResult, PyResult};
 use crate::nodes::{NodeKey, Select, Tracer, Visualizer};
 use graph::{Graph, InvalidationResult};
 use hashing;
@@ -328,10 +329,14 @@ impl Scheduler {
                   // out of retries) recover to complete the join, which will cause the results to
                   // propagate to the user.
                   debug!("Root {} completed.", NodeKey::Select(Box::new(root)));
-                  Ok(other.map(|res| {
-                    res
+                  Ok(other.and_then(|res| {
+                    let res: InvocationResult = res
                       .try_into()
-                      .unwrap_or_else(|_| panic!("A Node implementation was ambiguous."))
+                      .unwrap_or_else(|_| panic!("A Node implementation was ambiguous."));
+                    match res {
+                      InvocationResult::Exception(val) => Err(PyResult::failure_from(val)),
+                      InvocationResult::SuccessfulReturn(val) => Ok(val),
+                    }
                   }))
                 }
               }

@@ -19,7 +19,7 @@ use url::Url;
 
 use crate::context::{Context, Core};
 use crate::core::{throw, Failure, Key, Params, TypeId, Value};
-use crate::externs;
+use crate::externs::{self, InvocationResult};
 use crate::intrinsics;
 use crate::selectors;
 use crate::tasks::{self, Intrinsic, Rule};
@@ -153,16 +153,19 @@ impl Select {
         ))
       });
     let context = context.clone();
-    Select::new_from_edges(self.params.clone(), product, &try_future!(edges)).run(context)
+    Select::new_from_edges(self.params.clone(), product, &try_future!(edges))
+      .run(context.clone())
+      .and_then(|result| future::result(result.unsafe_extract()))
+      .to_boxed()
   }
 }
 
 // TODO: This is a Node only because it is used as a root in the graph, but it should never be
 // requested using context.get
 impl WrappedNode for Select {
-  type Item = Value;
+  type Item = InvocationResult;
 
-  fn run(self, context: Context) -> NodeFuture<Value> {
+  fn run(self, context: Context) -> NodeFuture<InvocationResult> {
     match &self.entry {
       &rule_graph::Entry::WithDeps(rule_graph::EntryWithDeps::Inner(ref inner)) => {
         match inner.rule() {
@@ -175,12 +178,16 @@ impl WrappedNode for Select {
           &Rule::Intrinsic(Intrinsic { product, input }) => self
             .select_product(&context, input, "intrinsic")
             .and_then(move |value| intrinsics::run_intrinsic(input, product, context, value))
+            .then(|value| future::ok(match value {
+              Ok(value) => InvocationResult::SuccessfulReturn(value),
+              Err(e) => InvocationResult::Exception(e.extract_exception().unwrap().clone()),
+            }))
             .to_boxed(),
         }
       }
       &rule_graph::Entry::Param(type_id) => {
         if let Some(key) = self.params.find(type_id) {
-          ok(externs::val_for(key))
+          ok(InvocationResult::SuccessfulReturn(externs::val_for(key)))
         } else {
           err(throw(&format!(
             "Expected a Param of type {} to be present.",
@@ -779,7 +786,7 @@ impl Task {
     params: &Params,
     entry: &Arc<rule_graph::Entry<Rule>>,
     gets: Vec<externs::Get>,
-  ) -> NodeFuture<Vec<Value>> {
+  ) -> NodeFuture<Vec<InvocationResult>> {
     let get_futures = gets
       .into_iter()
       .map(|get| {
@@ -842,13 +849,15 @@ impl Task {
     params: Params,
     entry: Arc<rule_graph::Entry<Rule>>,
     generator: Value,
-  ) -> NodeFuture<Value> {
-    future::loop_fn(Value::from(externs::none()), move |input| {
-      let context = context.clone();
-      let params = params.clone();
-      let entry = entry.clone();
-      future::result(externs::generator_send(&generator, &input)).and_then(move |response| {
-        match response {
+  ) -> NodeFuture<InvocationResult> {
+    future::loop_fn(
+      InvocationResult::SuccessfulReturn(Value::from(externs::none())),
+      move |input| {
+        let send_result = externs::generator_send_or_throw(&generator, input);
+        let context = context.clone();
+        let params = params.clone();
+        let entry = entry.clone();
+        future::result(send_result).and_then(move |response| match response {
           externs::GeneratorResponse::Get(get) => {
             Self::gen_get(&context, &params, &entry, vec![get])
               .map(|vs| future::Loop::Continue(vs.into_iter().next().unwrap()))
@@ -856,13 +865,33 @@ impl Task {
           }
           externs::GeneratorResponse::GetMulti(gets) => {
             Self::gen_get(&context, &params, &entry, gets)
-              .map(|vs| future::Loop::Continue(externs::store_tuple(&vs)))
+              .map(|vs| {
+                let mut values: Vec<Value> = vec![];
+                for v in vs.into_iter() {
+                  match v {
+                    InvocationResult::Exception(v) => {
+                      return future::Loop::Continue(InvocationResult::Exception(v));
+                    }
+                    InvocationResult::SuccessfulReturn(v) => {
+                      values.push(v);
+                    }
+                  }
+                }
+                future::Loop::Continue(InvocationResult::SuccessfulReturn(externs::store_tuple(
+                  &values,
+                )))
+              })
               .to_boxed()
           }
-          externs::GeneratorResponse::Break(val) => future::ok(future::Loop::Break(val)).to_boxed(),
-        }
-      })
-    })
+          externs::GeneratorResponse::Break(val) => {
+            future::ok(future::Loop::Break(InvocationResult::SuccessfulReturn(val))).to_boxed()
+          }
+          externs::GeneratorResponse::Throw(val) => {
+            future::ok(future::Loop::Break(InvocationResult::Exception(val))).to_boxed()
+          }
+        })
+      },
+    )
     .to_boxed()
   }
 }
@@ -878,9 +907,9 @@ impl fmt::Debug for Task {
 }
 
 impl WrappedNode for Task {
-  type Item = Value;
+  type Item = InvocationResult;
 
-  fn run(self, context: Context) -> NodeFuture<Value> {
+  fn run(self, context: Context) -> NodeFuture<InvocationResult> {
     let params = self.params;
     let deps = {
       let edges = &context
@@ -903,17 +932,36 @@ impl WrappedNode for Task {
     let product = self.product;
     deps
       .then(move |deps_result| match deps_result {
-        Ok(deps) => externs::call(&externs::val_for(&func.0), &deps),
+        Ok(deps) => {
+          let mut param_deps: Vec<Value> = vec![];
+          for result in deps.into_iter() {
+            match result {
+              InvocationResult::Exception(val) => {
+                return Ok(InvocationResult::Exception(val));
+              }
+              InvocationResult::SuccessfulReturn(val) => {
+                param_deps.push(val);
+              }
+            }
+          }
+          Ok(externs::call_catching_error(
+            &externs::val_for(&func.0),
+            &param_deps,
+          ))
+        }
         Err(failure) => Err(failure),
       })
       .then(move |task_result| match task_result {
-        Ok(val) => match externs::get_type_for(&val) {
-          t if t == context.core.types.coroutine => Self::generate(context, params, entry, val),
-          t if t == product => ok(val),
-          _ => err(throw(&format!(
-            "{:?} returned a result value that did not satisfy its constraints: {:?}",
-            func, val
-          ))),
+        Ok(ret) => match ret {
+          InvocationResult::Exception(val) => ok(InvocationResult::Exception(val)),
+          InvocationResult::SuccessfulReturn(val) => match externs::get_type_for(&val) {
+            t if t == context.core.types.coroutine => Self::generate(context, params, entry, val),
+            t if t == product => ok(InvocationResult::SuccessfulReturn(val)),
+            _ => err(throw(&format!(
+              "{:?} returned a result value that did not satisfy its constraints: {:?}",
+              func, val
+            ))),
+          },
         },
         Err(failure) => err(failure),
       })
@@ -1097,7 +1145,7 @@ impl Node for NodeKey {
       | NodeResult::LinkDest(_)
       | NodeResult::ProcessResult(_)
       | NodeResult::Snapshot(_)
-      | NodeResult::Value(_) => None,
+      | NodeResult::InvocationResult(_) => None,
     }
   }
 
@@ -1164,12 +1212,12 @@ pub enum NodeResult {
   LinkDest(LinkDest),
   ProcessResult(ProcessResult),
   Snapshot(Arc<store::Snapshot>),
-  Value(Value),
+  InvocationResult(InvocationResult),
 }
 
-impl From<Value> for NodeResult {
-  fn from(v: Value) -> Self {
-    NodeResult::Value(v)
+impl From<InvocationResult> for NodeResult {
+  fn from(v: InvocationResult) -> Self {
+    NodeResult::InvocationResult(v)
   }
 }
 
@@ -1203,12 +1251,12 @@ impl From<Arc<DirectoryListing>> for NodeResult {
   }
 }
 
-impl TryFrom<NodeResult> for Value {
+impl TryFrom<NodeResult> for InvocationResult {
   type Error = ();
 
   fn try_from(nr: NodeResult) -> Result<Self, ()> {
     match nr {
-      NodeResult::Value(v) => Ok(v),
+      NodeResult::InvocationResult(v) => Ok(v),
       _ => Err(()),
     }
   }

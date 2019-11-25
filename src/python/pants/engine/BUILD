@@ -75,6 +75,15 @@ python_library(
 )
 
 python_library(
+  name='generators',
+  sources=['generators.py'],
+  dependencies=[
+    '3rdparty/python:dataclasses',
+  ],
+  tags = {'partially_type_checked'},
+)
+
+python_library(
   name='goal',
   sources=['goal.py'],
   dependencies=[
