@@ -58,6 +58,6 @@ class CppToolchain:
 
     tool_path = which(tool)
     if tool_path is None:
-      raise self.Error('Failed to locate {0}. Please install.'.format(tool))
+      raise self.Error(f'Failed to locate {tool}. Please install.')
     self._validated_tools[name] = tool_path
     return tool_path

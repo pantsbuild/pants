@@ -48,9 +48,9 @@ class JavaThriftyGen(NailgunTaskBase, SimpleCodegenTask):
 
   def format_args_for_target(self, target, target_workdir):
     sources = OrderedSet(target.sources_relative_to_buildroot())
-    args = ['--out={0}'.format(target_workdir)]
+    args = [f'--out={target_workdir}']
     for include_path in self._compute_include_paths(target):
-      args.append('--path={0}'.format(include_path))
+      args.append(f'--path={include_path}')
     args.extend(sources)
     return args
 
@@ -63,7 +63,7 @@ class JavaThriftyGen(NailgunTaskBase, SimpleCodegenTask):
                             workunit_name='compile',
                             workunit_labels=[WorkUnitLabel.TOOL])
       if result != 0:
-        raise TaskError('Thrifty compiler exited non-zero ({0})'.format(result))
+        raise TaskError(f'Thrifty compiler exited non-zero ({result})')
 
   def _compute_include_paths(self, target):
     """Computes the set of paths that thrifty uses to lookup imports.

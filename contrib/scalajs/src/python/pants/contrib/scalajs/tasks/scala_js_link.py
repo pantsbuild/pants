@@ -50,7 +50,7 @@ class ScalaJSLink(NailgunTask):
     return isinstance(target, ScalaJSBinary)
 
   def _target_file(self, vt):
-    return os.path.join(vt.results_dir, "{}.js".format(vt.target.name))
+    return os.path.join(vt.results_dir, f"{vt.target.name}.js")
 
   def execute(self):
     scala_js_binaries = self.context.products.get_data('scala_js_binaries',
@@ -61,10 +61,10 @@ class ScalaJSLink(NailgunTask):
         invalidate_dependents=True) as invalidation_check:
       for vt in invalidation_check.all_vts:
         if not vt.valid:
-          self.context.log.debug('Linking {}...'.format(vt.target.address.spec))
+          self.context.log.debug(f'Linking {vt.target.address.spec}...')
           self._link(vt.target, self._target_file(vt), classpaths)
         else:
-          self.context.log.debug('Already linked {}'.format(vt.target.address.spec))
+          self.context.log.debug(f'Already linked {vt.target.address.spec}')
         scala_js_binaries[vt.target].add_abs_paths(vt.results_dir, [self._target_file(vt)])
         classpaths.add_for_target(vt.target, [('default', vt.results_dir)])
 
