@@ -40,6 +40,7 @@ class ExportDepAsJar(ConsoleTask):
 
   @classmethod
   def prepare(cls, options, round_manager):
+    super().prepare(options, round_manager)
     round_manager.require_data('runtime_classpath')
 
   @property
@@ -287,6 +288,8 @@ class ExportDepAsJar(ConsoleTask):
         targets_map[t.address.spec]['libraries'] = [t.id]
         jar_products = runtime_classpath.get_for_target(t)
         for conf, jar_entry in jar_products:
+          # TODO(yic): check --compile-rsc-use-classpath-jars is enabled.
+          # If not, zip up the classes/ dir here.
           if 'z.jar' in jar_entry:
             graph_info['libraries'][t.id][conf] = jar_entry
 
