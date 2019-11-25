@@ -5,7 +5,6 @@ from pants.backend.python.rules.inject_init import InjectedInitDigest, inject_in
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, EMPTY_SNAPSHOT, Snapshot
 from pants.engine.rules import RootRule
 from pants.testutil.test_base import TestBase
-from pants.util.collections import assert_single_element
 
 
 class TestInjectInit(TestBase):
@@ -15,9 +14,7 @@ class TestInjectInit(TestBase):
     return super().rules() + [inject_init, RootRule(Snapshot)]
 
   def assert_result(self, input_snapshot, expected_digest):
-    injected_digest = assert_single_element(
-      self.scheduler.product_request(InjectedInitDigest, [input_snapshot])
-    )
+    injected_digest = self.request_single_product(InjectedInitDigest, input_snapshot)
     self.assertEqual(injected_digest.directory_digest, expected_digest)
 
   def test_noops_when_empty_snapshot(self):

@@ -17,7 +17,7 @@ class RunTest(ConsoleRuleTestBase):
     input_files_content = InputFilesContent((
       FileContent(path='program.py', content=program_text, is_executable=True),
     ))
-    digest, = self.scheduler.product_request(Digest, [input_files_content])
+    digest = self.request_single_product(Digest, input_files_content)
     return CreatedBinary(
       binary_name='program.py',
       digest=digest,

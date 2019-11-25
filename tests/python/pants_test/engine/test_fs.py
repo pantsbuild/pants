@@ -335,25 +335,24 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
         ))
       )
 
-      empty_merged = self.scheduler.product_request(
-        Digest,
-        [DirectoriesToMerge((empty_snapshot.directory_digest,))],
-      )[0]
+      empty_merged = self.request_single_product(
+        Digest, DirectoriesToMerge((empty_snapshot.directory_digest,)),
+      )
       self.assertEqual(empty_snapshot.directory_digest, empty_merged)
 
-      roland_merged = self.scheduler.product_request(
+      roland_merged = self.request_single_product(
         Digest,
-        [DirectoriesToMerge((roland_snapshot.directory_digest, empty_snapshot.directory_digest))],
-      )[0]
+        DirectoriesToMerge((roland_snapshot.directory_digest, empty_snapshot.directory_digest)),
+      )
       self.assertEqual(
         roland_snapshot.directory_digest,
         roland_merged,
       )
 
-      both_merged = self.scheduler.product_request(
+      both_merged = self.request_single_product(
         Digest,
-        [DirectoriesToMerge((roland_snapshot.directory_digest, susannah_snapshot.directory_digest))],
-      )[0]
+        DirectoriesToMerge((roland_snapshot.directory_digest, susannah_snapshot.directory_digest)),
+      )
 
       self.assertEqual(both_snapshot.directory_digest, both_merged)
 
@@ -381,11 +380,11 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
       FileContent(path='subdir/sub.py', content=b'print("from sub")'),
     ))
 
-    digest, = self.scheduler.product_request(Digest, [input_files_content])
+    digest = self.request_single_product(Digest, input_files_content)
 
     dpa = DirectoryWithPrefixToAdd(digest, "outer_dir")
-    output_digest, = self.scheduler.product_request(Digest, [dpa])
-    snapshot, = self.scheduler.product_request(Snapshot, [output_digest])
+    output_digest = self.request_single_product(Digest, dpa)
+    snapshot = self.request_single_product(Snapshot, output_digest)
 
     self.assertEqual(sorted(snapshot.files), ['outer_dir/main.py', 'outer_dir/subdir/sub.py'])
     self.assertEqual(sorted(snapshot.dirs), ['outer_dir', 'outer_dir/subdir'])
@@ -431,17 +430,15 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
       self.assertEquals(snapshot_with_extra_files.files, all_files)
 
       # Strip empty prefix:
-      zero_prefix_stripped_digest = assert_single_element(self.scheduler.product_request(
-        Digest,
-        [DirectoryWithPrefixToStrip(snapshot.directory_digest, "")],
-      ))
+      zero_prefix_stripped_digest = self.request_single_product(
+        Digest, DirectoryWithPrefixToStrip(snapshot.directory_digest, ""),
+      )
       self.assertEquals(snapshot.directory_digest, zero_prefix_stripped_digest)
 
       # Strip a non-empty prefix shared by all files:
-      stripped_digest = assert_single_element(self.scheduler.product_request(
-        Digest,
-        [DirectoryWithPrefixToStrip(snapshot.directory_digest, "characters/dark_tower")],
-      ))
+      stripped_digest = self.request_single_product(
+        Digest, DirectoryWithPrefixToStrip(snapshot.directory_digest, "characters/dark_tower"),
+      )
       self.assertEquals(
         stripped_digest,
         Digest(
@@ -456,15 +453,22 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
       self.assertEquals(stripped_digest, expected_snapshot.directory_digest)
 
       # Try to strip a prefix which isn't shared by all files:
-      with self.assertRaisesWithMessageContaining(Exception, "Cannot strip prefix characters/dark_tower from root directory Digest(Fingerprint<28c47f77867f0c8d577d2ada2f06b03fc8e5ef2d780e8942713b26c5e3f434b8>, 243) - root directory contained non-matching directory named: books and file named: index"):
-        self.scheduler.product_request(
+      with self.assertRaisesWithMessageContaining(
+        Exception,
+        "Cannot strip prefix characters/dark_tower from root directory Digest(Fingerprint<28c47f77"
+        "867f0c8d577d2ada2f06b03fc8e5ef2d780e8942713b26c5e3f434b8>, 243) - root directory "
+        "contained non-matching directory named: books and file named: index"
+      ):
+        self.request_single_product(
           Digest,
-          [DirectoryWithPrefixToStrip(snapshot_with_extra_files.directory_digest, "characters/dark_tower")]
+          DirectoryWithPrefixToStrip(
+            snapshot_with_extra_files.directory_digest, "characters/dark_tower"
+          )
         )
 
   def test_lift_directory_digest_to_snapshot(self):
     digest = self.prime_store_with_roland_digest()
-    snapshot = assert_single_element(self.scheduler.product_request(Snapshot, [digest]))
+    snapshot = self.request_single_product(Snapshot, digest)
     self.assertEquals(snapshot.files, ("roland",))
     self.assertEquals(snapshot.directory_digest, digest)
 
@@ -479,7 +483,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
     digest = Digest(fingerprint=hasher.hexdigest(), serialized_bytes_length=len(text))
 
     with self.assertRaisesWithMessageContaining(ExecutionError, "unknown directory"):
-      self.scheduler.product_request(Snapshot, [digest])
+      self.request_single_product(Snapshot, digest)
 
   def test_glob_match_error(self):
     with self.assertRaises(ValueError) as cm:
@@ -543,7 +547,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
     with self.isolated_local_store():
       with http_server(StubHandler) as port:
         url = UrlToFetch(f"http://localhost:{port}/CNAME", self.pantsbuild_digest)
-        snapshot, = self.scheduler.product_request(Snapshot, subjects=[url])
+        snapshot = self.request_single_product(Snapshot, url)
         self.assert_snapshot_equals(snapshot, ["CNAME"], Digest(
           "16ba2118adbe5b53270008790e245bbf7088033389461b08640a4092f7f647cf",
           81
@@ -554,7 +558,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
       with http_server(StubHandler) as port:
         url = UrlToFetch(f"http://localhost:{port}/notfound", self.pantsbuild_digest)
         with self.assertRaises(ExecutionError) as cm:
-          self.scheduler.product_request(Snapshot, subjects=[url])
+          self.request_single_product(Snapshot, url)
         self.assertIn('404', str(cm.exception))
 
   def test_download_wrong_digest(self):
@@ -568,7 +572,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
           ),
         )
         with self.assertRaises(ExecutionError) as cm:
-          self.scheduler.product_request(Snapshot, subjects=[url])
+          self.request_single_product(Snapshot, url)
         self.assertIn('wrong digest', str(cm.exception).lower())
 
   # It's a shame that this isn't hermetic, but setting up valid local HTTPS certificates is a pain.
@@ -578,7 +582,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
         "63652768bd65af8a4938c415bdc25e446e97c473308d26b3da65890aebacf63f",
         18,
       ))
-      snapshot, = self.scheduler.product_request(Snapshot, subjects=[url])
+      snapshot = self.request_single_product(Snapshot, url)
       self.assert_snapshot_equals(snapshot, ["CNAME"], Digest(
         "16ba2118adbe5b53270008790e245bbf7088033389461b08640a4092f7f647cf",
         81
@@ -596,7 +600,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
           f"http://localhost:{port}/roland",
           Digest('693d8db7b05e99c6b7a7c0616456039d89c555029026936248085193559a0b5d', 16),
         )
-        snapshot, = self.scheduler.product_request(Snapshot, subjects=[url])
+        snapshot = self.request_single_product(Snapshot, url)
         self.assert_snapshot_equals(snapshot, ["roland"], Digest(
           "9341f76bef74170bedffe51e4f2e233f61786b7752d21c2339f8ee6070eba819",
           82
