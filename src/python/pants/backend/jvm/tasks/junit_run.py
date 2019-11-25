@@ -278,6 +278,7 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
         batch_output_dir = os.path.join(batch_output_dir, f'batch-{batch_id}')
 
       run_modifications = coverage.run_modifications(batch_output_dir)
+      self.context.log.debug(f'run_modifications: {run_modifications}')
 
       extra_jvm_options = run_modifications.extra_jvm_options
 

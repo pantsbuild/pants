@@ -9,6 +9,7 @@ from contextlib import contextmanager
 
 from pants.base.build_environment import get_buildroot
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
+from pants.util.contextutil import temporary_dir
 
 
 class JunitRunIntegrationTest(PantsRunIntegrationTest):
@@ -33,23 +34,24 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
   def report_file_path(self, relpath):
     return os.path.join(get_buildroot(), 'dist', relpath)
 
-  def cucumber_coverage(self, processor, xml_path, html_path, tests=(), args=()):
+  def cucumber_coverage(self, processor, xml_path, html_path, pre_args=(), tests=(), args=()):
     return self.coverage(
       processor,
       xml_path,
       html_path,
       'testprojects/tests/java/org/pantsbuild/testproject/unicode/cucumber',
       'org.pantsbuild.testproject.unicode.cucumber.CucumberTest',
+      pre_args,
       tests,
       args
     )
 
   @contextmanager
-  def coverage(self, processor, xml_path, html_path, test_project, test_class='', tests=(), args=()):
+  def coverage(self, processor, xml_path, html_path, test_project, test_class='', pre_args=(), tests=(), args=()):
     def test_specifier_arg(test):
       return f'--test={test_class}#{test}'
 
-    with self.pants_results(['clean-all', 'test.junit'] + list(args) +
+    with self.pants_results(list(pre_args) + ['clean-all', 'test.junit'] + list(args) +
                             [test_specifier_arg(name) for name in tests] +
                             [test_project,
                              f'--test-junit-coverage-processor={processor}',
@@ -67,6 +69,41 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
           return fp.read()
 
       yield ET.parse(coverage_xml).getroot(), read_utf8(coverage_html)
+
+  def do_test_junit_run_with_coverage_succeeds_scoverage(self, tests=(), args=()):
+    html_path = ('test/junit/coverage/reports/html/'
+                 'org.pantsbuild.testproject.unicode.cucumber.CucumberAnnotatedExample.html')
+    with temporary_dir(cleanup=False) as tmp_dir:
+      with self.cucumber_coverage(processor='scoverage',
+                                  xml_path='test/junit/coverage/reports/xml/coverage.xml',
+                                  html_path=html_path,
+                                  pre_args=[
+                                    '-ldebug',
+                                    '--scoverage-enable-scoverage',
+                                    f'--scoverage-report-coverage-output-dir={tmp_dir}',
+                                  ],
+                                  tests=tests,
+                                  args=args) as (xml_report, html_report_string):
+
+        # Validate 100% coverage; ie a line coverage rate of 1.
+        self.assertEqual('coverage', xml_report.tag)
+        self.assertEqual(1.0, float(xml_report.attrib['line-rate']))
+
+        # Validate that the html report was able to find sources for annotation.
+        self.assertIn('String pleasantry1()', html_report_string)
+        self.assertIn('String pleasantry2()', html_report_string)
+        self.assertIn('String pleasantry3()', html_report_string)
+
+        self.assertTrue(bool(os.listdir(tmp_dir)), f'tmp_dir: {tmp_dir} was empty!')
+
+  def test_junit_run_with_coverage_succeeds_scoverage(self):
+    self.do_test_junit_run_with_coverage_succeeds_scoverage(args=['--no-chroot', '--fast'])
+
+  def test_junit_run_with_coverage_succeeds_scoverage_merged(self):
+    self.do_test_junit_run_with_coverage_succeeds_scoverage(tests=['testUnicodeClass1',
+                                                                   'testUnicodeClass2',
+                                                                   'testUnicodeClass3'],
+                                                            args=['--batch-size=2'])
 
   def do_test_junit_run_with_coverage_succeeds_cobertura(self, tests=(), args=()):
     html_path = ('test/junit/coverage/reports/html/'

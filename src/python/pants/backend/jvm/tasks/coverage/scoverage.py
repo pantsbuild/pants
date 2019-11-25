@@ -51,7 +51,7 @@ class Scoverage(CoverageEngine):
       )
 
       register(
-        '--target-filters', type=list, default=[], fingerprint=True,
+        '--target-filters', type=list, default=[], fingerprint=False,
         help='Regex patterns passed to scoverage report generator, specifying which targets '
              'should be '
              'included in reports. All targets matching any of the patterns will be '
@@ -163,6 +163,15 @@ class Scoverage(CoverageEngine):
     safe_mkdir(html_report_path, clean=True)
     safe_mkdir(xml_report_path, clean=True)
 
+    self._settings.log.info(f'output dir: {self._coverage_output_dir}')
+    if self._coverage_output_dir:
+      self._settings.log.debug(f'Scoverage output also written to: {self._coverage_output_dir}!')
+      mergetree(output_dir, self._coverage_output_dir)
+
+    import glob
+    dir_globbed = glob.glob(os.path.join(output_dir, '**'))
+    self._settings.log.debug(f'output_dir: {output_dir}, /**: {dir_globbed}')
+
     final_target_dirs = []
     for parent_measurements_dir in self._iter_datadirs(output_dir):
       final_target_dirs += self.filter_scoverage_targets(parent_measurements_dir)
@@ -185,10 +194,6 @@ class Scoverage(CoverageEngine):
 
     self._settings.log.info(f"Scoverage html reports available at {html_report_path}")
     self._settings.log.info(f"Scoverage xml reports available at {xml_report_path}")
-
-    if self._coverage_output_dir:
-      self._settings.log.debug(f'Scoverage output also written to: {self._coverage_output_dir}!')
-      mergetree(output_dir, self._coverage_output_dir)
 
     if self._settings.coverage_open:
       return os.path.join(html_report_path, 'index.html')
