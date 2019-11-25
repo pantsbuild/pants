@@ -171,10 +171,11 @@ python_library(
   name='platform',
   sources=['platform.py'],
   dependencies=[
-      ':rules',
-      'src/python/pants/util:collections',
-      'src/python/pants/util:memo',
-      'src/python/pants/util:osutil',
+    ':rules',
+    'src/python/pants/util:collections',
+    'src/python/pants/util:enums',
+    'src/python/pants/util:memo',
+    'src/python/pants/util:osutil',
   ],
   tags = {"type_checked"},
 )
