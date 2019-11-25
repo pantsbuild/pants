@@ -140,11 +140,11 @@ class Confluence:
     if self._content_format == 'markdown':
       content = '{html}\n\n%s\n\n{html}' % html
     elif self._content_format == 'xhtml':
-      content = '''<ac:macro ac:name="html">
-          <ac:plain-text-body><![CDATA[%s]]></ac:plain-text-body>
-          </ac:macro>''' % html
+      content = f'''<ac:macro ac:name="html">
+          <ac:plain-text-body><![CDATA[{html}]]></ac:plain-text-body>
+          </ac:macro>'''
     else:
-      raise ConfluenceError("Don't know how to convert %s to HTML" % format)
+      raise ConfluenceError(f"Don't know how to convert {self._content_format} to HTML")
     return self.create(space, title, content, parent_page, **pageoptions)
 
   def addattachment(self, page, filename):
