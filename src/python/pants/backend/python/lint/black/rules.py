@@ -103,7 +103,7 @@ async def setup_black(wrapped_target: FormattablePythonTarget, black: Black) -> 
   return BlackSetup(config_path, resolved_requirements_pex, merged_input_files)
 
 
-@rule
+@rule(name="Format using black")
 async def fmt(
   wrapped_target: FormattablePythonTarget,
   black_setup: BlackSetup,
@@ -124,7 +124,7 @@ async def fmt(
   )
 
 
-@rule
+@rule(name="Lint using black")
 async def lint(
   wrapped_target: FormattablePythonTarget,
   black_setup: BlackSetup,

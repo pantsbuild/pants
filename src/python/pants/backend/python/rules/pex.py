@@ -84,7 +84,7 @@ class Pex(HermeticPex):
 
 # TODO: This is non-hermetic because the requirements will be resolved on the fly by
 # pex, where it should be hermetically provided in some way.
-@rule
+@rule(name="Create PEX")
 async def create_pex(
     request: CreatePex,
     pex_bin: DownloadedPexBin,
