@@ -12,9 +12,9 @@ from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import open_zip, temporary_dir
 
 
-_LINUX_PLATFORM = "linux-x86_64"
+_LINUX_PLATFORM = "manylinux1-x86_64-cp-36-m"
 _LINUX_WHEEL_SUBSTRING = "manylinux"
-_OSX_PLATFORM = "macosx-10.13-x86_64"
+_OSX_PLATFORM = "macosx-10.13-x86_64-cp-36-m"
 _OSX_WHEEL_SUBSTRING = "macosx"
 
 
@@ -123,8 +123,8 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
     want_present_platforms,
     want_missing_platforms=(),
   ):
-    def numpy_deps(deps):
-      return [d for d in deps if 'numpy' in d]
+    def p537_deps(deps):
+      return [d for d in deps if 'p537' in d]
     def assertInAny(substring, collection):
       self.assertTrue(any(substring in d for d in collection),
         f'Expected an entry matching "{substring}" in {collection}')
@@ -139,7 +139,7 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
 
     with self.caching_config() as config, self.mock_buildroot() as buildroot, buildroot.pushd():
       config['python-setup'] = {
-        'platforms': None
+        'platforms': []
       }
 
       buildroot.write_file(test_src, '')
@@ -154,7 +154,7 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
         python_requirement_library(
           name='numpy',
           requirements=[
-            python_requirement('numpy==1.14.5')
+            python_requirement('p537==1.0.4')
           ]
         )
 
@@ -176,7 +176,7 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
       self.assert_success(result)
 
       with open_zip(test_pex) as z:
-        deps = numpy_deps(z.namelist())
+        deps = p537_deps(z.namelist())
         for platform in want_present_platforms:
           assertInAny(platform, deps)
         for platform in want_missing_platforms:

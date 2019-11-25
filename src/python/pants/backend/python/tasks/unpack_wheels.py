@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+import shutil
 from hashlib import sha1
 
 from pex.pex_builder import PEXBuilder
@@ -15,7 +16,7 @@ from pants.base.fingerprint_strategy import DefaultFingerprintHashingMixin, Fing
 from pants.fs.archive import ZIP
 from pants.task.unpack_remote_sources_base import UnpackRemoteSourcesBase
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import mergetree, safe_concurrent_creation
+from pants.util.dirutil import mergetree, safe_concurrent_creation, safe_rmtree
 from pants.util.memo import memoized_method
 from pants.util.objects import SubclassesOf
 
@@ -79,16 +80,28 @@ class UnpackWheels(UnpackRemoteSourcesBase):
         matched_dist = self._get_matching_wheel(resolve_dir, interpreter,
                                                 unpacked_whls.all_imported_requirements,
                                                 unpacked_whls.module_name)
-        ZIP.extract(matched_dist.location, extract_dir)
-        if unpacked_whls.within_data_subdir:
+
+        # TODO(John Sirois): Kill support for zipped wheels since pex now resolves installed wheel
+        #  chroots explusivley instead.
+        if os.path.isfile(matched_dist.location):
+          ZIP.extract(matched_dist.location, extract_dir)
+        else:
+          safe_rmtree(extract_dir)
+          shutil.copytree(matched_dist.location, extract_dir)
+
+        if os.path.isfile(matched_dist.location) and unpacked_whls.within_data_subdir:
           data_dir_prefix = '{name}-{version}.data/{subdir}'.format(
             name=matched_dist.project_name,
             version=matched_dist.version,
             subdir=unpacked_whls.within_data_subdir,
           )
           dist_data_dir = os.path.join(extract_dir, data_dir_prefix)
+        elif unpacked_whls.within_data_subdir:
+          # N.B.: Wheels with data dirs have the data installed under the top module.
+          dist_data_dir = os.path.join(extract_dir, unpacked_whls.module_name)
         else:
           dist_data_dir = extract_dir
+
         unpack_filter = self.get_unpack_filter(unpacked_whls)
         # Copy over the module's data files into `unpack_dir`.
         mergetree(dist_data_dir, unpack_dir, file_filter=unpack_filter)

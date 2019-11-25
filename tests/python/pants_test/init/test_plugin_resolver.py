@@ -2,47 +2,79 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-import time
+import shutil
 import unittest
+from abc import ABCMeta, abstractmethod
 from contextlib import contextmanager
+from dataclasses import dataclass
+from pathlib import Path
 from textwrap import dedent
 
 from parameterized import parameterized
-from pex.crawler import Crawler
-from pex.installer import EggInstaller, Packager, WheelInstaller
 from pex.interpreter import PythonInterpreter
 from pex.resolver import Unsatisfiable
 from pkg_resources import Requirement, WorkingSet
 
 from pants.init.plugin_resolver import PluginResolver
 from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.python.setup_py_runner import SetupPyRunner
 from pants.testutil.interpreter_selection_utils import (
   PY_36,
   PY_37,
   python_interpreter_path,
   skip_unless_python36_and_python37_present,
 )
+from pants.testutil.subsystem.util import init_subsystem
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import safe_open, safe_rmtree, touch
+from pants.util.dirutil import safe_rmtree, touch
 
 
 req = Requirement.parse
 
-INSTALLERS = [('sdist', Packager), ('egg', EggInstaller), ('whl', WheelInstaller)]
+
+@dataclass(frozen=True)
+class Installer(metaclass=ABCMeta):
+  source_dir: Path
+  install_dir: Path
+
+  def run(self) -> None:
+    init_subsystem(SetupPyRunner.Factory)
+    dist = self._create_dist(SetupPyRunner.Factory.create())
+    shutil.copy(dist, self.install_dir)
+
+  @abstractmethod
+  def _create_dist(self, runner: SetupPyRunner) -> Path:
+    ...
+
+
+class SdistInstaller(Installer):
+  def _create_dist(self, runner: SetupPyRunner) -> Path:
+    return runner.sdist(source_dir=self.source_dir)
+
+
+class WheelInstaller(Installer):
+  def _create_dist(self, runner: SetupPyRunner):
+    return runner.bdist(source_dir=self.source_dir)
+
+
+INSTALLERS = [('sdist', SdistInstaller), ('whl', WheelInstaller)]
 
 
 class PluginResolverTest(unittest.TestCase):
   @staticmethod
   def create_plugin(distribution_repo_dir, plugin, version=None, packager_cls=None):
-    with safe_open(os.path.join(distribution_repo_dir, plugin, 'setup.py'), 'w') as fp:
-      fp.write(dedent(f"""
+    distribution_repo_dir = Path(distribution_repo_dir)
+
+    source_dir = distribution_repo_dir.joinpath(plugin)
+    source_dir.mkdir(parents=True)
+    source_dir.joinpath('setup.py').write_text(dedent(f"""
         from setuptools import setup
 
 
         setup(name="{plugin}", version="{version or '0.0.0'}")
       """))
-    packager_cls = packager_cls or Packager
-    packager = packager_cls(source_dir=os.path.join(distribution_repo_dir, plugin),
+    packager_cls = packager_cls or SdistInstaller
+    packager = packager_cls(source_dir=source_dir,
                             install_dir=distribution_repo_dir)
     packager.run()
 
@@ -137,7 +169,7 @@ class PluginResolverTest(unittest.TestCase):
       self.assertEqual(2, len(working_set.entries))
 
       safe_rmtree(repo_dir)
-      with self.assertRaises(FileNotFoundError):
+      with self.assertRaises(Unsatisfiable):
         with self.plugin_resolution(interpreter=python37,
                                     chroot=chroot,
                                     plugins=[('jake', '1.2.3'), ('jane', '3.4.5')]):
@@ -163,11 +195,9 @@ class PluginResolverTest(unittest.TestCase):
 
       # Kill the cache and the repo source dir and wait past our 1s test TTL, if the PluginResolver
       # truly detects inexact plugin requirements it should skip perma-caching and fall through to
-      # pex to a TLL expiry resolve and then fail.
+      # a pex resolve and then fail.
       safe_rmtree(repo_dir)
       safe_rmtree(cache_dir)
-      Crawler.reset_cache()
-      time.sleep(1.5)
 
       with self.assertRaises(Unsatisfiable):
         with self.plugin_resolution(chroot=chroot, plugins=[('jake', '1.2.3'), 'jane']):

@@ -44,10 +44,6 @@ class PythonSetup(Subsystem):
     register('--resolver-cache-dir', advanced=True, default=None, metavar='<dir>',
              help='The parent directory for the requirement resolver cache. '
                   'If unspecified, a standard path under the workdir is used.')
-    register('--resolver-cache-ttl', advanced=True, type=int, metavar='<seconds>',
-             default=10 * 365 * 86400,  # 10 years.
-             help='The time in seconds before we consider re-resolving an open-ended requirement, '
-                  'e.g. "flask>=0.2" if a matching distribution is available on disk.')
     register('--resolver-allow-prereleases', advanced=True, type=bool, default=UnsetBool,
              fingerprint=True, help='Whether to include pre-releases when resolving requirements.')
     register('--artifact-cache-dir', advanced=True, default=None, metavar='<dir>',
@@ -60,9 +56,6 @@ class PythonSetup(Subsystem):
                   '"<PATH>" (the contents of the PATH env var), '
                   '"<PEXRC>" (paths in the PEX_PYTHON_PATH variable in a pexrc file), '
                   '"<PYENV>" (all python versions under $(pyenv root)/versions).')
-    register('--resolver-use-manylinux', advanced=True, type=bool, default=True, fingerprint=True,
-             help='Whether to consider manylinux wheels when resolving requirements for linux '
-                  'platforms.')
 
   @property
   def interpreter_constraints(self):
@@ -106,16 +99,8 @@ class PythonSetup(Subsystem):
             os.path.join(self.scratch_dir, 'resolved_requirements'))
 
   @property
-  def resolver_cache_ttl(self):
-    return self.get_options().resolver_cache_ttl
-
-  @property
   def resolver_allow_prereleases(self):
     return self.get_options().resolver_allow_prereleases
-
-  @property
-  def use_manylinux(self):
-    return self.get_options().resolver_use_manylinux
 
   @property
   def artifact_cache_dir(self):
