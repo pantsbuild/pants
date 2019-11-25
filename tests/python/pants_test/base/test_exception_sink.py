@@ -7,6 +7,7 @@ import re
 import unittest.mock
 
 from pants.base.exception_sink import ExceptionSink
+from pants.engine.platform import Platform
 from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir
 from pants.util.osutil import get_normalized_os_name
@@ -42,13 +43,11 @@ class TestExceptionSink(TestBase):
     # creating a new directory with safe_mkdir(), Linux errors out trying to create the directory
     # for its log files with safe_open(). This may be due to differences in the filesystems.
     # TODO: figure out why we error out at different points here!
-    if get_normalized_os_name() == 'darwin':
-      err_rx = re.escape("The provided exception sink path at '/' is not writable or could not be created: [Errno 21] Is a directory: '/'.")
-    else:
-      err_rx = '.*'.join([
-        re.escape("Error opening fatal error log streams for log location '/': [Errno 13] Permission denied: '/logs'"),
-      ])
-    with self.assertRaisesRegexp(ExceptionSink.ExceptionSinkError, err_rx):
+    err_str = Platform.current.match({
+      Platform.darwin: "The provided exception sink path at '/' is not writable or could not be created: [Errno 21] Is a directory: '/'.",
+      Platform.linux: "Error opening fatal error log streams for log location '/': [Errno 13] Permission denied: '/.pids'"
+    })
+    with self.assertRaisesWithMessageContaining(ExceptionSink.ExceptionSinkError, err_str):
       sink.reset_log_location('/')
 
   def test_log_exception(self):
