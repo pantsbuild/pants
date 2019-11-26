@@ -309,7 +309,7 @@ class PexBuilderWrapper:
     missing_init_files = identify_missing_init_files(sources)
     if missing_init_files:
       with temporary_file(permissions=0o644) as ns_package:
-        ns_package.write(b'__import__("pkg_resources").declare_namespace(__name__)')
+        ns_package.write(b'__import__("pkg_resources").declare_namespace(__name__)  # type: ignore[attr-defined]')
         ns_package.flush()
         for missing_init_file in missing_init_files:
           self._builder.add_source(filename=ns_package.name, env_filename=missing_init_file)

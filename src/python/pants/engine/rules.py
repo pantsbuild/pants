@@ -65,7 +65,7 @@ def _get_starting_indent(source):
 
 
 def _make_rule(
-  return_type: type, parameter_types: typing.Iterable[type], cacheable: bool = True,
+  return_type: Type, parameter_types: typing.Iterable[Type], cacheable: bool = True,
   name: Optional[bool] = None
 ) -> Callable[[Callable], Callable]:
   """A @decorator that declares that a particular static function may be used as a TaskRule.
@@ -80,7 +80,7 @@ def _make_rule(
                     its inputs.
   """
 
-  is_goal_cls = isinstance(return_type, type) and issubclass(return_type, Goal)
+  is_goal_cls = issubclass(return_type, Goal)
   if is_goal_cls == cacheable:
     raise TypeError(
       'An `@rule` that produces a `Goal` must be declared with @console_rule in order to signal '
@@ -365,14 +365,14 @@ class TaskRule(Rule):
     self._output_type = output_type
     self.input_selectors = input_selectors
     self.input_gets = input_gets
-    self.func = func  # type: ignore
+    self.func = func  # type: ignore[assignment] # cannot assign to a method
     self._dependency_rules = dependency_rules or ()
     self._dependency_optionables = dependency_optionables or ()
     self.cacheable = cacheable
     self.name = name
 
   def __str__(self):
-    return ('(name={}, {!r}, {}, gets={}, opts={})'
+    return ('(name={}, {}, {!r}, {}, gets={}, opts={})'
             .format(self.name or '<not defined>',
                     self.output_type.__name__,
                     self.input_selectors,
