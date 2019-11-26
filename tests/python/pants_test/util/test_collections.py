@@ -127,7 +127,7 @@ class EnumTest(unittest.TestCase):
 
   def test_unrecognized_match(self) -> None:
     with self.assertRaises(UnrecognizedMatchError):
-      EnumTest.Test.pig.match({  # type: ignore[type-var]
+      EnumTest.Test.pig.match({  # type: ignore[type-var] # intended to fail type check
         EnumTest.Test.dog: "woof",
         EnumTest.Test.cat: "meow",
         EnumTest.Test.pig: "oink",

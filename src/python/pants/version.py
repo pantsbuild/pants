@@ -13,6 +13,7 @@ _PANTS_VERSION_OVERRIDE = '_PANTS_VERSION_OVERRIDE'
 
 VERSION: str = (
   os.environ.get(_PANTS_VERSION_OVERRIDE) or
+  # NB: We expect VERSION to always have an entry and want a runtime failure if this is false.
   pkgutil.get_data(__name__, 'VERSION').decode().strip()  # type: ignore[union-attr]
 )
 

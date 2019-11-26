@@ -65,7 +65,7 @@ def _get_starting_indent(source):
 
 
 def _make_rule(
-  return_type: type, parameter_types: typing.Iterable[type], cacheable: bool = True,
+  return_type: Type, parameter_types: typing.Iterable[Type], cacheable: bool = True,
   name: Optional[bool] = None
 ) -> Callable[[Callable], Callable]:
   """A @decorator that declares that a particular static function may be used as a TaskRule.
@@ -80,10 +80,7 @@ def _make_rule(
                     its inputs.
   """
 
-  # NB: the left operand is always true, according to MyPy, because we annotate `return_type` as
-  # `Type`. We keep it for now until we have higher type coverage because we should not be removing
-  # runtime checks yet.
-  is_goal_cls = isinstance(return_type, type) and issubclass(return_type, Goal)  # type: ignore[misc]
+  is_goal_cls = issubclass(return_type, Goal)
   if is_goal_cls == cacheable:
     raise TypeError(
       'An `@rule` that produces a `Goal` must be declared with @console_rule in order to signal '

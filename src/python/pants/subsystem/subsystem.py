@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import inspect
-from typing import Dict, Optional, Tuple, Type, TypeVar, cast
+from typing import Dict, Optional, Tuple, Type, TypeVar, Union, cast
 
 from pants.option.optionable import Optionable
 from pants.option.options import Options
@@ -85,7 +85,9 @@ class Subsystem(SubsystemClientMixin, Optionable):
 
   # A cache of (cls, scope) -> the instance of cls tied to that scope.
   # NB: it would be ideal to use `_S` rather than `Subsystem`, but we can't do this because
-  # MyPy complains that `_S` would not be properly constrained.
+  # MyPy complains that `_S` would not be properly constrained. Specifically, it suggests that we'd
+  # have to use typing.Generic or typing.Protocol to properly constrain the type var, which we
+  # don't want to do.
   _scoped_instances: Dict[Tuple[Type["Subsystem"], str], "Subsystem"] = {}
 
   @classmethod
@@ -99,7 +101,7 @@ class Subsystem(SubsystemClientMixin, Optionable):
     return cls._instance_for_scope(cls.options_scope)  # type: ignore[arg-type]  # MyPy is treating cls.options_scope as a Callable, rather than `str`
 
   @classmethod
-  def scoped_instance(cls: Type[_S], optionable: Optionable) -> _S:
+  def scoped_instance(cls: Type[_S], optionable: Union[Optionable, Type[Optionable]]) -> _S:
     """Returns an instance of this subsystem for exclusive use by the given `optionable`.
 
     :API: public
@@ -107,7 +109,7 @@ class Subsystem(SubsystemClientMixin, Optionable):
     :param optionable: An optionable type or instance to scope this subsystem under.
     :returns: The scoped subsystem instance.
     """
-    if not isinstance(optionable, Optionable) and not issubclass(optionable, Optionable):  # type: ignore[misc] # MyPy thinks the RHS never evaluates, but it somehow does
+    if not isinstance(optionable, Optionable) and not issubclass(optionable, Optionable):
       raise TypeError('Can only scope an instance against an Optionable, given {} of type {}.'
                       .format(optionable, type(optionable)))
     return cls._instance_for_scope(cls.subscope(optionable.options_scope))

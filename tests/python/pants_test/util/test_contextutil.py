@@ -194,17 +194,17 @@ class ContextutilTest(unittest.TestCase):
   def test_open_zipDefault(self) -> None:
     with temporary_dir() as tempdir:
       with open_zip(os.path.join(tempdir, 'test'), 'w') as zf:
-        self.assertTrue(zf._allowZip64)  # type: ignore[attr-defined]
+        self.assertTrue(zf._allowZip64)  # type: ignore[attr-defined] # intended to fail type check
 
   def test_open_zipTrue(self) -> None:
     with temporary_dir() as tempdir:
       with open_zip(os.path.join(tempdir, 'test'), 'w', allowZip64=True) as zf:
-        self.assertTrue(zf._allowZip64)  # type: ignore[attr-defined]
+        self.assertTrue(zf._allowZip64)  # type: ignore[attr-defined] # intended to fail type check
 
   def test_open_zipFalse(self) -> None:
     with temporary_dir() as tempdir:
       with open_zip(os.path.join(tempdir, 'test'), 'w', allowZip64=False) as zf:
-        self.assertFalse(zf._allowZip64)  # type: ignore[attr-defined]
+        self.assertFalse(zf._allowZip64)  # type: ignore[attr-defined] # intended to fail type check
 
   def test_open_zip_raises_exception_on_falsey_paths(self):
     falsey = (None, '', False)
@@ -322,7 +322,7 @@ class ContextutilTest(unittest.TestCase):
 
     with self.assertRaises(AssertionError):
       with exception_logging(fake_logger, 'error!'):
-        assert True is False  # type: ignore[comparison-overlap]
+        assert True is False  # type: ignore[comparison-overlap] # intended to fail type check
 
     fake_logger.exception.assert_called_once_with('error!')
 
