@@ -33,9 +33,7 @@ class MockWorkspaceGoal(Goal):
 @console_rule
 async def workspace_console_rule(console: Console, workspace: Workspace, msg: MessageToConsoleRule) -> MockWorkspaceGoal:
   digest = await Get(Digest, InputFilesContent, msg.input_files_content)
-  output = workspace.materialize_directory(
-    DirectoryToMaterialize(path="", directory_digest=digest)
-  )
+  output = workspace.materialize_directory(DirectoryToMaterialize(digest))
   console.print_stdout(output.output_paths[0], end='')
   return MockWorkspaceGoal(exit_code=0)
 
@@ -80,9 +78,7 @@ class FileSystemTest(TestBase):
     assert not path1.is_file()
     assert not path2.is_file()
 
-    output = workspace.materialize_directories((
-      DirectoryToMaterialize(path="", directory_digest=digest),
-    ))
+    output = workspace.materialize_directories((DirectoryToMaterialize(digest),))
 
     assert type(output) == MaterializeDirectoriesResult
     materialize_result = output.dependencies[0]

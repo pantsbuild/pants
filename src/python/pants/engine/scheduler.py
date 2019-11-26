@@ -591,7 +591,7 @@ class SchedulerSession:
     """Materialize multiple directory digests to disk in parallel."""
     # Ensure that there isn't more than one of the same directory paths and paths do not have the
     # same prefix.
-    dir_list = [dtm.path for dtm in directories_to_materialize]
+    dir_list = [dtm.path_prefix for dtm in directories_to_materialize]
     check_no_overlapping_paths(dir_list)
 
     wrapped_result = self._scheduler._native.lib.materialize_directories(

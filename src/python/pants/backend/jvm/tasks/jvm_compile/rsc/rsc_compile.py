@@ -800,7 +800,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
 
     res.output_directory_digest.dump(ctx.rsc_jar_file.path)
     self.context._scheduler.materialize_directory(
-      DirectoryToMaterialize("", res.output_directory_digest),
+      DirectoryToMaterialize(res.output_directory_digest),
     )
     ctx.rsc_jar_file.hydrate_missing_directory_digest(res.output_directory_digest)
 
