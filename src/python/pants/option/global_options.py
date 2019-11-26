@@ -173,6 +173,8 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                   'Useful when printing help messages.')
 
     register('--plugins', advanced=True, type=list, help='Load these plugins.')
+    register('--plugins-force-resolve', advanced=True, type=bool, default=False,
+             help='Re-resolve plugins even if previously resolved.')
     register('--plugin-cache-dir', advanced=True,
              default=os.path.join(get_pants_cachedir(), 'plugins'),
              help='Cache resolved plugin requirements here.')
