@@ -150,35 +150,35 @@ def rootify_rules(
   """Utility to convert `optionable_rule`s into `RootRule`s and no-op on other types of rules.
 
   This is useful for `TestBase.request_single_product_request`-style tests during the setup of
-  `rules()`. To use an `optionable_rule` in tests, you have to provide an `OptionsBootstrapper`,
-  which is more heavy-weight than most tests want. This prevents certain tests from using the
-  following style, because it means the test will now require `OptionsBootstrapper`:
+  `rules()`, which require Subsystems to be registered as `RootRule`s or to provide an
+  `OptionsBootstrapper`. For example, the below will fail with the message `Types that will be
+  passed as Params at the root of a graph need to be registered via RootRule: SourceRootConfig`:
 
   ```
-  from pants.rules.core.fmt import rules as fmt_rules
+  from pants.rules.core.strip_source_root import rules as strip_source_root_rules
 
-  class TestFmt(TestBase):
+  class TestStripSourceRoots(TestBase):
 
     @classmethod
     def rules():
-      return (*super.rules(), *fmt_rules())
+      return (*super.rules(), *strip_source_root_rules())
   ```
 
-  Instead, every `optionable_rule` would need to be registered as a `RootRule`. But, it is tedious
-  to have to register every individual Subsystem used transitively as a RootRule and to also
-  register every individual rule used transitively.
+  While we could register these Subsystems as RootRules, this leads to unnecessary boilerplate.
+  Instead, we can leverage the fact the production code has already registered every Subsystem used
+  transitively by the rule being tested.
 
-  Instead, this utility function allows for this:
+  This utility function allows for this:
 
   ```
-  from pants.rules.core.fmt import rules as fmt_rules
+  from pants.rules.core.strip_source_root import rules as strip_source_root_rules
   from pants.testutil.engine.util import rootify_rules
 
-  class TestFmt(TestBase):
+  class TestStripSourceRoots(TestBase):
 
     @classmethod
     def rules():
-      return rootify_rules(*super.rules(), *fmt_rules())
+       return rootify_rules(*super.rules(), *strip_source_root_rules())
   ```
   """
   def is_optionable_rule(rule: Union[Callable, TaskRule, RootRule, UnionRule]) -> bool:
