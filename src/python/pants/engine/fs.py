@@ -171,16 +171,16 @@ class DirectoryWithPrefixToAdd:
 
 @dataclass(frozen=True)
 class DirectoryToMaterialize:
-  """A request to materialize the contents of a directory digest at the provided path,
-  relative to the buildroot."""
+  """A request to materialize the contents of a directory digest at the build root, optionally with
+  a path prefix (relative to the build root)."""
   directory_digest: Digest
-  path: str = ""  # i.e. at the root level of the build root
+  path_prefix: str = ""  # i.e., we default to the root level of the build root
 
   def __post_init__(self) -> None:
-    if Path(self.path).is_absolute():
+    if Path(self.path_prefix).is_absolute():
       raise ValueError(
-        f"The path must be relative for {self}, as the engine materializes directories relative to "
-        f"the build root."
+        f"The path_prefix must be relative for {self}, as the engine materializes directories "
+        f"relative to the build root."
       )
 
 

@@ -971,20 +971,24 @@ pub extern "C" fn run_local_interactive_process(
 pub extern "C" fn materialize_directories(
   scheduler_ptr: *mut Scheduler,
   session_ptr: *mut Session,
-  directories_digests_and_paths_value: Handle,
+  directories_digests_and_path_prefixes_value: Handle,
 ) -> PyResult {
-  let values = externs::project_multi(&directories_digests_and_paths_value.into(), "dependencies");
-  let directories_digests_and_paths_results: Result<Vec<(Digest, PathBuf)>, String> = values
-    .iter()
-    .map(|value| {
-      let dir = PathBuf::from(externs::project_str(&value, "path"));
-      let dir_digest =
-        nodes::lift_digest(&externs::project_ignoring_type(&value, "directory_digest"));
-      dir_digest.map(|dir_digest| (dir_digest, dir))
-    })
-    .collect();
+  let values = externs::project_multi(
+    &directories_digests_and_path_prefixes_value.into(),
+    "dependencies",
+  );
+  let directories_digests_and_path_prefixes_results: Result<Vec<(Digest, PathBuf)>, String> =
+    values
+      .iter()
+      .map(|value| {
+        let dir_digest =
+          nodes::lift_digest(&externs::project_ignoring_type(&value, "directory_digest"));
+        let path_prefix = PathBuf::from(externs::project_str(&value, "path_prefix"));
+        dir_digest.map(|dir_digest| (dir_digest, path_prefix))
+      })
+      .collect();
 
-  let digests_and_dirs = match directories_digests_and_paths_results {
+  let digests_and_path_prefixes = match directories_digests_and_path_prefixes_results {
     Ok(d) => d,
     Err(err) => {
       let e: Result<Value, String> = Err(err);
@@ -997,14 +1001,14 @@ pub extern "C" fn materialize_directories(
     let construct_materialize_directories_results = types.construct_materialize_directories_results;
     let construct_materialize_directory_result = types.construct_materialize_directory_result;
     let work_future = futures::future::join_all(
-      digests_and_dirs
+      digests_and_path_prefixes
         .into_iter()
-        .map(|(digest, dir)| {
+        .map(|(digest, path_prefix)| {
           // NB: all DirectoryToMaterialize paths are validated in Python to be relative paths.
           // Here, we join them with the build root.
           let mut destination = PathBuf::new();
           destination.push(scheduler.core.build_root.clone());
-          destination.push(dir);
+          destination.push(path_prefix);
           let metadata = scheduler.core.store().materialize_directory(
             destination.clone(),
             digest,

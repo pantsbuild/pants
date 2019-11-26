@@ -37,7 +37,7 @@ async def create_binary(addresses: BuildFileAddresses, console: Console, workspa
     print_stdout("Generating binaries in `dist/`")
     binaries = await MultiGet(Get(CreatedBinary, Address, address.to_address()) for address in addresses)
     dirs_to_materialize = tuple(
-      DirectoryToMaterialize(binary.digest, path='dist/') for binary in binaries
+      DirectoryToMaterialize(binary.digest, path_prefix='dist/') for binary in binaries
     )
     results = workspace.materialize_directories(dirs_to_materialize)
     for result in results.dependencies:
