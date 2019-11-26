@@ -31,7 +31,7 @@ from pants.testutil.test_base import TestBase
 
 class IsortIntegrationTest(TestBase):
 
-  good_source = FileContent(path="test/good.py", content=b'from colors import blue, green\n')
+  good_source = FileContent(path="test/good.py", content=b'from animals import cat, dog\n')
   bad_source = FileContent(path="test/bad.py", content=b'from colors import green, blue\n')
   fixed_bad_source = FileContent(path="test/bad.py", content=b'from colors import blue, green\n')
 

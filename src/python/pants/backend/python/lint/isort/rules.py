@@ -65,7 +65,7 @@ class IsortSetup:
 
 @rule
 async def setup_isort(wrapped_target: FormattablePythonTarget, isort: Isort) -> IsortSetup:
-  # NB: isort auto-discovers config. We ensure that the config is included in the inputted files.
+  # NB: isort auto-discovers config. We ensure that the config is included in the input files.
   config_path = isort.get_options().config
   config_snapshot = await Get(Snapshot, PathGlobs(include=(config_path,)))
   resolved_requirements_pex = await Get(

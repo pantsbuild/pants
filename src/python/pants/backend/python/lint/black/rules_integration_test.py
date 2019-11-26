@@ -31,7 +31,7 @@ from pants.testutil.test_base import TestBase
 
 class BlackIntegrationTest(TestBase):
 
-  good_source = FileContent(path="test/good.py", content=b'name = "Anakin"\n')
+  good_source = FileContent(path="test/good.py", content=b'animal = "Koala"\n')
   bad_source = FileContent(path="test/bad.py", content=b'name=    "Anakin"\n')
   fixed_bad_source = FileContent(path="test/bad.py", content=b'name = "Anakin"\n')
 
@@ -117,7 +117,7 @@ class BlackIntegrationTest(TestBase):
 
   def test_respects_config_file(self) -> None:
     # Note the single quotes, which Black does not like by default.
-    source = FileContent(path="test/good.py", content=b"name = 'Anakin'\n")
+    source = FileContent(path="test/good.py", content=b"animal = 'Koala'\n")
     lint_result, fmt_result = self.run_black(
       [source], config="[tool.black]\nskip-string-normalization = 'true'\n"
     )
