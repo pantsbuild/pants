@@ -582,9 +582,8 @@ class SchedulerSession:
     directories_to_materialize: Tuple[DirectoryToMaterialize, ...]
   ) -> MaterializeDirectoriesResult:
     """Creates the specified directories on the file system."""
-    # Ensure that there isn't more than one of the same directory paths, that paths do not have
-    # the same prefix, and that all paths are relative (the engine materializes relative to the
-    # build root).
+    # Ensure that there isn't more than one of the same directory paths and paths do not have the
+    # same prefix.
     dir_list = [dtm.path for dtm in directories_to_materialize]
     check_no_overlapping_paths(dir_list)
 
