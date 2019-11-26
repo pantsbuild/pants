@@ -394,6 +394,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
       build_file_imports_behavior='allow',
       native=init_native(),
       options_bootstrapper=OptionsBootstrapper.create(args=['--pants-config-files=[]']),
+      build_root=self.build_root,
       build_configuration=self.build_config(),
       build_ignore_patterns=None,
     ).new_session(zipkin_trace_v2=False, build_id="buildid_for_test")

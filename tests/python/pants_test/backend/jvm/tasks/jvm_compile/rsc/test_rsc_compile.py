@@ -59,7 +59,7 @@ class RscCompileTest(NailgunTaskTestBase):
       tags={'use-compiler:zinc-only'}
     )
 
-    with temporary_dir() as tmp_dir:
+    with temporary_dir(root_dir=self.build_root) as tmp_dir:
       invalid_targets = [java_target, scala_target]
       task = self.create_task_with_target_roots(
         target_roots=[java_target]
@@ -107,7 +107,7 @@ class RscCompileTest(NailgunTaskTestBase):
       tags={f'use-compiler:{RscCompile.JvmCompileWorkflowType.rsc_and_zinc.value}'},
     )
 
-    with temporary_dir() as tmp_dir:
+    with temporary_dir(root_dir=self.build_root) as tmp_dir:
       invalid_targets = [java_target, scala_target]
       task = self.create_task_with_target_roots(
         target_roots=[java_target]
@@ -152,7 +152,7 @@ class RscCompileTest(NailgunTaskTestBase):
       dependencies=[]
     )
 
-    with temporary_dir() as tmp_dir:
+    with temporary_dir(root_dir=self.build_root) as tmp_dir:
       invalid_targets = [scala_target]
       task = self.create_task_with_target_roots(
         target_roots=[scala_target],
@@ -224,7 +224,7 @@ class RscCompileTest(NailgunTaskTestBase):
       tags={'use-compiler:zinc-only'}
     )
 
-    with temporary_dir() as tmp_dir:
+    with temporary_dir(root_dir=self.build_root) as tmp_dir:
       invalid_targets = [java_target, scala_target, scala_dep, test_target]
       task = self.create_task_with_target_roots(
         target_roots=[java_target, scala_target, test_target]
@@ -312,7 +312,7 @@ class RscCompileTest(NailgunTaskTestBase):
       dependencies=[]
     )
 
-    with temporary_dir() as tmp_dir:
+    with temporary_dir(root_dir=self.build_root) as tmp_dir:
       invalid_targets = [
         java_target,
         scala_target_direct_java_sources,

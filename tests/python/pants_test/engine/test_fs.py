@@ -9,6 +9,7 @@ import unittest
 from abc import ABCMeta
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler
+from pathlib import Path
 
 from pants.engine.fs import (
   EMPTY_DIRECTORY_DIGEST,
@@ -357,22 +358,12 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
       self.assertEqual(both_snapshot.directory_digest, both_merged)
 
   def test_materialize_directories(self):
-    # I tried passing in the digest of a file, but it didn't make it to the
-    # rust code due to all of the checks we have in place (which is probably a good thing).
     self.prime_store_with_roland_digest()
-
-    with temporary_dir() as temp_dir:
-      dir_path = os.path.join(temp_dir, "containing_roland")
-      digest = Digest(
-        "63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16",
-        80
-      )
-      self.scheduler.materialize_directories((DirectoryToMaterialize(dir_path, digest),))
-
-      created_file = os.path.join(dir_path, "roland")
-      with open(created_file, 'r') as f:
-        content = f.read()
-        self.assertEqual(content, "European Burmese")
+    digest = Digest(
+      "63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16", 80
+    )
+    self.scheduler.materialize_directories((DirectoryToMaterialize("test", digest),))
+    assert Path(self.build_root, "test/roland").read_text() == "European Burmese"
 
   def test_add_prefix(self):
     input_files_content = InputFilesContent((

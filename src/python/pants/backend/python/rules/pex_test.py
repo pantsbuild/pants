@@ -29,7 +29,6 @@ from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.testutil.subsystem.util import init_subsystems
 from pants.testutil.test_base import TestBase
-from pants.util.contextutil import temporary_dir
 from pants.util.strutil import create_path_env_var
 
 
@@ -75,14 +74,13 @@ class TestResolveRequirements(TestBase):
         PythonNativeCode.global_instance()
       )
     )
-    with temporary_dir() as tmp_dir:
-      self.scheduler.materialize_directories((
-        DirectoryToMaterialize(path=tmp_dir, directory_digest=requirements_pex.directory_digest),
-      ))
-      with zipfile.ZipFile(os.path.join(tmp_dir, "test.pex"), "r") as pex:
-        with pex.open("PEX-INFO", "r") as pex_info:
-          pex_info_content = pex_info.readline().decode()
-          pex_list = pex.namelist()
+    self.scheduler.materialize_directories((
+      DirectoryToMaterialize(path="", directory_digest=requirements_pex.directory_digest),
+    ))
+    with zipfile.ZipFile(os.path.join(self.build_root, "test.pex"), "r") as pex:
+      with pex.open("PEX-INFO", "r") as pex_info:
+        pex_info_content = pex_info.readline().decode()
+        pex_list = pex.namelist()
     return {'pex': requirements_pex, 'info': json.loads(pex_info_content), 'files': pex_list}
 
   def create_pex_and_get_pex_info(
