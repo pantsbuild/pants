@@ -82,7 +82,7 @@ class RootsTest(ConsoleRuleTestBase):
 
   @classmethod
   def rules(cls):
-    return super().rules() + list_roots.rules()
+    return (*super().rules(), *list_roots.rules())
 
   def test_no_langs(self):
     source_roots = json.dumps({'fakeroot': tuple()})

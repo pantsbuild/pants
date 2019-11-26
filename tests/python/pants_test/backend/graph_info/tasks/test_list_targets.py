@@ -40,7 +40,7 @@ class ListTargetsTest(ConsoleRuleTestBase):
 
   @classmethod
   def rules(cls):
-    return super().rules() + list_targets.rules()
+    return (*super().rules(), *list_targets.rules())
 
   def setUp(self) -> None:
     super().setUp()

@@ -169,7 +169,8 @@ class SchedulerTest(TestBase):
 
   @classmethod
   def rules(cls):
-    return super().rules() + [
+    return (
+      *super().rules(),
       RootRule(A),
       # B is both a RootRule and an intermediate product here.
       RootRule(B),
@@ -188,7 +189,7 @@ class SchedulerTest(TestBase):
       RootRule(UnionB),
       select_union_b,
       a_union_test,
-    ]
+    )
 
   def test_use_params(self):
     # Confirm that we can pass in Params in order to provide multiple inputs to an execution.
@@ -249,7 +250,8 @@ class SchedulerWithNestedRaiseTest(TestBase):
 
   @classmethod
   def rules(cls):
-    return super().rules() + [
+    return (
+      *super().rules(),
       RootRule(B),
       RootRule(TypeCheckFailWrapper),
       RootRule(CollectionType),
@@ -257,7 +259,7 @@ class SchedulerWithNestedRaiseTest(TestBase):
       c_unhashable,
       c_unhashable_dataclass,
       nested_raise,
-    ]
+    )
 
   #TODO(#8675) - This test (and others like it) that rely on matching a specific string repr of a complex python object is fragile.
   def test_get_type_match_failure(self):

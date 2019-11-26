@@ -23,7 +23,7 @@ class FileDepsTest(ConsoleRuleTestBase):
 
   @classmethod
   def rules(cls):
-    return super().rules() + filedeps.rules()
+    return (*super().rules(), *filedeps.rules())
 
   @classmethod
   def alias_groups(cls) -> BuildFileAliases:

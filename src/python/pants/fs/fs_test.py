@@ -48,7 +48,7 @@ class WorkspaceInConsoleRuleTest(ConsoleRuleTestBase):
 
   @classmethod
   def rules(cls):
-    return super().rules() + [RootRule(MessageToConsoleRule), workspace_console_rule]
+    return (*super().rules(), workspace_console_rule, RootRule(MessageToConsoleRule))
 
   def test(self):
     msg = MessageToConsoleRule(

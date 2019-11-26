@@ -12,9 +12,10 @@ from pants.testutil.task_test_base import TaskTestBase
 
 
 class NativeTaskTestBase(TaskTestBase):
+
   @classmethod
   def rules(cls):
-    return super().rules() + register.rules()
+    return (*super().rules(), *register.rules())
 
 
 class NativeCompileTestMixin:

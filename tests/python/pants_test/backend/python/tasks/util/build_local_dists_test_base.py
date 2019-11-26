@@ -39,7 +39,7 @@ class BuildLocalPythonDistributionsTestBase(PythonTaskTestBase, DeclarativeTaskT
 
   @classmethod
   def rules(cls):
-    return super().rules() + native_backend_rules()
+    return (*super().rules(), *native_backend_rules())
 
   @classproperty
   @abstractmethod

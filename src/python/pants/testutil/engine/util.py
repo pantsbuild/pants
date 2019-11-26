@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass
 from io import StringIO
 from types import CoroutineType, GeneratorType
-from typing import Any, Callable, Optional, Sequence, Type
+from typing import Any, Callable, Optional, Sequence, Tuple, Type, Union
 
 from colors import blue, green, red
 
@@ -14,10 +14,12 @@ from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.engine.addressable import addressable_list
 from pants.engine.native import Native
 from pants.engine.parser import SymbolTable
+from pants.engine.rules import RootRule, Rule, TaskRule, UnionRule
 from pants.engine.scheduler import Scheduler
 from pants.engine.selectors import Get
 from pants.engine.struct import Struct
 from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS
+from pants.subsystem.subsystem import Subsystem
 from pants.util.objects import SubclassesOf
 
 
@@ -141,6 +143,52 @@ class Target(Struct):
 
 
 TARGET_TABLE = SymbolTable({'struct': Struct, 'target': Target})
+
+
+def rootify_rules(
+  *rules: Union[Rule, UnionRule]
+) -> Tuple[Union[TaskRule, RootRule, UnionRule], ...]:
+  """Utility to convert `optionable_rule`s into `RootRule`s and no-op on other types of rules.
+
+  This is useful for `TestBase.request_single_product_request`-style tests during the setup of
+  `rules()`. To use an `optionable_rule` in tests, you have to provide an `OptionsBootstrapper`,
+  which is more heavy-weight than most tests want. This prevents certain tests from using the
+  following style, because it means the test will now require `OptionsBootstrapper`:
+
+  ```
+  from pants.rules.core.fmt import rules as fmt_rules
+
+  class TestFmt(TestBase):
+
+    @classmethod
+    def rules():
+      return (*super.rules(), *fmt_rules())
+  ```
+
+  Instead, every `optionable_rule` would need to be registered as a `RootRule`. But, it is tedious
+  to have to register every individual Subsystem used transitively as a RootRule and to also
+  register every individual rule used transitively.
+
+  Instead, this utility function allows for this:
+
+  ```
+  from pants.rules.core.fmt import rules as fmt_rules
+  from pants.testutil.engine.util import rootify_rules
+
+  class TestFmt(TestBase):
+
+    @classmethod
+    def rules():
+      return rootify_rules(*super.rules(), *fmt_rules())
+  ```
+  """
+  def is_optionable_rule(rule: Union[Rule, UnionRule]) -> bool:
+    return hasattr(rule, "output_type") and issubclass(rule.output_type, Subsystem)
+
+  return tuple(
+    RootRule(rule.output_type) if is_optionable_rule(rule) else rule
+    for rule in rules
+  )
 
 
 def assert_equal_with_printing(test_case, expected, actual):

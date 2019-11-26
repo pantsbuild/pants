@@ -3,18 +3,17 @@
 
 from typing import List, Optional, Tuple
 
-from pants.backend.python.lint.black.rules import BlackSetup, fmt, lint, setup_black
+from pants.backend.python.lint.black.rules import BlackSetup
+from pants.backend.python.lint.black.rules import rules as black_rules
 from pants.backend.python.lint.black.subsystem import Black
-from pants.backend.python.rules.download_pex_bin import download_pex_bin
-from pants.backend.python.rules.pex import CreatePex, create_pex
-from pants.backend.python.subsystems.python_native_code import (
-  PythonNativeCode,
-  create_pex_native_build_environment,
-)
+from pants.backend.python.rules.download_pex_bin import rules as download_pex_bin_rules
+from pants.backend.python.rules.pex import rules as pex_rules
+from pants.backend.python.subsystems.python_native_code import PythonNativeCode
+from pants.backend.python.subsystems.python_native_code import rules as python_native_code_rules
 from pants.backend.python.subsystems.python_setup import PythonSetup
+from pants.backend.python.subsystems.subprocess_environment import SubprocessEnvironment
 from pants.backend.python.subsystems.subprocess_environment import (
-  SubprocessEnvironment,
-  create_subprocess_encoding_environment,
+  rules as subprocess_environment_rules,
 )
 from pants.backend.python.targets.formattable_python_target import FormattablePythonTarget
 from pants.build_graph.address import Address
@@ -25,6 +24,7 @@ from pants.engine.selectors import Params
 from pants.rules.core.fmt import FmtResult
 from pants.rules.core.lint import LintResult
 from pants.source.wrapped_globs import EagerFilesetWithSpec
+from pants.testutil.engine.util import rootify_rules
 from pants.testutil.subsystem.util import global_subsystem_instance, init_subsystems
 from pants.testutil.test_base import TestBase
 
@@ -37,22 +37,15 @@ class BlackIntegrationTest(TestBase):
 
   @classmethod
   def rules(cls):
-    return (
+    return rootify_rules(
       *super().rules(),
-      fmt,
-      lint,
-      setup_black,
-      create_pex,
-      create_subprocess_encoding_environment,
-      create_pex_native_build_environment,
-      download_pex_bin,
-      RootRule(CreatePex),
-      RootRule(FormattablePythonTarget),
-      RootRule(Black),
+      *black_rules(),
+      *pex_rules(),
+      *download_pex_bin_rules(),
+      *python_native_code_rules(),
+      *subprocess_environment_rules(),
       RootRule(BlackSetup),
-      RootRule(PythonSetup),
-      RootRule(PythonNativeCode),
-      RootRule(SubprocessEnvironment),
+      RootRule(FormattablePythonTarget),
     )
 
   def setUp(self):

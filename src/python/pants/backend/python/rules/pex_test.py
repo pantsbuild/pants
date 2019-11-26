@@ -6,27 +6,26 @@ import os.path
 import zipfile
 from typing import Dict, List
 
-from pants.backend.python.rules.download_pex_bin import download_pex_bin
+from pants.backend.python.rules.download_pex_bin import rules as download_pex_bin_rules
 from pants.backend.python.rules.pex import (
   CreatePex,
   Pex,
   PexInterpreterConstraints,
   PexRequirements,
-  create_pex,
 )
-from pants.backend.python.subsystems.python_native_code import (
-  PythonNativeCode,
-  create_pex_native_build_environment,
-)
+from pants.backend.python.rules.pex import rules as pex_rules
+from pants.backend.python.subsystems.python_native_code import PythonNativeCode
+from pants.backend.python.subsystems.python_native_code import rules as python_native_code_rules
 from pants.backend.python.subsystems.python_setup import PythonSetup
+from pants.backend.python.subsystems.subprocess_environment import SubprocessEnvironment
 from pants.backend.python.subsystems.subprocess_environment import (
-  SubprocessEnvironment,
-  create_subprocess_encoding_environment,
+  rules as subprocess_environment_rules,
 )
 from pants.engine.fs import Digest, DirectoryToMaterialize, FileContent, InputFilesContent
 from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
+from pants.testutil.engine.util import rootify_rules
 from pants.testutil.subsystem.util import init_subsystems
 from pants.testutil.test_base import TestBase
 from pants.util.strutil import create_path_env_var
@@ -36,16 +35,14 @@ class TestResolveRequirements(TestBase):
 
   @classmethod
   def rules(cls):
-    return super().rules() + [
-      create_pex,
-      create_pex_native_build_environment,
-      create_subprocess_encoding_environment,
-      download_pex_bin,
+    return rootify_rules(
+      *super().rules(),
+      *pex_rules(),
+      *download_pex_bin_rules(),
+      *python_native_code_rules(),
+      *subprocess_environment_rules(),
       RootRule(CreatePex),
-      RootRule(PythonSetup),
-      RootRule(PythonNativeCode),
-      RootRule(SubprocessEnvironment)
-    ]
+    )
 
   def setUp(self):
     super().setUp()

@@ -8,8 +8,10 @@ from pants.engine.fs import create_fs_rules
 from pants.engine.legacy.graph import HydratedTarget
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
-from pants.rules.core.strip_source_root import SourceRootStrippedSources, strip_source_root
+from pants.rules.core.strip_source_root import SourceRootStrippedSources
+from pants.rules.core.strip_source_root import rules as strip_source_root_rules
 from pants.source.source_root import SourceRootConfig
+from pants.testutil.engine.util import rootify_rules
 from pants.testutil.subsystem.util import init_subsystem
 from pants.testutil.test_base import TestBase
 
@@ -17,14 +19,15 @@ from pants.testutil.test_base import TestBase
 class StripSourceRootsTests(TestBase):
   @classmethod
   def rules(cls):
-    return super().rules() + [
-      strip_source_root,
-      RootRule(SourceRootConfig),
-      RootRule(HydratedTarget),
-    ] + create_fs_rules()
+    return rootify_rules(
+      *super().rules(), *create_fs_rules(), *strip_source_root_rules(), RootRule(HydratedTarget),
+    )
+
+  def setUp(self):
+    super().setUp()
+    init_subsystem(SourceRootConfig)
 
   def assert_stripped_source_file(self, *, original_path: str, expected_path: str, target_type_alias = None):
-    init_subsystem(SourceRootConfig)
     adaptor = Mock()
     adaptor.sources = Mock()
     source_files = {original_path: "print('random python')"}

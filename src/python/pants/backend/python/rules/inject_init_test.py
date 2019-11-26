@@ -11,7 +11,7 @@ class TestInjectInit(TestBase):
 
   @classmethod
   def rules(cls):
-    return super().rules() + [inject_init, RootRule(Snapshot)]
+    return (*super().rules(), inject_init, RootRule(Snapshot))
 
   def assert_result(self, input_snapshot, expected_digest):
     injected_digest = self.request_single_product(InjectedInitDigest, input_snapshot)

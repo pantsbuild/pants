@@ -14,7 +14,7 @@ class ClocTest(ConsoleRuleTestBase):
 
   @classmethod
   def rules(cls):
-    return super().rules() + cloc.rules()
+    return (*super().rules(), *cloc.rules())
 
   @classmethod
   def alias_groups(cls):
