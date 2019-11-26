@@ -799,9 +799,9 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     # TODO: parse the output of -Xprint:timings for rsc and write it to self._record_target_stats()!
 
     res.output_directory_digest.dump(ctx.rsc_jar_file.path)
-    self.context._scheduler.materialize_directories((
+    self.context._scheduler.materialize_directory(
       DirectoryToMaterialize("", res.output_directory_digest),
-    ))
+    )
     ctx.rsc_jar_file.hydrate_missing_directory_digest(res.output_directory_digest)
 
     return res

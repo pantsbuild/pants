@@ -208,6 +208,11 @@ class Workspace:
   """Abstract handle for operations that touch the real local filesystem."""
   _scheduler: "SchedulerSession"
 
+  def materialize_directory(
+    self, directory_to_materialize: DirectoryToMaterialize
+  ) -> MaterializeDirectoryResult:
+    return self._scheduler.materialize_directory(directory_to_materialize)
+
   def materialize_directories(
     self, directories_to_materialize: Tuple[DirectoryToMaterialize, ...]
   ) -> MaterializeDirectoriesResult:

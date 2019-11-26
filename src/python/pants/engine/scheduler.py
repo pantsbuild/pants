@@ -17,6 +17,7 @@ from pants.engine.fs import (
   Digest,
   DirectoryToMaterialize,
   MaterializeDirectoriesResult,
+  MaterializeDirectoryResult,
   PathGlobsAndRoot,
 )
 from pants.engine.native import Function, TypeId
@@ -577,9 +578,13 @@ class SchedulerSession:
     result: 'InteractiveProcessResult' = self._scheduler._raise_or_return(wrapped_result)
     return result
 
+  def materialize_directory(
+    self, directory_to_materialize: DirectoryToMaterialize
+  ) -> MaterializeDirectoryResult:
+    return self.materialize_directories((directory_to_materialize,)).dependencies[0]
+
   def materialize_directories(
-    self,
-    directories_to_materialize: Tuple[DirectoryToMaterialize, ...]
+    self, directories_to_materialize: Tuple[DirectoryToMaterialize, ...]
   ) -> MaterializeDirectoriesResult:
     """Creates the specified directories on the file system."""
     # Ensure that there isn't more than one of the same directory paths and paths do not have the
