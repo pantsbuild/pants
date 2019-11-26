@@ -33,7 +33,8 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
         'targets',
         'project_path',
         'pants_idea_plugin_version',
-        'incremental_import'
+        'incremental_import',
+        'dep_as_jar'
       }
     self.assertTrue({p.getAttribute('name')
                      for p in actual_properties}.issubset(valid_property_names))
