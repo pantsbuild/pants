@@ -14,12 +14,11 @@ from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.engine.addressable import addressable_list
 from pants.engine.native import Native
 from pants.engine.parser import SymbolTable
-from pants.engine.rules import RootRule, Rule, TaskRule, UnionRule
+from pants.engine.rules import RootRule, TaskRule, UnionRule
 from pants.engine.scheduler import Scheduler
 from pants.engine.selectors import Get
 from pants.engine.struct import Struct
 from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS
-from pants.subsystem.subsystem import Subsystem
 from pants.util.objects import SubclassesOf
 
 
@@ -146,8 +145,8 @@ TARGET_TABLE = SymbolTable({'struct': Struct, 'target': Target})
 
 
 def rootify_rules(
-  *rules: Union[Rule, UnionRule]
-) -> Tuple[Union[TaskRule, RootRule, UnionRule], ...]:
+  *rules: Union[Callable, TaskRule, RootRule, UnionRule]
+) -> Tuple[Union[Callable, RootRule, UnionRule], ...]:
   """Utility to convert `optionable_rule`s into `RootRule`s and no-op on other types of rules.
 
   This is useful for `TestBase.request_single_product_request`-style tests during the setup of
@@ -182,8 +181,11 @@ def rootify_rules(
       return rootify_rules(*super.rules(), *fmt_rules())
   ```
   """
-  def is_optionable_rule(rule: Union[Rule, UnionRule]) -> bool:
-    return hasattr(rule, "output_type") and issubclass(rule.output_type, Subsystem)
+  def is_optionable_rule(rule: Union[Callable, TaskRule, RootRule, UnionRule]) -> bool:
+    # NB: The only rules that we expect to be TaskRules in tests are `optionable_rule`s. Normal
+    # rules like `inject_init` and `fmt` are simply functions and `RootRule`s and `UnionRule`s are
+    # those distinct types.
+    return isinstance(rule, TaskRule)
 
   return tuple(
     RootRule(rule.output_type) if is_optionable_rule(rule) else rule
