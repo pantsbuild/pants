@@ -9,7 +9,7 @@ import site
 from pex import resolver
 from pex.base import requirement_is_exact
 from pex.interpreter import PythonInterpreter
-from pkg_resources import Requirement
+from pkg_resources import Requirement, RequirementParseError
 from pkg_resources import working_set as global_working_set
 from wheel.install import WheelFile
 
@@ -77,10 +77,20 @@ class PluginResolver:
     return working_set
 
   def _resolve_plugin_locations(self):
+    def _requirement_is_exact(req):
+      try:
+        return requirement_is_exact(Requirement.parse(req))
+      except RequirementParseError:
+        # Requirement string may be URL, which Requirement.parse does not handle.
+        return False
+
     # We jump through some hoops here to avoid a live resolve if possible for purposes of speed.
     # Even with a local resolve cache fully up to date, running a resolve to activate a plugin
     # takes ~250ms whereas loading from a pre-cached list takes ~50ms.
-    if all(requirement_is_exact(Requirement.parse(req)) for req in self._plugin_requirements):
+    # TODO: Never live-resolve, even if we can't prove that requirements aren't exact.
+    #  Instead, support some way of forcing a new resolve. This will allow requirement strings
+    #  that are not of the foo==x.y.z form, e.g., URLs to .whl files.
+    if all(_requirement_is_exact(req) for req in self._plugin_requirements):
       return self._resolve_exact_plugin_locations()
     else:
       return (plugin.location for plugin in self._resolve_plugins())
