@@ -177,6 +177,11 @@ The following is an abbreviated export file from a command in the pants repo:
 
 # Export Format Changes
 
+## 1.0.13
+
+Add `--available-target-types` option, which exports currently available target types. 
+Same ones as the ones obtained by invoking `pants targets` task.
+
 ## 1.0.12
 
 Add `export-dep-as-jar` task, which exports target roots as sources and dependencies as jars.
