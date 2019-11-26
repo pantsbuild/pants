@@ -3,6 +3,7 @@
 
 from pathlib import Path
 
+from pants.base.build_root import BuildRoot
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.console import Console
 from pants.engine.fs import DirectoryToMaterialize, Workspace
@@ -20,12 +21,21 @@ class Run(Goal):
 
 
 @console_rule
-def run(console: Console, workspace: Workspace, runner: InteractiveRunner, bfa: BuildFileAddress) -> Run:
+async def run(
+  console: Console,
+  workspace: Workspace,
+  runner: InteractiveRunner,
+  build_root: BuildRoot,
+  bfa: BuildFileAddress,
+) -> Run:
   target = bfa.to_address()
-  binary = yield Get(CreatedBinary, Address, target)
+  binary = await Get(CreatedBinary, Address, target)
 
-  with temporary_dir(cleanup=True) as tmpdir:
-    dirs_to_materialize = (DirectoryToMaterialize(path=str(tmpdir), directory_digest=binary.digest),)
+  with temporary_dir(root_dir=str(Path(build_root.path, ".pants.d")), cleanup=True) as tmpdir:
+    path_relative_to_build_root = Path(tmpdir).relative_to(build_root.path)
+    dirs_to_materialize = (DirectoryToMaterialize(
+      path=path_relative_to_build_root, directory_digest=binary.digest),
+    )
     workspace.materialize_directories(dirs_to_materialize)
 
     console.write_stdout(f"Running target: {target}\n")
@@ -47,7 +57,7 @@ def run(console: Console, workspace: Workspace, runner: InteractiveRunner, bfa: 
       console.write_stderr(f"Exception when attempting to run {target} : {e}\n")
       exit_code = -1
 
-  yield Run(exit_code)
+  return Run(exit_code)
 
 
 def rules():

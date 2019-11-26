@@ -102,7 +102,7 @@ class WrapperType:
 
 @rule
 def example_rule(root_type: RootType) -> WrapperType:
-  yield WrapperType(root_type.value)
+  return WrapperType(root_type.value)
 
 
 class PluginProduct:
@@ -111,7 +111,7 @@ class PluginProduct:
 
 @rule
 def example_plugin_rule(root_type: RootType) -> PluginProduct:
-  yield PluginProduct()
+  return PluginProduct()
 
 
 class LoaderTest(unittest.TestCase):

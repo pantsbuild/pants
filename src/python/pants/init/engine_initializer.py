@@ -56,7 +56,6 @@ from pants.option.global_options import (
   ExecutionOptions,
   GlobMatchErrorBehavior,
 )
-from pants.reporting.async_workunit_handler import AsyncWorkunitHandler
 
 
 logger = logging.getLogger(__name__)
@@ -172,7 +171,7 @@ class LegacyGraphScheduler:
   build_file_aliases: Any
   goal_map: Any
 
-  def new_session(self, zipkin_trace_v2, build_id, v2_ui=False, should_report_workunits=True):
+  def new_session(self, zipkin_trace_v2, build_id, v2_ui=False, should_report_workunits=False):
     session = self.scheduler.new_session(zipkin_trace_v2, build_id, v2_ui, should_report_workunits)
     return LegacyGraphSession(session, self.build_file_aliases, self.goal_map)
 
@@ -205,7 +204,6 @@ class LegacyGraphSession:
     :returns: An exit code.
     """
 
-    async_reporter = AsyncWorkunitHandler(self.scheduler_session, callback=None)
     subject = target_roots.specs
     console = Console(
       use_colors=options_bootstrapper.bootstrap_options.for_global_scope().colors
@@ -213,18 +211,17 @@ class LegacyGraphSession:
     workspace = Workspace(self.scheduler_session)
     interactive_runner = InteractiveRunner(self.scheduler_session)
 
-    with async_reporter.session():
-      for goal in goals:
-        goal_product = self.goal_map[goal]
-        params = Params(subject, options_bootstrapper, console, workspace, interactive_runner)
-        logger.debug(f'requesting {goal_product} to satisfy execution of `{goal}` goal')
-        try:
-          exit_code = self.scheduler_session.run_console_rule(goal_product, params)
-        finally:
-          console.flush()
+    for goal in goals:
+      goal_product = self.goal_map[goal]
+      params = Params(subject, options_bootstrapper, console, workspace, interactive_runner)
+      logger.debug(f'requesting {goal_product} to satisfy execution of `{goal}` goal')
+      try:
+        exit_code = self.scheduler_session.run_console_rule(goal_product, params)
+      finally:
+        console.flush()
 
-        if exit_code != PANTS_SUCCEEDED_EXIT_CODE:
-          return exit_code
+      if exit_code != PANTS_SUCCEEDED_EXIT_CODE:
+        return exit_code
 
     return PANTS_SUCCEEDED_EXIT_CODE
 
@@ -379,12 +376,12 @@ class EngineInitializer:
       return BuildRoot.instance
 
     @rule
-    def single_build_file_address(specs: Specs) -> BuildFileAddress:
-      build_file_addresses = yield Get(BuildFileAddresses, Specs, specs)
+    async def single_build_file_address(specs: Specs) -> BuildFileAddress:
+      build_file_addresses = await Get(BuildFileAddresses, Specs, specs)
       if len(build_file_addresses.dependencies) == 0:
         raise ResolveError("No targets were matched")
       if len(build_file_addresses.dependencies) > 1:
-        potential_addresses = yield Get(BuildFileAddresses, Specs, specs)
+        potential_addresses = await Get(BuildFileAddresses, Specs, specs)
         targets = [bfa.to_address() for bfa in potential_addresses]
         output = '\n '.join(str(target) for target in targets)
 
@@ -392,7 +389,7 @@ class EngineInitializer:
           "Expected a single target, but was given multiple targets:\n"
           f"Did you mean one of:\n {output}"
         )
-      yield build_file_addresses.dependencies[0]
+      return build_file_addresses.dependencies[0]
 
     # Create a Scheduler containing graph and filesystem rules, with no installed goals. The
     # LegacyBuildGraph will explicitly request the products it needs.

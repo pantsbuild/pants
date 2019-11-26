@@ -84,8 +84,8 @@ class Pex(HermeticPex):
 
 # TODO: This is non-hermetic because the requirements will be resolved on the fly by
 # pex, where it should be hermetically provided in some way.
-@rule
-def create_pex(
+@rule(name="Create PEX")
+async def create_pex(
     request: CreatePex,
     pex_bin: DownloadedPexBin,
     python_setup: PythonSetup,
@@ -106,9 +106,9 @@ def create_pex(
 
   argv.append(f'--sources-directory={source_dir_name}')
   sources_digest = request.input_files_digest if request.input_files_digest else EMPTY_DIRECTORY_DIGEST
-  sources_digest_as_subdir = yield Get(Digest, DirectoryWithPrefixToAdd(sources_digest, source_dir_name))
+  sources_digest_as_subdir = await Get(Digest, DirectoryWithPrefixToAdd(sources_digest, source_dir_name))
   all_inputs = (pex_bin.directory_digest, sources_digest_as_subdir,)
-  merged_digest = yield Get(Digest, DirectoriesToMerge(directories=all_inputs))
+  merged_digest = await Get(Digest, DirectoriesToMerge(directories=all_inputs))
 
   # NB: PEX outputs are platform dependent so in order to get a PEX that we can use locally, without
   # cross-building, we specify that out PEX command be run on the current local platform. When we
@@ -134,12 +134,12 @@ def create_pex(
     }
   )
 
-  result = yield Get(
+  result = await Get(
     ExecuteProcessResult,
     MultiPlatformExecuteProcessRequest,
     execute_process_request
   )
-  yield Pex(directory_digest=result.output_directory_digest, output_filename=request.output_filename)
+  return Pex(directory_digest=result.output_directory_digest, output_filename=request.output_filename)
 
 
 def rules():

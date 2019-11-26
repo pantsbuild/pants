@@ -31,7 +31,6 @@ use futures::task_local;
 use parking_lot::Mutex;
 use rand::thread_rng;
 use rand::Rng;
-use std::collections::HashSet;
 use std::sync::Arc;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -40,6 +39,18 @@ pub struct WorkUnit {
   pub time_span: TimeSpan,
   pub span_id: String,
   pub parent_id: Option<String>,
+}
+
+impl WorkUnit {
+  pub fn new(name: String, time_span: TimeSpan, parent_id: Option<String>) -> WorkUnit {
+    let span_id = generate_random_64bit_string();
+    WorkUnit {
+      name,
+      time_span,
+      span_id,
+      parent_id,
+    }
+  }
 }
 
 #[derive(Clone, Default)]
@@ -95,21 +106,6 @@ pub fn generate_random_64bit_string() -> String {
 
 fn hex_16_digit_string(number: u64) -> String {
   format!("{:016.x}", number)
-}
-
-pub fn workunits_with_constant_span_id(workunit_store: &WorkUnitStore) -> HashSet<WorkUnit> {
-  //  This function is for the test purpose.
-
-  workunit_store
-    .get_workunits()
-    .lock()
-    .workunits
-    .iter()
-    .map(|workunit| WorkUnit {
-      span_id: String::from("ignore"),
-      ..workunit.clone()
-    })
-    .collect()
 }
 
 task_local! {

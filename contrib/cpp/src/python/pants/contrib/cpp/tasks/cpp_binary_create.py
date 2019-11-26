@@ -48,7 +48,7 @@ class CppBinaryCreate(CppTask):
     for basedir, objs in self.context.products.get('objs').get(target).items():
       objects.extend([os.path.join(basedir, obj) for obj in objs])
     self._link_binary(target, binary_path, objects)
-    self.context.log.info('Built c++ binary: {0}'.format(binary_path))
+    self.context.log.info(f'Built c++ binary: {binary_path}')
 
   def _libname(self, libpath):
     """Converts a full library filepath to the library's name.
@@ -77,11 +77,11 @@ class CppBinaryCreate(CppTask):
       libraries.extend(target.libraries)
 
     cmd.extend(objects)
-    cmd.extend(('-L{0}'.format(L) for L in library_dirs))
-    cmd.extend(('-l{0}'.format(l) for l in libraries))
+    cmd.extend((f'-L{L}' for L in library_dirs))
+    cmd.extend((f'-l{l}' for l in libraries))
     cmd.extend(['-o' + binary_path])
     if self.get_options().ld_options != None:
-      cmd.extend(('-Wl,{0}'.format(o) for o in self.get_options().ld_options.split(' ')))
+      cmd.extend((f'-Wl,{o}' for o in self.get_options().ld_options.split(' ')))
 
     with self.context.new_workunit(name='cpp-link', labels=[WorkUnitLabel.COMPILER]) as workunit:
       self.run_command(cmd, workunit)

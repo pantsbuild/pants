@@ -22,7 +22,7 @@ class TestPythonTestRunner(TestBase):
 
   def test_empty_target_succeeds(self) -> None:
     # NB: Because this particular edge case should early return, we can avoid providing valid
-    # mocked yield gets for most of the rule's body. Future tests added to this file will need to
+    # mocked await gets for most of the rule's body. Future tests added to this file will need to
     # provide valid mocks instead.
     unimplemented_mock = lambda _: NotImplemented
     target = PythonTestsAdaptor(address=BuildFileAddress(target_name="target", rel_path="test"))

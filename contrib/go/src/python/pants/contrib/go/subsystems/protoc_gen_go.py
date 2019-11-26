@@ -59,7 +59,7 @@ class ProtocGenGo(Subsystem):
       )
 
       if result != 0:
-        raise SubsystemError('{} failed with exit code {}'.format(go_cmd, result))
+        raise SubsystemError(f'{go_cmd} failed with exit code {result}')
 
-    logger.info('Selected {} binary bootstrapped to: {}'.format(self.options_scope, tool_path))
+    logger.info(f'Selected {self.options_scope} binary bootstrapped to: {tool_path}')
     return tool_path

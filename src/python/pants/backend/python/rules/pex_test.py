@@ -29,8 +29,6 @@ from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.testutil.subsystem.util import init_subsystems
 from pants.testutil.test_base import TestBase
-from pants.util.collections import assert_single_element
-from pants.util.contextutil import temporary_dir
 from pants.util.strutil import create_path_env_var
 
 
@@ -67,22 +65,22 @@ class TestResolveRequirements(TestBase):
       entry_point=entry_point,
       input_files_digest=input_files,
     )
-    requirements_pex = assert_single_element(
-      self.scheduler.product_request(Pex, [Params(
+    requirements_pex = self.request_single_product(
+      Pex,
+      Params(
         request,
         PythonSetup.global_instance(),
         SubprocessEnvironment.global_instance(),
         PythonNativeCode.global_instance()
-      )])
+      )
     )
-    with temporary_dir() as tmp_dir:
-      self.scheduler.materialize_directories((
-        DirectoryToMaterialize(path=tmp_dir, directory_digest=requirements_pex.directory_digest),
-      ))
-      with zipfile.ZipFile(os.path.join(tmp_dir, "test.pex"), "r") as pex:
-        with pex.open("PEX-INFO", "r") as pex_info:
-          pex_info_content = pex_info.readline().decode()
-          pex_list = pex.namelist()
+    self.scheduler.materialize_directories((
+      DirectoryToMaterialize(path="", directory_digest=requirements_pex.directory_digest),
+    ))
+    with zipfile.ZipFile(os.path.join(self.build_root, "test.pex"), "r") as pex:
+      with pex.open("PEX-INFO", "r") as pex_info:
+        pex_info_content = pex_info.readline().decode()
+        pex_list = pex.namelist()
     return {'pex': requirements_pex, 'info': json.loads(pex_info_content), 'files': pex_list}
 
   def create_pex_and_get_pex_info(
@@ -98,7 +96,7 @@ class TestResolveRequirements(TestBase):
       FileContent(path='subdir/sub.py', content=b'print("from sub")'),
     ))
 
-    input_files, = self.scheduler.product_request(Digest, [input_files_content])
+    input_files = self.request_single_product(Digest, input_files_content)
     pex_output = self.create_pex_and_get_all_data(entry_point='main', input_files=input_files)
 
     pex_files = pex_output['files']
@@ -112,7 +110,7 @@ class TestResolveRequirements(TestBase):
     pex = pex_output['pex']
 
     req = ExecuteProcessRequest(argv=('python', 'test.pex'), env=env, input_files=pex.directory_digest, description="Run the pex and make sure it works")
-    result, = self.scheduler.product_request(ExecuteProcessResult, [req])
+    result = self.request_single_product(ExecuteProcessResult, req)
     self.assertEqual(result.stdout, b"from main\n")
 
   def test_resolves_dependencies(self) -> None:

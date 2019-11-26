@@ -593,7 +593,7 @@ def split_basename_and_dirname(path: str) -> Tuple[str, str]:
   return os.path.dirname(path), os.path.basename(path)
 
 
-def check_no_overlapping_paths(paths: Sequence[str]) -> None:
+def check_no_overlapping_paths(paths: Iterable[str]) -> None:
   """Given a list of paths, ensure that all are unique and do not have the same prefix."""
   for path in paths:
     list_copy_without_path = list(paths)

@@ -9,19 +9,19 @@ from typing import Any, Callable, Iterator, Optional
 DEFAULT_REPORT_INTERVAL_SECONDS = 10
 
 
-class AsyncWorkunitHandler:
+class StreamingWorkunitHandler:
   def __init__(self, scheduler: Any, callback: Optional[Callable], report_interval_seconds: float = DEFAULT_REPORT_INTERVAL_SECONDS):
     self.scheduler = scheduler
     self.report_interval = report_interval_seconds
     self.callback = callback
-    self._thread_runner = None
+    self._thread_runner: Optional[_InnerHandler] = None
 
-  def start(self):
+  def start(self) -> None:
     if self.callback is not None:
       self._thread_runner = _InnerHandler(self.scheduler, self.callback, self.report_interval)
       self._thread_runner.start()
 
-  def end(self):
+  def end(self) -> None:
     if self._thread_runner:
       self._thread_runner.join()
 

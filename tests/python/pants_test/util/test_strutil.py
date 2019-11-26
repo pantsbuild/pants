@@ -38,13 +38,13 @@ class StrutilTest(unittest.TestCase):
     bytes_val = bytes(bytearray([0xe5, 0xbf, 0xab]))
     self.assertEqual(u'快', ensure_text(bytes_val))
     with self.assertRaises(TypeError):
-      ensure_text(45)  # type: ignore
+      ensure_text(45)  # type: ignore[arg-type] # intended to fail type check
 
   def test_ensure_binary(self) -> None:
     unicode_val = u'快'
     self.assertEqual(bytearray([0xe5, 0xbf, 0xab]), ensure_binary(unicode_val))
     with self.assertRaises(TypeError):
-      ensure_binary(45)  # type: ignore
+      ensure_binary(45)  # type: ignore[arg-type] # intended to fail type check
 
   def test_strip_prefix(self) -> None:
     self.assertEqual('testString', strip_prefix('testString', '//'))

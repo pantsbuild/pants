@@ -82,7 +82,7 @@ class GoTargetGenerator:
             except AddressLookupError:
               if not self._generate_remotes:
                 raise self.NewRemoteEncounteredButRemotesNotAllowedError(
-                  'Cannot generate dependency for remote import path {}'.format(import_path))
+                  f'Cannot generate dependency for remote import path {import_path}')
               self._build_graph.inject_synthetic_target(address=address,
                                                         target_type=GoRemoteLibrary,
                                                         pkg=remote_pkg_path)
@@ -219,7 +219,7 @@ class GoBuildgen(GoTask):
       :type logger: A :class:`logging.Logger` compatible object.
       """
       log = logger.info if self.local or self.rev else logger.warn
-      log('\t{}'.format(self))
+      log(f'\t{self}')
 
     @property
     def failed(self):
@@ -231,9 +231,8 @@ class GoBuildgen(GoTask):
 
     def __str__(self):
       import_paths = ' '.join(sorted(self.import_paths))
-      rev = '' if self.local else ' {}'.format(self.rev or 'FLOATING')
-      return ('{build_file_path} ({import_paths}){rev}'
-              .format(build_file_path=self.build_file_path, import_paths=import_paths, rev=rev))
+      rev = '' if self.local else f" {self.rev or 'FLOATING'}"
+      return (f'{self.build_file_path} ({import_paths}){rev}')
 
   class FloatingRemoteError(TaskError):
     """Indicates Go remote libraries exist or were generated that don't specify a `rev`."""

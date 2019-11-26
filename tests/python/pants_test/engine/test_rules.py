@@ -1,10 +1,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import re
-import sys
 import unittest
-from dataclasses import dataclass
 from textwrap import dedent
 
 from pants.engine.build_files import create_graph_rules
@@ -17,7 +14,7 @@ from pants.engine.rules import (
   MissingReturnTypeAnnotation,
   RootRule,
   RuleIndex,
-  _RuleVisitor,
+  UnrecognizedRuleArgument,
   console_rule,
   rule,
 )
@@ -80,10 +77,10 @@ class Example(Goal):
 
 
 @console_rule
-def a_console_rule_generator(console: Console) -> Example:
-  a = yield Get(A, str('a str!'))
+async def a_console_rule_generator(console: Console) -> Example:
+  a = await Get(A, str('a str!'))
   console.print_stdout(str(a))
-  yield Example(exit_code=0)
+  return Example(exit_code=0)
 
 
 class RuleTest(unittest.TestCase):
@@ -102,8 +99,37 @@ class RuleIndexTest(TestBase):
       TypeError,
       "Rule entry A() had an unexpected type: <class "
       "'pants_test.engine.test_rules.A'>. Rules either extend Rule or UnionRule, or "
-      "are static functions decorated with @rule."""):
+      "are static functions decorated with @rule."):
       RuleIndex.create([A()])
+
+
+class RuleArgumentAnnotationTest(unittest.TestCase):
+  def test_name_kwarg(self):
+    @rule(name='A named rule')
+    def named_rule(a: int, b: str) -> bool:
+      return False
+    self.assertIsNotNone(named_rule.rule)
+    self.assertEqual(named_rule.rule.name, "A named rule")
+
+  def test_bogus_rule(self):
+    with self.assertRaises(UnrecognizedRuleArgument):
+      @rule(bogus_kwarg='TOTALLY BOGUS!!!!!!')
+      def named_rule(a: int, b: str) -> bool:
+        return False
+
+  def test_console_rule_automatically_gets_name_from_goal(self):
+    @console_rule
+    def some_console_rule(console: Console) -> Example:
+      return Example(exit_code=0)
+
+    self.assertEqual(some_console_rule.rule.name, "example")
+
+  def test_can_override_console_rule_name(self):
+    @console_rule(name='example but **COOLER**')
+    def some_console_rule(console: Console) -> Example:
+      return Example(exit_code=0)
+
+    self.assertEqual(some_console_rule.rule.name, "example but **COOLER**")
 
 
 class RuleTypeAnnotationTest(unittest.TestCase):
@@ -280,8 +306,8 @@ class RuleGraphTest(TestBase):
       pass
 
     @rule
-    def d_from_a_and_suba(a: A, suba: SubA) -> D:
-      _ = yield Get(A, C, C())  # noqa: F841
+    async def d_from_a_and_suba(a: A, suba: SubA) -> D:
+      _ = await Get(A, C, C())  # noqa: F841
 
     @rule
     def a_from_c(c: C) -> A:
@@ -311,11 +337,11 @@ class RuleGraphTest(TestBase):
     """Test that when one rule "shadows" another, we get an error."""
     @rule
     def d_singleton() -> D:
-      yield D()
+      return D()
 
     @rule
     def d_for_b(b: B) -> D:
-      yield D()
+      return D()
 
     rules = [
       d_singleton,
@@ -481,8 +507,8 @@ class RuleGraphTest(TestBase):
     # they intend for the Get's parameter to be consumed in the subgraph. Anything else would
     # be surprising.
     @rule
-    def a(sub_a: SubA) -> A:
-      _ = yield Get(B, C())  # noqa: F841
+    async def a(sub_a: SubA) -> A:
+      _ = await Get(B, C())  # noqa: F841
 
     @rule
     def b_from_suba(suba: SubA) -> B:
@@ -770,11 +796,11 @@ class RuleGraphTest(TestBase):
 
   def test_get_simple(self):
     @rule
-    def a() -> A:
-      _ = yield Get(B, D, D())  # noqa: F841
+    async def a() -> A:
+      _ = await Get(B, D, D())  # noqa: F841
 
     @rule
-    def b_from_d(d: D) -> B:
+    async def b_from_d(d: D) -> B:
       pass
 
     rules = [
@@ -801,104 +827,15 @@ class RuleGraphTest(TestBase):
 Could not resolve type `XXX` in top level of module pants_test.engine.test_rules"""):
       class XXX: pass
       @rule
-      def f() -> A:
-        a = yield Get(A, XXX, 3)
-        yield a
+      async def f() -> A:
+        return await Get(A, XXX, 3)
 
     # This fails because the argument is defined in this file's module, but it is not a type.
     with self.assertRaisesWithMessage(ValueError, """\
 Expected a `type` constructor for `_this_is_not_a_type`, but got: 3 (type `int`)"""):
       @rule
-      def g() -> A:
-        a = yield Get(A, _this_is_not_a_type, 3)
-        yield a
-
-  def test_validate_yield_statements_in_rule_body(self):
-    with self.assertRaisesRegexp(_RuleVisitor.YieldVisitError, re.escape('yield A()')):
-      @rule
-      def f() -> A:
-        yield A()
-        # The yield statement isn't at the end of this series of statements.
-        return
-
-    with self.assertRaises(_RuleVisitor.YieldVisitError) as cm:
-      @rule
-      def h() -> A:
-        yield A(
-          1 + 2
-        )
-        return
-    # Test that the full indentation of multiple-line yields are represented in the output.
-    self.assertIn("""\
-        yield A(
-          1 + 2
-        )
-""", str(cm.exception))
-
-    with self.assertRaises(_RuleVisitor.YieldVisitError) as cm:
-      @rule
-      def g() -> A:
-        # This is a yield statement without an assignment, and not at the end.
-        yield Get(B, D, D())
-        yield A()
-    exc_msg = str(cm.exception)
-    exc_msg_trimmed = re.sub(r'^.*?(test_rules\.py)', r'\1', exc_msg, flags=re.MULTILINE)
-    self.assertEquals(exc_msg_trimmed, """\
-In function g: yield in @rule without assignment must come at the end of a series of statements.
-
-A yield in an @rule without an assignment is equivalent to a return, and we
-currently require that no statements follow such a yield at the same level of nesting.
-Use `_ = yield Get(...)` if you wish to yield control to the engine and discard the
-result.
-
-Note that any `yield Get(...)` in an @rule without assignment is also currently not
-supported. See https://github.com/pantsbuild/pants/pull/8227 for progress.
-
-The invalid statement was:
-test_rules.py:{lineno}:{col}
-        yield Get(B, D, D())
-
-The rule defined by function `g` begins at:
-test_rules.py:{rule_lineno}:{rule_col}
-      @rule
-      def g() -> A:
-        # This is a yield statement without an assignment, and not at the end.
-        yield Get(B, D, D())
-        yield A()
-""".format(lineno=(sys._getframe().f_lineno - 26),
-           col=8,
-           rule_lineno=(sys._getframe().f_lineno - 31),
-           rule_col=6))
-
-  def test_final_yield(self):
-    @dataclass(frozen=True)
-    class Y:
-      none_value: type(None)
-
-    @dataclass(frozen=True)
-    class X:
-      y_value: Y
-
-    with self.assertRaisesWithMessageContaining(_RuleVisitor.YieldVisitError, '`yield Get(...)` in @rule is currently not allowed without an assignment.'):
-      @rule
-      def final_yield(n: type(None)) -> X:
-        yield Get(X, Y(n))
-
-    # Try a more complex example.
-    with self.assertRaises(_RuleVisitor.YieldVisitError) as cm:
-      @rule
-      def final_yield_within_if(n: type(None)) -> X:
-        if n is None:
-          yield Get(X, Y(n))
-    exc_msg = str(cm.exception)
-    exc_msg_trimmed = re.sub(r'^.*?(test_rules\.py)', r'\1', exc_msg, flags=re.MULTILINE)
-    self.assertIn('`yield Get(...)` in @rule is currently not allowed without an assignment.',
-                  exc_msg_trimmed)
-    self.assertIn(f"""\
-The invalid statement was:
-test_rules.py:{sys._getframe().f_lineno - 9}:10
-          yield Get(X, Y(n))
-""", exc_msg_trimmed)
+      async def g() -> A:
+        return await Get(A, _this_is_not_a_type, 3)
 
   def create_full_graph(self, rules, validate=True):
     scheduler = create_scheduler(rules, validate=validate)

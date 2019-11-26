@@ -92,6 +92,9 @@ python_binary(
 python_binary(
   name = 'mypy',
   source = 'mypy.py',
+  dependencies = [
+    ':common',
+  ],
   tags = {'type_checked'},
 )
 

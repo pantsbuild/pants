@@ -77,16 +77,16 @@ class CatExecutionRequest:
 
 
 @rule
-def cat_files_process_result_concatted(cat_exe_req: CatExecutionRequest) -> Concatted:
+async def cat_files_process_result_concatted(cat_exe_req: CatExecutionRequest) -> Concatted:
   cat_bin = cat_exe_req.shell_cat
-  cat_files_snapshot = yield Get(Snapshot, PathGlobs, cat_exe_req.path_globs)
+  cat_files_snapshot = await Get(Snapshot, PathGlobs, cat_exe_req.path_globs)
   process_request = ExecuteProcessRequest(
     argv=cat_bin.argv_from_snapshot(cat_files_snapshot),
     input_files=cat_files_snapshot.directory_digest,
     description='cat some files',
   )
-  cat_process_result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, process_request)
-  yield Concatted(cat_process_result.stdout.decode())
+  cat_process_result = await Get(ExecuteProcessResult, ExecuteProcessRequest, process_request)
+  return Concatted(cat_process_result.stdout.decode())
 
 
 def create_cat_stdout_rules():
@@ -115,16 +115,16 @@ class JavacVersionOutput:
 
 
 @rule
-def get_javac_version_output(javac_version_command: JavacVersionExecutionRequest) -> JavacVersionOutput:
+async def get_javac_version_output(javac_version_command: JavacVersionExecutionRequest) -> JavacVersionOutput:
   javac_version_proc_req = ExecuteProcessRequest(
     argv=javac_version_command.gen_argv(),
     description=javac_version_command.description,
     input_files=EMPTY_DIRECTORY_DIGEST,
   )
-  javac_version_proc_result = yield Get(
+  javac_version_proc_result = await Get(
     ExecuteProcessResult, ExecuteProcessRequest, javac_version_proc_req)
 
-  yield JavacVersionOutput(javac_version_proc_result.stderr.decode())
+  return JavacVersionOutput(javac_version_proc_result.stderr.decode())
 
 
 @dataclass(frozen=True)
@@ -167,12 +167,12 @@ class JavacCompileResult:
 # This rule/test should be deleted when we have more real java rules (or anything else which serves
 # as a suitable rule-writing example).
 @rule
-def javac_compile_process_result(javac_compile_req: JavacCompileRequest) -> JavacCompileResult:
+async def javac_compile_process_result(javac_compile_req: JavacCompileRequest) -> JavacCompileResult:
   java_files = javac_compile_req.javac_sources.java_files
   for java_file in java_files:
     if not java_file.endswith(".java"):
       raise ValueError(f"Can only compile .java files but got {java_file}")
-  sources_snapshot = yield Get(Snapshot, PathGlobs, PathGlobs(java_files, ()))
+  sources_snapshot = await Get(Snapshot, PathGlobs, PathGlobs(java_files, ()))
   output_dirs = tuple({os.path.dirname(java_file) for java_file in java_files})
   process_request = ExecuteProcessRequest(
     argv=javac_compile_req.argv_from_source_snapshot(sources_snapshot),
@@ -180,9 +180,9 @@ def javac_compile_process_result(javac_compile_req: JavacCompileRequest) -> Java
     output_directories=output_dirs,
     description='javac compilation'
   )
-  javac_proc_result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, process_request)
+  javac_proc_result = await Get(ExecuteProcessResult, ExecuteProcessRequest, process_request)
 
-  yield JavacCompileResult(
+  return JavacCompileResult(
     javac_proc_result.stdout.decode(),
     javac_proc_result.stderr.decode(),
     javac_proc_result.output_directory_digest,
@@ -214,7 +214,7 @@ class TestInputFileCreation(TestBase):
     file_contents = b'some file contents'
 
     input_file = InputFilesContent((FileContent(path=file_name, content=file_contents),))
-    digest, = self.scheduler.product_request(Digest, [input_file])
+    digest = self.request_single_product(Digest, input_file)
 
     req = ExecuteProcessRequest(
       argv=('/bin/cat', file_name),
@@ -222,7 +222,7 @@ class TestInputFileCreation(TestBase):
       description='cat the contents of this file',
     )
 
-    result, = self.scheduler.product_request(ExecuteProcessResult, [req])
+    result = self.request_single_product(ExecuteProcessResult, req)
     self.assertEqual(result.stdout, file_contents)
 
   def test_multiple_file_creation(self):
@@ -231,7 +231,7 @@ class TestInputFileCreation(TestBase):
       FileContent(path='b.txt', content=b'goodbye'),
     ))
 
-    digest, = self.scheduler.product_request(Digest, [input_files_content])
+    digest = self.request_single_product(Digest, input_files_content)
 
     req = ExecuteProcessRequest(
       argv=('/bin/cat', 'a.txt', 'b.txt'),
@@ -239,7 +239,7 @@ class TestInputFileCreation(TestBase):
       description='cat the contents of this file',
     )
 
-    result, = self.scheduler.product_request(ExecuteProcessResult, [req])
+    result = self.request_single_product(ExecuteProcessResult, req)
     self.assertEqual(result.stdout, b'hellogoodbye')
 
   def test_file_in_directory_creation(self):
@@ -247,7 +247,7 @@ class TestInputFileCreation(TestBase):
     content = b'file contents'
 
     input_file = InputFilesContent((FileContent(path=path, content=content),))
-    digest, = self.scheduler.product_request(Digest, [input_file])
+    digest = self.request_single_product(Digest, input_file)
 
     req = ExecuteProcessRequest(
       argv=('/bin/cat', 'somedir/filename'),
@@ -255,7 +255,7 @@ class TestInputFileCreation(TestBase):
       description="Cat a file in a directory to make sure that doesn't break",
     )
 
-    result, = self.scheduler.product_request(ExecuteProcessResult, [req])
+    result = self.request_single_product(ExecuteProcessResult, req)
     self.assertEqual(result.stdout, content)
 
   def test_not_executable(self):
@@ -263,7 +263,7 @@ class TestInputFileCreation(TestBase):
     file_contents = b'#!/bin/bash -eu\necho "Hello"\n'
 
     input_file = InputFilesContent((FileContent(path=file_name, content=file_contents),))
-    digest, = self.scheduler.product_request(Digest, [input_file])
+    digest = self.request_single_product(Digest, input_file)
 
     req = ExecuteProcessRequest(
       argv=('./echo.sh',),
@@ -272,14 +272,14 @@ class TestInputFileCreation(TestBase):
     )
 
     with self.assertRaisesWithMessageContaining(ExecutionError, "Permission"):
-      self.scheduler.product_request(ExecuteProcessResult, [req])
+      self.request_single_product(ExecuteProcessResult, req)
 
   def test_executable(self):
     file_name = 'echo.sh'
     file_contents = b'#!/bin/bash -eu\necho "Hello"\n'
 
     input_file = InputFilesContent((FileContent(path=file_name, content=file_contents, is_executable=True),))
-    digest, = self.scheduler.product_request(Digest, [input_file])
+    digest = self.request_single_product(Digest, input_file)
 
     req = ExecuteProcessRequest(
       argv=('./echo.sh',),
@@ -287,7 +287,7 @@ class TestInputFileCreation(TestBase):
       description='cat the contents of this file',
     )
 
-    result, = self.scheduler.product_request(ExecuteProcessResult, [req])
+    result = self.request_single_product(ExecuteProcessResult, req)
     self.assertEqual(result.stdout, b"Hello\n")
 
 
@@ -310,12 +310,12 @@ class IsolatedProcessTest(TestBase, unittest.TestCase):
       PathGlobs(include=['f*']),
     )
 
-    concatted = self.scheduler.product_request(Concatted, [cat_exe_req])[0]
+    concatted = self.request_single_product(Concatted, cat_exe_req)
     self.assertEqual(Concatted('one\ntwo\n'), concatted)
 
   def test_javac_version_example(self):
     request = JavacVersionExecutionRequest(BinaryLocation('/usr/bin/javac'))
-    result = self.scheduler.product_request(JavacVersionOutput, [request])[0]
+    result = self.request_single_product(JavacVersionOutput, request)
     self.assertIn('javac', result.value)
 
   def test_write_file(self):
@@ -326,10 +326,7 @@ class IsolatedProcessTest(TestBase, unittest.TestCase):
       input_files=EMPTY_DIRECTORY_DIGEST,
     )
 
-    execute_process_result = self.scheduler.product_request(
-      ExecuteProcessResult,
-      [request],
-    )[0]
+    execute_process_result = self.request_single_product(ExecuteProcessResult, request)
 
     self.assertEqual(
       execute_process_result.output_directory_digest,
@@ -339,10 +336,9 @@ class IsolatedProcessTest(TestBase, unittest.TestCase):
       )
     )
 
-    files_content_result = self.scheduler.product_request(
-      FilesContent,
-      [execute_process_result.output_directory_digest],
-    )[0]
+    files_content_result = self.request_single_product(
+      FilesContent, execute_process_result.output_directory_digest,
+    )
 
     self.assertEqual(
       files_content_result.dependencies,
@@ -356,7 +352,7 @@ class IsolatedProcessTest(TestBase, unittest.TestCase):
       description='sleepy-cat',
       input_files=EMPTY_DIRECTORY_DIGEST,
     )
-    result = self.scheduler.product_request(FallibleExecuteProcessResult, [request])[0]
+    result = self.request_single_product(FallibleExecuteProcessResult, request)
     self.assertNotEqual(result.exit_code, 0)
     self.assertIn(b"Exceeded timeout", result.stdout)
     self.assertIn(b"sleepy-cat", result.stdout)
@@ -374,8 +370,8 @@ class Simple {
       JavacSources(('simple/Simple.java',)),
     )
 
-    result = self.scheduler.product_request(JavacCompileResult, [request])[0]
-    files_content = self.scheduler.product_request(FilesContent, [result.directory_digest])[0].dependencies
+    result = self.request_single_product(JavacCompileResult, request)
+    files_content = self.request_single_product(FilesContent, result.directory_digest).dependencies
 
     self.assertEqual(
       tuple(sorted((
@@ -400,7 +396,7 @@ class Broken {
     )
 
     with self.assertRaises(ExecutionError) as cm:
-      self.scheduler.product_request(JavacCompileResult, [request])[0]
+      self.request_single_product(JavacCompileResult, request)
     e = cm.exception.wrapped_exceptions[0]
     self.assertIsInstance(e, ProcessExecutionFailure)
     self.assertEqual(1, e.exit_code)
@@ -417,7 +413,7 @@ class Broken {
         description='cat JDK roland',
         jdk_home=temp_dir,
       )
-      result = self.scheduler.product_request(ExecuteProcessResult, [request])[0]
+      result = self.request_single_product(ExecuteProcessResult, request)
       self.assertEqual(result.stdout, b'European Burmese')
 
   def test_fallible_failing_command_returns_exited_result(self):
@@ -427,7 +423,7 @@ class Broken {
       input_files=EMPTY_DIRECTORY_DIGEST,
     )
 
-    result = self.scheduler.product_request(FallibleExecuteProcessResult, [request])[0]
+    result = self.request_single_product(FallibleExecuteProcessResult, request)
 
     self.assertEqual(result.exit_code, 1)
 
@@ -439,5 +435,5 @@ class Broken {
     )
 
     with self.assertRaises(ExecutionError) as cm:
-      self.scheduler.product_request(ExecuteProcessResult, [request])
+      self.request_single_product(ExecuteProcessResult, request)
     self.assertIn("process 'one-cat' failed with exit code 1.", str(cm.exception))

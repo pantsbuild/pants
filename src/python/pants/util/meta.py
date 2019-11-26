@@ -44,7 +44,7 @@ class ClassPropertyDescriptor:
       # Get the callable field for this object, which may be a property.
     callable_field = self.fget.__get__(obj, objtype)
     if getattr(self.fget.__func__, '__isabstractmethod__', False):
-      field_name = self.fget.__func__.fget.__name__  # type: ignore
+      field_name = self.fget.__func__.fget.__name__  # type: ignore[attr-defined]
       raise TypeError("""\
 The classproperty '{func_name}' in type '{type_name}' was an abstractproperty, meaning that type \
 {type_name} must override it by setting it as a variable in the class body or defining a method \
@@ -124,7 +124,7 @@ def frozen_after_init(cls: Type[T]) -> Type[T]:
 
   @wraps(prev_init)
   def new_init(self, *args: Any, **kwargs: Any) -> None:
-    prev_init(self, *args, **kwargs)  # type: ignore
+    prev_init(self, *args, **kwargs)  # type: ignore[call-arg]
     self._is_frozen = True
 
   @wraps(prev_setattr)
@@ -135,6 +135,6 @@ def frozen_after_init(cls: Type[T]) -> Type[T]:
       )
     prev_setattr(self, key, value)
 
-  cls.__init__ = new_init  # type: ignore
-  cls.__setattr__ = new_setattr  # type: ignore
+  cls.__init__ = new_init  # type: ignore[assignment]
+  cls.__setattr__ = new_setattr  # type: ignore[assignment]
   return cls

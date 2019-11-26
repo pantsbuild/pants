@@ -57,9 +57,9 @@ class D:
 
 
 @rule
-def transitive_coroutine_rule(c: C) -> D:
-  b = yield Get(B, C, c)
-  yield D(b)
+async def transitive_coroutine_rule(c: C) -> D:
+  b = await Get(B, C, c)
+  return D(b)
 
 
 @union
@@ -104,9 +104,9 @@ def select_union_b(union_b: UnionB) -> A:
 
 # TODO: add GetMulti testing for unions!
 @rule
-def a_union_test(union_wrapper: UnionWrapper) -> A:
-  union_a = yield Get(A, UnionBase, union_wrapper.inner)
-  yield union_a
+async def a_union_test(union_wrapper: UnionWrapper) -> A:
+  union_a = await Get(A, UnionBase, union_wrapper.inner)
+  return union_a
 
 
 class UnionX:
@@ -114,15 +114,15 @@ class UnionX:
 
 
 @rule
-def error_msg_test_rule(union_wrapper: UnionWrapper) -> UnionX:
-  union_x = yield Get(UnionX, UnionWithNonMemberErrorMsg, union_wrapper.inner)
-  yield union_x
+async def error_msg_test_rule(union_wrapper: UnionWrapper) -> UnionX:
+  union_x = await Get(UnionX, UnionWithNonMemberErrorMsg, union_wrapper.inner)
+  return union_x
 
 
 class TypeCheckFailWrapper:
   """
   This object wraps another object which will be used to demonstrate a type check failure when the
-  engine processes a `yield Get(...)` statement.
+  engine processes an `await Get(...)` statement.
   """
 
   def __init__(self, inner):
@@ -130,19 +130,19 @@ class TypeCheckFailWrapper:
 
 
 @rule
-def a_typecheck_fail_test(wrapper: TypeCheckFailWrapper) -> A:
-  # This `yield` would use the `nested_raise` rule, but it won't get to the point of raising since
+async def a_typecheck_fail_test(wrapper: TypeCheckFailWrapper) -> A:
+  # This `await` would use the `nested_raise` rule, but it won't get to the point of raising since
   # the type check will fail at the Get.
-  _ = yield Get(A, B, wrapper.inner) # noqa: F841
-  yield A()
+  _ = await Get(A, B, wrapper.inner) # noqa: F841
+  return A()
 
 
 @rule
-def c_unhashable(_: TypeCheckFailWrapper) -> C:
-  # This `yield` would use the `nested_raise` rule, but it won't get to the point of raising since
+async def c_unhashable(_: TypeCheckFailWrapper) -> C:
+  # This `await` would use the `nested_raise` rule, but it won't get to the point of raising since
   # the hashability check will fail.
-  _ = yield Get(A, B, list()) # noqa: F841
-  yield C()
+  _ = await Get(A, B, list()) # noqa: F841
+  return C()
 
 
 @dataclass(frozen=True)
@@ -151,11 +151,11 @@ class CollectionType:
 
 
 @rule
-def c_unhashable_dataclass(_: CollectionType) -> C:
-  # This `yield` would use the `nested_raise` rule, but it won't get to the point of raising since
+async def c_unhashable_dataclass(_: CollectionType) -> C:
+  # This `await` would use the `nested_raise` rule, but it won't get to the point of raising since
   # the hashability check will fail.
-  _ = yield Get(A, B, list()) # noqa: F841
-  yield C()
+  _ = await Get(A, B, list()) # noqa: F841
+  return C()
 
 
 @contextmanager
@@ -193,30 +193,30 @@ class SchedulerTest(TestBase):
   def test_use_params(self):
     # Confirm that we can pass in Params in order to provide multiple inputs to an execution.
     a, b = A(), B()
-    result_str, = self.scheduler.product_request(str, [Params(a, b)])
+    result_str = self.request_single_product(str, Params(a, b))
     self.assertEquals(result_str, consumes_a_and_b(a, b))
 
     # And confirm that a superset of Params is also accepted.
-    result_str, = self.scheduler.product_request(str, [Params(a, b, self)])
+    result_str = self.request_single_product(str, Params(a, b, self))
     self.assertEquals(result_str, consumes_a_and_b(a, b))
 
     # But not a subset.
     expected_msg = ("No installed @rules can compute {} for input Params(A), but"
                     .format(str.__name__))
     with self.assertRaisesRegexp(Exception, re.escape(expected_msg)):
-      self.scheduler.product_request(str, [Params(a)])
+      self.request_single_product(str, Params(a))
 
   def test_transitive_params(self):
     # Test that C can be provided and implicitly converted into a B with transitive_b_c() to satisfy
     # the selectors of consumes_a_and_b().
     a, c = A(), C()
-    result_str, = self.scheduler.product_request(str, [Params(a, c)])
+    result_str = self.request_single_product(str, Params(a, c))
     self.assertEquals(remove_locations_from_traceback(result_str),
                       remove_locations_from_traceback(consumes_a_and_b(a, transitive_b_c(c))))
 
     # Test that an inner Get in transitive_coroutine_rule() is able to resolve B from C due to the
     # existence of transitive_b_c().
-    result_d, = self.scheduler.product_request(D, [Params(c)])
+    result_d = self.request_single_product(D, Params(c))
     # We don't need the inner B objects to be the same, and we know the arguments are type-checked,
     # we're just testing transitively resolving products in this file.
     self.assertTrue(isinstance(result_d, D))
@@ -227,22 +227,22 @@ class SchedulerTest(TestBase):
       yield
 
   def test_union_rules(self):
-    a, = self.scheduler.product_request(A, [Params(UnionWrapper(UnionA()))])
+    a = self.request_single_product(A, Params(UnionWrapper(UnionA())))
     # TODO: figure out what to assert here!
     self.assertTrue(isinstance(a, A))
-    a, = self.scheduler.product_request(A, [Params(UnionWrapper(UnionB()))])
+    a = self.request_single_product(A, Params(UnionWrapper(UnionB())))
     self.assertTrue(isinstance(a, A))
     # Fails due to no union relationship from A -> UnionBase.
     expected_msg = """\
 Type A is not a member of the UnionBase @union
 """
     with self._assert_execution_error(expected_msg):
-      self.scheduler.product_request(A, [Params(UnionWrapper(A()))])
+      self.request_single_product(A, Params(UnionWrapper(A())))
 
   def test_union_rules_no_docstring(self):
     expected_msg = "specific error message for UnionA instance"
     with self._assert_execution_error(expected_msg):
-      self.scheduler.product_request(UnionX, [Params(UnionWrapper(UnionA()))])
+      self.request_single_product(UnionX, Params(UnionWrapper(UnionA())))
 
 
 class SchedulerWithNestedRaiseTest(TestBase):
@@ -259,14 +259,15 @@ class SchedulerWithNestedRaiseTest(TestBase):
       nested_raise,
     ]
 
+  #TODO(#8675) - This test (and others like it) that rely on matching a specific string repr of a complex python object is fragile.
   def test_get_type_match_failure(self):
     """Test that Get(...)s are now type-checked during rule execution, to allow for union types."""
     expected_msg = """\
-Exception: WithDeps(Inner(InnerEntry { params: {TypeCheckFailWrapper}, rule: Task(Task { product: A, clause: [Select { product: TypeCheckFailWrapper }], gets: [Get { product: A, subject: B }], func: a_typecheck_fail_test(), cacheable: true }) })) did not declare a dependency on JustGet(Get { product: A, subject: A })
+Exception: WithDeps(Inner(InnerEntry { params: {TypeCheckFailWrapper}, rule: Task(Task { product: A, clause: [Select { product: TypeCheckFailWrapper }], gets: [Get { product: A, subject: B }], func: a_typecheck_fail_test(), cacheable: true, display_info: None }) })) did not declare a dependency on JustGet(Get { product: A, subject: A })
 """
     with assert_execution_error(self, expected_msg):
       # `a_typecheck_fail_test` above expects `wrapper.inner` to be a `B`.
-      self.scheduler.product_request(A, [Params(TypeCheckFailWrapper(A()))])
+      self.request_single_product(A, Params(TypeCheckFailWrapper(A())))
 
   def test_unhashable_failure(self):
     """Test that unhashable Get(...) params result in a structured error."""
@@ -295,7 +296,7 @@ Exception: WithDeps(Inner(InnerEntry { params: {TypeCheckFailWrapper}, rule: Tas
     # Test that the error contains the full traceback from within the CFFI context as well
     # (mentioning which specific extern method ended up raising the exception).
     with self.assertRaises(ExecutionError) as cm:
-      self.scheduler.product_request(C, [Params(CollectionType([1, 2, 3]))])
+      self.request_single_product(C, Params(CollectionType([1, 2, 3])))
     exc_str = remove_locations_from_traceback(str(cm.exception))
     # TODO: convert these manual self.assertTrue() conditionals to a self.assertStartsWith() method
     # in TestBase!
@@ -323,7 +324,7 @@ Exception: WithDeps(Inner(InnerEntry { params: {TypeCheckFailWrapper}, rule: Tas
                                **PATCH_OPTS) as mock_cffi_exceptions:
           mock_exe_request.return_value = None
           mock_cffi_exceptions.return_value = [create_cffi_exception()]
-          self.scheduler.product_request(C, [Params(CollectionType([1, 2, 3]))])
+          self.request_single_product(C, Params(CollectionType([1, 2, 3])))
     exc_str = remove_locations_from_traceback(str(cm.exception))
     assert_has_cffi_extern_traceback_header(exc_str)
     self.assertIn("Exception: test cffi exception", exc_str)
@@ -336,7 +337,7 @@ Exception: WithDeps(Inner(InnerEntry { params: {TypeCheckFailWrapper}, rule: Tas
       with unittest.mock.patch.object(SchedulerSession, 'execution_request',
                              **PATCH_OPTS) as mock_exe_request:
         mock_exe_request.side_effect = TestError('non-CFFI error')
-        self.scheduler.product_request(C, [Params(CollectionType([1, 2, 3]))])
+        self.request_single_product(C, Params(CollectionType([1, 2, 3])))
 
   def test_trace_includes_rule_exception_traceback(self):
     # Execute a request that will trigger the nested raise, and then directly inspect its trace.
