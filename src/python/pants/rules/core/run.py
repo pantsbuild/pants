@@ -33,10 +33,9 @@ async def run(
 
   with temporary_dir(root_dir=str(Path(build_root.path, ".pants.d")), cleanup=True) as tmpdir:
     path_relative_to_build_root = Path(tmpdir).relative_to(build_root.path)
-    dirs_to_materialize = (DirectoryToMaterialize(
-      path=path_relative_to_build_root, directory_digest=binary.digest),
+    workspace.materialize_directory(
+      DirectoryToMaterialize(path=path_relative_to_build_root, directory_digest=binary.digest)
     )
-    workspace.materialize_directories(dirs_to_materialize)
 
     console.write_stdout(f"Running target: {target}\n")
     full_path = str(Path(tmpdir, binary.binary_name))

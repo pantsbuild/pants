@@ -208,9 +208,17 @@ class Workspace:
   """Abstract handle for operations that touch the real local filesystem."""
   _scheduler: "SchedulerSession"
 
+  def materialize_directory(
+    self, directory_to_materialize: DirectoryToMaterialize
+  ) -> MaterializeDirectoryResult:
+    """Materialize one single directory digest to disk. If you need to materialize multiple, you
+    should use the parallel materialize_directories() instead."""
+    return self._scheduler.materialize_directory(directory_to_materialize)
+
   def materialize_directories(
     self, directories_to_materialize: Tuple[DirectoryToMaterialize, ...]
   ) -> MaterializeDirectoriesResult:
+    """Materialize multiple directory digests to disk in parallel."""
     return self._scheduler.materialize_directories(directories_to_materialize)
 
 

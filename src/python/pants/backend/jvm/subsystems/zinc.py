@@ -371,9 +371,9 @@ class Zinc:
 
     if not os.path.exists(bridge_jar):
       res = self._run_bootstrapper(bridge_jar, context)
-      context._scheduler.materialize_directories((
-        DirectoryToMaterialize("", res.output_directory_digest),
-      ))
+      context._scheduler.materialize_directory(
+        DirectoryToMaterialize("", res.output_directory_digest)
+      )
       # For the workaround above to work, we need to store a copy of the bridge in
       # the bootstrapdir cache (.cache).
       safe_mkdir(global_bridge_cache_dir)
