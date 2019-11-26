@@ -17,7 +17,7 @@ from pants.util.collections import recursively_update
 
 def banner(s):
   print(cyan('=' * 63))
-  print(cyan('- {} {}'.format(s, '-' * (60 - len(s)))))
+  print(cyan(f"- {s} {('-' * (60 - len(s)))}"))
   print(cyan('=' * 63))
 
 
@@ -89,14 +89,14 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
       with self.temporary_workdir() as workdir_base:
         pid_dir = os.path.join(workdir_base, '.pids')
         workdir = os.path.join(workdir_base, '.workdir.pants.d')
-        print('\npantsd log is {}/pantsd/pantsd.log'.format(workdir))
+        print(f'\npantsd log is {workdir}/pantsd/pantsd.log')
         pantsd_config = {
           'GLOBAL': {
             'enable_pantsd': True,
             'shutdown_pantsd_after_run': False,
             # The absolute paths in CI can exceed the UNIX socket path limitation
             # (>104-108 characters), so we override that here with a shorter path.
-            'watchman_socket_path': '/tmp/watchman.{}.sock'.format(os.getpid()),
+            'watchman_socket_path': f'/tmp/watchman.{os.getpid()}.sock',
             'level': log_level,
             'pants_subprocessdir': pid_dir,
           }
@@ -104,7 +104,7 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
 
         if extra_config:
           recursively_update(pantsd_config, extra_config)
-        print('>>> config: \n{}\n'.format(pantsd_config))
+        print(f'>>> config: \n{pantsd_config}\n')
 
         checker = PantsDaemonMonitor(runner_process_context, pid_dir)
         self.assert_runner(workdir, pantsd_config, ['kill-pantsd'], expected_runs=1)
@@ -168,7 +168,7 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
       # tee_output=True
     )
     elapsed = time.time() - start_time
-    print(bold(cyan('\ncompleted in {} seconds'.format(elapsed))))
+    print(bold(cyan(f'\ncompleted in {elapsed} seconds')))
 
     # TODO: uncomment this and add an issue link!
     runs_created = self._run_count(workdir) - run_count

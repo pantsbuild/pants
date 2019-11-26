@@ -250,7 +250,7 @@ class FileDepsTest(ConsoleTaskTestBase, AbstractTestGenerator):
       for test_name, test in sorted(locals().items()):
         if test_name.startswith('test_'):
           cls.add_test(
-            '{}_{}'.format(test_name, "abs_path" if is_absolute else "rel_path"),
+            f"{test_name}_{('abs_path' if is_absolute else 'rel_path')}",
             test
           )
 

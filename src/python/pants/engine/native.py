@@ -9,7 +9,7 @@ import sys
 import sysconfig
 import traceback
 from contextlib import closing
-from types import GeneratorType
+from types import CoroutineType
 from typing import Any, NamedTuple, Tuple, Type
 
 import cffi
@@ -502,9 +502,14 @@ class _FFISpecification(object):
             c.identities_buf([c.identify(g.subject) for g in res]),
           )
       else:
-        # Break.
-        response.tag = self._lib.Broke
-        response.broke = (c.to_value(res),)
+        raise ValueError(f'internal engine error: unrecognized coroutine result {res}')
+    except StopIteration as e:
+      if not e.args:
+        raise
+      # This was a `return` from a coroutine, as opposed to a `StopIteration` raised
+      # by calling `next()` on an empty iterator.
+      response.tag = self._lib.Broke
+      response.broke = (c.to_value(e.value),)
     except Exception as e:
       # Throw.
       response.tag = self._lib.Throw
@@ -567,7 +572,7 @@ class EngineTypes(NamedTuple):
   link: TypeId
   multi_platform_process_request: TypeId
   process_result: TypeId
-  generator: TypeId
+  coroutine: TypeId
   url_to_fetch: TypeId
   string: TypeId
   bytes: TypeId
@@ -873,8 +878,18 @@ class Native(metaclass=SingletonMetaclass):
       self.lib.execution_request_create(),
       self.lib.execution_request_destroy)
 
-  def new_session(self, scheduler, should_record_zipkin_spans, should_render_ui, ui_worker_count, build_id):
-    return self.gc(self.lib.session_create(scheduler, should_record_zipkin_spans, should_render_ui, ui_worker_count, self.context.utf8_buf(build_id)), self.lib.session_destroy)
+  def new_session(self, scheduler, should_record_zipkin_spans, should_render_ui, ui_worker_count, build_id, should_report_workunits: bool):
+    return self.gc(
+      self.lib.session_create(
+        scheduler,
+        should_record_zipkin_spans,
+        should_render_ui,
+        ui_worker_count,
+        self.context.utf8_buf(build_id),
+        should_report_workunits,
+      ),
+      self.lib.session_destroy
+    )
 
   def new_scheduler(self,
                     tasks,
@@ -914,7 +929,7 @@ class Native(metaclass=SingletonMetaclass):
         link=ti(Link),
         multi_platform_process_request=ti(MultiPlatformExecuteProcessRequest),
         process_result=ti(FallibleExecuteProcessResult),
-        generator=ti(GeneratorType),
+        coroutine=ti(CoroutineType),
         url_to_fetch=ti(UrlToFetch),
         string=ti(str),
         bytes=ti(bytes),

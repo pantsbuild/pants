@@ -26,7 +26,7 @@ use crate::{
 };
 use std;
 use std::cmp::min;
-use workunit_store::{generate_random_64bit_string, get_parent_id, WorkUnit, WorkUnitStore};
+use workunit_store::{get_parent_id, WorkUnit, WorkUnitStore};
 
 // Environment variable which is exclusively used for cache key invalidation.
 // This may be not specified in an ExecuteProcessRequest, and may be populated only by the
@@ -734,21 +734,21 @@ impl CommandRunner {
         }
         future::err(ExecutionError::MissingDigests(missing_digests)).to_boxed()
       }
-      code => {
-        // Error we see from Google's RBE service if we use pre-emptable workers and one gets pre-empted.
-        if code == grpcio::RpcStatusCode::Aborted
-          && status.get_message() == "the bot running the task appears to be lost"
-        {
+      code => match code {
+        grpcio::RpcStatusCode::Aborted
+        | grpcio::RpcStatusCode::Internal
+        | grpcio::RpcStatusCode::ResourceExhausted
+        | grpcio::RpcStatusCode::Unavailable
+        | grpcio::RpcStatusCode::Unknown => {
           future::err(ExecutionError::Retryable(status.get_message().to_owned())).to_boxed()
-        } else {
-          future::err(ExecutionError::Fatal(format!(
-            "Error from remote execution: {:?}: {:?}",
-            code,
-            status.get_message()
-          )))
-          .to_boxed()
         }
-      }
+        _ => future::err(ExecutionError::Fatal(format!(
+          "Error from remote execution: {:?}: {:?}",
+          code,
+          status.get_message()
+        )))
+        .to_boxed(),
+      },
     }
     .to_boxed()
   }
@@ -825,12 +825,7 @@ fn maybe_add_workunit(
   //  TODO: workunits for scheduling, fetching, executing and uploading should be recorded
   //   only if '--reporting-zipkin-trace-v2' is set
   if !result_cached {
-    let workunit = WorkUnit {
-      name: String::from(name),
-      time_span,
-      span_id: generate_random_64bit_string(),
-      parent_id,
-    };
+    let workunit = WorkUnit::new(name.to_string(), time_span, parent_id);
     workunit_store.add_workunit(workunit);
   }
 }

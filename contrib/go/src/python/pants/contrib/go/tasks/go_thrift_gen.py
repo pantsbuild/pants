@@ -111,15 +111,15 @@ class GoThriftGen(SimpleCodegenTask):
   @memoized_property
   def _thrift_cmd(self):
     cmd = [self._thrift_binary]
-    thrift_import = 'thrift_import={}'.format(self.get_options().thrift_import)
+    thrift_import = f'thrift_import={self.get_options().thrift_import}'
     if thrift_import is None:
-      raise TaskError('Option thrift_import in scope {} must be set.'.format(self.options_scope))
+      raise TaskError(f'Option thrift_import in scope {self.options_scope} must be set.')
     gen_options = self.get_options().gen_options
     if gen_options:
       gen_options += ',' + thrift_import
     else:
       gen_options = thrift_import
-    cmd.extend(('--gen', 'go:{}'.format(gen_options)))
+    cmd.extend(('--gen', f'go:{gen_options}'))
 
     if self.get_options().strict:
       cmd.append('-strict')
@@ -149,7 +149,7 @@ class GoThriftGen(SimpleCodegenTask):
                                  stdout=workunit.output('stdout'),
                                  stderr=workunit.output('stderr'))
         if result != 0:
-          raise TaskError('{} ... exited non-zero ({})'.format(self._thrift_binary, result))
+          raise TaskError(f'{self._thrift_binary} ... exited non-zero ({result})')
 
     gen_dir = os.path.join(target_workdir, 'gen-go')
     src_dir = os.path.join(target_workdir, 'src')

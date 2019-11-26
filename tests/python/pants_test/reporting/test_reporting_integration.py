@@ -174,10 +174,10 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
   def test_zipkin_reporter(self):
     ZipkinHandler = zipkin_handler()
     with http_server(ZipkinHandler) as port:
-      endpoint = "http://localhost:{}".format(port)
+      endpoint = f"http://localhost:{port}"
       command = [
         '-ldebug',
-        '--reporting-zipkin-endpoint={}'.format(endpoint),
+        f'--reporting-zipkin-endpoint={endpoint}',
         'cloc',
         'examples/src/java/org/pantsbuild/example/hello/simple',
       ]
@@ -203,14 +203,14 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
   def test_zipkin_reporter_with_given_trace_id_parent_id(self):
     ZipkinHandler = zipkin_handler()
     with http_server(ZipkinHandler) as port:
-      endpoint = "http://localhost:{}".format(port)
+      endpoint = f"http://localhost:{port}"
       trace_id = "aaaaaaaaaaaaaaaa"
       parent_span_id = "ffffffffffffffff"
       command = [
         '-ldebug',
-        '--reporting-zipkin-endpoint={}'.format(endpoint),
-        '--reporting-zipkin-trace-id={}'.format(trace_id),
-        '--reporting-zipkin-parent-id={}'.format(parent_span_id),
+        f'--reporting-zipkin-endpoint={endpoint}',
+        f'--reporting-zipkin-trace-id={trace_id}',
+        f'--reporting-zipkin-parent-id={parent_span_id}',
         'cloc',
         'examples/src/java/org/pantsbuild/example/hello/simple'
       ]
@@ -241,10 +241,10 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
   def test_zipkin_reporter_with_zero_sample_rate(self):
     ZipkinHandler = zipkin_handler()
     with http_server(ZipkinHandler) as port:
-      endpoint = "http://localhost:{}".format(port)
+      endpoint = f"http://localhost:{port}"
       command = [
         '-ldebug',
-        '--reporting-zipkin-endpoint={}'.format(endpoint),
+        f'--reporting-zipkin-endpoint={endpoint}',
         '--reporting-zipkin-sample-rate=0.0',
         'cloc',
         'examples/src/java/org/pantsbuild/example/hello/simple'
@@ -262,10 +262,10 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
   def test_zipkin_reporter_for_v2_engine(self):
     ZipkinHandler = zipkin_handler()
     with http_server(ZipkinHandler) as port:
-      endpoint = "http://localhost:{}".format(port)
+      endpoint = f"http://localhost:{port}"
       command = [
         '-ldebug',
-        '--reporting-zipkin-endpoint={}'.format(endpoint),
+        f'--reporting-zipkin-endpoint={endpoint}',
         '--reporting-zipkin-trace-v2',
         'cloc',
         'examples/src/java/org/pantsbuild/example/hello/simple'
@@ -281,7 +281,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
 
       trace = assert_single_element(ZipkinHandler.traces.values())
 
-      v2_span_name_part = "Scandir"
+      v2_span_name_part = "Snapshot"
       self.assertTrue(any(v2_span_name_part in span['name'] for span in trace),
         "There is no span that contains '{}' in it's name. The trace:{}".format(
         v2_span_name_part, trace
@@ -290,12 +290,12 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
   def test_zipkin_reports_for_pure_v2_goals(self):
     ZipkinHandler = zipkin_handler()
     with http_server(ZipkinHandler) as port:
-      endpoint = "http://localhost:{}".format(port)
+      endpoint = f"http://localhost:{port}"
       command = [
         '-ldebug',
         '--no-v1',
         '--v2',
-        '--reporting-zipkin-endpoint={}'.format(endpoint),
+        f'--reporting-zipkin-endpoint={endpoint}',
         '--reporting-zipkin-trace-v2',
         'list',
         '3rdparty:'
@@ -311,7 +311,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
 
       trace = assert_single_element(ZipkinHandler.traces.values())
 
-      v2_span_name_part = "Scandir"
+      v2_span_name_part = "Snapshot"
       self.assertTrue(any(v2_span_name_part in span['name'] for span in trace),
         "There is no span that contains '{}' in it's name. The trace:{}".format(
         v2_span_name_part, trace
@@ -320,10 +320,10 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
   def test_zipkin_reporter_multi_threads(self):
     ZipkinHandler = zipkin_handler()
     with http_server(ZipkinHandler) as port:
-      endpoint = "http://localhost:{}".format(port)
+      endpoint = f"http://localhost:{port}"
       command = [
         '-ldebug',
-        '--reporting-zipkin-endpoint={}'.format(endpoint),
+        f'--reporting-zipkin-endpoint={endpoint}',
         'compile',
         'examples/src/scala/org/pantsbuild/example/several_scala_targets::'
       ]

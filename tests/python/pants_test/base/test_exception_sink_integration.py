@@ -6,12 +6,14 @@ import signal
 import time
 from contextlib import contextmanager
 from textwrap import dedent
+from unittest import skipIf
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import read_file, safe_file_dump, safe_mkdir, touch
+from pants.util.osutil import get_normalized_os_name
 
 
 class ExceptionSinkIntegrationTest(PantsRunIntegrationTest):
@@ -150,6 +152,7 @@ Signal {signum} \\({signame}\\) was raised\\. Exiting with failure\\.
       # Return the (failed) pants execution result.
       yield (workdir, waiter_run)
 
+  @skipIf(get_normalized_os_name() == "darwin", "https://github.com/pantsbuild/pants/issues/8127")
   def test_dumps_logs_on_signal(self):
     """Send signals which are handled, but don't get converted into a KeyboardInterrupt."""
     signal_names = {
@@ -169,6 +172,7 @@ Signal {signum} \\({signame}\\) was raised\\. Exiting with failure\\.
         self._assert_graceful_signal_log_matches(
           waiter_run.pid, signum, signame, read_file(shared_log_file))
 
+  @skipIf(get_normalized_os_name() == "darwin", "https://github.com/pantsbuild/pants/issues/8127")
   def test_dumps_traceback_on_sigabrt(self):
     # SIGABRT sends a traceback to the log file for the current process thanks to
     # faulthandler.enable().
@@ -183,6 +187,7 @@ Thread [^\n]+ \\(most recent call first\\):
       # faulthandler.enable() only allows use of a single logging file at once for fatal tracebacks.
       self.assertEqual('', read_file(shared_log_file))
 
+  @skipIf(get_normalized_os_name() == "darwin", "https://github.com/pantsbuild/pants/issues/8127")
   def test_prints_traceback_on_sigusr2(self):
     with self._make_waiter_handle() as (workdir, pid, join):
       # Send SIGUSR2, then sleep so the signal handler from faulthandler.register() can run.
@@ -195,6 +200,7 @@ Thread [^\n]+ \\(most recent call first\\):
 Current thread [^\n]+ \\(most recent call first\\):
 """)
 
+  @skipIf(get_normalized_os_name() == "darwin", "https://github.com/pantsbuild/pants/issues/8127")
   def test_keyboardinterrupt(self):
     with self._send_signal_to_waiter_handle(signal.SIGINT) as (_, waiter_run):
       self.assertIn(
@@ -208,8 +214,8 @@ Current thread [^\n]+ \\(most recent call first\\):
     testproject_backend_pkg_name = 'test_pants_plugin'
     lifecycle_stub_cmdline = [
       '--no-enable-pantsd',
-      "--pythonpath=+['{}']".format(testproject_backend_src_dir),
-      "--backend-packages=+['{}']".format(testproject_backend_pkg_name),
+      f"--pythonpath=+['{testproject_backend_src_dir}']",
+      f"--backend-packages=+['{testproject_backend_pkg_name}']",
       # This task will always raise an exception.
       'lifecycle-stub-goal',
     ]
@@ -228,7 +234,7 @@ Current thread [^\n]+ \\(most recent call first\\):
 
     # The exiter that gets added when this option is changed prints that option to stderr.
     changed_exiter_run = self.run_pants([
-      "--lifecycle-stubs-add-exiter-message='{}'".format('NEW MESSAGE'),
+      "--lifecycle-stubs-add-exiter-message='NEW MESSAGE'",
     ] + lifecycle_stub_cmdline)
     self.assert_failure(changed_exiter_run)
     self.assertIn('erroneous!', changed_exiter_run.stderr_data)
@@ -246,7 +252,7 @@ Current thread [^\n]+ \\(most recent call first\\):
       some_file = os.path.join(tmpdir, 'some_file')
       safe_file_dump(some_file, '')
       redirected_pants_run = self.run_pants([
-        "--lifecycle-stubs-new-interactive-stream-output-file={}".format(some_file),
+        f"--lifecycle-stubs-new-interactive-stream-output-file={some_file}",
       ] + lifecycle_stub_cmdline)
       self.assert_failure(redirected_pants_run)
       # The Exiter prints the final error message to whatever the interactive output stream is set

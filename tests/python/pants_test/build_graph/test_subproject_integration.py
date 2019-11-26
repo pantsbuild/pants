@@ -99,11 +99,11 @@ class SubprojectIntegrationTest(PantsRunIntegrationTest):
     """
     with harness():
       # Has dependencies below the subproject.
-      pants_args = ['--subproject-roots={}'.format(SUBPROJ_ROOT),
+      pants_args = [f'--subproject-roots={SUBPROJ_ROOT}',
                     'dependencies', SUBPROJ_SPEC]
       self.assert_success(self.run_pants(pants_args))
 
       # A relative path at the root of the subproject.
-      pants_args = ['--subproject-roots={}'.format(SUBPROJ_ROOT),
-                    'dependencies', '{}:local'.format(SUBPROJ_ROOT)]
+      pants_args = [f'--subproject-roots={SUBPROJ_ROOT}',
+                    'dependencies', f'{SUBPROJ_ROOT}:local']
       self.assert_success(self.run_pants(pants_args))

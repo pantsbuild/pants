@@ -31,7 +31,7 @@ class JvmRunIntegrationTest(PantsRunIntegrationTest):
                 '/src/main/java/org/pantsbuild/duplicateres/example{name}/'
                 .format(name=name))
       stdout = self._exec_run(target)
-      expected = 'Hello world!: resource from example {name}\n'.format(name=name)
+      expected = f'Hello world!: resource from example {name}\n'
       self.assertIn(expected, stdout)
 
   def test_no_run_cwd(self):

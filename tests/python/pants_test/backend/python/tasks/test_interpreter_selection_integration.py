@@ -35,7 +35,7 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
     # By default, Avoid some known-to-choke-on interpreters.
     constraint = '["CPython>=3.6,<4"]' if version == PY_3 else '["CPython>=2.7,<3"]'
     args = list(args) if args is not None else [
-          '--python-setup-interpreter-constraints={}'.format(constraint)
+          f'--python-setup-interpreter-constraints={constraint}'
         ]
     command = ['binary', binary_target] + args
     return self.run_pants(command=command, config=config)
@@ -47,10 +47,10 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
           'pants_distdir': distdir
         }
       }
-      binary_name = 'echo_interpreter_version_{}'.format(version)
-      binary_target = '{}:{}'.format(self.testproject, binary_name)
+      binary_name = f'echo_interpreter_version_{version}'
+      binary_target = f'{self.testproject}:{binary_name}'
       pants_run = self._build_pex(binary_target, config, version=version)
-      self.assert_success(pants_run, 'Failed to build {binary}.'.format(binary=binary_target))
+      self.assert_success(pants_run, f'Failed to build {binary_target}.')
 
       # Run the built pex.
       exe = os.path.join(distdir, binary_name + '.pex')
@@ -66,15 +66,15 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
 
   def _assert_version_matches(self, actual, expected):
     v = actual.strip().split('.')  # E.g., 2.7.13.
-    self.assertTrue(len(v) > 2, 'Not a valid version string: {}'.format(v))
+    self.assertTrue(len(v) > 2, f'Not a valid version string: {v}')
     expected_components = expected.split('.')
     self.assertEqual(expected_components, v[:len(expected_components)])
 
   def test_cli_option_wins_compatibility_conflict(self):
     # Tests that targets with compatibility conflicts collide.
-    binary_target = '{}:deliberately_conflicting_compatibility'.format(self.testproject)
+    binary_target = f'{self.testproject}:deliberately_conflicting_compatibility'
     pants_run = self._build_pex(binary_target)
-    self.assert_success(pants_run, 'Failed to build {binary}.'.format(binary=binary_target))
+    self.assert_success(pants_run, f'Failed to build {binary_target}.')
 
   def test_conflict_via_config(self):
     # Tests that targets with compatibility conflict with targets with default compatibility.
@@ -84,11 +84,11 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
           'interpreter_constraints': ['CPython<2.7'],
         }
       }
-    binary_target = '{}:echo_interpreter_version'.format(self.testproject)
+    binary_target = f'{self.testproject}:echo_interpreter_version'
     pants_run = self._build_pex(binary_target, config=config, args=[])
     self.assert_failure(
       pants_run,
-      'Unexpected successful build of {binary}.'.format(binary=binary_target)
+      f'Unexpected successful build of {binary_target}.'
     )
     self.assertIn(
       "Unable to detect a suitable interpreter for compatibilities",
@@ -99,7 +99,7 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
       pants_run.stdout_data,
       "Did not output requested compatibiility."
     )
-    self.assertIn("Conflicting targets: {}".format(binary_target), pants_run.stdout_data)
+    self.assertIn(f"Conflicting targets: {binary_target}", pants_run.stdout_data)
     # NB: we expect the error message to print *all* interpreters resolved by Pants. However,
     # to simplify the tests and for hermicity, here we only test that the current interpreter
     # gets printed as a proxy for the overall behavior.
@@ -128,9 +128,9 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
           '--python-setup-interpreter-constraints=["CPython>=3.6,<4"]',
         ]
       binary_name = 'echo_interpreter_version'
-      binary_target = '{}:{}'.format(self.testproject, binary_name)
+      binary_target = f'{self.testproject}:{binary_name}'
       pants_run = self._build_pex(binary_target, config=config, args=args)
-      self.assert_success(pants_run, 'Failed to build {binary}.'.format(binary=binary_target))
+      self.assert_success(pants_run, f'Failed to build {binary_target}.')
 
       actual = self._popen_stdout(os.path.join(distdir, binary_name + '.pex'))
       self._assert_version_matches(actual, '3')
@@ -144,7 +144,7 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
     self._test_version(PY_27)
 
   def test_stale_interpreter_purge_integration(self):
-    target = '{}:{}'.format(self.testproject, 'echo_interpreter_version')
+    target = f"{self.testproject}:{'echo_interpreter_version'}"
     config = {
       'python-setup': {
         'interpreter_constraints': ['CPython>=2.7,<4'],
@@ -188,5 +188,5 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
       for path in glob.glob(os.path.join(workdir, 'pyprep/interpreter/*/interpreter.info')):
         self.assertTrue(
           _validate_good_interpreter_path_file(path),
-          'interpreter.info was not purged and repopulated properly: {}'.format(path)
+          f'interpreter.info was not purged and repopulated properly: {path}'
         )

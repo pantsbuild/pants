@@ -57,7 +57,7 @@ class JavascriptStyleBase(NodeTask):
     dir_exists = os.path.isdir(javascriptstyle_dir)
     if not dir_exists:
       raise TaskError(
-        'javascriptstyle package does not exist: {}.'.format(javascriptstyle_dir))
+        f'javascriptstyle package does not exist: {javascriptstyle_dir}.')
     else:
       lock_file = os.path.join(javascriptstyle_dir, 'yarn.lock')
       package_json = os.path.join(javascriptstyle_dir, 'package.json')
@@ -72,8 +72,8 @@ class JavascriptStyleBase(NodeTask):
   def _bootstrap_eslinter(self, bootstrap_dir):
     with pushd(bootstrap_dir):
       eslint_version = self.node_distribution.eslint_version
-      eslint = 'eslint@{}'.format(eslint_version)
-      self.context.log.debug('Installing {}...'.format(eslint))
+      eslint = f'eslint@{eslint_version}'
+      self.context.log.debug(f'Installing {eslint}...')
       result, add_command = self.add_package(
         package=eslint,
         package_manager=self.node_distribution.get_package_manager(package_manager=PACKAGE_MANAGER_YARNPKG),
@@ -100,7 +100,7 @@ class JavascriptStyleBase(NodeTask):
         raise TaskError('Failed to install ESLint\n'
                         '\t{} failed with exit code {}'.format(install_command, result))
 
-    self.context.log.debug('Successfully installed ESLint to {}'.format(bootstrap_dir))
+    self.context.log.debug(f'Successfully installed ESLint to {bootstrap_dir}')
     return bootstrap_dir
 
   def _get_target_ignore_patterns(self, target):
@@ -128,7 +128,7 @@ class JavascriptStyleBase(NodeTask):
     if ignore_patterns:
       # Wrap ignore-patterns in quotes to avoid conflict with shell glob pattern
       args.extend([arg for ignore_args in ignore_patterns
-                   for arg in ['--ignore-pattern', '{}'.format(ignore_args)]])
+                   for arg in ['--ignore-pattern', f'{ignore_args}']])
     if other_args:
       args.extend(other_args)
     args.extend(files)

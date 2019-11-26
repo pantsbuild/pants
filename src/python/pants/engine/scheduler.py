@@ -9,11 +9,16 @@ import time
 import traceback
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Dict, Tuple
 
 from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE
-from pants.engine.fs import Digest, DirectoryToMaterialize, PathGlobsAndRoot
+from pants.engine.fs import (
+  Digest,
+  DirectoryToMaterialize,
+  MaterializeDirectoriesResult,
+  PathGlobsAndRoot,
+)
 from pants.engine.native import Function, TypeId
 from pants.engine.nodes import Return, Throw
 from pants.engine.objects import Collection
@@ -167,12 +172,15 @@ class Scheduler:
         else:
           raise ValueError('Unexpected Rule type: {}'.format(rule))
 
-  def _register_task(self, output_type, rule, union_rules):
+  def _register_task(self, output_type, rule: TaskRule, union_rules):
     """Register the given TaskRule with the native scheduler."""
     func = Function(self._to_key(rule.func))
     self._native.lib.tasks_task_begin(self._tasks, func, self._to_type(output_type), rule.cacheable)
     for selector in rule.input_selectors:
       self._native.lib.tasks_add_select(self._tasks, self._to_type(selector))
+
+    if rule.name:
+      self._native.lib.tasks_add_display_info(self._tasks, rule.name.encode())
 
     def add_get_edge(product, subject):
       self._native.lib.tasks_add_get(self._tasks, self._to_type(product), self._to_type(subject))
@@ -250,6 +258,10 @@ class Scheduler:
   def _metrics(self, session):
     return self._from_value(self._native.lib.scheduler_metrics(self._scheduler, session))
 
+  def poll_workunits(self, session) -> Tuple[Dict[str, Any], ...]:
+    result: Tuple[Dict[str, Any], ...] = self._from_value(self._native.lib.poll_session_workunits(self._scheduler, session))
+    return result
+
   def with_fork_context(self, func):
     """See the rustdocs for `scheduler_fork_context` for more information."""
     res = self._native.lib.scheduler_fork_context(self._scheduler, Function(self._to_key(func)))
@@ -291,10 +303,10 @@ class Scheduler:
   def garbage_collect_store(self):
     self._native.lib.garbage_collect_store(self._scheduler)
 
-  def new_session(self, zipkin_trace_v2, build_id, v2_ui=False):
+  def new_session(self, zipkin_trace_v2, build_id, v2_ui=False, should_report_workunits=False):
     """Creates a new SchedulerSession for this Scheduler."""
     return SchedulerSession(self, self._native.new_session(
-      self._scheduler, zipkin_trace_v2, v2_ui, multiprocessing.cpu_count(), build_id)
+      self._scheduler, zipkin_trace_v2, v2_ui, multiprocessing.cpu_count(), build_id, should_report_workunits)
     )
 
 
@@ -323,6 +335,10 @@ class SchedulerSession:
     self._scheduler = scheduler
     self._session = session
     self._run_count = 0
+
+  def poll_workunits(self) -> Tuple[Dict[str, Any], ...]:
+    result: Tuple[Dict[str, Any], ...] = self._scheduler.poll_workunits(self._session)
+    return result
 
   def graph_len(self):
     return self._scheduler.graph_len()
@@ -554,29 +570,30 @@ class SchedulerSession:
   ) -> 'InteractiveProcessResult':
     sched_pointer = self._scheduler._scheduler
 
-    wrapped_result  = self._scheduler._native.lib.run_local_interactive_process(
+    wrapped_result = self._scheduler._native.lib.run_local_interactive_process(
       sched_pointer,
       self._scheduler._to_value(request)
     )
     result: 'InteractiveProcessResult' = self._scheduler._raise_or_return(wrapped_result)
     return result
 
-  def materialize_directories(self, directories_paths_and_digests):
-    """Creates the specified directories on the file system.
-    :param directories_paths_and_digests tuple<DirectoryToMaterialize>: Tuple of the path and
-           digest of the directories to materialize.
-    :returns: Nothing or an error.
-    """
-    # Ensure there isn't more than one of the same directory paths and paths do not have the same prefix.
-    dir_list = [dpad.path for dpad in directories_paths_and_digests]
+  def materialize_directories(
+    self,
+    directories_to_materialize: Tuple[DirectoryToMaterialize, ...]
+  ) -> MaterializeDirectoriesResult:
+    """Creates the specified directories on the file system."""
+    # Ensure that there isn't more than one of the same directory paths and paths do not have the
+    # same prefix.
+    dir_list = [dtm.path for dtm in directories_to_materialize]
     check_no_overlapping_paths(dir_list)
 
-    result = self._scheduler._native.lib.materialize_directories(
+    wrapped_result = self._scheduler._native.lib.materialize_directories(
       self._scheduler._scheduler,
       self._session,
-      self._scheduler._to_value(_DirectoriesToMaterialize(directories_paths_and_digests)),
+      self._scheduler._to_value(_DirectoriesToMaterialize(directories_to_materialize)),
     )
-    return self._scheduler._raise_or_return(result)
+    result: MaterializeDirectoriesResult = self._scheduler._raise_or_return(wrapped_result)
+    return result
 
   def lease_files_in_graph(self):
     self._scheduler.lease_files_in_graph()

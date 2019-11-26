@@ -1,13 +1,14 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from pants.base.build_root import BuildRoot
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.fs import Digest, FileContent, InputFilesContent, Workspace
 from pants.engine.interactive_runner import InteractiveRunner
 from pants.rules.core import run
 from pants.rules.core.binary import CreatedBinary
 from pants.testutil.console_rule_test_base import ConsoleRuleTestBase
-from pants.testutil.engine.util import MockConsole, run_rule
+from pants.testutil.engine.util import MockConsole, MockGet, run_rule
 
 
 class RunTest(ConsoleRuleTestBase):
@@ -17,7 +18,7 @@ class RunTest(ConsoleRuleTestBase):
     input_files_content = InputFilesContent((
       FileContent(path='program.py', content=program_text, is_executable=True),
     ))
-    digest, = self.scheduler.product_request(Digest, [input_files_content])
+    digest = self.request_single_product(Digest, input_files_content)
     return CreatedBinary(
       binary_name='program.py',
       digest=digest,
@@ -27,14 +28,23 @@ class RunTest(ConsoleRuleTestBase):
     workspace = Workspace(self.scheduler)
     interactive_runner = InteractiveRunner(self.scheduler)
     address = Address.parse(spec)
-    bfa =  BuildFileAddress(
+    bfa = BuildFileAddress(
       build_file=None,
       target_name=address.target_name,
       rel_path=f'{address.spec_path}/BUILD'
     )
-    res = run_rule(run.run, console, workspace, interactive_runner, bfa, {
-      (CreatedBinary, Address): lambda _: self.create_mock_binary(program_text)
-    })
+    BuildRoot.path = self.build_root
+    res = run_rule(
+      run.run,
+      rule_args=[console, workspace, interactive_runner, BuildRoot, bfa],
+      mock_gets=[
+        MockGet(
+          product_type=CreatedBinary,
+          subject_type=Address,
+          mock=lambda _: self.create_mock_binary(program_text)
+        ),
+      ],
+    )
     return res
 
   def test_normal_run(self) -> None:

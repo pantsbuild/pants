@@ -72,7 +72,7 @@ class PluginResolverTest(unittest.TestCase):
           plugin_list.append(f'{plugin}=={version}' if version else plugin)
           if create_artifacts:
             self.create_plugin(repo_dir, plugin, version, packager_cls=packager_cls)
-        env['PANTS_PLUGINS'] = '[{}]'.format(','.join(map(repr, plugin_list)))
+        env['PANTS_PLUGINS'] = f"[{','.join(map(repr, plugin_list))}]"
         env['PANTS_PLUGIN_CACHE_DIR'] = os.path.join(root_dir, 'plugin-cache')
 
       configpath = os.path.join(root_dir, 'pants.ini')

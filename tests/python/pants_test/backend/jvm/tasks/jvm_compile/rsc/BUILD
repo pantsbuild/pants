@@ -22,7 +22,7 @@ python_tests(
     'testprojects/src/scala/org/pantsbuild/testproject:javasources_directory',
     'testprojects/src/scala/org/pantsbuild/testproject:mutual_directory',
   ],
-  timeout = 600,
+  timeout = 660,
   tags = {'integration'},
 )
 
@@ -35,7 +35,7 @@ python_tests(
     'testprojects/src/scala/org/pantsbuild/testproject:mutual_directory',
     'testprojects/src/scala/org/pantsbuild/testproject:public_inference_directory',
   ],
-  timeout = 600,
+  timeout = 800,
   tags = {'integration'},
 )
 

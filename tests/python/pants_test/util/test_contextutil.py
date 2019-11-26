@@ -194,17 +194,17 @@ class ContextutilTest(unittest.TestCase):
   def test_open_zipDefault(self) -> None:
     with temporary_dir() as tempdir:
       with open_zip(os.path.join(tempdir, 'test'), 'w') as zf:
-        self.assertTrue(zf._allowZip64)  # type: ignore
+        self.assertTrue(zf._allowZip64)  # type: ignore[attr-defined] # intended to fail type check
 
   def test_open_zipTrue(self) -> None:
     with temporary_dir() as tempdir:
       with open_zip(os.path.join(tempdir, 'test'), 'w', allowZip64=True) as zf:
-        self.assertTrue(zf._allowZip64)  # type: ignore
+        self.assertTrue(zf._allowZip64)  # type: ignore[attr-defined] # intended to fail type check
 
   def test_open_zipFalse(self) -> None:
     with temporary_dir() as tempdir:
       with open_zip(os.path.join(tempdir, 'test'), 'w', allowZip64=False) as zf:
-        self.assertFalse(zf._allowZip64)  # type: ignore
+        self.assertFalse(zf._allowZip64)  # type: ignore[attr-defined] # intended to fail type check
 
   def test_open_zip_raises_exception_on_falsey_paths(self):
     falsey = (None, '', False)
@@ -234,7 +234,7 @@ class ContextutilTest(unittest.TestCase):
     # them from other instances.
     uuid_str = str(uuid.uuid4())
     def u(string: str) -> str:
-      return '{}#{}'.format(uuid_str, string)
+      return f'{uuid_str}#{string}'
     stdin_data = u('stdio')
     stdout_data = u('stdout')
     stderr_data = u('stderr')
@@ -264,7 +264,7 @@ class ContextutilTest(unittest.TestCase):
 
   def test_stdio_as(self) -> None:
     self.assertTrue(sys.stderr.fileno() > 2,
-                    "Expected a pseudofile as stderr, got: {}".format(sys.stderr))
+                    f"Expected a pseudofile as stderr, got: {sys.stderr}")
     old_stdout, old_stderr, old_stdin = sys.stdout, sys.stderr, sys.stdin
 
     # The first level tests that when `sys.std*` are file-likes (in particular, the ones set up in
@@ -322,7 +322,7 @@ class ContextutilTest(unittest.TestCase):
 
     with self.assertRaises(AssertionError):
       with exception_logging(fake_logger, 'error!'):
-        assert True is False
+        assert True is False  # type: ignore[comparison-overlap] # intended to fail type check
 
     fake_logger.exception.assert_called_once_with('error!')
 

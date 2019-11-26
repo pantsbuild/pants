@@ -2,12 +2,14 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import unittest
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from textwrap import dedent
+from typing import List
 
 from pants.engine.rules import RootRule, rule
 from pants.engine.scheduler import ExecutionError
-from pants.engine.selectors import Get
+from pants.engine.selectors import Get, MultiGet
+from pants.reporting.streaming_workunit_handler import StreamingWorkunitHandler
 from pants.testutil.engine.util import assert_equal_with_printing, remove_locations_from_traceback
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
 
@@ -42,12 +44,12 @@ class Fib:
   val: int
 
 
-@rule
-def fib(n: int) -> Fib:
+@rule(name="fib")
+async def fib(n: int) -> Fib:
   if n < 2:
-    yield Fib(n)
-  x, y = yield Get(Fib, int(n-2)), Get(Fib, int(n-1))
-  yield Fib(x.val + y.val)
+    return Fib(n)
+  x, y = tuple(await MultiGet([Get(Fib, int(n-2)), Get(Fib, int(n-1))]))
+  return Fib(x.val + y.val)
 
 
 @dataclass(frozen=True)
@@ -62,7 +64,7 @@ class MyFloat:
 
 @rule
 def upcast(n: MyInt) -> MyFloat:
-  yield MyFloat(float(n.val))
+  return MyFloat(float(n.val))
 
 
 class EngineTest(unittest.TestCase, SchedulerTestBase):
@@ -234,3 +236,30 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
         ''').strip(),
       str(cm.exception)
     )
+
+  def test_async_reporting(self):
+    rules = [ fib, RootRule(int)]
+    scheduler = self.mk_scheduler(rules, include_trace_on_error=False, should_report_workunits=True)
+
+    @dataclass
+    class Tracker:
+      workunits: List[dict] = field(default_factory=list)
+
+      def add(self, workunits) -> None:
+        self.workunits.extend(workunits)
+
+    tracker = Tracker()
+    async_reporter = StreamingWorkunitHandler(scheduler, callback=tracker.add, report_interval_seconds=0.01)
+    with async_reporter.session():
+      scheduler.product_request(Fib, subjects=[0])
+
+    # The execution of the single named @rule "fib" should be providing this one workunit.
+    self.assertEquals(len(tracker.workunits), 1)
+
+    tracker.workunits = []
+    with async_reporter.session():
+      scheduler.product_request(Fib, subjects=[10])
+
+    # Requesting a bigger fibonacci number will result in more rule executions and thus more reported workunits.
+    # In this case, we expect 10 invocations of the `fib` rule.
+    self.assertEquals(len(tracker.workunits), 10)

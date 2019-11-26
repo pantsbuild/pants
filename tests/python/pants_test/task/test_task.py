@@ -181,15 +181,7 @@ class TaskTest(TaskTestBase):
     )
 
   def _write_build_file(self):
-    self.add_to_build_file(
-      '',
-      '''
-files(
-  name = "t",
-  sources = ["{filename}"],
-)
-'''.format(filename=self._filename)
-    )
+    self.add_to_build_file('', f'\nfiles(\n  name = "t",\n  sources = ["{self._filename}"],\n)\n')
 
   def _task(self, incremental, options=None):
     target = self.target(':t')
@@ -225,7 +217,7 @@ files(
     """Generate a synthesized subtype of `cls`."""
     if scope is None:
       scope = cls.options_scope
-    subclass_name = 'test_{0}_{1}_{2}'.format(cls.__name__, scope, name)
+    subclass_name = f'test_{cls.__name__}_{scope}_{name}'
     kwargs['options_scope'] = scope
     return type(subclass_name, (cls,), kwargs)
 

@@ -28,7 +28,7 @@ from pants.engine.mapper import AddressMapper
 from pants.engine.objects import Collection
 from pants.engine.parser import HydratedStruct
 from pants.engine.rules import RootRule, rule
-from pants.engine.selectors import Get
+from pants.engine.selectors import Get, MultiGet
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.source.filespec import any_matches_filespec
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
@@ -317,7 +317,7 @@ class _DependentGraph(object):
       self._implicit_dependent_address_map[dep].add(target_adaptor.address)
 
   def dependents_of_addresses(self, addresses):
-    """Given an iterable of addresses, yield all of those addresses dependents."""
+    """Given an iterable of addresses, return all of those addresses dependents."""
     seen = OrderedSet(addresses)
     for address in addresses:
       seen.update(self._dependent_address_map[address])
@@ -325,7 +325,7 @@ class _DependentGraph(object):
     return seen
 
   def transitive_dependents_of_addresses(self, addresses):
-    """Given an iterable of addresses, yield all of those addresses dependents, transitively."""
+    """Given an iterable of addresses, return all of those addresses dependents, transitively."""
     closure = set()
     result = []
     to_visit = deque(addresses)
@@ -392,7 +392,7 @@ class OwnersRequest:
 
 
 @rule
-def find_owners(
+async def find_owners(
   build_configuration: BuildConfiguration,
   address_mapper: AddressMapper,
   owners_request: OwnersRequest
@@ -402,7 +402,7 @@ def find_owners(
 
   # Walk up the buildroot looking for targets that would conceivably claim changed sources.
   candidate_specs = tuple(AscendantAddresses(directory=d) for d in dirs_set)
-  candidate_targets = yield Get(HydratedTargets, Specs(candidate_specs))
+  candidate_targets = await Get(HydratedTargets, Specs(candidate_specs))
 
   # Match the source globs against the expanded candidate targets.
   def owns_any_source(legacy_target):
@@ -428,26 +428,28 @@ def find_owners(
 
   # If the OwnersRequest does not require dependees, then we're done.
   if owners_request.include_dependees == 'none':
-    yield BuildFileAddresses(direct_owners)
+    return BuildFileAddresses(direct_owners)
   else:
     # Otherwise: find dependees.
-    all_addresses = yield Get(BuildFileAddresses, Specs((DescendantAddresses(''),)))
-    all_structs = yield [Get(HydratedStruct, Address, a.to_address()) for a in all_addresses]
-    all_structs = [s.value for s in all_structs]
+    all_addresses = await Get(BuildFileAddresses, Specs((DescendantAddresses(''),)))
+    all_structs = [
+      s.value for s in
+      await MultiGet(Get(HydratedStruct, Address, a.to_address()) for a in all_addresses)
+    ]
 
     bfa = build_configuration.registered_aliases()
     graph = _DependentGraph.from_iterable(target_types_from_build_file_aliases(bfa),
                                           address_mapper,
                                           all_structs)
     if owners_request.include_dependees == 'direct':
-      yield BuildFileAddresses(tuple(graph.dependents_of_addresses(direct_owners)))
+      return BuildFileAddresses(tuple(graph.dependents_of_addresses(direct_owners)))
     else:
       assert owners_request.include_dependees == 'transitive'
-      yield BuildFileAddresses(tuple(graph.transitive_dependents_of_addresses(direct_owners)))
+      return BuildFileAddresses(tuple(graph.transitive_dependents_of_addresses(direct_owners)))
 
 
 @rule
-def transitive_hydrated_targets(
+async def transitive_hydrated_targets(
   build_file_addresses: BuildFileAddresses
 ) -> TransitiveHydratedTargets:
   """Given BuildFileAddresses, kicks off recursion on expansion of TransitiveHydratedTargets.
@@ -458,8 +460,9 @@ def transitive_hydrated_targets(
   roots, their structure will be shared.
   """
 
-  transitive_hydrated_targets = yield [Get(TransitiveHydratedTarget, Address, a)
-                                       for a in build_file_addresses.addresses]
+  transitive_hydrated_targets = await MultiGet(
+    Get(TransitiveHydratedTarget, Address, a) for a in build_file_addresses.addresses
+  )
 
   closure = OrderedSet()
   to_visit = deque(transitive_hydrated_targets)
@@ -471,20 +474,20 @@ def transitive_hydrated_targets(
     closure.add(tht.root)
     to_visit.extend(tht.dependencies)
 
-  yield TransitiveHydratedTargets(tuple(tht.root for tht in transitive_hydrated_targets), closure)
+  return TransitiveHydratedTargets(tuple(tht.root for tht in transitive_hydrated_targets), closure)
 
 
 @rule
-def transitive_hydrated_target(root: HydratedTarget) -> TransitiveHydratedTarget:
-  dependencies = yield [Get(TransitiveHydratedTarget, Address, d) for d in root.dependencies]
-  yield TransitiveHydratedTarget(root, dependencies)
+async def transitive_hydrated_target(root: HydratedTarget) -> TransitiveHydratedTarget:
+  dependencies = await MultiGet(Get(TransitiveHydratedTarget, Address, d) for d in root.dependencies)
+  return TransitiveHydratedTarget(root, dependencies)
 
 
 @rule
-def hydrated_targets(build_file_addresses: BuildFileAddresses) -> HydratedTargets:
+async def hydrated_targets(build_file_addresses: BuildFileAddresses) -> HydratedTargets:
   """Requests HydratedTarget instances for BuildFileAddresses."""
-  targets = yield [Get(HydratedTarget, Address, a) for a in build_file_addresses.addresses]
-  yield HydratedTargets(targets)
+  targets = await MultiGet(Get(HydratedTarget, Address, a) for a in build_file_addresses.addresses)
+  return HydratedTargets(targets)
 
 
 @dataclass(frozen=True)
@@ -495,16 +498,16 @@ class HydratedField:
 
 
 @rule
-def hydrate_target(hydrated_struct: HydratedStruct) -> HydratedTarget:
+async def hydrate_target(hydrated_struct: HydratedStruct) -> HydratedTarget:
   target_adaptor = hydrated_struct.value
   """Construct a HydratedTarget from a TargetAdaptor and hydrated versions of its adapted fields."""
   # Hydrate the fields of the adaptor and re-construct it.
-  hydrated_fields = yield [Get(HydratedField, HydrateableField, fa)
-                           for fa in target_adaptor.field_adaptors]
+  hydrated_fields = await MultiGet(Get(HydratedField, HydrateableField, fa)
+                                   for fa in target_adaptor.field_adaptors)
   kwargs = target_adaptor.kwargs()
   for field in hydrated_fields:
     kwargs[field.name] = field.value
-  yield HydratedTarget(target_adaptor.address,
+  return HydratedTarget(target_adaptor.address,
                        type(target_adaptor)(**kwargs),
                        tuple(target_adaptor.dependencies))
 
@@ -524,7 +527,7 @@ def _eager_fileset_with_spec(spec_path, filespec, snapshot, include_dirs=False):
 
 
 @rule
-def hydrate_sources(
+async def hydrate_sources(
   sources_field: SourcesField, glob_match_error_behavior: GlobMatchErrorBehavior
 ) -> HydratedField:
   """Given a SourcesField, request a Snapshot for its path_globs and create an EagerFilesetWithSpec.
@@ -534,17 +537,17 @@ def hydrate_sources(
   path_globs = dataclasses.replace(
     sources_field.path_globs, glob_match_error_behavior=glob_match_error_behavior
   )
-  snapshot = yield Get(Snapshot, PathGlobs, path_globs)
+  snapshot = await Get(Snapshot, PathGlobs, path_globs)
   fileset_with_spec = _eager_fileset_with_spec(
     sources_field.address.spec_path,
     sources_field.filespecs,
     snapshot)
   sources_field.validate_fn(fileset_with_spec)
-  yield HydratedField(sources_field.arg, fileset_with_spec)
+  return HydratedField(sources_field.arg, fileset_with_spec)
 
 
 @rule
-def hydrate_bundles(
+async def hydrate_bundles(
   bundles_field: BundlesField, glob_match_error_behavior: GlobMatchErrorBehavior
 ) -> HydratedField:
   """Given a BundlesField, request Snapshots for each of its filesets and create BundleAdaptors."""
@@ -552,7 +555,7 @@ def hydrate_bundles(
     dataclasses.replace(pg, glob_match_error_behavior=glob_match_error_behavior)
     for pg in bundles_field.path_globs_list
   ]
-  snapshot_list = yield [Get(Snapshot, PathGlobs, pg) for pg in path_globs_with_match_errors]
+  snapshot_list = await MultiGet(Get(Snapshot, PathGlobs, pg) for pg in path_globs_with_match_errors)
 
   spec_path = bundles_field.address.spec_path
 
@@ -571,7 +574,7 @@ def hydrate_bundles(
                                                  snapshot,
                                                  include_dirs=True)
     bundles.append(BundleAdaptor(**kwargs))
-  yield HydratedField('bundles', bundles)
+  return HydratedField('bundles', bundles)
 
 
 def create_legacy_graph_tasks():

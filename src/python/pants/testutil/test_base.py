@@ -11,6 +11,7 @@ from collections import defaultdict
 from contextlib import contextmanager
 from tempfile import mkdtemp
 from textwrap import dedent
+from typing import Any, Type, TypeVar, Union, cast
 
 from pants.base.build_root import BuildRoot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
@@ -24,6 +25,8 @@ from pants.engine.fs import PathGlobs, PathGlobsAndRoot
 from pants.engine.legacy.graph import HydratedField
 from pants.engine.legacy.structs import SourcesField
 from pants.engine.rules import RootRule
+from pants.engine.scheduler import SchedulerSession
+from pants.engine.selectors import Params
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.util import clean_global_runtime_state
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -346,21 +349,19 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
       self._build_graph.reset()
       self._scheduler.invalidate_all_files()
 
-  @classmethod
-  def aggressively_reset_scheduler(cls):
-    cls._scheduler = None
-    if cls._local_store_dir is not None:
-      safe_rmtree(cls._local_store_dir)
+  def aggressively_reset_scheduler(self):
+    self._scheduler = None
+    if self._local_store_dir is not None:
+      safe_rmtree(self._local_store_dir)
 
-  @classmethod
   @contextmanager
-  def isolated_local_store(cls):
-    cls.aggressively_reset_scheduler()
-    cls._init_engine()
+  def isolated_local_store(self):
+    self.aggressively_reset_scheduler()
+    self._init_engine()
     try:
       yield
     finally:
-      cls.aggressively_reset_scheduler()
+      self.aggressively_reset_scheduler()
 
   @property
   def build_root(self):
@@ -370,42 +371,40 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
   def pants_workdir(self):
     return self._pants_workdir()
 
-  @classmethod
   @memoized_method
-  def _build_root(cls):
+  def _build_root(self):
     return os.path.realpath(mkdtemp(suffix='_BUILD_ROOT'))
 
-  @classmethod
   @memoized_method
-  def _pants_workdir(cls):
-    return os.path.join(cls._build_root(), '.pants.d')
+  def _pants_workdir(self):
+    return os.path.join(self._build_root(), '.pants.d')
 
-  @classmethod
-  def _init_engine(cls):
-    if cls._scheduler is not None:
+  def _init_engine(self) -> None:
+    if self._scheduler is not None:
       return
 
-    cls._local_store_dir = os.path.realpath(safe_mkdtemp())
-    safe_mkdir(cls._local_store_dir)
+    self._local_store_dir = os.path.realpath(safe_mkdtemp())
+    safe_mkdir(self._local_store_dir)
 
     # NB: This uses the long form of initialization because it needs to directly specify
     # `cls.alias_groups` rather than having them be provided by bootstrap options.
     graph_session = EngineInitializer.setup_legacy_graph_extended(
       pants_ignore_patterns=None,
-      local_store_dir=cls._local_store_dir,
+      local_store_dir=self._local_store_dir,
       build_file_imports_behavior='allow',
       native=init_native(),
       options_bootstrapper=OptionsBootstrapper.create(args=['--pants-config-files=[]']),
-      build_configuration=cls.build_config(),
+      build_root=self.build_root,
+      build_configuration=self.build_config(),
       build_ignore_patterns=None,
     ).new_session(zipkin_trace_v2=False, build_id="buildid_for_test")
-    cls._scheduler = graph_session.scheduler_session
-    cls._build_graph, cls._address_mapper = graph_session.create_build_graph(
-        TargetRoots([]), cls._build_root()
+    self._scheduler = graph_session.scheduler_session
+    self._build_graph, self._address_mapper = graph_session.create_build_graph(
+        TargetRoots([]), self._build_root()
       )
 
   @property
-  def scheduler(self):
+  def scheduler(self) -> SchedulerSession:
     if self._scheduler is None:
       self._init_engine()
       self.post_scheduler_init()
@@ -437,6 +436,16 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
       self.invalidate_for(*files)
     if self._build_graph is not None:
       self._build_graph.reset()
+
+  _P = TypeVar("_P")
+
+  def request_single_product(
+    self, product_type: Type["TestBase._P"], subject: Union[Params, Any]
+  ) -> "TestBase._P":
+    result = assert_single_element(
+      self.scheduler.product_request(product_type, [subject])
+    )
+    return cast(TestBase._P, result)
 
   def set_options_for_scope(self, scope, **kwargs):
     self.options[scope].update(kwargs)

@@ -22,7 +22,7 @@ class SourceMapperTest(TestBase):
 
   def owner(self, owner, f):
     request = OwnersRequest(sources=(f,), include_dependees=str('none'))
-    addresses, = self.scheduler.product_request(BuildFileAddresses, [request])
+    addresses = self.request_single_product(BuildFileAddresses, request)
     self.assertEqual(set(owner), {i.spec for i in addresses})
 
   def test_target_address_for_source_yields_unique_addresses(self):

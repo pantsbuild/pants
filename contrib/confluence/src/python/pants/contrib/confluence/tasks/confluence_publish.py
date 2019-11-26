@@ -70,10 +70,10 @@ class ConfluencePublish(Task):
     for page, wiki_artifact in pages:
       html_info = genmap.get((wiki_artifact, page))
       if len(html_info) > 1:
-        raise TaskError('Unexpected resources for {}: {}'.format(page, html_info))
+        raise TaskError(f'Unexpected resources for {page}: {html_info}')
       basedir, htmls = list(html_info.items())[0]
       if len(htmls) != 1:
-        raise TaskError('Unexpected resources for {}: {}'.format(page, htmls))
+        raise TaskError(f'Unexpected resources for {page}: {htmls}')
       with safe_open(os.path.join(basedir, htmls[0]), 'r') as contents:
         url = self.publish_page(
           page.address,
@@ -85,7 +85,7 @@ class ConfluencePublish(Task):
         )
         if url:
           urls.append(url)
-          self.context.log.info('Published {} to {}'.format(page, url))
+          self.context.log.info(f'Published {page} to {url}')
     
     if self.open and urls:
       try:
@@ -108,7 +108,7 @@ class ConfluencePublish(Task):
     existing = wiki.getpage(space, title)
     if existing:
       if not self.force and existing['content'].strip() == body.strip():
-        self.context.log.warn("Skipping publish of '{}' - no changes".format(title))
+        self.context.log.warn(f"Skipping publish of '{title}' - no changes")
         return
       
       pageopts['id'] = existing['id']
@@ -118,12 +118,12 @@ class ConfluencePublish(Task):
       page = wiki.create_html_page(space, title, body, parent, **pageopts)
       return page['url']
     except ConfluenceError as e:
-      raise TaskError('Failed to update confluence: {}'.format(e))
+      raise TaskError(f'Failed to update confluence: {e!r}')
   
   def login(self):
     if not self._wiki:
       try:
         self._wiki = Confluence.login(self.url, self.user, self.api())
       except ConfluenceError as e:
-        raise TaskError('Failed to login to confluence: {}'.format(e))
+        raise TaskError(f'Failed to login to confluence: {e!r}')
     return self._wiki

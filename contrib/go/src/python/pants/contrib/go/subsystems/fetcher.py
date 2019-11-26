@@ -77,7 +77,7 @@ class CloningFetcher(Fetcher):
     if imported_repo:
       return imported_repo.import_prefix
     else:
-      raise FetchError('No <meta name="go-import"> tag found at {}'.format(self.import_path))
+      raise FetchError(f'No <meta name="go-import"> tag found at {self.import_path}')
 
   def fetch(self, dest, rev=None):
     imported_repo = self._meta_tag_reader.get_imported_repo(self.import_path)
@@ -86,9 +86,9 @@ class CloningFetcher(Fetcher):
                        'at {}'.format(self.import_path))
     if imported_repo.vcs != 'git':
       # TODO: Support other vcs systems as needed.
-      raise FetchError("Don't know how to fetch for vcs type {}.".format(imported_repo.vcs))
+      raise FetchError(f"Don't know how to fetch for vcs type {imported_repo.vcs}.")
     # TODO: Do this in a workunit (see https://github.com/pantsbuild/pants/issues/3502).
-    logger.info('Cloning {} into {}'.format(imported_repo.url, dest))
+    logger.info(f'Cloning {imported_repo.url} into {dest}')
     repo = Git.clone(imported_repo.url, dest)
     if rev:
       repo.set_state(rev)
@@ -124,7 +124,7 @@ class ArchiveFetcher(Fetcher):
       self._fetch(archive_url, self._url_info.strip_level, dest)
     except FetchError as e:
       # Modify the message to add more information, then reraise with the original traceback.
-      e.add_message_prefix('Error while fetching import {}: '.format(self.import_path))
+      e.add_message_prefix(f'Error while fetching import {self.import_path}: ')
       raise
 
   def _fetch(self, archive_url, strip_level, dest):

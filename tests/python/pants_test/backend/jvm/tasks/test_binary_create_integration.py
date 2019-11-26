@@ -65,7 +65,7 @@ class BinaryCreateIntegrationTest(PantsRunIntegrationTest):
 
   def test_agent_dependency(self):
     directory = "testprojects/src/java/org/pantsbuild/testproject/manifest"
-    target = "{}:manifest-with-agent".format(directory)
+    target = f"{directory}:manifest-with-agent"
     with self.temporary_workdir() as workdir:
       pants_run = self.run_pants_with_workdir(["binary", target], workdir=workdir)
       self.assert_success(pants_run)
@@ -79,12 +79,12 @@ class BinaryCreateIntegrationTest(PantsRunIntegrationTest):
   def test_deploy_excludes(self):
     with temporary_dir() as distdir:
       def build(name):
-        jar_filename = os.path.join(distdir, '{}.jar'.format(name))
+        jar_filename = os.path.join(distdir, f'{name}.jar')
         command = [
-          '--pants-distdir={}'.format(distdir),
+          f'--pants-distdir={distdir}',
           '--no-compile-rsc-capture-classpath',
           'binary',
-          'testprojects/src/java/org/pantsbuild/testproject/deployexcludes:{}'.format(name),
+          f'testprojects/src/java/org/pantsbuild/testproject/deployexcludes:{name}',
         ]
         self.assert_success(self.run_pants(command))
         return jar_filename

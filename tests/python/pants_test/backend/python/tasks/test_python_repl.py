@@ -132,8 +132,8 @@ class PythonReplTest(PythonTaskTestBase):
 
   def test_requirement(self):
     self.do_test_repl(code=['import six',
-                            'print("python 2?:{}".format(six.PY2))'],
-                      expected=['python 2?:True'],
+                            'six._print("Hello there")'],
+                      expected=['Hello there'],
                       targets=[self.six])
 
   def test_mixed_python(self):
@@ -142,10 +142,10 @@ class PythonReplTest(PythonTaskTestBase):
                             'from lib.lib import go',
                             'print("teapot response code is: {}".format(requests.codes.teapot))',
                             'go()',
-                            'print("python 2?:{}".format(six.PY2))'],
+                            'six._print("Hello there")'],
                       expected=['teapot response code is: 418',
                                 'gogogo!',
-                                'python 2?:True'],
+                                'Hello there'],
                       targets=[self.requests, self.binary])
 
   def test_disallowed_mix(self):
@@ -171,7 +171,7 @@ class PythonReplTest(PythonTaskTestBase):
     # the head of this very file.
     with open(__file__, 'r') as fp:
       me = fp.readline()
-      self.do_test_repl(code=['!head -1 {}'.format(__file__)],
+      self.do_test_repl(code=[f'!head -1 {__file__}'],
                         expected=[me],
                         targets=[self.six],  # Just to get the repl to pop up.
                         options={'ipython': True})

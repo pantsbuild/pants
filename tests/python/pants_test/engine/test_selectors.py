@@ -35,7 +35,7 @@ The two-argument form of Get does not accept a type as its second argument.
 args were: Get(({a!r}, {b!r}))
 
 Get.create_statically_for_rule_graph() should be used to generate a Get() for
-the `input_gets` field of a rule. If you are using a `yield Get(...)` in a rule
+the `input_gets` field of a rule. If you are using a `await Get(...)` in a rule
 and a type was intended, use the 3-argument version:
 Get({a!r}, {t!r}, {b!r})
 """.format(a=AClass, t=type(BClass), b=BClass), str(cm.exception))

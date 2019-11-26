@@ -263,7 +263,7 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
             # Mutate the working copy so we can do `--changed-parent=HEAD` deterministically.
             with mutated_working_copy([os.path.join(worktree, filename)]):
               stdout = self.run_list(
-                ['--changed-include-dependees={}'.format(dependee_type), '--changed-parent=HEAD'],
+                [f'--changed-include-dependees={dependee_type}', '--changed-parent=HEAD'],
               )
 
               self.assertEqual(
@@ -272,7 +272,7 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
               )
 
         cls.add_test(
-          'test_changed_coverage_{}_{}'.format(dependee_type, safe_filename(filename)),
+          f'test_changed_coverage_{dependee_type}_{safe_filename(filename)}',
           inner_integration_coverage_test
         )
 
@@ -293,7 +293,7 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
       with mutated_working_copy([os.path.join(worktree, changed_src)]):
         pants_run = self.run_pants([
           '-ldebug',   # This ensures the changed target names show up in the pants output.
-          '--exclude-target-regexp={}'.format(exclude_target_regexp),
+          f'--exclude-target-regexp={exclude_target_regexp}',
           '--changed-parent=HEAD',
           '--changed-include-dependees=transitive',
           'test',
@@ -318,7 +318,7 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
       with mutated_working_copy([os.path.join(worktree, changed_src)]):
         pants_run = self.run_pants([
           '-ldebug',   # This ensures the changed target names show up in the pants output.
-          '--exclude-target-regexp={}'.format(exclude_target_regexp),
+          f'--exclude-target-regexp={exclude_target_regexp}',
           '--changed-parent=HEAD',
           '--changed-include-dependees=transitive',
           'test',

@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 class ExecutablePexTool(Subsystem):
 
-  entry_point = None
+  entry_point: Optional[str] = None
 
   base_requirements: List['PythonRequirement'] = []
 

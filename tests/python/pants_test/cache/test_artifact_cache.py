@@ -4,6 +4,8 @@
 import os
 from contextlib import contextmanager
 
+import pytest
+
 from pants.cache.artifact import TarballArtifact
 from pants.cache.artifact_cache import (
   NonfatalArtifactCacheError,
@@ -62,6 +64,7 @@ class TestArtifactCache(TestBase):
     with self.setup_local_cache() as artifact_cache:
       self.do_test_artifact_cache(artifact_cache)
 
+  @pytest.mark.flaky(retries=1)  # https://github.com/pantsbuild/pants/issues/6838
   def test_restful_cache(self):
     with self.assertRaises(InvalidRESTfulCacheProtoError):
       RESTfulArtifactCache('foo', BestUrlSelector(['ftp://localhost/bar']), 'foo')
@@ -69,6 +72,7 @@ class TestArtifactCache(TestBase):
     with self.setup_rest_cache() as artifact_cache:
       self.do_test_artifact_cache(artifact_cache)
 
+  @pytest.mark.flaky(retries=1)  # https://github.com/pantsbuild/pants/issues/6838
   def test_restful_cache_failover(self):
     bad_url = 'http://badhost:123'
 
@@ -185,6 +189,7 @@ class TestArtifactCache(TestBase):
             self.assertTrue(os.path.exists(results_dir))
             self.assertTrue(len(os.listdir(results_dir)) == 0)
 
+  @pytest.mark.flaky(retries=1)  # https://github.com/pantsbuild/pants/issues/6838
   def test_multiproc(self):
     key = CacheKey('muppet_key', 'fake_hash')
 

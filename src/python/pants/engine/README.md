@@ -28,7 +28,7 @@ produce the requested value.
 ### Products and Params
 
 The engine executes your `@rule`s in order to (recursively) compute a `Product` of the requested
-type for a set of `Param`s. This recursive type search leads to a loosely coupled (and yet still 
+type for a set of `Param`s. This recursive type search leads to a loosely coupled (and yet still
 statically checked) form of dependency injection.
 
 When an `@rule` runs, it requires a set of `Param`s that the engine has determined are needed to
@@ -79,7 +79,7 @@ fail with a useful error message.
 ### Datatypes
 
 In practical use, builtin types like `str` or `int` do not provide enough information to
-disambiguate between various types of data in `@rule` signatures, so declaring small `datatype` 
+disambiguate between various types of data in `@rule` signatures, so declaring small `datatype`
 definitions to provide a unique and descriptive type is highly recommended:
 
 ```python
@@ -135,7 +135,7 @@ the rule graph and then passed in.
 
 The second case for introducing new `Params` occurs within the running graph when an `@rule` needs
 to pass values to its dependencies that are necessary to compute a product. In this case, `@rule`s
-may be written as coroutines (ie, using the python `yield` statement) that yield "`Get` requests"
+may be written as `async` methods that `await` on "`Get` requests"
 that request products for other `Params`. Just like `@rule` parameter selectors, `Get` requests
 instantiated in the body of an `@rule` are statically checked to be satisfiable in the set of
 installed `@rule`s.
@@ -147,13 +147,13 @@ and then concatentates that content into a (datatype-wrapped) string:
 
 ```python
 @rule
-def concat(files: Files) -> ConcattedFiles:
-  file_content_list = yield [Get(FileContent, File(f)) for f in files]
-  yield ConcattedFiles(''.join(fc.content for fc in file_content_list))
+async def concat(files: Files) -> ConcattedFiles:
+  file_content_list = await MultiGet(Get(FileContent, File(f)) for f in files)
+  return ConcattedFiles(''.join(fc.content for fc in file_content_list))
 ```
 
 This `@rule` declares that: "for any `Params` for which we can compute `Files`, we can also compute
-`ConcattedFiles`". Each yielded `Get` request results in FileContent for a different File `Param`
+`ConcattedFiles`". Each awaited `Get` request results in FileContent for a different File `Param`
 from the Files list. And, happily, all of these requests can proceed in parallel.
 
 ### Advanced Param Usage

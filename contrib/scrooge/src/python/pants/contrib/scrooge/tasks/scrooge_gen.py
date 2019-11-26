@@ -103,7 +103,7 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
           self.context.build_graph.maybe_inject_address_closure(dep_address)
           dependencies.add(self.context.build_graph.get_target(dep_address))
         except AddressLookupError as e:
-          raise AddressLookupError('{}\n  referenced from {} scope'.format(e, self.options_scope))
+          raise AddressLookupError(f'{e}\n  referenced from {self.options_scope} scope')
     return deps
 
   def _validate_language(self, target):
@@ -111,7 +111,7 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
     if language not in self._registered_language_aliases():
       raise TargetDefinitionException(
         target,
-        'language {} not supported: expected one of {}.'.format(language, list(self._registered_language_aliases().keys())))
+        f'language {language} not supported: expected one of {list(self._registered_language_aliases().keys())}.')
     return language
 
   @memoized_method
@@ -124,9 +124,9 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
     registered_aliases = self.context.build_configuration.registered_aliases()
     target_types = registered_aliases.target_types_by_alias.get(alias_for_lang, None)
     if not target_types:
-      raise TaskError('Registered target type `{0}` for language `{1}` does not exist!'.format(alias_for_lang, language))
+      raise TaskError(f'Registered target type `{alias_for_lang}` for language `{language}` does not exist!')
     if len(target_types) > 1:
-      raise TaskError('More than one target type registered for language `{0}`'.format(language))
+      raise TaskError(f'More than one target type registered for language `{language}`')
     return next(iter(target_types))
 
   def execute_codegen(self, target, target_workdir):
@@ -157,7 +157,7 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
     args.extend(['--language', partial_cmd.language])
 
     for lhs, rhs in partial_cmd.namespace_map:
-      args.extend(['--namespace-map', '%s=%s' % (lhs, rhs)])
+      args.extend(['--namespace-map', f'{lhs}={rhs}'])
 
     args.extend(['--dest', target_workdir])
 
@@ -185,7 +185,7 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
                               args=args,
                               workunit_name='scrooge-gen')
     if 0 != returncode:
-      raise TaskError('Scrooge compiler exited non-zero for {} ({})'.format(target, returncode))
+      raise TaskError(f'Scrooge compiler exited non-zero for {target} ({returncode})')
 
   @staticmethod
   def _declares_exception(source):
@@ -245,9 +245,9 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
     if mismatched_compiler_configs:
       msg = ['Thrift dependency trees must be generated with a uniform compiler configuration.\n\n']
       for tgt in sorted(mismatched_compiler_configs.keys()):
-        msg.append('%s - %s\n' % (tgt, compiler_config(tgt)))
+        msg.append(f'{tgt} - {compiler_config(tgt)}\n')
         for dep in mismatched_compiler_configs[tgt]:
-          msg.append('    %s - %s\n' % (dep, compiler_config(dep)))
+          msg.append(f'    {dep} - {compiler_config(dep)}\n')
       raise TaskError(''.join(msg))
 
   def _must_have_sources(self, target):

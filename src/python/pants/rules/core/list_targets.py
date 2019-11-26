@@ -29,13 +29,13 @@ class List(LineOriented, Goal):
 
 
 @console_rule
-def list_targets(console: Console, list_options: List.Options, specs: Specs) -> List:
+async def list_targets(console: Console, list_options: List.Options, specs: Specs) -> List:
   provides = list_options.values.provides
   provides_columns = list_options.values.provides_columns
   documented = list_options.values.documented
   if provides or documented:
     # To get provides clauses or documentation, we need hydrated targets.
-    collection = yield Get(HydratedTargets, Specs, specs)
+    collection = await Get(HydratedTargets, Specs, specs)
     if provides:
       extractors = dict(
           address=lambda target: target.address.spec,
@@ -65,7 +65,7 @@ def list_targets(console: Console, list_options: List.Options, specs: Specs) -> 
       print_fn = print_documented
   else:
     # Otherwise, we can use only addresses.
-    collection = yield Get(BuildFileAddresses, Specs, specs)
+    collection = await Get(BuildFileAddresses, Specs, specs)
     print_fn = lambda address: address.spec
 
   with List.line_oriented(list_options, console) as print_stdout:
@@ -77,7 +77,7 @@ def list_targets(console: Console, list_options: List.Options, specs: Specs) -> 
       if result:
         print_stdout(result)
 
-  yield List(exit_code=0)
+  return List(exit_code=0)
 
 
 def rules():

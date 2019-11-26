@@ -34,7 +34,7 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
     ]),
   }
 
-  _WARN_FMT = """[WARN] Globs did not match. Excludes were: {excludes}. Unmatched globs were: {unmatched}.\n\n"""
+  _WARN_FMT = """[WARN] Globs did not match. Excludes were: {excludes}. Unmatched globs were: {unmatched}."""
 
   _BUNDLE_ERR_MSGS = [
     ['*.aaaa'],
@@ -46,7 +46,7 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
   _BUNDLE_TARGET_BASE = 'testprojects/src/java/org/pantsbuild/testproject/bundle'
 
   def _list_target_check_warnings_sources(self, target_name):
-    target_full = '{}:{}'.format(self._SOURCES_TARGET_BASE, target_name)
+    target_full = f'{self._SOURCES_TARGET_BASE}:{target_name}'
     glob_str, expected_globs = self._SOURCES_ERR_MSGS[target_name]
 
     pants_run = self.run_pants(['filedeps', target_full], config={
@@ -58,11 +58,13 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
 
     warning_msg = (
       self._WARN_FMT.format(
-        excludes = "[]",
-        unmatched = "[{}]".format(', '.join('"{}"'.format(os.path.join(self._SOURCES_TARGET_BASE, g)) for g in expected_globs))
+        excludes="[]",
+        unmatched="[{}]".format(', '.join(
+          f'"{os.path.join(self._SOURCES_TARGET_BASE, g)}"' for g in expected_globs)
+        )
       )
     )
-    self.assertTrue(warning_msg in pants_run.stderr_data)
+    self.assertIn(warning_msg, pants_run.stderr_data)
 
   _ERR_TARGETS = {
     'testprojects/src/python/sources:some-missing-some-not': [
@@ -104,7 +106,7 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
       self._list_target_check_warnings_sources(target_name)
 
   def test_existing_sources(self):
-    target_full = '{}:text'.format(self._SOURCES_TARGET_BASE)
+    target_full = f'{self._SOURCES_TARGET_BASE}:text'
     pants_run = self.run_pants(['filedeps', target_full], config={
       GLOBAL_SCOPE_CONFIG_SECTION: {
         'glob_expansion_failure': 'warn',
@@ -114,7 +116,7 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
     self.assertNotIn("Globs", pants_run.stderr_data)
 
   def test_missing_bundles_warnings(self):
-    target_full = '{}:missing-bundle-fileset'.format(self._BUNDLE_TARGET_BASE)
+    target_full = f'{self._BUNDLE_TARGET_BASE}:missing-bundle-fileset'
     pants_run = self.run_pants(['filedeps', target_full], config={
       GLOBAL_SCOPE_CONFIG_SECTION: {
         'glob_expansion_failure': 'warn',
@@ -133,7 +135,7 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
       self.assertIn(warning_msg, pants_run.stderr_data)
 
   def test_existing_bundles(self):
-    target_full = '{}:mapper'.format(self._BUNDLE_TARGET_BASE)
+    target_full = f'{self._BUNDLE_TARGET_BASE}:mapper'
     pants_run = self.run_pants(['filedeps', target_full], config={
       GLOBAL_SCOPE_CONFIG_SECTION: {
         'glob_expansion_failure': 'warn',
@@ -143,7 +145,7 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
     self.assertNotIn("Globs", pants_run.stderr_data)
 
   def test_existing_directory_with_no_build_files_fails(self):
-    pants_run = self.run_pants(['list', "{}::".format(self._NO_BUILD_FILE_TARGET_BASE)])
+    pants_run = self.run_pants(['list', f"{self._NO_BUILD_FILE_TARGET_BASE}::"])
     self.assert_failure(pants_run)
     self.assertIn("does not match any targets.", pants_run.stderr_data)
 

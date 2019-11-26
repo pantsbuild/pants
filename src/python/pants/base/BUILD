@@ -182,6 +182,7 @@ python_library(
     ':specs',
     'src/python/pants/build_graph',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(

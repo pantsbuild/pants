@@ -73,7 +73,7 @@ class GoFetch(GoTask):
     # Only fetch each remote root once.
     if not os.path.exists(root_dir):
       with temporary_dir() as tmp_fetch_root:
-        with self.context.new_workunit('fetch {}'.format(pkg)):
+        with self.context.new_workunit(f'fetch {pkg}'):
           fetcher.fetch(dest=tmp_fetch_root, rev=rev)
           safe_mkdir(root_dir)
           for path in os.listdir(tmp_fetch_root):
@@ -108,7 +108,7 @@ class GoFetch(GoTask):
       with safe_concurrent_creation(remote_import_paths_cache) as safe_path:
         with open(safe_path, 'w') as fp:
           for path in remote_import_paths:
-            fp.write('{}\n'.format(path))
+            fp.write(f'{path}\n')
 
     for remote_import_path in remote_import_paths:
       remote_root = import_root_map.get(remote_import_path)
@@ -277,4 +277,4 @@ class GoFetch(GoTask):
     with safe_concurrent_creation(path) as safe_path:
       with open(safe_path, 'w') as fp:
         for import_path, root in sorted(import_root_map.items()):
-          fp.write('{}\t{}\n'.format(import_path, root))
+          fp.write(f'{import_path}\t{root}\n')

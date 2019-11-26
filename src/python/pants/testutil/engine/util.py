@@ -3,8 +3,10 @@
 
 import os
 import re
+from dataclasses import dataclass
 from io import StringIO
-from types import GeneratorType
+from types import CoroutineType, GeneratorType
+from typing import Any, Callable, Optional, Sequence, Type
 
 from colors import blue, green, red
 
@@ -19,23 +21,48 @@ from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS
 from pants.util.objects import SubclassesOf
 
 
-def run_rule(rule, *args):
-  """A test helper function that runs an @rule with a set of arguments and Get providers.
+# TODO(#6742): Improve the type signature by using generics and type vars. `mock` should be
+#  `Callable[[SubjectType], ProductType]`.
+@dataclass(frozen=True)
+class MockGet:
+  product_type: Type
+  subject_type: Type
+  mock: Callable[[Any], Any]
+
+
+def run_rule(
+  rule,
+  *,
+  rule_args: Optional[Sequence[Any]] = None,
+  mock_gets: Optional[Sequence[MockGet]] = None
+):
+  """A test helper function that runs an @rule with a set of arguments and mocked Get providers.
 
   An @rule named `my_rule` that takes one argument and makes no `Get` requests can be invoked
   like so (although you could also just invoke it directly):
   ```
-  return_value = run_rule(my_rule, arg1)
+  return_value = run_rule(my_rule, rule_args=[arg1])
   ```
 
-  In the case of an @rule that makes Get requests, things get more interesting: an extra argument
-  is required that represents a dict mapping (product, subject) type pairs to one argument functions
-  that take a subject value and return a product value.
+  In the case of an @rule that makes Get requests, things get more interesting: the
+  `mock_gets` argument must be provided as a sequence of `MockGet`s. Each MockGet takes the Product
+  and Subject type, along with a one-argument function that takes a subject value and returns a
+  product value.
 
   So in the case of an @rule named `my_co_rule` that takes one argument and makes Get requests
-  for product and subject types (Listing, Dir), the invoke might look like:
+  for a product type `Listing` with subject type `Dir`, the invoke might look like:
   ```
-  return_value = run_rule(my_co_rule, arg1, {(Listing, Dir): lambda x: Listing(..)})
+  return_value = run_rule(
+    my_co_rule,
+    rule_args=[arg1],
+    mock_gets=[
+      MockGet(
+        product_type=Listing,
+        subject_type=Dir,
+        mock=lambda dir_subject: Listing(..),
+      ),
+    ],
+  )
   ```
 
   :returns: The return value of the completed @rule.
@@ -45,23 +72,24 @@ def run_rule(rule, *args):
   if task_rule is None:
     raise TypeError('Expected to receive a decorated `@rule`; got: {}'.format(rule))
 
-  gets_len = len(task_rule.input_gets)
-
-  if len(args) != len(task_rule.input_selectors) + (1 if gets_len else 0):
+  if rule_args is not None and len(rule_args) != len(task_rule.input_selectors):
     raise ValueError('Rule expected to receive arguments of the form: {}; got: {}'.format(
-      task_rule.input_selectors, args))
+      task_rule.input_selectors, rule_args))
 
-  args, get_providers = (args[:-1], args[-1]) if gets_len > 0 else (args, {})
-  if gets_len != len(get_providers):
+  if mock_gets is not None and len(mock_gets) != len(task_rule.input_gets):
     raise ValueError('Rule expected to receive Get providers for {}; got: {}'.format(
-      task_rule.input_gets, get_providers))
+      task_rule.input_gets, mock_gets))
 
-  res = rule(*args)
-  if not isinstance(res, GeneratorType):
+  res = rule(*(rule_args or ()))
+  if not isinstance(res, (CoroutineType, GeneratorType)):
     return res
 
   def get(product, subject):
-    provider = get_providers.get((product, type(subject)))
+    provider = next((
+      mock_get.mock
+      for mock_get in mock_gets
+      if mock_get.product_type == product and mock_get.subject_type == type(subject)
+    ), None)
     if provider is None:
       raise AssertionError('Rule requested: Get{}, which cannot be satisfied.'.format(
         (product, type(subject), subject)))
@@ -70,13 +98,17 @@ def run_rule(rule, *args):
   rule_coroutine = res
   rule_input = None
   while True:
-    res = rule_coroutine.send(rule_input)
-    if isinstance(res, Get):
-      rule_input = get(res.product, res.subject)
-    elif type(res) in (tuple, list):
-      rule_input = [get(g.product, g.subject) for g in res]
-    else:
-      return res
+    try:
+      res = rule_coroutine.send(rule_input)
+      if isinstance(res, Get):
+        rule_input = get(res.product, res.subject)
+      elif type(res) in (tuple, list):
+        rule_input = [get(g.product, g.subject) for g in res]
+      else:
+        return res
+    except StopIteration as e:
+      if e.args:
+        return e.value
 
 
 def init_native():
@@ -131,8 +163,8 @@ def assert_equal_with_printing(test_case, expected, actual):
 
 
 def remove_locations_from_traceback(trace):
-  location_pattern = re.compile('"/.*", line \d+')
-  address_pattern = re.compile('0x[0-9a-f]+')
+  location_pattern = re.compile(r'"/.*", line \d+')
+  address_pattern = re.compile(r'0x[0-9a-f]+')
   new_trace = location_pattern.sub('LOCATION-INFO', trace)
   new_trace = address_pattern.sub('0xEEEEEEEEE', new_trace)
   return new_trace

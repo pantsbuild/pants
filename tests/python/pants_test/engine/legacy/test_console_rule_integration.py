@@ -78,7 +78,7 @@ class TestConsoleRuleIntegration(PantsDaemonIntegrationTestBase):
           '--loop',
           '--loop-max=3',
           'list',
-          '{}:'.format(tmpdir),
+          f'{tmpdir}:',
         ],
         workdir,
         config,
@@ -97,6 +97,6 @@ class TestConsoleRuleIntegration(PantsDaemonIntegrationTestBase):
       pants_result = handle.join()
       self.assert_success(pants_result)
       self.assertEquals(
-          ['{}:{}'.format(rel_tmpdir, name) for name in ('one', 'two', 'three')],
+          [f'{rel_tmpdir}:{name}' for name in ('one', 'two', 'three')],
           list(pants_result.stdout_data.splitlines())
         )

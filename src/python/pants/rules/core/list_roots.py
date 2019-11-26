@@ -17,7 +17,7 @@ class Roots(LineOriented, Goal):
 
 
 @rule
-def all_roots(source_root_config: SourceRootConfig) -> AllSourceRoots:
+async def all_roots(source_root_config: SourceRootConfig) -> AllSourceRoots:
 
   source_roots = source_root_config.get_source_roots()
 
@@ -28,7 +28,7 @@ def all_roots(source_root_config: SourceRootConfig) -> AllSourceRoots:
     else:
       all_paths.add(f"**/{path}/")
 
-  snapshot = yield Get(Snapshot, PathGlobs(include=tuple(all_paths)))
+  snapshot = await Get(Snapshot, PathGlobs(include=tuple(all_paths)))
 
   all_source_roots: Set[SourceRoot] = set()
 
@@ -41,16 +41,16 @@ def all_roots(source_root_config: SourceRootConfig) -> AllSourceRoots:
     if match:
       all_source_roots.add(match)
 
-  yield AllSourceRoots(all_source_roots)
+  return AllSourceRoots(all_source_roots)
 
 
 @console_rule
-def list_roots(console: Console, options: Roots.Options, all_roots: AllSourceRoots) -> Roots:
+async def list_roots(console: Console, options: Roots.Options, all_roots: AllSourceRoots) -> Roots:
   with Roots.line_oriented(options, console) as print_stdout:
     for src_root in sorted(all_roots, key=lambda x: x.path):
       all_langs = ','.join(sorted(src_root.langs))
       print_stdout(f"{src_root.path}: {all_langs or '*'}")
-  yield Roots(exit_code=0)
+  return Roots(exit_code=0)
 
 
 def rules():

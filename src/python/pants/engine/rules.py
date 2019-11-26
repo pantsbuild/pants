@@ -9,12 +9,9 @@ import sys
 import typing
 from abc import ABC, abstractmethod
 from collections import OrderedDict
-from collections.abc import Iterable
 from dataclasses import dataclass
-from textwrap import dedent
-from typing import Any, Callable, Dict, Optional, Tuple, Type
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type
 
-import asttokens
 from twitter.common.collections import OrderedSet
 
 from pants.engine.goal import Goal
@@ -28,163 +25,23 @@ logger = logging.getLogger(__name__)
 
 
 class _RuleVisitor(ast.NodeVisitor):
-  """Pull `Get` calls out of an @rule body and validate `yield` statements."""
+  """Pull `Get` calls out of an @rule body."""
 
-  def __init__(self, func, func_node, func_source, orig_indent, parents_table):
+  def __init__(self):
     super().__init__()
-    self._gets = []
-    self._func = func
-    self._func_node = func_node
-    self._func_source = func_source
-    self._orig_indent = orig_indent
-    self._parents_table = parents_table
-    self._yields_in_assignments = set()
+    self._gets: List[Get] = []
 
   @property
-  def gets(self):
+  def gets(self) -> List[Get]:
     return self._gets
 
-  def _generate_ast_error_message(self, node, msg):
-    # This is the location info of the start of the decorated @rule.
-    filename = inspect.getsourcefile(self._func)
-    source_lines, line_number = inspect.getsourcelines(self._func)
+  def _is_get(self, node: ast.Call):
+    return isinstance(node.func, ast.Name) and node.func.id == Get.__name__
 
-    # The asttokens library is able to keep track of line numbers and column offsets for us -- the
-    # stdlib ast library only provides these relative to each parent node.
-    tokenized_rule_body = asttokens.ASTTokens(self._func_source,
-                                              tree=self._func_node,
-                                              filename=filename)
-    start_offset, _ = tokenized_rule_body.get_text_range(node)
-    line_offset, col_offset = asttokens.LineNumbers(self._func_source).offset_to_line(start_offset)
-    node_file_line = line_number + line_offset - 1
-    # asttokens also very helpfully lets us provide the exact text of the node we want to highlight
-    # in an error message.
-    node_text = tokenized_rule_body.get_text(node)
-
-    fully_indented_node_col = col_offset + self._orig_indent
-    indented_node_text = '{}{}'.format(
-      # The node text doesn't have any initial whitespace, so we have to add it back.
-      col_offset * ' ',
-      '\n'.join(
-        # We removed the indentation from the original source in order to parse it with the ast
-        # library (otherwise it raises an exception), so we add it back here.
-        '{}{}'.format(self._orig_indent * ' ', l)
-        for l in node_text.split('\n')))
-
-    return ("""In function {func_name}: {msg}
-The invalid statement was:
-{filename}:{node_line_number}:{node_col}
-{node_text}
-
-The rule defined by function `{func_name}` begins at:
-{filename}:{line_number}:{orig_indent}
-{source_lines}
-""".format(func_name=self._func.__name__, msg=msg,
-           filename=filename, line_number=line_number, orig_indent=self._orig_indent,
-           node_line_number=node_file_line,
-           node_col=fully_indented_node_col,
-           node_text=indented_node_text,
-           # Strip any leading or trailing newlines from the start of the rule body.
-           source_lines=''.join(source_lines).strip('\n')))
-
-  class YieldVisitError(Exception): pass
-
-  @staticmethod
-  def _maybe_end_of_stmt_list(attr_value):
-    """If `attr_value` is a non-empty iterable, return its final element."""
-    if (attr_value is not None) and isinstance(attr_value, Iterable):
-      result = list(attr_value)
-      if len(result) > 0:
-        return result[-1]
-    return None
-
-  def _stmt_is_at_end_of_parent_list(self, stmt):
-    """Determine if `stmt` is at the end of a list of statements (i.e. can be an implicit `return`).
-
-    If there are any statements following `stmt` at the same level of nesting, this method returns
-    False, such as the following (if `stmt` is the Expr for `yield 'good'`):
-
-    if 2 + 2 == 5:
-      yield 'good'
-      a = 3
-
-    Note that this returns False even if the statement following `stmt` is a `return`.
-
-    However, if `stmt` is at the end of a list of statements, it can be made more clear that `stmt`
-    is intended to represent a `return`. Another way to view this method is as a dead code
-    elimination check, for a `stmt` which is intended to represent control flow moving out of the
-    current @rule. For example, this method would return True for both of the yield Expr statements
-    in the below snippet.
-
-    if True:
-      yield 3
-    else:
-      a = 3
-      yield a
-
-    This checking is performed by getting the parent of `stmt` with a pre-generated table passed
-    into the constructor.
-
-    See https://docs.python.org/2/library/ast.html#abstract-grammar for the grammar specification.
-    'body', 'orelse', and 'finalbody' are the only attributes on any AST nodes which can contain
-    lists of stmts.  'body' is also an attribute in the Exec statement for some reason, but as a
-    single expr, so we simply check if it is iterable in `_maybe_end_of_stmt_list()`.
-    """
-    parent_stmt = self._parents_table[stmt]
-    last_body_stmt = self._maybe_end_of_stmt_list(getattr(parent_stmt, 'body', None))
-    if stmt == last_body_stmt:
-      return True
-    last_orelse_stmt = self._maybe_end_of_stmt_list(getattr(parent_stmt, 'orelse', None))
-    if stmt == last_orelse_stmt:
-      return True
-    last_finally_stmt = self._maybe_end_of_stmt_list(getattr(parent_stmt, 'finalbody', None))
-    if stmt == last_finally_stmt:
-      return True
-    return False
-
-  def _is_get(self, node):
-    return isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == Get.__name__
-
-  def visit_Call(self, node):
+  def visit_Call(self, node: ast.Call) -> None:
+    self.generic_visit(node)
     if self._is_get(node):
       self._gets.append(Get.extract_constraints(node))
-
-  def visit_Assign(self, node):
-    if isinstance(node.value, ast.Yield):
-      self._yields_in_assignments.add(node.value)
-    self.generic_visit(node)
-
-  def visit_Yield(self, node):
-    self.generic_visit(node)
-    if node not in self._yields_in_assignments:
-      # The current yield "expr" is the child of an "Expr" "stmt".
-      expr_for_yield = self._parents_table[node]
-
-      if self._stmt_is_at_end_of_parent_list(expr_for_yield):
-        if self._is_get(node.value):
-          raise self.YieldVisitError(
-            self._generate_ast_error_message(node, dedent("""\
-            `yield Get(...)` in @rule is currently not allowed without an assignment.
-
-            Use something like the following instead:
-                x = yield Get(...)
-                yield x
-
-            See https://github.com/pantsbuild/pants/pull/8227 for progress.
-            """)))
-      else:
-        raise self.YieldVisitError(
-          self._generate_ast_error_message(node, dedent("""\
-          yield in @rule without assignment must come at the end of a series of statements.
-
-          A yield in an @rule without an assignment is equivalent to a return, and we
-          currently require that no statements follow such a yield at the same level of nesting.
-          Use `_ = yield Get(...)` if you wish to yield control to the engine and discard the
-          result.
-
-          Note that any `yield Get(...)` in an @rule without assignment is also currently not
-          supported. See https://github.com/pantsbuild/pants/pull/8227 for progress.
-          """)))
 
 
 @memoized
@@ -201,14 +58,15 @@ def optionable_rule(optionable_factory):
 
 
 def _get_starting_indent(source):
-  """Remove leading indentation from `source` so ast.parse() doesn't raise an exception."""
+  """Used to remove leading indentation from `source` so ast.parse() doesn't raise an exception."""
   if source.startswith(" "):
     return sum(1 for _ in itertools.takewhile(lambda c: c in {' ', b' '}, source))
   return 0
 
 
 def _make_rule(
-  return_type: type, parameter_types: typing.Iterable[type], cacheable: bool = True
+  return_type: Type, parameter_types: typing.Iterable[Type], cacheable: bool = True,
+  name: Optional[bool] = None
 ) -> Callable[[Callable], Callable]:
   """A @decorator that declares that a particular static function may be used as a TaskRule.
 
@@ -217,12 +75,12 @@ def _make_rule(
 
   :param return_type: The return/output type for the Rule. This must be a concrete Python type.
   :param parameter_types: A sequence of types that matches the number and order of arguments to the
-                          @decorated decorated function.
+                          decorated function.
   :param cacheable: Whether the results of executing the Rule should be cached as keyed by all of
                     its inputs.
   """
 
-  is_goal_cls = isinstance(return_type, type) and issubclass(return_type, Goal)
+  is_goal_cls = issubclass(return_type, Goal)
   if is_goal_cls == cacheable:
     raise TypeError(
       'An `@rule` that produces a `Goal` must be declared with @console_rule in order to signal '
@@ -256,30 +114,27 @@ def _make_rule(
     gets = OrderedSet()
     rule_func_node = assert_single_element(
       node for node in ast.iter_child_nodes(module_ast)
-      if isinstance(node, ast.FunctionDef) and node.name == func.__name__)
+      if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == func.__name__)
 
     parents_table = {}
     for parent in ast.walk(rule_func_node):
       for child in ast.iter_child_nodes(parent):
         parents_table[child] = parent
 
-    rule_visitor = _RuleVisitor(
-      func=func,
-      func_node=rule_func_node,
-      func_source=source,
-      orig_indent=beginning_indent,
-      parents_table=parents_table,
-    )
+    rule_visitor = _RuleVisitor()
     rule_visitor.visit(rule_func_node)
     gets.update(
       Get.create_statically_for_rule_graph(resolve_type(p), resolve_type(s))
       for p, s in rule_visitor.gets)
 
     # Register dependencies for @console_rule/Goal.
-    if is_goal_cls:
-      dependency_rules = (optionable_rule(return_type.Options),)
+    dependency_rules = (optionable_rule(return_type.Options),) if is_goal_cls else None
+
+    # Set a default name for Goal classes if one is not explicitly provided
+    if is_goal_cls and name is None:
+      effective_name = return_type.name
     else:
-      dependency_rules = None
+      effective_name = name
 
     func.rule = TaskRule(
         return_type,
@@ -288,26 +143,35 @@ def _make_rule(
         input_gets=tuple(gets),
         dependency_rules=dependency_rules,
         cacheable=cacheable,
+        name=effective_name,
       )
 
     return func
   return wrapper
 
 
+class InvalidTypeAnnotation(TypeError):
+  """Indicates an incorrect type annotation for an `@rule`."""
+
+
+class UnrecognizedRuleArgument(TypeError):
+  """Indicates an unrecognized keyword argument to a `@rule`."""
+
+
 class MissingTypeAnnotation(TypeError):
   """Indicates a missing type annotation for an `@rule`."""
 
 
-class MissingReturnTypeAnnotation(MissingTypeAnnotation):
+class MissingReturnTypeAnnotation(InvalidTypeAnnotation):
   """Indicates a missing return type annotation for an `@rule`."""
 
 
-class MissingParameterTypeAnnotation(MissingTypeAnnotation):
+class MissingParameterTypeAnnotation(InvalidTypeAnnotation):
   """Indicates a missing parameter type annotation for an `@rule`."""
 
 
 def _ensure_type_annotation(
-  annotation: Any, name: str, empty_value: Any, raise_type: Type[MissingTypeAnnotation]
+  annotation: Any, name: str, empty_value: Any, raise_type: Type[InvalidTypeAnnotation],
 ) -> type:
   if annotation == empty_value:
     raise raise_type(f'{name} is missing a type annotation.')
@@ -317,14 +181,30 @@ def _ensure_type_annotation(
   return annotation
 
 
-def rule(*args, cacheable=True) -> Callable:
+PUBLIC_RULE_DECORATOR_ARGUMENTS = {'name'}
+# We don't want @rule-writers to use 'cacheable' as a kwarg directly, but rather
+# set it implicitly based on whether the rule annotation is @rule or @console_rule.
+# So we leave it out of PUBLIC_RULE_DECORATOR_ARGUMENTS.
+IMPLICIT_PRIVATE_RULE_DECORATOR_ARGUMENTS = {'cacheable'}
+
+
+def rule_decorator(*args, **kwargs) -> Callable:
   if len(args) != 1 and not inspect.isfunction(args[0]):
     raise ValueError(
       'The @rule decorator expects no arguments and for the function it decorates to be '
       f'type-annotated. Given {args}.'
     )
 
+  if len(set(kwargs) - PUBLIC_RULE_DECORATOR_ARGUMENTS - IMPLICIT_PRIVATE_RULE_DECORATOR_ARGUMENTS) != 0:
+    raise UnrecognizedRuleArgument(
+      f"`@rule`s and `@console_rule`s only accept the following keyword arguments: {PUBLIC_RULE_DECORATOR_ARGUMENTS}"
+    )
+
   func = args[0]
+
+  cacheable: bool = kwargs['cacheable']
+  name = kwargs.get('name')
+
   signature = inspect.signature(func)
   func_id = f'@rule {func.__module__}:{func.__name__}'
   return_type = _ensure_type_annotation(
@@ -342,11 +222,24 @@ def rule(*args, cacheable=True) -> Callable:
     )
     for name, parameter in signature.parameters.items()
   )
-  return _make_rule(return_type, parameter_types, cacheable=cacheable)(func)
+  return _make_rule(return_type, parameter_types, cacheable=cacheable, name=name)(func)
 
 
-def console_rule(*args) -> Callable:
-  return rule(*args, cacheable=False)
+def inner_rule(*args, **kwargs) -> Callable:
+  if len(args) == 1 and inspect.isfunction(args[0]):
+    return rule_decorator(*args, **kwargs)
+  else:
+    def wrapper(*args):
+      return rule_decorator(*args, **kwargs)
+    return wrapper
+
+
+def rule(*args, **kwargs) -> Callable:
+  return inner_rule(*args, **kwargs, cacheable=True)
+
+
+def console_rule(*args, **kwargs) -> Callable:
+  return inner_rule(*args, **kwargs, cacheable=False)
 
 
 def union(cls):
@@ -355,14 +248,14 @@ def union(cls):
   Annotating a class with @union allows other classes to use a UnionRule() instance to indicate that
   they can be resolved to this base union class. This class will never be instantiated, and should
   have no members -- it is used as a tag only, and will be replaced with whatever object is passed
-  in as the subject of a `yield Get(...)`. See the following example:
+  in as the subject of a `await Get(...)`. See the following example:
 
   @union
   class UnionBase: pass
 
   @rule
   def get_some_union_type(x: X) -> B:
-    result = yield Get(ResultType, UnionBase, x.f())
+    result = await Get(ResultType, UnionBase, x.f())
     # ...
 
   If there exists a single path from (whatever type the expression `x.f()` returns) -> `ResultType`
@@ -456,6 +349,7 @@ class TaskRule(Rule):
   _dependency_rules: Tuple
   _dependency_optionables: Tuple
   cacheable: bool
+  name: Optional[str]
 
   def __init__(
     self,
@@ -466,22 +360,26 @@ class TaskRule(Rule):
     dependency_rules: Optional[Tuple] = None,
     dependency_optionables: Optional[Tuple] = None,
     cacheable: bool = True,
+    name: Optional[str] = None,
   ):
     self._output_type = output_type
     self.input_selectors = input_selectors
     self.input_gets = input_gets
-    self.func = func  # type: ignore
+    self.func = func  # type: ignore[assignment] # cannot assign to a method
     self._dependency_rules = dependency_rules or ()
     self._dependency_optionables = dependency_optionables or ()
     self.cacheable = cacheable
+    self.name = name
 
   def __str__(self):
-    return ('({}, {!r}, {}, gets={}, opts={})'
-            .format(self.output_type.__name__,
+    return ('(name={}, {}, {!r}, {}, gets={}, opts={})'
+            .format(self.name or '<not defined>',
+                    self.output_type.__name__,
                     self.input_selectors,
                     self.func.__name__,
                     self.input_gets,
-                    self.dependency_optionables))
+                    self.dependency_optionables,
+                    ))
 
   @property
   def output_type(self):

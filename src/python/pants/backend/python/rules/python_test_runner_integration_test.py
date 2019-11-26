@@ -27,7 +27,7 @@ class TestPythonTestRunnerIntegration(PantsRunIntegrationTest):
     self.assertEqual(
       len(want_lines),
       len(got_lines),
-      'Wrong number of lines comparing:\nWANT:\n{}\nGOT:\n{}'.format(want, got)
+      f'Wrong number of lines comparing:\nWANT:\n{want}\nGOT:\n{got}'
     )
 
     for line_number, (want_line, got_line) in enumerate(zip(want_lines, got_lines)):
@@ -37,8 +37,8 @@ class TestPythonTestRunnerIntegration(PantsRunIntegrationTest):
                          "Line {} wrong: want '{}', got '{}'"
                          .format(line_number, want_line, got_line))
       elif len(want_parts) == 2:
-        self.assertTrue(got_line.startswith(want_parts[0]), 'Line {} Want "{}" to start with "{}"'.format(line_number, got_line, want_parts[0]))
-        self.assertTrue(got_line.endswith(want_parts[1]), 'Line {} Want "{}" to end with "{}"'.format(line_number, got_line, want_parts[1]))
+        self.assertTrue(got_line.startswith(want_parts[0]), f'Line {line_number} Want "{got_line}" to start with "{want_parts[0]}"')
+        self.assertTrue(got_line.endswith(want_parts[1]), f'Line {line_number} Want "{got_line}" to end with "{want_parts[1]}"')
 
   def run_passing_pants_test(self, trailing_args):
     pants_run = self.run_pants(trailing_args)
@@ -67,7 +67,7 @@ class TestPythonTestRunnerIntegration(PantsRunIntegrationTest):
 
         pants/dummies/test_pass.py .                                             [100%]
 
-        =========================== 1 passed in SOME_TEXT ===========================
+        ============================== 1 passed in SOME_TEXT ===============================
 
 
         testprojects/tests/python/pants/dummies:passing_target                          .....   SUCCESS
@@ -98,7 +98,7 @@ class TestPythonTestRunnerIntegration(PantsRunIntegrationTest):
         E     assert False
 
         pants/dummies/test_fail.py:2: AssertionError
-        =========================== 1 failed in SOME_TEXT ===========================
+        ============================== 1 failed in SOME_TEXT ===============================
 
 
         testprojects/tests/python/pants/dummies:failing_target                          .....   FAILURE
@@ -130,7 +130,7 @@ class TestPythonTestRunnerIntegration(PantsRunIntegrationTest):
         E     assert False
 
         pants/dummies/test_fail.py:2: AssertionError
-        =========================== 1 failed in SOME_TEXT ===========================
+        ============================== 1 failed in SOME_TEXT ===============================
 
         testprojects/tests/python/pants/dummies:passing_target stdout:
         ============================= test session starts ==============================
@@ -141,7 +141,7 @@ class TestPythonTestRunnerIntegration(PantsRunIntegrationTest):
 
         pants/dummies/test_pass.py .                                             [100%]
 
-        =========================== 1 passed in SOME_TEXT ===========================
+        ============================== 1 passed in SOME_TEXT ===============================
 
 
         testprojects/tests/python/pants/dummies:failing_target                          .....   FAILURE
@@ -165,7 +165,7 @@ class TestPythonTestRunnerIntegration(PantsRunIntegrationTest):
 
         pants/dummies/test_with_source_dep_absolute_import.py .                  [100%]
 
-        =========================== 1 passed in SOME_TEXT ===========================
+        ============================== 1 passed in SOME_TEXT ===============================
 
 
         testprojects/tests/python/pants/dummies:target_with_source_dep_absolute_import  .....   SUCCESS
@@ -188,7 +188,7 @@ class TestPythonTestRunnerIntegration(PantsRunIntegrationTest):
 
         pants/dummies/test_with_source_dep_relative_import.py .                  [100%]
 
-        =========================== 1 passed in SOME_TEXT ===========================
+        ============================== 1 passed in SOME_TEXT ===============================
 
 
         testprojects/tests/python/pants/dummies:target_with_source_dep_relative_import  .....   SUCCESS
@@ -211,7 +211,7 @@ class TestPythonTestRunnerIntegration(PantsRunIntegrationTest):
 
         pants/dummies/test_with_thirdparty_dep.py .                              [100%]
 
-        =========================== 1 passed in SOME_TEXT ===========================
+        ============================== 1 passed in SOME_TEXT ===============================
 
 
         testprojects/tests/python/pants/dummies:target_with_thirdparty_dep              .....   SUCCESS
@@ -234,7 +234,7 @@ class TestPythonTestRunnerIntegration(PantsRunIntegrationTest):
 
         pants/dummies/test_with_transitive_dep.py .                              [100%]
 
-        =========================== 1 passed in SOME_TEXT ===========================
+        ============================== 1 passed in SOME_TEXT ===============================
 
 
         testprojects/tests/python/pants/dummies:target_with_transitive_dep              .....   SUCCESS

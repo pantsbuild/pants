@@ -58,7 +58,7 @@ class CustomUrlGenerator(BinaryToolUrlGenerator):
       system_id=self._SYSTEM_ID[host_platform.os_name])
     return [
       base,
-      '{}-alternate'.format(base),
+      f'{base}-alternate',
     ]
 
 
@@ -159,7 +159,7 @@ class BinaryToolBaseTest(TestBase):
         for_subsystems=[DefaultVersion],
         options={
           GLOBAL_SCOPE: {
-            'binaries_baseurls': ['file:///{}'.format(temp_dir)],
+            'binaries_baseurls': [f'file:///{temp_dir}'],
           },
         })
       self.maxDiff = None

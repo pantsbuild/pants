@@ -49,9 +49,9 @@ class GoTarget(Target):
     :raises: `ValueError` if the package path cannot be normalized.
     """
     if package_path.startswith(os.pardir + os.sep):
-      raise ValueError('Relative package paths are not allowed. Given: {!r}'.format(package_path))
+      raise ValueError(f'Relative package paths are not allowed. Given: {package_path!r}')
     if os.path.isabs(package_path):
-      raise ValueError('Absolute package paths are not allowed. Given: {!r}'.format(package_path))
+      raise ValueError(f'Absolute package paths are not allowed. Given: {package_path!r}')
     return '' if not package_path or package_path == os.curdir else package_path.lstrip('/')
 
   @property

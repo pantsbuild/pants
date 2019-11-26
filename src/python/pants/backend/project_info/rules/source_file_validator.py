@@ -13,7 +13,7 @@ from pants.engine.goal import Goal
 from pants.engine.legacy.graph import HydratedTarget, HydratedTargets
 from pants.engine.objects import Collection
 from pants.engine.rules import console_rule, optionable_rule, rule
-from pants.engine.selectors import Get
+from pants.engine.selectors import Get, MultiGet
 from pants.subsystem.subsystem import Subsystem
 from pants.util.collections import Enum
 from pants.util.memo import memoized_method
@@ -117,7 +117,7 @@ class Matcher:
 
 class PathMatcher(Matcher):
   """A matcher for matching file paths."""
-  
+
   def __init__(self, pattern, inverted=False, content_encoding='utf8'):
     super().__init__(pattern, inverted)
     # The expected encoding of the content of files whose paths match this pattern.
@@ -214,10 +214,10 @@ class MultiMatcher:
 # TODO: Switch this to `lint` once we figure out a good way for v1 tasks and v2 rules
 # to share goal names.
 @console_rule
-def validate(
+async def validate(
   console: Console, hydrated_targets: HydratedTargets, validate_options: Validate.Options
 ) -> Validate:
-  per_tgt_rmrs = yield [Get(RegexMatchResults, HydratedTarget, ht) for ht in hydrated_targets]
+  per_tgt_rmrs = await MultiGet(Get(RegexMatchResults, HydratedTarget, ht) for ht in hydrated_targets)
   regex_match_results = list(itertools.chain(*per_tgt_rmrs))
 
   detail_level = validate_options.values.detail_level
@@ -250,21 +250,21 @@ def validate(
     exit_code = PANTS_FAILED_EXIT_CODE
   else:
     exit_code = PANTS_SUCCEEDED_EXIT_CODE
-  yield Validate(exit_code)
+  return Validate(exit_code)
 
 
 @rule
-def match_regexes_for_one_target(
+async def match_regexes_for_one_target(
   hydrated_target: HydratedTarget, source_file_validation: SourceFileValidation
 ) -> RegexMatchResults:
   multi_matcher = source_file_validation.get_multi_matcher()
   rmrs = []
   if hasattr(hydrated_target.adaptor, 'sources'):
-    files_content = yield Get(FilesContent,
+    files_content = await Get(FilesContent,
                               Digest, hydrated_target.adaptor.sources.snapshot.directory_digest)
     for file_content in files_content:
       rmrs.append(multi_matcher.check_source_file(file_content.path, file_content.content))
-  yield RegexMatchResults(rmrs)
+  return RegexMatchResults(rmrs)
 
 
 def rules():

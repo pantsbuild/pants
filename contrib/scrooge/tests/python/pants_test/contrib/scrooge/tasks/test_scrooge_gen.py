@@ -81,9 +81,9 @@ class ScroogeGenTest(NailgunTaskTestBase):
     self._test_help('scala', ScalaLibrary, [], sources)
 
   def compiler_args_to_string(self, compiler_args):
-    quoted = ["'{}'".format(x) for x in compiler_args]
+    quoted = [f"'{x}'" for x in compiler_args]
     comma_separated = ', '.join(quoted)
-    return '[{}]'.format(comma_separated)
+    return f'[{comma_separated}]'
 
   def _test_create_build_str(self, language, compiler_args):
     compiler_args_str = self.compiler_args_to_string(compiler_args)

@@ -725,7 +725,7 @@ public class ConsoleRunnerImpl {
 
       @Override
       public boolean shouldRun(Description desc) {
-        if (desc.isSuite()) {
+        if (desc.isSuite() && !ScalaTestUtil.isScalaTestTest(desc.getTestClass())) {
           return true;
         }
         String descString = Util.getPantsFriendlyDisplayName(desc);

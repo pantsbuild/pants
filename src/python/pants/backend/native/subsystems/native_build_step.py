@@ -3,8 +3,8 @@
 
 from abc import abstractmethod
 
-from pants.backend.native.config.environment import Platform
 from pants.build_graph.mirrored_target_option_mixin import MirroredTargetOptionMixin
+from pants.engine.platform import Platform
 from pants.option.compiler_option_sets_mixin import CompilerOptionSetsMixin
 from pants.subsystem.subsystem import Subsystem
 from pants.util.collections import Enum

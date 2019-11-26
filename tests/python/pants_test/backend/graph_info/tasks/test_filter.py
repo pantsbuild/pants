@@ -59,7 +59,7 @@ class FilterTest(BaseFilterTest):
       if path not in requirement_injected:
         self.add_to_build_file(path, "python_requirement_library(name='foo')")
         requirement_injected.add(path)
-      all_deps = ["'{0}'".format(dep) for dep in deps] + ["':foo'"]
+      all_deps = [f"'{dep}'" for dep in deps] + ["':foo'"]
       self.add_to_build_file(path, dedent("""
           python_library(name='{name}',
             sources=[],

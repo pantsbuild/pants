@@ -69,16 +69,16 @@ class GoProtobufGen(SimpleCodegenTask):
 
     bases = OrderedSet(tgt.target_base for tgt in target.closure() if self.is_gentarget(tgt))
     for base in bases:
-      target_cmd.append('-I={}'.format(os.path.join(get_buildroot(), base)))
+      target_cmd.append(f'-I={os.path.join(get_buildroot(), base)}')
 
     outdir = os.path.join(target_workdir, 'src', 'go')
     safe_mkdir(outdir)
     protoc_plugins = self.get_options().protoc_plugins + list(target.protoc_plugins)
     if protoc_plugins:
-      go_out = 'plugins={}:{}'.format('+'.join(protoc_plugins), outdir)
+      go_out = f"plugins={'+'.join(protoc_plugins)}:{outdir}"
     else:
       go_out = outdir
-    target_cmd.append('--go_out={}'.format(go_out))
+    target_cmd.append(f'--go_out={go_out}')
 
     all_sources = list(target.sources_relative_to_buildroot())
     for source in all_sources:
@@ -92,7 +92,7 @@ class GoProtobufGen(SimpleCodegenTask):
                                  stdout=workunit.output('stdout'),
                                  stderr=workunit.output('stderr'))
         if result != 0:
-          raise TaskError('{} ... exited non-zero ({})'.format(self._protoc, result))
+          raise TaskError(f'{self._protoc} ... exited non-zero ({result})')
 
   @property
   def _copy_target_attributes(self):

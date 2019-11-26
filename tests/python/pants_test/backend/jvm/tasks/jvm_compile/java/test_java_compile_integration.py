@@ -46,8 +46,7 @@ class JavaCompileIntegrationTest(BaseCompileIT):
   # TODO(John Sirois): Factor up a shared utility for reuse by
   # tests/python/pants_test/backend/core/tasks/test_cache_cleanup_integration.py
   def create_platform_args(self, version):
-    return [("""--jvm-platform-platforms={{'default': {{'target': '{version}'}}}}"""
-             .format(version=version)),
+    return [(f"""--jvm-platform-platforms={{'default': {{'target': '{version}'}}}}"""),
             '--jvm-platform-default-platform=default']
 
   def test_java_compile_produces_different_artifact_depending_on_java_version(self):
@@ -174,12 +173,12 @@ class JavaCompileIntegrationTest(BaseCompileIT):
 
       self.assert_success(self.run_pants_with_workdir([
         'compile',
-        '{}:only-15-directly'.format(path_prefix),
+        f'{path_prefix}:only-15-directly',
       ], workdir, config))
       guava_15_base_dir = self.get_cache_subdir(cache_dir)
       guava_15_artifact_dir = os.path.join(
         guava_15_base_dir,
-        '{}.jarversionincompatibility'.format(dotted_path),
+        f'{dotted_path}.jarversionincompatibility',
       )
 
       # One artifact for guava 15
@@ -188,7 +187,7 @@ class JavaCompileIntegrationTest(BaseCompileIT):
       # Rerun for guava 16
       self.assert_success(self.run_pants_with_workdir([
         'compile',
-        (u'{}:alongside-16'.format(path_prefix)),
+        (f'{path_prefix}:alongside-16'),
       ], workdir, config))
 
       guava_16_base_dir = self.get_cache_subdir(cache_dir)
@@ -196,7 +195,7 @@ class JavaCompileIntegrationTest(BaseCompileIT):
       # results directory should be the same
       guava_16_artifact_dir = os.path.join(
         guava_16_base_dir,
-        '{}.jarversionincompatibility'.format(dotted_path),
+        f'{dotted_path}.jarversionincompatibility',
       )
 
       # One artifact for guava 15 and one for guava 16

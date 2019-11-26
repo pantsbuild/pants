@@ -21,6 +21,7 @@ python_tests(
     'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+    'src/python/pants/testutil/engine:util',
     'src/python/pants/testutil/subsystem',
     'tests/python/pants_test:interpreter_selection_utils',
     'src/python/pants/testutil:test_base',

@@ -52,7 +52,7 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
             'lint.checkstyle',
             cache_args,
             'examples/src/java/org/pantsbuild/example/hello/simple',
-            '--lint-checkstyle-configuration={}'.format(config_file)
+            f'--lint-checkstyle-configuration={config_file}'
           ]
           pants_run = self.run_pants_with_workdir(args, workdir)
           self.assert_success(pants_run)
@@ -76,7 +76,7 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
             'lint.checkstyle',
             cache_args,
             'examples/src/java/org/pantsbuild/example/hello/simple',
-            '--lint-checkstyle-configuration={}'.format(config_file)
+            f'--lint-checkstyle-configuration={config_file}'
           ]
           pants_run = self.run_pants_with_workdir(args, workdir)
           self.assert_success(pants_run)
@@ -142,7 +142,7 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
           'lint.checkstyle',
           cache_args,
           'examples/src/java/org/pantsbuild/example/hello/simple',
-          '--lint-checkstyle-configuration={}'.format(config_file),
+          f'--lint-checkstyle-configuration={config_file}',
         ]
         pants_run = self.run_pants_with_workdir(args, workdir)
         self.assert_success(pants_run)
@@ -173,7 +173,7 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
             'lint.checkstyle',
             cache_args,
             'examples/src/java/org/pantsbuild/example/hello/simple',
-            "--lint-checkstyle-properties={}".format(json.dumps(properties)),
+            f"--lint-checkstyle-properties={json.dumps(properties)}",
           ]
           pants_run = self.run_pants_with_workdir(args, workdir)
           self.assert_success(pants_run)
@@ -216,7 +216,7 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
             'lint.checkstyle',
             cache_args,
             'examples/src/java/org/pantsbuild/example/hello/simple',
-            "--lint-checkstyle-properties={}".format(json.dumps(properties)),
+            f"--lint-checkstyle-properties={json.dumps(properties)}",
           ]
           pants_run = self.run_pants_with_workdir(args, workdir)
           self.assert_success(pants_run)
@@ -235,7 +235,7 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
             'lint.checkstyle',
             cache_args,
             'examples/src/java/org/pantsbuild/example/hello/simple',
-            "--lint-checkstyle-properties={}".format(json.dumps(properties)),
+            f"--lint-checkstyle-properties={json.dumps(properties)}",
           ]
           pants_run = self.run_pants_with_workdir(args, workdir)
           self.assert_success(pants_run)
@@ -248,7 +248,7 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
         args = [
             'lint.checkstyle',
             cache_args,
-            '--checkstyle={}'.format(checkstyle_jar) if checkstyle_jar else '',
+            f'--checkstyle={checkstyle_jar}' if checkstyle_jar else '',
             'examples/src/java/org/pantsbuild/example/hello/simple'
           ]
         pants_run = self.run_pants_with_workdir(args, workdir)

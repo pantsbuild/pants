@@ -42,7 +42,7 @@ class IvyResolveTest(NailgunTaskTestBase):
 
   def setUp(self):
     super().setUp()
-    self.set_options_for_scope('cache.{}'.format(self.options_scope),
+    self.set_options_for_scope(f'cache.{self.options_scope}',
                                read_from=None,
                                write_to=None)
 
@@ -340,7 +340,7 @@ class IvyResolveTest(NailgunTaskTestBase):
     # Run a fetch with a fresh workdir.
     # The fetch should still pick up the correct file.
     with self._temp_cache_dir(), temporary_file_path() as jarfile:
-      jar_with_url = JarDependency('org1', 'name1', rev='1234', url='file://{}'.format(jarfile))
+      jar_with_url = JarDependency('org1', 'name1', rev='1234', url=f'file://{jarfile}')
       jar_lib = self.make_target('//:a', JarLibrary, jars=[jar_with_url])
 
       with self._temp_workdir() as workdir, self._temp_ivy_cache_dir():
@@ -415,7 +415,7 @@ class IvyResolveTest(NailgunTaskTestBase):
     ivy_dir_subdirs = os.listdir(ivy_dir)
     ivy_dir_subdirs.remove('jars')  # Ignore the jars directory.
     self.assertEqual(1, len(ivy_dir_subdirs), 'There should only be the resolve directory.')
-    print('>>> got dir {}'.format(ivy_dir_subdirs))
+    print(f'>>> got dir {ivy_dir_subdirs}')
     ivy_resolve_workdir = ivy_dir_subdirs[0]
     return os.path.join(ivy_dir, ivy_resolve_workdir)
 
@@ -445,7 +445,7 @@ class IvyResolveTest(NailgunTaskTestBase):
   @contextmanager
   def _temp_cache_dir(self):
     with temporary_dir() as cache_dir:
-      self.set_options_for_scope('cache.{}'.format(self.options_scope),
+      self.set_options_for_scope(f'cache.{self.options_scope}',
                                  read_from=[cache_dir],
                                  write_to=[cache_dir])
       yield
@@ -458,7 +458,7 @@ class IvyResolveTest(NailgunTaskTestBase):
 
   def _assertIsFile(self, path):
     self.assertTrue(os.path.isfile(path),
-                    'Expected {} to exist as a file'.format(path))
+                    f'Expected {path} to exist as a file')
 
 
 class EmptyTask(Task):

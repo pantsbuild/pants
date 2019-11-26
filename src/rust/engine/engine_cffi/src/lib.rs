@@ -52,7 +52,6 @@ use logging::{Destination, Logger};
 use rule_graph::{GraphMaker, RuleGraph};
 use std::any::Any;
 use std::borrow::Borrow;
-use std::collections::HashSet;
 use std::ffi::CStr;
 use std::fs::File;
 use std::io;
@@ -390,9 +389,8 @@ fn make_core(
   )
 }
 
-fn workunits_to_py_tuple_value(workunits: &HashSet<WorkUnit>) -> Value {
+fn workunits_to_py_tuple_value<'a>(workunits: impl Iterator<Item = &'a WorkUnit>) -> Value {
   let workunit_values = workunits
-    .iter()
     .map(|workunit: &WorkUnit| {
       let mut workunit_zipkin_trace_info = vec![
         externs::store_utf8("name"),
@@ -419,6 +417,22 @@ fn workunits_to_py_tuple_value(workunits: &HashSet<WorkUnit>) -> Value {
   externs::store_tuple(&workunit_values)
 }
 
+#[no_mangle]
+pub extern "C" fn poll_session_workunits(
+  scheduler_ptr: *mut Scheduler,
+  session_ptr: *mut Session,
+) -> Handle {
+  with_scheduler(scheduler_ptr, |_scheduler| {
+    with_session(session_ptr, |session| {
+      let value = session.workunit_store().with_latest_workunits(|workunits| {
+        let mut iter = workunits.iter();
+        workunits_to_py_tuple_value(&mut iter)
+      });
+      value.into()
+    })
+  })
+}
+
 ///
 /// Returns a Handle representing a dictionary where key is metric name string and value is
 /// metric value int.
@@ -437,8 +451,9 @@ pub extern "C" fn scheduler_metrics(
         .collect::<Vec<_>>();
       if session.should_record_zipkin_spans() {
         let workunits = session.workunit_store().get_workunits();
-
-        let value = workunits_to_py_tuple_value(&workunits.lock());
+        let locked = workunits.lock();
+        let mut iter = locked.workunits.iter();
+        let value = workunits_to_py_tuple_value(&mut iter);
         values.push(externs::store_utf8("engine_workunits"));
         values.push(value);
       };
@@ -533,6 +548,16 @@ pub extern "C" fn tasks_add_get(tasks_ptr: *mut Tasks, product: TypeId, subject:
 pub extern "C" fn tasks_add_select(tasks_ptr: *mut Tasks, product: TypeId) {
   with_tasks(tasks_ptr, |tasks| {
     tasks.add_select(product);
+  })
+}
+
+#[no_mangle]
+pub extern "C" fn tasks_add_display_info(tasks_ptr: *mut Tasks, name_ptr: *const raw::c_char) {
+  let name: String = unsafe { CStr::from_ptr(name_ptr) }
+    .to_string_lossy()
+    .into_owned();
+  with_tasks(tasks_ptr, |tasks| {
+    tasks.add_display_info(name);
   })
 }
 
@@ -649,6 +674,7 @@ pub extern "C" fn session_create(
   should_render_ui: bool,
   ui_worker_count: u64,
   build_id: Buffer,
+  should_report_workunits: bool,
 ) -> *const Session {
   let build_id = build_id
     .to_string()
@@ -660,6 +686,7 @@ pub extern "C" fn session_create(
       should_render_ui,
       ui_worker_count as usize,
       build_id,
+      should_report_workunits,
     )))
   })
 }
@@ -973,12 +1000,17 @@ pub extern "C" fn materialize_directories(
       dir_and_digests
         .into_iter()
         .map(|(dir, digest)| {
+          // NB: all DirectoryToMaterialize paths are validated in Python to be relative paths.
+          // Here, we join them with the build root.
+          let mut destination = PathBuf::new();
+          destination.push(scheduler.core.build_root.clone());
+          destination.push(dir);
           let metadata = scheduler.core.store().materialize_directory(
-            dir.clone(),
+            destination.clone(),
             digest,
             workunit_store.clone(),
           );
-          metadata.map(|m| (dir, m))
+          metadata.map(|m| (destination, m))
         })
         .collect::<Vec<_>>(),
     )

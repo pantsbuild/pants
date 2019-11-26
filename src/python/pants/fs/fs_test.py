@@ -19,12 +19,10 @@ from pants.engine.rules import RootRule, console_rule
 from pants.engine.selectors import Get
 from pants.testutil.console_rule_test_base import ConsoleRuleTestBase
 from pants.testutil.test_base import TestBase
-from pants.util.contextutil import temporary_dir
 
 
 @dataclass(frozen=True)
 class MessageToConsoleRule:
-  tmp_dir: str
   input_files_content: InputFilesContent
 
 
@@ -33,14 +31,14 @@ class MockWorkspaceGoal(Goal):
 
 
 @console_rule
-def workspace_console_rule(console: Console, workspace: Workspace, msg: MessageToConsoleRule) -> MockWorkspaceGoal:
-  digest = yield Get(Digest, InputFilesContent, msg.input_files_content)
+async def workspace_console_rule(console: Console, workspace: Workspace, msg: MessageToConsoleRule) -> MockWorkspaceGoal:
+  digest = await Get(Digest, InputFilesContent, msg.input_files_content)
   output = workspace.materialize_directories((
-    DirectoryToMaterialize(path=msg.tmp_dir, directory_digest=digest),
+    DirectoryToMaterialize(path="", directory_digest=digest),
   ))
   output_path = output.dependencies[0].output_paths[0]
-  console.print_stdout(str(Path(msg.tmp_dir, output_path)), end='')
-  yield MockWorkspaceGoal(exit_code=0)
+  console.print_stdout(output_path, end='')
+  return MockWorkspaceGoal(exit_code=0)
 
 
 class WorkspaceInConsoleRuleTest(ConsoleRuleTestBase):
@@ -54,16 +52,12 @@ class WorkspaceInConsoleRuleTest(ConsoleRuleTestBase):
     return super().rules() + [RootRule(MessageToConsoleRule), workspace_console_rule]
 
   def test(self):
-    with temporary_dir() as tmp_dir:
-      input_files_content = InputFilesContent((
-        FileContent(path='a.txt', content=b'hello', is_executable=False),
-      ))
-
-      msg = MessageToConsoleRule(tmp_dir=tmp_dir, input_files_content=input_files_content)
-      output_path = str(Path(tmp_dir, 'a.txt'))
-      self.assert_console_output_contains(output_path, additional_params=[msg])
-      contents = open(output_path).read()
-      self.assertEqual(contents, 'hello')
+    msg = MessageToConsoleRule(
+      input_files_content=InputFilesContent([FileContent(path='a.txt', content=b'hello')])
+    )
+    output_path = Path(self.build_root, 'a.txt')
+    self.assert_console_output_contains(str(output_path), additional_params=[msg])
+    assert output_path.read_text() == "hello"
 
 
 #TODO(gshuflin) - it would be nice if this test, which tests that the MaterializeDirectoryResults value
@@ -75,26 +69,25 @@ class FileSystemTest(TestBase):
     workspace = Workspace(self.scheduler)
 
     input_files_content = InputFilesContent((
-      FileContent(path='a.txt', content=b'hello', is_executable=False),
-      FileContent(path='subdir/b.txt', content=b'goodbye', is_executable=False),
+      FileContent(path='a.txt', content=b'hello'),
+      FileContent(path='subdir/b.txt', content=b'goodbye'),
     ))
 
-    digest, = self.scheduler.product_request(Digest, [input_files_content])
+    digest = self.request_single_product(Digest, input_files_content)
 
-    with temporary_dir() as tmp_dir:
-      path1 = Path(tmp_dir, 'a.txt')
-      path2 = Path(tmp_dir, 'subdir', 'b.txt')
+    path1 = Path('a.txt')
+    path2 = Path('subdir/b.txt')
 
-      self.assertFalse(path1.is_file())
-      self.assertFalse(path2.is_file())
+    assert not path1.is_file()
+    assert not path2.is_file()
 
-      output = workspace.materialize_directories((
-        DirectoryToMaterialize(path=tmp_dir, directory_digest=digest),
-      ))
+    output = workspace.materialize_directories((
+      DirectoryToMaterialize(path="", directory_digest=digest),
+    ))
 
-      self.assertEqual(type(output), MaterializeDirectoriesResult)
-      materialize_result = output.dependencies[0]
-      self.assertEqual(type(materialize_result), MaterializeDirectoryResult)
-      self.assertEqual(materialize_result.output_paths,
-        (str(Path(tmp_dir, 'a.txt')), str(Path(tmp_dir, 'subdir/b.txt')),)
-      )
+    assert type(output) == MaterializeDirectoriesResult
+    materialize_result = output.dependencies[0]
+    assert type(materialize_result) == MaterializeDirectoryResult
+    assert materialize_result.output_paths == tuple(
+      str(Path(self.build_root, p)) for p in [path1, path2]
+    )

@@ -45,7 +45,7 @@ class BinaryUtilTest(TestBase):
 
     def download(self, url, path_or_fd=None, **kwargs):
       if not url in self._map:
-        raise IOError("404: Virtual URL '{}' does not exist.".format(url))
+        raise IOError(f"404: Virtual URL '{url}' does not exist.")
       if not path_or_fd:
         raise AssertionError("Expected path_or_fd to be set")
       path_or_fd.write(self._map[url])
@@ -62,7 +62,7 @@ class BinaryUtilTest(TestBase):
 
   @classmethod
   def _fake_base(cls, name):
-    return 'fake-url-{name}'.format(name=name)
+    return f'fake-url-{name}'
 
   @classmethod
   def _fake_url(cls, binaries, base, binary_key):
@@ -71,7 +71,7 @@ class BinaryUtilTest(TestBase):
     binary_request = binary_util._make_deprecated_binary_request(supportdir, version, name)
 
     binary_path = binary_request.get_download_path(binary_util._host_platform())
-    return '{base}/{binary}'.format(base=base, binary=binary_path)
+    return f'{base}/{binary_path}'
 
   @classmethod
   def _gen_binary_tool_fetcher(cls, bootstrap_dir='/tmp', timeout_secs=30, fetcher=None,
@@ -106,7 +106,7 @@ class BinaryUtilTest(TestBase):
     self.assertFalse(fetcher.download.called)
 
     fetch_path = binary_util.select_script(supportdir='a-binary', version='v1.2', name='a-binary')
-    logger.debug("fetch_path: {}".format(fetch_path))
+    logger.debug(f"fetch_path: {fetch_path}")
     fetcher.download.assert_called_once_with('http://binaries.example.com/a-binary/v1.2/a-binary',
                                              listener=unittest.mock.ANY,
                                              path_or_fd=unittest.mock.ANY,
@@ -352,7 +352,7 @@ pants_bootstrapdir: {}
 """.format(tmp_dir))
       expected_output_glob = os.path.join(
         tmp_dir, 'bin', 'cmake', '*', '*', '3.9.5', 'cmake')
-      with environment_as(PANTS_CONFIG_FILES='[{!r}]'.format(config_file_loc)):
+      with environment_as(PANTS_CONFIG_FILES=f'[{config_file_loc!r}]'):
         # Ignore the first argument, as per sys.argv.
         output_file = select(['_', 'cmake', '3.9.5', 'cmake.tar.gz'])
       self.assertTrue(is_readable_dir(output_file))

@@ -48,12 +48,12 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
   def test_java_compile_with_ivy_report(self):
     # Ensure the ivy report file gets generated
     with self.temporary_workdir() as workdir:
-      ivy_report_dir = '{workdir}/ivy-report'.format(workdir=workdir)
+      ivy_report_dir = f'{workdir}/ivy-report'
       pants_run = self.run_pants_with_workdir([
           'compile',
           'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
           '--resolve-ivy-report',
-          '--resolve-ivy-outdir={reportdir}'.format(reportdir=ivy_report_dir)],
+          f'--resolve-ivy-outdir={ivy_report_dir}'],
           workdir)
       self.assert_success(pants_run)
 
@@ -132,7 +132,7 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
   def test_generates_no_report_if_no_resolve_performed(self):
     with temporary_dir() as ivy_report_dir:
       run = self.run_pants(['resolve', 'src/java/org/pantsbuild/junit/annotations', '--resolve-ivy-report',
-                             '--resolve-ivy-outdir={reportdir}'.format(reportdir=ivy_report_dir)])
+                             f'--resolve-ivy-outdir={ivy_report_dir}'])
       self.assert_success(run)
 
       html_report_file, listdir = self._find_html_report(ivy_report_dir)
@@ -149,7 +149,7 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
         return self.run_pants_with_workdir(command, workdir, config=config)
       with temporary_dir() as ivy_report_dir:
         first_run = run_pants(['resolve', '3rdparty:junit', '--resolve-ivy-report',
-                               '--resolve-ivy-outdir={reportdir}'.format(reportdir=ivy_report_dir)])
+                               f'--resolve-ivy-outdir={ivy_report_dir}'])
         self.assert_success(first_run)
 
         html_report_file, listdir = self._find_html_report(ivy_report_dir)
@@ -164,7 +164,7 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
 
       with temporary_dir() as ivy_report_dir:
         fetch_run = run_pants(['resolve', '3rdparty:junit', '--resolve-ivy-report',
-                               '--resolve-ivy-outdir={reportdir}'.format(reportdir=ivy_report_dir)])
+                               f'--resolve-ivy-outdir={ivy_report_dir}'])
         self.assert_success(fetch_run)
 
         # Find the ivy report.

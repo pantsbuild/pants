@@ -40,22 +40,22 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
   def _run_version(self, version):
     echo = self._run_echo_version(version)
     v = echo.split('.')  # E.g., 2.7.13.
-    self.assertTrue(len(v) > 2, 'Not a valid version string: {}'.format(v))
+    self.assertTrue(len(v) > 2, f'Not a valid version string: {v}')
     expected_components = version.split('.')
     self.assertEqual(expected_components, v[:len(expected_components)])
 
   def _run_echo_version(self, version):
-    binary_name = 'echo_interpreter_version_{}'.format(version)
-    binary_target = '{}:{}'.format(self.testproject, binary_name)
+    binary_name = f'echo_interpreter_version_{version}'
+    binary_target = f'{self.testproject}:{binary_name}'
     # Build a pex.
     # Avoid some known-to-choke-on interpreters.
     if version == PY_3:
-      constraint = '["{}"]'.format(self.py3_interpreter_constraint)
+      constraint = f'["{self.py3_interpreter_constraint}"]'
     else:
-      constraint = '["{}"]'.format(self.py2_interpreter_constraint)
+      constraint = f'["{self.py2_interpreter_constraint}"]'
     command = ['run',
                binary_target,
-               '--python-setup-interpreter-constraints={}'.format(constraint),
+               f'--python-setup-interpreter-constraints={constraint}',
                '--quiet']
     pants_run = self.run_pants(command=command)
     return pants_run.stdout_data.splitlines()[0].strip()
@@ -65,14 +65,14 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
     with temporary_dir() as interpreters_cache:
       pants_ini_config = {'python-setup': {'interpreter_cache_dir': interpreters_cache}}
       pants_run_27 = self.run_pants(
-        command=['run', '{}:echo_interpreter_version_2.7'.format(self.testproject)],
+        command=['run', f'{self.testproject}:echo_interpreter_version_2.7'],
         config=pants_ini_config
       )
       self.assert_success(pants_run_27)
       pants_run_3 = self.run_pants(
-        command=['run', '{}:echo_interpreter_version_3'.format(self.testproject),
-                 '--python-setup-interpreter-constraints={}'.format(self.py2_interpreter_constraint),
-                 '--python-setup-interpreter-constraints={}'.format(self.py3_interpreter_constraint)],
+        command=['run', f'{self.testproject}:echo_interpreter_version_3',
+                 f'--python-setup-interpreter-constraints={self.py2_interpreter_constraint}',
+                 f'--python-setup-interpreter-constraints={self.py3_interpreter_constraint}'],
         config=pants_ini_config
       )
       self.assert_success(pants_run_3)
@@ -82,14 +82,14 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
     with temporary_dir() as interpreters_cache:
       pants_ini_config = {'python-setup': {
         'interpreter_constraints': [
-          '"{}"'.format(self.py2_interpreter_constraint),
-          '"{}"'.format(self.py3_interpreter_constraint)
+          f'"{self.py2_interpreter_constraint}"',
+          f'"{self.py3_interpreter_constraint}"'
         ],
         'interpreter_cache_dir': interpreters_cache
         }}
       pants_run_3 = self.run_pants(
-        command=['run', '{}:echo_interpreter_version_3'.format(self.testproject),
-        '--python-setup-interpreter-constraints=["{}"]'.format(self.py3_interpreter_constraint)],
+        command=['run', f'{self.testproject}:echo_interpreter_version_3',
+        f'--python-setup-interpreter-constraints=["{self.py3_interpreter_constraint}"]'],
         config=pants_ini_config
       )
       self.assert_success(pants_run_3)
@@ -99,22 +99,22 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
     with temporary_dir() as interpreters_cache:
       pants_ini_config = {'python-setup': {
         'interpreter_constraints': [
-          '"{}"'.format(self.py2_interpreter_constraint),
-          '"{}"'.format(self.py3_interpreter_constraint)
+          f'"{self.py2_interpreter_constraint}"',
+          f'"{self.py3_interpreter_constraint}"'
         ],
         'interpreter_cache_dir': interpreters_cache
         }}
       pants_run_2 = self.run_pants(
-        command=['run', '{}:echo_interpreter_version_2.7'.format(self.testproject),
-        '--python-setup-interpreter-constraints=["{}"]'.format(self.py2_interpreter_constraint)],
+        command=['run', f'{self.testproject}:echo_interpreter_version_2.7',
+        f'--python-setup-interpreter-constraints=["{self.py2_interpreter_constraint}"]'],
         config=pants_ini_config
       )
       self.assert_success(pants_run_2)
 
   def test_die(self):
     command = ['run',
-               '{}:die'.format(self.testproject),
-               '--python-setup-interpreter-constraints=["{}", "{}"]'.format(self.py2_interpreter_constraint, self.py3_interpreter_constraint),
+               f'{self.testproject}:die',
+               f'--python-setup-interpreter-constraints=["{self.py2_interpreter_constraint}", "{self.py3_interpreter_constraint}"]',
                '--quiet']
     pants_run = self.run_pants(command=command)
     assert pants_run.returncode == 57

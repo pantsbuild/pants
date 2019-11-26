@@ -122,22 +122,22 @@ class PythonIsortTest(PythonTaskTestBase):
             self.assertIn("a_1.py Imports are incorrectly sorted.", output)
             self.assertIn("a_2.py Imports are incorrectly sorted.", output)
           else:
-            fail("--check-only test for {} is supposed to fail, but passed.".format(self.a_library))
+            fail(f"--check-only test for {self.a_library} is supposed to fail, but passed.")
 
   def assertSortedWithConfigA(self, path):
     with open(path, 'r') as f:
       self.assertEqual(self.RESULT_A, f.read(),
-                       '{} should be sorted with CONFIG_A, but is not.'.format(path))
+                       f'{path} should be sorted with CONFIG_A, but is not.')
 
   def assertSortedWithConfigB(self, path):
     with open(path, 'r') as f:
       self.assertEqual(self.RESULT_B, f.read(),
-                       '{} should be sorted with CONFIG_B, but is not.'.format(path))
+                       f'{path} should be sorted with CONFIG_B, but is not.')
 
   def assertNotSorted(self, path):
     with open(path, 'r') as f:
       self.assertEqual(self.BAD_IMPORT_ORDER, f.read(),
-                       '{} should not be sorted, but is.'.format(path))
+                       f'{path} should not be sorted, but is.')
 
   def test_skip_config(self):
     self.create_file('src/python/a/.isort.cfg', mode='a', contents='skip=a_1.py')

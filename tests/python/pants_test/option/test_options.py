@@ -67,9 +67,9 @@ class OptionsTest(TestBase):
   @contextmanager
   def _write_config_to_file(self, fp, config):
     for section, options in config.items():
-      fp.write('[{}]\n'.format(section))
+      fp.write(f'[{section}]\n')
       for key, value in options.items():
-        fp.write('{}: {}\n'.format(key, value))
+        fp.write(f'{key}: {value}\n')
 
   def _create_config(self, config):
     with open(os.path.join(safe_mkdtemp(), 'test_config.ini'), 'w') as fp:
@@ -304,13 +304,13 @@ class OptionsTest(TestBase):
 
     # Test file-typed option.
     with temporary_file_path() as fp:
-      options = self._parse('./pants --filey="{}"'.format(fp))
+      options = self._parse(f'./pants --filey="{fp}"')
       self.assertEqual(fp, options.for_global_scope().filey)
 
     # Test list-of-file-typed option.
     with temporary_file_path() as fp1:
       with temporary_file_path() as fp2:
-        options = self._parse('./pants --file-listy="{}" --file-listy="{}"'.format(fp1, fp2))
+        options = self._parse(f'./pants --file-listy="{fp1}" --file-listy="{fp2}"')
         self.assertEqual([fp1, fp2], options.for_global_scope().file_listy)
 
   def test_explicit_boolean_values(self):
@@ -1204,7 +1204,7 @@ class OptionsTest(TestBase):
 
   def test_fromfile_flags(self):
     def parse_func(dest, fromfile):
-      return self._parse('./pants fromfile --{}=@{}'.format(dest.replace('_', '-'), fromfile))
+      return self._parse(f"./pants fromfile --{dest.replace('_', '-')}=@{fromfile}")
 
     # You can only append a single item at a time with append flags, ie: we don't override the
     # default list like we do with env of config.  As such, send in a single append value here
@@ -1213,37 +1213,37 @@ class OptionsTest(TestBase):
 
   def test_fromfile_config(self):
     def parse_func(dest, fromfile):
-      return self._parse('./pants fromfile', config={'fromfile': {dest: '@{}'.format(fromfile)}})
+      return self._parse('./pants fromfile', config={'fromfile': {dest: f'@{fromfile}'}})
 
     self.assert_fromfile(parse_func)
 
   def test_fromfile_env(self):
     def parse_func(dest, fromfile):
       return self._parse('./pants fromfile',
-                         env={'PANTS_FROMFILE_{}'.format(dest.upper()): '@{}'.format(fromfile)})
+                         env={f'PANTS_FROMFILE_{dest.upper()}': f'@{fromfile}'})
 
     self.assert_fromfile(parse_func)
 
   def test_fromfile_json(self):
     def parse_func(dest, fromfile):
-      return self._parse('./pants fromfile --{}=@{}'.format(dest.replace('_', '-'), fromfile))
+      return self._parse(f"./pants fromfile --{dest.replace('_', '-')}=@{fromfile}")
 
     val = {'a': {'b': 1}, 'c': [2, 3]}
     with temporary_file(suffix='.json', binary_mode=False) as fp:
       json.dump(val, fp)
       fp.close()
-      options = self._parse('./pants fromfile --{}=@{}'.format('dictvalue', fp.name))
+      options = self._parse(f"./pants fromfile --{'dictvalue'}=@{fp.name}")
       self.assertEqual(val, options.for_scope('fromfile')['dictvalue'])
 
   def test_fromfile_yaml(self):
     def parse_func(dest, fromfile):
-      return self._parse('./pants fromfile --{}=@{}'.format(dest.replace('_', '-'), fromfile))
+      return self._parse(f"./pants fromfile --{dest.replace('_', '-')}=@{fromfile}")
 
     val = {'a': {'b': 1}, 'c': [2, 3]}
     with temporary_file(suffix='.yaml', binary_mode=False) as fp:
       yaml.safe_dump(val, fp)
       fp.close()
-      options = self._parse('./pants fromfile --{}=@{}'.format('dictvalue', fp.name))
+      options = self._parse(f"./pants fromfile --{'dictvalue'}=@{fp.name}")
       self.assertEqual(val, options.for_scope('fromfile')['dictvalue'])
 
   def test_fromfile_error(self):
@@ -1517,5 +1517,5 @@ class OptionsTestStringPayloads(OptionsTest):
       fp.seek(0)
       payload = fp.read()
       return Config.load_file_contents(
-        config_payloads=[FileContent('blah', payload, is_executable=False)],
+        config_payloads=[FileContent(path='blah', content=payload)],
       )

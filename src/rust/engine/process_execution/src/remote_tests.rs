@@ -24,13 +24,13 @@ use maplit::{btreemap, hashset};
 use mock::execution_server::MockOperation;
 use protobuf::well_known_types::Timestamp;
 use spectral::prelude::*;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::iter::{self, FromIterator};
 use std::ops::Sub;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 use tokio::timer::Delay;
-use workunit_store::{workunits_with_constant_span_id, WorkUnit, WorkUnitStore};
+use workunit_store::{WorkUnit, WorkUnitStore};
 
 #[derive(Debug, PartialEq)]
 enum StdoutType {
@@ -1081,6 +1081,7 @@ fn timeout_after_sufficiently_delayed_getoperations() {
 }
 
 #[test]
+#[ignore] // https://github.com/pantsbuild/pants/issues/8405
 fn dropped_request_cancels() {
   let request_timeout = Duration::new(10, 0);
   let delayed_operation_time = Duration::new(5, 0);
@@ -2166,6 +2167,19 @@ fn extract_output_files_from_response_no_prefix() {
     extract_output_files_from_response(&execute_response),
     Ok(TestDirectory::containing_roland().digest())
   )
+}
+
+fn workunits_with_constant_span_id(workunit_store: &WorkUnitStore) -> HashSet<WorkUnit> {
+  workunit_store
+    .get_workunits()
+    .lock()
+    .workunits
+    .iter()
+    .map(|workunit| WorkUnit {
+      span_id: String::from("ignore"),
+      ..workunit.clone()
+    })
+    .collect()
 }
 
 #[test]

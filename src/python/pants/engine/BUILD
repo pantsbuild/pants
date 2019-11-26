@@ -29,6 +29,7 @@ python_library(
     'src/python/pants/util:memo',
     'src/python/pants/util:objects',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -38,7 +39,8 @@ python_library(
     ':addressable',
     ':objects',
     'src/python/pants/util:objects',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -86,7 +88,8 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:filtering',
     'src/python/pants/util:objects',
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -99,7 +102,8 @@ python_library(
     'src/python/pants/build_graph',
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -138,7 +142,8 @@ python_library(
     ':struct',
     'src/python/pants/base:project_tree',
     'src/python/pants/build_graph',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -156,7 +161,8 @@ python_library(
     ':objects',
     'src/python/pants/build_graph',
     'src/python/pants/util:memo',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -175,7 +181,6 @@ python_library(
   name='rules',
   sources=['rules.py'],
   dependencies=[
-    '3rdparty/python:asttokens',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':goal',
     ':selectors',

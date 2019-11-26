@@ -1,6 +1,8 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from typing import FrozenSet
+
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
@@ -34,7 +36,7 @@ class JvmPrepCommand(JvmTarget):
 
   :API: public
   """
-  _goals=frozenset()
+  _goals: FrozenSet[str] = frozenset()
 
   @staticmethod
   def add_goal(goal):
@@ -42,12 +44,12 @@ class JvmPrepCommand(JvmTarget):
     JvmPrepCommand._goals = frozenset(list(JvmPrepCommand._goals) + [goal])
 
   @classmethod
-  def reset(cls):
+  def reset(cls) -> None:
     """Used for testing purposes to reset state."""
-    cls._goals=frozenset()
+    cls._goals = frozenset()
 
   @staticmethod
-  def goals():
+  def goals() -> FrozenSet[str]:
     return JvmPrepCommand._goals
 
   def __init__(self, payload=None, mainclass=None, args=None, jvm_options=None, goal=None,

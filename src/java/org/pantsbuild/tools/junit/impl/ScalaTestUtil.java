@@ -29,17 +29,15 @@ public final class ScalaTestUtil {
    * TODO: Remove this when https://github.com/scalatest/scalatestplus-junit/pull/8 is merged
    */
   private static class ScalaTestJunitRunnerWrapper extends Runner implements Filterable {
-      private Runner delegate;
-      private Class<?> suite;
+      private final Runner delegate;
 
-      private ScalaTestJunitRunnerWrapper(Runner delegate, Class<?> suite) {
+      private ScalaTestJunitRunnerWrapper(Runner delegate) {
         this.delegate = delegate;
-        this.suite = suite;
       }
 
       @Override
       public Description getDescription() {
-          return Description.createSuiteDescription(suite);
+        return delegate.getDescription();
       }
 
       @Override
@@ -61,7 +59,7 @@ public final class ScalaTestUtil {
    */
   public static Runner getJUnitRunner(Class<?> clazz) throws Exception {
     return new ScalaTestJunitRunnerWrapper(
-            (Runner) junitRunnerClass.getConstructor(Class.class).newInstance(clazz), clazz);
+            (Runner) junitRunnerClass.getConstructor(Class.class).newInstance(clazz));
   }
 
   /**

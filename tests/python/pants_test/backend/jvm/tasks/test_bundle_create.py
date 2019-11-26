@@ -183,18 +183,18 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
 
   def _check_archive_products(self, archive_name_prefix, archive_extension, check_copy=False, copy_name_prefix=''):
     products = self.task_context.products.get('deployable_archives')
-    archive_fullname = '{}.{}'.format(archive_name_prefix, archive_extension)
+    archive_fullname = f'{archive_name_prefix}.{archive_extension}'
     archive_path = self._check_products(products, archive_fullname)
     self.assertTrue(os.path.isfile(archive_path))
 
     if check_copy:
-      copy_fullname = '{}.{}'.format(copy_name_prefix, archive_extension) if copy_name_prefix else archive_fullname
+      copy_fullname = f'{copy_name_prefix}.{archive_extension}' if copy_name_prefix else archive_fullname
       copy_path = os.path.join(self.dist_root, copy_fullname)
       self.assertTrue(os.path.isfile(copy_path))
 
   def _check_bundle_products(self, bundle_name_prefix, check_symlink=False, symlink_name_prefix=''):
     products = self.task_context.products.get('jvm_bundles')
-    bundle_fullname = '{}-bundle'.format(bundle_name_prefix)
+    bundle_fullname = f'{bundle_name_prefix}-bundle'
     bundle_root = self._check_products(products, bundle_fullname)
     self.assertTrue(os.path.isdir(bundle_root))
 
@@ -222,7 +222,7 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
 
     # Check symlink.
     if check_symlink:
-      symlink_fullname = '{}-bundle'.format(symlink_name_prefix) if symlink_name_prefix else bundle_fullname
+      symlink_fullname = f'{symlink_name_prefix}-bundle' if symlink_name_prefix else bundle_fullname
       symlink_path = os.path.join(self.dist_root, symlink_fullname)
       self.assertTrue(os.path.islink(symlink_path))
       self.assertEqual(os.readlink(symlink_path), bundle_root)

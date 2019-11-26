@@ -52,7 +52,7 @@ class JavacCompileIntegration(BaseCompileIT):
                           'javax.annotation.processing.Processor'],
           extra_args=[
             '--jvm-platform-compiler=javac',
-            '--compile-javac-execution-strategy={}'.format(strategy)
+            f'--compile-javac-execution-strategy={strategy}'
           ]) as found:
         self.assertTrue(
           self.get_only(found, 'ResourceMappingProcessor.class').endswith(

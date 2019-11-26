@@ -194,7 +194,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
         """package org.pantsbuild.consumer
            import org.pantsbuild.dep.A
            class B { def mkA: A = new A() }"""))
-      self.create_file(con_build_file, "scala_library(dependencies=['{}'])".format(dep_spec))
+      self.create_file(con_build_file, f"scala_library(dependencies=['{dep_spec}'])")
 
       rel_workdir = fast_relpath(workdir, get_buildroot())
       rel_src_dir = fast_relpath(src_dir, get_buildroot())

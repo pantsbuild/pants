@@ -184,7 +184,8 @@ class SchedulerService(PantsService):
     build_id = RunTracker.global_instance().run_id
     v2_ui = options.for_global_scope().v2_ui
     zipkin_trace_v2 = options.for_scope('reporting').zipkin_trace_v2
-    session = self._graph_helper.new_session(zipkin_trace_v2, build_id, v2_ui)
+    stream_workunits = options.for_scope('reporting').stream_workunits
+    session = self._graph_helper.new_session(zipkin_trace_v2, build_id, v2_ui, should_report_workunits=stream_workunits)
 
     if options.for_global_scope().loop:
       fn = self._loop

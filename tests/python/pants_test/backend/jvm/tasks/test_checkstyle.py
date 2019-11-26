@@ -83,12 +83,12 @@ class CheckstyleTest(NailgunTaskTestBase):
 
   def _create_target(self, name, test_java_source):
     rel_dir = os.path.join('src/java', name)
-    self.create_file(relpath=os.path.join(rel_dir, '{name}.java'.format(name=name)),
+    self.create_file(relpath=os.path.join(rel_dir, f'{name}.java'),
                      contents=test_java_source)
 
     return self.make_target(Address(spec_path=rel_dir, target_name=name).spec,
                             JavaLibrary,
-                            sources=['{}.java'.format(name)])
+                            sources=[f'{name}.java'])
 
   #
   # Test section

@@ -17,7 +17,7 @@ class RoundEngineTest(EngineTestBase, TestBase):
     self.set_options_for_scope('', explain=False)
     for outer in ['goal1', 'goal2', 'goal3', 'goal4', 'goal5']:
       for inner in ['task1', 'task2', 'task3', 'task4', 'task5']:
-        self.set_options_for_scope('{}.{}'.format(outer, inner),
+        self.set_options_for_scope(f'{outer}.{inner}',
                                    level='info', colors=False)
 
     self.engine = RoundEngine()

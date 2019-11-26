@@ -23,7 +23,7 @@ from pants.engine.nodes import Return, Throw
 from pants.engine.parser import HydratedStruct, SymbolTable
 from pants.engine.rules import rule
 from pants.engine.struct import Struct, StructWithDeps
-from pants.testutil.engine.util import Target, run_rule
+from pants.testutil.engine.util import MockGet, Target, run_rule
 from pants.util.objects import Exactly
 from pants_test.engine.examples.parsers import (
   JsonParser,
@@ -37,10 +37,22 @@ class ParseAddressFamilyTest(unittest.TestCase):
   def test_empty(self):
     """Test that parsing an empty BUILD file results in an empty AddressFamily."""
     address_mapper = AddressMapper(JsonParser(TEST_TABLE))
-    af = run_rule(parse_address_family, address_mapper, Dir('/dev/null'), {
-        (Snapshot, PathGlobs): lambda _: Snapshot(Digest('abc', 10), ('/dev/null/BUILD',), ()),
-        (FilesContent, Digest): lambda _: FilesContent([FileContent('/dev/null/BUILD', b'', False)]),
-      })
+    af = run_rule(
+      parse_address_family,
+      rule_args=[address_mapper, Dir('/dev/null')],
+      mock_gets=[
+        MockGet(
+          product_type=Snapshot,
+          subject_type=PathGlobs,
+          mock=lambda _: Snapshot(Digest('abc', 10), ('/dev/null/BUILD',), ()),
+        ),
+        MockGet(
+          product_type=FilesContent,
+          subject_type=Digest,
+          mock=lambda _: FilesContent([FileContent(path='/dev/null/BUILD', content=b'')]),
+        ),
+      ],
+    )
     self.assertEqual(len(af.objects_by_name), 0)
 
 
@@ -53,11 +65,23 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
     return Snapshot(Digest('xx', 2), ('root/BUILD',), ())
 
   def _resolve_build_file_addresses(self, specs, address_family, snapshot, address_mapper):
-    pbfas = run_rule(provenanced_addresses_from_address_families, address_mapper, specs, {
-      (Snapshot, PathGlobs): lambda _: snapshot,
-      (AddressFamily, Dir): lambda _: address_family,
-    })
-    return run_rule(remove_provenance, pbfas)
+    pbfas = run_rule(
+      provenanced_addresses_from_address_families,
+      rule_args=[address_mapper, specs],
+      mock_gets=[
+        MockGet(
+          product_type=Snapshot,
+          subject_type=PathGlobs,
+          mock=lambda _: snapshot,
+        ),
+        MockGet(
+          product_type=AddressFamily,
+          subject_type=Dir,
+          mock=lambda _: address_family,
+        ),
+      ],
+    )
+    return run_rule(remove_provenance, rule_args=[pbfas])
 
   def test_duplicated(self):
     """Test that matching the same Spec twice succeeds."""
@@ -145,12 +169,9 @@ class ApacheThriftConfiguration(StructWithDeps):
   # dictionary entry.
 
   def __init__(self, name=None, version=None, strict=None, lang=None, options=None, **kwargs):
-    super().__init__(name=name,
-                                                    version=version,
-                                                    strict=strict,
-                                                    lang=lang,
-                                                    options=options,
-                                                    **kwargs)
+    super().__init__(
+      name=name, version=version, strict=strict, lang=lang, options=options, **kwargs
+    )
 
   # An example of a validatable bit of config.
   def validate_concrete(self):
@@ -214,12 +235,12 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
 
   def resolve_failure(self, scheduler, address):
     _, state = self._populate(scheduler, address)
-    self.assertEqual(type(state), Throw, '{} is not a Throw.'.format(state))
+    self.assertEqual(type(state), Throw, f'{state} is not a Throw.')
     return state.exc
 
   def resolve(self, scheduler, address):
     _, state = self._populate(scheduler, address)
-    self.assertEqual(type(state), Return, '{} is not a Return.'.format(state))
+    self.assertEqual(type(state), Return, f'{state} is not a Return.')
     return state.value.value
 
 
@@ -362,4 +383,4 @@ class InlinedGraphTest(GraphTestBase):
     failure = self.resolve_failure(scheduler, mismatch)
     self.assertEqual(type(failure),
                       expected_type,
-                      'type was not {}. Instead was {}, {!r}'.format(expected_type.__name__, type(failure).__name__, failure))
+                      f'type was not {expected_type.__name__}. Instead was {type(failure).__name__}, {failure!r}')

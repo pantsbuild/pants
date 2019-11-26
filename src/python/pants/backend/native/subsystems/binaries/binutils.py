@@ -16,21 +16,21 @@ class Binutils(NativeTool):
   def path_entries(self):
     return [os.path.join(self.select(), 'bin')]
 
-  def assembler(self):
+  def assembler(self) -> Assembler:
     return Assembler(
       path_entries=self.path_entries(),
       exe_filename='as',
-      runtime_library_dirs=[],
-      extra_args=[])
+      runtime_library_dirs=(),
+      extra_args=())
 
-  def linker(self):
+  def linker(self) -> Linker:
     return Linker(
       path_entries=self.path_entries(),
       exe_filename='ld',
-      runtime_library_dirs=[],
-      linking_library_dirs=[],
-      extra_args=[],
-      extra_object_files=[],
+      runtime_library_dirs=(),
+      linking_library_dirs=(),
+      extra_args=(),
+      extra_object_files=(),
     )
 
 

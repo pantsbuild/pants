@@ -17,7 +17,7 @@ class IvyOutdatedIntegrationTest(PantsRunIntegrationTest):
         f.write(dedent("""
         java_library(name='lib')
         """))
-      pants_run = self.run_pants(['outdated.ivy', '{}:lib'.format(tmpdir)])
+      pants_run = self.run_pants(['outdated.ivy', f'{tmpdir}:lib'])
       self.assert_success(pants_run)
 
       self.assertIn('Dependency updates available:', pants_run.stdout_data)
@@ -34,7 +34,7 @@ class IvyOutdatedIntegrationTest(PantsRunIntegrationTest):
           ],
         )
         """))
-      pants_run = self.run_pants(['outdated.ivy', '{}:lib'.format(tmpdir)])
+      pants_run = self.run_pants(['outdated.ivy', f'{tmpdir}:lib'])
       self.assert_success(pants_run)
 
       self.assertNotIn('All dependencies are up to date', pants_run.stdout_data)
@@ -55,7 +55,7 @@ class IvyOutdatedIntegrationTest(PantsRunIntegrationTest):
         """))
       pants_run = self.run_pants(['outdated.ivy',
           '--outdated-ivy-exclude-patterns=commons-io:*',
-          '{}:{}'.format(tmpdir, 'lib')])
+          f"{tmpdir}:{'lib'}"])
       self.assert_success(pants_run)
 
       self.assertNotIn('All dependencies are up to date', pants_run.stdout_data)

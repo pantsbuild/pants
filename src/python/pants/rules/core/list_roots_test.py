@@ -7,7 +7,7 @@ from pants.engine.fs import Digest, PathGlobs, Snapshot
 from pants.rules.core import list_roots
 from pants.source.source_root import SourceRoot, SourceRootCategories, SourceRootConfig
 from pants.testutil.console_rule_test_base import ConsoleRuleTestBase
-from pants.testutil.engine.util import run_rule
+from pants.testutil.engine.util import MockGet, run_rule
 from pants.testutil.test_base import TestBase
 
 
@@ -56,9 +56,13 @@ class AllRootsTest(TestBase):
       )
       return Snapshot(Digest('abcdef', 10), (), dirs)
 
-    output = run_rule(list_roots.all_roots, source_root_config, {
-      (Snapshot, PathGlobs): provider_rule
-    })
+    output = run_rule(
+      list_roots.all_roots,
+      rule_args=[source_root_config],
+      mock_gets=[
+        MockGet(product_type=Snapshot, subject_type=PathGlobs, mock=provider_rule),
+      ],
+    )
 
     self.assertEqual({SourceRoot('contrib/go/examples/3rdparty/go', ('go',), THIRDPARTY),
                        SourceRoot('contrib/go/examples/src/go/src', ('go',), SOURCE),

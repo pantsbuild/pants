@@ -32,12 +32,12 @@ class DownloadedClocScript:
 #TODO(#7790) - We can't call this feature-complete with the v1 version of cloc
 # until we have a way to download the cloc binary without hardcoding it
 @rule
-def download_cloc_script() -> DownloadedClocScript:
+async def download_cloc_script() -> DownloadedClocScript:
   url = "https://binaries.pantsbuild.org/bin/cloc/1.80/cloc"
   sha_256 = "2b23012b1c3c53bd6b9dd43cd6aa75715eed4feb2cb6db56ac3fbbd2dffeac9d"
   digest = Digest(sha_256, 546279)
-  snapshot = yield Get(Snapshot, UrlToFetch(url, digest))
-  yield DownloadedClocScript(script_path=snapshot.files[0], digest=snapshot.directory_digest)
+  snapshot = await Get(Snapshot, UrlToFetch(url, digest))
+  return DownloadedClocScript(script_path=snapshot.files[0], digest=snapshot.directory_digest)
 
 
 class CountLinesOfCode(Goal):
@@ -54,17 +54,17 @@ class CountLinesOfCode(Goal):
 
 
 @console_rule
-def run_cloc(console: Console, options: CountLinesOfCode.Options, cloc_script: DownloadedClocScript, specs: Specs) -> CountLinesOfCode:
+async def run_cloc(console: Console, options: CountLinesOfCode.Options, cloc_script: DownloadedClocScript, specs: Specs) -> CountLinesOfCode:
   """Runs the cloc perl script in an isolated process"""
 
   transitive = options.values.transitive
   ignored = options.values.ignored
 
   if transitive:
-    targets = yield Get(TransitiveHydratedTargets, Specs, specs)
+    targets = await Get(TransitiveHydratedTargets, Specs, specs)
     all_target_adaptors = {t.adaptor for t in targets.closure}
   else:
-    targets = yield Get(HydratedTargets, Specs, specs)
+    targets = await Get(HydratedTargets, Specs, specs)
     all_target_adaptors = {t.adaptor for t in targets}
 
   digests_to_merge = []
@@ -84,10 +84,10 @@ def run_cloc(console: Console, options: CountLinesOfCode.Options, cloc_script: D
   ignore_filename = 'ignored.txt'
 
   input_file_list = InputFilesContent(FilesContent((FileContent(path=input_files_filename, content=file_content, is_executable=False),)))
-  input_file_digest = yield Get(Digest, InputFilesContent, input_file_list)
+  input_file_digest = await Get(Digest, InputFilesContent, input_file_list)
   cloc_script_digest = cloc_script.digest
   digests_to_merge.extend([cloc_script_digest, input_file_digest])
-  digest = yield Get(Digest, DirectoriesToMerge(directories=tuple(digests_to_merge)))
+  digest = await Get(Digest, DirectoriesToMerge(directories=tuple(digests_to_merge)))
 
   cmd = (
     '/usr/bin/perl',
@@ -105,8 +105,8 @@ def run_cloc(console: Console, options: CountLinesOfCode.Options, cloc_script: D
     description='cloc',
   )
 
-  exec_result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, req)
-  files_content = yield Get(FilesContent, Digest, exec_result.output_directory_digest)
+  exec_result = await Get(ExecuteProcessResult, ExecuteProcessRequest, req)
+  files_content = await Get(FilesContent, Digest, exec_result.output_directory_digest)
 
   file_outputs = {fc.path: fc.content.decode() for fc in files_content.dependencies}
 
@@ -121,7 +121,7 @@ def run_cloc(console: Console, options: CountLinesOfCode.Options, cloc_script: D
     for line in ignored.splitlines():
       console.print_stdout(line)
 
-  yield CountLinesOfCode(exit_code=0)
+  return CountLinesOfCode(exit_code=0)
 
 
 def rules():

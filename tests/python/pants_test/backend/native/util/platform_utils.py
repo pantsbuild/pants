@@ -7,7 +7,7 @@ from pants.util.osutil import all_normalized_os_names
 
 def platform_specific(normalized_os_name):
   if normalized_os_name not in all_normalized_os_names():
-    raise ValueError("unrecognized platform: {}".format(normalized_os_name))
+    raise ValueError(f"unrecognized platform: {normalized_os_name}")
 
   def decorator(test_fn):
     def wrapper(self, *args, **kwargs):

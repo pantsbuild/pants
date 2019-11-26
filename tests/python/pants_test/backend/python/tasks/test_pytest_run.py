@@ -36,7 +36,7 @@ from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTest
 class PytestPrepCoverageVersionPinned(PytestPrep):
   def extra_requirements(self):
     extra_reqs = list(super().extra_requirements())
-    extra_reqs.append('coverage=={}'.format(coverage.__version__))
+    extra_reqs.append(f'coverage=={coverage.__version__}')
     return extra_reqs
 
 
@@ -208,7 +208,7 @@ class PytestTest(PytestTestBase):
   def setUp(self):
     super().setUp()
 
-    self.set_options_for_scope('cache.{}'.format(self.options_scope),
+    self.set_options_for_scope(f'cache.{self.options_scope}',
                                read_from=None,
                                write_to=None)
 
@@ -929,7 +929,7 @@ python_tests(
           """.format(marker_dir=marker_dir)))
 
       def assert_mark(exists, name):
-        message = '{} {!r} to be executed.'.format('Expected' if exists else 'Did not expect', name)
+        message = f"{('Expected' if exists else 'Did not expect')} {name!r} to be executed."
         marker_file = os.path.join(marker_dir, name)
         self.assertEqual(exists, os.path.exists(marker_file), message)
 
@@ -983,7 +983,7 @@ python_tests(
 
   def test_junit_xml_dir(self):
     with self.run_with_junit_xml_dir([self.green]) as junit_xml_files:
-      assert ['TEST-{}.xml'.format(self.green.id)] == junit_xml_files
+      assert [f'TEST-{self.green.id}.xml'] == junit_xml_files
 
   def test_issue_7749(self):
     empty_test_target = self.make_target(spec='empty', target_type=PythonTests)

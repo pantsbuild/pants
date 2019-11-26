@@ -20,7 +20,7 @@ class RunTrackerIntegrationTest(PantsRunIntegrationTest):
       pants_run = self.run_pants([
         'list',
         'test',
-        '--run-tracker-stats-local-json-file={}'.format(tmpfile),
+        f'--run-tracker-stats-local-json-file={tmpfile}',
         '--run-tracker-stats-version=1',
         '--reporting-zipkin-trace-v2',
         '--run-tracker-stats-option-scopes-to-record=["GLOBAL", "GLOBAL^v2_ui", "compile.rsc^capture_classpath"]',
@@ -70,7 +70,7 @@ class RunTrackerIntegrationTest(PantsRunIntegrationTest):
     with temporary_file_path() as tmpfile:
       pants_run = self.run_pants([
         'test',
-        '--run-tracker-stats-local-json-file={}'.format(tmpfile),
+        f'--run-tracker-stats-local-json-file={tmpfile}',
         '--run-tracker-stats-version=2',
         '--reporting-zipkin-trace-v2',
         'testprojects/src/java/org/pantsbuild/testproject/unicode/main',

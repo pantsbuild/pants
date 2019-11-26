@@ -13,8 +13,7 @@ from pants.util.dirutil import safe_delete, safe_mkdir, touch
 class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
 
   def _create_platform_args(self, version):
-    return [("""--jvm-platform-platforms={{'default': {{'target': '{version}'}}}}"""
-             .format(version=version)),
+    return [(f"""--jvm-platform-platforms={{'default': {{'target': '{version}'}}}}"""),
             '--jvm-platform-default-platform=default']
 
   def _run_pants_get_artifact_dir(self, args, cache_dir, subdir, num_files_to_insert, expected_num_files, config=None, prev_dirs=[]):
@@ -34,7 +33,7 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
     for tgz in glob.glob(os.path.join(artifact_dir, '*.tgz')):
       safe_delete(tgz)
     for i in range(0, num_files_to_insert):
-      touch(os.path.join(artifact_dir, 'old_cache_test{}'.format(i + 1)))
+      touch(os.path.join(artifact_dir, f'old_cache_test{(i + 1)}'))
 
     self.assert_success(self.run_pants(args, config=config))
     self.assertEqual(len(os.listdir(artifact_dir)), expected_num_files)
@@ -175,7 +174,7 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
         'compile',
         'export-classpath',
         'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
-        '--workdir-max-build-entries={}'.format(max_entries_per_target)
+        f'--workdir-max-build-entries={max_entries_per_target}'
       ], workdir))
 
       # stable (same as before), current, and 2 newest dirs
@@ -195,7 +194,7 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
         'export-classpath',
         'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
         '--compile-rsc-debug-symbols',
-        '--workdir-max-build-entries={}'.format(max_entries_per_target)
+        f'--workdir-max-build-entries={max_entries_per_target}'
       ], workdir))
 
       # stable, current, and 2 newest dirs

@@ -9,10 +9,10 @@ class TypeConstraintTestBase(TestBase):
   class A:
 
     def __repr__(self):
-      return '{}()'.format(type(self).__name__)
+      return f'{type(self).__name__}()'
 
     def __str__(self):
-      return '(str form): {}'.format(repr(self))
+      return f'(str form): {repr(self)}'
 
     def __eq__(self, other):
       return type(self) == type(other)

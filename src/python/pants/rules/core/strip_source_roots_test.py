@@ -34,8 +34,9 @@ class StripSourceRootsTests(TestBase):
     if target_type_alias:
       adaptor.type_alias = target_type_alias
     target = HydratedTarget('some/target/address', adaptor, tuple())
-    output = self.scheduler.product_request(SourceRootStrippedSources, [Params(target, SourceRootConfig.global_instance())])
-    stripped_sources = output[0]
+    stripped_sources = self.request_single_product(
+      SourceRootStrippedSources, Params(target, SourceRootConfig.global_instance())
+    )
     self.assertEqual(stripped_sources.snapshot.files, (expected_path,))
 
   def test_source_roots_python(self):

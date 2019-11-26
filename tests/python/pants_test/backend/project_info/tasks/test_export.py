@@ -23,6 +23,7 @@ from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.project_info.tasks.export import Export
+from pants.backend.project_info.tasks.export_version import DEFAULT_EXPORT_VERSION
 from pants.backend.python.register import build_file_aliases as register_python
 from pants.base.exceptions import TaskError
 from pants.build_graph.register import build_file_aliases as register_core
@@ -335,7 +336,7 @@ class ExportTest(ConsoleTaskTestBase):
   def test_version(self):
     result = self.execute_export_json('project_info:first')
     # If you have to update this test, make sure export.md is updated with changelog notes
-    self.assertEqual('1.0.11', result['version'])
+    self.assertEqual(DEFAULT_EXPORT_VERSION, result['version'])
 
   def test_scala_platform_custom(self):
     result = self.execute_export_json('project_info:first')
@@ -387,7 +388,7 @@ class ExportTest(ConsoleTaskTestBase):
     source_root = result['targets']['project_info:third']['roots'][0]
     self.assertEqual('com.foo', source_root['package_prefix'])
     self.assertEqual(
-      '{0}/project_info/com/foo'.format(self.build_root),
+      f'{self.build_root}/project_info/com/foo',
       source_root['source_root']
     )
 
@@ -412,7 +413,7 @@ class ExportTest(ConsoleTaskTestBase):
       'is_target_root': True,
       'roots': [
          {
-           'source_root': '{root}/project_info/this/is/a/source'.format(root=self.build_root),
+           'source_root': f'{self.build_root}/project_info/this/is/a/source',
            'package_prefix': 'this.is.a.source'
          },
       ],
@@ -435,7 +436,7 @@ class ExportTest(ConsoleTaskTestBase):
     self.assertEqual('TEST', result['targets']['project_info:java_test']['target_type'])
     # Note that the junit dep gets auto-injected via the JUnit subsystem.
     self.assertEqual(['org.apache:apache-jar:12.12.2012',
-                      'junit:junit:{}'.format(JUnit.LIBRARY_REV)],
+                      f'junit:junit:{JUnit.LIBRARY_REV}'],
                      result['targets']['project_info:java_test']['libraries'])
     self.assertEqual('TEST_RESOURCE',
                      result['targets']['project_info:test_resource']['target_type'])

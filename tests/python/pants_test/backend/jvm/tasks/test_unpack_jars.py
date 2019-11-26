@@ -26,10 +26,10 @@ class UnpackJarsTest(TaskTestBase):
   @contextmanager
   def sample_jarfile(self, name):
     with temporary_dir() as temp_dir:
-      jar_name = os.path.join(temp_dir, '{}.jar'.format(name))
+      jar_name = os.path.join(temp_dir, f'{name}.jar')
       with open_zip(jar_name, 'w') as proto_jarfile:
-        proto_jarfile.writestr('a/b/c/{}.txt'.format(name), 'Some text')
-        proto_jarfile.writestr('a/b/c/{}.proto'.format(name), 'message Msg {}')
+        proto_jarfile.writestr(f'a/b/c/{name}.txt', 'Some text')
+        proto_jarfile.writestr(f'a/b/c/{name}.proto', 'message Msg {}')
       yield jar_name
 
   def _make_jar_library(self, coord):

@@ -77,7 +77,7 @@ class DeferredSourcesMapperIntegration(PantsRunIntegrationTest):
         ],
       )
       """))
-    return ['{}:proto-{}'.format(os.path.relpath(workdir, get_buildroot()), suffix)
+    return [f'{os.path.relpath(workdir, get_buildroot())}:proto-{suffix}'
             for suffix in (7, 8, 'other')]
 
   def _configured_pants_run(self, command, workdir):

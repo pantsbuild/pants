@@ -21,12 +21,12 @@ class BundleIntegrationTest(PantsRunIntegrationTest):
     with temporary_dir() as temp_distdir:
       with self.pants_results(
           ['-q',
-           '--pants-distdir={}'.format(temp_distdir),
+           f'--pants-distdir={temp_distdir}',
            'bundle',
-           '{}:{}'.format(self.TARGET_PATH, target_name)]) as pants_run:
+           f'{self.TARGET_PATH}:{target_name}']) as pants_run:
         self.assert_success(pants_run)
         yield os.path.join(temp_distdir,
-                           '{}.{}-bundle'.format(self.TARGET_PATH.replace('/', '.'), target_name))
+                           f"{self.TARGET_PATH.replace('/', '.')}.{target_name}-bundle")
 
   def test_bundle_mapper(self):
     with self.bundled('mapper') as bundle_dir:

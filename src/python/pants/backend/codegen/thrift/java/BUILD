@@ -13,4 +13,5 @@ python_library(
     'src/python/pants/subsystem',
     'src/python/pants/task',
   ],
+  tags = {"partially_type_checked"},
 )

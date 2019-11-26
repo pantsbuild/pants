@@ -6,6 +6,7 @@ import re
 from collections import OrderedDict, defaultdict
 
 from pants.backend.codegen.thrift.python.python_thrift_library import PythonThriftLibrary
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.engine.fs import FilesContent
 from pants.task.task import Task
@@ -26,9 +27,13 @@ class PyThriftNamespaceClashCheck(Task):
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    # TODO: deprecate the --strict option in a future release!
+    # TODO: deprecate the --strict option in a future release, and strict should be always true.
     register('--strict', type=bool, default=False, fingerprint=True,
-             help='Whether to fail the build if thrift sources have invalid python namespaces.')
+      help='Whether to fail the build if any namespace issue is found')
+    register('--strict-clashing-py-namespace', type=bool, default=False, fingerprint=True,
+      help='Whether to fail the build if thrift sources have clashing py namespaces.')
+    register('--strict-missing-py-namespace', type=bool, default=False, fingerprint=True,
+      help='Whether to fail the build if thrift sources is missing py namespaces.')
 
   @classmethod
   def product_types(cls):
@@ -63,7 +68,7 @@ class PyThriftNamespaceClashCheck(Task):
       self.output_file = output_file
       super(PyThriftNamespaceClashCheck.NamespaceExtractionError, self).__init__(msg)
 
-  def _extract_all_python_namespaces(self, thrift_file_sources_by_target):
+  def _extract_all_python_namespaces(self, thrift_file_sources_by_target, is_strict):
     """Extract the python namespace from each thrift source file."""
     py_namespaces_by_target = OrderedDict()
     failing_py_thrift_by_target = defaultdict(list)
@@ -94,7 +99,7 @@ and/or files which need to be edited will be dumped to: {}
 
       safe_file_dump(no_py_namespace_output_file, '{}\n'.format(pretty_printed_failures))
 
-      if self.get_options().strict:
+      if is_strict:
         raise error
       else:
         self.context.log.warn(str(error))
@@ -102,7 +107,7 @@ and/or files which need to be edited will be dumped to: {}
 
   class ClashingNamespaceError(TaskError): pass
 
-  def _determine_clashing_namespaces(self, py_namespaces_by_target):
+  def _determine_clashing_namespaces(self, py_namespaces_by_target, is_strict):
     """Check for any overlapping namespaces."""
     namespaces_by_files = defaultdict(list)
     for target, all_namespaces in py_namespaces_by_target.items():
@@ -129,15 +134,25 @@ same python namespace. This is an upstream WONTFIX in thrift, see:
 Errors:
 {}
 """.format(pretty_printed_clashing))
-      if self.get_options().strict:
+      if is_strict:
         raise error
       else:
         self.context.log.warn(str(error))
     return namespaces_by_files
 
   def execute(self):
+    deprecated_conditional(
+      lambda: self.get_options().strict,
+      removal_version='1.25.0.dev0',
+      entity_description=self.options_scope,
+      hint_message='--strict will be removed. '
+                   'Please use --strict-clashing-py-namespace or --strict-missing-py-namespace '
+                   'to be more explicit on which error type should fail the build.')
+
     py_thrift_targets = self.get_targets(lambda tgt: isinstance(tgt, PythonThriftLibrary))
     thrift_file_sources_by_target = self._get_python_thrift_library_sources(py_thrift_targets)
-    py_namespaces_by_target = self._extract_all_python_namespaces(thrift_file_sources_by_target)
-    namespaces_by_files = self._determine_clashing_namespaces(py_namespaces_by_target)
+    py_namespaces_by_target = self._extract_all_python_namespaces(thrift_file_sources_by_target,
+      self.get_options().strict or self.get_options().strict_missing_py_namespace)
+    namespaces_by_files = self._determine_clashing_namespaces(py_namespaces_by_target,
+      self.get_options().strict or self.get_options().strict_clashing_py_namespace)
     self.context.products.register_data('_py_thrift_namespaces_by_files', namespaces_by_files)

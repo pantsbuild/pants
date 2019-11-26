@@ -15,7 +15,7 @@ use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 use std::time::Duration;
 use uuid;
-use workunit_store::WorkUnitStore;
+use workunit_store::{WorkUnit, WorkUnitStore};
 
 #[derive(Clone)]
 pub struct ByteStore {
@@ -218,12 +218,11 @@ impl ByteStore {
         }
       })
       .then(move |future| {
-        let workunit = workunit_store::WorkUnit {
-          name: workunit_name.clone(),
-          time_span: TimeSpan::since(&start_time),
-          span_id: workunit_store::generate_random_64bit_string(),
-          parent_id: workunit_store::get_parent_id(),
-        };
+        let workunit = WorkUnit::new(
+          workunit_name.clone(),
+          TimeSpan::since(&start_time),
+          workunit_store::get_parent_id(),
+        );
         workunit_store.add_workunit(workunit);
         future
       })
@@ -297,12 +296,11 @@ impl ByteStore {
         }
       })
       .then(move |future| {
-        let workunit = workunit_store::WorkUnit {
-          name: workunit_name.clone(),
-          time_span: TimeSpan::since(&start_time),
-          span_id: workunit_store::generate_random_64bit_string(),
-          parent_id: workunit_store::get_parent_id(),
-        };
+        let workunit = WorkUnit::new(
+          workunit_name.clone(),
+          TimeSpan::since(&start_time),
+          workunit_store::get_parent_id(),
+        );
         workunit_store.add_workunit(workunit);
         future
       })
@@ -345,12 +343,11 @@ impl ByteStore {
           })
       })
       .then(move |future| {
-        let workunit = workunit_store::WorkUnit {
-          name: workunit_name.clone(),
-          time_span: TimeSpan::since(&start_time),
-          span_id: workunit_store::generate_random_64bit_string(),
-          parent_id: workunit_store::get_parent_id(),
-        };
+        let workunit = WorkUnit::new(
+          workunit_name.clone(),
+          TimeSpan::since(&start_time),
+          workunit_store::get_parent_id(),
+        );
         workunit_store.add_workunit(workunit);
         future
       })

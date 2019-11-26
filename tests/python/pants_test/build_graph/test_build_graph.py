@@ -30,7 +30,7 @@ class BuildGraphTest(TestBase):
         # The target is located in the root.
         src_path = '.'
       self.add_to_build_file(
-          '{}/BUILD'.format(src_path),
+          f'{src_path}/BUILD',
           '''target(name='{}', dependencies=[{}])\n'''.format(
             src_name,
             "'{}'".format("','".join(targets)) if targets else ''

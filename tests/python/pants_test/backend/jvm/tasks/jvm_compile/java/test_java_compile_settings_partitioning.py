@@ -26,7 +26,7 @@ class JavaCompileSettingsPartitioningTest(NailgunTaskTestBase):
     return RscCompile
 
   def _java(self, name, platform=None, deps=None):
-    return self.make_target(spec='java:{}'.format(name),
+    return self.make_target(spec=f'java:{name}',
                             target_type=JavaLibrary,
                             platform=platform,
                             dependencies=deps or [],
@@ -71,8 +71,8 @@ class JavaCompileSettingsPartitioningTest(NailgunTaskTestBase):
   @staticmethod
   def _format_zinc_arguments(settings, distribution):
     zinc_args = [
-      '-C-source', '-C{}'.format(settings.source_level),
-      '-C-target', '-C{}'.format(settings.target_level),
+      '-C-source', f'-C{settings.source_level}',
+      '-C-target', f'-C{settings.target_level}',
     ]
     if settings.args:
       settings_args = settings.args
@@ -109,9 +109,9 @@ class JavaCompileSettingsPartitioningTest(NailgunTaskTestBase):
   def test_java_version_aliases(self):
     expected = {}
     for version in (6, 7, 8):
-      expected[Revision.lenient('1.{}'.format(version))] = {
-        self._java('j1{}'.format(version), '1.{}'.format(version)),
-        self._java('j{}'.format(version), '{}'.format(version)),
+      expected[Revision.lenient(f'1.{version}')] = {
+        self._java(f'j1{version}', f'1.{version}'),
+        self._java(f'j{version}', f'{version}'),
       }
     partition = self._partition(list(reduce(set.union, list(expected.values()), set())),
                                 platforms=self._platforms('6', '7', '8', '1.6', '1.7', '1.8'))
@@ -262,7 +262,7 @@ class JavaCompileSettingsPartitioningTest(NailgunTaskTestBase):
         args=['$JAVA_HOME/foo', '$JAVA_HOME'],
       ))
       self.assertEqual(paths[0], results[-1])
-      self.assertEqual('{}/foo'.format(paths[0]), results[-2])
+      self.assertEqual(f'{paths[0]}/foo', results[-2])
 
     # Make sure we pick up the strictest possible distribution.
     with fake_distribution_locator(farer_future_version, far_future_version) as paths:
@@ -273,7 +273,7 @@ class JavaCompileSettingsPartitioningTest(NailgunTaskTestBase):
         args=['$JAVA_HOME/foo', '$JAVA_HOME'],
       ))
       self.assertEqual(far_path, results[-1])
-      self.assertEqual('{}/foo'.format(far_path), results[-2])
+      self.assertEqual(f'{far_path}/foo', results[-2])
 
     # Make sure we pick the higher distribution when the lower one doesn't work.
     with fake_distribution_locator(farer_future_version, far_future_version) as paths:
@@ -284,4 +284,4 @@ class JavaCompileSettingsPartitioningTest(NailgunTaskTestBase):
         args=['$JAVA_HOME/foo', '$JAVA_HOME'],
       ))
       self.assertEqual(farer_path, results[-1])
-      self.assertEqual('{}/foo'.format(farer_path), results[-2])
+      self.assertEqual(f'{farer_path}/foo', results[-2])

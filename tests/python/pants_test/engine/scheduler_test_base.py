@@ -45,7 +45,9 @@ class SchedulerTestBase:
                    union_rules=None,
                    project_tree=None,
                    work_dir=None,
-                   include_trace_on_error=True):
+                   include_trace_on_error=True,
+                   should_report_workunits=False,
+                   ):
     """Creates a SchedulerSession for a Scheduler with the given Rules installed."""
     rules = rules or []
     work_dir = work_dir or self._create_work_dir()
@@ -58,7 +60,7 @@ class SchedulerTestBase:
                           union_rules,
                           DEFAULT_EXECUTION_OPTIONS,
                           include_trace_on_error=include_trace_on_error)
-    return scheduler.new_session(zipkin_trace_v2=False, build_id="buildid_for_test")
+    return scheduler.new_session(zipkin_trace_v2=False, build_id="buildid_for_test", should_report_workunits=should_report_workunits)
 
   def context_with_scheduler(self, scheduler, *args, **kwargs):
     return self.context(*args, scheduler=scheduler, **kwargs)
@@ -73,7 +75,7 @@ class SchedulerTestBase:
     if throws:
       with temporary_file_path(cleanup=False, suffix='.dot') as dot_file:
         scheduler.visualize_graph_to_file(dot_file)
-        raise ValueError('At least one root failed: {}. Visualized as {}'.format(throws, dot_file))
+        raise ValueError(f'At least one root failed: {throws}. Visualized as {dot_file}')
     return list(state.value for _, state in returns)
 
   def execute_expecting_one_result(self, scheduler, product, subject):
