@@ -30,6 +30,7 @@ from pants.rules.core.lint import LintResult
 class IsortSetup:
   requirements_pex: Pex
   config_snapshot: Snapshot
+  passthrough_args: Tuple[str, ...]
 
 
 @rule
@@ -46,7 +47,11 @@ async def setup_isort(isort: Isort) -> IsortSetup:
       entry_point=isort.get_entry_point(),
     )
   )
-  return IsortSetup(requirements_pex=requirements_pex, config_snapshot=config_snapshot)
+  return IsortSetup(
+    requirements_pex=requirements_pex,
+    config_snapshot=config_snapshot,
+    passthrough_args=isort.get_args(),
+  )
 
 
 @dataclass(frozen=True)
@@ -54,13 +59,17 @@ class IsortArgs:
   args: Tuple[str, ...]
 
   @staticmethod
-  def create(*, wrapped_target: FormattablePythonTarget, check_only: bool) -> "IsortArgs":
+  def create(
+    *, wrapped_target: FormattablePythonTarget, isort_setup: IsortSetup, check_only: bool,
+  ) -> "IsortArgs":
     # NB: isort auto-discovers config files. There is no way to hardcode them via command line
     # flags. So long as the files are in the Pex's input files, isort will use the config.
     files = wrapped_target.target.sources.snapshot.files
     pex_args = []
     if check_only:
       pex_args.append("--check-only")
+    if isort_setup.passthrough_args:
+      pex_args.extend(isort_setup.passthrough_args)
     pex_args.extend(files)
     return IsortArgs(tuple(pex_args))
 
@@ -95,16 +104,16 @@ async def create_isort_request(
 
 
 @rule(name="Format using isort")
-async def fmt(wrapped_target: FormattablePythonTarget) -> FmtResult:
-  args = IsortArgs.create(wrapped_target=wrapped_target, check_only=False)
+async def fmt(wrapped_target: FormattablePythonTarget, isort_setup: IsortSetup) -> FmtResult:
+  args = IsortArgs.create(wrapped_target=wrapped_target, isort_setup=isort_setup, check_only=False)
   request = await Get[ExecuteProcessRequest](IsortArgs, args)
   result = await Get[ExecuteProcessResult](ExecuteProcessRequest, request)
   return FmtResult.from_execute_process_result(result)
 
 
 @rule(name="Lint using isort")
-async def lint(wrapped_target: FormattablePythonTarget) -> LintResult:
-  args = IsortArgs.create(wrapped_target=wrapped_target, check_only=True)
+async def lint(wrapped_target: FormattablePythonTarget, isort_setup: IsortSetup) -> LintResult:
+  args = IsortArgs.create(wrapped_target=wrapped_target, isort_setup=isort_setup, check_only=True)
   request = await Get[ExecuteProcessRequest](IsortArgs, args)
   result = await Get(FallibleExecuteProcessResult, ExecuteProcessRequest, request)
   return LintResult.from_fallible_execute_process_result(result)

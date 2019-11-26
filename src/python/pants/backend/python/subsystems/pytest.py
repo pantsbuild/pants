@@ -4,6 +4,7 @@
 from typing import List, Tuple
 
 from pants.base.deprecated import deprecated_conditional
+from pants.option.option_util import flatten_shlexed_list
 from pants.subsystem.subsystem import Subsystem
 
 
@@ -13,6 +14,10 @@ class PyTest(Subsystem):
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
+    register(
+      '--args', type=list, member_type=str,
+      help="Arguments to pass directly to Pytest, e.g. `--pytest-args=\"-k test_foo --quiet\"`",
+    )
     register('--version', default='pytest>=4.6.6,<4.7', help="Requirement string for Pytest.")
     register(
       '--pytest-plugins',
@@ -85,3 +90,6 @@ class PyTest(Subsystem):
         opts.unittest2_requirements,
       )
     return (opts.version, *opts.pytest_plugins)
+
+  def get_args(self) -> Tuple[str, ...]:
+    return flatten_shlexed_list(self.get_options().args)

@@ -42,5 +42,5 @@ python_tests(
     'src/python/pants/testutil/subsystem',
   ],
   tags = {'integration'},
-  timeout = 90,
+  timeout = 120,
 )
