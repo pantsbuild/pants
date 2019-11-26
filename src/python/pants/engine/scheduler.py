@@ -581,12 +581,14 @@ class SchedulerSession:
   def materialize_directory(
     self, directory_to_materialize: DirectoryToMaterialize
   ) -> MaterializeDirectoryResult:
+    """Materialize one single directory digest to disk. If you need to materialize multiple, you
+    should use the parallel materialize_directories() instead."""
     return self.materialize_directories((directory_to_materialize,)).dependencies[0]
 
   def materialize_directories(
     self, directories_to_materialize: Tuple[DirectoryToMaterialize, ...]
   ) -> MaterializeDirectoriesResult:
-    """Creates the specified directories on the file system."""
+    """Materialize multiple directory digests to disk in parallel."""
     # Ensure that there isn't more than one of the same directory paths and paths do not have the
     # same prefix.
     dir_list = [dtm.path for dtm in directories_to_materialize]
