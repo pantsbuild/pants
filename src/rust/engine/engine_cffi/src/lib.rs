@@ -971,20 +971,20 @@ pub extern "C" fn run_local_interactive_process(
 pub extern "C" fn materialize_directories(
   scheduler_ptr: *mut Scheduler,
   session_ptr: *mut Session,
-  directories_paths_and_digests_value: Handle,
+  directories_digests_and_paths_value: Handle,
 ) -> PyResult {
-  let values = externs::project_multi(&directories_paths_and_digests_value.into(), "dependencies");
-  let directories_paths_and_digests_results: Result<Vec<(PathBuf, Digest)>, String> = values
+  let values = externs::project_multi(&directories_digests_and_paths_value.into(), "dependencies");
+  let directories_digests_and_paths_results: Result<Vec<(Digest, PathBuf)>, String> = values
     .iter()
     .map(|value| {
       let dir = PathBuf::from(externs::project_str(&value, "path"));
       let dir_digest =
         nodes::lift_digest(&externs::project_ignoring_type(&value, "directory_digest"));
-      dir_digest.map(|dir_digest| (dir, dir_digest))
+      dir_digest.map(|dir_digest| (dir_digest, dir))
     })
     .collect();
 
-  let dir_and_digests = match directories_paths_and_digests_results {
+  let digests_and_dirs = match directories_digests_and_paths_results {
     Ok(d) => d,
     Err(err) => {
       let e: Result<Value, String> = Err(err);
@@ -997,9 +997,9 @@ pub extern "C" fn materialize_directories(
     let construct_materialize_directories_results = types.construct_materialize_directories_results;
     let construct_materialize_directory_result = types.construct_materialize_directory_result;
     let work_future = futures::future::join_all(
-      dir_and_digests
+      digests_and_dirs
         .into_iter()
-        .map(|(dir, digest)| {
+        .map(|(digest, dir)| {
           // NB: all DirectoryToMaterialize paths are validated in Python to be relative paths.
           // Here, we join them with the build root.
           let mut destination = PathBuf::new();

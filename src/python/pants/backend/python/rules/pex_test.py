@@ -75,7 +75,7 @@ class TestResolveRequirements(TestBase):
       )
     )
     self.scheduler.materialize_directory(
-      DirectoryToMaterialize(path="", directory_digest=requirements_pex.directory_digest),
+      DirectoryToMaterialize(requirements_pex.directory_digest),
     )
     with zipfile.ZipFile(os.path.join(self.build_root, "test.pex"), "r") as pex:
       with pex.open("PEX-INFO", "r") as pex_info:

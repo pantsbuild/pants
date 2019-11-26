@@ -171,9 +171,10 @@ class DirectoryWithPrefixToAdd:
 
 @dataclass(frozen=True)
 class DirectoryToMaterialize:
-  """A request to materialize the contents of a directory digest at the provided path."""
-  path: str
+  """A request to materialize the contents of a directory digest at the provided path,
+  relative to the buildroot."""
   directory_digest: Digest
+  path: str = ""  # i.e. at the root level of the build root
 
   def __post_init__(self) -> None:
     if Path(self.path).is_absolute():

@@ -174,8 +174,8 @@ class JavacCompile(JvmCompile):
         classes_directory = Path(ctx.classes_dir.path).relative_to(get_buildroot())
         self.context._scheduler.materialize_directory(
           DirectoryToMaterialize(
-            str(classes_directory),
-            self.post_compile_extra_resources_digest(ctx, prepend_post_merge_relative_path=False)
+            self.post_compile_extra_resources_digest(ctx, prepend_post_merge_relative_path=False),
+            path=str(classes_directory),
           ),
         )
 
@@ -236,5 +236,5 @@ class JavacCompile(JvmCompile):
       ])
     classes_directory = Path(ctx.classes_dir.path).relative_to(get_buildroot())
     self.context._scheduler.materialize_directory(
-      DirectoryToMaterialize(str(classes_directory), merged_directories),
+      DirectoryToMaterialize(merged_directories, path=str(classes_directory)),
     )

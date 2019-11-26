@@ -362,7 +362,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
     digest = Digest(
       "63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16", 80
     )
-    self.scheduler.materialize_directory(DirectoryToMaterialize("test", digest))
+    self.scheduler.materialize_directory(DirectoryToMaterialize(digest, path="test/"))
     assert Path(self.build_root, "test/roland").read_text() == "European Burmese"
 
   def test_add_prefix(self):
