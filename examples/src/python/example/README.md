@@ -129,7 +129,7 @@ run the PEX:
 You can also run the binary "from source" with the `run` goal:
 
     :::bash
-    $ ./pants run.py --args='Whirled' examples/src/python/example/hello/main
+    $ ./pants run.py examples/src/python/example/hello/main -- 'Whirled'
          ...much output...
     14:32:01 00:00     [py]
     14:32:02 00:01       [run]

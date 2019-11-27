@@ -17,7 +17,10 @@ class PythonRun(PythonExecutionTaskBase):
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--args', type=list, help='Run with these extra args to main().')
+    register(
+      '--args', type=list, help='Run with these extra args to main().',
+      removal_version="1.26.0.dev0", removal_hint="Use `--passthrough-args` instead of `--args`."
+    )
 
   @classmethod
   def supports_passthru_args(cls):
