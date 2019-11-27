@@ -4,7 +4,7 @@
 from pathlib import Path
 from typing import List, Tuple, Type
 
-from pants.engine.fs import Digest, FileContent, InputFilesContent, Workspace
+from pants.engine.fs import Digest, DirectoriesToMerge, FileContent, InputFilesContent, Workspace
 from pants.engine.legacy.graph import HydratedTarget, HydratedTargets
 from pants.engine.legacy.structs import JvmAppAdaptor, PythonTargetAdaptor, TargetAdaptor
 from pants.engine.rules import UnionMembership
@@ -52,6 +52,7 @@ class FmtTest(TestBase):
             digest=result_digest, stdout=f"Formatted target `{adaptor.name}`", stderr=""
           )
         ),
+        MockGet(product_type=Digest, subject_type=DirectoriesToMerge, mock=lambda _: result_digest),
       ],
     )
     return result, console
@@ -79,6 +80,8 @@ class FmtTest(TestBase):
     self.assert_workspace_modified()
 
   def test_multiple_targets(self) -> None:
+    # NB: we do not test the case where FmtResults have conflicting changes, as that logic
+    # is handled by DirectoriesToMerge.
     result, console = self.run_fmt_rule(
       targets=[self.make_hydrated_target(name="t1"), self.make_hydrated_target(name="t2")]
     )
@@ -86,7 +89,4 @@ class FmtTest(TestBase):
     assert console.stdout.getvalue().splitlines() == [
       "Formatted target `t1`", "Formatted target `t2`"
     ]
-    # NB: these targets result in the same `FmtResult.digest`s, meaning that they will overwrite
-    # each other when the formatting is applied. This test ensures that we properly
-    # handle overlapping `FmtResult.digest`s.
     self.assert_workspace_modified()

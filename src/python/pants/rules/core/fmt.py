@@ -4,7 +4,7 @@
 from dataclasses import dataclass
 
 from pants.engine.console import Console
-from pants.engine.fs import Digest, DirectoryToMaterialize, Workspace
+from pants.engine.fs import Digest, DirectoriesToMerge, DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal
 from pants.engine.legacy.graph import HydratedTargets
 from pants.engine.rules import UnionMembership, console_rule, union
@@ -46,13 +46,14 @@ async def fmt(
     if union_membership.is_member(TargetWithSources, target.adaptor) and hasattr(target.adaptor, "sources")
   )
 
+  # NB: this will fail if there are any conflicting changes, which we want to happen rather than
+  # silently having one result override the other.
+  # TODO(#8722): how should we handle multiple auto-formatters touching the same files?
+  merged_formatted_digest = await Get[Digest](
+    DirectoriesToMerge(tuple(result.digest for result in results))
+  )
+  workspace.materialize_directory(DirectoryToMaterialize(merged_formatted_digest))
   for result in results:
-    # NB: we cannot call `workspace.materialize_directories()` in one single call with all of the
-    # results because results can override each other—they share the same path prefix of `./` and
-    # are capable of changing the same files. We must instead call
-    # `workspace.materialize_directory()` for every result. If two results make conflicting
-    # changes, one will get overridden by the other.
-    workspace.materialize_directory(DirectoryToMaterialize(result.digest))
     if result.stdout:
       console.print_stdout(result.stdout)
     if result.stderr:
