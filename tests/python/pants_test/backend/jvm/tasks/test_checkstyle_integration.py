@@ -95,6 +95,7 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
       'contrib',
       'pants-plugins',
       'src',
+      '.isort.cfg',
       'pyproject.toml',
     ))
     with temporary_dir() as temp_root:

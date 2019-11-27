@@ -598,6 +598,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
     files_to_copy = ('BUILD.tools',)
     files_to_link = (
       'BUILD_ROOT',
+      '.isort.cfg',
       '.pants.d',
       'build-support',
       # NB: when running with --chroot or the V2 engine, `pants` refers to the source root-stripped
