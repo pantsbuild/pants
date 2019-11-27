@@ -24,6 +24,7 @@ from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.project_info.tasks.export_dep_as_jar import ExportDepAsJar
 from pants.backend.project_info.tasks.export_version import DEFAULT_EXPORT_VERSION
 from pants.base.exceptions import TaskError
+from pants.build_graph.address import Address
 from pants.build_graph.register import build_file_aliases as register_core
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
@@ -185,7 +186,7 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
       dependencies=[jar_lib],
     )
 
-    self.make_target(
+    jvm_target_with_sources = self.make_target(
       'project_info:jvm_target',
       target_type=ScalaLibrary,
       dependencies=[jar_lib],
@@ -238,6 +239,22 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
       target_type=JvmTarget,
     )
 
+    self.scala_with_source_dep = self.make_target(
+      'project_info:scala_with_source_dep',
+      target_type=ScalaLibrary,
+      dependencies=[jvm_target_with_sources],
+      sources=[]
+    )
+
+  def create_runtime_classpath_for_targets(self, target):
+    def path_to_zjar_with_workdir(address: Address):
+      return os.path.join(self.pants_workdir, address.path_safe_spec, "z.jar")
+
+    runtime_classpath = ClasspathProducts(self.pants_workdir)
+    for dep in target.dependencies:
+      runtime_classpath.add_for_target(dep, [('default', path_to_zjar_with_workdir(dep.address))])
+    return runtime_classpath
+
   def execute_export(self, *specs, **options_overrides):
     options = {
       ScalaPlatform.options_scope: {
@@ -259,8 +276,11 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
     context = self.context(options=options, target_roots=[self.target(spec) for spec in specs],
                            for_subsystems=[JvmPlatform],
                            for_task_types=[BootstrapJvmTools])
+
+    runtime_classpath = self.create_runtime_classpath_for_targets(self.scala_with_source_dep)
     context.products.safe_create_data('runtime_classpath',
-                                      init_func=ClasspathProducts.init_func(self.pants_workdir))
+                                      init_func=lambda: runtime_classpath)
+
     bootstrap_task = BootstrapJvmTools(context, self.pants_workdir)
     bootstrap_task.execute()
     task = self.create_task(context)
@@ -467,3 +487,51 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
         self.assertIn(export_json['preferred_jvm_distributions']['java9999']['non_strict'],
                       [non_strict_home, strict_home],
                       "non-strict home does not match")
+
+  def test_includes_zjars_in_dependencies(self):
+
+    result = self.execute_export_json('project_info:scala_with_source_dep')
+    self.assertIn(
+      'project_info.jvm_target',
+      result['libraries']
+    )
+    self.assertIn(
+      'z.jar',
+      result['libraries']['project_info.jvm_target']['default']
+    )
+
+  def test_dont_export_sources_by_default(self):
+
+    result = self.execute_export_json('project_info:scala_with_source_dep')
+
+    self.assertIn(
+      'project_info.jvm_target',
+      result['libraries']
+    )
+
+    self.assertNotIn(
+      'sources',
+      result['libraries']['project_info.jvm_target']
+    )
+
+  def test_export_sources_if_flag_passed(self):
+    result = self.execute_export_json('project_info:scala_with_source_dep', **{
+      ExportDepAsJar.options_scope: {
+        'sources': True
+      }
+    })
+
+    print(json.dumps(result))
+
+    self.assertIn(
+      'project_info.jvm_target',
+      result['libraries']
+    )
+    self.assertIn(
+      'sources',
+      result['libraries']['project_info.jvm_target']
+    )
+    self.assertIn(
+      '-sources.jar',
+      result['libraries']['project_info.jvm_target']['sources']
+    )

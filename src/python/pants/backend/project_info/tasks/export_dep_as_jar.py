@@ -32,11 +32,15 @@ class ExportDepAsJar(ConsoleTask):
   jvm dependencies instead of sources.
   """
 
+  options_scope = "export-dep-as-jar"
+
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
     register('--formatted', type=bool, implicit_value=False,
       help='Causes output to be a single line of JSON.')
+    register('--sources', type=bool,
+      help='Causes sources to be output.')
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -292,6 +296,9 @@ class ExportDepAsJar(ConsoleTask):
           # If not, zip up the classes/ dir here.
           if 'z.jar' in jar_entry:
             graph_info['libraries'][t.id][conf] = jar_entry
+        if self.get_options().sources:
+          graph_info['libraries'][t.id]['sources'] = f"{t.id}-sources.jar"
+
 
     return graph_info
 
