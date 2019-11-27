@@ -83,7 +83,7 @@ class PailgunHandler(PailgunHandlerBase):
     # We don't support parallel runs in pantsd, and therefore if this pailgun request
     # triggers any pants command, we want it to not use pantsd at all.
     # See https://github.com/pantsbuild/pants/issues/7881 for context.
-    environment["PANTS_CONCURRENT"] = "True"
+    environment["PANTS_INNER_RUN"] = "True"
 
     # Execute the requested command with optional daemon-side profiling.
     with maybe_profiled(environment.get('PANTSD_PROFILE')):
