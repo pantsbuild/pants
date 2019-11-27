@@ -22,6 +22,15 @@ python_library(
 )
 
 python_library(
+  name='http',
+  sources=['http.py'],
+  dependencies=[
+    ':goal',
+    ':selectors',
+  ]
+)
+
+python_library(
   name='addressable',
   sources=['addressable.py'],
   dependencies=[

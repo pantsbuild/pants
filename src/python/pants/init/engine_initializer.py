@@ -26,6 +26,7 @@ from pants.engine.build_files import create_graph_rules
 from pants.engine.console import Console
 from pants.engine.fs import Workspace, create_fs_rules
 from pants.engine.goal import Goal
+from pants.engine.http import create_http_rules
 from pants.engine.interactive_runner import InteractiveRunner, create_interactive_runner_rules
 from pants.engine.isolated_process import create_process_rules
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
@@ -414,6 +415,7 @@ class EngineInitializer:
       create_graph_rules(address_mapper) +
       create_options_parsing_rules() +
       structs_rules() +
+      create_http_rules() +
       rules
     )
 

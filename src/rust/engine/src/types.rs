@@ -14,6 +14,7 @@ pub struct Types {
   pub construct_process_result: Function,
   pub construct_materialize_directories_results: Function,
   pub construct_materialize_directory_result: Function,
+  pub construct_http_response: Function,
   pub address: TypeId,
   pub path_globs: TypeId,
   pub directories_to_merge: TypeId,
@@ -32,4 +33,6 @@ pub struct Types {
   pub construct_interactive_process_result: Function,
   pub interactive_process_request: TypeId,
   pub interactive_process_result: TypeId,
+  pub make_http_request: TypeId,
+  pub make_http_response: TypeId,
 }
