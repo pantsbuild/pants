@@ -46,6 +46,9 @@ async def fmt(
     if union_membership.is_member(TargetWithSources, target.adaptor) and hasattr(target.adaptor, "sources")
   )
 
+  if not results:
+    return Fmt(exit_code=0)
+
   # NB: this will fail if there are any conflicting changes, which we want to happen rather than
   # silently having one result override the other.
   # TODO(#8722): how should we handle multiple auto-formatters touching the same files?
@@ -61,8 +64,7 @@ async def fmt(
 
   # Since the rules to produce FmtResult should use ExecuteRequest, rather than
   # FallibleExecuteProcessRequest, we assume that there were no failures.
-  exit_code = 0
-  return Fmt(exit_code)
+  return Fmt(exit_code=0)
 
 
 def rules():

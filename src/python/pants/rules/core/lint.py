@@ -36,6 +36,9 @@ async def lint(console: Console, targets: HydratedTargets, union_membership: Uni
     if union_membership.is_member(TargetWithSources, target.adaptor) and hasattr(target.adaptor, "sources")
   )
 
+  if not results:
+    return Lint(exit_code=0)
+
   exit_code = 0
   for result in results:
     if result.stdout:
