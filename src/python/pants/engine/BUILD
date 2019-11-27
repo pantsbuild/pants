@@ -266,3 +266,15 @@ resources(
   name='native_engine_shared_library',
   sources=['native_engine.so']
 )
+ 
+python_tests(
+  name = "tests",
+  sources = ["http_test.py"],
+  dependencies = [
+    ':http',
+    'src/python/pants/testutil:test_base',
+    'tests/python/pants_test:console_rule_test_base',
+    'tests/python/pants_test/engine:util'
+  ]
+)
+
