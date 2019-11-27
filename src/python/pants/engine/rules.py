@@ -4,7 +4,6 @@
 import ast
 import inspect
 import itertools
-import logging
 import sys
 import typing
 from abc import ABC, abstractmethod
@@ -21,9 +20,6 @@ from pants.util.memo import memoized
 from pants.util.meta import frozen_after_init
 
 
-logger = logging.getLogger(__name__)
-
-
 class _RuleVisitor(ast.NodeVisitor):
   """Pull `Get` calls out of an @rule body."""
 
@@ -35,13 +31,25 @@ class _RuleVisitor(ast.NodeVisitor):
   def gets(self) -> List[Get]:
     return self._gets
 
-  def _is_get(self, node: ast.Call):
-    return isinstance(node.func, ast.Name) and node.func.id == Get.__name__
+  def _matches_get_name(self, node: ast.AST) -> bool:
+    """Check if the node is a Name which matches 'Get'."""
+    return isinstance(node, ast.Name) and node.id == Get.__name__
+
+  def _is_get(self, node: ast.AST) -> bool:
+    """Check if the node looks like a Get(...) or Get[X](...) call."""
+    if isinstance(node, ast.Call):
+      if self._matches_get_name(node.func):
+        return True
+      if isinstance(node.func, ast.Subscript) and self._matches_get_name(node.func.value):
+        return True
+      return False
+    return False
 
   def visit_Call(self, node: ast.Call) -> None:
-    self.generic_visit(node)
     if self._is_get(node):
       self._gets.append(Get.extract_constraints(node))
+    # Ensure we descend into e.g. MultiGet(Get(...)...) calls.
+    self.generic_visit(node)
 
 
 @memoized
