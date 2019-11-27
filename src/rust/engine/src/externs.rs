@@ -184,7 +184,10 @@ pub fn project_tuple_encoded_map(
 ) -> Result<BTreeMap<String, String>, String> {
   let parts = project_multi_strs(&value, field);
   if parts.len() % 2 != 0 {
-    return Err("Error parsing env: odd number of parts".to_owned());
+    return Err(format!(
+      "Error parsing field '{}': odd number of parts",
+      field
+    ));
   }
   Ok(parts.into_iter().tuples::<(_, _)>().collect())
 }

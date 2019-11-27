@@ -583,7 +583,7 @@ class EngineTypes(NamedTuple):
   interactive_process_request: TypeId
   interactive_process_result: TypeId
   make_http_request: TypeId
-  make_http_response: TypeId
+  http_response: TypeId
 
 
 class PyResult(NamedTuple):
@@ -949,7 +949,7 @@ class Native(metaclass=SingletonMetaclass):
         interactive_process_request=ti(InteractiveProcessRequest),
         interactive_process_result=ti(InteractiveProcessResult),
         make_http_request=ti(MakeHttpRequest),
-        make_http_response=ti(HttpResponse),
+        http_response=ti(HttpResponse),
     )
 
     scheduler_result = self.lib.scheduler_create(

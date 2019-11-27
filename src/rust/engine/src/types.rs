@@ -34,5 +34,5 @@ pub struct Types {
   pub interactive_process_request: TypeId,
   pub interactive_process_result: TypeId,
   pub make_http_request: TypeId,
-  pub make_http_response: TypeId,
+  pub http_response: TypeId,
 }

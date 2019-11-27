@@ -13,6 +13,7 @@ use std::{self, fmt};
 use concrete_time::TimeSpan;
 use futures::future::{self, Future};
 use futures::Stream;
+use reqwest;
 use url::Url;
 
 use crate::context::{Context, Core};
@@ -21,7 +22,8 @@ use crate::externs;
 use crate::selectors;
 use crate::tasks::{self, Intrinsic, Rule};
 use boxfuture::{try_future, BoxFuture, Boxable};
-use bytes::{self, BufMut};
+#[allow(unused_imports)]
+use bytes::{self, BufMut, Bytes};
 use fs::{
   self, Dir, DirectoryListing, File, FileContent, GlobExpansionConjunction, GlobMatching, Link,
   PathGlobs, PathStat, StrictGlobMatching, VFS,
@@ -229,6 +231,53 @@ impl WrappedNode for Select {
             .to_boxed()
         }
         &Rule::Intrinsic(Intrinsic { product, input })
+          if product == types.http_response && input == types.make_http_request =>
+        {
+          let context = context.clone();
+          let core = context.core.clone();
+          self
+            .select_product(&context, types.make_http_request, "intrinsic")
+            .and_then(move |val: Value| context.get(HttpRequester(externs::key_for(val))))
+            .map(move |resp: EngineHttpResponse| {
+              let url_val = externs::store_utf8(&resp.url);
+
+              let response_code_val = match resp.response_code {
+                Some(n) => externs::store_u64(n as u64),
+                None => Value::from(externs::none()),
+              };
+
+              let output_bytes_val = match resp.bytes {
+                None => Value::from(externs::none()),
+                Some(bytes) => externs::store_bytes(&bytes),
+              };
+
+              let header_tuples: Vec<Value> = resp
+                .headers
+                .into_iter()
+                .map(|(k, v)| {
+                  let values = [
+                    externs::store_utf8(k.as_str()),
+                    externs::store_utf8(v.as_str()),
+                  ];
+                  externs::store_tuple(&values)
+                })
+                .collect();
+
+              let output_headers_val = externs::store_tuple(&header_tuples);
+
+              externs::unsafe_call(
+                &core.types.construct_http_response,
+                &[
+                  url_val,
+                  response_code_val,
+                  output_bytes_val,
+                  output_headers_val,
+                ],
+              )
+            })
+            .to_boxed()
+        }
+        &Rule::Intrinsic(Intrinsic { product, input })
           if product == types.directory_digest && input == types.directories_to_merge =>
         {
           let request = self.select_product(&context, types.directories_to_merge, "intrinsic");
@@ -340,7 +389,7 @@ impl WrappedNode for Select {
           let core = context.core.clone();
           self
             .select_product(&context, types.multi_platform_process_request, "intrinsic")
-            .and_then(|request| {
+            .and_then(|request: Value| {
               MultiPlatformExecuteProcess::lift(&request).map_err(|str| {
                 throw(&format!(
                   "Error lifting MultiPlatformExecuteProcess: {}",
@@ -378,6 +427,104 @@ impl WrappedNode for Select {
         panic!("Not a runtime-executable entry! {:?}", self.entry)
       }
     }
+  }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct HttpRequester(Key);
+
+impl From<HttpRequester> for NodeKey {
+  fn from(n: HttpRequester) -> Self {
+    NodeKey::HttpRequester(n)
+  }
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct EngineHttpResponse {
+  response_code: Option<u16>,
+  bytes: Option<Vec<u8>>,
+  url: String,
+  headers: Vec<(String, String)>,
+}
+
+impl WrappedNode for HttpRequester {
+  type Item = EngineHttpResponse;
+
+  fn run(self, context: Context) -> NodeFuture<EngineHttpResponse> {
+    use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
+
+    let value = externs::val_for(&self.0);
+    let url_string = externs::project_str(&value, "url");
+    let headers =
+      try_future!(externs::project_tuple_encoded_map(&value, "headers").map_err(|err| throw(&err)));
+
+    let mut header_map = HeaderMap::new();
+    for (k, v) in headers.iter() {
+      let header_name = HeaderName::from_bytes(k.as_bytes()).unwrap();
+      let header_value = HeaderValue::from_str(v).unwrap();
+      header_map.insert(header_name, header_value);
+    }
+
+    let url = try_future!(Url::parse(&url_string).map_err(|err| throw(&format!(
+      "HttpRequest - error parsing URL {}: {}",
+      url_string, err
+    ))));
+
+    let core = context.core.clone();
+    let request = core.http_client.get(url).headers(header_map);
+
+    request
+      .send()
+      .then(|result: Result<reqwest::r#async::Response, reqwest::Error>| match result {
+        Ok(resp) => {
+          println!("RESULT IN RUST: {:?}", resp);
+          let response_code = Some(resp.status().as_u16());
+          let url = resp.url().as_str().to_string();
+          let headers: Vec<(String, String)> = resp
+            .headers()
+            .into_iter()
+            .map(|(k, v)| (k.as_str().to_string(), v.to_str().unwrap().to_string()))
+            .collect();
+
+          let bytes: Vec<u8> = Vec::new();
+          let decoder = resp.into_body();
+          let fold: futures::stream::Fold<
+            _,
+            _,
+            futures::future::FutureResult<_, reqwest::Error>,
+            _,
+          > = decoder.fold(bytes, |mut acc: Vec<u8>, chunk: reqwest::r#async::Chunk| {
+            acc.extend_from_slice(&chunk);
+            future::ok(acc)
+          });
+          fold
+            .map_err(|err: reqwest::Error| throw(&format!("{}", err)))
+            .and_then(move |bytes: Vec<u8>| {
+              future::ok(EngineHttpResponse {
+                response_code,
+                bytes: Some(bytes),
+                url,
+                headers,
+              })
+            })
+            .to_boxed()
+        }
+        Err(err) => {
+          let response_code = err.status().map(|s| s.as_u16());
+          let url = match err.url() {
+            None => String::new(),
+            Some(url) => url.as_str().to_string(),
+          };
+          future::ok(EngineHttpResponse {
+            response_code,
+            bytes: None,
+            url,
+            headers: vec![],
+          })
+          .to_boxed()
+        }
+      })
+      .to_boxed()
   }
 }
 
@@ -1176,6 +1323,7 @@ pub enum NodeKey {
   Scandir(Scandir),
   Select(Box<Select>),
   Snapshot(Snapshot),
+  HttpRequester(HttpRequester),
   Task(Box<Task>),
 }
 
@@ -1190,6 +1338,7 @@ impl NodeKey {
       &NodeKey::DigestFile(..) => "DigestFile".to_string(),
       &NodeKey::ReadLink(..) => "LinkDest".to_string(),
       &NodeKey::Scandir(..) => "DirectoryListing".to_string(),
+      &NodeKey::HttpRequester(..) => "HttpRequester".to_string(),
     }
   }
 
@@ -1207,6 +1356,7 @@ impl NodeKey {
       | &NodeKey::Select { .. }
       | &NodeKey::Snapshot { .. }
       | &NodeKey::Task { .. }
+      | &NodeKey::HttpRequester { .. }
       | &NodeKey::DownloadedFile { .. } => None,
     }
   }
@@ -1249,6 +1399,7 @@ impl Node for NodeKey {
         NodeKey::Scandir(n) => n.run(context).map(NodeResult::from).to_boxed(),
         NodeKey::Select(n) => n.run(context).map(NodeResult::from).to_boxed(),
         NodeKey::Snapshot(n) => n.run(context).map(NodeResult::from).to_boxed(),
+        NodeKey::HttpRequester(n) => n.run(context).map(NodeResult::from).to_boxed(),
         NodeKey::Task(n) => n.run(context).map(NodeResult::from).to_boxed(),
       }
     })
@@ -1274,6 +1425,7 @@ impl Node for NodeKey {
       | NodeResult::LinkDest(_)
       | NodeResult::ProcessResult(_)
       | NodeResult::Snapshot(_)
+      | NodeResult::HttpResponse(_)
       | NodeResult::Value(_) => None,
     }
   }
@@ -1297,6 +1449,7 @@ impl Node for NodeKey {
       NodeKey::ReadLink(..) => None,
       NodeKey::Scandir(..) => None,
       NodeKey::Select(..) => None,
+      NodeKey::HttpRequester(..) => None,
     }
   }
 }
@@ -1312,6 +1465,11 @@ impl Display for NodeKey {
       &NodeKey::ReadLink(ref s) => write!(f, "ReadLink({:?})", s.0),
       &NodeKey::Scandir(ref s) => write!(f, "Scandir({:?})", s.0),
       &NodeKey::Select(ref s) => write!(f, "Select({}, {})", s.params, s.product,),
+      &NodeKey::HttpRequester(HttpRequester(ref key)) => {
+        let value = externs::val_for(key);
+        let url_string = externs::project_str(&value, "url");
+        write!(f, "HttpRequester(url: '{}')", url_string)
+      }
       &NodeKey::Task(ref s) => write!(f, "{:?}", s),
       &NodeKey::Snapshot(ref s) => write!(f, "Snapshot({})", format!("{}", &s.0)),
     }
@@ -1343,7 +1501,14 @@ pub enum NodeResult {
   LinkDest(LinkDest),
   ProcessResult(ProcessResult),
   Snapshot(Arc<store::Snapshot>),
+  HttpResponse(EngineHttpResponse),
   Value(Value),
+}
+
+impl From<EngineHttpResponse> for NodeResult {
+  fn from(r: EngineHttpResponse) -> Self {
+    NodeResult::HttpResponse(r)
+  }
 }
 
 impl From<Value> for NodeResult {
@@ -1379,6 +1544,17 @@ impl From<LinkDest> for NodeResult {
 impl From<Arc<DirectoryListing>> for NodeResult {
   fn from(v: Arc<DirectoryListing>) -> Self {
     NodeResult::DirectoryListing(v)
+  }
+}
+
+impl TryFrom<NodeResult> for EngineHttpResponse {
+  type Error = ();
+
+  fn try_from(nr: NodeResult) -> Result<Self, ()> {
+    match nr {
+      NodeResult::HttpResponse(r) => Ok(r),
+      _ => Err(()),
+    }
   }
 }
 
