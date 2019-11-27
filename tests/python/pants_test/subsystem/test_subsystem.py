@@ -1,12 +1,20 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import unittest
+import logging
 
 from pants.option.optionable import Optionable
 from pants.option.scope import ScopeInfo
 from pants.subsystem.subsystem import Subsystem
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
+from pants.testutil.test_base import TestBase
+
+
+class WorkunitSubscriptableSubsystem(Subsystem):
+  options_scope = "dummy scope"
+
+  def handle_workunits(self, workunits):
+    pass
 
 
 class DummySubsystem(Subsystem):
@@ -41,9 +49,10 @@ def si(scope, subsystem_cls):
   return ScopeInfo(scope, ScopeInfo.SUBSYSTEM, subsystem_cls)
 
 
-class SubsystemTest(unittest.TestCase):
+class SubsystemTest(TestBase):
   def setUp(self):
     DummySubsystem._options = DummyOptions()
+    WorkunitSubscriptableSubsystem._options = DummyOptions()
 
   def test_global_instance(self):
     # Verify that we get the same instance back every time.
@@ -266,3 +275,17 @@ class SubsystemTest(unittest.TestCase):
 
     with self.assertRaises(SubsystemClientMixin.CycleException):
       list(SubsystemB.subsystem_closure_iter())
+
+  def test_get_streaming_workunit_callbacks(self):
+    import_str = "pants_test.subsystem.test_subsystem.WorkunitSubscriptableSubsystem"
+    callables_list = Subsystem.get_streaming_workunit_callbacks([import_str])
+    assert len(callables_list) == 1
+
+  def test_streaming_workunit_callbacks_with_invalid_subsystem(self):
+    import_str = "pants_test.subsystem.test_subsystem.DummySubsystem"
+    with self.captured_logging(level = logging.WARNING) as captured:
+      callables_list = Subsystem.get_streaming_workunit_callbacks([import_str])
+      warnings = captured.warnings()
+      assert len(warnings) == 1
+      assert "does not have a method named `handle_workunits` defined" in warnings[0]
+      assert len(callables_list) == 0

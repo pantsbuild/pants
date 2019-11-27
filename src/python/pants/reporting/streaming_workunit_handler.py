@@ -3,22 +3,22 @@
 
 import threading
 from contextlib import contextmanager
-from typing import Any, Callable, Iterator, Optional
+from typing import Any, Callable, Iterable, Iterator, Optional
 
 
 DEFAULT_REPORT_INTERVAL_SECONDS = 10
 
 
 class StreamingWorkunitHandler:
-  def __init__(self, scheduler: Any, callback: Optional[Callable], report_interval_seconds: float = DEFAULT_REPORT_INTERVAL_SECONDS):
+  def __init__(self, scheduler: Any, callbacks: Iterable[Callable] = (), report_interval_seconds: float = DEFAULT_REPORT_INTERVAL_SECONDS):
     self.scheduler = scheduler
     self.report_interval = report_interval_seconds
-    self.callback = callback
+    self.callbacks = callbacks
     self._thread_runner: Optional[_InnerHandler] = None
 
   def start(self) -> None:
-    if self.callback is not None:
-      self._thread_runner = _InnerHandler(self.scheduler, self.callback, self.report_interval)
+    if self.callbacks:
+      self._thread_runner = _InnerHandler(self.scheduler, self.callbacks, self.report_interval)
       self._thread_runner.start()
 
   def end(self) -> None:
@@ -28,8 +28,8 @@ class StreamingWorkunitHandler:
     # After stopping the thread, poll workunits one last time to make sure
     # we report any workunits that were added after the last time the thread polled.
     workunits = self.scheduler.poll_workunits()
-    if self.callback:
-      self.callback(workunits)
+    for callback in self.callbacks:
+      callback(workunits)
 
   @contextmanager
   def session(self) -> Iterator[None]:
@@ -44,17 +44,18 @@ class StreamingWorkunitHandler:
 
 
 class _InnerHandler(threading.Thread):
-  def __init__(self, scheduler: Any, callback: Callable, report_interval: float):
+  def __init__(self, scheduler: Any, callbacks: Iterable[Callable], report_interval: float):
     super(_InnerHandler, self).__init__()
     self.scheduler = scheduler
     self.stop_request = threading.Event()
     self.report_interval = report_interval
-    self.callback = callback
+    self.callbacks = callbacks
 
   def run(self):
     while not self.stop_request.isSet():
       workunits = self.scheduler.poll_workunits()
-      self.callback(workunits)
+      for callback in self.callbacks:
+        callback(workunits)
       self.stop_request.wait(timeout=self.report_interval)
 
   def join(self, timeout=None):

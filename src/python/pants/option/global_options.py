@@ -502,6 +502,12 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--lock', advanced=True, type=bool, default=True,
              help='Use a global lock to exclude other versions of pants from running during '
                   'critical operations.')
+    register('--streaming-workunits-handlers', type=list, member_type=str, default=[],
+        advanced=True,
+        help="Use this option to name Subsystems which will receive streaming workunit events. "
+        """For instance, `--streaming-workunits-handlers="['pants.reporting.workunit.Workunits']"` will """
+        """register a Subsystem called Workunits defined in the module "pants.reporting.workunit"."""
+    )
 
   @classmethod
   def validate_instance(cls, opts):

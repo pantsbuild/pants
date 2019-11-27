@@ -6,6 +6,7 @@ python_tests(
   dependencies=[
     'src/python/pants/option',
     'src/python/pants/subsystem',
+    'src/python/pants/testutil:test_base',
   ],
   tags = {"partially_type_checked"},
 )
