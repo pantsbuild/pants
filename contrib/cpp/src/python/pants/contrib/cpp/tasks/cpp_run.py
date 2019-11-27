@@ -13,9 +13,10 @@ class CppRun(CppTask):
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--args',
-             type=list,
-             help='Append these options to the executable command line.')
+    register(
+      '--args', type=list, help='Append these options to the executable command line.',
+      removal_version="1.26.0.dev0", removal_hint="Use `--passthrough-args` instead of `--args`."
+    )
 
   @classmethod
   def supports_passthru_args(cls):
