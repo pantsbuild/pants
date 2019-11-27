@@ -2,11 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from pathlib import Path
 
-from pants.base.build_environment import get_buildroot
 from pants.engine.console import Console
-from pants.engine.fs import Digest, FilesContent
+from pants.engine.fs import Digest, DirectoriesToMerge, DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal
 from pants.engine.legacy.graph import HydratedTargets
 from pants.engine.rules import UnionMembership, console_rule, union
@@ -34,7 +32,12 @@ class Fmt(Goal):
 
 
 @console_rule
-async def fmt(console: Console, targets: HydratedTargets, union_membership: UnionMembership) -> Fmt:
+async def fmt(
+  console: Console,
+  targets: HydratedTargets,
+  workspace: Workspace,
+  union_membership: UnionMembership
+) -> Fmt:
   results = await MultiGet(
     Get[FmtResult](TargetWithSources, target.adaptor)
     for target in targets
@@ -43,23 +46,25 @@ async def fmt(console: Console, targets: HydratedTargets, union_membership: Unio
     if union_membership.is_member(TargetWithSources, target.adaptor) and hasattr(target.adaptor, "sources")
   )
 
-  for result in results:
-    files_content = await Get[FilesContent](Digest, result.digest)
-    # TODO: This is hacky and inefficient, and should be replaced by using the Workspace type
-    # once that is available on master.
-    # Blocked on: https://github.com/pantsbuild/pants/pull/8329
-    for file_content in files_content:
-      with Path(get_buildroot(), file_content.path).open('wb') as f:
-        f.write(file_content.content)
+  if not results:
+    return Fmt(exit_code=0)
 
+  # NB: this will fail if there are any conflicting changes, which we want to happen rather than
+  # silently having one result override the other.
+  # TODO(#8722): how should we handle multiple auto-formatters touching the same files?
+  merged_formatted_digest = await Get[Digest](
+    DirectoriesToMerge(tuple(result.digest for result in results))
+  )
+  workspace.materialize_directory(DirectoryToMaterialize(merged_formatted_digest))
+  for result in results:
     if result.stdout:
       console.print_stdout(result.stdout)
     if result.stderr:
       console.print_stderr(result.stderr)
 
-  # Since we ran an ExecuteRequest, any failure would already have interrupted our flow
-  exit_code = 0
-  return Fmt(exit_code)
+  # Since the rules to produce FmtResult should use ExecuteRequest, rather than
+  # FallibleExecuteProcessRequest, we assume that there were no failures.
+  return Fmt(exit_code=0)
 
 
 def rules():

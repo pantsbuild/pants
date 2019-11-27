@@ -154,7 +154,7 @@ class Snapshot:
 
 @dataclass(frozen=True)
 class DirectoriesToMerge:
-  directories: Tuple
+  directories: Tuple[Digest, ...]
 
 
 @dataclass(frozen=True)
