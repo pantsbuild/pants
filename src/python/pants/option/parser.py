@@ -6,6 +6,7 @@ import inspect
 import json
 import os
 import re
+import shlex
 import traceback
 from collections import defaultdict
 from dataclasses import dataclass
@@ -25,6 +26,7 @@ from pants.option.custom_types import (
   dir_option,
   file_option,
   list_option,
+  shlexable_str_member_type,
   target_option,
 )
 from pants.option.errors import (
@@ -483,7 +485,7 @@ class Parser:
 
   # TODO: Remove dict_option from here after deprecation is complete.
   _allowed_member_types = {
-    str, int, float, dict, dir_option, dict_option, file_option, target_option
+    str, int, float, dict, dir_option, dict_option, file_option, target_option, shlexable_str_member_type
   }
 
   def _validate(self, args, kwargs):
@@ -722,10 +724,17 @@ class Parser:
     if is_list_option(kwargs):
       merged_rank = ranked_vals[-1].rank
       merged_val = ListValueComponent.merge(
-          [rv.value for rv in ranked_vals if rv.value is not None]).val
+        [rv.value for rv in ranked_vals if rv.value is not None]
+      ).val
+      # We flatten any lists whose member type is `shlexable_str_member_type`. At this
+      # point, `merged_val` looks like ["arg1 arg2", "--arg3"]. We want to flatten this to
+      # ["arg1", "arg2", "--arg3"].
+      if kwargs.get('member_type') == shlexable_str_member_type:
+        merged_val = [word for unsplit_arg in merged_val for word in shlex.split(unsplit_arg)]
       # TODO: run `check()` for all elements of a list option too!!!
-      merged_val = [self._convert_member_type(kwargs.get('member_type', str), x)
-                    for x in merged_val]
+      merged_val = [
+        self._convert_member_type(kwargs.get('member_type', str), x) for x in merged_val
+      ]
       for val in merged_val:
         check(val)
       ret = RankedValue(merged_rank, merged_val)

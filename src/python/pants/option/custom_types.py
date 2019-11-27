@@ -112,6 +112,14 @@ def dict_with_files_option(s):
   return dict_option(s)
 
 
+def shlexable_str_member_type(s):
+  """When the `type` is `list`, this can be used for the `member_type` to allow passing a shlexed
+  string, e.g. `--isort-args='arg1 arg2' or '--isort-args=+['arg1 arg2']."""
+  # NB: we no-op here as parser.py will call shlex.split() and then flatten the list for us. This
+  # function only exists as a marker to parser.py that it should do this.
+  return s
+
+
 def _convert(val, acceptable_types):
   """Ensure that val is one of the acceptable types, converting it if needed.
 

@@ -16,7 +16,12 @@ from pants.base.deprecated import CodeRemovedError
 from pants.base.hash_utils import CoercingEncoder
 from pants.engine.fs import FileContent
 from pants.option.config import Config
-from pants.option.custom_types import UnsetBool, file_option, target_option
+from pants.option.custom_types import (
+  UnsetBool,
+  file_option,
+  shlexable_str_member_type,
+  target_option,
+)
 from pants.option.errors import (
   BooleanOptionNameWithNo,
   FrozenRegistration,
@@ -142,6 +147,8 @@ class OptionsTest(TestBase):
                     default=['//:a', '//:b'])
     register_global('--filey', type=file_option, default=None)
     register_global('--file-listy', type=list, member_type=file_option)
+    register_global('--listy-shlexable-str', type=list, member_type=shlexable_str_member_type,
+                    default=['default1 default2'])
 
     # Implicit value.
     register_global('--implicit-valuey', default='default', implicit_value='implicit')
@@ -532,6 +539,61 @@ class OptionsTest(TestBase):
           './pants', config={'GLOBAL': {'target_listy': '+["//:c", "//:d"]'} })
     check(['//:c', '//:d'],
           './pants', config={'GLOBAL': {'target_listy': '["//:c", "//:d"]'} })
+
+  def test_list_shlexable_str_member_type(self):
+    def check(expected, args_str, env=None, config=None):
+      options = self._parse(args_str=args_str, env=env, config=config)
+      assert expected == options.for_global_scope().listy_shlexable_str
+
+    default = ['default1', 'default2']
+    specified_args = ['arg1', 'arg2=foo', '--arg3']
+
+    # Appending to the default.
+    check(default, './pants')
+    check(
+      [*default, *specified_args],
+      './pants --listy-shlexable-str="arg1 arg2=foo" --listy-shlexable-str="--arg3"'
+    )
+    check(
+      [*default, *specified_args], './pants --listy-shlexable-str=\'+["arg1 arg2=foo", "--arg3"]\''
+    )
+
+    # Replacing the default.
+    check(specified_args, './pants --listy-shlexable-str=\'["arg1 arg2=foo", "--arg3"]\'')
+
+    # Parsing env var correctly.
+    check(
+      [*default, 'arg1', 'arg2=foo'],
+      './pants',
+      env={'PANTS_GLOBAL_LISTY_SHLEXABLE_STR': 'arg1 arg2=foo'}
+    )
+    check(
+      [*default, *specified_args],
+      './pants',
+      env={'PANTS_GLOBAL_LISTY_SHLEXABLE_STR': '+["arg1 arg2=foo", "--arg3"]'}
+    )
+    check(
+      specified_args,
+      './pants',
+      env={'PANTS_GLOBAL_LISTY_SHLEXABLE_STR': '["arg1 arg2=foo", "--arg3"]'}
+    )
+
+    # Parsing config value correctly.
+    check(
+      [*default, 'arg1', 'arg2=foo'],
+      './pants',
+      config={'GLOBAL': {'listy_shlexable_str': 'arg1 arg2=foo'}}
+    )
+    check(
+      [*default, *specified_args],
+      './pants',
+      config={'GLOBAL': {'listy_shlexable_str': '+["arg1 arg2=foo", "--arg3"]'}}
+    )
+    check(
+      specified_args,
+      './pants',
+      config={'GLOBAL': {'listy_shlexable_str': '["arg1 arg2=foo", "--arg3"]'}}
+    )
 
   def test_dict_option(self):
     def check(expected, args_str, env=None, config=None):
