@@ -302,7 +302,9 @@ class BaseZincCompile(JvmCompile):
       zinc_args.append('--use-barebones-logger')
 
     compiler_bridge_classpath_entry = self._zinc.compile_compiler_bridge(self.context)
-    zinc_args.extend(['-compiled-bridge-jar', relative_to_exec_root(compiler_bridge_classpath_entry.path)])
+    compiler_bridge_relpath = relative_to_exec_root(compiler_bridge_classpath_entry.path)
+
+    zinc_args.extend(['-compiled-bridge-jar', compiler_bridge_relpath])
     zinc_args.extend(['-scala-path', ':'.join(scala_path)])
 
     zinc_args.extend(self._javac_plugin_args(javac_plugin_map))
@@ -367,7 +369,7 @@ class BaseZincCompile(JvmCompile):
     return self.execution_strategy.match({
       self.ExecutionStrategy.hermetic: lambda: self._compile_hermetic(
         jvm_options, ctx, classes_dir, jar_file, compiler_bridge_classpath_entry,
-        dependency_classpath, scalac_classpath_entries),
+        dependency_classpath, scalac_classpath_entries, scala_path, compiler_bridge_relpath),
       self.ExecutionStrategy.subprocess: lambda: self._compile_nonhermetic(jvm_options, ctx, classes_dir),
       self.ExecutionStrategy.nailgun: lambda: self._compile_nonhermetic(jvm_options, ctx, classes_dir),
     })()
@@ -407,7 +409,7 @@ class BaseZincCompile(JvmCompile):
 
   def _compile_hermetic(self, jvm_options, ctx, classes_dir, jar_file,
                         compiler_bridge_classpath_entry, dependency_classpath,
-                        scalac_classpath_entries):
+                        scalac_classpath_entries, scala_relpaths, compiler_bridge_relpath):
     nailgun_classpath_entry = self._nailgun_server_classpath_entry()
     zinc_relpath = fast_relpath(self._zinc.zinc.path, get_buildroot())
     nailgun_relpath = fast_relpath(nailgun_classpath_entry.path, get_buildroot())
@@ -427,7 +429,7 @@ class BaseZincCompile(JvmCompile):
     snapshots.extend(java_sources_snapshots)
 
     # Ensure the dependencies and compiler bridge jars are available in the execution sandbox.
-    relevant_classpath_entries = (dependency_classpath + [
+    relevant_classpath_entries = (dependency_classpath + scalac_classpath_entries + [
       compiler_bridge_classpath_entry,
       # We include nailgun-server, to use it to start servers when needed from the hermetic execution case.
       nailgun_classpath_entry,
@@ -442,9 +444,6 @@ class BaseZincCompile(JvmCompile):
             "ClasspathEntry {} didn't have a Digest, so won't be present for hermetic "
             "execution of zinc".format(dep)
           )
-    directory_digests.extend(
-      classpath_entry.directory_digest for classpath_entry in scalac_classpath_entries
-    )
 
     if self._zinc.use_native_image:
       if jvm_options:
@@ -474,7 +473,10 @@ class BaseZincCompile(JvmCompile):
       native_image_snapshots = []
       # TODO: Lean on distribution for the bin/java appending here
       image_specific_argv =  ['.jdk/bin/java'] + jvm_options + [
-        '-cp', ":".join([nailgun_relpath, zinc_relpath]),
+        # put all the scala deps on the classpath so that if they change and we're using nailgun through
+        # zinc's nailMain method we will invalidate the nailgun if the scala paths change. The path itself
+        # is used for the fingerprint not the content on the jars.
+        '-cp', ":".join([nailgun_relpath, zinc_relpath, compiler_bridge_relpath] + scala_relpaths),
         Zinc.ZINC_COMPILE_MAIN
       ]
 

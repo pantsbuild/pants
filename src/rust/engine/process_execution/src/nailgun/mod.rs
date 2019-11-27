@@ -204,9 +204,9 @@ impl super::CommandRunner for CommandRunner {
       context,
       store,
       executor,
-      true,
+      false,
       &self.workdir_base,
-      Some(self.client_workdir.clone())
+      None,
     )
   }
 
