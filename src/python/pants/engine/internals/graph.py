@@ -182,6 +182,7 @@ class OwnersRequest:
     """A request for the owners of a set of file paths."""
 
     sources: Tuple[str, ...]
+    do_not_generate_subtargets: bool = False
 
 
 class Owners(Collection[Address]):
@@ -221,7 +222,7 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
         if bfa.rel_path not in sources_set and not matching_files:
             continue
         deleted_files_matched = bool(set(matching_files) - all_source_files)
-        if deleted_files_matched:
+        if deleted_files_matched or owners_request.do_not_generate_subtargets:
             original_addresses_due_to_deleted_files.add(candidate_tgt.address)
             continue
         # Else, we generate subtargets for greater precision. We use those subtargets, unless

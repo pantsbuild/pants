@@ -17,10 +17,18 @@ from pants.base.specs import (
     Specs,
 )
 from pants.engine.internals.scheduler import SchedulerSession
+from pants.engine.query import QueryAddresses, QueryComponentWrapper, QueryParseInput
 from pants.engine.selectors import Params
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.scm.subsystems.changed import ChangedAddresses, ChangedOptions, ChangedRequest
+from pants.scm.git import Git
+from pants.scm.subsystems.changed import (
+    ChangedAddresses,
+    ChangedFiles,
+    ChangedFilesRequest,
+    ChangedOptions,
+    ChangedRequest,
+)
 from pants.util.ordered_set import OrderedSet
 
 logger = logging.getLogger(__name__)
@@ -74,6 +82,7 @@ class SpecsCalculator:
         exclude_patterns: Optional[Iterable[str]] = None,
         tags: Optional[Iterable[str]] = None,
     ) -> Specs:
+        # Determine the literal specs.
         specs = cls.parse_specs(
             raw_specs=options.specs,
             build_root=build_root,
@@ -81,10 +90,17 @@ class SpecsCalculator:
             tags=tags,
         )
 
+        # Determine `Changed` arguments directly from options to support pre-`Subsystem`
+        # initialization paths.
         changed_options = ChangedOptions.from_options(options.for_scope("changed"))
+
+        # Parse --query expressions into objects which can be resolved into BuildFileAddresses via
+        # v2 rules.
+        query_expr_strings = options.for_global_scope().query
 
         logger.debug("specs are: %s", specs)
         logger.debug("changed_options are: %s", changed_options)
+        logger.debug("query exprs are: %s", query_expr_strings)
 
         if specs.provided and changed_options.provided:
             changed_name = "--changed-since" if changed_options.since else "--changed-diffspec"
@@ -99,17 +115,19 @@ class SpecsCalculator:
                 "use only one."
             )
 
-        if not changed_options.provided:
+        if not (changed_options.provided or query_expr_strings):
             return specs
 
-        scm = get_scm()
-        if not scm:
+        git = get_scm()
+        if not git:
             raise InvalidSpecConstraint(
-                "The `--changed-*` options are not available without a recognized SCM (usually "
-                "Git)."
+                "{} are not available without a recognized SCM (currently just git)."
             )
+        assert isinstance(git, Git)
+        (changed_files,) = session.product_request(ChangedFiles, [
+            Params(ChangedFilesRequest(changed_options, git=git))])
         changed_request = ChangedRequest(
-            sources=tuple(changed_options.changed_files(scm=scm)),
+            sources=tuple(changed_files),
             dependees=changed_options.dependees,
         )
         (changed_addresses,) = session.product_request(
@@ -125,6 +143,36 @@ class SpecsCalculator:
                 filesystem_specs.append(FilesystemLiteralSpec(file_name))
             else:
                 address_specs.append(SingleAddress(address.spec_path, address.target_name))
+
+
+        if query_expr_strings:
+            # TODO(#7346): deprecate --owner-of and --changed-* in favor of --query versions, allow
+            # pipelining of successive query expressions with the command-line target specs as the
+            # initial input!
+            if len(query_expr_strings) > 1:
+                raise ValueError("Only one --query argument is currently supported! "
+                                 f"Received: {query_expr_strings}.")
+
+            # TODO: allow returning @union types to avoid this double synchronous engine invocation!
+            exprs = session.product_request(
+                QueryComponentWrapper, [QueryParseInput(s) for s in query_expr_strings]
+            )
+            exprs = [ex.underlying for ex in exprs]
+
+            (expr_addresses,) = session.product_request(
+                QueryAddresses, [Params(git, exprs[0], options_bootstrapper)]
+            )
+            logger.debug("expr addresses: %s", expr_addresses)
+            dependencies = tuple(
+                SingleAddress(a.spec_path, a.target_name) for a in expr_addresses
+            )
+            return Specs(
+                address_specs=AddressSpecs(
+                    dependencies=dependencies, exclude_patterns=exclude_patterns, tags=tags
+                ),
+                filesystem_specs=FilesystemSpecs(filesystem_specs),
+            )
+
         return Specs(
             address_specs=AddressSpecs(
                 address_specs, exclude_patterns=exclude_patterns, tags=tags,

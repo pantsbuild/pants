@@ -16,9 +16,11 @@ from pants.base.deprecated import resolve_conflicting_options
 from pants.engine.addresses import Address
 from pants.engine.collection import Collection
 from pants.engine.internals.graph import Owners, OwnersRequest
-from pants.engine.rules import RootRule, rule
+from pants.engine.rules import RootRule, rule, _uncacheable_rule
 from pants.engine.selectors import Get
 from pants.option.option_value_container import OptionValueContainer
+from pants.option.scope import Scope, ScopedOptions
+from pants.scm.git import Git
 from pants.scm.scm import Scm
 from pants.subsystem.subsystem import Subsystem
 
@@ -33,6 +35,7 @@ class DependeesOption(Enum):
 class ChangedRequest:
     sources: Tuple[str, ...]
     dependees: DependeesOption
+    do_not_generate_subtargets: bool = False
 
 
 class ChangedAddresses(Collection[Address]):
@@ -41,7 +44,7 @@ class ChangedAddresses(Collection[Address]):
 
 @rule
 async def find_changed_owners(request: ChangedRequest) -> ChangedAddresses:
-    owners = await Get(Owners, OwnersRequest(request.sources))
+    owners = await Get(Owners, OwnersRequest(request.sources, do_not_generate_subtargets=request.do_not_generate_subtargets))
     if request.dependees == DependeesOption.NONE:
         return ChangedAddresses(owners)
     dependees_with_roots = await Get(
@@ -51,6 +54,16 @@ async def find_changed_owners(request: ChangedRequest) -> ChangedAddresses:
         ),
     )
     return ChangedAddresses(dependees_with_roots)
+
+
+class ChangedFiles(Collection[str]):
+    pass
+
+
+@dataclass(frozen=True)
+class ChangedFilesRequest:
+    options: 'ChangedOptions'
+    git: Git
 
 
 @dataclass(frozen=True)
@@ -88,19 +101,6 @@ class ChangedOptions:
     @property
     def provided(self) -> bool:
         return bool(self.since) or bool(self.diffspec)
-
-    def changed_files(self, *, scm: Scm) -> List[str]:
-        """Determines the files changed according to SCM/workspace and options."""
-        if self.diffspec:
-            return cast(List[str], scm.changes_in(self.diffspec, relative_to=get_buildroot()))
-
-        changes_since = self.since or scm.current_rev_identifier
-        return cast(
-            List[str],
-            scm.changed_files(
-                from_commit=changes_since, include_untracked=True, relative_to=get_buildroot()
-            ),
-        )
 
 
 class Changed(Subsystem):
@@ -160,10 +160,35 @@ class Changed(Subsystem):
         )
 
 
+# TODO: This rule is uncacheable due to using an unsandboxed process execution. @_uncacheable_rule
+# is not exposed to the public API, and it would be preferable to focus the "uncacheability" to each
+# individual git execution rather than this entire rule.
+@_uncacheable_rule
+def changed_files(request: ChangedFilesRequest) -> ChangedFiles:
+    """Determines the files changed according to SCM/workspace and options."""
+    opts = request.options
+    git = request.git
+
+    if opts.diffspec:
+        result = cast(List[str], git.changes_in(opts.diffspec, relative_to=get_buildroot()))
+
+    changes_since = opts.since or git.current_rev_identifier
+    result = cast(
+        List[str],
+        git.changed_files(
+            from_commit=changes_since, include_untracked=True, relative_to=get_buildroot()
+        ),
+    )
+    return ChangedFiles(result)
+
+
 def rules():
     return [
         map_addresses_to_dependees,
         find_dependees,
         find_changed_owners,
+        changed_files,
         RootRule(ChangedRequest),
+        RootRule(ChangedFilesRequest),
+        RootRule(Git),
     ]

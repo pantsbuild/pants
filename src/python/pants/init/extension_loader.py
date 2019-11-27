@@ -9,6 +9,7 @@ from pkg_resources import Requirement, WorkingSet
 
 from pants.base.exceptions import BackendConfigurationError
 from pants.build_graph.build_configuration import BuildConfiguration
+from pants.engine.query import rules as query_rules
 from pants.util.ordered_set import FrozenOrderedSet
 
 
@@ -112,6 +113,13 @@ def load_build_configuration_from_source(
     )
     for backend_package in backend_packages:
         load_backend(build_configuration, backend_package)
+
+    # TODO: query_rules() needs to be registered here instead of in engine_initializer.py because it
+    # declares @union members, which are only loaded into UnionMembership when the
+    # BuildConfiguration is first created (it's now frozen after that). Since --query requires
+    # @union members to be registered in UnionMembership to work, it has to be declared here for now
+    # until we can add union rules after the fact.
+    build_configuration.register_rules(query_rules())
 
 
 def load_backend(build_configuration: BuildConfiguration.Builder, backend_package: str) -> None:

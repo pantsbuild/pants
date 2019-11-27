@@ -633,11 +633,15 @@ impl<R: Rule> RuleGraph<R> {
       .collect();
     msgs.sort();
 
-    Err(format!(
-      "Rules with errors: {}\n\n  {}",
-      msgs.len(),
-      msgs.join("\n\n  ")
-    ))
+    if msgs.is_empty() {
+      Ok(())
+    } else {
+      Err(format!(
+        "Rules with errors: {}\n\n  {}",
+        msgs.len(),
+        msgs.join("\n\n  ")
+      ))
+    }
   }
 
   pub fn visualize(&self, f: &mut dyn io::Write) -> io::Result<()> {
