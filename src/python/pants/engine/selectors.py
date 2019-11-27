@@ -10,6 +10,9 @@ from pants.util.meta import frozen_after_init
 from pants.util.objects import TypeConstraint
 
 
+# This type variable is used as the `product` field in a `Get`, and represents the type that the
+# engine will return from an `await Get[_Product](...)` expression. This type variable is also used
+# in the `Tuple[X, ...]` type returned by `await MultiGet(Get[X](...)...)`.
 _Product = TypeVar("_Product")
 
 
