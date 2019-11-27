@@ -5,6 +5,7 @@ import json
 import os
 import textwrap
 from contextlib import contextmanager
+from zipfile import ZipFile
 
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.jvm.subsystems.junit import JUnit
@@ -186,7 +187,7 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
       dependencies=[jar_lib],
     )
 
-    jvm_target_with_sources = self.make_target(
+    self.jvm_target_with_sources = self.make_target(
       'project_info:jvm_target',
       target_type=ScalaLibrary,
       dependencies=[jar_lib],
@@ -242,7 +243,7 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
     self.scala_with_source_dep = self.make_target(
       'project_info:scala_with_source_dep',
       target_type=ScalaLibrary,
-      dependencies=[jvm_target_with_sources],
+      dependencies=[self.jvm_target_with_sources],
       sources=[]
     )
 
@@ -515,11 +516,8 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
     )
 
   def test_export_sources_if_flag_passed(self):
-    result = self.execute_export_json('project_info:scala_with_source_dep', **{
-      ExportDepAsJar.options_scope: {
-        'sources': True
-      }
-    })
+    self.set_options(sources=True)
+    result = self.execute_export_json('project_info:scala_with_source_dep')
 
     print(json.dumps(result))
 
@@ -534,4 +532,11 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
     self.assertIn(
       '-sources.jar',
       result['libraries']['project_info.jvm_target']['sources']
+    )
+
+    sources_jar_of_dep = ZipFile(result['libraries']['project_info.jvm_target']['sources'])
+
+    self.assertEqual(
+      sorted(self.jvm_target_with_sources.sources_relative_to_source_root()),
+      sorted(sources_jar_of_dep.namelist())
     )
