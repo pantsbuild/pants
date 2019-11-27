@@ -46,6 +46,7 @@ from pants.engine.legacy.structs import (
 from pants.engine.legacy.structs import rules as structs_rules
 from pants.engine.platform import create_platform_rules
 from pants.engine.rules import RootRule, rule
+from pants.engine.query import rules as query_rules
 from pants.engine.selectors import Params
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
@@ -376,6 +377,9 @@ class EngineInitializer:
         build_configuration = build_configuration or BuildConfigInitializer.get(
             options_bootstrapper
         )
+
+        # build_configuration.register_rules(query_rules())
+
         bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
 
         build_file_aliases = build_configuration.registered_aliases()

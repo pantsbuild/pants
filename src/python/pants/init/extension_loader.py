@@ -9,6 +9,7 @@ from pkg_resources import Requirement, WorkingSet
 
 from pants.base.exceptions import BackendConfigurationError
 from pants.build_graph.build_configuration import BuildConfiguration
+from pants.engine.query import rules as query_rules
 from pants.util.ordered_set import FrozenOrderedSet
 
 
@@ -142,6 +143,8 @@ def load_build_configuration_from_source(
     )
     for backend_package in backend_packages2:
         load_backend(build_configuration, backend_package, is_v1_backend=False)
+
+    build_configuration.register_rules(query_rules())
 
 
 def load_backend(

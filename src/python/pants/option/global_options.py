@@ -397,6 +397,20 @@ class GlobalOptions(Subsystem):
             help="Read additional specs from this file (e.g. target addresses or file names). "
             "Each spec should be one per line.",
         )
+
+        register(
+            "--query",
+            type=list,
+            default=[],
+            fromfile=True,
+            metavar="<query-expr>",
+            # TODO: rename this to restart_daemon=False! It's not clear where this option is
+            # even consumed.
+            daemon=False,
+            help="A list of query expressions which process the input target specs in a "
+            "pipeline in order.",
+        )
+
         register(
             "--verify-config",
             type=bool,

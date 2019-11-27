@@ -15,8 +15,15 @@ from pants.base.specs import (
     Specs,
 )
 from pants.engine.internals.scheduler import SchedulerSession
+from pants.engine.query import QueryAddresses, QueryComponentWrapper, QueryParseInput
+from pants.engine.selectors import Params
 from pants.option.options import Options
-from pants.scm.subsystems.changed import ChangedAddresses, ChangedOptions, ChangedRequest
+from pants.scm.subsystems.changed import (
+    ChangedAddresses,
+    ChangedOptions,
+    ChangedRequest,
+    UncachedScmWrapper,
+)
 from pants.util.ordered_set import OrderedSet
 
 logger = logging.getLogger(__name__)
@@ -69,6 +76,7 @@ class SpecsCalculator:
         exclude_patterns: Optional[Iterable[str]] = None,
         tags: Optional[Iterable[str]] = None,
     ) -> Specs:
+        # Determine the literal specs.
         specs = cls.parse_specs(
             raw_specs=options.specs,
             build_root=build_root,
@@ -76,20 +84,49 @@ class SpecsCalculator:
             tags=tags,
         )
 
+        # Determine `Changed` arguments directly from options to support pre-`Subsystem`
+        # initialization paths.
         changed_options = ChangedOptions.from_options(options.for_scope("changed"))
+
+        # Parse --query expressions into objects which can be resolved into BuildFileAddresses via v2
+        # rules.
+        query_expr_strings = options.for_global_scope().query
+        exprs = session.product_request(
+            QueryComponentWrapper, [QueryParseInput(s) for s in query_expr_strings]
+        )
+        exprs = [ex.underlying for ex in exprs]
 
         logger.debug("specs are: %s", specs)
         logger.debug("changed_options are: %s", changed_options)
+        logger.debug("query exprs are: %s (%s)", exprs, bool(exprs))
+        targets_specified = sum(
+            1
+            for item in (changed_options.is_actionable(), specs.provided_specs.dependencies, exprs)
+            if item
+        )
 
-        if changed_options.is_actionable() and specs.provided_specs.dependencies:
-            # We've been provided both a change request and specs.
+        if targets_specified > 1:
+            # We've been provided more than one of: a change request, an owner request, a query request,
+            # or spec roots.
             raise InvalidSpecConstraint(
                 "Multiple target selection methods provided. Please use only one of "
-                "`--changed-*`, address specs, or filesystem specs."
+                "`--changed-*`, `--owner-of`, `--query`, address specs, or filesystem specs."
             )
 
-        if changed_options.is_actionable():
+        def scm(entity):
             scm = get_scm()
+            if not scm:
+                raise InvalidSpecConstraint(
+                    # TODO: centralize the error messaging for when an SCM is required, and describe what SCMs
+                    # are supported!
+                    "{} are not available without a recognized SCM (usually git).".format(entity)
+                )
+            return scm
+
+        if changed_options.is_actionable():
+            # We've been provided no spec roots (e.g. `./pants list`) AND a changed request. Compute
+            # alternate target roots.
+            scm = scm("The --changed-* options")
             if not scm:
                 raise InvalidSpecConstraint(
                     "The `--changed-*` options are not available without a recognized SCM (usually Git)."
@@ -106,6 +143,33 @@ class SpecsCalculator:
             return Specs(
                 address_specs=AddressSpecs(
                     dependencies=dependencies, exclude_patterns=exclude_patterns, tags=tags,
+                ),
+                filesystem_specs=FilesystemSpecs([]),
+            )
+
+        if exprs:
+            # TODO: this should only be necessary for the `changed-since`/etc queries! This can be done by
+            # returning a dummy ScmWrapper if no `changed-*` queries are used!
+            scm = scm("The --query option")
+            # TODO(#7346): deprecate --owner-of and --changed-* in favor of --query versions, allow
+            # pipelining of successive query expressions with the command-line target specs as the initial
+            # input!
+            if len(exprs) > 1:
+                raise ValueError(
+                    "Only one --query argument is currently supported! Received: {}.".format(exprs)
+                )
+
+            scm_wrapper = UncachedScmWrapper.create(scm)
+            (expr_addresses,) = session.product_request(
+                QueryAddresses, [Params(scm_wrapper, exprs[0])]
+            )
+            logger.debug("expr addresses: %s", expr_addresses)
+            dependencies = tuple(
+                SingleAddress(a.spec_path, a.target_name) for a in expr_addresses.addresses
+            )
+            return Specs(
+                address_specs=AddressSpecs(
+                    dependencies=dependencies, exclude_patterns=exclude_patterns, tags=tags
                 ),
                 filesystem_specs=FilesystemSpecs([]),
             )

@@ -1,6 +1,7 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import uuid
 from dataclasses import dataclass
 from enum import Enum
 from typing import List, Optional, Tuple, cast
@@ -17,6 +18,7 @@ from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.goal.workspace import ScmWorkspace
 from pants.option.option_value_container import OptionValueContainer
+from pants.option.scope import Scope, ScopedOptions
 from pants.scm.scm import Scm
 from pants.subsystem.subsystem import Subsystem
 
@@ -169,5 +171,22 @@ class Changed(Subsystem):
         )
 
 
+@dataclass(frozen=True)
+class UncachedScmWrapper:
+    """???/the salt is intended to be different every time, so the scm should avoid being memoized
+    by the engine!"""
+
+    scm: Scm
+    salt: str
+
+    @classmethod
+    def create(cls, scm: Scm) -> "UncachedScmWrapper":
+        return cls(scm=scm, salt=str(uuid.uuid4()),)
+
+
 def rules():
-    return [find_owners, RootRule(ChangedRequest)]
+    return [
+        find_owners,
+        RootRule(ChangedRequest),
+        RootRule(UncachedScmWrapper),
+    ]

@@ -27,6 +27,8 @@ python_library(
     'src/python/pants/engine/legacy:structs',
     'src/python/pants/engine:console',
     'src/python/pants/engine:platform',
+    'src/python/pants/engine:query',
+    'src/python/pants/engine:scheduler',
     'src/python/pants/engine:unions',
     'src/python/pants/goal',
     'src/python/pants/goal:run_tracker',
