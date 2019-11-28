@@ -31,7 +31,7 @@ async def lint(console: Console, targets: HydratedTargets, union_membership: Uni
   results = await MultiGet(
     Get(LintResult, TargetWithSources, target.adaptor)
     for target in targets
-    if TargetWithSources.valid_target(target.adaptor, union_membership=union_membership)
+    if TargetWithSources.is_formattable_and_lintable(target.adaptor, union_membership=union_membership)
   )
 
   if not results:

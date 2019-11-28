@@ -33,7 +33,7 @@ class AddressAndTestResult:
   test_result: Optional[TestResult]  # If None, target was not a test target.
 
   @staticmethod
-  def valid_target(
+  def is_testable(
     target: HydratedTarget,
     *,
     union_membership: UnionMembership,
@@ -97,7 +97,7 @@ async def coordinator_of_tests(
   provenance_map: AddressProvenanceMap
 ) -> AddressAndTestResult:
 
-  if not AddressAndTestResult.valid_target(
+  if not AddressAndTestResult.is_testable(
     target, union_membership=union_membership, provenance_map=provenance_map
   ):
     return AddressAndTestResult(target.address, None)

@@ -134,6 +134,8 @@ class TestTest(TestBase):
       "src",
       {"globs": []},
       snapshot=Snapshot(
+        # TODO: this is not robust to set as an empty digest. Add a test util that provides
+        #  some premade snapshots and possibly a generalized make_hydrated_target function.
         directory_digest=EMPTY_DIRECTORY_DIGEST,
         files=("test.py",) if include_sources else (),
         dirs=()
@@ -171,6 +173,9 @@ class TestTest(TestBase):
 
   def test_coordinator_single_non_test_target(self):
     bfaddr = BuildFileAddress(None, 'bin', 'some/dir')
+    # Note that this is not the same error message the end user will see, as we're resolving
+    # union Get requests in run_rule, not the real engine.  But this test still asserts that
+    # we error when we expect to error.
     with self.assertRaisesRegex(AssertionError, r'Rule requested: .* which cannot be satisfied.'):
       self.run_coordinator_of_tests(
         address=bfaddr.to_address(),
