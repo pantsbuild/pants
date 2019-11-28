@@ -289,6 +289,9 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                   'start up all concurrent invocations (e.g. in other terminals) without pantsd. '
                   'Enabling this option requires parallel pants invocations to block on the first')
 
+    register('--parent_build_id', advanced=True, default=None,
+             help='')
+
     # Shutdown pantsd after the current run.
     # This needs to be accessed at the same time as enable_pantsd,
     # so we register it at bootstrap time.

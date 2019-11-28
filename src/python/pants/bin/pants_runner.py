@@ -45,15 +45,15 @@ class PantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     # When running with pantsd if a ./pants command, somewhere in its process calls ./pants again
     # (e.g. to build a pex), the inner run will wait for the outer run to finish,
     # which will never happen.
-    # Setting the 'PANTS_INNER_RUN' environmental variable when pantsd handles first request
-    # to run ./pants command will allow us to mark all pants inner runs
-    # and not to run them with pantsd.
-    is_inner_run = 'PANTS_INNER_RUN' in self._env and self._env['PANTS_INNER_RUN'] == 'True'
+    # The parent_build_id option is set only for pants inner runs which parent is pantsd run.
+    # This will allow us not to run them with pantsd and to know who was the parent
+    # of pants inner runs.
+    is_inner_run_from_pantsd = global_bootstrap_options.parent_build_id is not None
     # If we want concurrent pants runs, we can't have pantsd enabled.
     return global_bootstrap_options.enable_pantsd and \
            not self.will_terminate_pantsd() and \
            not global_bootstrap_options.concurrent and \
-           not is_inner_run
+           not is_inner_run_from_pantsd
 
   @staticmethod
   def scrub_pythonpath():
