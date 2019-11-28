@@ -110,7 +110,7 @@ class RscCompileContext(CompileContext):
 class RscCompile(ZincCompile, MirroredTargetOptionMixin):
   """Compile Scala and Java code to classfiles using Rsc."""
 
-  _name = 'mixed' # noqa
+  _name = 'mixed'
   compiler_name = 'rsc'
 
   @classmethod

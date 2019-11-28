@@ -17,7 +17,8 @@ python_library(
   sources = ['compile_context.py'],
   dependencies = [
     'src/python/pants/util:contextutil',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -30,7 +31,8 @@ python_library(
     'src/python/pants/task',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:fileutil',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -63,6 +65,7 @@ python_library(
     'src/python/pants/util:fileutil',
     'src/python/pants/util:memo',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -72,6 +75,7 @@ python_library(
     'src/python/pants/base:worker_pool',
     'src/python/pants/util:contextutil',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -84,4 +88,5 @@ python_library(
     '3rdparty/python:ansicolors',
     '3rdparty/python/twitter/commons:twitter.common.collections',
   ],
+  tags = {"partially_type_checked"},
 )

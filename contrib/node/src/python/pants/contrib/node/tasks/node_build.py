@@ -4,7 +4,8 @@
 import os
 from collections import defaultdict
 
-from pants.backend.jvm.tasks.classpath_products import ClasspathEntry, ClasspathProducts
+from pants.backend.jvm.tasks.classpath_entry import ClasspathEntry
+from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel

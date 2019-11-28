@@ -11,7 +11,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/testutil/subsystem',
-  ]
+  ],
 )
 
 python_tests(

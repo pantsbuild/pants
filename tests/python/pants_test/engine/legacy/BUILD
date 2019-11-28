@@ -187,7 +187,8 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/engine/legacy:parser',
     'src/python/pants/engine:parser',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -195,5 +196,6 @@ python_tests(
   sources = ['test_structs.py'],
   dependencies = [
     'src/python/pants/engine/legacy:structs',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )

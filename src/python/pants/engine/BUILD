@@ -18,6 +18,7 @@ python_library(
     'src/python/pants/base:workunit',
     'src/python/pants/goal',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(

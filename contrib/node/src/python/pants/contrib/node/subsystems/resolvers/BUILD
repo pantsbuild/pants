@@ -19,7 +19,8 @@ python_library(
     'src/python/pants/util:contextutil',
     'contrib/node/src/python/pants/contrib/node/targets:node_module',
     'contrib/node/src/python/pants/contrib/node/tasks:node_resolve',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -35,7 +36,8 @@ python_library(
     'src/python/pants/util:dirutil',
     'contrib/node/src/python/pants/contrib/node/targets:node_preinstalled_module',
     'contrib/node/src/python/pants/contrib/node/tasks:node_resolve',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -44,5 +46,6 @@ python_library(
   dependencies=[
     'src/python/pants/base:build_environment',
     'src/python/pants/util:dirutil',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )

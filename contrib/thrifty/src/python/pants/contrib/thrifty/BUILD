@@ -1,7 +1,10 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-python_library(sources=['java_thrifty_gen.py', 'java_thrifty_library.py'])
+python_library(
+  sources=['java_thrifty_gen.py', 'java_thrifty_library.py'],
+  tags={"partially_type_checked"},
+)
 
 contrib_plugin(
   name='plugin',

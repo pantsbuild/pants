@@ -32,4 +32,6 @@ class NodeInstall(NodeTask):
         # By requiring NodePathsLocal, the node resolver walks through each node_module target and installs
         # them in topological order in the root source target path.
         node_paths = self.context.products.get_data(NodePathsLocal)
-        self.context.log.debug('Start installing node_module target: {} in path'.format(target, node_paths.node_path(target)))
+        self.context.log.debug(
+          f'Start installing node_module target: {target} in path {node_paths.node_path(target)}'
+        )

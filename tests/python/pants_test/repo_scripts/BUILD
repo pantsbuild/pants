@@ -9,5 +9,6 @@ python_tests(
     'src/python/pants/testutil:git_util',
     'build-support/bin:bash_scripts',
     'build-support/bin:python_scripts',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )

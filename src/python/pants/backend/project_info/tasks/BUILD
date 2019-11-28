@@ -23,6 +23,7 @@ python_library(
     'src/python/pants/base:payload_field',
     'src/python/pants/task',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -33,6 +34,7 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/task',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -86,6 +88,7 @@ python_library(
 python_library(
   name = 'export_version',
   sources = ['export_version.py'],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -98,6 +101,7 @@ python_library(
     'src/python/pants/build_graph',
     'src/python/pants/task',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(

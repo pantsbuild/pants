@@ -4,7 +4,8 @@
 
 python_library(
   name='buildozer_util',
-  sources=['buildozer_util.py']
+  sources=['buildozer_util.py'],
+  tags = {"partially_type_checked"},
 )
 
 
