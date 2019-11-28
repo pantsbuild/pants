@@ -28,48 +28,16 @@ from pants.rules.core.lint import LintResult
 
 @dataclass(frozen=True)
 class IsortSetup:
-  """This abstraction is used to deduplicate the implementations for the `fmt` and `lint` rules,
-  which only differ in whether or not to append `--check-only` to the isort CLI args."""
-  resolved_requirements_pex: Pex
-  merged_input_files: Digest
-
-  @staticmethod
-  def generate_pex_arg_list(*, files: Tuple[str, ...], check_only: bool) -> Tuple[str, ...]:
-    pex_args = []
-    if check_only:
-      pex_args.append("--check-only")
-    pex_args.extend(files)
-    return tuple(pex_args)
-
-  def create_execute_request(
-    self,
-    *,
-    wrapped_target: FormattablePythonTarget,
-    python_setup: PythonSetup,
-    subprocess_encoding_environment: SubprocessEncodingEnvironment,
-    check_only: bool,
-  ) -> ExecuteProcessRequest:
-    target = wrapped_target.target
-    return self.resolved_requirements_pex.create_execute_request(
-      python_setup=python_setup,
-      subprocess_encoding_environment=subprocess_encoding_environment,
-      pex_path="./isort.pex",
-      pex_args=self.generate_pex_arg_list(
-        files=target.sources.snapshot.files, check_only=check_only
-      ),
-      input_files=self.merged_input_files,
-      output_files=target.sources.snapshot.files,
-      description=f'Run isort for {target.address.reference()}',
-    )
+  requirements_pex: Pex
+  config_snapshot: Snapshot
 
 
 @rule
-async def setup_isort(wrapped_target: FormattablePythonTarget, isort: Isort) -> IsortSetup:
-  # NB: isort auto-discovers config. We ensure that the config is included in the input files.
+async def setup_isort(isort: Isort) -> IsortSetup:
   config_path = isort.get_options().config
-  config_snapshot = await Get(Snapshot, PathGlobs(include=(config_path,)))
-  resolved_requirements_pex = await Get(
-    Pex, CreatePex(
+  config_snapshot = await Get[Snapshot](PathGlobs(include=(config_path,)))
+  requirements_pex = await Get[Pex](
+    CreatePex(
       output_filename="isort.pex",
       requirements=PexRequirements(requirements=tuple(isort.get_requirement_specs())),
       interpreter_constraints=PexInterpreterConstraints(
@@ -78,69 +46,69 @@ async def setup_isort(wrapped_target: FormattablePythonTarget, isort: Isort) -> 
       entry_point=isort.get_entry_point(),
     )
   )
+  return IsortSetup(requirements_pex=requirements_pex, config_snapshot=config_snapshot)
 
-  sources_digest = wrapped_target.target.sources.snapshot.directory_digest
 
-  merged_input_files = await Get(
-    Digest,
+@dataclass(frozen=True)
+class IsortArgs:
+  args: Tuple[str, ...]
+
+  @staticmethod
+  def create(*, wrapped_target: FormattablePythonTarget, check_only: bool) -> "IsortArgs":
+    # NB: isort auto-discovers config files. There is no way to hardcode them via command line
+    # flags. So long as the files are in the Pex's input files, isort will use the config.
+    files = wrapped_target.target.sources.snapshot.files
+    pex_args = []
+    if check_only:
+      pex_args.append("--check-only")
+    pex_args.extend(files)
+    return IsortArgs(tuple(pex_args))
+
+
+@rule
+async def create_isort_request(
+  wrapped_target: FormattablePythonTarget,
+  isort_args: IsortArgs,
+  isort_setup: IsortSetup,
+  python_setup: PythonSetup,
+  subprocess_encoding_environment: SubprocessEncodingEnvironment,
+) -> ExecuteProcessRequest:
+  target = wrapped_target.target
+  merged_input_files = await Get[Digest](
     DirectoriesToMerge(
       directories=(
-        sources_digest,
-        resolved_requirements_pex.directory_digest,
-        config_snapshot.directory_digest,
+        target.sources.snapshot.directory_digest,
+        isort_setup.requirements_pex.directory_digest,
+        isort_setup.config_snapshot.directory_digest,
       )
     ),
   )
-  return IsortSetup(resolved_requirements_pex, merged_input_files)
-
-
-@rule
-async def fmt(
-  wrapped_target: FormattablePythonTarget,
-  isort_setup: IsortSetup,
-  python_setup: PythonSetup,
-  subprocess_encoding_environment: SubprocessEncodingEnvironment,
-) -> FmtResult:
-  request = isort_setup.create_execute_request(
-    wrapped_target=wrapped_target,
+  return isort_setup.requirements_pex.create_execute_request(
     python_setup=python_setup,
     subprocess_encoding_environment=subprocess_encoding_environment,
-    check_only=False
-  )
-  result = await Get(ExecuteProcessResult, ExecuteProcessRequest, request)
-  return FmtResult(
-    digest=result.output_directory_digest,
-    stdout=result.stdout.decode(),
-    stderr=result.stderr.decode(),
+    pex_path="./isort.pex",
+    pex_args=isort_args.args,
+    input_files=merged_input_files,
+    output_files=target.sources.snapshot.files,
+    description=f'Run isort for {target.address.reference()}',
   )
 
 
-@rule
-async def lint(
-  wrapped_target: FormattablePythonTarget,
-  isort_setup: IsortSetup,
-  python_setup: PythonSetup,
-  subprocess_encoding_environment: SubprocessEncodingEnvironment,
-) -> LintResult:
-  request = isort_setup.create_execute_request(
-    wrapped_target=wrapped_target,
-    python_setup=python_setup,
-    subprocess_encoding_environment=subprocess_encoding_environment,
-    check_only=True
-  )
+@rule(name="Format using isort")
+async def fmt(wrapped_target: FormattablePythonTarget) -> FmtResult:
+  args = IsortArgs.create(wrapped_target=wrapped_target, check_only=False)
+  request = await Get[ExecuteProcessRequest](IsortArgs, args)
+  result = await Get[ExecuteProcessResult](ExecuteProcessRequest, request)
+  return FmtResult.from_execute_process_result(result)
+
+
+@rule(name="Lint using isort")
+async def lint(wrapped_target: FormattablePythonTarget) -> LintResult:
+  args = IsortArgs.create(wrapped_target=wrapped_target, check_only=True)
+  request = await Get[ExecuteProcessRequest](IsortArgs, args)
   result = await Get(FallibleExecuteProcessResult, ExecuteProcessRequest, request)
-  return LintResult(
-    exit_code=result.exit_code,
-    stdout=result.stdout.decode(),
-    stderr=result.stderr.decode(),
-  )
+  return LintResult.from_fallible_execute_process_result(result)
 
 
 def rules():
-  return [
-    setup_isort,
-    fmt,
-    lint,
-    optionable_rule(Isort),
-    optionable_rule(PythonSetup),
-  ]
+  return [setup_isort, create_isort_request, fmt, lint, optionable_rule(Isort)]

@@ -3,7 +3,8 @@
 
 from typing import List, Optional, Tuple
 
-from pants.backend.python.lint.black.rules import BlackSetup, fmt, lint, setup_black
+from pants.backend.python.lint.black.rules import BlackSetup
+from pants.backend.python.lint.black.rules import rules as black_rules
 from pants.backend.python.lint.black.subsystem import Black
 from pants.backend.python.rules.download_pex_bin import download_pex_bin
 from pants.backend.python.rules.pex import CreatePex, create_pex
@@ -34,14 +35,15 @@ class BlackIntegrationTest(TestBase):
   good_source = FileContent(path="test/good.py", content=b'animal = "Koala"\n')
   bad_source = FileContent(path="test/bad.py", content=b'name=    "Anakin"\n')
   fixed_bad_source = FileContent(path="test/bad.py", content=b'name = "Anakin"\n')
+  # Note the single quotes, which Black does not like by default. To get Black to pass, it will
+  # need to successfully read our config/CLI args.
+  needs_config_source = FileContent(path="test/config.py", content=b"animal = 'Koala'\n")
 
   @classmethod
   def rules(cls):
     return (
       *super().rules(),
-      fmt,
-      lint,
-      setup_black,
+      *black_rules(),
       create_pex,
       create_subprocess_encoding_environment,
       create_pex_native_build_environment,
@@ -77,7 +79,6 @@ class BlackIntegrationTest(TestBase):
     black_setup = self.request_single_product(
       BlackSetup,
       Params(
-        target,
         black_subsystem,
         PythonNativeCode.global_instance(),
         PythonSetup.global_instance(),
@@ -116,12 +117,10 @@ class BlackIntegrationTest(TestBase):
     self.assertEqual(fmt_result.digest, self.get_digest([self.good_source, self.fixed_bad_source]))
 
   def test_respects_config_file(self) -> None:
-    # Note the single quotes, which Black does not like by default.
-    source = FileContent(path="test/good.py", content=b"animal = 'Koala'\n")
     lint_result, fmt_result = self.run_black(
-      [source], config="[tool.black]\nskip-string-normalization = 'true'\n"
+      [self.needs_config_source], config="[tool.black]\nskip-string-normalization = 'true'\n"
     )
     self.assertEqual(lint_result.exit_code, 0)
     self.assertIn("1 file would be left unchanged", lint_result.stderr)
     self.assertIn("1 file left unchanged", fmt_result.stderr)
-    self.assertEqual(fmt_result.digest, self.get_digest([source]))
+    self.assertEqual(fmt_result.digest, self.get_digest([self.needs_config_source]))

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pants.engine.console import Console
 from pants.engine.fs import Digest, DirectoriesToMerge, DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal
+from pants.engine.isolated_process import ExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTargets
 from pants.engine.rules import UnionMembership, console_rule, union
 from pants.engine.selectors import Get, MultiGet
@@ -16,6 +17,14 @@ class FmtResult:
   digest: Digest
   stdout: str
   stderr: str
+
+  @staticmethod
+  def from_execute_process_result(process_result: ExecuteProcessResult) -> "FmtResult":
+    return FmtResult(
+      digest=process_result.output_directory_digest,
+      stdout=process_result.stdout.decode(),
+      stderr=process_result.stderr.decode(),
+    )
 
 
 @union

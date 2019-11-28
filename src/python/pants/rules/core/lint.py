@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from pants.engine.console import Console
 from pants.engine.goal import Goal
+from pants.engine.isolated_process import FallibleExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTargets
 from pants.engine.rules import UnionMembership, console_rule
 from pants.engine.selectors import Get, MultiGet
@@ -16,6 +17,16 @@ class LintResult:
   exit_code: int
   stdout: str
   stderr: str
+
+  @staticmethod
+  def from_fallible_execute_process_result(
+    process_result: FallibleExecuteProcessResult
+  ) -> "LintResult":
+    return LintResult(
+      exit_code=process_result.exit_code,
+      stdout=process_result.stdout.decode(),
+      stderr=process_result.stderr.decode(),
+    )
 
 
 class Lint(Goal):
