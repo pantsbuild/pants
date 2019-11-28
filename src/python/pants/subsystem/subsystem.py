@@ -203,8 +203,9 @@ class Subsystem(SubsystemClientMixin, Optionable):
 
     for name in subsystem_names:
       try:
-        module_name = '.'.join(name.split(".")[:-1])
-        class_name = name.split(".")[-1]
+        name_components = name.split(".")
+        module_name = ".".join(name_components[:-1])
+        class_name = name_components[-1]
         module = importlib.import_module(module_name)
         subsystem_class = getattr(module, class_name)
       except (IndexError, AttributeError, ModuleNotFoundError, ValueError) as e:
