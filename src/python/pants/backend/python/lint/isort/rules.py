@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Tuple
+from typing import List, Optional, Tuple
 
 from pants.backend.python.lint.isort.subsystem import Isort
 from pants.backend.python.rules.pex import (
@@ -34,8 +34,8 @@ class IsortSetup:
 
 @rule
 async def setup_isort(isort: Isort) -> IsortSetup:
-  config_path = isort.get_options().config
-  config_snapshot = await Get[Snapshot](PathGlobs(include=(config_path,)))
+  config_path: Optional[List[str]] = isort.get_options().config
+  config_snapshot = await Get[Snapshot](PathGlobs(include=config_path or ()))
   requirements_pex = await Get[Pex](
     CreatePex(
       output_filename="isort.pex",

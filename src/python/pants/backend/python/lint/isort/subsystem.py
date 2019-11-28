@@ -14,6 +14,6 @@ class Isort(PythonToolBase):
   def register_options(cls, register):
     super().register_options(register)
     register(
-      '--config', type=file_option, default=None,
-      help="Path to `isort.cfg` or alternative isort config file"
+      '--config', type=list, member_type=file_option, default=None,
+      help="Path to `isort.cfg` or alternative isort config file(s)"
     )
