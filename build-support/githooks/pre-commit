@@ -53,7 +53,7 @@ echo "* Checking shell scripts via our custom linter"
 # fails in pants changed.
 if git rev-parse --verify "${MERGE_BASE}" &>/dev/null; then
   echo "* Checking imports"
-  ./build-support/bin/isort.sh || die "To fix import sort order, run \`build-support/bin/isort.sh -f\`"
+  ./pants lint-v2 :: || die "To fix import sort order, run \`./pants fmt-v2 ::\`"
 
   # TODO(CMLivingston) Make lint use `-q` option again after addressing proper workunit labeling:
   # https://github.com/pantsbuild/pants/issues/6633

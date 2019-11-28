@@ -34,7 +34,7 @@ def main() -> None:
     if args.sanity_checks:
       run_sanity_checks()
     if args.lint:
-      run_lint()
+      run_lint(oauth_token_path=remote_execution_oauth_token_path)
     if args.doc_gen:
       run_doc_gen_tests()
     if args.clippy:
@@ -369,13 +369,16 @@ def run_sanity_checks() -> None:
       run_check(check)
 
 
-def run_lint() -> None:
-  targets = ["contrib::", "examples::", "src::", "tests::", "zinc::"]
+def run_lint(*, oauth_token_path: Optional[str] = None) -> None:
+  command = ["./pants.pex", "--tag=-nolint", "lint", "lint-v2"]
+  if oauth_token_path is not None:
+    command.extend([
+      "--pants-config-files=pants.remote.ini",
+      f"--remote-oauth-bearer-token-path={oauth_token_path}"
+    ])
+  command.extend(["contrib::", "examples::", "src::", "tests::", "zinc::"])
   _run_command(
-    ["./pants.pex", "--tag=-nolint", "lint", *targets],
-    slug="Lint",
-    start_message="Running lint checks",
-    die_message="Lint check failure."
+    command, slug="Lint", start_message="Running lint checks", die_message="Lint check failure."
   )
 
 
