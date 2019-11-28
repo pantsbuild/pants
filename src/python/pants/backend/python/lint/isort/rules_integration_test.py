@@ -82,7 +82,7 @@ class IsortIntegrationTest(TestBase):
       )
     )
     isort_subsystem = global_subsystem_instance(
-      Isort, options={Isort.options_scope: {"config": ".isort.cfg" if config else None}}
+      Isort, options={Isort.options_scope: {"config": [".isort.cfg"] if config else None}}
     )
     isort_setup = self.request_single_product(
       IsortSetup,
