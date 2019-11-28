@@ -39,34 +39,6 @@ async def run_python_test(
   all_targets = transitive_hydrated_targets.closure
   all_target_adaptors = tuple(t.adaptor for t in all_targets)
 
-  # Get the file names for the test_target, adjusted for the source root. This allows us to
-  # specify to Pytest which files to test and thus to avoid the test auto-discovery defined by
-  # https://pytest.org/en/latest/goodpractices.html#test-discovery. In addition to a performance
-  # optimization, this ensures that any transitive sources, such as a test project file named
-  # test_fail.py, do not unintentionally end up being run as tests.
-  source_root_stripped_test_target_sources = await Get(
-    SourceRootStrippedSources, Address, test_target.address.to_address()
-  )
-
-  if not source_root_stripped_test_target_sources.snapshot.files:
-    return TestResult(
-      status=Status.SUCCESS,
-      stdout="",
-      stderr="",
-    )
-
-  source_root_stripped_sources = await MultiGet(
-    Get(SourceRootStrippedSources, HydratedTarget, target_adaptor)
-    for target_adaptor in all_targets
-  )
-
-  stripped_sources_digests = [stripped_sources.snapshot.directory_digest for stripped_sources in source_root_stripped_sources]
-  sources_digest = await Get(
-    Digest, DirectoriesToMerge(directories=tuple(stripped_sources_digests)),
-  )
-
-  inits_digest = await Get(InjectedInitDigest, Digest, sources_digest)
-
   interpreter_constraints = PexInterpreterConstraints.create_from_adaptors(
     adaptors=tuple(all_target_adaptors),
     python_setup=python_setup
@@ -77,7 +49,6 @@ async def run_python_test(
     adaptors=all_target_adaptors,
     additional_requirements=pytest.get_requirement_strings()
   )
-
   resolved_requirements_pex = await Get(
     Pex, CreatePex(
       output_filename=output_pytest_requirements_pex_filename,
@@ -86,6 +57,27 @@ async def run_python_test(
       entry_point="pytest:main",
     )
   )
+
+  # Get the file names for the test_target, adjusted for the source root. This allows us to
+  # specify to Pytest which files to test and thus to avoid the test auto-discovery defined by
+  # https://pytest.org/en/latest/goodpractices.html#test-discovery. In addition to a performance
+  # optimization, this ensures that any transitive sources, such as a test project file named
+  # test_fail.py, do not unintentionally end up being run as tests.
+  source_root_stripped_test_target_sources = await Get(
+    SourceRootStrippedSources, Address, test_target.address.to_address()
+  )
+
+  source_root_stripped_sources = await MultiGet(
+    Get(SourceRootStrippedSources, HydratedTarget, target_adaptor)
+    for target_adaptor in all_targets
+  )
+
+  stripped_sources_digests = tuple(
+    stripped_sources.snapshot.directory_digest for stripped_sources in source_root_stripped_sources
+  )
+  sources_digest = await Get(Digest, DirectoriesToMerge(directories=stripped_sources_digests))
+
+  inits_digest = await Get(InjectedInitDigest, Digest, sources_digest)
 
   merged_input_files = await Get(
     Digest,

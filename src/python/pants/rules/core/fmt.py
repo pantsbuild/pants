@@ -8,6 +8,7 @@ from pants.engine.fs import Digest, DirectoriesToMerge, DirectoryToMaterialize, 
 from pants.engine.goal import Goal
 from pants.engine.isolated_process import ExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTargets
+from pants.engine.legacy.structs import TargetAdaptor
 from pants.engine.rules import UnionMembership, console_rule, union
 from pants.engine.selectors import Get, MultiGet
 
@@ -31,6 +32,18 @@ class FmtResult:
 class TargetWithSources:
   """A union for registration of a formattable target type."""
 
+  @staticmethod
+  def is_formattable_and_lintable(
+    target_adaptor: TargetAdaptor, *, union_membership: UnionMembership
+  ) -> bool:
+    return (
+      union_membership.is_member(TargetWithSources, target_adaptor)
+      # TODO: make TargetAdaptor return a 'sources' field with an empty snapshot instead of
+      #  raising to remove the hasattr() checks here!
+      and hasattr(target_adaptor, "sources")
+      and target_adaptor.sources.snapshot.files  # i.e., sources is not empty
+    )
+
 
 class Fmt(Goal):
   """Autoformat source code."""
@@ -50,9 +63,9 @@ async def fmt(
   results = await MultiGet(
     Get[FmtResult](TargetWithSources, target.adaptor)
     for target in targets
-    # TODO: make TargetAdaptor return a 'sources' field with an empty snapshot instead of
-    # raising to remove the hasattr() checks here!
-    if union_membership.is_member(TargetWithSources, target.adaptor) and hasattr(target.adaptor, "sources")
+    if TargetWithSources.is_formattable_and_lintable(
+      target.adaptor, union_membership=union_membership
+    )
   )
 
   if not results:
