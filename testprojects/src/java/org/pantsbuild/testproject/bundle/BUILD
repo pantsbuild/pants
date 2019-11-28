@@ -67,15 +67,6 @@ jvm_binary(name = 'bundle-bin',
   ]
 )
 
-# This should fail because the relpath is wrong
-jvm_app(name='missing-files',
-  basename = 'bundle-example',
-  binary=':bundle-bin',
-  bundles=[
-    bundle(fileset=['data/no-such-file']),
-  ]
-)
-
 # Tests resources ordering via integration test.
 jvm_binary(
   name='bundle-resource-ordering',
@@ -86,15 +77,4 @@ jvm_binary(
     'testprojects/src/resources/org/pantsbuild/testproject/bundleresources:resources',
     'testprojects/tests/resources/org/pantsbuild/testproject/bundleresources:resources',
   ]
-)
-
-jvm_app(name='missing-bundle-fileset',
-  binary=':bundle-bin',
-  bundles=[
-    bundle(fileset=['a/b/file1.txt']),
-    bundle(fileset=rglobs('*.aaaa', '*.bbbb')),
-    bundle(fileset=globs('*.aaaa')),
-    bundle(fileset=zglobs('**/*.abab')),
-    bundle(fileset=['file1.aaaa', 'file2.aaaa']),
-  ],
 )

@@ -7,6 +7,7 @@ target(
 )
 
 java_library(name='base',
+  sources=[],
   dependencies=['3rdparty:junit'],
 )
 

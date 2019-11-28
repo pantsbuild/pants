@@ -42,12 +42,12 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
                                     classname='org.pantsbuild.example.hello.welcome.WelSpec')
 
   def test_junit_test(self):
-    with self.temporary_workdir() as workdir:
-      pants_run = self.run_pants_with_workdir([
-          'test',
-          'testprojects/tests/scala/org/pantsbuild/testproject/empty'],
-          workdir)
-      self.assert_failure(pants_run)
+    empty_directory_path = 'testprojects/tests/java/org/pantsbuild/testproject/empty'
+    empty_target = b"junit_tests()\n"
+    with self.temporary_file_content(f"{empty_directory_path}/BUILD", empty_target), \
+         self.temporary_workdir() as workdir:
+      pants_run = self.run_pants_with_workdir(['test', empty_directory_path], workdir)
+    self.assert_failure(pants_run)
 
   def test_junit_test_with_test_option_with_classname(self):
     with self.temporary_workdir() as workdir:
