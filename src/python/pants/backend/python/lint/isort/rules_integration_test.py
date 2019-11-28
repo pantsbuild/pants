@@ -3,7 +3,8 @@
 
 from typing import List, Optional, Tuple
 
-from pants.backend.python.lint.isort.rules import IsortSetup, fmt, lint, setup_isort
+from pants.backend.python.lint.isort.rules import IsortSetup
+from pants.backend.python.lint.isort.rules import rules as isort_rules
 from pants.backend.python.lint.isort.subsystem import Isort
 from pants.backend.python.rules.download_pex_bin import download_pex_bin
 from pants.backend.python.rules.pex import CreatePex, create_pex
@@ -34,14 +35,23 @@ class IsortIntegrationTest(TestBase):
   good_source = FileContent(path="test/good.py", content=b'from animals import cat, dog\n')
   bad_source = FileContent(path="test/bad.py", content=b'from colors import green, blue\n')
   fixed_bad_source = FileContent(path="test/bad.py", content=b'from colors import blue, green\n')
+  # Note the as import. Isort by default keeps as imports on a new line, so this wouldn't be
+  # reformatted by default. If we set the config/CLI args correctly, isort will combine the two
+  # imports into one line.
+  needs_config_source = FileContent(
+    path="test/config.py",
+    content=b"from colors import blue\nfrom colors import green as verde\n"
+  )
+  fixed_needs_config_source = FileContent(
+    path="test/config.py",
+    content=b"from colors import blue, green as verde\n"
+  )
 
   @classmethod
   def rules(cls):
     return (
       *super().rules(),
-      fmt,
-      lint,
-      setup_isort,
+      *isort_rules(),
       create_pex,
       create_subprocess_encoding_environment,
       create_pex_native_build_environment,
@@ -77,7 +87,6 @@ class IsortIntegrationTest(TestBase):
     isort_setup = self.request_single_product(
       IsortSetup,
       Params(
-        target,
         isort_subsystem,
         PythonNativeCode.global_instance(),
         PythonSetup.global_instance(),
@@ -119,22 +128,11 @@ class IsortIntegrationTest(TestBase):
     assert fmt_result.digest == self.get_digest([self.good_source, self.fixed_bad_source])
 
   def test_respects_config_file(self) -> None:
-    # Normally isort wants "as imports" on a new line, so `source` should not be formatted with a
-    # default isort run. We configure our settings to instead combine the two lines. If the config
-    # is picked up, then `source` should be reformatted by isort.
-    source = FileContent(
-      path="test/config.py",
-      content=b"from colors import blue\nfrom colors import green as verde"
-    )
-    fixed_source = FileContent(
-      path="test/config.py",
-      content=b"from colors import blue, green as verde\n"
-    )
     lint_result, fmt_result = self.run_isort(
-      [source], config="[settings]\ncombine_as_imports=True\n"
+      [self.needs_config_source], config="[settings]\ncombine_as_imports=True\n"
     )
     assert lint_result.exit_code == 1
     assert "test/config.py Imports are incorrectly sorted" in lint_result.stdout
     assert "Fixing" in fmt_result.stdout
     assert "test/config.py" in fmt_result.stdout
-    assert fmt_result.digest == self.get_digest([fixed_source])
+    assert fmt_result.digest == self.get_digest([self.fixed_needs_config_source])

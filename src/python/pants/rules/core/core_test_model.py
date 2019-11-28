@@ -3,6 +3,7 @@
 
 from dataclasses import dataclass
 
+from pants.engine.isolated_process import FallibleExecuteProcessResult
 from pants.engine.rules import union
 from pants.util.collections import Enum
 
@@ -20,6 +21,16 @@ class TestResult:
 
   # Prevent this class from being detected by pytest as a test class.
   __test__ = False
+
+  @staticmethod
+  def from_fallible_execute_process_result(
+    process_result: FallibleExecuteProcessResult
+  ) -> "TestResult":
+    return TestResult(
+      status=Status.SUCCESS if process_result.exit_code == 0 else Status.FAILURE,
+      stdout=process_result.stdout.decode(),
+      stderr=process_result.stderr.decode(),
+    )
 
 
 @union

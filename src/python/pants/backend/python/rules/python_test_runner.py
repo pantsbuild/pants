@@ -110,15 +110,8 @@ async def run_python_test(
     #  and also use the specified max timeout time.
     timeout_seconds=getattr(test_target, 'timeout', 60)
   )
-
   result = await Get(FallibleExecuteProcessResult, ExecuteProcessRequest, request)
-  status = Status.SUCCESS if result.exit_code == 0 else Status.FAILURE
-
-  return TestResult(
-    status=status,
-    stdout=result.stdout.decode(),
-    stderr=result.stderr.decode(),
-  )
+  return TestResult.from_fallible_execute_process_result(result)
 
 
 def rules():
