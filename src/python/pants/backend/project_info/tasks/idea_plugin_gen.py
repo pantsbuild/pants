@@ -157,7 +157,7 @@ class IdeaPluginGen(ConsoleTask):
     shutil.move(idea_ws, self.idea_workspace_filename)
     shutil.move(idea_modules, self.idea_modules_filename)
 
-    return self.idea_workspace_filename
+    return self.gen_project_workdir
 
   def _generate_to_tempfile(self, generator):
     """Applies the specified generator to a temp file and returns the path to that file.
@@ -188,6 +188,6 @@ class IdeaPluginGen(ConsoleTask):
         subprocess.Popen([open_with, ide_file], stdout=null, stderr=null)
       else:
         try:
-          desktop.ui_open(ide_file)
+          desktop.idea_open(ide_file)
         except desktop.OpenError as e:
           raise TaskError(e)
