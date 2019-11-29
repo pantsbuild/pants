@@ -136,7 +136,7 @@ def _make_rule(
       for p, s in rule_visitor.gets)
 
     # Register dependencies for @console_rule/Goal.
-    dependency_rules = (optionable_rule(return_type.Options),) if is_goal_cls else None
+    dependency_rules = (optionable_rule(return_type.subsystem_cls),) if is_goal_cls else None
 
     # Set a default name for Goal classes if one is not explicitly provided
     if is_goal_cls and name is None:

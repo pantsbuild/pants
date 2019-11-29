@@ -1,20 +1,23 @@
+# Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 python_library(
-    dependencies = [
-      '3rdparty/python:dataclasses',
-      'src/python/pants/base:build_root',
-      'src/python/pants/base:exiter',
-      'src/python/pants/build_graph',
-      'src/python/pants/engine:goal',
-      'src/python/pants/engine:rules',
-      'src/python/pants/engine:interactive_runner',
-      'src/python/pants/engine:selectors',
-      'src/python/pants/engine:addressable',
-      'src/python/pants/engine:console',
-      'src/python/pants/engine/legacy:graph',
-      'src/python/pants/goal',
-      'src/python/pants/source',
-      'src/python/pants/util:collections',
-    ]
+  dependencies = [
+    '3rdparty/python:dataclasses',
+    'src/python/pants/base:build_root',
+    'src/python/pants/base:exiter',
+    'src/python/pants/build_graph',
+    'src/python/pants/engine:goal',
+    'src/python/pants/engine:rules',
+    'src/python/pants/engine:interactive_runner',
+    'src/python/pants/engine:selectors',
+    'src/python/pants/engine:addressable',
+    'src/python/pants/engine:console',
+    'src/python/pants/engine/legacy:graph',
+    'src/python/pants/goal',
+    'src/python/pants/source',
+    'src/python/pants/util:collections',
+  ],
 )
 
 python_tests(

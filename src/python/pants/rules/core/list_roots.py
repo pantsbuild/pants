@@ -5,15 +5,19 @@ from typing import Set
 
 from pants.engine.console import Console
 from pants.engine.fs import PathGlobs, Snapshot
-from pants.engine.goal import Goal, LineOriented
+from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import console_rule, optionable_rule, rule
 from pants.engine.selectors import Get
 from pants.source.source_root import AllSourceRoots, SourceRoot, SourceRootConfig
 
 
-class Roots(LineOriented, Goal):
+class RootsOptions(LineOriented, GoalSubsystem):
   """List the repo's registered source roots."""
   name = 'roots'
+
+
+class Roots(LineOriented, Goal):
+  subsystem_cls = RootsOptions
 
 
 @rule
@@ -45,8 +49,8 @@ async def all_roots(source_root_config: SourceRootConfig) -> AllSourceRoots:
 
 
 @console_rule
-async def list_roots(console: Console, options: Roots.Options, all_roots: AllSourceRoots) -> Roots:
-  with Roots.line_oriented(options, console) as print_stdout:
+async def list_roots(console: Console, options: RootsOptions, all_roots: AllSourceRoots) -> Roots:
+  with options.line_oriented(console) as print_stdout:
     for src_root in sorted(all_roots, key=lambda x: x.path):
       all_langs = ','.join(sorted(src_root.langs))
       print_stdout(f"{src_root.path}: {all_langs or '*'}")

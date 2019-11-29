@@ -7,16 +7,19 @@ from pants.build_graph.address import Address
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.console import Console
 from pants.engine.fs import Digest, DirectoryToMaterialize, Workspace
-from pants.engine.goal import Goal, LineOriented
+from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.legacy.graph import HydratedTarget
 from pants.engine.rules import console_rule, rule, union
 from pants.engine.selectors import Get, MultiGet
 
 
-@dataclass(frozen=True)
-class Binary(LineOriented, Goal):
+class BinaryOptions(LineOriented, GoalSubsystem):
   """Create a runnable binary."""
   name = 'binary'
+
+
+class Binary(Goal):
+  subsystem_cls = BinaryOptions
 
 
 @union
@@ -32,8 +35,10 @@ class CreatedBinary:
 
 
 @console_rule
-async def create_binary(addresses: BuildFileAddresses, console: Console, workspace: Workspace, options: Binary.Options) -> Binary:
-  with Binary.line_oriented(options, console) as print_stdout:
+async def create_binary(
+  addresses: BuildFileAddresses, console: Console, workspace: Workspace, options: BinaryOptions
+) -> Binary:
+  with options.line_oriented(console) as print_stdout:
     print_stdout("Generating binaries in `dist/`")
     binaries = await MultiGet(Get(CreatedBinary, Address, address.to_address()) for address in addresses)
     dirs_to_materialize = tuple(
