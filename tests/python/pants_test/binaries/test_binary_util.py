@@ -70,7 +70,7 @@ class BinaryUtilTest(TestBase):
     supportdir, version, name = binaries[binary_key]
     binary_request = binary_util._make_deprecated_binary_request(supportdir, version, name)
 
-    binary_path = binary_request.get_download_path(binary_util._host_platform())
+    binary_path = binary_request.get_download_path(binary_util.host_platform())
     return f'{base}/{binary_path}'
 
   @classmethod
@@ -148,7 +148,7 @@ class BinaryUtilTest(TestBase):
         version='2.4.1',
         name='protoc')
 
-      binary_path = binary_request.get_download_path(binary_util._host_platform())
+      binary_path = binary_request.get_download_path(binary_util.host_platform())
       contents = b'proof'
       with safe_open(os.path.join(valid_local_files, binary_path), 'wb') as fp:
         fp.write(contents)

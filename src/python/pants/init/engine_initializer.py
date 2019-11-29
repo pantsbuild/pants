@@ -18,6 +18,8 @@ from pants.base.deprecated import deprecated_conditional
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.base.specs import Specs
+from pants.binaries.binary_tool import rules as binary_tool_rules
+from pants.binaries.binary_util import rules as binary_util_rules
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.remote_sources import RemoteSources
@@ -450,6 +452,8 @@ class EngineInitializer:
       *create_options_parsing_rules(),
       *structs_rules(),
       *changed_rules(),
+      *binary_tool_rules(),
+      *binary_util_rules(),
       *rules,
     )
 

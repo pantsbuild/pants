@@ -40,7 +40,7 @@ class ReplacingLegacyOptionsTool(BinaryToolBase):
 
 class BinaryUtilFakeUname(BinaryUtil):
 
-  def _host_platform(self):
+  def host_platform(self):
     return HostPlatform('xxx', 'yyy')
 
 
@@ -71,7 +71,7 @@ class CustomUrls(BinaryToolBase):
     return CustomUrlGenerator()
 
   def _select_for_version(self, version):
-    binary_request = self._make_binary_request(version)
+    binary_request = self.make_binary_request(version)
     return BinaryUtilFakeUname.Factory._create_for_cls(BinaryUtilFakeUname).select(binary_request)
 
 
