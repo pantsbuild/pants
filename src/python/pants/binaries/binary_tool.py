@@ -166,6 +166,9 @@ class BinaryToolBase(Subsystem):
       version_registration_kwargs['fingerprint'] = True
     register('--version', **version_registration_kwargs)
 
+    register('--buildroot-path', type=str, default=None, fingerprint=True,
+             help='???')
+
     register('--version-digest-mapping', type=dict,
              default={
                # "Serialize" the default value dict into "basic" types that can be easily specified
@@ -181,6 +184,13 @@ class BinaryToolBase(Subsystem):
                   'all environments it needs to be used for. The "fingerprint" and "size_bytes" '
                   'arguments are the result printed when running `sha256sum` and `wc -c` on '
                   'the downloaded file, respectively.')
+
+  @property
+  def _buildroot_globs(self) -> Optional[PathGlobs]:
+    path = self.get_options().buildroot_path
+    if not path:
+      return None
+    return PathGlobs([path])
 
   @memoized_method
   def select(self, context=None):
@@ -384,18 +394,22 @@ async def get_binary_tool_urls(
 
 
 @rule
-async def fetch_binary_tool(req: BinaryToolFetchRequest, url_set: BinaryToolUrlSet) -> Snapshot:
-  digest = url_set.tool_for_platform.digest
-  urls = url_set.get_urls()
+async def fetch_binary_tool(req: BinaryToolFetchRequest) -> Snapshot:
+  local_globs = req.tool._buildroot_globs
+  if local_globs:
+    return await Get[Snapshot](PathGlobs, local_globs)
+  else:
+    digest = url_set.tool_for_platform.digest
+    urls = url_set.get_urls()
 
-  if not urls:
-    raise ValueError(f'binary tool url generator {url_set.url_generator} produced an empty list of '
-                     f'urls for the request {req}')
-  # TODO: allow fetching a UrlToFetch with failure! Consider FallibleUrlToFetch analog to
-  # FallibleExecuteProcessResult!
-  url_to_fetch = urls[0]
+    if not urls:
+      raise ValueError(f'binary tool url generator {url_set.url_generator} produced an empty list of '
+                       f'urls for the request {req}')
+    # TODO: allow fetching a UrlToFetch with failure! Consider FallibleUrlToFetch analog to
+    # FallibleExecuteProcessResult!
+    url_to_fetch = urls[0]
 
-  return await Get[Snapshot](UrlToFetch(url_to_fetch, digest))
+    return await Get[Snapshot](UrlToFetch(url_to_fetch, digest))
 
 
 def rules():

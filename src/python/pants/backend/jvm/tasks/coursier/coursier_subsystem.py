@@ -1,7 +1,9 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import itertools
 import os
+from typing import List
 
 from pants.base.build_environment import get_pants_cachedir
 from pants.binaries.binary_tool import Script
@@ -52,6 +54,20 @@ class CoursierSubsystem(Script):
 
   def get_external_url_generator(self):
     return CoursierUrlGenerator(list(self.get_options().bootstrap_jar_urls))
+
+  def common_args(self) -> List[str]:
+    repos = self.get_options().repos
+    # make [repoX, repoY] -> ['-r', repoX, '-r', repoY]
+    repo_args = list(itertools.chain(*list(zip(['-r'] * len(repos), repos))))
+    artifact_types_arg = ['-A', ','.join(self.get_options().artifact_types)]
+    advanced_options = self.get_options().fetch_options
+    common_args: List[str] = [
+      'fetch',
+      # Print the resolution tree
+      '-t',
+      '--cache', self.get_options().cache_dir,
+    ] + repo_args + artifact_types_arg + advanced_options
+    return common_args
 
 
 class CoursierUrlGenerator(BinaryToolUrlGenerator):

@@ -1,7 +1,17 @@
 python_library(
   dependencies=[
+    '3rdparty/python:dataclasses',
+    'src/python/pants/backend/jvm/subsystems:jar_dependency_management',
+    'src/python/pants/backend/jvm/tasks:coursier_resolve',
+    'src/python/pants/backend/jvm/tasks/coursier',
+    'src/python/pants/binaries',
     'src/python/pants/engine:console',
+    'src/python/pants/engine:fs',
     'src/python/pants/engine:goal',
+    'src/python/pants/engine:isolated_process',
     'src/python/pants/engine:rules',
+    'src/python/pants/java/jar',
+    'src/python/pants/util:contextutil',
   ],
+  tags = {"partially_type_checked"},
 )

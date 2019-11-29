@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import hashlib
-import itertools
 import json
 import os
 from collections import defaultdict
@@ -264,16 +263,7 @@ class CoursierMixin(JvmResolverBase):
     coursier_subsystem_instance = CoursierSubsystem.global_instance()
     coursier_jar = coursier_subsystem_instance.select()
 
-    repos = coursier_subsystem_instance.get_options().repos
-    # make [repoX, repoY] -> ['-r', repoX, '-r', repoY]
-    repo_args = list(itertools.chain(*list(zip(['-r'] * len(repos), repos))))
-    artifact_types_arg = ['-A', ','.join(coursier_subsystem_instance.get_options().artifact_types)]
-    advanced_options = coursier_subsystem_instance.get_options().fetch_options
-    common_args = ['fetch',
-                   # Print the resolution tree
-                   '-t',
-                   '--cache', coursier_cache_path
-                   ] + repo_args + artifact_types_arg + advanced_options
+    common_args = coursier_subsystem_instance.common_args()
 
     coursier_work_temp_dir = os.path.join(self.versioned_workdir, 'tmp')
     safe_mkdir(coursier_work_temp_dir)
