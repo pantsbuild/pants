@@ -4,6 +4,103 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.24.0.dev0 (11/29/2019)
+------------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Deprecate `--run-py-args` and `--run-cpp-args` (#8726)
+  `PR #8726 <https://github.com/pantsbuild/pants/pull/8726>`_
+
+* Treat all `MaterializeToDirectories` paths as relative to the buildroot (#8696)
+  `PR #8696 <https://github.com/pantsbuild/pants/pull/8696>`_
+
+New Features
+~~~~~~~~~~~~
+
+* [IntelliJ] Export source jars of dependencies in `export-dep-as-jar` (#8723)
+  `PR #8723 <https://github.com/pantsbuild/pants/pull/8723>`_
+
+* Add available targets to the exported json in order to support proper highlighting in the BUILD files (#8688)
+  `PR #8688 <https://github.com/pantsbuild/pants/pull/8688>`_
+
+* Add --dep-as-jar option for idea-plugin (#8632)
+  `PR #8632 <https://github.com/pantsbuild/pants/pull/8632>`_
+
+* Add `SchedulerSession.materialize_directory()` for less boilerplate in V2 rules (#8709)
+  `PR #8709 <https://github.com/pantsbuild/pants/pull/8709>`_
+
+* [experimental] Add export-dep-as-jar task (#8628)
+  `PR #8628 <https://github.com/pantsbuild/pants/pull/8628>`_
+
+* Support publishing plugins that expose rules. (#8693)
+  `PR #8693 <https://github.com/pantsbuild/pants/pull/8693>`_
+
+* Allow @rule-authors to give rules names (#8592)
+  `PR #8592 <https://github.com/pantsbuild/pants/pull/8592>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix unused variable breaking master branch (#8734)
+  `PR #8734 <https://github.com/pantsbuild/pants/pull/8734>`_
+
+* Don't check that plugins are exact requirements. (#8721)
+  `PR #8721 <https://github.com/pantsbuild/pants/pull/8721>`_
+
+* Don't choke on plugin requirements that are URLs. (#8708)
+  `PR #8708 <https://github.com/pantsbuild/pants/pull/8708>`_
+
+* Fix bug in create_html_page - undefined variable (#8700)
+  `PR #8700 <https://github.com/pantsbuild/pants/pull/8700>`_
+
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Allow V2 isort to use multiple config files (#8731)
+  `PR #8731 <https://github.com/pantsbuild/pants/pull/8731>`_
+
+* No-op when V2 `fmt`, `lint`, and `test` have a target with empty sources (#8730)
+  `PR #8730 <https://github.com/pantsbuild/pants/pull/8730>`_
+
+* Refactor V2 Black and isort for better de-duplication (#8732)
+  `PR #8732 <https://github.com/pantsbuild/pants/pull/8732>`_
+
+* Refactor `fmt-v2` to use Workspace (#8691)
+  `PR #8691 <https://github.com/pantsbuild/pants/pull/8691>`_
+
+* add types to await Get[X](...)!! (#8697)
+  `PR #8697 <https://github.com/pantsbuild/pants/pull/8697>`_
+
+* Add V2 implementation of isort  (#8689)
+  `PR #8689 <https://github.com/pantsbuild/pants/pull/8689>`_
+
+* Use default argument for `DirectoryToMaterialize`'s `path_prefix` (#8711)
+  `PR #8711 <https://github.com/pantsbuild/pants/pull/8711>`_
+
+* Bump default MyPy to 0.740 (#8358)
+  `PR #8358 <https://github.com/pantsbuild/pants/pull/8358>`_
+
+* Assign some names to rules (#8695)
+  `PR #8695 <https://github.com/pantsbuild/pants/pull/8695>`_
+
+* Convert `contrib/confluence`, `contrib/thrifty`, `contrib/cpp`, `contrib/scrooge`, `contrib/scalajs` to use f-strings (#8702)
+  `PR #8702 <https://github.com/pantsbuild/pants/pull/8702>`_
+
+* Add `TestBase.request_single_product()` for less boilerplate when writing V2 tests (#8698)
+  `PR #8698 <https://github.com/pantsbuild/pants/pull/8698>`_
+
+* Convert `contrib/node` and `contrib/go` to use f-strings. (#8699)
+  `PR #8699 <https://github.com/pantsbuild/pants/pull/8699>`_
+
+* Remove yielding @rules (#8652)
+  `PR #8652 <https://github.com/pantsbuild/pants/pull/8652>`_
+
+* Bump to latest junit-runner to pull in #8674. (#8692)
+  `PR #8692 <https://github.com/pantsbuild/pants/pull/8692>`_
+
 1.23.0rc0 (11/22/2019)
 ----------------------
 
