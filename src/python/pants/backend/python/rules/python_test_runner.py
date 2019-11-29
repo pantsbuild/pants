@@ -18,7 +18,7 @@ from pants.engine.legacy.graph import BuildFileAddresses, HydratedTarget, Transi
 from pants.engine.legacy.structs import PythonTestsAdaptor
 from pants.engine.rules import UnionRule, optionable_rule, rule
 from pants.engine.selectors import Get, MultiGet
-from pants.rules.core.core_test_model import Status, TestResult, TestTarget
+from pants.rules.core.core_test_model import TestResult, TestTarget
 from pants.rules.core.strip_source_root import SourceRootStrippedSources
 
 
