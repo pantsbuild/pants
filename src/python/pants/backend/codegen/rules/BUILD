@@ -1,0 +1,9 @@
+python_library(
+  dependencies=[
+    '3rdparty/python:dataclasses',
+    'src/python/pants/engine:fs',
+    'src/python/pants/engine:rules',
+    'src/python/pants/engine/legacy:graph',
+    'src/python/pants/util:memo',
+  ],
+)
