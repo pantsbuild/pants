@@ -225,11 +225,10 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
   def set_start_time(self, start_time):
     # Launch RunTracker as early as possible (before .run() is called).
     self._run_tracker = RunTracker.global_instance()
-    # We don't support parallel runs in pantsd, and therefore if this pants command
-    # triggers any other pants command, we want it to not use pantsd at all.
-    # See https://github.com/pantsbuild/pants/issues/7881 for context.
-    if self._is_daemon:
-      os.environ['PANTS_PARENT_BUILD_ID'] = self._run_tracker.run_id
+
+    # Propagates parent_build_id to pants runs that may be called from this pants run.
+    os.environ['PANTS_PARENT_BUILD_ID'] = self._run_tracker.run_id
+
     self._reporting = Reporting.global_instance()
 
     self._run_start_time = start_time
