@@ -45,4 +45,5 @@ jvm_app(
 java_agent(
   name = 'agent',
   agent_class = 'org.pantsbuild.testproject.manifest.Agent',
+  sources = ['Agent.java'],
 )
