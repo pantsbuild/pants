@@ -16,6 +16,9 @@ API Changes
 * Treat all `MaterializeToDirectories` paths as relative to the buildroot (#8696)
   `PR #8696 <https://github.com/pantsbuild/pants/pull/8696>`_
 
+* Use default argument for `DirectoryToMaterialize`'s `path_prefix` (#8711)
+  `PR #8711 <https://github.com/pantsbuild/pants/pull/8711>`_
+
 New Features
 ~~~~~~~~~~~~
 
@@ -55,15 +58,15 @@ Bugfixes
 * Fix bug in create_html_page - undefined variable (#8700)
   `PR #8700 <https://github.com/pantsbuild/pants/pull/8700>`_
 
+* No-op when V2 `fmt`, `lint`, and `test` have a target with empty sources (#8730)
+  `PR #8730 <https://github.com/pantsbuild/pants/pull/8730>`_
+
 
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 * Allow V2 isort to use multiple config files (#8731)
   `PR #8731 <https://github.com/pantsbuild/pants/pull/8731>`_
-
-* No-op when V2 `fmt`, `lint`, and `test` have a target with empty sources (#8730)
-  `PR #8730 <https://github.com/pantsbuild/pants/pull/8730>`_
 
 * Refactor V2 Black and isort for better de-duplication (#8732)
   `PR #8732 <https://github.com/pantsbuild/pants/pull/8732>`_
@@ -76,12 +79,6 @@ Refactoring, Improvements, and Tooling
 
 * Add V2 implementation of isort  (#8689)
   `PR #8689 <https://github.com/pantsbuild/pants/pull/8689>`_
-
-* Use default argument for `DirectoryToMaterialize`'s `path_prefix` (#8711)
-  `PR #8711 <https://github.com/pantsbuild/pants/pull/8711>`_
-
-* Bump default MyPy to 0.740 (#8358)
-  `PR #8358 <https://github.com/pantsbuild/pants/pull/8358>`_
 
 * Assign some names to rules (#8695)
   `PR #8695 <https://github.com/pantsbuild/pants/pull/8695>`_
@@ -97,6 +94,12 @@ Refactoring, Improvements, and Tooling
 
 * Remove yielding @rules (#8652)
   `PR #8652 <https://github.com/pantsbuild/pants/pull/8652>`_
+
+Version updates
+~~~~~~~~~~~~~~~
+
+* Bump default MyPy to 0.740 (#8358)
+  `PR #8358 <https://github.com/pantsbuild/pants/pull/8358>`_
 
 * Bump to latest junit-runner to pull in #8674. (#8692)
   `PR #8692 <https://github.com/pantsbuild/pants/pull/8692>`_
