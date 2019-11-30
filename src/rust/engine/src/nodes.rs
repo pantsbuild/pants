@@ -475,7 +475,8 @@ impl Snapshot {
         workunit_store,
       )
     } else {
-      context.expand(path_globs)
+      context
+        .expand(path_globs)
         .map_err(|e| format!("PathGlobs expansion failed: {}", e))
         .and_then(move |path_stats| {
           store::Snapshot::from_path_stats(
@@ -484,14 +485,12 @@ impl Snapshot {
             path_stats,
             WorkUnitStore::new(),
           )
-            .map_err(move |e| format!("Snapshot failed: {}", e))
+          .map_err(move |e| format!("Snapshot failed: {}", e))
         })
         .to_boxed()
     };
 
-    globs_expansion
-      .map_err(|e| throw(&e))
-      .to_boxed()
+    globs_expansion.map_err(|e| throw(&e)).to_boxed()
   }
 
   pub fn lift_path_globs(item: &Value) -> Result<PathGlobs, String> {

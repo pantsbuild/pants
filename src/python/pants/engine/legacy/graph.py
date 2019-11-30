@@ -39,12 +39,14 @@ from pants.engine.addressable import (
 from pants.engine.fs import EMPTY_SNAPSHOT, PathGlobs, Snapshot
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.structs import (
+  ArbitraryField,
   BundleAdaptor,
   BundlesField,
   HydrateableField,
   SourcesField,
   TargetAdaptor,
 )
+from pants.engine.mapper import AddressMapper
 from pants.engine.objects import Collection
 from pants.engine.parser import HydratedStruct
 from pants.engine.rules import RootRule, rule
@@ -600,6 +602,11 @@ def _eager_fileset_with_spec(
 
 
 @rule
+def hydrate_arbitrary_field(arbitrary_field: ArbitraryField) -> HydratedField:
+  return HydratedField(arbitrary_field.arg, arbitrary_field.value)
+
+
+@rule
 async def hydrate_sources(
   sources_field: SourcesField, glob_match_error_behavior: GlobMatchErrorBehavior,
 ) -> HydratedField:
@@ -749,6 +756,7 @@ def create_legacy_graph_tasks():
     hydrated_targets,
     hydrate_target,
     find_owners,
+    hydrate_arbitrary_field,
     hydrate_sources,
     hydrate_bundles,
     sort_targets,

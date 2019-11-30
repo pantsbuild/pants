@@ -4,9 +4,10 @@
 from dataclasses import dataclass
 from typing import FrozenSet, Tuple
 
+from pants.backend.codegen.thrift.java.thrift_defaults import ThriftDefaults
 from pants.engine.fs import Snapshot
 from pants.engine.legacy.graph import HydratedTarget, TransitiveHydratedTargets
-from pants.engine.rules import rule
+from pants.engine.rules import optionable_rule, rule
 from pants.util.memo import memoized_classproperty
 
 
@@ -51,7 +52,10 @@ class ThriftResults:
 
 
 @rule
-def fast_thrift_gen(thriftable_targets: ThriftableTargets) -> ThriftResults:
+def fast_thrift_gen(
+    thriftable_targets: ThriftableTargets,
+    thrift_defaults: ThriftDefaults,
+) -> ThriftResults:
   # TODO: jvm process execution!!!
   return None
 
@@ -59,5 +63,6 @@ def fast_thrift_gen(thriftable_targets: ThriftableTargets) -> ThriftResults:
 def rules():
   return [
     collect_thriftable_targets,
+    optionable_rule(ThriftDefaults),
     fast_thrift_gen,
   ]

@@ -92,6 +92,7 @@ class TargetAdaptor(StructWithDeps):
 
       base_globs = BaseGlobs.from_sources_field(sources, self.address.spec_path)
       path_globs = base_globs.to_path_globs(self.address.spec_path, conjunction_globs.conjunction)
+
       sources_field = SourcesField(
         self.address,
         'sources',
@@ -100,7 +101,19 @@ class TargetAdaptor(StructWithDeps):
         path_globs,
         self.validate_sources,
       )
-      return sources_field,
+
+      property_fields = [
+        ArbitraryField(
+          address=self.address,
+          arg=k,
+          value=getattr(self, k),
+        )
+        for k, v in
+        self.__class__.__dict__.items()
+        if isinstance(v, property) and k != 'field_adaptors'
+      ]
+
+      return tuple([sources_field] + property_fields)
 
   @classproperty
   def default_sources_globs(cls):
@@ -126,7 +139,15 @@ class TargetAdaptor(StructWithDeps):
 
 @union
 class HydrateableField:
-  """A marker for Target(Adaptor) fields for which the engine might perform extra construction."""
+  """A marker for Target(Adaptor) fields for which the engine mightperform extra construction."""
+
+
+@dataclass(frozen=True)
+class ArbitraryField:
+  """???"""
+  address: Any
+  arg: Any
+  value: Any
 
 
 @dataclass(frozen=True)
@@ -459,6 +480,7 @@ class GlobsWithConjunction:
 
 def rules():
   return [
+    UnionRule(HydrateableField, ArbitraryField),
     UnionRule(HydrateableField, SourcesField),
     UnionRule(HydrateableField, BundlesField),
   ]

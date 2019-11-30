@@ -14,5 +14,4 @@ python_library(
     'src/python/pants/java/jar',
     'src/python/pants/util:contextutil',
   ],
-  tags = {"partially_type_checked"},
 )

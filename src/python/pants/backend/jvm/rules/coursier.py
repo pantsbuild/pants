@@ -137,8 +137,8 @@ async def snapshotted_coursier_result(
     res: CoursierResolveResult,
     coursier: CoursierSubsystem,
 ) -> SnapshottedResolveResult:
-  # TODO: remove the hacky SchedulerSession Param and figure out a better way to snapshot things
-  # outside of the buildroot (which also makes use of the coursier cache)!!
+  # TODO: figure out whether the arbitrary_root kwarg is the right way to snapshot things outside of
+  # the buildroot (which also makes use of the coursier cache)!!
   cache_root = coursier.get_options().cache_dir
   snapshot = await Get[Snapshot](PathGlobs(
     include=(

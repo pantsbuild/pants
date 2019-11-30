@@ -54,7 +54,7 @@ class JavaThriftLibrary(JvmTarget):
     self._compiler = check_value_for_arg('compiler', compiler, self._COMPILERS)
     self._language = language
 
-    self.namespace_map = namespace_map
+    self._namespace_map = namespace_map
     self.thrift_linter_strict = thrift_linter_strict
     self._default_java_namespace = default_java_namespace
     self._include_paths = include_paths
@@ -67,6 +67,10 @@ class JavaThriftLibrary(JvmTarget):
   @property
   def language(self):
     return self._language
+
+  @property
+  def namespace_map(self):
+    return self._namespace_map
 
   @property
   def compiler_args(self):
