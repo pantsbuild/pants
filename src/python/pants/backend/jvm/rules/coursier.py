@@ -11,7 +11,7 @@ from pants.backend.jvm.tasks.coursier_resolve import CoursierMixin
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
 from pants.binaries.binary_tool import BinaryToolFetchRequest
 from pants.engine.console import Console
-from pants.engine.fs import Digest, FilesContent, PathGlobs, PathGlobsAndRoot, Snapshot, Workspace
+from pants.engine.fs import Digest, FilesContent, PathGlobs, Snapshot
 from pants.engine.goal import Goal
 from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
 from pants.engine.rules import RootRule, console_rule, optionable_rule, rule
@@ -133,21 +133,19 @@ class SnapshottedResolveResult:
 
 
 @rule
-def snapshotted_coursier_result(
+async def snapshotted_coursier_result(
     res: CoursierResolveResult,
     coursier: CoursierSubsystem,
-    workspace: Workspace,
 ) -> SnapshottedResolveResult:
   # TODO: remove the hacky SchedulerSession Param and figure out a better way to snapshot things
   # outside of the buildroot (which also makes use of the coursier cache)!!
   cache_root = coursier.get_options().cache_dir
-  snapshot, = workspace.capture_snapshots([PathGlobsAndRoot(
-    PathGlobs([
+  snapshot = await Get[Snapshot](PathGlobs(
+    include=(
       fast_relpath(resolved_jar.unsafe_local_file_path, cache_root)
       for resolved_jar in res.resolved_jars
-    ]),
-    root=cache_root,
-  )])
+    ),
+    arbitrary_root=cache_root))
   return SnapshottedResolveResult(snapshot)
 
 
@@ -160,9 +158,6 @@ async def test_coursier_resolve(console: Console) -> TestCoursierResolve:
   coursier_result = await Get[SnapshottedResolveResult](JarResolveRequest(tuple([
     JarDependency(org='org.pantsbuild', name='zinc-compiler_2.12', rev='0.0.17'),
   ])))
-  # coursier_result = await Get[Snapshot](JarResolveRequest(tuple([
-  #   JarDependency(org='org.pantsbuild', name='zinc-compiler', rev='0.0.19'),
-  # ])))
   console.print_stdout(f'coursier_result: {coursier_result}')
   return TestCoursierResolve(exit_code=0)
 

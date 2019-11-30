@@ -24,7 +24,7 @@ use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::{self, BufMut};
 use fs::{
   self, Dir, DirectoryListing, File, FileContent, GlobExpansionConjunction, GlobMatching, Link,
-  PathGlobs, PathStat, StrictGlobMatching, VFS,
+  PathGlob, PathGlobs, PathStat, StrictGlobMatching, VFS,
 };
 use hashing;
 use process_execution::{
@@ -463,18 +463,33 @@ impl Snapshot {
     // Recursively expand PathGlobs into PathStats.
     // We rely on Context::expand tracking dependencies for scandirs,
     // and store::Snapshot::from_path_stats tracking dependencies for file digests.
-    context
-      .expand(path_globs)
-      .map_err(|e| format!("{}", e))
-      .and_then(move |path_stats| {
-        store::Snapshot::from_path_stats(
-          context.core.store(),
-          &context,
-          path_stats,
-          WorkUnitStore::new(),
-        )
-        .map_err(move |e| format!("Snapshot failed: {}", e))
-      })
+    let globs_expansion = if let Some(root) = path_globs.arbitrary_root() {
+      let core = context.core.clone();
+      let workunit_store = context.session.workunit_store();
+      store::Snapshot::capture_snapshot_from_arbitrary_root(
+        core.store(),
+        core.executor.clone(),
+        root,
+        path_globs,
+        None,
+        workunit_store,
+      )
+    } else {
+      context.expand(path_globs)
+        .map_err(|e| format!("PathGlobs expansion failed: {}", e))
+        .and_then(move |path_stats| {
+          store::Snapshot::from_path_stats(
+            context.core.store(),
+            &context,
+            path_stats,
+            WorkUnitStore::new(),
+          )
+            .map_err(move |e| format!("Snapshot failed: {}", e))
+        })
+        .to_boxed()
+    };
+
+    globs_expansion
       .map_err(|e| throw(&e))
       .to_boxed()
   }
@@ -499,7 +514,13 @@ impl Snapshot {
     let conjunction_string = externs::project_str(&conjunction_obj, "value");
     let conjunction = GlobExpansionConjunction::create(&conjunction_string)?;
 
-    PathGlobs::create(&globs, strict_glob_matching, conjunction)
+    /* NB: project_str() will return '' if the object is None! */
+    let arbitrary_root = match externs::project_str(item, "arbitrary_root") {
+      s if s.is_empty() => None,
+      s => Some(s),
+    };
+
+    PathGlobs::create(&globs, strict_glob_matching, conjunction, arbitrary_root)
       .map_err(|e| format!("Failed to parse PathGlobs for globs({:?}): {}", globs, e))
   }
 

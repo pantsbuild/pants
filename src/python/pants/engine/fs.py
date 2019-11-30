@@ -63,6 +63,7 @@ class PathGlobs:
   glob_match_error_behavior: GlobMatchErrorBehavior
   conjunction: GlobExpansionConjunction
   description_of_origin: str
+  arbitrary_root: Optional[str]
 
   def __init__(
     self,
@@ -70,6 +71,7 @@ class PathGlobs:
     glob_match_error_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.ignore,
     conjunction: GlobExpansionConjunction = GlobExpansionConjunction.any_match,
     description_of_origin: Optional[str] = None,
+    arbitrary_root: Optional[str] = None,
   ) -> None:
     """
     :param globs: globs to match, e.g. `foo.txt` or `**/*.txt`. To exclude something, prefix it
@@ -85,6 +87,7 @@ class PathGlobs:
     self.glob_match_error_behavior = glob_match_error_behavior
     self.conjunction = conjunction
     self.description_of_origin = description_of_origin or ""
+    self.arbitrary_root = arbitrary_root
     self.__post_init__()
 
   def __post_init__(self) -> None:
@@ -255,12 +258,6 @@ class UrlToFetch:
 class Workspace:
   """Abstract handle for operations that touch the real local filesystem."""
   _scheduler: "SchedulerSession"
-
-  def capture_snapshots(
-      self, path_globs_and_roots: Tuple[PathGlobsAndRoot, ...],
-  ) -> Tuple[Snapshot, ...]:
-    """???"""
-    return self._scheduler.capture_snapshots(path_globs_and_roots)
 
   def materialize_directory(
     self, directory_to_materialize: DirectoryToMaterialize

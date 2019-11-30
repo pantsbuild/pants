@@ -248,7 +248,7 @@ impl PathGlob {
     entries.into_iter().flat_map(|entry| entry.globs).collect()
   }
 
-  fn spread_filespecs(filespecs: &[String]) -> Result<Vec<PathGlobIncludeEntry>, String> {
+  pub fn spread_filespecs(filespecs: &[String]) -> Result<Vec<PathGlobIncludeEntry>, String> {
     let mut spec_globs_map = Vec::new();
     for filespec in filespecs {
       let canonical_dir = Dir(PathBuf::new());
@@ -482,6 +482,7 @@ impl PathGlobs {
     globs: &[String],
     strict_match_behavior: StrictGlobMatching,
     conjunction: GlobExpansionConjunction,
+    arbitrary_root: Option<String>,
   ) -> Result<PathGlobs, String> {
     // NB: We use a loop, rather than `.filter()`, to avoid traversing the globs twice.
     let mut include_globs: Vec<String> = vec![];
@@ -498,12 +499,14 @@ impl PathGlobs {
     let exclude = GitignoreStyleExcludes::create(exclude_globs.as_slice())?;
     let patterns = PathGlobs::parse_patterns_from_include(&include)?;
 
+    let arbitrary_root = arbitrary_root.map(|r| PathBuf::from(r));
     Ok(PathGlobs {
       include,
       exclude,
       strict_match_behavior,
       conjunction,
       patterns,
+      arbitrary_root,
     })
   }
 
@@ -524,7 +527,8 @@ impl PathGlobs {
       strict_match_behavior: StrictGlobMatching::Ignore,
       conjunction: GlobExpansionConjunction::AllMatch,
       patterns,
-    })
+      arbitrary_root: None,
+    )
   }
 
   ///
