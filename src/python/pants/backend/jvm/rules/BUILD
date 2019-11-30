@@ -4,6 +4,7 @@ python_library(
     'src/python/pants/backend/jvm/subsystems:jar_dependency_management',
     'src/python/pants/backend/jvm/tasks:coursier_resolve',
     'src/python/pants/backend/jvm/tasks/coursier',
+    'src/python/pants/backend/jvm/tasks/jvm_compile',
     'src/python/pants/binaries',
     'src/python/pants/engine:console',
     'src/python/pants/engine:fs',

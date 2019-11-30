@@ -256,6 +256,12 @@ class Workspace:
   """Abstract handle for operations that touch the real local filesystem."""
   _scheduler: "SchedulerSession"
 
+  def capture_snapshots(
+      self, path_globs_and_roots: Tuple[PathGlobsAndRoot, ...],
+  ) -> Tuple[Snapshot, ...]:
+    """???"""
+    return self._scheduler.capture_snapshots(path_globs_and_roots)
+
   def materialize_directory(
     self, directory_to_materialize: DirectoryToMaterialize
   ) -> MaterializeDirectoryResult:
