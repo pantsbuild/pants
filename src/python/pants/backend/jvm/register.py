@@ -11,6 +11,7 @@ from pants.backend.jvm.ossrh_publication_metadata import (
 from pants.backend.jvm.repository import Repository as repo
 from pants.backend.jvm.rules.coursier import rules as coursier_rules
 from pants.backend.jvm.rules.export_classpath import rules as export_classpath_rules
+from pants.backend.jvm.rules.hermetic_dist import rules as hermetic_dist_rules
 from pants.backend.jvm.rules.zinc_compile import rules as zinc_compile_rules
 from pants.backend.jvm.scala_artifact import ScalaArtifact
 from pants.backend.jvm.subsystems.jar_dependency_management import JarDependencyManagementSetup
@@ -234,4 +235,4 @@ def register_goals():
 
 
 def rules():
-  return export_classpath_rules() + zinc_compile_rules() + coursier_rules()
+  return export_classpath_rules() + zinc_compile_rules() + coursier_rules() + hermetic_dist_rules()

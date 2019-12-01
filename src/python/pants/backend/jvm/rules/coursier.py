@@ -5,10 +5,10 @@ import json
 from dataclasses import dataclass
 from typing import Tuple
 
+from pants.backend.jvm.rules.hermetic_dist import HermeticDist
 from pants.backend.jvm.subsystems.jar_dependency_management import JarDependencyManagement
 from pants.backend.jvm.tasks.coursier.coursier_subsystem import CoursierSubsystem
 from pants.backend.jvm.tasks.coursier_resolve import CoursierMixin
-from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
 from pants.binaries.binary_tool import BinaryToolFetchRequest
 from pants.engine.console import Console
 from pants.engine.fs import Digest, FilesContent, PathGlobs, Snapshot
@@ -54,6 +54,7 @@ def generate_coursier_execution_request(
     coursier: CoursierSubsystem,
     resolved_coursier: ResolvedCoursier,
     manager: JarDependencyManagement,
+    hermetic_dist: HermeticDist,
     jar_req: JarResolveRequest,
 ) -> CoursierResolveRequest:
   jars_to_resolve, pinned_coords = CoursierMixin._compute_jars_to_resolve_and_pin(
@@ -73,9 +74,6 @@ def generate_coursier_execution_request(
       pinned_coords=pinned_coords,
       coursier_workdir=workdir,
       json_output_path=CoursierResolveRequest._json_output_path)
-
-  local_dist = JvmCompile._local_jvm_distribution()
-  hermetic_dist = JvmCompile._HermeticDistribution('.jdk', local_dist)
 
   exe_req = ExecuteProcessRequest(
     argv=tuple([
