@@ -3,6 +3,7 @@ python_library(
     '3rdparty/python:dataclasses',
     'src/python/pants/backend/codegen/thrift/java',
     'src/python/pants/backend/jvm/rules',
+    'src/python/pants/backend/jvm/subsystems:jvm_tool_mixin',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:rules',
     'src/python/pants/engine/legacy:graph',

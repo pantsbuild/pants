@@ -82,13 +82,27 @@ class TargetAdaptor(StructWithDeps):
   def field_adaptors(self) -> Tuple:
     """Returns a tuple of Fields for captured fields which need additional treatment."""
     with exception_logging(logger, 'Exception in `field_adaptors` property'):
+
+      property_fields = [
+        ArbitraryField(
+          address=self.address,
+          arg=k,
+          value=getattr(self, k),
+        )
+        for k, v in
+        self.__class__.__dict__.items()
+        if isinstance(v, property) and k != 'field_adaptors'
+      ]
+
+      all_adaptors = tuple(property_fields)
+
       conjunction_globs = self.get_sources()
       if conjunction_globs is None:
-        return tuple()
+        return all_adaptors
 
       sources = conjunction_globs.non_path_globs
       if not sources:
-        return tuple()
+        return all_adaptors
 
       base_globs = BaseGlobs.from_sources_field(sources, self.address.spec_path)
       path_globs = base_globs.to_path_globs(self.address.spec_path, conjunction_globs.conjunction)
@@ -102,18 +116,9 @@ class TargetAdaptor(StructWithDeps):
         self.validate_sources,
       )
 
-      property_fields = [
-        ArbitraryField(
-          address=self.address,
-          arg=k,
-          value=getattr(self, k),
-        )
-        for k, v in
-        self.__class__.__dict__.items()
-        if isinstance(v, property) and k != 'field_adaptors'
-      ]
+      all_adaptors = (sources_field,) + all_adaptors
 
-      return tuple([sources_field] + property_fields)
+      return all_adaptors
 
   @classproperty
   def default_sources_globs(cls):

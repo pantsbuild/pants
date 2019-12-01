@@ -231,6 +231,8 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                       'pants.backend.python',
                       'pants.backend.jvm',
                       'pants.backend.native',
+                      # TODO: is this supposed to be loaded???
+                      # 'pants.backend.codegen',
                       'pants.backend.codegen.antlr.java',
                       'pants.backend.codegen.antlr.python',
                       'pants.backend.codegen.jaxb',

@@ -94,3 +94,11 @@ jar_library(
     jar(org='org.apache.avro', name='avro-ipc', rev=avro_rev),
   ],
 )
+
+BOOTSTRAP_SCROOGE_VERSION='19.11.0'
+jar_library(
+  name = 'v2-thrift-gen',
+  jars = [
+    scala_jar(org='com.twitter', name='scrooge-generator', rev=BOOTSTRAP_SCROOGE_VERSION),
+  ],
+)

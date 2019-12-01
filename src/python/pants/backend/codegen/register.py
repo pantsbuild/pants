@@ -14,7 +14,6 @@ from pants.backend.codegen.protobuf.java.java_protobuf_library import JavaProtob
 from pants.backend.codegen.protobuf.java.protobuf_gen import ProtobufGen
 from pants.backend.codegen.ragel.java.java_ragel_library import JavaRagelLibrary
 from pants.backend.codegen.ragel.java.ragel_gen import RagelGen
-from pants.backend.codegen.rules.thrift_gen import rules as thrift_rules
 from pants.backend.codegen.thrift.java.apache_thrift_java_gen import ApacheThriftJavaGen
 from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
 from pants.backend.codegen.thrift.python.apache_thrift_py_gen import ApacheThriftPyGen
@@ -52,7 +51,3 @@ def register_goals():
   task(name='ragel', action=RagelGen).install('gen')
   task(name='jaxb', action=JaxbGen).install('gen')
   task(name='wire', action=WireGen).install('gen')
-
-
-def rules():
-  return thrift_rules()

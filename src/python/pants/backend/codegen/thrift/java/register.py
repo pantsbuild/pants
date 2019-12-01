@@ -3,6 +3,7 @@
 
 from pants.backend.codegen.thrift.java.apache_thrift_java_gen import ApacheThriftJavaGen
 from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
+from pants.backend.codegen.thrift.java.rules.thrift_gen import rules as thrift_rules
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task
 
@@ -17,3 +18,7 @@ def build_file_aliases():
 
 def register_goals():
   task(name='thrift-java', action=ApacheThriftJavaGen).install('gen')
+
+
+def rules():
+  return thrift_rules()
