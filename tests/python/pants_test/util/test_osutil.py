@@ -29,7 +29,7 @@ class OsutilTest(TestBase):
       with self.captured_logging(logging.WARNING) as captured:
         normalize_os_name(name)
         self.assertEqual(0, len(captured.warnings()),
-                         f'Recieved unexpected warnings: {captured.warnings()}')
+                         f'Received unexpected warnings: {captured.warnings()}')
 
   def test_warnings_on_unknown_names(self) -> None:
     name = 'I really hope no one ever names an operating system with this string.'
