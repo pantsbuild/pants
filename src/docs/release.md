@@ -122,14 +122,14 @@ from master the release manager may also need to do a release from a stable bran
 See [Release Strategy](http://www.pantsbuild.org/release_strategy.html) for more details about
 whether a release is needed from a stable branch.
 
-1. Cherry pick [changes labelled needs-cherrypick][needs-cherrypick]
+1. Cherry-pick [changes labelled needs-cherrypick][needs-cherrypick]
     for the relevant milestone directly to the stable branch.  Note that these pull requests must have been merged into
     master, and therefore will already be closed.
 2. In master, update the branch-specific file in `src/python/pants/notes` to reflect all patches that were
     cherry-picked (can use `build-support/bin/release-changelog-helper.sh` to get a head start).
     For example, if you were releasing 1.2.0rc1 you would edit `src/python/pants/notes/1.2.x.rst`.
 3. Create and land a review for the notes changes in master.
-4. Cherry pick the merged notes changes from master to the release branch.
+4. Cherry-pick the merged notes changes from master to the release branch.
 5. In your release branch: edit and commit the version number in `src/python/pants/VERSION`.
 6. Manually publish the release notes pages by checking out master and running `build-support/bin/publish_docs.sh -p`.
 7. Execute the release as described later on this page.
