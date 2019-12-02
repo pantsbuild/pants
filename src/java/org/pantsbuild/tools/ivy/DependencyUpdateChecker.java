@@ -143,7 +143,7 @@ public class DependencyUpdateChecker {
           if (!originalDependency.getResolvedId().getRevision()
               .equals(latest.getResolvedId().getRevision())) {
             // is this dependency a transitive dependency or a direct dependency
-            // (unfortunately the .isTranstive() method doesn't have the same meaning)
+            // (unfortunately the .isTransitive() method doesn't have the same meaning)
             boolean isTransitiveDependency =
                 latest.getDependencyDescriptor(latest.getRoot()) == null;
             if ((!isTransitiveDependency) || (isTransitiveDependency && showTransitive)) {
