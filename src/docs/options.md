@@ -231,7 +231,7 @@ Sometimes it's convenient to keep `.ini` settings in more than one file. Perhaps
 operate Pants in one "mode", but occasionally need to use a tweaked set of settings.
 
 Use the `--pants-config-files` command-line option to specify a second `.ini` file. Each of
-this `.ini` file's values override the corresponding value in `pants.ini`, if any.
+this `.ini` file's values overrides the corresponding value in `pants.ini`, if any.
 For example, if your `pants.ini` contains the section
 
     [test.junit]
