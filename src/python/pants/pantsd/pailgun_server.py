@@ -117,7 +117,7 @@ class PailgunHandleRequestLock:
     """
     Try to acquire the lock, blocking until the timeout is reached. Will return immediately if the lock is acquired.
 
-    :return True if the lock was aquired, False if the timeout was reached.
+    :return True if the lock was acquired, False if the timeout was reached.
     """
     self.cond.acquire()
     if self.available:
@@ -265,7 +265,7 @@ class PailgunServer(ThreadingMixIn, TCPServer):
 
     time_polled = 0.0
     user_notification_interval = 5.0 # Stop polling to notify the user every second.
-    self.logger.debug("request {} is trying to aquire the request lock.".format(request))
+    self.logger.debug("request {} is trying to acquire the request lock.".format(request))
 
     # NB: Optimistically try to acquire the lock without blocking, in case we are the only request being handled.
     # This could be merged into the `while` loop below, but separating this special case for logging helps.
@@ -273,7 +273,7 @@ class PailgunServer(ThreadingMixIn, TCPServer):
       with yield_and_release(time_polled):
         yield
     else:
-      self.logger.debug("request {} didn't aquire the lock on the first try, polling...".format(request))
+      self.logger.debug("request {} didn't acquire the lock on the first try, polling...".format(request))
       # We have to wait for another request to finish being handled.
       self._send_stderr(request, "Another pants invocation is running. "
                                  "Will wait {} for it to finish before giving up.\n".format(
