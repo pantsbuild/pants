@@ -102,7 +102,7 @@ The remote server should be a RESTful server that can handle `GET`, `HEAD`, `PUT
 on large binary blobs. E.g., you can implement this using [Varnish](https://www.varnish-cache.org/)
 in front of [nginx](https://www.nginx.com/resources/wiki/) (with `dav_methods PUT DELETE;` enabled).
 
-When reading from a cache server, Pants tries to `GET` an URL at some path under the server URL;
+When reading from a cache server, Pants tries to `GET` a URL at some path under the server URL;
 your server should respond with 404 if there's nothing there, 200 if there is.
 
 When writing to a cache server, Pants first tries a `HEAD` request to see if the file's already
