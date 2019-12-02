@@ -434,7 +434,7 @@ class TaskTest(TaskTestBase):
     self.assertEqual(vtB.current_results_dir, vtC.previous_results_dir)
 
     # Verify the content. The task was invalid twice - the initial run and the run with the changed
-    # source file. Only vtC (previous sucessful runs + cache miss) resulted in copying the
+    # source file. Only vtC (previous successful runs + cache miss) resulted in copying the
     # previous_results.
     self.assertContent(vtC, first_contents + second_contents)
 
