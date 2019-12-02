@@ -11,7 +11,7 @@ bundle code, etc.
 
 In typical cases, Pants can deduce the source roots automatically based on naming conventions.
 E.g., `src/<lang>`, `src/main/<lang>`, `test/<lang>`, `src/test/<lang>`, `3rdparty/<lang>` and so on.
-However if your source roots don't conform to any of the default patterns, you can add your own
+However, if your source roots don't conform to any of the default patterns, you can add your own
 patterns.  See ` ./pants help-advanced source` for details.
 
 `.gitignore`
@@ -45,7 +45,7 @@ Options
 Pants is very configurable and has literally hundreds of tunable parameters, known in Pants
 parlance as _options_.
 
-Most options are  automatically set to useful defaults. However it is inevitable that sooner or
+Most options are  automatically set to useful defaults. However, it is inevitable that sooner or
 later you'll need to tweak some of them.
 
 + [[More details on pants options|pants('src/docs:options')]]
