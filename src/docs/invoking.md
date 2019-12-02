@@ -129,7 +129,7 @@ cases where relatively small portions of the repo have changed since the previou
 As of `1.4.0`, there is one remaining set of caveats to using the daemon:
 
 * Although `./pants repl` works, it is missing some advanced TTY integrations which prevent line
-  editing and some control sequences from being propagated. Ammonite in particular has a known issue
+  editing and some control sequences from being propagated. Ammonite, in particular, has a known issue
   -- see [#5223](https://github.com/pantsbuild/pants/issues/5223).
 
 ### Usage
