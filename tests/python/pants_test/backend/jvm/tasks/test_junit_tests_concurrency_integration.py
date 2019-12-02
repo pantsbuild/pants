@@ -98,7 +98,7 @@ class JunitTestsConcurrencyIntegrationTest(PantsRunIntegrationTest):
 
   @ensure_experimental
   def test_parallel_both(self):
-    """Checks the concurency='parallel_both' setting."""
+    """Checks the concurrency='parallel_both' setting."""
     with self.temporary_workdir() as workdir:
       pants_run = self.run_pants_with_workdir([
         'test',
@@ -157,7 +157,7 @@ class ExperimentalOnlyJunitTestsConcurrencyIntegrationTest(PantsRunIntegrationTe
       self.assertIn("OK (2 tests)", pants_run.stdout_data)
 
   def test_parallel_methods(self):
-    """Checks the concurency='parallel_methods' setting."""
+    """Checks the concurrency='parallel_methods' setting."""
     with self.temporary_workdir() as workdir:
       pants_run = self.run_pants_with_workdir([
         'test',
