@@ -86,7 +86,7 @@ Note the dot before the `dev0`.  See https://www.python.org/dev/peps/pep-0440/#p
 
 * Leading up to the release of `2.0.0` the release manager would create a `stable` branch with
 the literal name "`2.0.x`". They would cut release candidates named `2.0.0rc0` (and so on), and
-afterwards, they'd finalize the `2.0.0` release in that `2.0.x` branch by tagging the
+afterward, they'd finalize the `2.0.0` release in that `2.0.x` branch by tagging the
 commit with the release version: `v2.0.0`.
 Note the lack of a dot before the `rc0`. See https://www.python.org/dev/peps/pep-0440/#public-version-identifiers.
 
