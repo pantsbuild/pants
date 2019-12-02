@@ -165,7 +165,7 @@ export HTTP_PROXY=http://proxy.corp.example.com:123
 export HTTPS_PROXY=https://proxy.corp.example.com:456
 ```
 
-If Pants tries to find resources with HTTPS urls, you may see an error like:
+If Pants tries to find resources with HTTPS URLs, you may see an error like:
 
 ```
 Exception message: Problem fetching the ivy bootstrap jar! Problem GETing data from https://artifactserver.example.com/content/groups/public/org/apache/ivy/ivy/2.3.0/ivy-2.3.0.jar: [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed (_ssl.c:581)
