@@ -174,7 +174,7 @@ Exception message: Problem fetching the ivy bootstrap jar! Problem GETing data f
 The requests library attempts to verify SSL certificates by default.
 The reason it is denying the request is that it cannot find a trusted
 public key for the root certificate authority presented by the server.
-The requests library uses the 'certifi' library of well known
+The requests library uses the 'certifi' library of well-known
 certificate authorities, if that library is installed.  If you are
 using a virtualenv installation of pants, using `pip
 install certifi` to add the certify package to your pants environment
