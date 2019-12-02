@@ -71,7 +71,7 @@ script fail:
 
   - Note that the release script expects your pantsbuild/pants git remote to be named `origin`.
     If you have another name for it, you should `git remote rename othername origin` before running
-    the release script, and rename it back afterwards.
+    the release script, and rename it back afterward.
 
 1. Prepare Release
 ------------------
