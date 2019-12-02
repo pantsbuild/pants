@@ -236,7 +236,7 @@ class CoursierMixin(JvmResolverBase):
             {
               "coord": "orgA:nameA:versionA",
               "file": <path>,
-              "dependencies": [ // coodinates for its transitive dependencies
+              "dependencies": [ // coordinates for its transitive dependencies
                 <orgX:nameX:versionX>,
                 <orgY:nameY:versionY>,
               ]
@@ -244,7 +244,7 @@ class CoursierMixin(JvmResolverBase):
             {
               "coord": "orgB:nameB:jar:classifier:versionB",
               "file": <path>,
-              "dependencies": [ // coodinates for its transitive dependencies
+              "dependencies": [ // coordinates for its transitive dependencies
                 <orgX:nameX:versionX>,
                 <orgZ:nameZ:versionZ>,
               ]
