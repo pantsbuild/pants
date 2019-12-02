@@ -42,7 +42,7 @@ into finer-grained ones.
 Options
 -------
 
-Pants is very configurable and has literally hundreds of tuneable parameters, known in Pants
+Pants is very configurable and has literally hundreds of tunable parameters, known in Pants
 parlance as _options_.
 
 Most options are  automatically set to useful defaults. However it is inevitable that sooner or
