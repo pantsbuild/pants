@@ -130,7 +130,7 @@ Every Pants option can be set in one three ways, in descending order of precende
 Config files are typically used to set codebase-wide defaults for all users.  Individual
 users can then override various values using environment variables or command-line flags.
 
-Options that aren't set by one of these three methods will fall back to a sensible default, so
+Options that aren't set by one of these three methods will fall back to a sensible default so
 that Pants will work "out of the box" in common scenarios.
 
 ### Command Line Flags
