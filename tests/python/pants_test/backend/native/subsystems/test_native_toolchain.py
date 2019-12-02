@@ -100,11 +100,11 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
     llvm_cpp_toolchain = self.execute_expecting_one_result(
       scheduler, LLVMCppToolchain, self.toolchain).value
     clangpp = llvm_cpp_toolchain.cpp_toolchain.cpp_compiler
-    clanggpp_version_out = self._invoke_capturing_output(
+    clangpp_version_out = self._invoke_capturing_output(
       [clangpp.exe_filename, '--version'],
       env=clangpp.invocation_environment_dict)
 
-    self.assertIsNotNone(clangpp_version_regex.search(clanggpp_version_out))
+    self.assertIsNotNone(clangpp_version_regex.search(clangpp_version_out))
 
   @contextmanager
   def _hello_world_source_environment(self, toolchain_type, file_name, contents):
