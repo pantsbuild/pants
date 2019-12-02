@@ -34,7 +34,7 @@ Some options, such as `-l` to control the logging verbosity level, are
 expected to be set directly by users, as needed. But most options are
 expected to be configured once by a codebase administrator and not
 directly modified by users. These latter options are called _advanced_
-options, and are not enumerated in help messages by default.  Advanced
+options and are not enumerated in help messages by default.  Advanced
 options may change the way projects are built and packaged, impact the
 build cache or change test behavior.  For that reason, they should
 usually be set in config files and checked in to the repo so that
