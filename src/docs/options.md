@@ -152,7 +152,7 @@ Note that this shorthand requires you to mention a specific task, not just a goa
 instead of just `./pants compile` as you would usually enter. All tasks in the `compile` goal will
 still be executed, not just `compile.rsc`, but the `.zinc` addition is a convenience to support shorthand options.
 
-Of course this works when specifying multiple goals, e.g.,
+Of course, this works when specifying multiple goals, e.g.,
 
 `./pants compile.rsc --no-incremental --name-hashing test.junit --parallel-threads=4`
 
