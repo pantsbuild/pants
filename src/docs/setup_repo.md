@@ -212,7 +212,7 @@ See the section on Configuring the Python requests library above.
 
 If your site uses Sonatype Nexus or another reverse proxy for
 artifacts, you do not need to use a separate HTTP proxy.  Contact the
-reverse proxy administrator to setup a proxy for the sites listed in
+reverse proxy administrator to set up a proxy for the sites listed in
 `build-support/ivy/settings.xml` and `pants.ini`.  By default these
 are `https://repo1.maven.org/maven2/` and `https://dl.bintray.com/pantsbuild/maven/`:
 
