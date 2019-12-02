@@ -40,7 +40,7 @@ Consider the following command:
   isn't specified on the command line it implicitly runs because
   `compile.rsc` task depends on it.
 
-You can pass options to pants using the a config file, the
+You can pass options to pants using a config file, the
 environment, or command line flags. See the
 [[Options|pants('src/docs:options')]] page for more details.
 
