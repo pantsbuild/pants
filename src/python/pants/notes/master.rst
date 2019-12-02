@@ -4,8 +4,19 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.24.0.dev1 (12/02/2019)
+------------------------
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Add missing source file (#8737)
+  `PR #8737 <https://github.com/pantsbuild/pants/pull/8737>`_
+
 1.24.0.dev0 (11/29/2019)
 ------------------------
+
+Note: This was not published due to infrastructure issues. dev1 is effectively identical.
 
 API Changes
 ~~~~~~~~~~~
