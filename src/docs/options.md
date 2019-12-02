@@ -222,7 +222,7 @@ command line:
   - Dash characters (`-`) are transposed to underscores (`_`).
   - Boolean flag values are enabled and disabled by setting the value
     of the option to `True` or `False`
-  - The prefix for long form options is not specified. Instead, you must organize the options
+  - The prefix for long-form options is not specified. Instead, you must organize the options
     into their appropriate sections.
 
 ### Overlaying Config Files
