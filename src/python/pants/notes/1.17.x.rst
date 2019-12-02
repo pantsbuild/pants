@@ -58,7 +58,7 @@ Bugfixes
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-* Re-instate PosixFS Threadpool (#7848)
+* Reinstate PosixFS Threadpool (#7848)
   `PR #7848 <https://github.com/pantsbuild/pants/pull/7848>`_
 
 * Avoid redundant work while hackily_snapshot()ing. (#7829)
