@@ -37,12 +37,12 @@ public class AnnotatedParallelClassesAndMethodsTest1 {
   }
 
   @Test
-  public void apmcatest11() throws Exception {
+  public void apcamtest11() throws Exception {
     awaitLatch("apcamtest11");
   }
 
   @Test
-  public void apmcatest12() throws Exception {
+  public void apcamtest12() throws Exception {
     awaitLatch("apcamtest12");
   }
     static void awaitLatch(String methodName) throws Exception {
