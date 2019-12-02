@@ -11,7 +11,7 @@ import org.junit.Test;
  * This test is intentionally under a java_library() BUILD target so it will not be run
  * on its own. It is run by the ConsoleRunnerTest suite to test ConsoleRunnerImpl.
  */
-public class XmlReportFirstTestIngoredTest {
+public class XmlReportFirstTestIgnoredTest {
   @Ignore
   @Test
   public void testXmlIgnored() {
