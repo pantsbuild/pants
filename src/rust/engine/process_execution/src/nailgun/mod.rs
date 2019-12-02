@@ -10,7 +10,6 @@ use futures::stream::Stream;
 use log::{debug, trace};
 use nails::execution::{child_channel, ChildInput, ChildOutput, Command};
 use tokio::net::TcpStream;
-use tempfile;
 
 use crate::local::CapturedWorkdir;
 use crate::nailgun::nailgun_pool::NailgunProcessName;
@@ -87,9 +86,10 @@ fn construct_nailgun_client_request(
     is_nailgunnable,
   } = original_req;
   client_args.insert(0, client_main_class);
-  // arg file is only materialized to the client workdir but java is running in the
-  // nailgun dir so we have to adjust the path to point to the correct spot, which is in the
-  // client workdir.
+  // arg file is only materialized to the client workdir, but because we use nailMain java is running in the
+  // differnt  dir so we have to adjust the path to point to the correct spot, which is in the
+  // client workdir. This happens because the arg file is parsed before the absolute paths
+  // are computed by nailgun in nailMain
   let maybe_arg_file = client_args.last().unwrap();
   if maybe_arg_file.starts_with('@') {
     if let Ok(arg_file_path) = maybe_arg_file[1..].parse::<PathBuf>() {
@@ -137,7 +137,6 @@ pub struct CommandRunner {
   metadata: ExecuteProcessRequestMetadata,
   workdir_base: PathBuf,
   executor: task_executor::Executor,
-  client_workdir: PathBuf,
 }
 
 impl CommandRunner {
@@ -153,11 +152,6 @@ impl CommandRunner {
       metadata: metadata,
       workdir_base: workdir_base.clone(),
       executor: executor,
-      client_workdir: tempfile::Builder::new()
-        .prefix("process-execution")
-        .tempdir_in(workdir_base)
-        .expect("Error making client tempdir for process execution")
-        .into_path()
     }
   }
 
@@ -204,9 +198,8 @@ impl super::CommandRunner for CommandRunner {
       context,
       store,
       executor,
-      false,
+      true,
       &self.workdir_base,
-      None,
     )
   }
 

@@ -96,8 +96,13 @@ fn creating_nailgun_server_request_updates_the_cli() {
 #[test]
 fn creating_nailgun_client_request_removes_jdk_home() {
   let original_req = mock_nailgunnable_request(Some(PathBuf::from("some/path")));
-  let req = super::construct_nailgun_client_request(original_req, "".to_string(), vec![]);
-  assert_eq!(req.jdk_home, None);
+  let req = super::construct_nailgun_client_request(
+    original_req,
+    "".to_string(),
+    vec![],
+    PathBuf::from("some/other/path"),
+  );
+  assert_eq!(req.unwrap().jdk_home, None);
 }
 
 #[test]
