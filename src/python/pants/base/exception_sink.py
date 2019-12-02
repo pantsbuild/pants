@@ -522,7 +522,7 @@ Signal {signum} ({signame}) was raised. Exiting with failure.{formatted_tracebac
       signame=signame,
       formatted_traceback=formatted_traceback)
     # TODO: determine the appropriate signal-safe behavior here (to avoid writing to our file
-    # descriptors re-entrantly, which raises an IOError).
+    # descriptors reentrantly, which raises an IOError).
     # This method catches any exceptions raised within it.
     cls.log_exception(signal_error_log_entry)
 
