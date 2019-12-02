@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import hashlib
-from typing import Tuple, Type
 
 from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
@@ -31,7 +30,7 @@ class DependencyContext(Subsystem, DependencyContextBase):
 
   options_scope = 'jvm-dependency-context'
 
-  types_with_closure: Tuple[Type, ...] = (AnnotationProcessor, JavacPlugin, ScalacPlugin)
+  types_with_closure = (AnnotationProcessor, JavacPlugin, ScalacPlugin)
   target_closure_kwargs = dict(include_scopes=Scopes.JVM_COMPILE_SCOPES, respect_intransitive=True)
 
   @classmethod

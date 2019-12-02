@@ -2,12 +2,19 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from collections import namedtuple
+from dataclasses import dataclass
 from textwrap import dedent
 from typing import List
 
 from pants.base.exceptions import TaskError
+from pants.build_graph.address import Address
 from pants.java.distribution.distribution import DistributionLocator
 from pants.option.custom_types import target_option
+
+
+@dataclass(frozen=True)
+class JvmToolRequest:
+  address: Address
 
 
 class JvmToolMixin:
@@ -223,3 +230,9 @@ class JvmToolMixin:
     if not callback:
       raise TaskError(f'No bootstrap callback registered for {key} in {scope}')
     return callback()
+
+  def create_tool_request(self, key: str) -> JvmToolRequest:
+    # NB: This assumes that the JvmToolMixin is used on an Optionable to get self.get_options()!
+    pointed_to_target = getattr(self.get_options(), key.replace('-', '_')) # type: ignore[attr-defined]
+    parsed_address = Address.parse(pointed_to_target)
+    return JvmToolRequest(parsed_address)

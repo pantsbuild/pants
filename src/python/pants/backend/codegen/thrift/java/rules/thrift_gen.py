@@ -6,21 +6,19 @@ from dataclasses import dataclass
 from typing import FrozenSet, Tuple
 
 from pants.backend.codegen.thrift.java.thrift_defaults import ThriftDefaults
-from pants.backend.jvm.rules.coursier import JarResolveRequest, SnapshottedResolveResult
 from pants.backend.jvm.rules.hermetic_dist import HermeticDist
-from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
-from pants.build_graph.address import Address
+from pants.backend.jvm.rules.jvm_tool import JvmToolClasspathResult
+from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin, JvmToolRequest
 from pants.engine.console import Console
 from pants.engine.fs import Digest, DirectoriesToMerge, Snapshot
 from pants.engine.goal import Goal
 from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.engine.legacy.graph import HydratedTarget, TransitiveHydratedTargets
 from pants.engine.objects import Collection
-from pants.engine.rules import RootRule, UnionRule, console_rule, optionable_rule, rule, union
+from pants.engine.rules import RootRule, console_rule, optionable_rule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.rules.core.strip_source_root import SourceRootStrippedSources
 from pants.subsystem.subsystem import Subsystem
-from pants.util.collections import Enum
 from pants.util.memo import memoized_classproperty
 
 
@@ -33,79 +31,18 @@ class ThriftGenTool(Subsystem, JvmToolMixin):
     cls.register_jvm_tool(register, 'v2-thrift-gen')
 
 
-# TODO: make a way to depend on the //:v2-thrift-gen target, even if that target is a jvm_binary()
-# (as well as a jar_library())!!!!
-@dataclass(frozen=True)
-class ThriftGenToolRequest:
-  address: Address
-
-
-# TODO: request a ThriftGenTool from some downstream rule and construct this!! Otherwise the
-# `test_thrift_gen_tool_classpath` rule fails with:
-# Exception message: Rules with errors: 1
-#   (TestThriftGenClasspath, [Console], [Get(ThriftGenToolClasspath, ThriftGenToolRequest)], test_thrift_gen_tool_classpath()):
-#     Was not usable by any other @rule.
-# @rule
-# def create_thrift_gen_tool_request(thrift_gen_tool: ThriftGenTool) -> ThriftGenToolRequest:
-#   v2_thrift_gen_pointed_to_target = thrift_gen_tool.get_options().v2_thrift_gen
-#   thrift_gen_source_address = Address.parse(v2_thrift_gen_pointed_to_target)
-#   return thrift_gen_source_address
-@dataclass(frozen=True)
-class ThriftGenToolClasspath:
-  snapshot: Snapshot
-
-
-# TODO: put this somewhere more generic!
-class JvmToolBootstrapError(Exception): pass
-
-
-# TODO: put this somewhere more generic!
-class JvmToolBootstrapTargetTypes(Enum):
-  jar_library = 'jar_library'
-
-
-# TODO: put this somewhere more generic!
-@union
-class ClasspathRequest: pass
-
-
-@dataclass(frozen=True)
-class JarLibraryClasspathRequest:
-  jar_req: JarResolveRequest
-
-
-@rule
-async def snapshot_jar_library_classpath(req: JarLibraryClasspathRequest) -> ThriftGenToolClasspath:
-  result = await Get[SnapshottedResolveResult](JarResolveRequest, req.jar_req)
-  return ThriftGenToolClasspath(result.merged_snapshot)
-
-
-@rule
-async def obtain_thrift_gen_tool_classpath(thrift_gen_tool_request: ThriftGenToolRequest) -> ThriftGenToolClasspath:
-  hydrated_target_for_thrift_gen = await Get[HydratedTarget](Address, thrift_gen_tool_request.address)
-  target_adaptor = hydrated_target_for_thrift_gen.adaptor
-
-  try:
-    thrift_gen_classpath_req = JvmToolBootstrapTargetTypes(target_adaptor.type_alias).match({
-      JvmToolBootstrapTargetTypes.jar_library: lambda: JarLibraryClasspathRequest(
-        JarResolveRequest(tuple(target_adaptor.jars)))
-    })()
-  except ValueError as e:
-    raise JvmToolBootstrapError(f'unrecognized target type: {e} for'
-                                f'thrift gen tool request: {thrift_gen_tool_request}! '
-                                f'recognized target types are: {list(JvmToolBootstrapTargetTypes)}!')
-
-  return await Get[ThriftGenToolClasspath](ClasspathRequest, thrift_gen_classpath_req)
-
-
 class TestThriftGenClasspath(Goal):
   name = 'test-thrift-gen-classpath'
 
 
 @console_rule
-async def test_thrift_gen_tool_classpath(console: Console) -> TestThriftGenClasspath:
-  target_result = await Get[ThriftGenToolClasspath](ThriftGenToolRequest(Address.parse('//:v2-thrift-gen')))
-  console.print_stdout(f'target_result: {target_result}')
+async def test_thrift_gen_tool_classpath(
+    console: Console,
+    thrift_gen_tool: ThriftGenTool,
+) -> TestThriftGenClasspath:
+  classpath_result = await Get[JvmToolClasspathResult](JvmToolRequest,
+                                                       thrift_gen_tool.create_tool_request('v2-thrift-gen'))
+  console.print_stdout(f'classpath_result: {classpath_result}')
   return TestThriftGenClasspath(exit_code=0)
 
 
@@ -235,12 +172,6 @@ def fast_thrift_gen() -> ThriftResults:
 def rules():
   return [
     optionable_rule(ThriftGenTool),
-    # create_thrift_gen_tool_request,
-    # RootRule(ThriftGenToolRequest),
-    RootRule(JarLibraryClasspathRequest),
-    UnionRule(ClasspathRequest, JarLibraryClasspathRequest),
-    snapshot_jar_library_classpath,
-    obtain_thrift_gen_tool_classpath,
     test_thrift_gen_tool_classpath,
     collect_thriftable_targets,
     optionable_rule(ThriftDefaults),
