@@ -63,7 +63,7 @@ class PackageManager:
     raise NotImplementedError()
 
   def run_command(self, args=None, node_paths=None):
-    """Returns a command that when executed will run an arbitury command via package manager."""
+    """Returns a command that when executed will run an arbitrary command via package manager."""
     return command_gen(
       self.tool_installations,
       self.name,
