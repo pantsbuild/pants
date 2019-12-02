@@ -31,9 +31,12 @@ fn unique_temp_dir(base_dir: PathBuf, prefix: Option<String>) -> TempDir {
     .expect("Error making tempdir for local process execution: {:?}")
 }
 
-fn mock_nailgunnable_request(jdk_home: Option<PathBuf>) -> ExecuteProcessRequest {
+fn mock_nailgunnable_request(
+  jdk_home: Option<PathBuf>,
+  argv: Option<Vec<String>>,
+) -> ExecuteProcessRequest {
   ExecuteProcessRequest {
-    argv: vec![],
+    argv: argv.unwrap_or(vec![]),
     env: Default::default(),
     input_files: EMPTY_DIGEST,
     output_files: Default::default(),
@@ -95,7 +98,7 @@ fn creating_nailgun_server_request_updates_the_cli() {
 
 #[test]
 fn creating_nailgun_client_request_removes_jdk_home() {
-  let original_req = mock_nailgunnable_request(Some(PathBuf::from("some/path")));
+  let original_req = mock_nailgunnable_request(Some(PathBuf::from("some/path")), None);
   let req = super::construct_nailgun_client_request(
     original_req,
     "".to_string(),
@@ -103,6 +106,23 @@ fn creating_nailgun_client_request_removes_jdk_home() {
     PathBuf::from("some/other/path"),
   );
   assert_eq!(req.unwrap().jdk_home, None);
+}
+
+#[test]
+fn argfile_path_is_absolute_to_client_dir() {
+  let arg_file_path = ".pants.d/some/file/zinc_args";
+  let client_workdir = "/some/other/path";
+  let original_req = mock_nailgunnable_request(Some(PathBuf::from("some/path")), None);
+  let req = super::construct_nailgun_client_request(
+    original_req,
+    "".to_string(),
+    vec![format!("@{}", arg_file_path)],
+    PathBuf::from(client_workdir),
+  );
+  assert_eq!(
+    req.unwrap().argv[1],
+    format!("@{}/{}", client_workdir, arg_file_path)
+  );
 }
 
 #[test]
