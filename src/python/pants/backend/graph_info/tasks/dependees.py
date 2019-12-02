@@ -21,7 +21,7 @@ class ReverseDepmap(ConsoleTask):
     register('--output-format', default='text', choices=['text', 'json'],
              help='Output format of results.')
     register('--transitive', type=bool, default=False,
-             help='Whether to include only the first level of dependendees.')
+             help='Whether to include only the first level of dependencies.')
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
