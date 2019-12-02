@@ -62,7 +62,7 @@ fn attr_for(inode: Inode, size: u64, kind: fuse::FileType, perm: u16) -> fuse::F
   fuse::FileAttr {
     ino: inode,
     size: size,
-    // TODO: Find out whether blocks is actaully important
+    // TODO: Find out whether blocks is actually important
     blocks: 0,
     atime: CREATE_TIME,
     mtime: CREATE_TIME,
