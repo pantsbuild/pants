@@ -121,7 +121,7 @@ The options available in a given Pants-enabled codebase depend on which backends
 Setting Option Values
 ---------------------
 
-Every Pants option can be set in one three ways, in descending order of precendence:
+Every Pants option can be set in one three ways, in descending order of precedence:
 
 + Using a command-line flag.
 + Using an environment variable.
