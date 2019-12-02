@@ -48,8 +48,8 @@ is applied to `stable` releases. They help to ensure a steady release cadence fr
 in the gaps between the (generally more time consuming) `stable` releases.
 
 ### `stable` releases
-`stable` release cycles generally happen every month, provided that there are enough user
-facing changes to warrant a new `stable` release. For each release candidate for a `stable` release,
+`stable` release cycles generally happen every month, provided that there are enough user-facing
+changes to warrant a new `stable` release. For each release candidate for a `stable` release,
 five business days should be allocated to bugfixing and testing by pants contributors on a release
 candidate announcement thread (described below).  If any changes are needed to the stable release
 based on feedback, a new `rc` release will be created from the stable branch.
