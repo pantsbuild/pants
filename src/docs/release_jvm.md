@@ -22,7 +22,7 @@ At a high level, releasing pants jvm artifacts involves:
 
 You must be at least a
 [committer](https://github.com/orgs/pantsbuild/teams/committers) in
-the pantsbuild GitHub organisation to publish pants artifacts.  If you
+the pantsbuild GitHub organization to publish pants artifacts.  If you
 aren't yet, you need only ping the
 [pants-devel](https://groups.google.com/forum/#!forum/pants-devel)
 group to inquire about getting a release performed.
