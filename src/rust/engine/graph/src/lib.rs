@@ -83,7 +83,7 @@ impl<N: Node> InnerGraph<N> {
     self.nodes.get(node)
   }
 
-  // TODO: Now that we never delete Entries, we should consider making this infalliable.
+  // TODO: Now that we never delete Entries, we should consider making this infallible.
   fn entry_for_id(&self, id: EntryId) -> Option<&Entry<N>> {
     self.pg.node_weight(id)
   }

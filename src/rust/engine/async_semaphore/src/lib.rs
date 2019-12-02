@@ -79,7 +79,7 @@ impl AsyncSemaphore {
     Box::new(
       self
         .acquire()
-        .map_err(|()| panic!("Acquisition is infalliable."))
+        .map_err(|()| panic!("Acquisition is infallible."))
         .and_then(|permit| {
           f().map(move |t| {
             drop(permit);
