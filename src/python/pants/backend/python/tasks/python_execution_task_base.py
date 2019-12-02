@@ -27,7 +27,7 @@ def ensure_interpreter_search_path_env(interpreter):
   are added to the resulting pex binary's metadata. At runtime, pex will apply those constraints to
   locate a relevant interpreter on the `PATH`. If `PEX_PYTHON_PATH` is set in the environment, it
   will be used instead of a `PATH` search. Unlike a typical `PATH`, `PEX_PYTHON_PATH` can contain a
-  mix of files and directories. We exploit this to set up a singluar `PEX_PYTHON_PATH` pointing
+  mix of files and directories. We exploit this to set up a singular `PEX_PYTHON_PATH` pointing
   directly at the given `interpreter` (which should match the constraints that were provided at
   build time).
 
