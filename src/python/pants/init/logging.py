@@ -116,7 +116,7 @@ def encapsulated_global_logger():
   """Record all the handlers of the current global logger, yield, and reset that logger.
   This is useful in the case where we want to easily restore state after calling setup_logging.
   For instance, when DaemonPantsRunner creates an instance of LocalPantsRunner it sets up specific
-  nailgunned logging, which we want to undo once the LocalPantsRunner has finished runnnig.
+  nailgunned logging, which we want to undo once the LocalPantsRunner has finished running.
   """
   global_logger = logging.getLogger()
   old_handlers = copy.copy(global_logger.handlers)
