@@ -20,7 +20,7 @@ import org.kohsuke.args4j.spi.Parameters;
  * An argfile is just a file containing an option's value as its contents.  These can be useful
  * to avoid command-line argument length limits. An argfile is specified on the command-line by
  * prefixing the option argument value with a {@code @}, like so:
- * <pre>-potenially-long-argument=@/path/to/argfile</pre>
+ * <pre>-potentially-long-argument=@/path/to/argfile</pre>
  * The path can be relative in which case it is taken as relative to the working directory of the
  * associated java invocation.
  *
