@@ -101,7 +101,7 @@ from master the release manager may also need to do a release from a stable bran
 3. If this release is also a release candidate then:
      * Create the corresponding notes file for that release, initialized with notes for all
        `dev` releases in the series. <br/>
-       _For example if you were releasing `1.2.0rc0` you would need to
+       _For example, if you were releasing `1.2.0rc0` you would need to
        create `src/python/pants/notes/1.2.x.rst` and include all `1.2.0.devX` release notes._
      * Create a new page() in `src/python/pants/notes/BUILD` corresponding to the new notes.
      * Add the file to pants.ini in the branch_notes section.
