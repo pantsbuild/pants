@@ -12,8 +12,7 @@ class OpenError(Exception):
 
 
 def _mac_open_with_idea(file_: str) -> None:
-  raise NotImplementedError
-
+  subprocess.call(['open', "-a", "/Applications/IntelliJ IDEA CE.app", file_])
 
 def _mac_open(files: Sequence[str]) -> None:
   subprocess.call(['open'] + list(files))
