@@ -165,7 +165,7 @@ class Cobertura(CoverageEngine):
     self._canonical_datafile = os.path.join(output_dir, '{}.canonical'.format(self._DATAFILE_NAME))
     # It's conceivable we'll be executing a test that has no source file dependencies; ie: we'll
     # never generate a canonical coverage datafile below. Create an empty one here to allow the
-    # test run to proceeed normally.
+    # test run to proceed normally.
     touch(self._canonical_datafile)
 
     # Setup an instrumentation classpath based on the existing runtime classpath.
