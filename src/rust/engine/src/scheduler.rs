@@ -311,7 +311,7 @@ impl Scheduler {
       .map(NodeKey::from)
       .collect();
 
-    // This map keeps the k most relevant jobs in assigned possitions.
+    // This map keeps the k most relevant jobs in assigned positions.
     // Keys are positions in the display (display workers) and the values are the actual jobs to print.
     let mut tasks_to_display = IndexMap::new();
 
