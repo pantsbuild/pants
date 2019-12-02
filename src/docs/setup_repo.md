@@ -118,7 +118,7 @@ Uploading Timing Stats
 
 Pants tracks information about its performance: what it builds, how much
 time various build operations take, cache hits, and more.
-If you you work with a large engineering organization, you might want to
+If you work with a large engineering organization, you might want to
 gather this information in one place, so it can inform decisions about how
 to improve everybody's build times.
 
