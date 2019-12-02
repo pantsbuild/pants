@@ -151,7 +151,7 @@ publish the jvm tool jars to Sonatype's OSSRH staging repository.  Note
 that nothing will actually go live until the staging repository is
 [released by you later](#promoting-to-maven-central), so this step has
 no consequences of global importance.  Pants will create and push git
-tags for the staging releases you do here, but in the worst case the
+tags for the staging releases you do here, but in the worst case, the
 tags will point to releases never promoted to Maven Central, which is
 fine.
 
