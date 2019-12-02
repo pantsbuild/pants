@@ -89,7 +89,7 @@ occur in master, while version changes generally only occur in the relevant rele
 Every week we do a release from master.  In most cases we will use the `dev` naming convention
 detailed in [Release Strategy](http://www.pantsbuild.org/release_strategy.html). When we are
 ready to create a new stable branch we will release under the `rc` naming convention instead of
-`dev`.  For example releases in master should look similar to the following: `1.1.0.dev0`, `1.1.0.dev1`,
+`dev`.  For example, releases in master should look similar to the following: `1.1.0.dev0`, `1.1.0.dev1`,
 `1.1.0.dev2`, `1.1.0rc0`, `1.2.0.dev0`, `1.2.0.dev1`, `1.2.0rc0`, `1.3.0.dev0`. *In addition to a release
 from master the release manager may also need to do a release from a stable branch.*
 
@@ -114,7 +114,7 @@ from master the release manager may also need to do a release from a stable bran
 5. Create and land a review for changes in the master branch.
 6. Execute the release as described later on this page.
 7. Finally, if creating a release candidate, create the stable branch from the commit in
-   master for your release. For example if you were releasing `1.2.0rc0`, create the branch
+   master for your release. For example, if you were releasing `1.2.0rc0`, create the branch
    `1.2.x` from your release commit.
 
 #### Preparing a release from a stable branch
@@ -127,7 +127,7 @@ whether a release is needed from a stable branch.
     master, and therefore will already be closed.
 2. In master, update the branch-specific file in `src/python/pants/notes` to reflect all patches that were
     cherry-picked (can use `build-support/bin/release-changelog-helper.sh` to get a head start).
-    For example if you were releasing 1.2.0rc1 you would edit `src/python/pants/notes/1.2.x.rst`.
+    For example, if you were releasing 1.2.0rc1 you would edit `src/python/pants/notes/1.2.x.rst`.
 3. Create and land a review for the notes changes in master.
 4. Cherry pick the merged notes changes from master to the release branch.
 5. In your release branch: edit and commit the version number in `src/python/pants/VERSION`.
