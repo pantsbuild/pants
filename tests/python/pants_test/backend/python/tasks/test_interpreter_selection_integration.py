@@ -106,7 +106,7 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
     self.assertIn(
       PythonInterpreter.get().version_string,
       pants_run.stdout_data,
-      "Did not output interpreters discoved by Pants."
+      "Did not output interpreters discovered by Pants."
     )
 
   @skip_unless_python27_and_python3_present
