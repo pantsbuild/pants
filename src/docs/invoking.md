@@ -169,7 +169,7 @@ Profiling Pants
 
 There are three environment variables that profile various parts of a pants run.
 
-* `PANTS_PROFILE` - Covers the entire run when pantsd is disabled, or the post-fork portion
+* `PANTS_PROFILE` - Covers the entire run when pantsd is disabled or the post-fork portion
   of a pantsd run.
 * `PANTSC_PROFILE` - Covers the client in a pantsd run, which connects to pantsd and then
   communicates on the socket until the run completes.
