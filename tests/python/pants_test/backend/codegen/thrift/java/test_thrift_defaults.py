@@ -34,7 +34,7 @@ class TestThriftDefaults(TestBase):
       thrift_defaults.language(target)
 
   def create_thrift_library(self, **kwargs):
-    return self.make_target(spec=f'java_thift_library_{uuid.uuid4()}',
+    return self.make_target(spec=f'java_thrift_library_{uuid.uuid4()}',
                             target_type=JavaThriftLibrary,
                             **kwargs)
 
