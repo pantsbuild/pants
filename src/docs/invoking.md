@@ -120,7 +120,7 @@ we now consider the daemon to be of late beta-quality: it's nearly ready to be e
 
 ### Benefits
 
-The daemon caches many filesystem operations run over run, and uses watchman to invalidate that
+The daemon caches many filesystem operations run over run and uses watchman to invalidate that
 cache. This can significantly improve the performance of incremental and noop builds (ie,
 cases where relatively small portions of the repo have changed since the previous build).
 
