@@ -63,7 +63,7 @@ using the appropriate options. It's idiomatic, but not required, to set these op
 of targets in a special BUILD file named `BUILD.tools` in the repo root.
 
 Pants uses `Ivy` to fetch JVM-based tools.  Ivy requires an XML configuration file.
-By default, pants uses the configuration that ships with Ivy,
+By default, Pants uses the configuration that ships with Ivy,
 but if you need to change Ivy settings you can specify your own in `pants.ini`:
 
     [ivy]
