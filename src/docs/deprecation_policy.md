@@ -44,7 +44,7 @@ For example, a method `baz` of class `Bar` defined at the top level of module `f
       """
 
 As a special exception, some legacy subsystem types are marked `:API: public` and implicitly have all their registered options exposed as `:API: public` members.
-Going forward its expected new subsystem types are just factories for options-configured plain old types; so the type and its factory method will be the only `:API: public` members of subsytems.
+Going forward its expected new subsystem types are just factories for options-configured plain old types; so the type and its factory method will be the only `:API: public` members of subsystems.
 
 The following rules apply to definitions in the public API. No rules apply to definitions outside the public API. Those may be changed in any way at any time.
 

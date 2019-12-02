@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 # TODO: Add integration tests for this file.
 class BinaryToolBase(Subsystem):
-  """Base class for subsytems that configure binary tools.
+  """Base class for subsystems that configure binary tools.
 
   Subclasses can be further subclassed, manually, e.g., to add any extra options.
 
