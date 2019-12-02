@@ -34,7 +34,7 @@ Most organizations require tests to pass before merging a change to master. Pant
 only running tests _affected_ by a change. That is, only targets that transitively depend on a
 changed target have their tests run. In practice, a change to `README.md` might not trigger *any*
 tests, a change to a top-level node such as `org.pantsbuild.fe.service` in the dependency graph
-would only trigger it's direct tests, and a change to a low-level node
+would only trigger its direct tests, and a change to a low-level node
 (e.g.: protobuf/thrift IDL file) might trigger most tests.
 
 For most users, the following script would work well for a pull-request builder type CI job:
