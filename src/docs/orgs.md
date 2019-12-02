@@ -30,7 +30,7 @@ building `org.pantsbuild.be.service`:
 
 ## Continuous Integration
 
-Most organizations require test pass before merging a change to master. Pants enables fast CI by
+Most organizations require tests to pass before merging a change to master. Pants enables fast CI by
 only running tests _affected_ by a change. That is, only targets that transitively depend on a
 changed target have their tests run. In practice, a change to `README.md` might not trigger *any*
 tests, a change to a top-level node such as `org.pantsbuild.fe.service` in the dependency graph
