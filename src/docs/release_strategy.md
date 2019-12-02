@@ -77,7 +77,7 @@ are suffixed with `rcN`. For instance: "the `1.1.x` `stable` branch",
 
 
 ### `dev` naming
-`dev` releases occur between `stable` branches, and are differentiated by a `devN` suffix. The pattern
+`dev` releases occur between `stable` branches and are differentiated by a `devN` suffix. The pattern
 to follow is `N.N.0.devN`, where `N.N` are the _next_ `major`/`minor` branch that will be created
 and N is the next sequential number starting from `0`. For instance: "the `1.1.0.dev0` `dev` release".
 Note the dot before the `dev0`.  See https://www.python.org/dev/peps/pep-0440/#public-version-identifiers.
