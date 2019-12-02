@@ -28,7 +28,7 @@ aren't yet, you need only ping the
 group to inquire about getting a release performed.
 
 If you are a committer, there are four additional requirements to
-satisfy in order to be able publish to Maven Central:
+satisfy in order to be able to publish to Maven Central:
 
   - Create and publish a pgp key if you don't already have a published
     pgp key. There is nothing Maven Central specific about this, but
