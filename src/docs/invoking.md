@@ -98,7 +98,7 @@ Passthrough Args
 ----------------
 
 In some cases Pants allows you to pass arguments directly through to the underlying tool it invokes.
-These are specified last on the command line after a double-hyphen, and are passed through the
+These are specified last on the command line after a double-hyphen and are passed through the
 last goal specified.
 
 E.g., to pass `-k foo` to `pytest` (to say "only run tests whose names contain `foo`"):
