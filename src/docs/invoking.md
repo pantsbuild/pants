@@ -116,7 +116,7 @@ The Pants Daemon (pantsd)
 
 The `1.3.0` release of pants included an alpha release of a daemon (`pantsd`) to accelerate common
 graph operations including build file parsing and source fingerprinting. As of the `1.4.0` release,
-we now consider the daemon to be of late beta quality: it's nearly ready to be enabled by default!
+we now consider the daemon to be of late beta-quality: it's nearly ready to be enabled by default!
 
 ### Benefits
 
