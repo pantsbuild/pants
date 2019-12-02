@@ -103,7 +103,7 @@ In order to make a `stable` release, the release manager needs to create a relea
 contributors to test. Once a release candidate has been created and announced according to the
 [[Release Process|pants('src/docs:release')]], the release manager should allow five business days
 for contributors to raise concerns on the release candidate announcement thread. During those five
-days the release manager might need to perform multiple release candidates, until finally, when no
+days the release manager might need to perform multiple release candidates, until, finally, when no
 more blockers are raised against a particular release candidate, the final version of that release
 can be cut.
 
