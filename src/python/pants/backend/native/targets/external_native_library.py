@@ -77,7 +77,7 @@ class ConanRequirement:
 
     Example package specification:
       "my_library/1.0.0@pants/stable"
-    Example of the direcory path that Conan downloads pacakge data for this package to:
+    Example of the directory path that Conan downloads pacakge data for this package to:
       "my_library/1.0.0/pants/stable"
 
     For more info on Conan package specifications, see:

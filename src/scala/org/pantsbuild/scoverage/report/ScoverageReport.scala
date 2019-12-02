@@ -141,7 +141,7 @@ object ScoverageReport {
 
   /**
    *
-   * Cleans and makes the report drectory.
+   * Cleans and makes the report directory.
    */
   private def prepareFile(file: File, settings: Settings, fileType: String): Unit = {
     if (settings.cleanOldReports) {
