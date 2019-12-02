@@ -143,7 +143,7 @@ installed `@rule`s.
 #### Example
 
 For example, you could declare an `@rule` that requests FileContent for each entry in a Files list,
-and then concatentates that content into a (datatype-wrapped) string:
+and then concatenates that content into a (datatype-wrapped) string:
 
 ```python
 @rule
