@@ -48,14 +48,14 @@ How to Use Shorthand Flags
 --------------------------
 
 Either fully qualified or shorthand flags can be used to pass an
-option to a task. The fully qualified (or long form) options are
+option to a task. The fully qualified (or long-form) options are
 listed in the `help` output and the <a href="options_reference.html">Options Reference</a>.
-The long form is more foolproof to use because it can go almost anywhere on
+The long-form is more foolproof to use because it can go almost anywhere on
 the command line, but the shorthand version can save typing.
 
 For many goals, there is only a single task registered. For example,
 to specify the `--list-sep` option for the `list` goal you could use
-the long form:
+the long-form:
 
     :::bash
     ./pants list --list-sep='|' examples/src/python/example:
@@ -67,7 +67,7 @@ or you could use the short form:
 
 When a goal has multiple tasks registered, you must fully specify the
 task and goal name to use the short form flag.  Here's an example of
-using the long form to pass an option to the `zinc` task:
+using the long-form to pass an option to the `zinc` task:
 
     :::bash
     ./pants --no-compile-rsc-delete-scratch compile src::
