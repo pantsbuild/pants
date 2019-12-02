@@ -24,7 +24,7 @@ class Goal(metaclass=ABCMeta):
   are not cacheable, and the `Goal` product of a `@console_rule` contains only a exit_code value to
   indicate whether the rule exited cleanly.
 
-  Options values for a Goal can be retrived by declaring a dependency on the relevant `Goal.Options`
+  Options values for a Goal can be retrieved by declaring a dependency on the relevant `Goal.Options`
   class.
   """
   exit_code: int
