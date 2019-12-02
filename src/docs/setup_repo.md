@@ -7,7 +7,7 @@ Source Roots
 ------------
 
 Pants needs to know where the root of a source tree is, so it can correctly set up import paths,
-bundle code etc.
+bundle code, etc.
 
 In typical cases, Pants can deduce the source roots automatically based on naming conventions.
 E.g., `src/<lang>`, `src/main/<lang>`, `test/<lang>`, `src/test/<lang>`, `3rdparty/<lang>` and so on.
