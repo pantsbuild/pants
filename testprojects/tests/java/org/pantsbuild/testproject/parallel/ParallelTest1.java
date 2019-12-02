@@ -10,7 +10,7 @@ import static org.junit.Assert.assertTrue;
 
 /**
  * This test is designed to exercise the test.junit runner --test-junit-default-parallel argument
- * There is a similar test under tests/java/src/... to thest junit-runner standalone.
+ * There is a similar test under tests/java/src/... to test junit-runner standalone.
  * <p>
  * For all methods in ParallelTest1 and ParallelTest2
  * to succeed, both test classes  must be running at the same time. Intended to test the flags
