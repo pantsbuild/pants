@@ -180,17 +180,17 @@ fn dropped_future_is_removed_from_queue() {
     .expect("thread1 didn't acquire.");
   let waiter = handle2.with_acquired(move || future::ok::<_, ()>(()));
   runtime.spawn(future::ok::<_, ()>(()).select(waiter).then(move |res| {
-    let mut waiter_fute = match res {
-      Ok((_, fute)) => fute,
+    let mut waiter_future = match res {
+      Ok((_, future)) => future,
       Err(_) => panic!("future::ok is infallible"),
     };
     // We explicitly poll the future here because the select call resolves
     // immediately when called on a future::ok result, and the second future
     // is never polled.
-    let _waiter_res = waiter_fute.poll();
+    let _waiter_res = waiter_future.poll();
     tx_thread2.send(()).unwrap();
     rx_thread2.recv().unwrap();
-    drop(waiter_fute);
+    drop(waiter_future);
     tx_thread2.send(()).unwrap();
     rx_thread2.recv().unwrap();
     future::ok::<_, ()>(())
