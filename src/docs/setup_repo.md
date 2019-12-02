@@ -1,7 +1,7 @@
 Setting Up Pants
 ================
 
-Pants will work out of the box, at least for basic functionality. However some uses require further setup.
+Pants will work out of the box, at least for basic functionality. However, some uses require further setup.
 
 Source Roots
 ------------
