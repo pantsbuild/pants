@@ -207,7 +207,7 @@ class JavaCompileSettingsPartitioningTest(NailgunTaskTestBase):
   def test_java_home_extraction_missing_distributions(self):
     # This will need to be bumped if java ever gets to major version one million.
     far_future_version = '999999.1'
-    farer_future_version = '999999.2'
+    farther_future_version = '999999.2'
 
     os_name = normalize_os_name(get_os_name())
 
@@ -249,13 +249,13 @@ class JavaCompileSettingsPartitioningTest(NailgunTaskTestBase):
     with fake_distribution_locator(far_future_version):
       with self.assertRaises(DistributionLocator.Error):
         self._get_zinc_arguments(JvmPlatformSettings(
-          source_level=farer_future_version,
-          target_level=farer_future_version,
+          source_level=farther_future_version,
+          target_level=farther_future_version,
           args=['$JAVA_HOME/foo'],
         ))
 
     # Missing a strict distribution.
-    with fake_distribution_locator(farer_future_version) as paths:
+    with fake_distribution_locator(farther_future_version) as paths:
       results = self._get_zinc_arguments(JvmPlatformSettings(
         source_level=far_future_version,
         target_level=far_future_version,
@@ -265,8 +265,8 @@ class JavaCompileSettingsPartitioningTest(NailgunTaskTestBase):
       self.assertEqual(f'{paths[0]}/foo', results[-2])
 
     # Make sure we pick up the strictest possible distribution.
-    with fake_distribution_locator(farer_future_version, far_future_version) as paths:
-      farer_path, far_path = paths
+    with fake_distribution_locator(farther_future_version, far_future_version) as paths:
+      farther_path, far_path = paths
       results = self._get_zinc_arguments(JvmPlatformSettings(
         source_level=far_future_version,
         target_level=far_future_version,
@@ -276,12 +276,12 @@ class JavaCompileSettingsPartitioningTest(NailgunTaskTestBase):
       self.assertEqual(f'{far_path}/foo', results[-2])
 
     # Make sure we pick the higher distribution when the lower one doesn't work.
-    with fake_distribution_locator(farer_future_version, far_future_version) as paths:
-      farer_path, far_path = paths
+    with fake_distribution_locator(farther_future_version, far_future_version) as paths:
+      farther_path, far_path = paths
       results = self._get_zinc_arguments(JvmPlatformSettings(
-        source_level=farer_future_version,
-        target_level=farer_future_version,
+        source_level=farther_future_version,
+        target_level=farther_future_version,
         args=['$JAVA_HOME/foo', '$JAVA_HOME'],
       ))
-      self.assertEqual(farer_path, results[-1])
-      self.assertEqual(f'{farer_path}/foo', results[-2])
+      self.assertEqual(farther_path, results[-1])
+      self.assertEqual(f'{farther_path}/foo', results[-2])
