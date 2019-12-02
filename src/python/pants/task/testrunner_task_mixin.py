@@ -386,7 +386,7 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
   Provides support for partitioning via `--fast` (batches) and `--no-fast` (per target) options and
   helps ensure correct caching behavior in either mode.
 
-  It's expected that mixees implement proper chrooting (see `run_tests_in_chroot`) to support
+  It's expected that mixins implement proper chrooting (see `run_tests_in_chroot`) to support
   correct successful test result caching.
   """
 
