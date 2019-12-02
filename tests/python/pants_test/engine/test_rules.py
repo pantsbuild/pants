@@ -7,7 +7,7 @@ from textwrap import dedent
 from pants.engine.build_files import create_graph_rules
 from pants.engine.console import Console
 from pants.engine.fs import create_fs_rules
-from pants.engine.goal import Goal
+from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.mapper import AddressMapper
 from pants.engine.rules import (
   MissingParameterTypeAnnotation,
@@ -70,10 +70,13 @@ _suba_root_rules = [RootRule(SubA)]
 _this_is_not_a_type = 3
 
 
-class Example(Goal):
+class ExampleOptions(GoalSubsystem):
   """An example."""
-
   name = 'example'
+
+
+class Example(Goal):
+  subsystem_cls = ExampleOptions
 
 
 @console_rule

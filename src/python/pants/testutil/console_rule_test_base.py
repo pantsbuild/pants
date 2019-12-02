@@ -49,7 +49,7 @@ class ConsoleRuleTestBase(TestBase):
     env = dict(env)
     options_bootstrapper = OptionsBootstrapper.create(args=args, env=env)
     BuildConfigInitializer.get(options_bootstrapper)
-    full_options = options_bootstrapper.get_full_options(list(self.goal_cls.Options.known_scope_infos()))
+    full_options = options_bootstrapper.get_full_options(list(self.goal_cls.subsystem_cls.known_scope_infos()))
     stdout, stderr = StringIO(), StringIO()
     console = Console(stdout=stdout, stderr=stderr)
     scheduler = self.scheduler

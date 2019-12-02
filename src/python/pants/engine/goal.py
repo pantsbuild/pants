@@ -14,19 +14,36 @@ from pants.util.meta import classproperty
 
 
 class GoalSubsystem(SubsystemClientMixin, Optionable):
+  """The Subsystem used by `Goal`s to register the external API, meaning the goal name, the help
+  message, and any options.
+
+  This class should be subclassed and given a `GoalSubsystem.name` that it will be referred to by
+  when invoked from the command line. The `Goal.name` also acts as the options_scope for the Goal.
+
+  Rules that need to consume the GoalSubsystem's options may directly request the type:
+
+  ```
+  @rule
+  def list(console: Console, options: ListOptions) -> List:
+    transitive = options.values.transitive
+    documented = options.values.documented
+    ...
+  ```
+  """
 
   @classproperty
   @abstractmethod
   def name(cls):
-    """The name used to select this Goal on the commandline, and for its options."""
+    """The name used to select the corresponding Goal on the commandline and the options_scope for
+    its options."""
 
   @classproperty
   def deprecated_cache_setup_removal_version(cls):
     """Optionally defines a deprecation version for a CacheSetup dependency.
 
-    If this Goal should have an associated deprecated instance of `CacheSetup` (which was implicitly
-    required by all v1 Tasks), subclasses may set this to a valid deprecation version to create
-    that association.
+    If this GoalSubsystem should have an associated deprecated instance of `CacheSetup` (which was
+    implicitly required by all v1 Tasks), subclasses may set this to a valid deprecation version to
+    create that association.
     """
     return None
 
@@ -36,7 +53,7 @@ class GoalSubsystem(SubsystemClientMixin, Optionable):
 
   @classmethod
   def subsystem_dependencies(cls):
-    # NB: `Goal.Options` implements `SubsystemClientMixin` in order to allow v1 `Tasks` to
+    # NB: `GoalSubsystem` implements `SubsystemClientMixin` in order to allow v1 `Tasks` to
     # depend on v2 Goals, and for `Goals` to declare a deprecated dependency on a `CacheSetup`
     # instance for backwards compatibility purposes. But v2 Goals should _not_ have subsystem
     # dependencies: instead, the @rules participating (transitively) in a Goal should directly
@@ -63,7 +80,7 @@ class GoalSubsystem(SubsystemClientMixin, Optionable):
 
   @property
   def values(self):
-    """Returns the option values for these Goal.Options."""
+    """Returns the option values."""
     return self._scoped_options
 
 
@@ -71,15 +88,20 @@ class GoalSubsystem(SubsystemClientMixin, Optionable):
 class Goal:
   """The named product of a `@console_rule`.
 
-  This abstract class should be subclassed and given a `Goal.name` that it will be referred to by
-  when invoked from the command line. The `Goal.name` also acts as the options_scope for the `Goal`.
+  This class should be subclassed and linked to a corresponding `GoalSubsystem`:
 
-  Since `@console_rules` always run in order to produce side effects (generally: console output), they
-  are not cacheable, and the `Goal` product of a `@console_rule` contains only a exit_code value to
-  indicate whether the rule exited cleanly.
+  ```
+  class ListOptions(GoalSubsystem):
+    '''List targets.'''
+    name = "list"
 
-  Options values for a Goal can be retrived by declaring a dependency on the relevant `Goal.Options`
-  class.
+  class List(Goal):
+    subsystem_cls = ListOptions
+  ```
+
+  Since `@console_rules` always run in order to produce side effects (generally: console output),
+  they are not cacheable, and the `Goal` product of a `@console_rule` contains only a exit_code
+  value to indicate whether the rule exited cleanly.
   """
   exit_code: int
   subsystem_cls: ClassVar[Type[GoalSubsystem]]
