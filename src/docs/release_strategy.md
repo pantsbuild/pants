@@ -62,7 +62,7 @@ with the last five `minor` releases (see the [[deprecation policy|pants('src/doc
 
 #### `patch` stable Releases
 In order to allow us to react quickly to bugs, `patch` fixes are released for `stable` branches as
-needed and should always consist of fixes or small backwards-compatible features backported from
+needed and should always consist of fixes or small backward-compatible features backported from
 master using the [needs-cherrypick][needs-cherrypick] label. These releases update the patch version number, (ie, from `1.0.x` to `1.0.y`) and should
 only include commits that are deemed to be [[backwards compatible|pants('src/docs:deprecation_policy')]].
 
