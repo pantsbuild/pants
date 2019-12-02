@@ -109,7 +109,7 @@ class MissingDependencyFinder:
     """Select a target that contains the given classname.
 
     When multiple candidates are available, not uncommon in 3rdparty dependencies,
-    they are ranked according to their string similiarities with the classname because
+    they are ranked according to their string similarities with the classname because
     the way 3rdparty targets are conventionally named often shares similar naming
     structure.
     """
