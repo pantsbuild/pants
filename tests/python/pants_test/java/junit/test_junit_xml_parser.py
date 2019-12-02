@@ -181,7 +181,7 @@ class TestParseFailedTargets(unittest.TestCase):
       with safe_open(os.path.join(junit_xml_dir, 'subdir', 'TEST-c.xml'), 'w') as fp:
         fp.write("""
         <testsuite failures="1" errors="0">
-          <testcase classname="org.pantsbuild.subpackage.AnotherFailure" name="testAnotherFailue">
+          <testcase classname="org.pantsbuild.subpackage.AnotherFailure" name="testAnotherFailure">
             <failure/>
           </testcase>
         </testsuite>
@@ -192,7 +192,7 @@ class TestParseFailedTargets(unittest.TestCase):
                                 JUnitTest('org.pantsbuild.AnotherError', 'testAnotherError')},
                         'Jane': {JUnitTest('org.pantsbuild.Error', 'testError')},
                         'Mary': {JUnitTest('org.pantsbuild.subpackage.AnotherFailure',
-                                           'testAnotherFailue')}},
+                                           'testAnotherFailure')}},
                        failed_targets)
 
   def test_parse_failed_targets_error_raise(self):
