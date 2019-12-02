@@ -191,7 +191,7 @@ but the process is also described below:
   3. Close the selected staging repository.
 
      As shown below, with the staging repository selected, there will
-     be a 'Close' button available.  Look for in in the menu bar across
+     be a 'Close' button available.  Look for it in the menu bar across
      the top of the repository list.  Click it.
 
     ![image](images/ossrh-publish-close-staging-repo.png)
