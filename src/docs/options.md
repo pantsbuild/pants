@@ -4,7 +4,7 @@ Pants Options
 Pants is very configurable and has literally hundreds of tuneable parameters, known in Pants
 parlance as _options_.
 
-Most options are automatically set to useful defaults. However it is inevitable that sooner or
+Most options are automatically set to useful defaults. However, it is inevitable that sooner or
 later you'll need to tweak some of them.  For example, you may want [[to pin your Pants version|pants('src/docs:install')]].
 
 The Pants options system is fairly complex. Codebase administrators will need to understand its details
@@ -18,7 +18,7 @@ each configurable component is qualified by a _scope_.
 
 + Global options belong to the global scope.
 + Options for task `task` in goal `goal` belong to the `goal.task` scope. E.g., `gen.thrift` or `compile.rsc`.
-  However if the task has the same name as the goal, then the scope is just that name. E.g., `./pants list`,
+  However, if the task has the same name as the goal, then the scope is just that name. E.g., `./pants list`,
   not `./pants list.list`.
 + Options for the global instance of subsystem `subsystem` belong to the `subsystem` scope. E.g., `jvm` or `cache`.
 + Options for the instance of subsystem `subsystem` belonging to some other task or subsystem with scope `scope`
