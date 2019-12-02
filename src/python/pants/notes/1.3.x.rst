@@ -1430,7 +1430,7 @@ Refactoring, Improvements, and Tooling
   `RB #4342 <https://rbcommons.com/s/twitter/r/4342>`_
   `RB #4340 <https://rbcommons.com/s/twitter/r/4340>`_
 
-* Perf improvement: rebase analyis file once instead of multiple times
+* Perf improvement: rebase analysis file once instead of multiple times
   `Issue #8 <https://github.com/pantsbuild/zincutils/issues/8>`_
   `RB #4352 <https://rbcommons.com/s/twitter/r/4352>`_
 
