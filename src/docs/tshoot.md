@@ -36,7 +36,7 @@ restart on the next build.
 Nailgun Errors
 --------------
 
-If nailguns stop resonding, look for clues in the `stdout` and `stderr` files in
+If nailguns stop responding, look for clues in the `stdout` and `stderr` files in
 `.pants.d/ng/*/*`.
 
 
