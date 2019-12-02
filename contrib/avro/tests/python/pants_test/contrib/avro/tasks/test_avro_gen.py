@@ -13,7 +13,7 @@ from pants.contrib.avro.tasks.avro_gen import AvroJavaGenTask
 class MockAvroJavaGenTest(AvroJavaGenTask):
   _test_cmd_log = []  # List of lists for commands run by the task under test.
 
-  # Overide this method and record the command that would have been run.
+  # Override this method and record the command that would have been run.
   def _avro(self, args):
     self._test_cmd_log.append(args)
 
