@@ -1,7 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import List, Optional, Tuple
+from typing import List, Optional, Sequence, Tuple
 
 from pants.backend.python.lint.black.rules import BlackSetup
 from pants.backend.python.lint.black.rules import rules as black_rules
@@ -62,7 +62,11 @@ class BlackIntegrationTest(TestBase):
     init_subsystems([Black, PythonSetup, PythonNativeCode, SubprocessEnvironment])
 
   def run_black(
-    self, source_files: List[FileContent], *, config: Optional[str] = None
+    self,
+    source_files: List[FileContent],
+    *,
+    config: Optional[str] = None,
+    passthrough_args: Optional[Sequence[str]] = None,
   ) -> Tuple[LintResult, FmtResult]:
     if config is not None:
       self.create_file(relpath="pyproject.toml", contents=config)
@@ -74,7 +78,10 @@ class BlackIntegrationTest(TestBase):
       )
     )
     black_subsystem = global_subsystem_instance(
-      Black, options={Black.options_scope: {"config": "pyproject.toml" if config else None}}
+      Black, options={Black.options_scope: {
+        "config": "pyproject.toml" if config else None,
+        "args": passthrough_args or [],
+      }}
     )
     black_setup = self.request_single_product(
       BlackSetup,
@@ -124,3 +131,12 @@ class BlackIntegrationTest(TestBase):
     self.assertIn("1 file would be left unchanged", lint_result.stderr)
     self.assertIn("1 file left unchanged", fmt_result.stderr)
     self.assertEqual(fmt_result.digest, self.get_digest([self.needs_config_source]))
+
+  def test_respects_passthrough_args(self) -> None:
+    lint_result, fmt_result = self.run_black(
+      [self.needs_config_source], passthrough_args=["--skip-string-normalization"]
+    )
+    assert lint_result.exit_code == 0
+    assert "1 file would be left unchanged" in lint_result.stderr
+    assert "1 file left unchanged" in fmt_result.stderr
+    assert fmt_result.digest == self.get_digest([self.needs_config_source])

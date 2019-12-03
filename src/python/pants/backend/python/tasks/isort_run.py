@@ -49,7 +49,10 @@ class IsortRun(FmtTaskMixin, Task):
         return
 
       isort = self.context.products.get_data(IsortPrep.tool_instance_cls)
-      args = self.get_passthru_args() + ['--filter-files'] + sources
+      isort_subsystem = IsortPrep.tool_subsystem_cls.global_instance()
+      args = [
+        *self.get_passthru_args(), *isort_subsystem.get_args(), '--filter-files', *sources
+      ]
 
       # NB: We execute isort out of process to avoid unwanted side-effects from importing it:
       #   https://github.com/timothycrosley/isort/issues/456

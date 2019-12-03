@@ -47,5 +47,5 @@ python_tests(
     'testprojects/tests/python/pants:dummies_directory',
   ],
   tags = {'integration'},
-  timeout = 90,
+  timeout = 120,
 )

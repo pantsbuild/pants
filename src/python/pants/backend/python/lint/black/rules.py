@@ -32,6 +32,7 @@ from pants.rules.core.lint import LintResult
 class BlackSetup:
   requirements_pex: Pex
   config_snapshot: Snapshot
+  passthrough_args: Optional[Tuple[str, ...]]
 
 
 @rule
@@ -48,7 +49,11 @@ async def setup_black(black: Black) -> BlackSetup:
       entry_point=black.get_entry_point(),
     )
   )
-  return BlackSetup(requirements_pex=requirements_pex, config_snapshot=config_snapshot)
+  return BlackSetup(
+    requirements_pex=requirements_pex,
+    config_snapshot=config_snapshot,
+    passthrough_args=black.get_args(),
+  )
 
 
 @dataclass(frozen=True)
@@ -57,7 +62,7 @@ class BlackArgs:
 
   @staticmethod
   def create(
-    *, wrapped_target: FormattablePythonTarget, black_setup: BlackSetup, check_only: bool
+    *, wrapped_target: FormattablePythonTarget, black_setup: BlackSetup, check_only: bool,
   ) -> "BlackArgs":
     files = wrapped_target.target.sources.snapshot.files
     pex_args = []
@@ -65,6 +70,8 @@ class BlackArgs:
       pex_args.append("--check")
     if black_setup.config_snapshot.files:
       pex_args.extend(["--config", black_setup.config_snapshot.files[0]])
+    if black_setup.passthrough_args:
+      pex_args.extend(black_setup.passthrough_args)
     # NB: For some reason, Black's --exclude option only works on recursive invocations, meaning
     # calling Black on a directory(s) and letting it auto-discover files. However, we don't want
     # Black to run over everything recursively under the directory of our target, as Black should

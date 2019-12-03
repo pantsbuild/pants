@@ -1,7 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import List, Optional, Tuple
+from typing import List, Optional, Sequence, Tuple
 
 from pants.backend.python.lint.isort.rules import IsortSetup
 from pants.backend.python.lint.isort.rules import rules as isort_rules
@@ -70,7 +70,11 @@ class IsortIntegrationTest(TestBase):
     init_subsystems([Isort, PythonSetup, PythonNativeCode, SubprocessEnvironment])
 
   def run_isort(
-    self, source_files: List[FileContent], *, config: Optional[str] = None
+    self,
+    source_files: List[FileContent],
+    *,
+    config: Optional[str] = None,
+    passthrough_args: Optional[Sequence[str]] = None,
   ) -> Tuple[LintResult, FmtResult]:
     if config is not None:
       self.create_file(relpath=".isort.cfg", contents=config)
@@ -82,7 +86,10 @@ class IsortIntegrationTest(TestBase):
       )
     )
     isort_subsystem = global_subsystem_instance(
-      Isort, options={Isort.options_scope: {"config": [".isort.cfg"] if config else None}}
+      Isort, options={Isort.options_scope: {
+        "config": [".isort.cfg"] if config else None,
+        "args": passthrough_args or [],
+      }}
     )
     isort_setup = self.request_single_product(
       IsortSetup,
@@ -130,6 +137,16 @@ class IsortIntegrationTest(TestBase):
   def test_respects_config_file(self) -> None:
     lint_result, fmt_result = self.run_isort(
       [self.needs_config_source], config="[settings]\ncombine_as_imports=True\n"
+    )
+    assert lint_result.exit_code == 1
+    assert "test/config.py Imports are incorrectly sorted" in lint_result.stdout
+    assert "Fixing" in fmt_result.stdout
+    assert "test/config.py" in fmt_result.stdout
+    assert fmt_result.digest == self.get_digest([self.fixed_needs_config_source])
+
+  def test_respects_passthrough_args(self) -> None:
+    lint_result, fmt_result = self.run_isort(
+      [self.needs_config_source], passthrough_args=["--combine-as"],
     )
     assert lint_result.exit_code == 1
     assert "test/config.py Imports are incorrectly sorted" in lint_result.stdout

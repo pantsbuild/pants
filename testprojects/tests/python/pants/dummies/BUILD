@@ -52,3 +52,8 @@ python_tests(
     ':transitive_dep',
   ],
 )
+
+python_tests(
+  name = 'needs_config',
+  source = "test_config_works.py",
+)
