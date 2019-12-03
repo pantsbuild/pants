@@ -13,4 +13,5 @@ contrib_plugin(
   description='Avro Java code generation support for pants',
   build_file_aliases=True,
   register_goals=True,
+  tags = {"partially_type_checked"},
 )

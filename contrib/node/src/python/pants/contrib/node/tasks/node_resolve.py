@@ -3,12 +3,16 @@
 
 import os
 from hashlib import sha1
+from typing import Dict, Optional, Type
 
 from pants.base.build_environment import get_buildroot
 from pants.base.fingerprint_strategy import DefaultFingerprintHashingMixin, FingerprintStrategy
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.build_graph import sort_targets
+from pants.build_graph.target import Target
 
+from pants.contrib.node.subsystems.resolvers.node_resolver_base import NodeResolverBase
+from pants.contrib.node.targets.node_package import NodePackage
 from pants.contrib.node.tasks.node_paths import NodePaths, NodePathsLocal
 from pants.contrib.node.tasks.node_task import NodeTask
 
@@ -64,7 +68,7 @@ class NodeResolve(NodeTask):
   and have executed their build scripts if defined.
   """
 
-  _resolver_by_type = dict()
+  _resolver_by_type: Dict[Type[NodePackage], Type[NodeResolverBase]] = dict()
 
   @classmethod
   def product_types(cls):
@@ -78,22 +82,20 @@ class NodeResolve(NodeTask):
       resolver.prepare(options, round_manager)
 
   @property
-  def cache_target_dirs(self):
+  def cache_target_dirs(self) -> bool:
     return True
 
   @classmethod
-  def register_resolver_for_type(cls, node_package_type, resolver):
+  def register_resolver_for_type(
+    cls, node_package_type: Type[NodePackage], resolver: Type[NodeResolverBase]
+  ) -> None:
     """Register a NodeResolver instance for a particular subclass of NodePackage.
     Implementation uses a hash on node_package_type, so the resolver will only be used on the
-    exact NodePackage subclass (not further subclasses of it).
-
-    :param class node_package_type: A NodePackage subclass
-    :param class resolver: A NodeResolverBase subclass
-    """
+    exact NodePackage subclass (not further subclasses of it)."""
     cls._resolver_by_type[node_package_type] = resolver
 
   @classmethod
-  def _clear_resolvers(cls):
+  def _clear_resolvers(cls) -> None:
     """Remove all resolvers.
 
     This method is EXCLUSIVELY for use in tests.
@@ -101,22 +103,14 @@ class NodeResolve(NodeTask):
     cls._resolver_by_type.clear()
 
   @classmethod
-  def _resolver_for_target(cls, target):
-    """Get the resolver registered for a target's type, or None if there is none.
-
-    :param NodePackage target: A subclass of NodePackage.
-    :rtype: NodeResolver
-    """
+  def _resolver_for_target(cls, target: NodePackage) -> Optional[Type[NodeResolverBase]]:
+    """Get the resolver registered for a target's type, or None if there is none."""
     return cls._resolver_by_type.get(type(target))
 
   @classmethod
-  def can_resolve_target(cls, target):
-    """Returns whether this is a NodePackage and there a resolver registered for its subtype.
-
-    :param target: A Target
-    :rtype: Boolean
-    """
-    return cls.is_node_package(target) and cls._resolver_for_target(target) != None
+  def can_resolve_target(cls, target: Target) -> bool:
+    """Returns whether this is a NodePackage and there a resolver registered for its subtype."""
+    return isinstance(target, NodePackage) and cls._resolver_for_target(target) is not None
 
   def _topological_sort(self, targets):
     """Topologically order a list of targets"""

@@ -60,20 +60,18 @@ class TestContext(Context):
     def report_target_info(self, scope, target, keys, val): pass
 
 
-  class TestLogger(logging.getLoggerClass()):
+  class TestLogger(logging.getLoggerClass()):  # type: ignore[misc] # MyPy does't understand this dynamic base class
     """A logger that converts our structured records into flat ones.
 
     This is so we can use a regular logger in tests instead of our reporting machinery.
     """
 
-    def makeRecord(self, name, lvl, fn, lno, msg, args, exc_info, *pos_args, **kwargs):
-      # Python 2 and Python 3 have different arguments for makeRecord().
-      # For cross-compatibility, we are unpacking arguments.
-      # See https://stackoverflow.com/questions/44329421/logging-makerecord-takes-8-positional-arguments-but-11-were-given.
+    def makeRecord(
+      self, name, lvl, fn, lno, msg, args, exc_info, func=None, extra=None, sinfo=None
+    ):
       msg = ''.join([msg] + [a[0] if isinstance(a, (list, tuple)) else a for a in args])
       args = []
-      return super(TestContext.TestLogger, self).makeRecord(
-        name, lvl, fn, lno, msg, args, exc_info, *pos_args, **kwargs)
+      return super().makeRecord(name, lvl, fn, lno, msg, args, exc_info, func, extra, sinfo)
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)

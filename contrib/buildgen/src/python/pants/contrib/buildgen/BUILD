@@ -22,5 +22,6 @@ python_library(
   sources = ['build_file_manipulator.py'],
   dependencies = [
     'src/python/pants/build_graph',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )

@@ -6,5 +6,6 @@ python_tests(
   sources = ['test_manifest.py'],
   dependencies = [
     'src/python/pants/java/jar',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )

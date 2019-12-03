@@ -1,7 +1,7 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.native.config.environment import Platform
+from pants.engine.platform import Platform
 from pants.util.osutil import all_normalized_os_names
 
 

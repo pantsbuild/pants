@@ -66,6 +66,7 @@ python_tests(
   dependencies = [
     'src/python/pants/backend/jvm/tasks/jvm_compile:missing_dependency_finder',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(

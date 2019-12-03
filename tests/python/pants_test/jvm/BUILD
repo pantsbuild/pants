@@ -16,7 +16,8 @@ python_tests(
   sources=['test_safeargs.py'],
   dependencies=[
     'src/python/pants/backend/jvm:argfile'
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(

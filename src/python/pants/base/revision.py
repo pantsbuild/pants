@@ -24,7 +24,7 @@ class Revision:
       return atom
 
   @classmethod
-  def semver(cls, rev):
+  def semver(cls, rev) -> "Revision":
     """Attempts to parse a Revision from a semantic version.
 
     See http://semver.org/ for the full specification.
@@ -64,7 +64,7 @@ class Revision:
       raise cls.BadRevision("Failed to parse '{}' as a semantic version number".format(rev))
 
   @classmethod
-  def lenient(cls, rev):
+  def lenient(cls, rev) -> "Revision":
     """A lenient revision parser that tries to split the version into logical components with
     heuristics inspired by PHP's version_compare.
 

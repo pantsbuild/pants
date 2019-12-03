@@ -9,4 +9,5 @@ python_library(
     'src/python/pants/build_graph',
     'src/python/pants/source',
   ],
+  tags = {"partially_type_checked"},
 )

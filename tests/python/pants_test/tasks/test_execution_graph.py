@@ -4,6 +4,7 @@
 import re
 import unittest
 from collections import defaultdict
+from typing import Dict, List
 
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import (
   ExecutionFailure,
@@ -33,12 +34,12 @@ class PrintLogger:
 
 class CapturingLogger:
 
-  log_entries = defaultdict(list)
+  log_entries: Dict[str, List[str]] = defaultdict(list)
 
-  def error(self, msg):
+  def error(self, msg: str) -> None:
     self.log_entries['error'].append(msg)
 
-  def debug(self, msg):
+  def debug(self, msg: str) -> None:
     self.log_entries['debug'].append(msg)
 
 

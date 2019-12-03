@@ -28,6 +28,7 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -48,8 +49,7 @@ python_library(
 python_library(
   name='thrift_util',
   sources=['thrift_util.py'],
-  dependencies = [
-  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -59,4 +59,5 @@ python_library(
     'src/python/pants/backend/codegen/thrift/java',
     'src/python/pants/base:fingerprint_strategy',
   ],
+  tags = {"partially_type_checked"},
 )

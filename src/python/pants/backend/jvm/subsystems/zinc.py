@@ -5,6 +5,7 @@ import os
 from hashlib import sha1
 from pathlib import Path
 from threading import Lock
+from typing import cast
 
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
 from pants.backend.jvm.subsystems.java import Java
@@ -12,7 +13,7 @@ from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
-from pants.backend.jvm.tasks.classpath_products import ClasspathEntry
+from pants.backend.jvm.tasks.classpath_entry import ClasspathEntry
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
 from pants.base.build_environment import get_buildroot
@@ -227,14 +228,14 @@ class Zinc:
       # (e.g., a JDK that is no longer present), or points to the wrong JDK.
       if not jdk_home_symlink.exists() or jdk_home_symlink.resolve() != Path(underlying_dist.home):
         safe_delete(str(jdk_home_symlink))  # Safe-delete, in case it's a broken symlink.
-        safe_mkdir_for(jdk_home_symlink)
+        safe_mkdir_for(str(jdk_home_symlink))
         jdk_home_symlink.symlink_to(underlying_dist.home)
 
     return Distribution(home_path=jdk_home_symlink)
 
   @property
   def underlying_dist(self) -> Distribution:
-    return self._zinc_factory.dist
+    return cast(Distribution, self._zinc_factory.dist)
 
   @memoized_property
   def _compiler_bridge(self):

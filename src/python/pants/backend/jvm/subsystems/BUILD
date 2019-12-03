@@ -12,6 +12,7 @@ python_library(
     'src/python/pants/build_graph',
     'src/python/pants/java/jar',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -101,6 +102,7 @@ python_library(
     'src/python/pants/subsystem',
     'src/python/pants/task',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -154,7 +156,8 @@ python_library(
     ':shader',
     'src/python/pants/subsystem',
     'src/python/pants/util:dirutil',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -173,6 +176,7 @@ python_library(
   dependencies=[
     'src/python/pants/subsystem',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -185,4 +189,5 @@ python_library(
     'src/python/pants/subsystem',
     'src/python/pants/util:dirutil',
   ],
+  tags = {"partially_type_checked"},
 )

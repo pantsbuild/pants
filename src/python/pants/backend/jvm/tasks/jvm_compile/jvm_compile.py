@@ -4,6 +4,7 @@
 import functools
 import os
 from multiprocessing import cpu_count
+from typing import Optional
 
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
 from pants.backend.jvm.subsystems.java import Java
@@ -13,7 +14,7 @@ from pants.backend.jvm.subsystems.zinc import Zinc
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.javac_plugin import JavacPlugin
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
-from pants.backend.jvm.tasks.classpath_products import ClasspathEntry
+from pants.backend.jvm.tasks.classpath_entry import ClasspathEntry
 from pants.backend.jvm.tasks.jvm_compile.class_not_found_error_patterns import (
   CLASS_NOT_FOUND_ERROR_PATTERNS,
 )
@@ -180,9 +181,9 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
 
   # Subclasses must implement.
   # --------------------------
-  _name = None
+  _name: Optional[str] = None
   # The name used in JvmPlatform to refer to this compiler task.
-  compiler_name = None
+  compiler_name: Optional[str] = None
 
   @classmethod
   def subsystem_dependencies(cls):

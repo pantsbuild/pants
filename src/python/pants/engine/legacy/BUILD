@@ -15,6 +15,7 @@ python_library(
     'src/python/pants/engine:selectors',
     'src/python/pants/util:dirutil',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -29,6 +30,7 @@ python_library(
     'src/python/pants/engine:parser',
     'src/python/pants/util:memo',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -41,6 +43,7 @@ python_library(
     'src/python/pants/engine:objects',
     'src/python/pants/option',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -82,4 +85,5 @@ python_library(
     'src/python/pants/source',
     'src/python/pants/util:dirutil',
   ],
+  tags = {"partially_type_checked"},
 )

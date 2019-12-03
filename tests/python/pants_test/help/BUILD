@@ -8,7 +8,8 @@ python_tests(
   dependencies=[
     'src/python/pants/build_graph',
     'src/python/pants/help',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -17,7 +18,8 @@ python_tests(
   coverage=['pants.help.help_formatter'],
   dependencies=[
     'src/python/pants/help',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -27,7 +29,8 @@ python_tests(
   dependencies=[
     'src/python/pants/help',
     'src/python/pants/option',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -39,14 +42,13 @@ python_tests(
     'src/python/pants/option',
     'src/python/pants/subsystem',
     'src/python/pants/task',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
   name='help_integration',
-  sources=[
-    'test_help_integration.py',
-  ],
+  sources=['test_help_integration.py'],
   dependencies=[
     'src/python/pants/testutil:int-test',
   ],
