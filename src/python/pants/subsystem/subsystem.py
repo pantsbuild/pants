@@ -177,7 +177,6 @@ class Subsystem(SubsystemClientMixin, Optionable):
 
   @staticmethod
   def get_streaming_workunit_callbacks(subsystem_names: Iterable[str]) -> List[Callable]:
-
     """
     This method is used to dynamically generate a list of callables
     intended to be passed to StreamingWorkunitHandler. The caller provides a
