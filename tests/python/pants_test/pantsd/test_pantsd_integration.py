@@ -111,7 +111,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         # Run target that throws an exception in pants.
         self.assert_failure(
           self.run_pants_with_workdir(
-            ['test', 'testprojects/src/python/unicode/compilation_failure'],
+            ['lint', 'testprojects/src/python/unicode/compilation_failure'],
             workdir,
             pantsd_config)
         )
