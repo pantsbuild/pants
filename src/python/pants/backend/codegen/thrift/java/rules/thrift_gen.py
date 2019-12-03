@@ -1,7 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import re
+import os
 from dataclasses import dataclass
 from typing import FrozenSet, Tuple
 
@@ -9,11 +9,10 @@ from pants.backend.codegen.thrift.java.thrift_defaults import ThriftDefaults
 from pants.backend.jvm.rules.hermetic_dist import HermeticDist
 from pants.backend.jvm.rules.jvm_tool import JvmToolClasspathResult
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin, JvmToolRequest
-from pants.build_graph.address import Address
 from pants.engine.console import Console
 from pants.engine.fs import Digest, DirectoriesToMerge, Snapshot
 from pants.engine.goal import Goal
-from pants.engine.isolated_process import ExecuteProcessRequest
+from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTarget, TransitiveHydratedTargets
 from pants.engine.objects import Collection
 from pants.engine.rules import RootRule, console_rule, optionable_rule, rule
@@ -141,38 +140,41 @@ async def create_thrift_gen_request(
 
   # NB: To calculate the output files to capture, we replace the .thrift file extension with
   # .<language>, where <language> is the value computed for the --language argument above!
-  expected_output_files = [
-    re.sub(r'\.thrift$', f'.{output_language}', file_name)
+  expected_output_dirs = frozenset(
+    os.path.join(os.path.dirname(file_name), f'thrift{output_language}')
     for file_name in cur_target_source_root_stripped_sources.snapshot.files
-  ]
+  )
 
   exe_req = ExecuteProcessRequest(
     argv=tuple([
       '.jdk/bin/java',
-      '-cp', ':'.join(thrift_gen_classpath_result.snapshot.files),
+      '-cp', ':'.join(
+        thrift_gen_classpath_result.snapshot.files +
+        thrift_gen_classpath_result.snapshot.dirs
+      ),
+      'com.twitter.scrooge.Main',
+    ] + args + [
+      *cur_target_source_root_stripped_sources.snapshot.files
     ]),
     input_files=merged_input_files,
     description=f'Invoke scrooge for the sources of the target {hydrated_target.address}',
-    output_files=tuple(expected_output_files),
+    output_directories=tuple(expected_output_dirs),
     jdk_home=hermetic_dist.underlying_home,
     is_nailgunnable=True,
   )
   return ThriftGenRequest(exe_req)
 
 
-class TestThriftGenRequestCreation(Goal):
-  name = 'test-thrift-gen-request-creation'
+@dataclass(frozen=True)
+class ThriftGenResult:
+  snapshot: Snapshot
 
 
-@console_rule
-async def test_thrift_gen_request_creation(
-    console: Console,
-) -> TestThriftGenRequestCreation:
-  example_target_spec = Address.parse('testprojects/src/thrift/org/pantsbuild/testproject:thrift-java')
-  target = await Get[HydratedTarget](Address, example_target_spec)
-  req = await Get[ThriftGenRequest](ThriftableTarget(target))
-  console.print_stdout(f'req: {req}')
-  return TestThriftGenRequestCreation(exit_code=0)
+@rule
+async def execute_thrift(req: ThriftGenRequest) -> ThriftGenResult:
+  exe_result = await Get[ExecuteProcessResult](ExecuteProcessRequest, req.exe_req)
+  snapshot = await Get[Snapshot](Digest, exe_result.output_directory_digest)
+  return ThriftGenResult(snapshot)
 
 
 @dataclass(frozen=True)
@@ -187,8 +189,29 @@ class ThriftResults:
 
 
 @rule
-def fast_thrift_gen() -> ThriftResults:
-  return None
+async def fast_thrift_gen(thriftable_targets: ThriftableTargets) -> ThriftResults:
+  thrift_gen_results = zip(
+    thriftable_targets,
+    await MultiGet(Get[ThriftGenResult](ThriftableTarget, t) for t in thriftable_targets))
+  return ThriftResults(tuple(
+    ThriftedTarget(original=target.underlying, output=result.snapshot)
+    for target, result in thrift_gen_results
+  ))
+
+
+class TestThriftGen(Goal):
+  name = 'test-thrift-gen-request-creation'
+
+
+@console_rule
+async def test_thrift_gen(
+    console: Console,
+    thts: TransitiveHydratedTargets,
+) -> TestThriftGen:
+  console.print_stdout(f'thts: {thts}')
+  results = await Get[ThriftResults](TransitiveHydratedTargets, thts)
+  console.print_stdout(f'results: {results}')
+  return TestThriftGen(exit_code=0)
 
 
 def rules():
@@ -199,6 +222,7 @@ def rules():
     optionable_rule(ThriftDefaults),
     RootRule(ThriftableTarget),
     create_thrift_gen_request,
-    test_thrift_gen_request_creation,
+    execute_thrift,
     fast_thrift_gen,
+    test_thrift_gen,
   ]

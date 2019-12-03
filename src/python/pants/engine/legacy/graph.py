@@ -518,7 +518,8 @@ async def transitive_hydrated_targets(addresses: Addresses) -> TransitiveHydrate
     closure.add(tht.root)
     to_visit.extend(tht.dependencies)
 
-  return TransitiveHydratedTargets(tuple(tht.root for tht in transitive_hydrated_targets), closure)
+  return TransitiveHydratedTargets(roots=tuple(tht.root for tht in transitive_hydrated_targets),
+                                   closure=tuple(closure))
 
 
 @rule
