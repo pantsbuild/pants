@@ -6,7 +6,7 @@ import os.path
 from abc import ABCMeta, abstractmethod
 from collections.abc import MutableSequence, MutableSet
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable, List, Optional, Sequence, Tuple, Type, Union, cast
+from typing import Any, Callable, Dict, FrozenSet, Iterable, List, Optional, Sequence, Tuple, Type, Union, cast
 
 from pants.build_graph.address import BuildFileAddress
 from pants.build_graph.target import Target
@@ -17,6 +17,7 @@ from pants.engine.rules import UnionRule
 from pants.engine.struct import Struct, StructWithDeps
 from pants.source import wrapped_globs
 from pants.util.contextutil import exception_logging
+from pants.util.memo import memoized_classproperty
 from pants.util.meta import classproperty
 from pants.util.objects import Exactly
 
@@ -35,6 +36,58 @@ class TargetAdaptor(StructWithDeps):
     # TODO: this isn't actually safe to override as not being Optional. There are
     # some cases where this property is not defined. But, then we get a ton of MyPy issues.
     return cast(BuildFileAddress, super().address)
+
+  @abstractmethod
+  @classproperty
+  def v1_target_class(cls):
+    """A v1 Target class to intantiate without a v1 build graph."""
+
+  @memoized_classproperty
+  def _only_v2_target_kwargs(cls) -> FrozenSet[str]:
+    """These keys do not show up in the v1 Target class."""
+    return frozenset(['abstract', 'extends', 'merges', 'dependencies'])
+
+  @classmethod
+  def _patch_v1_target_kwargs(cls, **kwargs) -> Dict[str, Any]:
+    """Edit kwargs to be compatible with the v1 Target class."""
+    kwargs = kwargs.copy()
+
+    # Remove kwargs that are only for TargetAdaptors, and don't pass on keys that are just defined
+    # as properties on the v1 Target class to instantiate.
+    keys_to_delete = (cls._only_v2_target_kwargs |
+                      (cls.v1_target_class._all_property_attribute_names -
+                       cls.v1_target_class._named_constructor_args))
+    for non_v1_key in keys_to_delete:
+      if non_v1_key in kwargs:
+        del kwargs[non_v1_key]
+
+    address = kwargs['address']
+
+    maybe_sources = kwargs.get('sources', None)
+    if not maybe_sources:
+      maybe_single_source = kwargs.get('source', None)
+      if maybe_single_source:
+        kwargs['sources'] = wrapped_globs.Files.create_fileset_with_spec(
+          rel_path=address.spec_path,
+          patterns=[maybe_single_source])
+      else:
+        kwargs['sources'] = wrapped_globs.FilesetWithSpec.empty(address.spec_path)
+    elif isinstance(maybe_sources, BaseGlobs):
+      kwargs['sources'] = maybe_sources.legacy_globs_class.create_fileset_with_spec(
+        rel_path=address.spec_path,
+        patterns=maybe_sources._patterns,
+        **maybe_sources._kwargs)
+
+    return kwargs
+
+  def __init__(self, **kwargs):
+    super().__init__(**kwargs)
+    assert issubclass(self.v1_target_class, Target)
+    self.v1_target = self.v1_target_class(
+      **self._patch_v1_target_kwargs(**self._kwargs))
+
+  def get_sources(self):
+    """Returns target's non-deferred sources if exists or the default sources if defined.
 
   def get_sources(self) -> Optional["GlobsWithConjunction"]:
     """Returns target's non-deferred sources if exists or the default sources if defined.
@@ -83,15 +136,17 @@ class TargetAdaptor(StructWithDeps):
     """Returns a tuple of Fields for captured fields which need additional treatment."""
     with exception_logging(logger, 'Exception in `field_adaptors` property'):
 
+      # Add all fields which are declared as properties on the v1 Target class to the v2
+      # TargetAdaptor. An ArbitraryField requires no extra processing to hydrate.
       property_fields = [
-        ArbitraryField(
+        ArbitraryField.coerce_hashable_field(
           address=self.address,
           arg=k,
-          value=getattr(self, k),
+          value=getattr(self.v1_target, k),
         )
-        for k, v in
-        self.__class__.__dict__.items()
-        if isinstance(v, property) and k != 'field_adaptors'
+        for k in self.v1_target_class._all_property_attribute_names
+        if (k not in self._only_v2_target_kwargs) and
+        (k not in self.v1_target_class._non_v2_target_kwargs)
       ]
 
       all_adaptors = tuple(property_fields)
@@ -153,6 +208,18 @@ class ArbitraryField:
   address: Any
   arg: Any
   value: Any
+
+  @classmethod
+  def coerce_hashable_field(cls, address, arg, value):
+    if isinstance(value, list):
+      value = tuple(value)
+
+    try:
+      hash(value)
+    except TypeError as e:
+      raise TypeError(f'failed to coerce value {value} to hashable when creating {cls.__name__}!') from e
+
+    return cls(address=address, arg=arg, value=value)
 
 
 @dataclass(frozen=True)

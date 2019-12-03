@@ -5,7 +5,7 @@ import logging
 import os
 import weakref
 from hashlib import sha1
-from typing import Optional, Sequence, Union
+from typing import FrozenSet, Optional, Sequence, Union
 
 from twitter.common.collections import OrderedSet
 
@@ -23,9 +23,9 @@ from pants.build_graph.target_addressable import TargetAddressable
 from pants.build_graph.target_scopes import Scope
 from pants.fs.fs import safe_filename
 from pants.source.payload_fields import SourcesField
-from pants.source.wrapped_globs import FilesetWithSpec
+from pants.source.wrapped_globs import FilesetRelPathWrapper, FilesetWithSpec
 from pants.subsystem.subsystem import Subsystem
-from pants.util.memo import memoized_method, memoized_property
+from pants.util.memo import memoized_classproperty, memoized_method, memoized_property
 
 
 logger = logging.getLogger(__name__)
@@ -64,6 +64,39 @@ class Target(AbstractTarget):
 
   :API: public
   """
+
+  @memoized_classproperty
+  def _non_v2_target_kwargs(cls) -> FrozenSet[str]:
+    """These keys should *not* show up in the `.field_adaptors` property of any v2 TargetAdaptor."""
+    # TODO: derive these from some decorator!!!
+    return frozenset([
+      'dependents',
+      'export_addresses',
+      'export_specs',
+      'derived_from',
+      'is_synthetic',
+      'is_original',
+      'concrete_derived_from',
+      'transitive',
+      'identifier',
+      'id',
+      'derived_from_chain',
+      '_sources_field',
+      'target_base',
+    ])
+
+  @memoized_classproperty
+  def _all_property_attribute_names(cls) -> FrozenSet[str]:
+    return frozenset(
+      k for k, v in cls.__dict__.items()
+      if isinstance(v, property)
+    )
+
+  @memoized_classproperty
+  def _named_constructor_args(cls) -> FrozenSet[str]:
+    """Arguments to the constructor of this Target subclass"""
+    constructor = cls.__init__.__code__ # type: ignore[misc]
+    return frozenset(constructor.co_varnames[0:constructor.co_argcount])
 
   class RecursiveDepthError(AddressLookupError):
     """Raised when there are too many recursive calls to calculate the fingerprint."""
@@ -115,6 +148,9 @@ class Target(AbstractTarget):
       # `source` as a named kwarg; it would be nice to error rather than silently swallow the value,
       # if there were such a way.
       ignore_params.add('source')
+      # TODO: Figure out why this is necessary for the v2 TargetAdaptor.v1_target instantiation of
+      # the `target()` target to work!
+      ignore_params.add('sources')
       unknown_args = {arg: value for arg, value in kwargs.items() if arg not in ignore_params}
       ignored_args = {arg: value for arg, value in kwargs.items() if arg in ignore_params}
       if ignored_args:
@@ -148,7 +184,7 @@ class Target(AbstractTarget):
       result = {}
       for tag, targets in (self.get_options().tag_targets_mappings or {}).items():
         for target in targets:
-          target_tags = result.setdefault(Address.parse(target).spec, []) 
+          target_tags = result.setdefault(Address.parse(target).spec, [])
           target_tags.append(tag)
       return result
 
@@ -282,7 +318,7 @@ class Target(AbstractTarget):
     closure.update(target_roots)
     return closure
 
-  def __init__(self, name, address, build_graph, type_alias=None, payload=None, tags=None,
+  def __init__(self, name, address, build_graph=None, type_alias=None, payload=None, tags=None,
                description=None, no_cache=False, scope=None, _transitive=None,
                **kwargs):
     """
@@ -323,9 +359,9 @@ class Target(AbstractTarget):
     self.payload.freeze()
     self.name = name
     self.address = address
-    self._build_graph = weakref.proxy(build_graph)
+    self._build_graph = weakref.proxy(build_graph) if build_graph is not None else None
     self._type_alias = type_alias
-    self._tags = set(tags or []).union(self.TagAssignments.tags_for(address.spec))
+    self._tags = frozenset(tags or []) | frozenset(self.TagAssignments.tags_for(address.spec))
     self.description = description
 
     self._cached_fingerprint_map = {}
@@ -920,6 +956,9 @@ class Target(AbstractTarget):
     """
     if not sources:
       sources = FilesetWithSpec.empty(sources_rel_path)
+    elif isinstance(sources, list):
+      sources = FilesetRelPathWrapper.create_fileset_with_spec(rel_path=sources_rel_path,
+                                                               patterns=sources)
     elif not isinstance(sources, FilesetWithSpec):
       key_arg_section = "'{}' to be ".format(key_arg) if key_arg else ""
       raise TargetDefinitionException(self, "Expected {}a glob, an address or a list, but was {}"

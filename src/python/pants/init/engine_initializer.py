@@ -132,28 +132,39 @@ def _legacy_symbol_table(build_file_aliases: BuildFileAliases) -> SymbolTable:
         tuple(factory.target_types)[0],
       )
 
+  def specialize_target_adaptor(key, cls):
+    """Implement the TargetAdaptor.v1_target_class @classproperty.
+
+    Extract the assigned .v1_target_class from the entry `key` created above by
+    `_make_target_adaptor()`, and propagate it to the new TargetAdaptor subclass `cls.`
+    """
+    class AnonSpecializedClass(cls):
+      v1_target_class = table[key].v1_target_class
+    AnonSpecializedClass.__name__ = cls.__name__
+    table[key] = AnonSpecializedClass
+
   # TODO: The alias replacement here is to avoid elevating "TargetAdaptors" into the public
   # API until after https://github.com/pantsbuild/pants/issues/3560 has been completed.
   # These should likely move onto Target subclasses as the engine gets deeper into beta
   # territory.
-  table['python_library'] = PythonTargetAdaptor
-  table['jvm_app'] = JvmAppAdaptor
-  table['jvm_binary'] = JvmBinaryAdaptor
-  table['python_app'] = PythonAppAdaptor
-  table['python_tests'] = PythonTestsAdaptor
-  table['python_binary'] = PythonBinaryAdaptor
-  table['python_requirement_library'] = PythonRequirementLibraryAdaptor
-  table['remote_sources'] = RemoteSourcesAdaptor
-  table['resources'] = ResourcesAdaptor
-  table['page'] = PageAdaptor
-  table['python_awslambda'] = PythonAWSLambdaAdaptor
+  specialize_target_adaptor('python_library', PythonTargetAdaptor)
+  specialize_target_adaptor('jvm_app', JvmAppAdaptor)
+  specialize_target_adaptor('jvm_binary', JvmBinaryAdaptor)
+  specialize_target_adaptor('python_app', PythonAppAdaptor)
+  specialize_target_adaptor('python_tests', PythonTestsAdaptor)
+  specialize_target_adaptor('python_binary', PythonBinaryAdaptor)
+  specialize_target_adaptor('python_requirement_library', PythonRequirementLibraryAdaptor)
+  specialize_target_adaptor('remote_sources', RemoteSourcesAdaptor)
+  specialize_target_adaptor('resources', ResourcesAdaptor)
+  specialize_target_adaptor('page', PageAdaptor)
+  specialize_target_adaptor('python_awslambda', PythonAWSLambdaAdaptor)
 
   # Note that these don't call _make_target_adaptor because we don't have a handy reference to the
   # types being constructed. They don't have any default_sources behavior, so this should be ok,
   # but if we end up doing more things in _make_target_adaptor, we should make sure they're
   # applied here too.
-  table['pants_plugin'] = PantsPluginAdaptor
-  table['contrib_plugin'] = PantsPluginAdaptor
+  specialize_target_adaptor('pants_plugin', PantsPluginAdaptor)
+  specialize_target_adaptor('contrib_plugin', PantsPluginAdaptor)
 
   return SymbolTable(table)
 
@@ -162,11 +173,18 @@ def _make_target_adaptor(base_class, target_type):
   """Create an adaptor subclass for the given TargetAdaptor base class and legacy target type."""
   globs, excludes = _compute_default_sources_globs(base_class, target_type)
   if globs is None:
-    return base_class
+    class AnonClass(base_class):
+      # TargetAdaptor.v1_target_class is an abstract @classproperty!
+      v1_target_class = target_type
+    AnonClass.__name__ = base_class.__name__
+    return AnonClass
 
   class GlobsHandlingTargetAdaptor(base_class):
+    # TargetAdaptor.v1_target_class is an abstract @classproperty!
+    v1_target_class = target_type
     default_sources_globs = globs
     default_sources_exclude_globs = excludes
+  GlobsHandlingTargetAdaptor.__name__ = base_class.__name__
 
   return GlobsHandlingTargetAdaptor
 

@@ -11,6 +11,7 @@ from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 from pants.subsystem.subsystem import Subsystem
+from pants.util.memo import memoized_classproperty
 
 
 class PythonBinary(PythonTarget):
@@ -23,6 +24,10 @@ class PythonBinary(PythonTarget):
 
   :API: public
   """
+
+  @memoized_classproperty
+  def _non_v2_target_kwargs(cls):
+    return super()._non_v2_target_kwargs | frozenset(['pexinfo'])
 
   @classmethod
   def alias(cls):

@@ -210,7 +210,7 @@ class TargetTest(TestBase):
 
   def test_has_sources(self):
     def sources(rel_path, *args):
-      return Globs.create_fileset_with_spec(rel_path, *args)
+      return Globs.create_fileset_with_spec(rel_path, patterns=args)
 
     self.create_file('foo/bar/a.txt', 'a_contents')
 

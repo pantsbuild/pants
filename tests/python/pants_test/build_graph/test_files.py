@@ -9,7 +9,7 @@ from pants.testutil.test_base import TestBase
 class FilesTest(TestBase):
   @staticmethod
   def sources(rel_path, *globs):
-    return Globs.create_fileset_with_spec(rel_path, *globs)
+    return Globs.create_fileset_with_spec(rel_path, patterns=globs)
 
   def test_has_sources(self):
     self.create_files('files', ['a.txt', 'B.java'])

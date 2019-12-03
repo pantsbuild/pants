@@ -9,6 +9,7 @@ from pants.backend.codegen.thrift.java.thrift_defaults import ThriftDefaults
 from pants.backend.jvm.rules.hermetic_dist import HermeticDist
 from pants.backend.jvm.rules.jvm_tool import JvmToolClasspathResult
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin, JvmToolRequest
+from pants.build_graph.address import Address
 from pants.engine.console import Console
 from pants.engine.fs import Digest, DirectoriesToMerge, Snapshot
 from pants.engine.goal import Goal
@@ -88,30 +89,32 @@ async def create_thrift_gen_request(
     thriftable_target: ThriftableTarget,
     thrift_defaults: ThriftDefaults,
     hermetic_dist: HermeticDist,
+    thrift_gen_tool: ThriftGenTool,
 ) -> ThriftGenRequest:
 
+  # Extract the underlying HydratedTarget, then the v2 TargetAdaptor, then the v1 Target.
   hydrated_target = thriftable_target.underlying
-  target = hydrated_target.adaptor
+  v2_target = hydrated_target.adaptor
+  v1_target = v2_target.v1_target
 
-  args = list(thrift_defaults.compiler_args(target))
+  args = list(thrift_defaults.compiler_args(v1_target))
 
-  default_java_namespace = thrift_defaults.default_java_namespace(target)
+  default_java_namespace = thrift_defaults.default_java_namespace(v1_target)
   if default_java_namespace:
     args.extend(['--default-java-namespace', default_java_namespace])
 
   # NB: No need to set import paths here, because we can materialize all the target's dependencies
   # relative to their source root!
 
-  # TODO: validate language!
-  output_language = thrift_defaults.language(target)
+  output_language = thrift_defaults.language(v1_target)
   args.extend(['--language', output_language])
 
-  namespace_map = thrift_defaults.namespace_map(target)
+  namespace_map = thrift_defaults.namespace_map(v1_target)
   namespace_map = tuple(sorted(namespace_map.items())) if namespace_map else ()
   for lhs, rhs in namespace_map:
     args.extend(['--namespace-map', f'{lhs}={rhs}'])
 
-  # TODO: do we need to account for `target.include_paths`?
+  # TODO: do we need to account for `v1_target.include_paths`?
 
   args.append('--verbose')
 
@@ -124,8 +127,14 @@ async def create_thrift_gen_request(
     for dep in hydrated_target.dependencies
   )
 
+  thrift_gen_classpath_result = await Get[JvmToolClasspathResult](
+    JvmToolRequest, thrift_gen_tool.create_tool_request('v2-thrift-gen'))
+
   merged_input_files = await Get[Digest](DirectoriesToMerge(tuple(
-    [cur_target_source_root_stripped_sources.snapshot.directory_digest] + [
+    [
+      thrift_gen_classpath_result.snapshot.directory_digest,
+      cur_target_source_root_stripped_sources.snapshot.directory_digest
+    ] + [
       dep_sources.snapshot.directory_digest
       for dep_sources in dependency_source_root_stripped_sources
     ])))
@@ -140,9 +149,7 @@ async def create_thrift_gen_request(
   exe_req = ExecuteProcessRequest(
     argv=tuple([
       '.jdk/bin/java',
-      '-cp', ':'.join([
-        # TODO: get classspath for scrooge!!!!!!!
-      ])
+      '-cp', ':'.join(thrift_gen_classpath_result.snapshot.files),
     ]),
     input_files=merged_input_files,
     description=f'Invoke scrooge for the sources of the target {hydrated_target.address}',
@@ -151,6 +158,21 @@ async def create_thrift_gen_request(
     is_nailgunnable=True,
   )
   return ThriftGenRequest(exe_req)
+
+
+class TestThriftGenRequestCreation(Goal):
+  name = 'test-thrift-gen-request-creation'
+
+
+@console_rule
+async def test_thrift_gen_request_creation(
+    console: Console,
+) -> TestThriftGenRequestCreation:
+  example_target_spec = Address.parse('testprojects/src/thrift/org/pantsbuild/testproject:thrift-java')
+  target = await Get[HydratedTarget](Address, example_target_spec)
+  req = await Get[ThriftGenRequest](ThriftableTarget(target))
+  console.print_stdout(f'req: {req}')
+  return TestThriftGenRequestCreation(exit_code=0)
 
 
 @dataclass(frozen=True)
@@ -177,5 +199,6 @@ def rules():
     optionable_rule(ThriftDefaults),
     RootRule(ThriftableTarget),
     create_thrift_gen_request,
+    test_thrift_gen_request_creation,
     fast_thrift_gen,
   ]

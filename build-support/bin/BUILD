@@ -73,7 +73,7 @@ python_binary(
 
 python_binary(
   name = 'generate_travis_yml',
-  sources = 'generate_travis_yml.py',
+  source = 'generate_travis_yml.py',
   dependencies = [
     '3rdparty/python:PyYAML',
   ],
@@ -82,7 +82,7 @@ python_binary(
 
 python_binary(
   name = 'get_rbe_token',
-  sources = 'get_rbe_token.py',
+  source = 'get_rbe_token.py',
   dependencies = [
     '3rdparty/python:ansicolors',
     '3rdparty/python:requests',

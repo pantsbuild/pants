@@ -7,6 +7,7 @@ from pants.base.payload_field import ExcludesField, JarsField, PrimitiveField
 from pants.build_graph.address import Address
 from pants.build_graph.target import Target
 from pants.java.jar.jar_dependency import JarDependency
+from pants.util.memo import memoized_classproperty
 
 
 class JarLibrary(Target):
@@ -14,6 +15,10 @@ class JarLibrary(Target):
 
   :API: public
   """
+
+  @memoized_classproperty
+  def _non_v2_target_kwargs(cls):
+    return super()._non_v2_target_kwargs | frozenset(['excludes', 'jar_dependencies', 'strict_deps'])
 
   def __init__(self, payload=None, jars=None, managed_dependencies=None, **kwargs):
     """

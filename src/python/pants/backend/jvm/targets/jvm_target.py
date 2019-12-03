@@ -12,7 +12,7 @@ from pants.base.payload_field import ExcludesField, PrimitiveField, PrimitivesSe
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.java.jar.exclude import Exclude
-from pants.util.memo import memoized_property
+from pants.util.memo import memoized_classproperty, memoized_property
 
 
 class JvmTarget(Target, Jarable):
@@ -20,6 +20,10 @@ class JvmTarget(Target, Jarable):
 
   :API: public
   """
+
+  @memoized_classproperty
+  def _non_v2_target_kwargs(cls):
+    return super()._non_v2_target_kwargs | frozenset(['excludes'])
 
   @classmethod
   def subsystems(cls):

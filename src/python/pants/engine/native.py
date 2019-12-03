@@ -673,7 +673,11 @@ class ExternContext:
 
   def identify(self, obj):
     """Return an Ident-shaped tuple for the given object."""
-    hash_ = hash(obj)
+    try:
+      hash_ = hash(obj)
+    except TypeError as e:
+      raise TypeError(
+        f'internal error in engine: hashing error in extern_identify: {e}. object was: {obj}') from e
     type_id = self.to_id(type(obj))
     return (hash_, TypeId(type_id))
 

@@ -6,6 +6,7 @@ from pants.base.payload_field import PythonRequirementsField
 from pants.base.validation import assert_list
 from pants.build_graph.target import Target
 from pants.python.python_requirement import PythonRequirement
+from pants.util.memo import memoized_classproperty
 
 
 class PythonRequirementLibrary(Target):
@@ -13,6 +14,10 @@ class PythonRequirementLibrary(Target):
 
   :API: public
   """
+
+  @memoized_classproperty
+  def _non_v2_target_kwargs(cls):
+    return super()._non_v2_target_kwargs | frozenset(['requirements'])
 
   def __init__(self, payload=None, requirements=None, **kwargs):
     """

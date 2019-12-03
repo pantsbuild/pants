@@ -13,6 +13,7 @@ from pants.base.deprecated import warn_or_error
 from pants.base.exceptions import UnaddressableObjectError
 from pants.base.parse_context import ParseContext
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.build_graph.address import Address
 from pants.engine.legacy.structs import BundleAdaptor, Globs, RGlobs, TargetAdaptor, ZGlobs
 from pants.engine.objects import Serializable
 from pants.engine.parser import ParseError, Parser, SymbolTable
@@ -86,6 +87,7 @@ class LegacyPythonCallbacksParser(Parser):
                 'Targets in root-level BUILD files must be named explicitly.')
         name = kwargs.get('name')
         if name and self._serializable:
+          kwargs['address'] = Address(spec_path=self._parse_context.rel_path, target_name=name)
           kwargs.setdefault('type_alias', self._type_alias)
           obj = self._object_type(**kwargs)
           self._parse_context._storage.add(obj)

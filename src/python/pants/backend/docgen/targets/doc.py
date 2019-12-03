@@ -93,7 +93,7 @@ class Page(Target):
     """
     payload = payload or Payload()
     if not format:
-      if sources.files[0].lower().endswith('.rst'):
+      if sources.files and sources.files[0].lower().endswith('.rst'):
         format = 'rst'
       else:
         format = 'md'
@@ -113,7 +113,8 @@ class Page(Target):
   @property
   def source(self):
     """The first (and only) source listed by this Page."""
-    return list(self.payload.sources.source_paths)[0]
+    paths = list(self.payload.sources.source_paths)
+    return paths[0] if paths else None
 
   @classmethod
   def compute_injectable_address_specs(cls, kwargs=None, payload=None):
