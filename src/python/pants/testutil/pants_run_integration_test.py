@@ -358,7 +358,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
     env.update(PYTHONPATH=os.pathsep.join(sys.path))
 
     # Pants command that was called from the test shouldn't have a parent.
-    if env.get('PANTS_PARENT_BUILD_ID'):
+    if 'PANTS_PARENT_BUILD_ID' in env:
       del env['PANTS_PARENT_BUILD_ID']
 
     # Don't overwrite the profile of this process in the called process.

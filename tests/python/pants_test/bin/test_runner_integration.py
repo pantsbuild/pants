@@ -41,11 +41,6 @@ class RunnerIntegrationTest(PantsRunIntegrationTest):
 
   def test_parent_build_id_set_only_for_pants_runs_called_by_other_pants_runs(self):
     with self.temporary_workdir() as workdir:
-      config = {
-        'GLOBAL': {
-          'colors': True,
-        }
-      }
       command = [
         'run',
         'testprojects/src/python/nested_runs',
@@ -55,7 +50,6 @@ class RunnerIntegrationTest(PantsRunIntegrationTest):
       result = self.run_pants_with_workdir(
         command,
         workdir,
-        config,
       )
       self.assert_success(result)
 
@@ -66,13 +60,8 @@ class RunnerIntegrationTest(PantsRunIntegrationTest):
         info_path = os.path.join(run_tracker_sub_dir, 'info')
         self.assert_is_file(info_path)
         with open(info_path, 'r') as info_f:
-          info = info_f.read()
-          self.assertIn('cmd_line', info)
-          info_f.seek(0)
-          for line in info_f:
-            if 'cmd_line' in line:
-              if 'testprojects/src/python/nested_runs' in line:
-                self.assertNotIn('parent_build_id', info)
-              elif 'goals' in line:
-                self.assertIn('parent_build_id', info)
-              break
+          lines = dict(line.split(': ', 1) for line in info_f.readlines())
+          if 'goals' in lines['cmd_line']:
+            self.assertIn('parent_build_id', lines)
+          else:
+            self.assertNotIn('parent_build_id', lines)
