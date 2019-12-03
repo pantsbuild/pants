@@ -7,6 +7,12 @@ not undergone the vetting associated with ``stable`` releases.
 1.24.0.dev1 (12/02/2019)
 ------------------------
 
+API Changes
+~~~~~~~~~~~
+
+* Remove deprecated option mypy_version (#8751)
+  `PR #8751 <https://github.com/pantsbuild/pants/pull/8751>`_
+
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
