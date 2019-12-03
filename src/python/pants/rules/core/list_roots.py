@@ -16,7 +16,7 @@ class RootsOptions(LineOriented, GoalSubsystem):
   name = 'roots'
 
 
-class Roots(LineOriented, Goal):
+class Roots(Goal):
   subsystem_cls = RootsOptions
 
 
