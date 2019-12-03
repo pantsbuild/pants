@@ -111,7 +111,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         # Run target that throws an exception in pants.
         self.assert_failure(
           self.run_pants_with_workdir(
-            ['bundle', 'testprojects/src/java/org/pantsbuild/testproject/bundle:missing-files'],
+            ['lint', 'testprojects/src/python/unicode/compilation_failure'],
             workdir,
             pantsd_config)
         )

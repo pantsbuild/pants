@@ -1,10 +1,15 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from pathlib import Path
+from textwrap import dedent
+
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class TestJvmAppIntegrationTest(PantsRunIntegrationTest):
+
+  BUNDLE_DIRECTORY = 'testprojects/src/java/org/pantsbuild/testproject/bundle'
 
   def test_bundle(self):
     """Default bundle with --no-deployjar.
@@ -15,7 +20,7 @@ class TestJvmAppIntegrationTest(PantsRunIntegrationTest):
     self.assertEqual(
       'Hello world from Foo\n',
       self.bundle_and_run(
-        'testprojects/src/java/org/pantsbuild/testproject/bundle',
+        self.BUNDLE_DIRECTORY,
         'testprojects.src.java.org.pantsbuild.testproject.bundle.bundle',
         bundle_jar_name='bundle-example-bin',
         # this is the only thing bundle jar has, which means Class-Path must be properly
@@ -38,7 +43,7 @@ class TestJvmAppIntegrationTest(PantsRunIntegrationTest):
     self.assertEqual(
       'Hello world from Foo\n',
       self.bundle_and_run(
-        'testprojects/src/java/org/pantsbuild/testproject/bundle',
+        self.BUNDLE_DIRECTORY,
         'testprojects.src.java.org.pantsbuild.testproject.bundle.bundle',
         bundle_jar_name='bundle-example-bin',
         bundle_options=['--deployjar'],
@@ -48,6 +53,18 @@ class TestJvmAppIntegrationTest(PantsRunIntegrationTest):
           'data/exampledata.txt']))
 
   def test_missing_files(self):
-    pants_run = self.run_pants(['bundle',
-                                'testprojects/src/java/org/pantsbuild/testproject/bundle:missing-files'])
+    build_path = Path(self.BUNDLE_DIRECTORY, "BUILD")
+    original_content = build_path.read_text()
+    new_content = dedent("""\
+      jvm_app(
+        name='missing-files',
+        basename = 'bundle-example',
+        binary=':bundle-bin',
+        bundles=[
+          bundle(fileset=['data/no-such-file']),
+        ]
+      )
+      """)
+    with self.with_overwritten_file_content(str(build_path), f"{original_content}\n{new_content}"):
+      pants_run = self.run_pants(['bundle', f'{self.BUNDLE_DIRECTORY}:missing-files'])
     self.assert_failure(pants_run)
