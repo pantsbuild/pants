@@ -180,13 +180,7 @@ object Main {
 
     Settings.SettingsParser.parse(preprocessArgs(context.getArgs), Settings()) match {
       case Some(settings) =>
-        // We don't want to reload scala compiler everytime we call nailmain so just the version
-        // in the server directory. aka here.
-        var fixedScalaLocation = settings.scala.withAbsolutePaths(Paths.get(".").toAbsolutePath.toFile)
-        var fixedBridgeLocation = Util.normaliseOpt(Some(Paths.get(".").toAbsolutePath.toFile))(settings.compiledBridgeJar)
-        var settingsWithAbsPath = settings.withAbsolutePaths(new File(context.getWorkingDirectory))
-        settingsWithAbsPath = settingsWithAbsPath.copy(compiledBridgeJar = fixedBridgeLocation, scala = fixedScalaLocation)
-        mainImpl(settingsWithAbsPath, startTime, n => context.exit(n))
+        mainImpl(settings.withAbsolutePaths(new File(context.getWorkingDirectory)), startTime, n => context.exit(n))
       case None => {
         println("See zinc-compiler --help for information about options")
         context.exit(1)
@@ -212,7 +206,6 @@ object Main {
 
     if (isDebug) {
       log.debug(s"Inputs: $inputs")
-      log.debug(s"Compiled bridge location: ${settings.compiledBridgeJar}")
     }
 
     try {
