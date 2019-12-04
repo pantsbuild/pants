@@ -4,7 +4,7 @@
 
 set -eo pipefail
 
-PANTS_GH_PAGES='https://github.com/pantsbuild/pantsbuild.github.io.git'
+PANTS_GH_PAGES='git@github.com:pantsbuild/pantsbuild.github.io.git'
 GIT_URL="${GIT_URL:-${PANTS_GH_PAGES}}"
 
 PANTS_SITE_URL='https://www.pantsbuild.org'
