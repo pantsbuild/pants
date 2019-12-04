@@ -86,8 +86,8 @@ fn construct_nailgun_client_request(
     is_nailgunnable,
   } = original_req;
   client_args.insert(0, client_main_class);
-  // arg file is only materialized to the client workdir, but because we use nailMain java is running in the
-  // differnt  dir so we have to adjust the path to point to the correct spot, which is in the
+  // The arg file is only materialized to the client workdir, but because we use nailMain, java is running in a
+  // different dir. We have to adjust the path to point to the correct spot, which is in the
   // client workdir. This happens because the arg file is parsed before the absolute paths
   // are computed by nailgun in nailMain
   if let Some(maybe_arg_file) = client_args.last() {

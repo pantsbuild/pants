@@ -473,9 +473,9 @@ class BaseZincCompile(JvmCompile):
       native_image_snapshots = []
       # TODO: Lean on distribution for the bin/java appending here
       image_specific_argv =  ['.jdk/bin/java'] + jvm_options + [
-        # put all the scala deps on the classpath so that if they change and we're using nailgun through
-        # zinc's nailMain method we will invalidate the nailgun if the scala paths change. The path itself
-        # is used for the fingerprint not the content on the jars.
+        # Put all the scala deps on the classpath, so that if they change and we're using nailgun 
+        # we will invalidate the nailgun if the scala paths change. Fingerprintint is done with the file path
+        # not the content of the jars.
         '-cp', ":".join([nailgun_relpath, zinc_relpath, compiler_bridge_relpath] + scala_relpaths),
         Zinc.ZINC_COMPILE_MAIN
       ]

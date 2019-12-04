@@ -34,6 +34,8 @@ lazy_static! {
   static ref NAILGUN_PORT_REGEX: Regex = Regex::new(r".*\s+port\s+(\d+)\.$").unwrap();
 }
 
+static MAX_PROCESS_OUTPUT_POLLS: usize = 10;
+
 pub type NailgunProcessName = String;
 type NailgunProcessMap = HashMap<NailgunProcessName, Mutex<NailgunProcess>>;
 pub type Port = usize;
@@ -124,12 +126,12 @@ impl NailgunPool {
 
     let processes = self.processes.clone();
     processes.lock()
-      .map_err(|_| "Failed to lock processes Mutex".to_string())
+      .map_err(|e| format!("Failed to lock processes Mutex: {:?}", e))
       .and_then(move |mut processes| {
         let connection_result = if let Some(process) = processes.get_mut(&name) {
           // Clone some fields that we need for later
           process.lock()
-            .map_err(|_| "Failed to lock nailgun process Mutex".to_string())
+            .map_err(|e| format!("Failed to lock NailgunProcess Mutex: {:?}", e))
             .and_then(move |process| {
             let (process_name, process_fingerprint, process_port, build_id_that_started_the_server) = (
               process.name.clone(),
@@ -148,7 +150,7 @@ impl NailgunPool {
                 .handle
                 .lock()
                 .try_wait()
-                .map_err(|e| format!("Error getting the process status! {}", e))
+                .map_err(|e| format!("Error getting the process status: {}", e))
                 .clone();
             match status {
               Ok(None) => {
@@ -305,11 +307,11 @@ pub struct NailgunProcess {
 }
 
 fn read_port(stdout: PathBuf) -> BoxFuture<Port, String> {
-  future::loop_fn(10, move |mut loops| {
+  future::loop_fn(MAX_PROCESS_OUTPUT_POLLS, move |mut loops| {
     let stdout = stdout.clone();
     let wait_period = Duration::from_millis(100);
     sleep(wait_period)
-      .map_err(|_| "sleep failed for some reason!".to_string())
+      .map_err(|e| format!("sleep while waiting for nailgun stdout failed: {:?}", e))
       .and_then(move |_| {
         fs::File::open(stdout.clone()).map_err(move |_| format!("Could not open file {:?}", stdout))
       })
@@ -320,8 +322,8 @@ fn read_port(stdout: PathBuf) -> BoxFuture<Port, String> {
           .map_err(|(err, _s)| format!("Error getting file line in read port {}", err))
       })
       .and_then(move |(line, _)| {
-        info!("DEBUG_NAILGUN start output is {:?}", line);
         if let Some(s) = line {
+          debug!("Nailgun process startup output is: `{:?}`", s);
           Ok(Loop::Break(Ok(s)))
         } else {
           loops -= 1;
@@ -355,13 +357,13 @@ fn read_port(stdout: PathBuf) -> BoxFuture<Port, String> {
 
 impl NailgunProcess {
   fn create_output_file(server_workdir: PathBuf, name: String) -> BoxFuture<fs::File, String> {
-    let fname = Self::log_path(server_workdir, name);
+    let fname = Self::process_output_path(server_workdir, name);
     tokio::fs::File::create(fname.clone())
       .map_err(move |e| format!("Failed to open file {:?} for reading {:?}", fname, e))
       .to_boxed()
   }
 
-  fn log_path(server_workdir: PathBuf, name: String) -> PathBuf {
+  fn process_output_path(server_workdir: PathBuf, name: String) -> PathBuf {
     server_workdir.clone().join(name)
   }
 
@@ -404,8 +406,9 @@ impl NailgunProcess {
         }
       })
       .and_then(move |child| {
-        let stdout_log = Self::log_path(workdir_path.clone(), "stdout.log".to_string());
-        read_port(stdout_log).map(|port| (child, port))
+        let stdout_file_path =
+          Self::process_output_path(workdir_path.clone(), "stdout.log".to_string());
+        read_port(stdout_file_path).map(|port| (child, port))
       })
       .and_then(|(child, port)| {
         debug!(
@@ -427,7 +430,6 @@ impl NailgunProcess {
 
 impl Drop for NailgunProcess {
   fn drop(&mut self) {
-    // TODO we should probaly use the nails client to call the ng-kill nail?
     let _ = self.handle.lock().kill();
   }
 }
