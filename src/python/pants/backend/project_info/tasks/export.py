@@ -70,7 +70,7 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):  # t
     return  isinstance(dep, (JarLibrary, JvmTarget, JvmApp))
 
   @staticmethod
-  def _jar_id(jar):
+  def jar_id(jar):
     """Create a string identifier for the IvyModuleRef key.
     :param IvyModuleRef jar: key for a resolved jar
     :returns: String representing the key as a maven coordinate
@@ -244,7 +244,7 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):  # t
           for _, jar_entry in jar_products:
             coordinate = jar_entry.coordinate
             # We drop classifier and type_ since those fields are represented in the global
-            # libraries dict and here we just want the key into that dict (see `_jar_id`).
+            # libraries dict and here we just want the key into that dict (see `jar_id`).
             yield M2Coordinate(org=coordinate.org, name=coordinate.name, rev=coordinate.rev)
 
       target_libraries = OrderedSet()
@@ -277,7 +277,7 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):  # t
       } for source_root_package_prefix in self._source_roots_for_target(current_target)]
 
       if classpath_products:
-        info['libraries'] = [self._jar_id(lib) for lib in target_libraries]
+        info['libraries'] = [self.jar_id(lib) for lib in target_libraries]
       targets_map[current_target.address.spec] = info
 
     for target in targets:
@@ -359,10 +359,10 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):  # t
         'default_interpreter': str(default_interpreter.identity),
         'interpreters': interpreters_info
       }
-    
+
     if self.get_options().available_target_types:
       graph_info['available_target_types'] = self._target_types()
-    
+
     return graph_info
 
   def _resolve_jars_info(self, targets, classpath_products):
@@ -379,7 +379,7 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):  # t
       targets, respect_excludes=False)
     for conf, jar_entry in jar_products:
       conf = jar_entry.coordinate.classifier or 'default'
-      mapping[self._jar_id(jar_entry.coordinate)][conf] = jar_entry.cache_path
+      mapping[self.jar_id(jar_entry.coordinate)][conf] = jar_entry.cache_path
     return mapping
 
   @memoized_property

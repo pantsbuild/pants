@@ -464,6 +464,12 @@ class SchedulerSession:
         unique_exceptions
       )
 
+  @staticmethod
+  def _filter_throws(throws):
+    return (
+      state.exc for _, state in throws if state.exc is not None
+    )
+
   def run_goal_rule(self, product, subject):
     """
     :param product: A Goal subtype.
@@ -473,9 +479,7 @@ class SchedulerSession:
     request = self.execution_request([product], [subject])
     returns, throws = self.execute(request)
 
-    if throws:
-      _, state = throws[0]
-      exc = state.exc
+    for exc in self._filter_throws(throws):
       self._trace_on_error([exc], request)
       return PANTS_FAILED_EXIT_CODE
     _, state = returns[0]

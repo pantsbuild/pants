@@ -147,7 +147,7 @@ async def create_thrift_gen_request(
 
   exe_req = ExecuteProcessRequest(
     argv=tuple([
-      '.jdk/bin/java',
+      os.path.join(hermetic_dist.symbolic_home, 'bin/java'),
       '-cp', ':'.join(
         thrift_gen_classpath_result.snapshot.files +
         thrift_gen_classpath_result.snapshot.dirs

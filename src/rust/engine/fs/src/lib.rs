@@ -478,6 +478,15 @@ impl PathGlobs {
       .collect::<Result<Vec<_>, String>>()
   }
 
+  pub fn for_single_file(file_path: String) -> Result<Self, String> {
+    Self::create(
+      &[file_path],
+      &[],
+      StrictGlobMatching::Error,
+      GlobExpansionConjunction::AllMatch,
+    )
+  }
+
   pub fn create(
     globs: &[String],
     strict_match_behavior: StrictGlobMatching,

@@ -8,6 +8,7 @@ from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
+from pants.util.memo import memoized_classproperty
 
 
 class JUnitTests(JvmTarget):
@@ -34,6 +35,10 @@ class JUnitTests(JvmTarget):
   @classmethod
   def subsystems(cls):
     return super().subsystems() + (JUnit,)
+
+  @memoized_classproperty
+  def _non_v2_target_kwargs(cls):
+    return super()._non_v2_target_kwargs | frozenset(['test_platform'])
 
   def __init__(self, cwd=None, test_platform=None, payload=None, timeout=None,
                extra_jvm_options=None, extra_env_vars=None, concurrency=None,

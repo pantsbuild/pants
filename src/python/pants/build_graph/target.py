@@ -151,6 +151,8 @@ class Target(AbstractTarget):
       # TODO: Figure out why this is necessary for the v2 TargetAdaptor.v1_target instantiation of
       # the `target()` target to work!
       ignore_params.add('sources')
+      # TODO: This is used in RemoteSources -- should we be handling it here?
+      ignore_params.add('dest')
       unknown_args = {arg: value for arg, value in kwargs.items() if arg not in ignore_params}
       ignored_args = {arg: value for arg, value in kwargs.items() if arg in ignore_params}
       if ignored_args:

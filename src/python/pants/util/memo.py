@@ -184,6 +184,7 @@ def memoized_method(
   )
 
 
+# TODO: integrate with @functools.cached_property!
 def memoized_property(
   func: Optional[Callable[..., T]] = None, key_factory=per_instance, cache_factory=dict,
 ) -> T:

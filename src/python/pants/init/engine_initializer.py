@@ -8,8 +8,10 @@ from typing import Any, Iterable, Optional, Tuple, cast
 from pants.backend.docgen.targets.doc import Page
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
+from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.python.targets.python_app import PythonApp
 from pants.backend.python.targets.python_binary import PythonBinary
+from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.build_environment import get_buildroot
@@ -36,6 +38,7 @@ from pants.engine.legacy.parser import LegacyPythonCallbacksParser
 from pants.engine.legacy.structs import (
   JvmAppAdaptor,
   JvmBinaryAdaptor,
+  NodeBundleAdaptor,
   PageAdaptor,
   PantsPluginAdaptor,
   PythonAppAdaptor,
@@ -46,6 +49,11 @@ from pants.engine.legacy.structs import (
   PythonTestsAdaptor,
   RemoteSourcesAdaptor,
   ResourcesAdaptor,
+  PythonDistAdaptor,
+  PythonTargetAdaptor,
+  PythonTestsAdaptor,
+  RemoteSourcesAdaptor,
+  ScalaLibraryAdaptor,
   TargetAdaptor,
 )
 from pants.engine.legacy.structs import rules as structs_rules
@@ -103,13 +111,16 @@ def _apply_default_sources_globs(base_class, target_type):
 # their default source globs while preserving their concrete types. As with the alias replacement
 # below, this is a delaying tactic to avoid elevating the TargetAdaptor API.
 _apply_default_sources_globs(JvmAppAdaptor, JvmApp)
+_apply_default_sources_globs(ScalaLibraryAdaptor, ScalaLibrary)
 _apply_default_sources_globs(PythonAppAdaptor, PythonApp)
 _apply_default_sources_globs(JvmBinaryAdaptor, JvmBinary)
 _apply_default_sources_globs(PageAdaptor, Page)
 _apply_default_sources_globs(PythonBinaryAdaptor, PythonBinary)
+_apply_default_sources_globs(PythonDistAdaptor, PythonDistribution)
 _apply_default_sources_globs(PythonTargetAdaptor, PythonLibrary)
 _apply_default_sources_globs(PythonTestsAdaptor, PythonTests)
 _apply_default_sources_globs(RemoteSourcesAdaptor, RemoteSources)
+_apply_default_sources_globs(ScalaLibraryAdaptor, ScalaLibrary)
 
 
 def _legacy_symbol_table(build_file_aliases: BuildFileAliases) -> SymbolTable:
@@ -150,14 +161,17 @@ def _legacy_symbol_table(build_file_aliases: BuildFileAliases) -> SymbolTable:
   specialize_target_adaptor('python_library', PythonTargetAdaptor)
   specialize_target_adaptor('jvm_app', JvmAppAdaptor)
   specialize_target_adaptor('jvm_binary', JvmBinaryAdaptor)
+  specialize_target_adaptor('scala_library', ScalaLibraryAdaptor)
   specialize_target_adaptor('python_app', PythonAppAdaptor)
   specialize_target_adaptor('python_tests', PythonTestsAdaptor)
   specialize_target_adaptor('python_binary', PythonBinaryAdaptor)
   specialize_target_adaptor('python_requirement_library', PythonRequirementLibraryAdaptor)
+  specialize_target_adaptor('python_dist', PythonDistAdaptor)
   specialize_target_adaptor('remote_sources', RemoteSourcesAdaptor)
   specialize_target_adaptor('resources', ResourcesAdaptor)
   specialize_target_adaptor('page', PageAdaptor)
   specialize_target_adaptor('python_awslambda', PythonAWSLambdaAdaptor)
+  specialize_target_adaptor('node_bundle', NodeBundleAdaptor)
 
   # Note that these don't call _make_target_adaptor because we don't have a handy reference to the
   # types being constructed. They don't have any default_sources behavior, so this should be ok,

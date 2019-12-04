@@ -189,10 +189,10 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
   @classmethod
   def subsystem_dependencies(cls):
     return super().subsystem_dependencies() + (DependencyContext,
-                                                              Java,
-                                                              JvmPlatform,
-                                                              ScalaPlatform,
-                                                              Zinc.Factory)
+                                               Java,
+                                               JvmPlatform,
+                                               ScalaPlatform,
+                                               Zinc.Factory)
 
   @classmethod
   def name(cls):
@@ -922,7 +922,8 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     return {t.plugin: t.closure() for t in plugin_tgts}
 
   @staticmethod
-  def _local_jvm_distribution(settings=None):
+  def local_jvm_distribution(settings=None):
+    """General utility method to select a jvm distribution, falling back to non-strict selection."""
     settings_args = [settings] if settings else []
     try:
       local_distribution = JvmPlatform.preferred_jvm_distribution(settings_args, strict=True)
@@ -974,7 +975,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     # java version the target expects to be compiled against.
     # See: https://github.com/pantsbuild/pants/issues/6416 for covering using
     #      different jdks in remote builds.
-    local_distribution = self._local_jvm_distribution()
+    local_distribution = self.local_jvm_distribution()
     return match(self.execution_strategy, {
       self.ExecutionStrategy.subprocess: lambda: local_distribution,
       self.ExecutionStrategy.nailgun: lambda: local_distribution,

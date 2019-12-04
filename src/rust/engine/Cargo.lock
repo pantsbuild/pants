@@ -670,6 +670,7 @@ dependencies = [
  "cbindgen 0.8.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "cc 1.0.37 (registry+https://github.com/rust-lang/crates.io-index)",
  "engine 0.0.1",
+ "fs 0.0.1",
  "futures 0.1.28 (registry+https://github.com/rust-lang/crates.io-index)",
  "hashing 0.0.1",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",

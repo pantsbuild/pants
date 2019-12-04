@@ -6,6 +6,7 @@ from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 from pants.build_graph.target import Target
+from pants.util.memo import memoized_classproperty
 
 
 class PythonAWSLambda(Target):
@@ -13,6 +14,10 @@ class PythonAWSLambda(Target):
 
   :API: public
   """
+
+  @memoized_classproperty
+  def _non_v2_target_kwargs(cls):
+    return super()._non_v2_target_kwargs | frozenset(['binary'])
 
   def __init__(self,
                binary=None,

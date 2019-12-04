@@ -99,7 +99,7 @@ class ExportDepAsJar(ConsoleTask):
       return "{}.{}".format(pants_target_type.__module__, pants_target_type.__name__)
 
   @staticmethod
-  def _jar_id(jar):
+  def jar_id(jar):
     """Create a string identifier for the IvyModuleRef key.
     :param IvyModuleRef jar: key for a resolved jar
     :returns: String representing the key as a maven coordinate
@@ -148,7 +148,7 @@ class ExportDepAsJar(ConsoleTask):
       targets, respect_excludes=False)
     for conf, jar_entry in jar_products:
       conf = jar_entry.coordinate.classifier or 'default'
-      mapping[self._jar_id(jar_entry.coordinate)][conf] = jar_entry.cache_path
+      mapping[self.jar_id(jar_entry.coordinate)][conf] = jar_entry.cache_path
     return mapping
 
   @staticmethod

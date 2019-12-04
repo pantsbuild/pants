@@ -18,7 +18,7 @@ class JarLibrary(Target):
 
   @memoized_classproperty
   def _non_v2_target_kwargs(cls):
-    return super()._non_v2_target_kwargs | frozenset(['excludes', 'jar_dependencies', 'strict_deps'])
+    return super()._non_v2_target_kwargs | frozenset(['excludes', 'strict_deps', 'managed_dependencies'])
 
   def __init__(self, payload=None, jars=None, managed_dependencies=None, **kwargs):
     """

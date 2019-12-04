@@ -8,7 +8,7 @@ from collections.abc import MutableSequence, MutableSet
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, FrozenSet, Iterable, List, Optional, Sequence, Tuple, Type, Union, cast
 
-from pants.build_graph.address import BuildFileAddress
+from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.target import Target
 from pants.engine.addressable import addressable_list
 from pants.engine.fs import GlobExpansionConjunction, PathGlobs
@@ -16,8 +16,9 @@ from pants.engine.objects import Locatable, union
 from pants.engine.rules import UnionRule
 from pants.engine.struct import Struct, StructWithDeps
 from pants.source import wrapped_globs
+from pants.util.collections import assert_single_element
 from pants.util.contextutil import exception_logging
-from pants.util.memo import memoized_classproperty
+from pants.util.memo import memoized_classproperty, memoized_property
 from pants.util.meta import classproperty
 from pants.util.objects import Exactly
 
@@ -51,6 +52,10 @@ class TargetAdaptor(StructWithDeps):
   def _patch_v1_target_kwargs(cls, **kwargs) -> Dict[str, Any]:
     """Edit kwargs to be compatible with the v1 Target class."""
     kwargs = kwargs.copy()
+
+    class Wrapper:
+      target_types = [cls.v1_target_class]
+    kwargs['dest'] = Wrapper
 
     # Remove kwargs that are only for TargetAdaptors, and don't pass on keys that are just defined
     # as properties on the v1 Target class to instantiate.
@@ -86,7 +91,7 @@ class TargetAdaptor(StructWithDeps):
     self.v1_target = self.v1_target_class(
       **self._patch_v1_target_kwargs(**self._kwargs))
 
-  def get_sources(self):
+  def get_sources(self, single_source_attr_name='source', plural_sources_attr_name='sources'):
     """Returns target's non-deferred sources if exists or the default sources if defined.
 
   def get_sources(self) -> Optional["GlobsWithConjunction"]:
@@ -96,8 +101,8 @@ class TargetAdaptor(StructWithDeps):
     refactor how deferred sources are implemented.
       see: https://github.com/pantsbuild/pants/issues/2997
     """
-    source = getattr(self, 'source', None)
-    sources = getattr(self, 'sources', None)
+    source = getattr(self, single_source_attr_name, None) if single_source_attr_name else None
+    sources = getattr(self, plural_sources_attr_name, None)
 
     if source is not None and sources is not None:
       raise Target.IllegalArgument(
@@ -205,14 +210,25 @@ class HydrateableField:
 @dataclass(frozen=True)
 class ArbitraryField:
   """???"""
-  address: Any
-  arg: Any
+  address: Address
+  arg: str
   value: Any
 
   @classmethod
-  def coerce_hashable_field(cls, address, arg, value):
+  def coerce_hashable_object(cls, value):
     if isinstance(value, list):
       value = tuple(value)
+    if isinstance(value, set):
+      value = tuple(sorted(value))
+    if isinstance(value, dict):
+      value = tuple(sorted(value.items()))
+    if isinstance(value, tuple):
+      value = tuple(cls.coerce_hashable_object(v) for v in value)
+    return value
+
+  @classmethod
+  def coerce_hashable_field(cls, address, arg, value):
+    value = cls.coerce_hashable_object(value)
 
     try:
       hash(value)
@@ -220,6 +236,12 @@ class ArbitraryField:
       raise TypeError(f'failed to coerce value {value} to hashable when creating {cls.__name__}!') from e
 
     return cls(address=address, arg=arg, value=value)
+
+
+@dataclass(frozen=True)
+class PointedToAddressField:
+  arg: str
+  value: Address
 
 
 @dataclass(frozen=True)
@@ -252,6 +274,26 @@ class SourcesField:
   def __repr__(self):
     return '{}(address={}, input_globs={}, arg={}, filespecs={!r})'.format(
       type(self).__name__, self.address, self.base_globs, self.arg, self.filespecs)
+
+
+@dataclass(frozen=True)
+class JavaSourcesTargetsField:
+  arg: str
+  addresses: Tuple[Address, ...]
+
+
+class ScalaLibraryAdaptor(TargetAdaptor):
+  @memoized_classproperty
+  def _only_v2_target_kwargs(cls):
+    return super()._only_v2_target_kwargs | frozenset(['java_sources'])
+
+  @property
+  def field_adaptors(self):
+    with exception_logging(logger, 'Exception in `field_adaptors` property'):
+      return super().field_adaptors + (JavaSourcesTargetsField(
+        'java_sources',
+        addresses=(Address.parse(a) for a in getattr(self, 'java_sources', ())),
+      ),)
 
 
 class JvmBinaryAdaptor(TargetAdaptor):
@@ -315,7 +357,14 @@ class AppAdaptor(TargetAdaptor):
   @property
   def field_adaptors(self) -> Tuple:
     with exception_logging(logger, 'Exception in `field_adaptors` property'):
-      field_adaptors = super().field_adaptors
+      binary_spec = self._kwargs.get('binary', None)
+      if binary_spec:
+        binary_spec = Address.parse(binary_spec, relative_to=self.address.spec_path)
+      elif self.dependencies:
+        binary_spec = assert_single_element(self.dependencies)
+      field_adaptors = super().field_adaptors + ((
+        PointedToAddressField('binary', binary_spec),
+      ) if binary_spec else ())
       if getattr(self, 'bundles', None) is None:
         return field_adaptors
 
@@ -341,7 +390,10 @@ class AppAdaptor(TargetAdaptor):
     )
 
 
-class JvmAppAdaptor(AppAdaptor): pass
+class JvmAppAdaptor(AppAdaptor):
+  @property
+  def jar_dependencies(self):
+    return self.binary.jar_dependencies
 
 
 class PythonAppAdaptor(AppAdaptor): pass
@@ -397,6 +449,14 @@ class PythonAWSLambdaAdaptor(TargetAdaptor): pass
 
 class PythonRequirementLibraryAdaptor(TargetAdaptor): pass
 
+class PythonDistAdaptor(PythonTargetAdaptor):
+  def validate_sources(self, sources):
+    if 'setup.py' not in sources.files:
+      raise Target.IllegalArgument(
+        self.address.spec,
+        'A file named setup.py must be in the same '
+        'directory as the BUILD file containing this target.')
+
 
 class PantsPluginAdaptor(PythonTargetAdaptor):
   def get_sources(self) -> "GlobsWithConjunction":
@@ -405,6 +465,18 @@ class PantsPluginAdaptor(PythonTargetAdaptor):
 
 # TODO: Remove all the subclasses once we remove globs et al. The only remaining subclass would be
 # Files, which should simply be unified into BaseGlobs.
+class NodeBundleAdaptor(TargetAdaptor):
+  @property
+  def field_adaptors(self):
+    with exception_logging(logger, 'Exception in `field_adaptors` property'):
+      return super().field_adaptors + (
+        PointedToAddressField(
+          'node_module',
+          Address.parse(self._kwargs['node_module'], relative_to=self.address.spec_path),
+        ),
+      )
+
+
 class BaseGlobs(Locatable, metaclass=ABCMeta):
   """An adaptor class to allow BUILD file parsing from ContextAwareObjectFactories."""
 
@@ -553,6 +625,8 @@ class GlobsWithConjunction:
 def rules():
   return [
     UnionRule(HydrateableField, ArbitraryField),
+    UnionRule(HydrateableField, PointedToAddressField),
     UnionRule(HydrateableField, SourcesField),
+    UnionRule(HydrateableField, JavaSourcesTargetsField),
     UnionRule(HydrateableField, BundlesField),
   ]

@@ -134,18 +134,21 @@ class Distribution:
 
     return list(collect_existing_libs())
 
+  def _compute_home_from_system_properties(self) -> str:
+    home: str = self._get_system_properties(self.java)['java.home']
+    # The `jre/bin/java` executable in a JDK distribution will report `java.home` as the jre dir,
+    # so we check for this and re-locate to the containing jdk dir when present.
+    if os.path.basename(home) == 'jre':
+      jdk_dir = os.path.dirname(home)
+      if self._is_executable(os.path.join(jdk_dir, 'bin', 'javac')):
+        home = jdk_dir
+    return home
+
   @property
-  def home(self):
+  def home(self) -> str:
     """Returns the distribution JAVA_HOME."""
     if not self._home:
-      home = self._get_system_properties(self.java)['java.home']
-      # The `jre/bin/java` executable in a JDK distribution will report `java.home` as the jre dir,
-      # so we check for this and re-locate to the containing jdk dir when present.
-      if os.path.basename(home) == 'jre':
-        jdk_dir = os.path.dirname(home)
-        if self._is_executable(os.path.join(jdk_dir, 'bin', 'javac')):
-          home = jdk_dir
-      self._home = home
+      self._home = self._compute_home_from_system_properties()
     return self._home
 
   @property

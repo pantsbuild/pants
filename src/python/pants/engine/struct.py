@@ -250,7 +250,7 @@ class Struct(Serializable, SerializableFactory, Validatable):
       elif isinstance(value, set):
         return tuple(sorted(hashable(v) for v in value))
       else:
-        return value
+        return hash(value)
     return tuple(sorted((k, hashable(v)) for k, v in self._kwargs.items()
                         if k not in self._INHERITANCE_FIELDS))
 

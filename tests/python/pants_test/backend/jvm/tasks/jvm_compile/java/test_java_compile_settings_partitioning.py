@@ -179,7 +179,7 @@ class JavaCompileSettingsPartitioningTest(NailgunTaskTestBase):
                         JvmPlatformSettings('11', '11', ['-Xfoo:bar']))
 
   def _get_zinc_arguments(self, settings):
-    distribution = JvmCompile._local_jvm_distribution(settings=settings)
+    distribution = JvmCompile.local_jvm_distribution(settings=settings)
     return self._format_zinc_arguments(settings, distribution)
 
   def test_java_home_extraction(self):

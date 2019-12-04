@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Iterator, Optional
 
 from pants.util.meta import SingletonMetaclass
+from pants.util.memo import memoized_property
 
 
 # TODO: Even this should probably just be a new-style option?
@@ -41,19 +42,20 @@ class BuildRoot(metaclass=SingletonMetaclass):
 
   @property
   def pathlib_path(self) -> Path:
-    return Path(self.path)
+    return self.new_path
 
-  @property
+  @memoized_property
   def path(self) -> str:
     """Returns the build root for the current workspace."""
-    if self._root_dir is None:
-      # This env variable is for testing purpose.
-      override_buildroot = os.environ.get('PANTS_BUILDROOT_OVERRIDE', None)
-      if override_buildroot:
-        self._root_dir = override_buildroot
-      else:
-        self._root_dir = os.path.realpath(self.find_buildroot())
-    return self._root_dir
+    return str(self.new_path)
+
+  @memoized_property
+  def new_path(self) -> Path:
+    # This env variable is for testing purpose.
+    override_buildroot = os.environ.get('PANTS_BUILDROOT_OVERRIDE', None)
+    if override_buildroot:
+      return Path(override_buildroot)
+    return Path(os.path.realpath(self.find_buildroot()))
 
   @path.setter
   def path(self, root_dir: str) -> None:

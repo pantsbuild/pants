@@ -44,6 +44,7 @@ use engine::{
   RootResult, Rule, Scheduler, Session, Tasks, TypeId, Types, Value,
 };
 use futures01::{future, Future};
+use fs::PathGlobs;
 use hashing::{Digest, EMPTY_DIGEST};
 use log::{error, warn, Log};
 use logging::logger::LOGGER;
@@ -869,6 +870,15 @@ pub extern "C" fn capture_snapshots(
       return e.into();
     }
   };
+
+  capture_snapshots_impl(scheduler_ptr, session_ptr, path_globs_and_roots)
+}
+
+fn capture_snapshots_impl(
+  scheduler_ptr: *mut Scheduler,
+  session_ptr: *mut Session,
+  path_globs_and_roots: Vec<(PathGlobs, PathBuf, Option<Digest>)>,
+) -> PyResult {
   let workunit_store = with_session(session_ptr, |session| session.workunit_store());
 
   with_scheduler(scheduler_ptr, |scheduler| {
@@ -937,6 +947,14 @@ pub extern "C" fn run_local_interactive_process(
   session_ptr: *mut Session,
   request: Handle,
 ) -> PyResult {
+  run_local_interactive_process_impl(scheduler_ptr, session_ptr, request).into()
+}
+
+fn run_local_interactive_process_impl(
+  scheduler_ptr: *mut Scheduler,
+  session_ptr: *mut Session,
+  request: Handle,
+) -> Result<Value, String> {
   use std::process;
 
   with_scheduler(scheduler_ptr, |scheduler| {
@@ -1017,8 +1035,8 @@ pub extern "C" fn run_local_interactive_process(
       })
     })
   })
-  .into()
 }
+
 
 #[no_mangle]
 pub extern "C" fn materialize_directories(
@@ -1048,6 +1066,16 @@ pub extern "C" fn materialize_directories(
       return e.into();
     }
   };
+
+  materialize_directories_impl(scheduler_ptr, session_ptr, digests_and_path_prefixes, None)
+}
+
+fn materialize_directories_impl(
+  scheduler_ptr: *mut Scheduler,
+  session_ptr: *mut Session,
+  digests_and_path_prefixes: Vec<(Digest, PathBuf)>,
+  containing_dir: Option<PathBuf>,
+) -> PyResult {
   let workunit_store = with_session(session_ptr, |session| session.workunit_store());
   with_scheduler(scheduler_ptr, |scheduler| {
     let types = &scheduler.core.types;
@@ -1060,7 +1088,7 @@ pub extern "C" fn materialize_directories(
           // NB: all DirectoryToMaterialize paths are validated in Python to be relative paths.
           // Here, we join them with the build root.
           let mut destination = PathBuf::new();
-          destination.push(scheduler.core.build_root.clone());
+          destination.push(containing_dir.as_ref().unwrap_or_else(|| &scheduler.core.build_root));
           destination.push(path_prefix);
           let metadata = scheduler.core.store().materialize_directory(
             destination.clone(),

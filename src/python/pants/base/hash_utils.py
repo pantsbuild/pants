@@ -8,6 +8,7 @@ import typing
 from collections import OrderedDict
 from collections.abc import Iterable, Mapping, Set
 from enum import Enum
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Optional, Type, Union
 
@@ -165,7 +166,7 @@ def json_hash(
   return hash_all([json_str], digest=digest)
 
 
-# TODO(#6513): something like python 3's @lru_cache decorator could be useful here!
+@lru_cache(maxsize=128)
 def stable_json_sha1(obj: Any, digest: Optional[Digest] = None) -> str:
   """Hashes `obj` stably; ie repeated calls with the same inputs will produce the same hash.
 

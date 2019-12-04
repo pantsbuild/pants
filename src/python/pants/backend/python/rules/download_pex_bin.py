@@ -1,6 +1,8 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import logging
+import os
 from dataclasses import dataclass
 from typing import Any, Iterable, Optional
 
@@ -20,6 +22,9 @@ from pants.python.python_setup import PythonSetup
 class PexBinUrlGenerator(BinaryToolUrlGenerator):
   def generate_urls(self, version, host_platform):
     return [f'https://github.com/pantsbuild/pex/releases/download/{version}/pex']
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -76,14 +81,19 @@ class DownloadedPexBin(HermeticPex):
     :param kwargs: Any additional :class:`ExecuteProcessRequest` kwargs to pass through.
     """
 
+    pex_env = {k: v for k, v in os.environ.items() if k.startswith('PEX_')}
+    logger.debug(f'added PEX_* from environment: {pex_env}')
     return super().create_execute_request(
       python_setup=python_setup,
       subprocess_encoding_environment=subprocess_encoding_environment,
       pex_path=self.executable,
-      pex_args=["--disable-cache"] + list(pex_args),
+      pex_args=list(pex_args),
       description=description,
       input_files=input_files or self.directory_digest,
-      env=pex_build_environment.invocation_environment_dict,
+      env={
+        **pex_build_environment.invocation_environment_dict,
+        **pex_env,
+      },
       **kwargs
     )
 

@@ -2,8 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
+from typing import Tuple
 
-from pants.backend.jvm.rules.coursier import JarResolveRequest, SnapshottedResolveResult
+from pants.backend.jvm.rules.coursier import (CoursierRequest, JarResolveRequest,
+                                              SnapshottedResolveResult)
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolRequest
 from pants.build_graph.address import Address
 from pants.engine.fs import Snapshot
@@ -36,7 +38,7 @@ class JvmToolClasspathResult:
 
 @rule
 async def snapshot_jar_library_classpath(req: JarLibraryClasspathRequest) -> JvmToolClasspathResult:
-  result = await Get[SnapshottedResolveResult](JarResolveRequest, req.jar_req)
+  result = await Get[SnapshottedResolveResult](CoursierRequest(jar_resolution=req.jar_req))
   return JvmToolClasspathResult(result.merged_snapshot)
 
 
@@ -49,8 +51,9 @@ async def obtain_jvm_tool_classpath(jvm_tool_request: JvmToolRequest) -> JvmTool
   # target!
   try:
     jvm_tool_classpath_req = JvmToolBootstrapTargetTypes(target_adaptor.type_alias).match({
-      JvmToolBootstrapTargetTypes.jar_library: lambda: JarLibraryClasspathRequest(
-        JarResolveRequest(tuple(target_adaptor.jars)))
+      JvmToolBootstrapTargetTypes.jar_library: lambda: JarLibraryClasspathRequest(JarResolveRequest(
+        hydrated_targets=(hydrated_target_from_jvm_tool,),
+        jar_deps=tuple(target_adaptor.jars)))
     })()
   except ValueError as e:
     raise JvmToolBootstrapError(f'unrecognized target type: {e} for'

@@ -4,6 +4,8 @@
 from dataclasses import dataclass
 from typing import Iterable, List, Optional, Tuple
 
+from pex.interpreter import PythonIdentity, PythonInterpreter
+
 from pants.backend.python.rules.download_pex_bin import DownloadedPexBin
 from pants.backend.python.rules.hermetic_pex import HermeticPex
 from pants.backend.python.subsystems.python_native_code import PexBuildEnvironment
@@ -14,6 +16,7 @@ from pants.engine.fs import (
   DirectoriesToMerge,
   DirectoryWithPrefixToAdd,
 )
+from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
 from pants.engine.isolated_process import ExecuteProcessResult, MultiPlatformExecuteProcessRequest
 from pants.engine.legacy.structs import PythonTargetAdaptor, TargetAdaptor
 from pants.engine.platform import Platform, PlatformConstraint
@@ -62,7 +65,13 @@ class PexInterpreterConstraints:
         getattr(target_adaptor, 'compatibility', None)
       )
     }
-    return PexInterpreterConstraints(constraint_set=tuple(sorted(interpreter_constraints)))
+    return cls(constraint_set=tuple(sorted(interpreter_constraints)))
+
+  @classmethod
+  def create_from_interpreter(cls, interpreter: PythonInterpreter) -> 'PexInterpreterConstraints':
+    py_id = interpreter.identity
+    name = py_id.HASHBANGS.get(py_id, 'CPython')
+    return cls((f'{name}=={py_id.version_str}',))
 
 
 @dataclass(frozen=True)
@@ -90,6 +99,7 @@ async def create_pex(
     request: CreatePex,
     pex_bin: DownloadedPexBin,
     python_setup: PythonSetup,
+    interactive_runner: InteractiveRunner,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
     pex_build_environment: PexBuildEnvironment,
     platform: Platform,
@@ -122,25 +132,36 @@ async def create_pex(
   # (execution_platform_constraint, target_platform_constraint) of this dictionary is "The output of
   # this command is intended for `target_platform_constraint` iff it is run on `execution_platform
   # constraint`".
-  execute_process_request = MultiPlatformExecuteProcessRequest(
-    {
-      (PlatformConstraint(platform.value), PlatformConstraint(platform.value)):
-        pex_bin.create_execute_request(
-          python_setup=python_setup,
-          subprocess_encoding_environment=subprocess_encoding_environment,
-          pex_build_environment=pex_build_environment,
-          pex_args=argv,
-          input_files=merged_digest,
-          description=f"Create a requirements PEX: {', '.join(request.requirements.requirements)}",
-          output_files=(request.output_filename,)
-        )
-    }
+  base_exe_req = pex_bin.create_execute_request(
+    python_setup=python_setup,
+    subprocess_encoding_environment=subprocess_encoding_environment,
+    pex_build_environment=pex_build_environment,
+    pex_args=argv,
+    input_files=merged_digest,
+    description=f"Create a requirements PEX: {', '.join(request.requirements.requirements)}",
+    output_files=(request.output_filename,)
   )
+  execute_process_request = MultiPlatformExecuteProcessRequest({
+    (PlatformConstraint(platform.value), PlatformConstraint(platform.value)): base_exe_req,
+  })
 
-  result = await Get[ExecuteProcessResult](
-    MultiPlatformExecuteProcessRequest,
-    execute_process_request
-  )
+  # TODO: Try running it interactively first!!
+  if False:
+    interactive_result = interactive_runner.run_local_interactive_process(
+      InteractiveProcessRequest(
+        argv=base_exe_req.argv,
+        env=base_exe_req.env,
+        hermetic_input=merged_digest,
+        run_in_workspace=False,
+        output_file_path=request.output_filename,
+      ))
+    if interactive_result.process_exit_code == 0:
+      return Pex(directory_digest=interactive_result.output_snapshot.directory_digest,
+                 output_filename=request.output_filename)
+
+  # If that fails, let the normal process execution framework figure out how to error out normally.
+  result = await Get[ExecuteProcessResult](MultiPlatformExecuteProcessRequest,
+                                           execute_process_request)
   return Pex(directory_digest=result.output_directory_digest, output_filename=request.output_filename)
 
 

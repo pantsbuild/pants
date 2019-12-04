@@ -7,6 +7,7 @@ from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
+from pants.util.memo import memoized_classproperty
 
 
 class PythonDistribution(PythonTarget):
@@ -18,10 +19,13 @@ class PythonDistribution(PythonTarget):
   def alias(cls):
     return 'python_dist'
 
+  @memoized_classproperty
+  def _non_v2_target_kwargs(cls):
+    return super()._non_v2_target_kwargs | frozenset(['has_native_sources'])
+
   def __init__(self,
                address=None,
                payload=None,
-               sources=None,
                setup_requires=None,
                **kwargs):
     """
@@ -37,18 +41,12 @@ class PythonDistribution(PythonTarget):
     :param list setup_requires: A list of python requirements to provide during the invocation of
                                 setup.py.
     """
-    if not 'setup.py' in sources:
-      raise TargetDefinitionException(
-        self,
-        'A file named setup.py must be in the same '
-        'directory as the BUILD file containing this target.')
-
     payload = payload or Payload()
     payload.add_fields({
       'setup_requires': PrimitiveField(maybe_list(setup_requires or ()))
     })
     super().__init__(
-      address=address, payload=payload, sources=sources, **kwargs)
+      address=address, payload=payload, **kwargs)
 
   @property
   def has_native_sources(self):

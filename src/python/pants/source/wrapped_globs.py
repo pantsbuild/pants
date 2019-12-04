@@ -12,7 +12,7 @@ from typing_extensions import TypedDict
 from pants.base.build_environment import get_buildroot
 from pants.base.parse_context import ParseContext
 from pants.engine.fs import EMPTY_SNAPSHOT, Snapshot
-from pants.util.dirutil import fast_relpath, fast_relpath_optional
+from pants.util.dirutil import fast_relpath, fast_relpath_collection, fast_relpath_optional
 from pants.util.memo import memoized_property
 
 
@@ -105,7 +105,7 @@ class EagerFilesetWithSpec(FilesetWithSpec):
 
   @memoized_property
   def files(self) -> Tuple[str, ...]:  # type: ignore[override]  # superclass uses @property instead of @memoized_property
-    return tuple(fast_relpath(path, self.rel_root) for path in self.files_relative_to_buildroot)
+    return tuple(fast_relpath_collection(self.files_relative_to_buildroot, self.rel_root))
 
   @memoized_property
   def files_relative_to_buildroot(self) -> Tuple[str, ...]:

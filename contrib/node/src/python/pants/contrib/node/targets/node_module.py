@@ -6,6 +6,7 @@ import logging
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
+from pants.util.memo import memoized_classproperty
 
 from pants.contrib.node.targets.node_package import NodePackage
 
@@ -15,6 +16,10 @@ logger = logging.getLogger(__name__)
 
 class NodeModule(NodePackage):
   """A Node module."""
+
+  @memoized_classproperty
+  def _non_v2_target_kwargs(cls):
+    return super()._non_v2_target_kwargs | frozenset(['bin_executables'])
 
   def __init__(
     self, package_manager=None, sources=None, build_script=None, output_dir='dist',

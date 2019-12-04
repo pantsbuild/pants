@@ -181,7 +181,7 @@ class CoursierMixin(JvmResolverBase):
         for conf, result_list in results.items():
           for result in result_list:
             self._load_json_result(conf, compile_classpath, coursier_cache_dir, invalidation_check,
-                                   pants_jar_base_dir, result, self._override_classifiers_for_conf(conf))
+                                   pants_jar_base_dir, result, self.override_classifiers_for_conf(conf))
 
         self._populate_results_dir(vt_set_results_dir, results)
         resolve_vts.update()
@@ -189,7 +189,8 @@ class CoursierMixin(JvmResolverBase):
         if self.artifact_cache_writes_enabled():
           self.update_artifact_cache([(resolve_vts, [vt_set_results_dir])])
 
-  def _override_classifiers_for_conf(self, conf):
+  @classmethod
+  def override_classifiers_for_conf(cls, conf):
      # TODO Encapsulate this in the result from coursier instead of here.
      #      https://github.com/coursier/coursier/issues/803
     if conf == 'src_doc':
@@ -359,7 +360,9 @@ class CoursierMixin(JvmResolverBase):
 
   @staticmethod
   def _construct_cmd_args(jars, common_args, global_excludes,
-                          pinned_coords, coursier_workdir, json_output_path):
+                          pinned_coords, coursier_workdir, json_output_path,
+                          strict_jar_revision_checking=True,
+                          affecting_the_local_filesystem=True):
 
     # Make a copy, so there is no side effect or others using `common_args`
     cmd_args = list(common_args)
@@ -368,7 +371,7 @@ class CoursierMixin(JvmResolverBase):
 
     # Dealing with intransitivity and forced versions.
     for j in jars:
-      if not j.rev:
+      if (not j.rev) and strict_jar_revision_checking:
         raise TaskError('Undefined revs for jars unsupported by Coursier. "{}"'.format(repr(j.coordinate).replace('M2Coordinate', 'jar')))
 
       module = j.coordinate.simple_coord
@@ -404,19 +407,22 @@ class CoursierMixin(JvmResolverBase):
         local_exclude_args.append(ex_arg)
 
     if local_exclude_args:
-      with temporary_file(coursier_workdir, cleanup=False) as f:
-        exclude_file = f.name
-        with open(exclude_file, 'w') as ex_f:
-          ex_f.write('\n'.join(local_exclude_args))
+      if affecting_the_local_filesystem:
+        with temporary_file(coursier_workdir, cleanup=False) as f:
+          exclude_file = relative_local_excludes_path or f.name
+          with open(exclude_file, 'w') as ex_f:
+            ex_f.write('\n'.join(local_exclude_args))
 
-        cmd_args.append('--local-exclude-file')
-        cmd_args.append(exclude_file)
+          cmd_args.append('--local-exclude-file')
+          cmd_args.append(exclude_file)
 
     for ex in global_excludes:
       cmd_args.append('-E')
       cmd_args.append(f"{ex.org}:{ex.name or '*'}")
 
-    return cmd_args
+    if affecting_the_local_filesystem:
+      return cmd_args
+    return cmd_args, local_exclude_args
 
   def _load_json_result(self, conf, compile_classpath, coursier_cache_path, invalidation_check,
                         pants_jar_path_base, result, override_classifiers=None):
@@ -431,9 +437,9 @@ class CoursierMixin(JvmResolverBase):
     :return: n/a
     """
     # Parse the coursier result
-    flattened_resolution = self._extract_dependencies_by_root(result)
+    flattened_resolution = self.extract_dependencies_by_root(result)
 
-    coord_to_resolved_jars = self._map_coord_to_resolved_jars(result, coursier_cache_path, pants_jar_path_base)
+    coord_to_resolved_jars = self.map_coord_to_resolved_jars(result, coursier_cache_path, pants_jar_path_base)
 
     # Construct a map from org:name to the reconciled org:name:version coordinate
     # This is used when there is won't be a conflict_resolution entry because the conflict
@@ -515,14 +521,14 @@ class CoursierMixin(JvmResolverBase):
                                    invalidation_check,
                                    pants_jar_path_base,
                                    result,
-                                   self._override_classifiers_for_conf(conf))
+                                   self.override_classifiers_for_conf(conf))
           except CoursierResultNotFound:
             return False
 
     return True
 
   @classmethod
-  def _extract_dependencies_by_root(cls, result):
+  def extract_dependencies_by_root(cls, result):
     """
     Only extracts the transitive dependencies for the given coursier resolve.
     Note the "dependencies" field is already transitive.
@@ -562,7 +568,7 @@ class CoursierMixin(JvmResolverBase):
     return flat_result
 
   @classmethod
-  def _map_coord_to_resolved_jars(cls, result, coursier_cache_path, pants_jar_path_base):
+  def map_coord_to_resolved_jars(cls, result, coursier_cache_path, pants_jar_path_base):
     """
     Map resolved files to each org:name:version
 

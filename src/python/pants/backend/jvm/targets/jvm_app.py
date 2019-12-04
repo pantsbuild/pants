@@ -5,6 +5,7 @@ from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 from pants.build_graph.app_base import AppBase
+from pants.util.memo import memoized_classproperty
 
 
 class JvmApp(AppBase):
@@ -17,6 +18,10 @@ class JvmApp(AppBase):
 
   :API: public
   """
+
+  @memoized_classproperty
+  def _non_v2_target_kwargs(cls):
+    return super()._non_v2_target_kwargs | frozenset(['jar_dependencies'])
 
   def __init__(self, payload=None, deployjar=None, **kwargs):
     """

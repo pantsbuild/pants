@@ -1,6 +1,12 @@
 python_library(
   dependencies=[
     '3rdparty/python:dataclasses',
+    'src/python/pants/backend/codegen/thrift/java/rules',
+    'src/python/pants/backend/jvm/rules',
+    'src/python/pants/backend/jvm/targets:all',
+    'src/python/pants/backend/project_info/tasks:export',
+    'src/python/pants/backend/python/rules',
+    'src/python/pants/base:hash_utils',
     'src/python/pants/engine:console',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:objects',

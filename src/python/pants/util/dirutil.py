@@ -54,6 +54,11 @@ def fast_relpath(path: str, start: str) -> str:
   return relpath
 
 
+def fast_relpath_collection(collection: Iterable[str], root) -> List[str]:
+  """???"""
+  return [fast_relpath_optional(c, root) or c for c in collection]
+
+
 def fast_relpath_optional(path: str, start: str) -> Optional[str]:
   """A prefix-based relpath, with no normalization or support for returning `..`.
 

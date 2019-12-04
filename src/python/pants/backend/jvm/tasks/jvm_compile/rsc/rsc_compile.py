@@ -33,7 +33,8 @@ from pants.reporting.reporting_utils import items_to_report_element
 from pants.task.scm_publish_mixin import Semver
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import Timer
-from pants.util.dirutil import fast_relpath, fast_relpath_optional, safe_mkdir
+from pants.util.dirutil import (fast_relpath, fast_relpath_collection, fast_relpath_optional,
+                                safe_mkdir)
 from pants.util.enums import match
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.strutil import safe_shlex_join
@@ -47,11 +48,6 @@ from pants.util.strutil import safe_shlex_join
 #
 #
 logger = logging.getLogger(__name__)
-
-
-def fast_relpath_collection(collection):
-  buildroot = get_buildroot()
-  return [fast_relpath_optional(c, buildroot) or c for c in collection]
 
 
 def stdout_contents(wu):
@@ -729,7 +725,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     use_youtline = tool_name == 'scalac-outliner'
 
     tool_classpath_abs = self._scalac_classpath if use_youtline else self._rsc_classpath
-    tool_classpath = fast_relpath_collection(tool_classpath_abs)
+    tool_classpath = fast_relpath_collection(tool_classpath_abs, root=get_buildroot())
 
     rsc_jvm_options = Rsc.global_instance().get_options().jvm_options
 

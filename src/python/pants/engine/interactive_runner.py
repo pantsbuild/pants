@@ -2,10 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING, Optional, Tuple
 
 from pants.base.exception_sink import ExceptionSink
-from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, Digest
+from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, Digest, Snapshot
 from pants.engine.rules import RootRule, side_effecting
 
 
@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 @dataclass(frozen=True)
 class InteractiveProcessResult:
   process_exit_code: int
+  output_snapshot: Optional[Snapshot] = None
 
 
 @dataclass(frozen=True)
@@ -24,6 +25,8 @@ class InteractiveProcessRequest:
   env: Tuple[str, ...] = ()
   input_files: Digest = EMPTY_DIRECTORY_DIGEST
   run_in_workspace: bool = False
+  output_file_path: Optional[str] = None
+  jdk_home: Optional[str] = None
 
   def __post_init__(self):
     if self.input_files != EMPTY_DIRECTORY_DIGEST and self.run_in_workspace:

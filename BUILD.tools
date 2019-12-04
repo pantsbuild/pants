@@ -77,12 +77,12 @@ jar_library(
 
 # Running Kythe on JDK8 requires a standalone javac 9 on the bootclasspath.
 # This jar is published to the same custom repo as the Kythe jars.
-jar_library(
-  name='javac9',
-  jars = [
-    jar(org='java', name='javac', rev='9+181-r4173-1'),
-  ],
-)
+# jar_library(
+#   name='javac9',
+#   jars = [
+#     jar(org='java', name='javac', rev='9+181'),
+#   ],
+# )
 
 # Runtime dependencies for the Avro Java generated code.
 avro_rev = '1.8.2'
@@ -99,6 +99,14 @@ BOOTSTRAP_SCROOGE_VERSION='19.11.0'
 jar_library(
   name = 'v2-thrift-gen',
   jars = [
+    # jar(org='java', name='javac', rev='9+181-r4173-1'),
     scala_jar(org='com.twitter', name='scrooge-generator', rev=BOOTSTRAP_SCROOGE_VERSION),
+  ],
+)
+
+jar_library(
+  name = 'scalac',
+  jars = [
+    jar(org='org.scala-lang', name='scala-compiler', rev='2.12.8'),
   ],
 )

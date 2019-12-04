@@ -30,7 +30,7 @@ class PantsRequirement:
   def __init__(self, parse_context):
     self._parse_context = parse_context
 
-  def __call__(self, name=None, dist=None):
+  def __call__(self, name=None, dist=None, **kwargs):
     """
     :param string name: The name to use for the target, defaults to the dist name if specified and
                         otherwise the parent dir name.
@@ -50,4 +50,5 @@ class PantsRequirement:
 
     self._parse_context.create_object('python_requirement_library',
                                       name=name,
-                                      requirements=[requirement])
+                                      requirements=[requirement],
+                                      **kwargs)

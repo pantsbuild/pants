@@ -16,7 +16,7 @@ from pants.build_graph.target import Target
 from pants.fs import archive as Archive
 from pants.source.wrapped_globs import FilesetWithSpec
 from pants.util.dirutil import fast_relpath
-from pants.util.memo import memoized_property
+from pants.util.memo import memoized_classproperty, memoized_property
 
 
 class RelativeToMapper:
@@ -209,6 +209,10 @@ class AppBase(Target):
   """
   class InvalidArchiveType(Exception):
     """Raised when archive type defined in Target is invalid"""
+
+  @memoized_classproperty
+  def _non_v2_target_kwargs(cls):
+    return super()._non_v2_target_kwargs | frozenset(['binary'])
 
   def __init__(self,
                name=None,

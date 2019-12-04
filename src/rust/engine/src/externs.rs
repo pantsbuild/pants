@@ -22,6 +22,19 @@ pub fn none() -> Handle {
   with_externs(|e| (e.clone_val)(e.context, &e.none))
 }
 
+pub fn is_none(h: &Handle) -> bool {
+  return equals(h, &none());
+}
+
+pub fn maybe_project_field(value: &Value, field: &str) -> Option<Value> {
+  let ret: Value = project_ignoring_type(value, field);
+  if is_none(&ret as &Handle) {
+    None
+  } else {
+    Some(ret)
+  }
+}
+
 pub fn get_value_from_type_id(ty: TypeId) -> Value {
   with_externs(|e| {
     let handle = (e.get_handle_from_type_id)(e.context, ty);

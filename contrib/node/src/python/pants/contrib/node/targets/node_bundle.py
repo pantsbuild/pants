@@ -5,12 +5,17 @@ from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 from pants.fs import archive as archive_lib
+from pants.util.memo import memoized_classproperty
 
 from pants.contrib.node.targets.node_package import NodePackage
 
 
 class NodeBundle(NodePackage):
   """A bundle of node modules."""
+
+  @memoized_classproperty
+  def _non_v2_target_kwargs(cls):
+    return super()._non_v2_target_kwargs | frozenset(['node_module'])
 
   def __init__(self, node_module=None, archive='tgz', address=None, payload=None, **kwargs):
     """

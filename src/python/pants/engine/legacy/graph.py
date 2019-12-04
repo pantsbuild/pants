@@ -43,6 +43,8 @@ from pants.engine.legacy.structs import (
   BundleAdaptor,
   BundlesField,
   HydrateableField,
+  JavaSourcesTargetsField,
+  PointedToAddressField,
   SourcesField,
   TargetAdaptor,
 )
@@ -608,6 +610,12 @@ def hydrate_arbitrary_field(arbitrary_field: ArbitraryField) -> HydratedField:
 
 
 @rule
+async def hydrate_pointed_to_address_field(pointed_to: PointedToAddressField) -> HydratedField:
+  return HydratedField(pointed_to.arg,
+                       (await Get[HydratedTarget](Address, pointed_to.value)).adaptor)
+
+
+@rule
 async def hydrate_sources(
   sources_field: SourcesField, glob_match_error_behavior: GlobMatchErrorBehavior,
 ) -> HydratedField:
@@ -630,6 +638,12 @@ async def hydrate_sources(
   )
   sources_field.validate_fn(fileset_with_spec)
   return HydratedField(sources_field.arg, fileset_with_spec)
+
+
+@rule
+async def hydrate_java_sources_targets(java_sources: JavaSourcesTargetsField) -> HydratedField:
+  hydrated_targets = await MultiGet(Get[HydratedTarget](Address, a) for a in java_sources.addresses)
+  return HydratedField(java_sources.arg, hydrated_targets)
 
 
 @rule
@@ -758,7 +772,9 @@ def create_legacy_graph_tasks():
     hydrate_target,
     find_owners,
     hydrate_arbitrary_field,
+    hydrate_pointed_to_address_field,
     hydrate_sources,
+    hydrate_java_sources_targets,
     hydrate_bundles,
     sort_targets,
     hydrate_sources_snapshot,

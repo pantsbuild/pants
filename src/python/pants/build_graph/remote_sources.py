@@ -6,6 +6,7 @@ from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 from pants.build_graph.address import Address
 from pants.build_graph.target import Target
+from pants.util.memo import memoized_classproperty
 
 
 class RemoteSources(Target):
@@ -16,6 +17,10 @@ class RemoteSources(Target):
   the target that should be created with those sources is given via the `dest` parameter. Any
   additional arguments for the new target go into the `args` parameter.
   """
+
+  @memoized_classproperty
+  def _non_v2_target_kwargs(cls):
+    return super()._non_v2_target_kwargs | frozenset(['sources_target'])
 
   def __init__(self, address=None, payload=None, sources_target=None, dest=None, args=None,
                **kwargs):
@@ -34,7 +39,7 @@ class RemoteSources(Target):
                                             'sources from via the "sources_target" parameter.')
     if not dest or not hasattr(dest, 'target_types'):
       raise TargetDefinitionException(self, 'You must specify a target type for the "dest" '
-                                            'parameter.')
+                                            f'parameter: {dest}.')
     if len(dest.target_types) != 1:
       raise TargetDefinitionException(
         self,

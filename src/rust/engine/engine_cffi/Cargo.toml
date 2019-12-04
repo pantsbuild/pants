@@ -11,6 +11,7 @@ crate-type = ["cdylib"]
 [dependencies]
 engine = { path = ".." }
 futures01 = { package = "futures", version = "0.1" }
+fs = { path = "../fs" }
 hashing = { path = "../hashing" }
 log = "0.4"
 logging = { path = "../logging" }

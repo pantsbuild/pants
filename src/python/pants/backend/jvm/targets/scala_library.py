@@ -10,6 +10,7 @@ from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 from pants.build_graph.address import Address
 from pants.build_graph.target import Target
+from pants.util.memo import memoized_classproperty
 
 
 SCOVERAGE = "scoverage"
@@ -27,6 +28,10 @@ class ScalaLibrary(ExportableJvmLibrary):
   :API: public
   """
 
+  @memoized_classproperty
+  def _non_v2_target_kwargs(cls):
+    return super()._non_v2_target_kwargs | frozenset(['java_sources'])
+
   default_sources_globs = '*.scala'
   default_sources_exclude_globs = JUnitTests.scala_test_globs
 
@@ -40,7 +45,8 @@ class ScalaLibrary(ExportableJvmLibrary):
             ScoveragePlatform.global_instance().is_blacklisted(kwargs['address'].spec))
 
   def __init__(self, java_sources=None, scalac_plugins=None, scalac_plugin_args=None,
-    compiler_option_sets=None, payload=None, **kwargs):
+               compiler_option_sets=None, payload=None,
+               **kwargs):
     """
     :param java_sources: Java libraries this library has a *circular*
       dependency on.

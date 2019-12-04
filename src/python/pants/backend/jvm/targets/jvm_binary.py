@@ -16,6 +16,7 @@ from pants.base.payload_field import (
 )
 from pants.base.validation import assert_list
 from pants.java.jar.exclude import Exclude
+from pants.util.memo import memoized_classproperty
 
 
 class JarRule(FingerprintedMixin, metaclass=ABCMeta):
@@ -292,6 +293,10 @@ class JvmBinary(JvmTarget):
 
   :API: public
   """
+
+  @memoized_classproperty
+  def _non_v2_target_kwargs(cls):
+    return super()._non_v2_target_kwargs | frozenset(['deploy_excludes', 'manifest_entries'])
 
   def __init__(self,
                name=None,
