@@ -379,7 +379,7 @@ matrix:
     - '3.7'
     script:
     - ./build-support/bin/ci.py --githooks --sanity-checks --doc-gen --lint --python-version
-      3.6
+      3.6 --remote-execution-enabled
     stage: Test Pants
     sudo: required
   - addons:
@@ -437,7 +437,7 @@ matrix:
     - '3.7'
     script:
     - ./build-support/bin/ci.py --githooks --sanity-checks --doc-gen --lint --python-version
-      3.7
+      3.7 --remote-execution-enabled
     stage: Test Pants (Cron)
     sudo: required
   - before_cache:
