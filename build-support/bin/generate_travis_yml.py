@@ -437,7 +437,7 @@ def lint(python_version: PythonVersion) -> Dict:
     "name": f"Self-checks and lint (Python {python_version.decimal})",
     "script": [
       f"./build-support/bin/ci.py --githooks --sanity-checks --doc-gen --lint "
-      f"--python-version {python_version.decimal} --remote-execution-enabled"
+      f"--python-version {python_version.decimal}"
     ]
   }
   safe_append(shard, "env", f"CACHE_NAME=lint.py{python_version.number}")
