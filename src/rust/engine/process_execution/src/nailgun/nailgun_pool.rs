@@ -241,9 +241,6 @@ impl NailgunPool {
     }).to_boxed()
   }
 
-  //
-  // This is a blocking method that is being called under the NailgunProcessMap's lock (see #8543)
-  //
   fn start_new_nailgun(
     mut processes: MutexGuard<NailgunProcessMap>,
     name: String,
