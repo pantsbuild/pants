@@ -23,14 +23,16 @@ jar_library(name='common-lib',
 
 jar_library(name='old-jersey',
   jars=[
-    jar('jersey', 'jersey'),
+    # jar('jersey', 'jersey'),
+    jar('jersey', 'jersey', '0.4-ea'),
   ],
   managed_dependencies=':old-manager',
 )
 
 jar_library(name='new-jersey',
   jars=[
-    jar('jersey', 'jersey'),
+    # jar('jersey', 'jersey'),
+    jar('jersey', 'jersey', '0.7-ea'),
   ],
   managed_dependencies=':new-manager',
 )

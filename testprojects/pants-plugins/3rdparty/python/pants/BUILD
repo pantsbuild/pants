@@ -1,1 +1,3 @@
-pants_requirement()
+pants_requirement(
+  tags = {'impossible_to_import'},
+)

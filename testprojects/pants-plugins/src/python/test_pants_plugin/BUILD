@@ -13,5 +13,6 @@ python_library(
       'test_pants_plugin.subsystems',
       'test_pants_plugin.tasks',
     ],
-  )
+  ),
+  tags = {'impossible_to_import'},
 )

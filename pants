@@ -2,6 +2,10 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+# set -x
+
+export LEVEL=debug
+
 # This bootstrap script runs pants from the live sources in this repo.
 #
 # Further support is added for projects wrapping pants with custom external extensions.  In the
@@ -128,4 +132,13 @@ if [[ "${test_goal_used}" == 'true' && "${no_regen_pex}" != 'true' ]]; then
   "$HERE/build-support/bin/bootstrap_pants_pex.sh"
 fi
 
-exec_pants_bare "$@"
+new_argv=()
+for arg in "$@"; do
+  if [[ "$arg" == 'export' ]]; then
+    new_argv=("${new_argv[@]}" --enable-pantsd --v2 --no-v1 --tag='-impossible_to_import' export-v2 --output-dir=./wowzer --print-exception-stacktrace -ldebug)
+  elif [[ "$arg" != '--no-colors' && "$arg" != '--formatted' ]]; then
+    new_argv=("${new_argv[@]}" "$(echo "$arg" | sed -e 's#export-output-file#output-file#g')")
+  fi
+done
+
+exec_pants_bare "${new_argv[@]}"

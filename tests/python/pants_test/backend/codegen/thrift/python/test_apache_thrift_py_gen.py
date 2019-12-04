@@ -174,7 +174,7 @@ class ApacheThriftPyGenTest(TaskTestBase):
     #   https://github.com/pantsbuild/pants/issues/5975
     pythonpath = [os.path.join(get_buildroot(), t.target_base) for t in targets]
     for resolved_dist in resolve([f'thrift=={self.get_thrift_version(apache_thrift_gen)}',
-                                  'setuptools==40.6.3'],
+                                  'setuptools==41.0.0'],
                                  interpreter=interpreter,
                                  context=python_repos.get_network_context(),
                                  fetchers=python_repos.get_fetchers()):

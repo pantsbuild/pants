@@ -45,7 +45,8 @@ python_binary(
     ':echo_interpreter_version_lib',
   ],
   entry_point = 'interpreter_selection.echo_interpreter_version',
-  compatibility = ['CPython<2.7']
+  compatibility = ['CPython<2.7'],
+  tags = {'impossible_to_import'},
 )
 
 python_library(

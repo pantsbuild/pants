@@ -143,6 +143,8 @@ class TargetAdaptor(StructWithDeps):
 
       # Add all fields which are declared as properties on the v1 Target class to the v2
       # TargetAdaptor. An ArbitraryField requires no extra processing to hydrate.
+      # TODO: profile to see whether accessing all the properties (including @memoized_property) is
+      # the bottleneck here!
       property_fields = [
         ArbitraryField.coerce_hashable_field(
           address=self.address,

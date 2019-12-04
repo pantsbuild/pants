@@ -7,4 +7,5 @@ python_library(
     'testprojects/pants-plugins/3rdparty/python/pants',
     'testprojects/pants-plugins/src/python/test_pants_plugin/subsystems',
   ],
+  tags = {'impossible_to_import'},
 )
