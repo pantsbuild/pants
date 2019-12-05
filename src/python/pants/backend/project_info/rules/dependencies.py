@@ -3,18 +3,15 @@
 
 from typing import Set
 
-from twitter.common.collections import OrderedSet
-
-from pants.base.specs import AscendantAddresses, DescendantAddresses, SingleAddress, Specs
-from pants.build_graph.address import Address
+from pants.base.specs import Specs
 from pants.engine.console import Console
-from pants.engine.goal import Goal
+from pants.engine.goal import Goal, LineOriented
 from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
 from pants.engine.rules import console_rule
 from pants.engine.selectors import Get
 
 
-class Dependencies(Goal):
+class Dependencies(LineOriented, Goal):
   name = 'fast-dependencies'
 
   @classmethod
@@ -42,10 +39,12 @@ async def dependencies(console: Console, specs: Specs, dependencies_options: Dep
       for dep in hydrated_target.dependencies
     )
 
-  for address in sorted(addresses):
-    console.print_stdout(address)
+  with Dependencies.line_oriented(dependencies_options, console) as print_stdout:
+    for address in sorted(addresses):
+      print_stdout(address)
 
   return Dependencies(exit_code=0)
+
 
 def rules():
   return [

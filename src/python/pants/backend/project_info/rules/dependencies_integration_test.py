@@ -1,21 +1,16 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import os
-from textwrap import dedent
 from typing import List, Optional
 
-import pytest
-
-from pants.backend.project_info.rules import fast_dependencies
+from pants.backend.project_info.rules import dependencies
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.build_graph.target import Target
 from pants.testutil.console_rule_test_base import ConsoleRuleTestBase
 
 
 class FastDependenciesTest(ConsoleRuleTestBase):
-  goal_cls = fast_dependencies.Dependencies
+  goal_cls = dependencies.Dependencies
 
   @classmethod
   def alias_groups(cls) -> BuildFileAliases:
@@ -27,7 +22,7 @@ class FastDependenciesTest(ConsoleRuleTestBase):
 
   @classmethod
   def rules(cls):
-    return super().rules() + fast_dependencies.rules()
+    return super().rules() + dependencies.rules()
 
   def create_python_library(
     self, path: str,
@@ -38,13 +33,19 @@ class FastDependenciesTest(ConsoleRuleTestBase):
       path=path,
       target_type="python_library",
       name="target",
-      sources=[],
       dependencies=dependencies or []
     )
 
   def assert_dependencies(self, *, target: str, expected: List[str], transitive: bool = True) -> None:
     args = ["--no-transitive"] if not transitive else []
-    self.assert_console_output(*expected, args=args + [target])
+    self.assert_console_output(*expected, args=[*args, target])
+
+  def test_no_target(self):
+    self.assert_dependencies(
+      target='',
+      expected=[],
+      transitive=False,
+    )
 
   def test_no_dependencies(self):
     self.create_python_library(path="some/target")
