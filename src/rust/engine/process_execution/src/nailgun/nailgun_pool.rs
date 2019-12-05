@@ -372,11 +372,12 @@ impl NailgunProcess {
     build_id: String,
   ) -> BoxFuture<NailgunProcess, String> {
     let cmd = startup_options.argv[0].clone();
+    let full_cmd = workdir_path.clone().as_path().join(cmd);
     // TODO: This is an expensive operation, and thus we info! it.
     //       If it becomes annoying, we can downgrade the logging to just debug!
     info!(
       "Starting new nailgun server with cmd: {:?}, args {:?}, in cwd {:?}",
-      cmd,
+      full_cmd,
       &startup_options.argv[1..],
       &workdir_path
     );
@@ -388,7 +389,7 @@ impl NailgunProcess {
       .and_then({
         let workdir_path = workdir_path.clone();
         move |(stdout, stderr)| {
-          let handle = std::process::Command::new(&cmd)
+          let handle = std::process::Command::new(&full_cmd)
             .args(&startup_options.argv[1..])
             .stdout(stdout.into_std())
             .stderr(stderr.into_std())
@@ -396,8 +397,8 @@ impl NailgunProcess {
             .spawn();
           handle.map_err(|e| {
             format!(
-              "Failed to create child handle with cmd: {} options {:#?}: {}",
-              &cmd, &startup_options, e
+              "Failed to create child handle with cmd: {:?} options {:#?}: {:?}",
+              &full_cmd, &startup_options, e
             )
           })
         }
