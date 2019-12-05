@@ -11,6 +11,7 @@ from pants.engine.rules import console_rule
 from pants.engine.selectors import Get
 
 
+# TODO(#8762) Get this rule to feature parity with the dependencies task.
 class Dependencies(LineOriented, Goal):
   name = 'fast-dependencies'
 

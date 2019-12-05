@@ -54,9 +54,6 @@ class FastDependenciesTest(ConsoleRuleTestBase):
       expected=[],
       transitive=False,
     )
-
-  def test_no_dependencies_transitive(self):
-    self.create_python_library(path="some/target")
     self.assert_dependencies(
       target="some/target",
       expected=["some/target:target"],
@@ -76,6 +73,13 @@ class FastDependenciesTest(ConsoleRuleTestBase):
     self.create_python_library(path="dep/target")
     self.create_python_library(path="some/target", dependencies=["dep/target"])
     self.create_python_library(path="some/other/target", dependencies=["some/target"])
+    self.assert_dependencies(
+      target="some/other/target",
+      expected=[
+        "some/target:target",
+      ],
+      transitive=False,
+    )
     self.assert_dependencies(
       target="some/other/target",
       expected=[
