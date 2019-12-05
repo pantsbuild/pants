@@ -32,6 +32,10 @@ async def dependencies(console: Console, specs: Specs, dependencies_options: Dep
   if dependencies_options.values.transitive:
     transitive_targets = await Get[TransitiveHydratedTargets](Specs, specs)
     addresses.update(hydrated_target.address.spec for hydrated_target in transitive_targets.closure)
+    # transitive_targets.closure includes the initial target. To keep the behavior consistent with intransitive
+    # dependencies, we remove the initial target from the set of addresses.
+    for single_address in specs.dependencies:
+      addresses.discard(single_address.to_spec_string())
   else:
     hydrated_targets = await Get[HydratedTargets](Specs, specs)
     addresses.update(
