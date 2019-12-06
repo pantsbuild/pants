@@ -59,7 +59,7 @@ async def fast_test(console: Console, addresses: BuildFileAddresses) -> Test:
     if test_result.stdout:
       result = (console.red(test_result.stdout) if test_result.status == Status.FAILURE
         else test_result.stdout)
-      console.print_stdout("{address.reference()} stdout:\n{result}")
+      console.print_stdout(f"{address.reference()} stdout:\n{result}")
 
     if test_result.stderr:
       # NB: we write to stdout, rather than to stderr, to avoid potential issues interleaving the
