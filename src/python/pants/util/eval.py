@@ -40,6 +40,8 @@ def parse_expression(
     return '\n'.join(lines)
 
   try:
+    # TODO: some test cases fail if this is converted to `ast.literal_eval()`, but that's probably
+    # safer?
     parsed_value = eval(val)
   except Exception as e:
     raise raise_type(dedent("""\

@@ -4,19 +4,23 @@
 import ast
 import copy
 import json
+import logging
 import multiprocessing
 import os
+import re
 import sys
 import threading
 import time
 import uuid
 from collections import OrderedDict
 from contextlib import contextmanager
-from typing import Dict
+from dataclasses import dataclass
+from typing import Dict, FrozenSet, Tuple
 
 import requests
 
 from pants.auth.basic_auth import BasicAuth
+from pants.base.build_environment import get_buildroot
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.run_info import RunInfo
 from pants.base.worker_pool import SubprocPool, WorkerPool
@@ -30,7 +34,11 @@ from pants.reporting.json_reporter import JsonReporter
 from pants.reporting.report import Report
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import relative_symlink, safe_file_dump
+from pants.util.memo import memoized_method, memoized_property
 from pants.version import VERSION
+
+
+logger = logging.getLogger(__name__)
 
 
 class RunTrackerOptionEncoder(CoercingOptionEncoder):
@@ -44,6 +52,75 @@ class RunTrackerOptionEncoder(CoercingOptionEncoder):
     if isinstance(o, OrderedDict):
       return o
     return super().default(o)
+
+
+@dataclass(frozen=True)
+class WorkunitRedirectionSpec:
+  _scope_pattern_string: str
+  output_file_path: str
+  _matching_labels: Tuple[str]
+  _matching_output_names: Tuple[str]
+
+  @memoized_property
+  def workunit_scope_pattern(self):
+    return re.compile(self._scope_pattern_string)
+
+  @memoized_property
+  def matching_output_names(self) -> FrozenSet[str]:
+    return frozenset(self._matching_output_names)
+
+  @memoized_property
+  def matching_labels(self) -> FrozenSet[str]:
+    return frozenset(self._matching_labels)
+
+
+class WorkunitOutput(Subsystem):
+  """Controls where workunit output is sent."""
+  options_scope = 'workunit-output'
+
+  @classmethod
+  def register_options(cls, register):
+    super().register_options(register)
+    register('--redirections', type=dict, fingerprint=False,
+             help='A dict mapping <file_name> to a list of <spec>s, where <spec> is a dict '
+                  'describing which workunits should have their output sent to <file_name>. '
+                  'Note that if <file_name> is \'/dev/stdout\', pants will write to its own '
+                  'stdout. '
+                  'The <spec> dict may contain the keys \'workunit_scope\', \'labels\', and '
+                  '\'output_names\'. '
+                  '\'workunit_scope\' is a regex string (defaulting to \'.*\') to exactly match '
+                  'a workunit\'s path (which looks something like \'all:compile:jvm:scalac\'). '
+                  '\'labels\' is a list of members of WorkUnitLabel, such as \'TOOL\' or '
+                  '\'COMPILER\'. The default value is [\'TOOL\']. This list must intersect with '
+                  'the workunit\'s labels to match. '
+                  '\'output_names\' is a list of strings '
+                  '(defaulting to [\'stdout\', \'stderr\']) which exactly match the workunit '
+                  'output name to tee. Most workunits do not use anything other than \'stdout\' '
+                  'and \'stderr\' when invoking subprocesses.')
+
+  @property
+  def _redirections(self):
+    return self.get_options().redirections
+
+  @memoized_method
+  def interpreted_redirections(self):
+    ret = []
+    for output_file_path, redirection_specs in self._redirections.items():
+      if not os.path.isabs(output_file_path):
+        output_file_path = os.path.join(get_buildroot(), output_file_path)
+      for spec in redirection_specs:
+        scope_pattern_string = str(spec.get('workunit_scope', '.*'))
+        labels = tuple(spec.get('labels', ['TOOL']))
+        output_names = tuple(spec.get('output_names', ['stdout', 'stderr']))
+        parsed_spec = WorkunitRedirectionSpec(
+          _scope_pattern_string=scope_pattern_string,
+          output_file_path=output_file_path,
+          _matching_labels=labels,
+          _matching_output_names=output_names,
+        )
+        ret.append(parsed_spec)
+    logger.debug(f'redirections for {self.options_scope}: {ret}')
+    return ret
 
 
 class RunTracker(Subsystem):
@@ -77,7 +154,10 @@ class RunTracker(Subsystem):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super().subsystem_dependencies() + (BasicAuth,)
+    return super().subsystem_dependencies() + (
+      BasicAuth,
+      WorkunitOutput.scoped(cls),
+    )
 
   @classmethod
   def register_options(cls, register):
@@ -335,8 +415,9 @@ class RunTracker(Subsystem):
 
     :API: public
     """
+    output_redirections = WorkunitOutput.scoped_instance(self).interpreted_redirections()
     workunit = WorkUnit(run_info_dir=self.run_info_dir, parent=parent, name=name, labels=labels,
-                        cmd=cmd, log_config=log_config)
+                        cmd=cmd, log_config=log_config, output_redirections=output_redirections)
     workunit.start()
 
     outcome = WorkUnit.FAILURE  # Default to failure we will override if we get success/abort.
@@ -381,7 +462,7 @@ class RunTracker(Subsystem):
 
     if stats_version not in cls.SUPPORTED_STATS_VERSIONS:
       raise ValueError("Invalid stats version")
-    
+
 
     auth_data = BasicAuth.global_instance().get_auth_for_provider(auth_provider)
     headers = cls._get_headers(stats_version=stats_version)
@@ -460,7 +541,7 @@ class RunTracker(Subsystem):
     else:
       stats.update({
         'self_timings': self.self_timings.get_all(),
-        'critical_path_timings': self.get_critical_path_timings().get_all(),        
+        'critical_path_timings': self.get_critical_path_timings().get_all(),
         'outcomes': self.outcomes,
       })
     return stats

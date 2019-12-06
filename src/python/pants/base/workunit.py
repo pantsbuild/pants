@@ -1,17 +1,22 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import logging
 import os
 import re
 import time
 import uuid
-from collections import namedtuple
+from collections import defaultdict, namedtuple
 
 from pants.util.dirutil import safe_mkdir_for
 from pants.util.memo import memoized_method
-from pants.util.rwbuf import FileBackedRWBuf
+from pants.util.rwbuf import OutputTeeingFileBackedRWBuf
 
 
+logger = logging.getLogger(__name__)
+
+
+# TODO: convert this to a python 3 Enum!
 class WorkUnitLabel:
   """
   :API: public
@@ -87,7 +92,8 @@ class WorkUnit:
     """
     return ['ABORTED', 'FAILURE', 'WARNING', 'SUCCESS', 'UNKNOWN'][outcome]
 
-  def __init__(self, run_info_dir, parent, name, labels=None, cmd='', log_config=None):
+  def __init__(self, run_info_dir, parent, name, labels=None, cmd='', log_config=None,
+               output_redirections=None):
     """
     - run_info_dir: The path of the run_info_dir from the RunTracker that tracks this WorkUnit.
     - parent: The containing workunit, if any. E.g., 'compile' might contain 'java', 'scala' etc.,
@@ -98,6 +104,8 @@ class WorkUnit:
     - cmd: An optional longer string representing this work.
             E.g., the cmd line of a compiler invocation.
     - log_config: An optional tuple of registered options affecting reporting output.
+    - output_redirections: A list of WorkunitRedirectionSpec, which are matched against this
+                           workunit's info, and used for redirecting the output if they match.
     """
     self._outcome = WorkUnit.UNKNOWN
 
@@ -134,6 +142,20 @@ class WorkUnit:
       if not log_config:
         self.log_config = self.parent.log_config
       self.parent.children.append(self)
+
+    self.matching_redirection_files = defaultdict(list)
+    if output_redirections:
+      workunit_scope = self.path()
+      matching_specs = [
+        spec for spec in output_redirections
+        if spec.workunit_scope_pattern.match(workunit_scope)
+        and (self.labels & spec.matching_labels)
+      ]
+      for spec in matching_specs:
+        for output_name in spec.matching_output_names:
+          self.matching_redirection_files[output_name].append(spec.output_file_path)
+    self.matching_redirection_files = dict(self.matching_redirection_files)
+    logger.debug(f'matching redirections for {self.path()}: {self.matching_redirection_files}')
 
   def has_label(self, label):
     """
@@ -195,7 +217,8 @@ class WorkUnit:
                                   id=self.id,
                                   output_name=name))
       safe_mkdir_for(path)
-      self._outputs[name] = FileBackedRWBuf(path)
+      files_to_tee_to = self.matching_redirection_files.get(name, [])
+      self._outputs[name] = OutputTeeingFileBackedRWBuf(path, files_to_tee_to=files_to_tee_to)
       self._output_paths[name] = path
     return self._outputs[name]
 
