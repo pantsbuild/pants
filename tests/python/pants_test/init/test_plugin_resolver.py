@@ -136,7 +136,7 @@ class PluginResolverTest(unittest.TestCase):
 
       def assert_dist_version(name, expected_version):
         dist = working_set.find(req(name))
-        self.assertEqual(expected_version, dist.to_requirement().version)
+        self.assertEqual(expected_version, dist.version)
 
       self.assertEqual(2, len(working_set.entries))
 
