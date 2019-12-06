@@ -22,7 +22,7 @@ class Isort(PythonToolBase):
            "`--isort-args=\"--case-sensitive --trailing-comma\"`",
     )
     register(
-      '--config', type=list, member_type=file_option, default=None,
+      '--config', type=list, member_type=file_option,
       help="Path to `isort.cfg` or alternative isort config file(s)"
     )
 
