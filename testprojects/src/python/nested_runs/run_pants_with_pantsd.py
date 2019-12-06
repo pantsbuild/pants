@@ -8,7 +8,7 @@ def main():
   config = pathlib.Path(workdir) / 'pants.ini'
 
   cmd = [
-    './pants',
+    './pants.pex',
     '--no-pantsrc',
     f'--pants-config-files={config}',
     '--print-exception-stacktrace=True',
