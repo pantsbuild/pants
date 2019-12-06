@@ -13,6 +13,7 @@ import java.util.{List => JList, logging => jlogging}
 import scala.collection.JavaConverters._
 import scala.compat.java8.OptionConverters._
 import scala.util.matching.Regex
+import sbt.io.IO
 import sbt.io.syntax._
 import sbt.util.{Level, Logger}
 import xsbti.compile.{ClassFileManagerType, CompileOrder, TransactionalManagerType}
