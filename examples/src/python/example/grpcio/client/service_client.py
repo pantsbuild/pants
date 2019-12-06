@@ -17,7 +17,7 @@ def run_example():
         print("[ERROR] Connection to server is unavailable. You should create a server instance first.")
         print("To start a gRPC server, execute: `./pants run examples/src/python/example/grpcio/server`")
       else:
-        print('An error occured! Error code: [{}] Error details: [{}]'.format(error.code(), error.details()))
+        print('An error occurred! Error code: [{}] Error details: [{}]'.format(error.code(), error.details()))
     else:
       print(hello_response)
       print(bye_response)

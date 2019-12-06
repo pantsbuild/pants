@@ -339,7 +339,7 @@ class GitTest(unittest.TestCase):
 
     To some extent this is just testing functionality of git not pants, since all pants says
     is that it will pass the diffspec to git diff-tree, but this should serve to at least document
-    the functionality we belive works.
+    the functionality we believe works.
     """
     with environment_as(GIT_DIR=self.gitdir, GIT_WORK_TREE=self.worktree):
       def commit_contents_to_files(content, *files):

@@ -134,7 +134,7 @@ class NailgunStreamStdinReader(_StoppableDaemonThread):
     # NailgunStreamStdinReader will close the file descriptor it's writing to when it's done.
     # Therefore, when _self_closing_pipe tries to clean up, it will try to close an already closed fd.
     # The alternative is passing an os.dup(write_fd) to NSSR, but then we have the problem where
-    # _self_closing_pipe doens't close the write_fd until the pants run is done, and that generates
+    # _self_closing_pipe doesn't close the write_fd until the pants run is done, and that generates
     # issues around piping stdin to interactive processes such as REPLs.
     pipe = Pipe.create(isatty)
     reader = NailgunStreamStdinReader(maybe_shutdown_socket, os.fdopen(pipe.write_fd, 'wb'))

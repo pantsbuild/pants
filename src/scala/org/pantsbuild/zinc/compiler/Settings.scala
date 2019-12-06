@@ -474,7 +474,7 @@ object Settings {
   }
 
   /**
-   * If a settings.classesDirectory option isnt specified, create a temporary directory for output
+   * If a settings.classesDirectory option isn't specified, create a temporary directory for output
    * classes to be written to.
    */
   def defaultClassesDirectory(): File = {

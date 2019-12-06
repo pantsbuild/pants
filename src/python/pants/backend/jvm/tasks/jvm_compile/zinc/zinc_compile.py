@@ -353,7 +353,7 @@ class BaseZincCompile(JvmCompile):
       # It will probably be loaded even on the regular classpath: If not found on the bootclasspath,
       # getSystemJavaCompiler() constructs a classloader that loads from the JDK's tools.jar.
       # That classloader will first delegate to its parent classloader, which will search the
-      # regular classpath.  However it's harder to guarantee that our javac will preceed any others
+      # regular classpath.  However it's harder to guarantee that our javac will precede any others
       # on the classpath, so it's safer to prefix it to the bootclasspath.
       jvm_options.extend(['-Xbootclasspath/p:{}'.format(':'.join(self.javac_classpath()))])
 

@@ -12,7 +12,7 @@
 # WRAPPER_REQUIREMENTS  This is a colon separated list of pip install compatible requirements.txt
 #                       files.
 #
-# For example, with a wrapping project layed out like so:
+# For example, with a wrapping project laid out like so:
 # /src/wrapper/
 #   src/main/python/
 #     wrapper/

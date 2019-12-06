@@ -117,7 +117,7 @@ class PailgunHandleRequestLock:
     """
     Try to acquire the lock, blocking until the timeout is reached. Will return immediately if the lock is acquired.
 
-    :return True if the lock was aquired, False if the timeout was reached.
+    :return True if the lock was acquired, False if the timeout was reached.
     """
     self.cond.acquire()
     if self.available:
