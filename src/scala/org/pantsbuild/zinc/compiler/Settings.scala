@@ -31,7 +31,6 @@ case class Settings(
   _classesDirectory: Option[File]   = None,
   _postCompileMergeDir: Option[File] = None,
   outputJar: Option[File]           = None,
-  scala: ScalaLocation              = ScalaLocation(),
   scalacOptions: Seq[String]        = Seq.empty,
   javaHome: Option[File]            = None,
   javaOnly: Boolean                 = false,
@@ -40,7 +39,6 @@ case class Settings(
   _incOptions: IncOptions           = IncOptions(),
   analysis: AnalysisOptions         = AnalysisOptions(),
   creationTime: Long                = 0,
-  compiledBridgeJar: Option[File]   = None,
   useBarebonesLogger: Boolean       = false
 ) {
   import Settings._
