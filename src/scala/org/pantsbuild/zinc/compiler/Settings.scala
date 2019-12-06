@@ -238,7 +238,6 @@ object Settings {
 
     opt[File]("compiled-bridge-jar")
       .abbr("compiled-bridge-jar")
-      .required()
       .valueName("<file>")
       .action((x, c) => c.copy(compiledBridgeJar = Some(x)))
       .text("Path to pre-compiled compiler interface.")
