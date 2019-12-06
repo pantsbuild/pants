@@ -281,7 +281,8 @@ class BaseZincCompile(JvmCompile):
 
     # list of classpath entries
     scalac_classpath_entries = self.scalac_classpath_entries()
-    scala_path = [relative_to_exec_root(classpath_entry.path) for classpath_entry in scalac_classpath_entries]
+    scalac_classpath_entry_paths = [classpath_entry.path for classpath_entry in self.scalac_classpath_entries()]
+    scala_path = [relative_to_exec_root(path) for path in scalac_classpath_entry_paths]
 
     zinc_args = []
     zinc_args.extend([
@@ -303,9 +304,6 @@ class BaseZincCompile(JvmCompile):
 
     compiler_bridge_classpath_entry = self._zinc.compile_compiler_bridge(self.context)
     compiler_bridge_relpath = relative_to_exec_root(compiler_bridge_classpath_entry.path)
-
-    zinc_args.extend(['-compiled-bridge-jar', compiler_bridge_relpath])
-    zinc_args.extend(['-scala-path', ':'.join(scala_path)])
 
     zinc_args.extend(self._javac_plugin_args(javac_plugin_map))
     # Search for scalac plugins on the classpath.
@@ -370,21 +368,23 @@ class BaseZincCompile(JvmCompile):
       self.ExecutionStrategy.hermetic: lambda: self._compile_hermetic(
         jvm_options, ctx, classes_dir, jar_file, compiler_bridge_classpath_entry,
         dependency_classpath, scalac_classpath_entries, scala_path, compiler_bridge_relpath),
-      self.ExecutionStrategy.subprocess: lambda: self._compile_nonhermetic(jvm_options, ctx, classes_dir),
-      self.ExecutionStrategy.nailgun: lambda: self._compile_nonhermetic(jvm_options, ctx, classes_dir),
+      self.ExecutionStrategy.subprocess: lambda: self._compile_nonhermetic(
+        jvm_options, ctx, classes_dir, scalac_classpath_entry_paths, compiler_bridge_classpath_entry.path),
+      self.ExecutionStrategy.nailgun: lambda: self._compile_nonhermetic(
+        jvm_options, ctx, classes_dir, scalac_classpath_entry_paths, compiler_bridge_classpath_entry.path),
     })()
 
   class ZincCompileError(TaskError):
     """An exception type specifically to signal a failed zinc execution."""
 
-  def _compile_nonhermetic(self, jvm_options, ctx, classes_directory):
+  def _compile_nonhermetic(self, jvm_options, ctx, classes_directory, scalac_classpath, compiler_bridge_path):
     # Populate the resources to merge post compile onto disk for the nonhermetic case,
     # where `--post-compile-merge-dir` was added is the relevant part.
     self.context._scheduler.materialize_directories((
       DirectoryToMaterialize(get_buildroot(), self.post_compile_extra_resources_digest(ctx)),
     ))
 
-    exit_code = self.runjava(classpath=self.get_zinc_compiler_classpath(),
+    exit_code = self.runjava(classpath=self.get_zinc_compiler_classpath() + scalac_classpath + [compiler_bridge_path],
                              main=Zinc.ZINC_COMPILE_MAIN,
                              jvm_options=jvm_options,
                              args=['@{}'.format(ctx.args_file)],

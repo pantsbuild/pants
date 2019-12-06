@@ -95,10 +95,6 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
     """
     executor = self.create_java_executor(dist=dist, force_subprocess=force_subprocess)
 
-    # Creating synthetic jar to work around system arg length limit is not necessary
-    # when `NailgunExecutor` is used because args are passed through socket, therefore turning off
-    # creating synthetic jar if nailgun is used.
-    create_synthetic_jar = self.execution_strategy != self.ExecutionStrategy.nailgun or force_subprocess
     try:
       return util.execute_java(classpath=classpath,
                                main=main,
@@ -110,7 +106,7 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
                                workunit_name=workunit_name,
                                workunit_labels=workunit_labels,
                                workunit_log_config=workunit_log_config,
-                               create_synthetic_jar=create_synthetic_jar,
+                               create_synthetic_jar=False,
                                synthetic_jar_dir=self._executor_workdir)
     except executor.Error as e:
       raise TaskError(e)
