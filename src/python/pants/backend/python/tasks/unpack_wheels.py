@@ -67,7 +67,7 @@ class UnpackWheels(UnpackRemoteSourcesBase):
         resolved_dists = pex_builder.resolve_distributions(requirements, platforms=['current'])
 
         matched_dists = [resolved_dist.distribution for resolved_dist in resolved_dists
-                         if resolved_dist.key == module_name]
+                         if resolved_dist.distribution.key == module_name]
         if len(matched_dists) != 1:
           raise self.SingleDistExtractionError(
             f"Exactly one dist was expected to match name {module_name} in requirements "
