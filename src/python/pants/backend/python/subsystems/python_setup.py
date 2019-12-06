@@ -56,6 +56,8 @@ class PythonSetup(Subsystem):
                   '"<PATH>" (the contents of the PATH env var), '
                   '"<PEXRC>" (paths in the PEX_PYTHON_PATH variable in a pexrc file), '
                   '"<PYENV>" (all python versions under $(pyenv root)/versions).')
+    register('--resolver-jobs', type=int, default=None, advanced=True, fingerprint=True,
+             help='The maximum number of concurrent jobs to resolve wheels with.')
 
   @property
   def interpreter_constraints(self):
@@ -101,6 +103,10 @@ class PythonSetup(Subsystem):
   @property
   def resolver_allow_prereleases(self):
     return self.get_options().resolver_allow_prereleases
+
+  @property
+  def resolver_jobs(self):
+    return self.get_options().resolver_jobs
 
   @property
   def artifact_cache_dir(self):

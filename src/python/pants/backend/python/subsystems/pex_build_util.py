@@ -275,7 +275,8 @@ class PexBuilderWrapper:
         find_links=find_links,
         platform=platform,
         cache=requirements_cache_dir,
-        allow_prereleases=python_setup.resolver_allow_prereleases)
+        allow_prereleases=python_setup.resolver_allow_prereleases,
+        max_parallel_jobs=python_setup.resolver_jobs)
       distributions[platform] = [resolved_dist.distribution for resolved_dist in resolved_dists]
 
     return distributions
