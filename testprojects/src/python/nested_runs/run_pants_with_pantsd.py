@@ -10,7 +10,7 @@ def main():
   config = [f'--pants-config-files={config_path}'] if os.path.isfile(config_path) else []
 
   cmd = [
-    './pants',
+    './pants.pex',
     '--no-pantsrc',
     '--print-exception-stacktrace=True',
     f'--pants-workdir={workdir}',
