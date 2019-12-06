@@ -40,11 +40,11 @@ object InputUtils {
   ): Inputs = {
     import settings._
 
-    val scalaJars = InputUtils.selectScalaJars(settings.scala)
+    val scalaJars = InputUtils.selectScalaJars(log)
 
     val instance = ScalaUtils.scalaInstance(scalaJars.compiler, scalaJars.extra, scalaJars.library)
-    val compiledBridgeJar = settings.compiledBridgeJar getOrElse Defaults.compiledBridgeJar.get
-    System.out.println(s"DEBUG selected compiledBridgeJar $compiledBridgeJar")
+    val compiledBridgeJar = Defaults.compiledBridgeJar.get
+    log.debug(s"Selected CompiledBridgeJar $compiledBridgeJar")
     val compilers = ZincUtil.compilers(instance, ClasspathOptionsUtil.auto, settings.javaHome, newScalaCompiler(instance, compiledBridgeJar))
 
     // TODO: Remove duplication once on Scala 2.12.x.
@@ -153,14 +153,10 @@ object InputUtils {
    * Prefer the explicit scala-compiler, scala-library, and scala-extra settings,
    * then the scala-path setting, then the scala-home setting. Default to bundled scala.
    */
-  def selectScalaJars(scala: ScalaLocation): ScalaJars = {
-    val jars = splitScala(scala.path) getOrElse Defaults.scalaJars
-    System.out.println(s"DEBUG Selected scala jars: $jars")
-    ScalaJars(
-      scala.compiler getOrElse jars.compiler,
-      scala.library getOrElse jars.library,
-      scala.extra ++ jars.extra
-    )
+  def selectScalaJars(log: Logger): ScalaJars = {
+    val jars = Defaults.scalaJars
+    log.debug(s"Selected scala jars: $jars")
+    jars
   }
 
   /**

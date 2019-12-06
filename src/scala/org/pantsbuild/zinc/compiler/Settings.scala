@@ -236,12 +236,6 @@ object Settings {
     help("help").text("Prints this usage message")
     version("version").text("Print version")
 
-    opt[File]("compiled-bridge-jar")
-      .abbr("compiled-bridge-jar")
-      .valueName("<file>")
-      .action((x, c) => c.copy(compiledBridgeJar = Some(x)))
-      .text("Path to pre-compiled compiler interface.")
-
     opt[Long]("jar-creation-time")
       .abbr("jar-creation-time")
       .action((x, c) => c.copy(creationTime = x))
@@ -305,36 +299,6 @@ object Settings {
       .abbr("jar")
       .action((x, c) => c.copy(outputJar =  Some(x)))
       .text("Jar destination for compiled classes")
-
-    opt[File]("scala-home")
-      .abbr("scala-home")
-      .valueName("<directory>")
-      .action((x, c) => c.copy(scala = c.scala.copy(home = Some(x))))
-      .text("Scala home directory (for locating jars)")
-
-    opt[Seq[File]]("scala-path")
-      .abbr("scala-path")
-      .valueName("<path>")
-      .action((x, c) => c.copy(scala = c.scala.copy(path = x)))
-      .text("Specify all Scala jars directly")
-
-    opt[File]("scala-compiler")
-      .abbr("scala-compiler")
-      .valueName("<file>")
-      .action((x, c) => c.copy(scala = c.scala.copy(compiler = Some(x))))
-      .text("Specify Scala compiler jar directly")
-
-    opt[File]("scala-library")
-      .abbr("scala-library")
-      .valueName("<file>")
-      .action((x, c) => c.copy(scala = c.scala.copy(library = Some(x))))
-      .text("Specify Scala library jar directly")
-
-    opt[Seq[File]]("scala-extra")
-      .abbr("scala-extra")
-      .valueName("<path>")
-      .action((x, c) => c.copy(scala = c.scala.copy(extra = x)))
-      .text("Specify extra Scala jars directly")
 
     opt[File]("java-home")
       .abbr("java-home")
