@@ -178,12 +178,6 @@ class MockConsole:
     self.stderr = StringIO()
     self._use_colors = use_colors
 
-  def write_stdout(self, payload):
-    self.stdout.write(payload)
-
-  def write_stderr(self, payload):
-    self.stderr.write(payload)
-
   def print_stdout(self, payload):
     print(payload, file=self.stdout)
 

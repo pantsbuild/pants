@@ -20,12 +20,6 @@ class Console:
   def stderr(self):
     return self._stderr
 
-  def write_stdout(self, payload):
-    self.stdout.write(payload)
-
-  def write_stderr(self, payload):
-    self.stderr.write(payload)
-
   def print_stdout(self, payload, end='\n'):
     print(payload, file=self.stdout, end=end)
 

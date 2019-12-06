@@ -57,25 +57,17 @@ async def fast_test(console: Console, addresses: BuildFileAddresses) -> Test:
     if test_result.status == Status.FAILURE:
       did_any_fail = True
     if test_result.stdout:
-      console.write_stdout(
-        "{} stdout:\n{}\n".format(
-          address.reference(),
-          (console.red(test_result.stdout) if test_result.status == Status.FAILURE
-           else test_result.stdout)
-        )
-      )
+      result = (console.red(test_result.stdout) if test_result.status == Status.FAILURE
+        else test_result.stdout)
+      console.print_stdout("{address.reference()} stdout:\n{result}")
+
     if test_result.stderr:
       # NB: we write to stdout, rather than to stderr, to avoid potential issues interleaving the
       # two streams.
-      console.write_stdout(
-        "{} stderr:\n{}\n".format(
-          address.reference(),
-          (console.red(test_result.stderr) if test_result.status == Status.FAILURE
-           else test_result.stderr)
-        )
-      )
-
-  console.write_stdout("\n")
+      result = (console.red(test_result.stderr) if test_result.status == Status.FAILURE
+        else test_result.stderr)
+      console.print_stdout(f"{address.reference()} stderr:\n{result}")
+  console.print_stdout("\n", end="")
 
   for address, test_result in filtered_results:
     console.print_stdout('{0:80}.....{1:>10}'.format(

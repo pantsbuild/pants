@@ -37,7 +37,7 @@ async def run(
       DirectoryToMaterialize(binary.digest, path_prefix=path_relative_to_build_root)
     )
 
-    console.write_stdout(f"Running target: {target}\n")
+    console.print_stdout(f"Running target: {target}")
     full_path = str(Path(tmpdir, binary.binary_name))
     run_request = InteractiveProcessRequest(
       argv=[full_path],
@@ -48,12 +48,12 @@ async def run(
       result = runner.run_local_interactive_process(run_request)
       exit_code = result.process_exit_code
       if result.process_exit_code == 0:
-        console.write_stdout(f"{target} ran successfully.\n")
+        console.print_stdout(f"{target} ran successfully.")
       else:
-        console.write_stderr(f"{target} failed with code {result.process_exit_code}!\n")
+        console.print_stderr(f"{target} failed with code {result.process_exit_code}!")
 
     except Exception as e:
-      console.write_stderr(f"Exception when attempting to run {target} : {e}\n")
+      console.print_stderr(f"Exception when attempting to run {target} : {e}")
       exit_code = -1
 
   return Run(exit_code)
