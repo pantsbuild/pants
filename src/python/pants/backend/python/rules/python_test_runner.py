@@ -22,6 +22,24 @@ from pants.rules.core.core_test_model import TestResult, TestTarget
 from pants.rules.core.strip_source_root import SourceRootStrippedSources
 
 
+def get_timeout_seconds_for_target(test_target_timeout, timeout_default, timeout_maximum):
+  """Calculate the timeout for a test target.
+
+  If a target has no timeout configured its timeout will be set to the default timeout.
+
+  :param test_target: A test target
+  :param timeout_default: the default timeout in seconds.
+  :param timeout_maximum: the maximum timeout in seconds.
+  :return: timeout in seconds.
+  """
+  if test_target_timeout is None:
+    test_target_timeout = timeout_default
+  if timeout_maximum is not None and test_target_timeout > timeout_maximum:
+    # TODO Log a warning here.
+    return timeout_maximum
+  return test_target_timeout
+
+
 @rule(name="Run pytest")
 async def run_python_test(
   test_target: PythonTestsAdaptor,
@@ -100,7 +118,11 @@ async def run_python_test(
     description=f'Run Pytest for {test_target.address.reference()}',
     # TODO(#8584): hook this up to TestRunnerTaskMixin so that we can configure the default timeout
     #  and also use the specified max timeout time.
-    timeout_seconds=getattr(test_target, 'timeout', 60)
+    timeout_seconds=get_timeout_seconds_for_target(
+      test_target_timeout=getattr(test_target, 'timeout', None),
+      timeout_default=pytest.options.timeout_default,
+      timeout_maximum=pytest.options.timeout_maximum,
+    )
   )
   result = await Get(FallibleExecuteProcessResult, ExecuteProcessRequest, request)
   return TestResult.from_fallible_execute_process_result(result)

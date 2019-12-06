@@ -61,12 +61,14 @@ class PyTest(Subsystem):
       '--timeout-default',
       type=int,
       advanced=True,
+      default=60,
       help='The default timeout (in seconds) for a test if timeout is not set on the target.',
     )
     register(
       '--timeout-maximum',
       type=int,
       advanced=True,
+      default=120,
       help='The maximum timeout (in seconds) that can be set on a test target.',
     )
     register(
