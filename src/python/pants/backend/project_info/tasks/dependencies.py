@@ -7,6 +7,7 @@ from twitter.common.collections import OrderedSet
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_target import JvmTarget
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.base.payload_field import JarsField, PythonRequirementsField
 from pants.task.console_task import ConsoleTask
@@ -25,9 +26,15 @@ class Dependencies(ConsoleTask):
     register('--internal-only', type=bool,
              help='Specifies that only internal dependencies should be included in the graph '
                   'output (no external jars).')
-    register('--external-only', type=bool,
-             help='Specifies that only external dependencies should be included in the graph '
-                  'output (only external jars).')
+    register(
+      '--external-only',
+      type=bool,
+      help='Specifies that only external dependencies should be included in the graph output (only external jars).',
+      removal_version="1.26.0.dev1",
+      removal_hint="This feature is being removed. If you depend on this functionality, please let us know in the "
+                   "#general channel on slack. \nYou can join the pants slack here: "
+                   "https://pantsslack.herokuapp.com/ ",
+    )
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
@@ -38,6 +45,19 @@ class Dependencies(ConsoleTask):
       raise TaskError('At most one of --internal-only or --external-only can be selected.')
 
   def console_output(self, unused_method_argument):
+    deprecated_conditional(
+      lambda: not self.is_external_only and not self.is_internal_only,
+      removal_version="1.26.0.dev1",
+      entity_description="External dependencies will no longer be included in dependencies output.",
+      hint_message="Pants will soon default to `--internal-only`, and remove the `--external-only` option. "
+                    "and return only target addresses. Currently, Pants defaults to include both internal "
+                    "and external dependencies which means this task will return a mix of both target addresses "
+                    "and requirement strings."
+                    "\n\nTo prepare, you can run this task with the `--internal-only` option. "
+                    "If you depend on the inclusion of external dependencies, please let us know in the #general "
+                    "channel on slack."
+                    "\nYou can join the pants slack here: https://pantsslack.herokuapp.com/",
+    )
     ordered_closure = OrderedSet()
     for target in self.context.target_roots:
       if self.act_transitively:
