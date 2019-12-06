@@ -108,7 +108,7 @@ python_tests(
     'src/python/pants/testutil/subsystem',
     ':python_task_test_base',
   ],
-  timeout=600,
+  timeout=240,
 )
 
 python_tests(
@@ -126,7 +126,7 @@ python_tests(
     'testprojects/tests/python/pants:timeout_directory',
   ],
   tags = {'integration'},
-  timeout=480,
+  timeout=240,
 )
 
 python_tests(

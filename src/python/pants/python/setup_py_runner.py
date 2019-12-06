@@ -57,8 +57,8 @@ class SetupPyRunner:
     @property
     def base_requirements(self):
       return [
-        PythonRequirement('setuptools=={}'.format(self.get_options().setuptools_version)),
-        PythonRequirement('wheel=={}'.format(self.get_options().wheel_version)),
+        PythonRequirement(f'setuptools=={self.get_options().setuptools_version}'),
+        PythonRequirement(f'wheel=={self.get_options().wheel_version}'),
       ]
 
   class CommandFailure(Exception):

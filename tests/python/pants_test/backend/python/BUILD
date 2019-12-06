@@ -49,7 +49,7 @@ python_tests(
     'testprojects:pants_plugins_directory',
   ],
   tags={'integration'},
-  timeout = 360,
+  timeout = 120,
 )
 
 python_library(

@@ -88,7 +88,7 @@ python_tests(
     'testprojects/tests/python:all_directories',
   ],
   tags = {'integration'},
-  timeout = 240,
+  timeout = 120,
 )
 
 python_tests(
