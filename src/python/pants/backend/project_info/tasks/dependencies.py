@@ -32,7 +32,7 @@ class Dependencies(ConsoleTask):
       help='Specifies that only external dependencies should be included in the graph output (only external jars).',
       removal_version="1.26.0.dev1",
       removal_hint="This feature is being removed. If you depend on this functionality, please let us know in the "
-                   "#general channel on slack. \nYou can join the pants slack here: "
+                   "#general channel on Slack at https://pantsbuild.slack.com/. \nYou can join the pants slack here: "
                    "https://pantsslack.herokuapp.com/ ",
     )
 
@@ -48,14 +48,13 @@ class Dependencies(ConsoleTask):
     deprecated_conditional(
       lambda: not self.is_external_only and not self.is_internal_only,
       removal_version="1.26.0.dev1",
-      entity_description="External dependencies will no longer be included in dependencies output.",
+      entity_description="The default dependencies output including external dependencies",
       hint_message="Pants will soon default to `--internal-only`, and remove the `--external-only` option. "
-                    "and return only target addresses. Currently, Pants defaults to include both internal "
-                    "and external dependencies which means this task will return a mix of both target addresses "
-                    "and requirement strings."
+                    "Currently, Pants defaults to include both internal and external dependencies, which means this "
+                    "task returns a mix of both target addresses and requirement strings."
                     "\n\nTo prepare, you can run this task with the `--internal-only` option. "
-                    "If you depend on the inclusion of external dependencies, please let us know in the #general "
-                    "channel on slack."
+                    "If you need still need support for including external dependencies in the output, please let us "
+                    "know in the #general channel on Slack at https://pantsbuild.slack.com/."
                     "\nYou can join the pants slack here: https://pantsslack.herokuapp.com/",
     )
     ordered_closure = OrderedSet()
