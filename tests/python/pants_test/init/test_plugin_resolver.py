@@ -61,8 +61,11 @@ INSTALLERS = [('sdist', SdistInstaller), ('whl', WheelInstaller)]
 
 
 class PluginResolverTest(unittest.TestCase):
-  @staticmethod
-  def create_plugin(distribution_repo_dir, plugin, version=None, packager_cls=None):
+
+  DEFAULT_VERSION = '0.0.0'
+
+  @classmethod
+  def create_plugin(cls, distribution_repo_dir, plugin, version=None, packager_cls=None):
     distribution_repo_dir = Path(distribution_repo_dir)
 
     source_dir = distribution_repo_dir.joinpath(plugin)
@@ -71,7 +74,7 @@ class PluginResolverTest(unittest.TestCase):
         from setuptools import setup
 
 
-        setup(name="{plugin}", version="{version or '0.0.0'}")
+        setup(name="{plugin}", version="{version or cls.DEFAULT_VERSION}")
       """))
     packager_cls = packager_cls or SdistInstaller
     packager = packager_cls(source_dir=source_dir,
@@ -115,27 +118,30 @@ class PluginResolverTest(unittest.TestCase):
       options_bootstrapper = OptionsBootstrapper.create(env=env, args=args)
       plugin_resolver = PluginResolver(options_bootstrapper, interpreter=interpreter)
       cache_dir = plugin_resolver.plugin_cache_dir
-      yield plugin_resolver.resolve(WorkingSet(entries=[])), root_dir, repo_dir, cache_dir
+
+      working_set = plugin_resolver.resolve(WorkingSet(entries=[]))
+      for dist in working_set:
+        self.assertIn(Path(cache_dir), Path(dist.location).parents)
+
+      yield working_set, root_dir, repo_dir, cache_dir
 
   def test_no_plugins(self):
     with self.plugin_resolution() as (working_set, _, _, _):
-      self.assertEqual([], working_set.entries)
+      self.assertEqual([], list(working_set))
 
   @parameterized.expand(INSTALLERS)
   def test_plugins(self, unused_test_name, packager_cls):
     with self.plugin_resolution(plugins=[('jake', '1.2.3'), 'jane'],
                                 packager_cls=packager_cls) as (working_set, _, _, cache_dir):
+
+      def assert_dist_version(name, expected_version):
+        dist = working_set.find(req(name))
+        self.assertEqual(expected_version, dist.to_requirement().version)
+
       self.assertEqual(2, len(working_set.entries))
 
-      dist = working_set.find(req('jake'))
-      self.assertIsNotNone(dist)
-      self.assertEqual(os.path.realpath(cache_dir),
-                       os.path.realpath(os.path.dirname(dist.location)))
-
-      dist = working_set.find(req('jane'))
-      self.assertIsNotNone(dist)
-      self.assertEqual(os.path.realpath(cache_dir),
-                       os.path.realpath(os.path.dirname(dist.location)))
+      assert_dist_version(name='jake', expected_version='1.2.3')
+      assert_dist_version(name='jane', expected_version=self.DEFAULT_VERSION)
 
   @parameterized.expand(INSTALLERS)
   def test_exact_requirements(self, unused_test_name, packager_cls):
@@ -143,17 +149,16 @@ class PluginResolverTest(unittest.TestCase):
                                 packager_cls=packager_cls) as results:
       working_set, chroot, repo_dir, cache_dir = results
 
-      self.assertEqual(2, len(working_set.entries))
-
       # Kill the repo source dir and re-resolve.  If the PluginResolver truly detects exact
       # requirements it should skip any resolves and load directly from the still in-tact cache.
       safe_rmtree(repo_dir)
 
       with self.plugin_resolution(chroot=chroot,
                                   plugins=[('jake', '1.2.3'), ('jane', '3.4.5')]) as results2:
+
         working_set2, _, _, _ = results2
 
-        self.assertEqual(working_set.entries, working_set2.entries)
+        self.assertEqual(list(working_set), list(working_set2))
 
   @parameterized.expand(INSTALLERS)
   @skip_unless_python36_and_python37_present
@@ -164,9 +169,8 @@ class PluginResolverTest(unittest.TestCase):
     with self.plugin_resolution(interpreter=python36,
                                 plugins=[('jake', '1.2.3'), ('jane', '3.4.5')],
                                 packager_cls=packager_cls) as results:
-      working_set, chroot, repo_dir, cache_dir = results
 
-      self.assertEqual(2, len(working_set.entries))
+      working_set, chroot, repo_dir, cache_dir = results
 
       safe_rmtree(repo_dir)
       with self.assertRaises(Unsatisfiable):
@@ -181,17 +185,16 @@ class PluginResolverTest(unittest.TestCase):
       with self.plugin_resolution(interpreter=python36,
                                   chroot=chroot,
                                   plugins=[('jake', '1.2.3'), ('jane', '3.4.5')]) as results2:
-        working_set2, _, _, _ = results2
 
-        self.assertEqual(working_set.entries, working_set2.entries)
+        working_set2, _, _, _ = results2
+        self.assertEqual(list(working_set), list(working_set2))
 
   @parameterized.expand(INSTALLERS)
   def test_inexact_requirements(self, unused_test_name, packager_cls):
     with self.plugin_resolution(plugins=[('jake', '1.2.3'), 'jane'],
                                 packager_cls=packager_cls) as results:
-      working_set, chroot, repo_dir, cache_dir = results
 
-      self.assertEqual(2, len(working_set.entries))
+      working_set, chroot, repo_dir, cache_dir = results
 
       # Kill the cache and the repo source dir and wait past our 1s test TTL, if the PluginResolver
       # truly detects inexact plugin requirements it should skip perma-caching and fall through to
