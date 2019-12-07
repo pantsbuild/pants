@@ -121,7 +121,8 @@ class ScalaFmt(RewriteBase):
       key='scalafmt',
       scope=subsystem.options_scope)
 
-  def invoke_tool(self, absolute_root, target_sources):
+  def invoke_tool(self, current_workunit, absolute_root, target_sources):
+    self.context.run_tracker._threadlocal.current_workunit = current_workunit
     self.context.log.debug(f'scalafmt called with sources: {target_sources}')
 
     # If no config file is specified use default scalafmt config.
@@ -132,7 +133,10 @@ class ScalaFmt(RewriteBase):
     args.extend([source for _target, source in target_sources])
 
     if self._use_native_image:
-      with self.context.new_workunit(name='scalafmt', labels=[WorkUnitLabel.COMPILER]) as workunit:
+      with self.context.run_tracker.new_workunit(
+          name='scalafmt',
+          labels=[WorkUnitLabel.COMPILER],
+      ) as workunit:
         args = [self._native_image_path(), *args]
         self.context.log.debug(f'executing scalafmt with native image with args: {args}')
         return subprocess.run(
