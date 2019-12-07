@@ -3,7 +3,9 @@
 
 import os
 import shutil
+import threading
 from abc import ABCMeta, abstractmethod
+from typing import Any, List
 
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.build_environment import get_buildroot
@@ -28,6 +30,13 @@ class RewriteBase(NailgunTask, metaclass=ABCMeta):
       register('--output-dir', advanced=True, type=dir_option, fingerprint=True,
                help='Path to output directory. Any updated files will be written here. '
                'If not specified, files will be modified in-place.')
+
+    register('--files-per-process', type=int, fingerprint=False,
+             default=None,
+             help='Number of files to use per individual process execution for native-image.')
+    register('--total-number-parallel-processes', type=int, fingerprint=False,
+             default=None,
+             help='Total number of parallel scalafmt processes to run.')
 
   @classmethod
   def target_types(cls):
@@ -63,17 +72,59 @@ class RewriteBase(NailgunTask, metaclass=ABCMeta):
       with self.invalidated(relevant_targets) as invalidation_check:
         self._execute_for([vt.target for vt in invalidation_check.invalid_vts])
 
+  def _split_by_threads(self, inputs_list_of_lists: List[List[Any]], invoke_fn):
+    parent_workunit = self.context.run_tracker.get_current_workunit()
+
+    def hacked_thread_excepthook(args):
+      raise args.exc_value
+
+    threading.excepthook = hacked_thread_excepthook # type: ignore[attr-defined]
+    all_threads = [
+      threading.Thread(
+        name=f'scalafmt invocation thread #{idx}/{len(inputs_list_of_lists)}',
+        target=invoke_fn,
+        args=[parent_workunit, inputs_single_list],
+      )
+      for idx, inputs_single_list in enumerate(inputs_list_of_lists)
+    ]
+    for thread in all_threads:
+      thread.start()
+    for thread in all_threads:
+      thread.join()
+
   def _execute_for(self, targets):
     target_sources = self._calculate_sources(targets)
     if not target_sources:
       return
 
-    result = Xargs(self._invoke_tool).execute(target_sources)
-    if result != 0:
-      raise TaskError('{} is improperly implemented: a failed process '
-                      'should raise an exception earlier.'.format(type(self).__name__))
+    if self.get_options().files_per_process is not None:
+      # If --files-per-process is specified, split the target sources and run in separate threads!
+      n = self.get_options().files_per_process
+      inputs_list_of_lists = [
+        target_sources[i:i + n]
+        for i in range(0, len(target_sources), n)
+      ]
+      self._split_by_threads(inputs_list_of_lists=inputs_list_of_lists, invoke_fn=self._invoke_tool)
+    elif self.get_options().total_number_parallel_processes is not None:
+      # If --total-number-parallel-processes is specified, split the target sources into that many
+      # threads, and run in separate threads!
+      num_processes = self.get_options().total_number_parallel_processes
+      n = len(target_sources) // (num_processes - 1)
+      inputs_list_of_lists = [
+        target_sources[i:i + n]
+        for i in range(0, len(target_sources), n)
+      ]
+      self._split_by_threads(inputs_list_of_lists=inputs_list_of_lists, invoke_fn=self._invoke_tool)
+    else:
+      # Otherwise, pass in the parent workunit to Xargs, which is passed into self._invoke_tool.
+      parent_workunit = self.context.run_tracker.get_current_workunit()
+      result = Xargs(self._invoke_tool, constant_args=[parent_workunit]).execute(target_sources)
+      if result != 0:
+        raise TaskError('{} is improperly implemented: a failed process '
+                        'should raise an exception earlier.'.format(type(self).__name__))
 
-  def _invoke_tool(self, target_sources):
+  def _invoke_tool(self, parent_workunit, target_sources):
+    self.context.run_tracker.register_thread(parent_workunit)
     buildroot = get_buildroot()
     toolroot = buildroot
     if self.sideeffecting and self.get_options().output_dir:
@@ -88,7 +139,7 @@ class RewriteBase(NailgunTask, metaclass=ABCMeta):
       for old, new in zip(old_file_paths, new_file_paths):
         shutil.copyfile(old, new)
       target_sources = new_sources
-    result = self.invoke_tool(toolroot, target_sources)
+    result = self.invoke_tool(parent_workunit, toolroot, target_sources)
     self.process_result(result)
     return result
 

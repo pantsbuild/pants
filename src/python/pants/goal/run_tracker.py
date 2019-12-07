@@ -187,6 +187,14 @@ class RunTracker(Subsystem):
   def set_v2_console_rule_names(self, v2_console_rule_names):
     self._v2_console_rule_names = v2_console_rule_names
 
+  def get_current_workunit(self):
+    """Return the workunit associated with the current thread.
+
+    This can be used along with .register_thread() to ensure spawned threads have access to the
+    parent workunit that spawned them!
+    """
+    return self._threadlocal.current_workunit
+
   def register_thread(self, parent_workunit):
     """Register the parent workunit for all work in the calling thread.
 
@@ -383,7 +391,7 @@ class RunTracker(Subsystem):
 
     if stats_version not in cls.SUPPORTED_STATS_VERSIONS:
       raise ValueError("Invalid stats version")
-    
+
 
     auth_data = BasicAuth.global_instance().get_auth_for_provider(auth_provider)
     headers = cls._get_headers(stats_version=stats_version)
@@ -462,7 +470,7 @@ class RunTracker(Subsystem):
     else:
       stats.update({
         'self_timings': self.self_timings.get_all(),
-        'critical_path_timings': self.get_critical_path_timings().get_all(),        
+        'critical_path_timings': self.get_critical_path_timings().get_all(),
         'outcomes': self.outcomes,
       })
     return stats

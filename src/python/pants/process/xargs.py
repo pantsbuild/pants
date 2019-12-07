@@ -26,13 +26,15 @@ class Xargs:
       return subprocess.call(cmd + args, **kwargs)
     return cls(call)
 
-  def __init__(self, cmd):
+  def __init__(self, cmd, constant_args=None):
     """Creates an xargs engine that calls cmd with argument chunks.
 
     :param cmd: A function that can execute a command line in the form of a list of strings
       passed as its sole argument.
+    :param constant_args: Any positional arguments to be added to each invocation.
     """
     self._cmd = cmd
+    self._constant_args = constant_args or []
 
   def _split_args(self, args):
     half = len(args) // 2
@@ -46,7 +48,7 @@ class Xargs:
     all_args = list(args)
     logger.debug(f'xargs all_args: {all_args}')
     try:
-      return self._cmd(all_args)
+      return self._cmd(*(*self._constant_args, all_args))
     except OSError as e:
       if errno.E2BIG == e.errno:
         args1, args2 = self._split_args(all_args)
