@@ -40,6 +40,10 @@ class BuildRoot(metaclass=SingletonMetaclass):
     self._root_dir: Optional[str] = None
 
   @property
+  def pathlib_path(self) -> Path:
+    return Path(self.path)
+
+  @property
   def path(self) -> str:
     """Returns the build root for the current workspace."""
     if self._root_dir is None:
