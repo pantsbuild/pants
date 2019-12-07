@@ -2,7 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import errno
+import logging
 import subprocess
+
+
+logger = logging.getLogger(__name__)
 
 
 class Xargs:
@@ -40,11 +44,13 @@ class Xargs:
     :param list args: Extra arguments to pass to cmd.
     """
     all_args = list(args)
+    logger.debug(f'xargs all_args: {all_args}')
     try:
       return self._cmd(all_args)
     except OSError as e:
       if errno.E2BIG == e.errno:
         args1, args2 = self._split_args(all_args)
+        logger.debug(f'xargs split cmd line:\nargs1={args1},\nargs2={args2}!')
         result = self.execute(args1)
         if result != 0:
           return result
