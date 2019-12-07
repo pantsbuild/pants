@@ -41,7 +41,7 @@ async def download_cloc_script() -> DownloadedClocScript:
 
 
 class CountLinesOfCodeOptions(GoalSubsystem):
-  name = 'fast-cloc'
+  name = 'cloc2'
 
   @classmethod
   def register_options(cls, register) -> None:

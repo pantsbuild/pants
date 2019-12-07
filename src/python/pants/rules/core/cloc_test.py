@@ -47,7 +47,7 @@ class ClocTest(ConsoleRuleTestBase):
     self.assert_counts(output, 'Python', num_files=3, blank=2, comment=3, code=3)
     self.assert_counts(output, 'Java', num_files=1, blank=0, comment=1, code=1)
 
-    output = self.execute_rule(args=['src/py/foo', 'src/java/foo', '--fast-cloc-no-transitive']).splitlines()
+    output = self.execute_rule(args=['src/py/foo', 'src/java/foo', '--cloc2-no-transitive']).splitlines()
     self.assert_counts(output, 'Python', num_files=2, blank=2, comment=3, code=2)
     self.assert_counts(output, 'Java', num_files=1, blank=0, comment=1, code=1)
 
@@ -57,7 +57,7 @@ class ClocTest(ConsoleRuleTestBase):
 
     self.add_to_build_file('src/py/foo', 'python_library(sources=["foo.py", "empty.py"])')
 
-    output = self.execute_rule(args=['src/py/foo', '--fast-cloc-ignored'])
+    output = self.execute_rule(args=['src/py/foo', '--cloc2-ignored'])
 
     self.assertIn("Ignored the following files:", output)
     self.assertIn("empty.py: zero sized file", output)

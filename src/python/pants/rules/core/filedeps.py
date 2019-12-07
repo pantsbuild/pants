@@ -17,7 +17,7 @@ class FiledepsOptions(LineOriented, GoalSubsystem):
   Files may be listed with absolute or relative paths and any BUILD files implied in the transitive
   closure of targets are also included.
   """
-  name = 'fast-filedeps'
+  name = 'filedeps2'
 
   @classmethod
   def register_options(cls, register):

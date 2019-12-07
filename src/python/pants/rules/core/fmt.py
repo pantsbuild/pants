@@ -50,7 +50,7 @@ class FmtOptions(GoalSubsystem):
 
   # TODO: make this "fmt"
   # Blocked on https://github.com/pantsbuild/pants/issues/8351
-  name = 'fmt-v2'
+  name = 'fmt2'
 
 
 class Fmt(Goal):
