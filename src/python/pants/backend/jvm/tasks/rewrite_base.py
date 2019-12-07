@@ -78,6 +78,7 @@ class RewriteBase(NailgunTask, metaclass=ABCMeta):
     def hacked_thread_excepthook(args):
       raise args.exc_value
 
+    # Propagate exceptions in threads to the toplevel.
     threading.excepthook = hacked_thread_excepthook # type: ignore[attr-defined]
     all_threads = [
       threading.Thread(
@@ -90,7 +91,10 @@ class RewriteBase(NailgunTask, metaclass=ABCMeta):
     for thread in all_threads:
       thread.start()
     for thread in all_threads:
-      thread.join()
+      try:
+        thread.join()
+      except Exception as e:
+        raise TaskError(str(e), exit_code=1)
 
   def _execute_for(self, targets):
     target_sources = self._calculate_sources(targets)

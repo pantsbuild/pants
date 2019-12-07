@@ -122,7 +122,6 @@ class ScalaFmt(RewriteBase):
       scope=subsystem.options_scope)
 
   def invoke_tool(self, current_workunit, absolute_root, target_sources):
-    self.context.run_tracker._threadlocal.current_workunit = current_workunit
     self.context.log.debug(f'scalafmt called with sources: {target_sources}')
 
     # If no config file is specified use default scalafmt config.
