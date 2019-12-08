@@ -48,9 +48,6 @@ class UnpackWheels(UnpackRemoteSourcesBase):
             PythonSetup,
         )
 
-    class SingleDistExtractionError(Exception):
-        pass
-
     def _get_matching_wheel(self, pex_path, interpreter, requirements, module_name):
         """Use PexBuilderWrapper to resolve a single wheel from the requirement specs using pex.
 
@@ -63,21 +60,9 @@ class UnpackWheels(UnpackRemoteSourcesBase):
                     builder=PEXBuilder(path=chroot, interpreter=interpreter), log=self.context.log
                 )
 
-                resolved_dists = pex_builder.resolve_distributions(
-                    requirements, platforms=["current"]
+                return pex_builder.extract_single_dist_for_current_platform(
+                    requirements, dist_key=module_name
                 )
-
-                matched_dists = [
-                    resolved_dist.distribution
-                    for resolved_dist in resolved_dists
-                    if resolved_dist.distribution.key == module_name
-                ]
-                if len(matched_dists) != 1:
-                    raise self.SingleDistExtractionError(
-                        f"Exactly one dist was expected to match name {module_name} in requirements "
-                        f"{requirements}, found {matched_dists}"
-                    )
-                return matched_dists[0]
 
     @memoized_method
     def _compatible_interpreter(self, unpacked_whls):

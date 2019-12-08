@@ -4,7 +4,7 @@
 import os
 import re
 from enum import Enum
-from typing import Dict, Iterable, List, Pattern, Sequence
+from typing import Dict, Iterable, List, Optional, Pattern, Sequence, Type, Union
 
 from pants.option.errors import ParseError
 from pants.util.eval import parse_expression
@@ -24,6 +24,15 @@ class UnsetBool:
         raise NotImplementedError(
             "UnsetBool cannot be instantiated. It should only be used as a " "sentinel type."
         )
+
+    @classmethod
+    def coerce_bool(cls, value: Optional[Union[Type["UnsetBool"], bool]], default: bool) -> bool:
+        if value is None:
+            return default
+        if value is cls:
+            return default
+        assert isinstance(value, bool)
+        return value
 
 
 def target_option(s: str) -> str:

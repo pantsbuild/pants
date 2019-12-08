@@ -7,14 +7,14 @@ from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 
-from pants.backend.python.subsystems.pex_build_util import (
+from pants.base.exceptions import TaskError
+from pants.invalidation.cache_manager import VersionedTargetSet
+from pants.python.pex_build_util import (
+    PexBuilderWrapper,
     has_python_sources,
     has_resources,
     is_python_target,
 )
-from pants.base.exceptions import TaskError
-from pants.invalidation.cache_manager import VersionedTargetSet
-from pants.python.pex_build_util import PexBuilderWrapper
 from pants.task.task import Task
 from pants.util.dirutil import safe_concurrent_creation
 from pants.util.ordered_set import OrderedSet
