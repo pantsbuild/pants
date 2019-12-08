@@ -108,7 +108,7 @@ python_tests(
     'src/python/pants/testutil/subsystem',
     ':python_task_test_base',
   ],
-  timeout=360,
+  timeout=480,
 )
 
 python_tests(
