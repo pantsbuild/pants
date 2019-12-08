@@ -1,6 +1,7 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import itertools
 import logging
 from dataclasses import dataclass
 from typing import Dict, Optional, Tuple, Union
@@ -56,7 +57,7 @@ class ExecuteProcessRequest:
     self.argv = argv
     self.input_files = input_files
     self.description = description
-    self.env = tuple(item for pair in env.items() for item in pair) if env is not None else ()  # type: ignore[assignment] # infers the expression as `object` for some reason
+    self.env = tuple(itertools.chain.from_iterable((env or {}).items()))
     self.output_files = output_files or ()
     self.output_directories = output_directories or ()
     self.timeout_seconds = timeout_seconds
