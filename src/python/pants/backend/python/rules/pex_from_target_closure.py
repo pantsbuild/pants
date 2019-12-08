@@ -4,6 +4,7 @@
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
+from pants.backend.python.rules.ipex import IpexRequest
 from pants.backend.python.rules.pex import (
     CreatePex,
     Pex,
@@ -74,8 +75,11 @@ async def create_pex_from_target_closure(
         additional_args=request.additional_args,
     )
 
+  if request.generate_ipex:
+    pex = await Get[Pex](IpexRequest(create_pex_request))
+  else:
     pex = await Get[Pex](CreatePex, create_pex_request)
-    return pex
+  return pex
 
 
 def rules():

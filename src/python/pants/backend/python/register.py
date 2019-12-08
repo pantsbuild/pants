@@ -7,6 +7,7 @@ from pants.backend.python.python_requirements import PythonRequirements
 from pants.backend.python.rules import (
     download_pex_bin,
     inject_init,
+    ipex,
     pex,
     pex_from_target_closure,
     prepare_chrooted_python_sources,
@@ -110,6 +111,7 @@ def rules():
     return (
         *download_pex_bin.rules(),
         *inject_init.rules(),
+        *ipex.rules(),
         *prepare_chrooted_python_sources.rules(),
         *pex.rules(),
         *pex_from_target_closure.rules(),
