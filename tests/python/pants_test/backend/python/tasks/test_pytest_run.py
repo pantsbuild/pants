@@ -2,13 +2,13 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import configparser
-import functools
 import os
 from contextlib import contextmanager
 from textwrap import dedent
 
 import coverage
 
+from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.gather_sources import GatherSources
 from pants.backend.python.tasks.pytest_prep import PytestPrep
@@ -52,6 +52,17 @@ class PytestTestBase(PythonTaskTestBase, DeclarativeTaskTestMixin):
     PytestPrepCoverageVersionPinned,
   ]
 
+  @classmethod
+  def setUpClass(cls):
+    super().setUpClass()
+    cls.resolver_cache_dir = safe_mkdtemp()
+
+  def set_other_options(self):
+    self.set_options_for_scope(
+      PythonSetup.options_scope,
+      resolver_cache_dir=self.resolver_cache_dir,
+    )
+
   _CONFTEST_CONTENT = '# I am an existing root-level conftest file.'
 
   _default_test_options = {
@@ -67,6 +78,7 @@ class PytestTestBase(PythonTaskTestBase, DeclarativeTaskTestMixin):
   def run_tests(self, targets, *passthru_args, **options):
     """Run the tests in the specified targets, with the specified PytestRun task options."""
     self.set_options(**self._augment_options(options))
+    self.set_other_options()
     with pushd(self.build_root):
       result = self.invoke_tasks(
         target_roots=targets,
@@ -76,6 +88,7 @@ class PytestTestBase(PythonTaskTestBase, DeclarativeTaskTestMixin):
 
   def run_failing_tests(self, targets, failed_targets, *passthru_args, **options):
     self.set_options(**self._augment_options(options))
+    self.set_other_options()
     with self.assertRaises(ErrorWhileTesting) as cm:
       with pushd(self.build_root):
         self.invoke_tasks(
