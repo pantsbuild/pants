@@ -247,6 +247,20 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
       sources=[]
     )
 
+    self.strict_deps_enabled = self.make_target(
+      'strict_deps:enabled',
+      target_type=JvmTarget,
+      dependencies=[self.scala_with_source_dep],
+      strict_deps=True
+    )
+
+    self.strict_deps_disabled = self.make_target(
+      'strict_deps:disabled',
+      target_type=JvmTarget,
+      dependencies=[self.scala_with_source_dep],
+      strict_deps=False
+    )
+
   def create_runtime_classpath_for_targets(self, target):
     def path_to_zjar_with_workdir(address: Address):
       return os.path.join(self.pants_workdir, address.path_safe_spec, "z.jar")
@@ -369,6 +383,7 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
       'id': 'project_info.jvm_target',
       # 'is_code_gen': False,
       'targets': ['project_info:jar_lib', '//:scala-library'],
+      'transitive_targets': ['project_info:jvm_target', 'project_info:jar_lib', '//:scala-library'],
       'is_synthetic': False,
       'is_target_root': True,
       'roots': [
@@ -539,4 +554,16 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
     self.assertEqual(
       sorted(self.jvm_target_with_sources.sources_relative_to_source_root()),
       sorted(sources_jar_of_dep.namelist())
+    )
+
+  def test_transitive_targets(self):
+    enabled_result = self.execute_export_json('strict_deps:enabled')['targets']['strict_deps:enabled']
+    disabled_result = self.execute_export_json('strict_deps:disabled')['targets']['strict_deps:disabled']
+    self.assertNotIn(
+      self.jvm_target_with_sources.address.spec,
+      enabled_result['transitive_targets']
+    )
+    self.assertIn(
+      self.jvm_target_with_sources.address.spec,
+      disabled_result['transitive_targets']
     )

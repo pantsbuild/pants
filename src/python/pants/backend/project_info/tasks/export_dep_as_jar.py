@@ -8,6 +8,7 @@ from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
+from pants.backend.jvm.subsystems.dependency_context import DependencyContext
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
@@ -31,6 +32,10 @@ class ExportDepAsJar(ConsoleTask):
   This is an experimental task that mimics export but uses the jars for
   jvm dependencies instead of sources.
   """
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super().subsystem_dependencies() + (DependencyContext,)
 
   @classmethod
   def register_options(cls, register):
@@ -150,6 +155,7 @@ class ExportDepAsJar(ConsoleTask):
       info = {
         # this means 'dependencies'
         'targets': [],
+        'transitive_targets': [],
         'libraries': [],
         'roots': [],
         'id': current_target.id,
@@ -190,6 +196,11 @@ class ExportDepAsJar(ConsoleTask):
           target_libraries.update(iter_transitive_jars(dep))
         if isinstance(dep, Resources):
           resource_target_map[dep] = current_target
+
+      if hasattr(current_target, 'strict_deps'):
+        transitive_targets = DependencyContext.global_instance().dependencies_respecting_strict_deps(current_target)
+        for dep in transitive_targets:
+          info['transitive_targets'].append(dep.address.spec)
 
       if isinstance(current_target, ScalaLibrary):
         for dep in current_target.java_sources:
