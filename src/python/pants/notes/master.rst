@@ -4,6 +4,63 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.24.0.dev2 (12/08/2019)
+------------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Add option to attach Subsystems to streaming workunits (#8720)
+  `PR #8720 <https://github.com/pantsbuild/pants/pull/8720>`_
+
+* Allow passing arguments to Pytest, isort, and Black in V2 (#8729)
+  `PR #8729 <https://github.com/pantsbuild/pants/pull/8729>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Add `fast-depedencies` V2 rule (#8759)
+  `PR #8759 <https://github.com/pantsbuild/pants/pull/8759>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix V2 Black not being distributed to end users (#8776)
+  `PR #8776 <https://github.com/pantsbuild/pants/pull/8776>`_
+
+* Fix V2 isort config option when only using a single config file (#8768)
+  `PR #8768 <https://github.com/pantsbuild/pants/pull/8768>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Bump test_pytest_run.py timeout. (#8778)
+  `PR #8778 <https://github.com/pantsbuild/pants/pull/8778>`_
+
+* Upgrade to Pex 2.0.3. (#8704)
+  `PR #8704 <https://github.com/pantsbuild/pants/pull/8704>`_
+
+* Deprecate `--dependencies-external-only` and the default including external dependencies (#8763)
+  `PR #8763 <https://github.com/pantsbuild/pants/pull/8763>`_
+
+* Update reqwests dependency to 0.9.22
+  `PR #8755 <https://github.com/pantsbuild/pants/pull/8755>`_
+
+* Simplify `.travis.yml` setup now that more shards can use remote execution (#8754)
+  `PR #8754 <https://github.com/pantsbuild/pants/pull/8754>`_
+
+* Fix internal unmatched globs warnings (#8735)
+  `PR #8735 <https://github.com/pantsbuild/pants/pull/8735>`_
+
+* Partially type check 300 more files (#8741)
+  `PR #8741 <https://github.com/pantsbuild/pants/pull/8741>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Update "powered by" page. (#8761)
+  `PR #8761 <https://github.com/pantsbuild/pants/pull/8761>`_
+
 1.24.0.dev1 (12/02/2019)
 ------------------------
 
