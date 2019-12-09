@@ -71,13 +71,6 @@ class PyTest(Subsystem):
       default=120,
       help='The maximum timeout (in seconds) that can be set on a test target.',
     )
-    register(
-      '--timeout-terminate-wait',
-      type=int,
-      advanced=True,
-      default=10,
-      help='If a test does not terminate on a SIGTERM, how long to wait (in seconds) before sending a SIGKILL.',
-    )
 
   def get_requirement_strings(self) -> Tuple[str, ...]:
     """Returns a tuple of requirements-style strings for Pytest and Pytest plugins."""

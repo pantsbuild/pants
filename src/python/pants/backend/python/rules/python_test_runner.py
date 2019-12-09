@@ -35,7 +35,6 @@ def get_timeout_seconds_for_target(test_target_timeout, timeout_default, timeout
   if test_target_timeout is None:
     test_target_timeout = timeout_default
   if timeout_maximum is not None and test_target_timeout > timeout_maximum:
-    # TODO Log a warning here.
     return timeout_maximum
   return test_target_timeout
 
@@ -116,8 +115,6 @@ async def run_python_test(
     pex_args=(*pytest.get_args(), *test_target_sources_file_names),
     input_files=merged_input_files,
     description=f'Run Pytest for {test_target.address.reference()}',
-    # TODO(#8584): hook this up to TestRunnerTaskMixin so that we can configure the default timeout
-    #  and also use the specified max timeout time.
     timeout_seconds=get_timeout_seconds_for_target(
       test_target_timeout=getattr(test_target, 'timeout', None),
       timeout_default=pytest.options.timeout_default,
