@@ -48,7 +48,8 @@ async def create_binary(
     global_options = options_bootstrapper.bootstrap_options.for_global_scope()
     pants_distdir = Path(global_options.pants_distdir)
     if not is_child_of(pants_distdir, build_root.pathlib_path):
-      console.print_stderr(f"When set to an absolute path, `--pants-distdir` must be relative to the build root. You set it to {pants_distdir}. Instead, use a relative path or an absolute path relative to the build root.")
+      console.print_stderr(f"When set to an absolute path, `--pants-distdir` must be relative to the build root."
+      "You set it to {pants_distdir}. Instead, use a relative path or an absolute path relative to the build root.")
       return Binary(exit_code=1)
 
     relative_distdir = pants_distdir.relative_to(build_root.pathlib_path) if pants_distdir.is_absolute() else pants_distdir

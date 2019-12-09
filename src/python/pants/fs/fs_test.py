@@ -97,6 +97,8 @@ class IsChildOfTest(TestBase):
     assert is_child_of(Path("dist/dir"), mock_build_root)
     assert is_child_of(Path("./dist/dir"), mock_build_root)
     assert is_child_of(Path("../root/dist/dir"), mock_build_root)
+    assert is_child_of(Path(""), mock_build_root)
+    assert is_child_of(Path("./"), mock_build_root)
 
     assert not is_child_of(Path("/other/random/directory/root/dist/dir"), mock_build_root)
     assert not is_child_of(Path("../not_root/dist/dir"), mock_build_root)
