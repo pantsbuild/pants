@@ -31,6 +31,7 @@ class ExecuteProcessRequest:
   # reproduces this process execution request to make debugging remote executions effortless!
   argv: Tuple[str, ...]
   input_files: Digest
+  working_directory: Optional[str]
   description: str
   env: Tuple[str, ...]
   output_files: Tuple[str, ...]
@@ -44,6 +45,7 @@ class ExecuteProcessRequest:
     self,
     argv: Tuple[str, ...],
     *,
+    working_directory: Optional[str] = None,
     input_files: Digest,
     description: str,
     env: Optional[Dict[str, str]] = None,
@@ -55,6 +57,7 @@ class ExecuteProcessRequest:
     is_nailgunnable: bool = False,
   ) -> None:
     self.argv = argv
+    self.working_directory = working_directory
     self.input_files = input_files
     self.description = description
     self.env = tuple(itertools.chain.from_iterable((env or {}).items()))

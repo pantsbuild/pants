@@ -49,6 +49,7 @@ fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {
       format!("{}", script_path.display()),
     ],
     env: BTreeMap::new(),
+    working_directory: None,
     input_files: EMPTY_DIGEST,
     output_files: vec![PathBuf::from("roland")].into_iter().collect(),
     output_directories: BTreeSet::new(),
