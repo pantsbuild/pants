@@ -33,7 +33,8 @@ struct InnerSession {
   preceding_graph_size: usize,
   // The set of roots that have been requested within this session.
   roots: Mutex<HashSet<Root>>,
-  // If enabled, the display that will render the progress of the V2 engine.
+  // If enabled, the display that will render the progress of the V2 engine. This is only
+  // Some(_) if the --v2-ui option is enabled.
   display: Option<Arc<Mutex<EngineDisplay>>>,
   // If enabled, Zipkin spans for v2 engine will be collected.
   should_record_zipkin_spans: bool,
@@ -100,6 +101,14 @@ impl Session {
 
   pub fn build_id(&self) -> &str {
     &self.0.build_id
+  }
+
+  pub fn write_stdout(&self, msg: &str) {
+    print!(" {}", msg);
+  }
+
+  pub fn write_stderr(&self, msg: &str) {
+    eprint!("{}", msg);
   }
 }
 

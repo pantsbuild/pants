@@ -244,6 +244,7 @@ python_library(
   name='console',
   sources=['console.py'],
   dependencies=[
+    ':native',
     '3rdparty/python:ansicolors',
   ],
   tags = {'partially_type_checked'},

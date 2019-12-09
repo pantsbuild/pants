@@ -193,7 +193,7 @@ class LegacyGraphSession:
       )
       self.invalid_goals = invalid_goals
 
-  def run_console_rules(self, options_bootstrapper, goals, target_roots):
+  def run_console_rules(self, options_bootstrapper, options, goals, target_roots):
     """Runs @console_rules sequentially and interactively by requesting their implicit Goal products.
 
     For retryable failures, raises scheduler.ExecutionError.
@@ -204,9 +204,12 @@ class LegacyGraphSession:
     :returns: An exit code.
     """
 
+    global_options = options.for_global_scope()
+
     subject = target_roots.specs
     console = Console(
-      use_colors=options_bootstrapper.bootstrap_options.for_global_scope().colors
+      use_colors=global_options.colors,
+      session=self.scheduler_session if global_options.v2_ui else None
     )
     workspace = Workspace(self.scheduler_session)
     interactive_runner = InteractiveRunner(self.scheduler_session)
