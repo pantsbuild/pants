@@ -34,6 +34,9 @@ Bugfixes
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+* Bump test_pytest_run.py timeout. (#8778)
+  `PR #8778 <https://github.com/pantsbuild/pants/pull/8778>`_
+
 * Upgrade to Pex 2.0.3. (#8704)
   `PR #8704 <https://github.com/pantsbuild/pants/pull/8704>`_
 
