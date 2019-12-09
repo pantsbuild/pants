@@ -6,7 +6,7 @@ set -e
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd "$(git rev-parse --show-toplevel)" && pwd)
 
-function curl() {
+function safe_curl() {
   real_curl="$(command -v curl)"
   set +e
   "${real_curl}" --fail -SL "$@"
@@ -79,7 +79,7 @@ function run_pex() {
 
     pex="${pexdir}/pex"
 
-    curl -s "${PEX_DOWNLOAD_PREFIX}/v${PEX_VERSION}/pex" > "${pex}"
+    safe_curl -s "${PEX_DOWNLOAD_PREFIX}/v${PEX_VERSION}/pex" > "${pex}"
     "${PY}" "${pex}" "$@"
   )
 }
@@ -448,7 +448,7 @@ function list_prebuilt_wheels() {
   trap 'rm -f "${wheel_listing}"' RETURN
 
   for wheels_path in "${DEPLOY_PANTS_WHEELS_PATH}" "${DEPLOY_3RDPARTY_WHEELS_PATH}"; do
-    curl -s "${BINARY_BASE_URL}/?prefix=${wheels_path}" > "${wheel_listing}"
+    safe_curl -s "${BINARY_BASE_URL}/?prefix=${wheels_path}" > "${wheel_listing}"
     "${PY}" << EOF
 from __future__ import print_function
 import sys
@@ -484,7 +484,7 @@ function fetch_prebuilt_wheels() {
         echo "${BINARY_BASE_URL}/${url_path}:"
         local dest="${to_dir}/${file_path}"
         mkdir -p "$(dirname "${dest}")"
-        curl --progress-bar -o "${dest}" "${BINARY_BASE_URL}/${url_path}" \
+        safe_curl --progress-bar -o "${dest}" "${BINARY_BASE_URL}/${url_path}" \
           || die "Could not fetch ${dest}."
       done
     }
