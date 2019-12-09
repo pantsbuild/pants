@@ -7,7 +7,7 @@ set -e
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd "$(git rev-parse --show-toplevel)" && pwd)
 
 function curl() {
-  real_curl="$(which curl)"
+  real_curl="$(command -v curl)"
   set +e
   "${real_curl}" --fail -SL "$@"
   exit_code=$?
