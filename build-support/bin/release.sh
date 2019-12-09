@@ -6,6 +6,18 @@ set -e
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd "$(git rev-parse --show-toplevel)" && pwd)
 
+function curl() {
+  real_curl="$(which curl)"
+  set +e
+  "${real_curl}" --fail -SL "$@"
+  exit_code=$?
+  set -e
+  if [[ "${exit_code}" -ne 0 ]]; then
+    echo >&2 "Curl failed with args: $*"
+    exit 1
+  fi
+}
+
 # shellcheck source=build-support/common.sh
 source "${ROOT}/build-support/common.sh"
 
@@ -67,7 +79,7 @@ function run_pex() {
 
     pex="${pexdir}/pex"
 
-    curl --fail -sSL "${PEX_DOWNLOAD_PREFIX}/v${PEX_VERSION}/pex" > "${pex}"
+    curl -s "${PEX_DOWNLOAD_PREFIX}/v${PEX_VERSION}/pex" > "${pex}"
     "${PY}" "${pex}" "$@"
   )
 }
@@ -436,7 +448,7 @@ function list_prebuilt_wheels() {
   trap 'rm -f "${wheel_listing}"' RETURN
 
   for wheels_path in "${DEPLOY_PANTS_WHEELS_PATH}" "${DEPLOY_3RDPARTY_WHEELS_PATH}"; do
-    curl --fail -sSL "${BINARY_BASE_URL}/?prefix=${wheels_path}" > "${wheel_listing}"
+    curl -s "${BINARY_BASE_URL}/?prefix=${wheels_path}" > "${wheel_listing}"
     "${PY}" << EOF
 from __future__ import print_function
 import sys
@@ -472,7 +484,7 @@ function fetch_prebuilt_wheels() {
         echo "${BINARY_BASE_URL}/${url_path}:"
         local dest="${to_dir}/${file_path}"
         mkdir -p "$(dirname "${dest}")"
-        curl --fail --progress-bar -o "${dest}" "${BINARY_BASE_URL}/${url_path}" \
+        curl --progress-bar -o "${dest}" "${BINARY_BASE_URL}/${url_path}" \
           || die "Could not fetch ${dest}."
       done
     }
