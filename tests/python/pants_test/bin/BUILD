@@ -10,6 +10,7 @@ python_tests(
     'src/python/pants/option',
     'src/python/pants/testutil:int-test',
     'testprojects:pants_plugins_directory',
+    'testprojects/src/python:nested_runs_directory',
   ],
   tags = {'integration'},
 )

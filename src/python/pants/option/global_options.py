@@ -289,6 +289,15 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                   'start up all concurrent invocations (e.g. in other terminals) without pantsd. '
                   'Enabling this option requires parallel pants invocations to block on the first')
 
+    # Calling pants command (inner run) from other pants command is unusual behaviour,
+    # and most users should never set this flag.
+    # It is automatically set by pants when an inner run is detected.
+    # Currently, pants commands with this option set don't use pantsd,
+    # but this effect should not be relied upon.
+    # This option allows us to know who was the parent of pants inner runs for informational purposes.
+    register('--parent-build-id', advanced=True, default=None,
+             help='The build ID of the other pants run which spawned this one, if any.')
+
     # Shutdown pantsd after the current run.
     # This needs to be accessed at the same time as enable_pantsd,
     # so we register it at bootstrap time.

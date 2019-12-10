@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
+import os
 from contextlib import contextmanager
 
 from pants.base.build_environment import get_buildroot
@@ -224,6 +225,10 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
   def set_start_time(self, start_time):
     # Launch RunTracker as early as possible (before .run() is called).
     self._run_tracker = RunTracker.global_instance()
+
+    # Propagates parent_build_id to pants runs that may be called from this pants run.
+    os.environ['PANTS_PARENT_BUILD_ID'] = self._run_tracker.run_id
+
     self._reporting = Reporting.global_instance()
 
     self._run_start_time = start_time

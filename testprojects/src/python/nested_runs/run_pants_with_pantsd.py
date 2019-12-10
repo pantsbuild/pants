@@ -1,3 +1,4 @@
+import os
 import pathlib
 import subprocess
 import sys
@@ -5,16 +6,15 @@ import sys
 
 def main():
   workdir = sys.argv[1]
-  config = pathlib.Path(workdir) / 'pants.ini'
+  config_path = pathlib.Path(workdir) / 'pants.ini'
+  config = [f'--pants-config-files={config_path}'] if os.path.isfile(config_path) else []
 
   cmd = [
-    './pants',
+    './pants.pex',
     '--no-pantsrc',
-    f'--pants-config-files={config}',
     '--print-exception-stacktrace=True',
     f'--pants-workdir={workdir}',
-    'goals'
-  ]
+  ] + config + ['goals']
   print(f'Running pants with command {cmd}')
   subprocess.run(cmd, check=True)
 
