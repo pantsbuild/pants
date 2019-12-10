@@ -74,11 +74,9 @@ case class Settings(
       classpath = normaliseSeq(classpath),
       _classesDirectory = normaliseOpt(_classesDirectory),
       outputJar = normaliseOpt(outputJar),
-      scala = scala.withAbsolutePaths(relativeTo),
       javaHome = normaliseOpt(javaHome),
       _incOptions = _incOptions.withAbsolutePaths(relativeTo),
       analysis = analysis.withAbsolutePaths(relativeTo),
-      compiledBridgeJar = normaliseOpt(compiledBridgeJar)
     )
   }
 }
