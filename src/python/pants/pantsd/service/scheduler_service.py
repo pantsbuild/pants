@@ -229,6 +229,7 @@ class SchedulerService(PantsService):
       # N.B. @console_rules run pre-fork in order to cache the products they request during execution.
       exit_code = session.run_console_rules(
           options_bootstrapper,
+          options,
           goals,
           target_roots,
         )
