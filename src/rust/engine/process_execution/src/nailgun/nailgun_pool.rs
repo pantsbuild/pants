@@ -335,7 +335,7 @@ fn read_port(stdout: PathBuf) -> BoxFuture<Port, String> {
       })
   })
   .and_then(|line| {
-    info!("DEBUG_NAILGUN start output is {:?}", line);
+    debug!("DEBUG_NAILGUN start output is {:?}", line);
     match line {
       Ok(s) => {
         let port = &NAILGUN_PORT_REGEX.captures_iter(s.trim()).next();

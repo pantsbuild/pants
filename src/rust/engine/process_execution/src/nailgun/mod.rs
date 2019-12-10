@@ -70,7 +70,6 @@ fn construct_nailgun_client_request(
   original_req: ExecuteProcessRequest,
   client_main_class: String,
   mut client_args: Vec<String>,
-  client_workdir: PathBuf,
 ) -> Result<ExecuteProcessRequest, String> {
   let ExecuteProcessRequest {
     argv: _argv,
@@ -86,28 +85,6 @@ fn construct_nailgun_client_request(
     is_nailgunnable,
   } = original_req;
   client_args.insert(0, client_main_class);
-  // The arg file is only materialized to the client workdir, but because we use nailMain, java is running in a
-  // different dir. We have to adjust the path to point to the correct spot, which is in the
-  // client workdir. This happens because the arg file is parsed before the absolute paths
-  // are computed by nailgun in nailMain
-  if let Some(maybe_arg_file) = client_args.last() {
-    if maybe_arg_file.starts_with('@') {
-      if let Ok(arg_file_path) = maybe_arg_file[1..].parse::<PathBuf>() {
-        client_args.pop();
-        let mut full_arg_file_path = client_workdir
-          .as_path()
-          .join(arg_file_path)
-          .into_os_string()
-          .into_string()
-          .map_err(|_| {
-            "Couldn't convert path into String, does it contain valid unicode?".to_string()
-          })?;
-        // turn the path back into a java arguments file.
-        full_arg_file_path.insert(0, '@');
-        client_args.push(full_arg_file_path);
-      }
-    }
-  }
   Ok(ExecuteProcessRequest {
     argv: client_args,
     input_files,
@@ -199,7 +176,7 @@ impl super::CommandRunner for CommandRunner {
       context,
       store,
       executor,
-      false,
+      true,
       &self.workdir_base,
     )
   }
@@ -264,7 +241,6 @@ impl CapturedWorkdir for CommandRunner {
       req2,
       client_main_class,
       client_args,
-      client_workdir.clone(),
     )?;
 
     // Get the port of a running nailgun server (or a new nailgun server if it doesn't exist)
