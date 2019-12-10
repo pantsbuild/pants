@@ -176,8 +176,8 @@ class ApacheThriftPyGenTest(TaskTestBase):
     for resolved_dist in resolve([f'thrift=={self.get_thrift_version(apache_thrift_gen)}',
                                   'setuptools==40.6.3'],
                                  interpreter=interpreter,
-                                 indexes=python_repos.indexes,
-                                 find_links=python_repos.repos):
+                                 context=python_repos.get_network_context(),
+                                 fetchers=python_repos.get_fetchers()):
       pythonpath.append(resolved_dist.distribution.location)
 
     process = subprocess.Popen([interpreter.binary,
