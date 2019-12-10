@@ -1,4 +1,4 @@
-use crate::{ExecuteProcessRequest, Platform};
+use crate::{ExecuteProcessRequest, Platform, RelativePath};
 use hashing::{Digest, Fingerprint};
 use std::collections::hash_map::DefaultHasher;
 use std::collections::{BTreeMap, BTreeSet};
@@ -11,6 +11,7 @@ fn execute_process_request_equality() {
         |description: String, timeout: Duration, unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: hashing::Digest| ExecuteProcessRequest {
             argv: vec![],
             env: BTreeMap::new(),
+            working_directory: None,
             input_files: hashing::EMPTY_DIGEST,
             output_files: BTreeSet::new(),
             output_directories: BTreeSet::new(),
@@ -67,4 +68,21 @@ fn execute_process_request_equality() {
   // but not other fields
   assert!(a != c);
   assert!(hash(&a) != hash(&c));
+}
+
+#[test]
+fn relative_path_ok() {
+  assert_eq!(Some("a"), RelativePath::new("a").unwrap().to_str());
+  assert_eq!(Some("a"), RelativePath::new("./a").unwrap().to_str());
+  assert_eq!(Some("a"), RelativePath::new("b/../a").unwrap().to_str());
+  assert_eq!(
+    Some("a/c"),
+    RelativePath::new("b/../a/././c").unwrap().to_str()
+  );
+}
+
+#[test]
+fn relative_path_err() {
+  assert!(RelativePath::new("../a").is_err());
+  assert!(RelativePath::new("/a").is_err());
 }
