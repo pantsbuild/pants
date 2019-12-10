@@ -5,8 +5,8 @@ python_library(
   name = 'util',
   sources = ['util.py'],
   dependencies = [
-    'src/python/pants/base:deprecated',
     'src/python/pants/testutil/engine:util',
+    'tests/python/pants_test:deprecated_testinfra',
   ],
 )
 
@@ -14,8 +14,8 @@ python_library(
   name = 'engine_test_base',
   sources = ['base_engine_test.py'],
   dependencies = [
-    'src/python/pants/base:deprecated',
     'src/python/pants/testutil/engine:engine_test_base',
+    'tests/python/pants_test:deprecated_testinfra',
   ]
 )
 
@@ -48,6 +48,7 @@ python_tests(
     'src/python/pants/engine:addressable',
     'src/python/pants/util:objects',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -83,7 +84,8 @@ python_tests(
   sources=['test_selectors.py'],
   dependencies=[
     'src/python/pants/engine:selectors',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -94,7 +96,8 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/engine:objects',
     'src/python/pants/engine:struct',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -110,7 +113,7 @@ python_tests(
     'tests/python/pants_test/engine/examples:scheduler_inputs',
     'src/python/pants/testutil/engine:util',
     'src/python/pants/reporting',
-  ]
+  ],
 )
 
 python_tests(
@@ -128,7 +131,7 @@ python_tests(
     'src/python/pants/util:objects',
     'tests/python/pants_test/engine/examples:graph_test',
     'tests/python/pants_test/engine/examples:parsers',
-  ]
+  ],
 )
 
 python_tests(
@@ -145,7 +148,7 @@ python_tests(
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/engine/examples:mapper_test',
     'tests/python/pants_test/engine/examples:parsers',
-  ]
+  ],
 )
 
 python_tests(
@@ -154,7 +157,8 @@ python_tests(
   dependencies=[
     'tests/python/pants_test/engine/examples:parsers',
     'src/python/pants/engine:objects',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(

@@ -31,7 +31,6 @@ class ProjectsTestBase(PantsRunIntegrationTest):
     negative_test_targets = [
       'testprojects/maven_layout/provided_patching/leaf:fail',
       'testprojects/src/antlr/python/test:antlr_failure',
-      'testprojects/src/java/org/pantsbuild/testproject/bundle:missing-files',
       'testprojects/src/java/org/pantsbuild/testproject/compilation_warnings:fatal',
       'testprojects/src/java/org/pantsbuild/testproject/dummies:compilation_failure_target',
       'testprojects/src/java/org/pantsbuild/testproject/junit/earlyexit:tests',
@@ -47,7 +46,6 @@ class ProjectsTestBase(PantsRunIntegrationTest):
       'testprojects/src/thrift/org/pantsbuild/thrift_linter:',
       'testprojects/src/java/org/pantsbuild/testproject/provided:c',
       'testprojects/tests/java/org/pantsbuild/testproject/dummies:failing_target',
-      'testprojects/tests/java/org/pantsbuild/testproject/empty:',
       'testprojects/tests/java/org/pantsbuild/testproject/fail256:fail256',
       'testprojects/tests/python/pants/dummies:failing_target',
       'testprojects/tests/scala/org/pantsbuild/testproject/non_exports:C',

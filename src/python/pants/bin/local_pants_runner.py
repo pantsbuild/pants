@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
+import os
 from contextlib import contextmanager
 
 from pants.base.build_environment import get_buildroot
@@ -22,6 +23,7 @@ from pants.option.arg_splitter import UnknownGoalHelp
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.reporting.reporting import Reporting
 from pants.reporting.streaming_workunit_handler import StreamingWorkunitHandler
+from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import maybe_profiled
 
 
@@ -112,7 +114,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
       # be merged with the zipkin_trace_v2 flag, since they both involve most
       # of the same engine functionality, but for now is separate to avoid
       # breaking functionality associated with zipkin tracing while iterating on streaming workunit reporting.
-      stream_workunits = options.for_scope('reporting').stream_workunits
+      stream_workunits = len(options.for_global_scope().streaming_workunits_handlers) != 0
       graph_session = graph_scheduler_helper.new_session(zipkin_trace_v2, RunTracker.global_instance().run_id, v2_ui, should_report_workunits=stream_workunits)
     return graph_session, graph_session.scheduler_session
 
@@ -223,6 +225,10 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
   def set_start_time(self, start_time):
     # Launch RunTracker as early as possible (before .run() is called).
     self._run_tracker = RunTracker.global_instance()
+
+    # Propagates parent_build_id to pants runs that may be called from this pants run.
+    os.environ['PANTS_PARENT_BUILD_ID'] = self._run_tracker.run_id
+
     self._reporting = Reporting.global_instance()
 
     self._run_start_time = start_time
@@ -320,7 +326,9 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     try:
       self._maybe_handle_help()
 
-      streaming_reporter = StreamingWorkunitHandler(self._scheduler_session, callback=None)
+      streaming_handlers = self._options.for_global_scope().streaming_workunits_handlers
+      callbacks = Subsystem.get_streaming_workunit_callbacks(streaming_handlers)
+      streaming_reporter = StreamingWorkunitHandler(self._scheduler_session, callbacks=callbacks)
       with streaming_reporter.session():
         engine_result = self._maybe_run_v2()
 

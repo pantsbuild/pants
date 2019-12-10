@@ -95,7 +95,7 @@ async def run_python_test(
     python_setup=python_setup,
     subprocess_encoding_environment=subprocess_encoding_environment,
     pex_path=f'./{output_pytest_requirements_pex_filename}',
-    pex_args=test_target_sources_file_names,
+    pex_args=(*pytest.get_args(), *test_target_sources_file_names),
     input_files=merged_input_files,
     description=f'Run Pytest for {test_target.address.reference()}',
     # TODO(#8584): hook this up to TestRunnerTaskMixin so that we can configure the default timeout

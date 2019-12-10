@@ -32,7 +32,7 @@ class BinaryToolBase(Subsystem):
 
   # Subclasses may set this to the tool name as understood by BinaryUtil.
   # If unset, it defaults to the value of options_scope.
-  name = None
+  name: Optional[str] = None
 
   # Subclasses may set this to a suffix (e.g., '.pex') to add to the computed remote path.
   # Note that setting archive_type will add an appropriate archive suffix after this suffix.
@@ -40,8 +40,8 @@ class BinaryToolBase(Subsystem):
 
   # Subclasses may set these to effect migration from an old --version option to this one.
   # TODO(benjy): Remove these after migration to the mixin is complete.
-  replaces_scope = None
-  replaces_name = None
+  replaces_scope: Optional[str] = None
+  replaces_name: Optional[str] = None
 
   # Subclasses may set this to provide extra register() kwargs for the --version option.
   extra_version_option_kwargs = None

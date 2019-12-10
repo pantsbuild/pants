@@ -200,7 +200,7 @@ class PantsServices:
     self,
     services: Optional[Tuple[PantsService, ...]] = None,
     port_map: Optional[Dict] = None,
-    lifecycle_lock: Optional = None
+    lifecycle_lock=None
   ) -> None:
     """
     :param port_map: A dict of (port_name -> port_info) for named ports hosted by the services.

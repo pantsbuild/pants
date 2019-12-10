@@ -7,4 +7,5 @@ python_library(
     '//:pants_ini',
     'src/python/pants/option',
   ],
+  tags = {"partially_type_checked"},
 )

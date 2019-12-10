@@ -42,10 +42,17 @@ class PantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     setup_logging_to_stderr(logging.getLogger(None), levelname)
 
   def _should_run_with_pantsd(self, global_bootstrap_options):
+    # The parent_build_id option is set only for pants commands (inner runs)
+    # that were called by other pants command.
+    # Inner runs should never be run with pantsd.
+    # See https://github.com/pantsbuild/pants/issues/7881 for context.
+    is_inner_run = global_bootstrap_options.parent_build_id is not None
+
     # If we want concurrent pants runs, we can't have pantsd enabled.
     return global_bootstrap_options.enable_pantsd and \
            not self.will_terminate_pantsd() and \
-           not global_bootstrap_options.concurrent
+           not global_bootstrap_options.concurrent and \
+           not is_inner_run
 
   @staticmethod
   def scrub_pythonpath():

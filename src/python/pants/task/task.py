@@ -237,7 +237,7 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
     return True
 
   @classproperty
-  def target_filtering_enabled(cls):
+  def target_filtering_enabled(cls) -> bool:
     """Whether this task should apply configured filters against targets.
 
     Tasks can override to enable target filtering (e.g. based on tags) and must

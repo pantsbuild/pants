@@ -1,6 +1,8 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from typing import Optional
+
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.jvm_prep_command import JvmPrepCommand
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
@@ -26,7 +28,7 @@ class RunJvmPrepCommandBase(Task):
 
   :API: public
   """
-  goal = None
+  goal: Optional[str] = None
   classpath_product_only = False
 
   def __init__(self, context, workdir):

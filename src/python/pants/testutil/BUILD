@@ -48,7 +48,7 @@ python_library(
     'src/python/pants/util:process_handler',
     'src/python/pants/util:strutil',
     'src/python/pants:entry_point',
-  ]
+  ],
 )
 
 target(
@@ -86,7 +86,7 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
-  ]
+  ],
 )
 
 python_library(
@@ -97,7 +97,7 @@ python_library(
     'src/python/pants/bin',
     'src/python/pants/init',
     'src/python/pants/util:meta',
-  ]
+  ],
 )
 
 python_library(
@@ -112,12 +112,13 @@ python_library(
     'src/python/pants/util:memo',
     'src/python/pants/util:objects',
     ':test_base',
-  ]
+  ],
 )
 
 python_library(
   name='file_test_util',
   sources=['file_test_util.py'],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -128,11 +129,13 @@ python_library(
     'src/python/pants/scm:git',
     'src/python/pants/util:contextutil',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
   name='interpreter_selection_utils',
   sources=['interpreter_selection_utils.py'],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -141,6 +144,7 @@ python_library(
   dependencies = [
     'src/python/pants/reporting',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -149,6 +153,7 @@ python_library(
   dependencies = [
     ':git_util',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -158,4 +163,5 @@ python_library(
     '3rdparty/python:dataclasses',
     '3rdparty/python:psutil',
   ],
+  tags = {"partially_type_checked"},
 )

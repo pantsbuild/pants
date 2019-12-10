@@ -16,6 +16,7 @@ from io import StringIO
 from textwrap import dedent
 from typing import Any
 
+from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.gather_sources import GatherSources
 from pants.backend.python.tasks.pytest_prep import PytestPrep
@@ -635,7 +636,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
                                                                     pytest_rootdir):
       # Validate that the user didn't provide any passthru args that conflict
       # with those we must set ourselves.
-      for arg in self.get_passthru_args():
+      for arg in (*self.get_passthru_args(), *PyTest.global_instance().get_args()):
         if arg.startswith('--junitxml') or arg.startswith('--confcutdir'):
           raise TaskError(f'Cannot pass this arg through to pytest: {arg}')
 
@@ -656,7 +657,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
       if self.get_options().colors:
         args.extend(['--color', 'yes'])
 
-      args.extend(self.get_passthru_args())
+      args.extend([*self.get_passthru_args(), *PyTest.global_instance().get_args()])
 
       args.extend(test_args)
       args.extend(sources_map.keys())

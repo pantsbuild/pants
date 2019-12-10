@@ -17,6 +17,7 @@ from pants.engine.fs import (
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.rules import RootRule, console_rule
 from pants.engine.selectors import Get
+from pants.fs.fs import is_child_of
 from pants.testutil.console_rule_test_base import ConsoleRuleTestBase
 from pants.testutil.test_base import TestBase
 
@@ -90,3 +91,19 @@ class FileSystemTest(TestBase):
     assert materialize_result.output_paths == tuple(
       str(Path(self.build_root, p)) for p in [path1, path2]
     )
+
+
+class IsChildOfTest(TestBase):
+  def test_is_child_of(self):
+    mock_build_root = Path("/mock/build/root")
+
+    assert is_child_of(Path("/mock/build/root/dist/dir"), mock_build_root)
+    assert is_child_of(Path("dist/dir"), mock_build_root)
+    assert is_child_of(Path("./dist/dir"), mock_build_root)
+    assert is_child_of(Path("../root/dist/dir"), mock_build_root)
+    assert is_child_of(Path(""), mock_build_root)
+    assert is_child_of(Path("./"), mock_build_root)
+
+    assert not is_child_of(Path("/other/random/directory/root/dist/dir"), mock_build_root)
+    assert not is_child_of(Path("../not_root/dist/dir"), mock_build_root)
+

@@ -68,6 +68,7 @@ python_tests(
   dependencies = [
     'src/python/pants/util:filtering',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -77,6 +78,7 @@ python_tests(
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -95,6 +97,7 @@ python_tests(
   dependencies = [
     'src/python/pants/util:netrc',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -122,6 +125,7 @@ python_tests(
   dependencies = [
     'src/python/pants/util:process_handler',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -130,6 +134,7 @@ python_tests(
   dependencies = [
     'src/python/pants/util:retry',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -139,6 +144,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:rwbuf',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -148,6 +154,7 @@ python_tests(
   dependencies = [
     'src/python/pants/util:socket',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -166,6 +173,7 @@ python_tests(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:tarutil',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -174,6 +182,7 @@ python_library(
   dependencies = [
     'src/python/pants/util:contextutil',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -183,4 +192,5 @@ python_tests(
     'src/python/pants/util:xml_parser',
     'tests/python/pants_test/util:xml_test_base',
   ],
+  tags = {"partially_type_checked"},
 )

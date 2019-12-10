@@ -18,4 +18,5 @@ python_library(
     'src/python/pants/task',
     'src/python/pants/util:dirutil',
   ],
+  tags = {"partially_type_checked"},
 )

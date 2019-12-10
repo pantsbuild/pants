@@ -240,3 +240,27 @@ class TestPythonTestRunnerIntegration(PantsRunIntegrationTest):
         testprojects/tests/python/pants/dummies:target_with_transitive_dep              .....   SUCCESS
         """)
     )
+
+  def test_respects_passthrough_args(self):
+    pants_run = self.run_passing_pants_test([
+      '--pytest-args=-k test_run_me',
+      'testprojects/tests/python/pants/dummies:needs_config',
+    ])
+    self.assert_fuzzy_string_match(
+      pants_run.stdout_data,
+      dedent("""\
+        testprojects/tests/python/pants/dummies:needs_config stdout:
+        ============================= test session starts ==============================
+        platform SOME_TEXT
+        rootdir: SOME_TEXT
+        plugins: SOME_TEXT
+        collected 2 items / 1 deselected / 1 selected
+
+        pants/dummies/test_config_works.py .                                     [100%]
+
+        ======================= 1 passed, 1 deselected in SOME_TEXT ========================
+
+
+        testprojects/tests/python/pants/dummies:needs_config                            .....   SUCCESS
+        """)
+    )

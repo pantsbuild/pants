@@ -17,15 +17,6 @@ python_library(
 )
 
 python_tests(
-  name='tests',
-  sources=globs('*_test.py', exclude=[globs('*_integration_test.py')]),
-  dependencies=[
-    ':black',
-  ],
-)
-
-
-python_tests(
   name='integration',
   sources=globs('*_integration_test.py'),
   dependencies=[
@@ -42,5 +33,5 @@ python_tests(
     'src/python/pants/testutil/subsystem',
   ],
   tags = {'integration'},
-  timeout = 90,
+  timeout = 120,
 )

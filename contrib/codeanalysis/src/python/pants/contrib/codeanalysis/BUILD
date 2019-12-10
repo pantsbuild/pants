@@ -11,4 +11,5 @@ contrib_plugin(
   distribution_name='pantsbuild.pants.contrib.codeanalysis',
   description='Support for various code analysis tools in Pants.',
   register_goals=True,
+  tags = {"partially_type_checked"},
 )

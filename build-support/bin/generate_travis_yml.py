@@ -767,18 +767,11 @@ def main() -> None:
       *[bootstrap_osx(v) for v in PythonVersion],
       {**bootstrap_linux(PythonVersion.py36), "stage": Stage.bootstrap_cron.value},
       {**bootstrap_osx(PythonVersion.py36), "stage": Stage.bootstrap_cron.value},
-      # NB: We move both the unit test and V2 integration test shards up here to ensure that
-      # they are shards #5 and #6. Per the token generator design
-      # https://docs.google.com/document/d/1gL3D1f-AzL_LzRxWLskCpVQ2ZlB_26GTETgXkXsrpDY/edit#heading=h.akhkfdtqfpw,
-      # the RBE token server will only give tokens to job numbers #5 and #6, so we must do this
-      # for the cron jobs to work with remoting.
-      unit_tests(PythonVersion.py37),
-      integration_tests_v2(PythonVersion.py37),
       *[lint(v) for v in PythonVersion],
       clippy(),
       cargo_audit(),
-      unit_tests(PythonVersion.py36),
-      integration_tests_v2(PythonVersion.py36),
+      *[unit_tests(v) for v in PythonVersion],
+      *[integration_tests_v2(v) for v in PythonVersion],
       build_wheels_linux(),
       build_wheels_osx(),
       *integration_tests_v1(PythonVersion.py36),

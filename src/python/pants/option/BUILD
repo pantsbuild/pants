@@ -21,3 +21,10 @@ python_library(
   ],
   tags = {'partially_type_checked'},
 )
+
+python_tests(
+  name="tests",
+  dependencies=[
+    ':option',
+  ],
+)

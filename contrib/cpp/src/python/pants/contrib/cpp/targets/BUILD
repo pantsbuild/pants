@@ -14,4 +14,5 @@ python_library(
     'src/python/pants/base:payload_field',
     'src/python/pants/build_graph',
   ],
+  tags = {"partially_type_checked"},
 )

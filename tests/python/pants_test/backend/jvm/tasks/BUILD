@@ -690,7 +690,8 @@ python_tests(
   sources = ['test_properties.py'],
   dependencies = [
     'src/python/pants/backend/jvm/tasks:properties',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(

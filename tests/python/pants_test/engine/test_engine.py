@@ -249,7 +249,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
         self.workunits.extend(workunits)
 
     tracker = Tracker()
-    async_reporter = StreamingWorkunitHandler(scheduler, callback=tracker.add, report_interval_seconds=0.01)
+    async_reporter = StreamingWorkunitHandler(scheduler, callbacks=[tracker.add], report_interval_seconds=0.01)
     with async_reporter.session():
       scheduler.product_request(Fib, subjects=[0])
 

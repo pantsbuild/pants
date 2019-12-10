@@ -49,8 +49,8 @@ python_library(
   name = 'context_utils',
   sources = ['context_utils.py'],
   dependencies = [
-    'src/python/pants/base:deprecated',
     'src/python/pants/testutil/base:context_utils',
+    'tests/python/pants_test:deprecated_testinfra',
   ]
 )
 
@@ -73,7 +73,8 @@ python_tests(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:build_file',
     'src/python/pants/util:dirutil',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -101,7 +102,8 @@ python_tests(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:hash_utils',
     'src/python/pants/util:contextutil',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -176,7 +178,8 @@ python_tests(
   dependencies = [
     'src/python/pants/base:worker_pool',
     'src/python/pants/util:contextutil',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -184,7 +187,8 @@ python_tests(
   sources = ['test_validation.py'],
   dependencies = [
     'src/python/pants/base:validation',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(

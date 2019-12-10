@@ -278,12 +278,19 @@ def deprecated(
   return decorator
 
 
-def deprecated_module(removal_version: str, hint_message: Optional[str] = None) -> None:
+def deprecated_module(
+  removal_version: str,
+  hint_message: Optional[str] = None,
+  stacklevel: int = 3
+) -> None:
   """Marks an entire module as deprecated.
 
   Add a call to this at the top of the deprecated module, and it will print a warning message
   when the module is imported.
 
-  Arguments are as for deprecated(), above.
+  :param removal_version: The pantsbuild.pants version which will remove the deprecated
+                          function.
+  :param hint_message: An optional hint pointing to alternatives to the deprecation.
+  :param stacklevel: The stacklevel to pass to warnings.warn.
   """
-  warn_or_error(removal_version, 'module', hint_message)
+  warn_or_error(removal_version, 'module', hint_message, stacklevel=stacklevel)
