@@ -27,10 +27,18 @@ python_library(
 )
 
 python_library(
+  name='deprecated_testinfra',
+  sources=['deprecated_testinfra.py'],
+  dependencies = [
+    'src/python/pants/base:deprecated',
+  ]
+)
+
+python_library(
   name = 'int-test-for-export',
   sources = ['pants_run_integration_test.py'],
   dependencies = [
-    'src/python/pants/base:deprecated',
+    ':deprecated_testinfra',
     'src/python/pants/testutil:int-test-for-export',
   ]
 )
@@ -56,7 +64,7 @@ python_library(
   name = 'console_rule_test_base',
   sources = ['console_rule_test_base.py'],
   dependencies = [
-    'src/python/pants/base:deprecated',
+    ':deprecated_testinfra',
     'src/python/pants/testutil:console_rule_test_base',
   ]
 )
@@ -66,7 +74,7 @@ python_library(
   name = 'task_test_base',
   sources = ['task_test_base.py'],
   dependencies = [
-    'src/python/pants/base:deprecated',
+    ':deprecated_testinfra',
     'src/python/pants/testutil:task_test_base',
   ]
 )
@@ -75,7 +83,7 @@ python_library(
   name='interpreter_selection_utils',
   sources=['interpreter_selection_utils.py'],
   dependencies = [
-    'src/python/pants/base:deprecated',
+    ':deprecated_testinfra',
     'src/python/pants/testutil:interpreter_selection_utils',
   ]
 )
