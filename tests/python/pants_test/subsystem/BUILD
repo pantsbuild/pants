@@ -14,7 +14,7 @@ python_library(
   name='subsystem_utils',
   sources=['subsystem_util.py'],
   dependencies=[
-    'src/python/pants/base:deprecated',
     'src/python/pants/testutil/subsystem',
+    'tests/python/pants_test:deprecated_testinfra',
   ],
 )

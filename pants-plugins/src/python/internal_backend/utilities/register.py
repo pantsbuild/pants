@@ -49,6 +49,7 @@ def pants_setup_py(name, description, additional_classifiers=None, **kwargs):
       version=VERSION,
       description=description,
       long_description=Path('src/python/pants/ABOUT.rst').read_text() + notes,
+      long_description_content_type='text/x-rst',
       url='https://github.com/pantsbuild/pants',
       project_urls={
           'Documentation': 'https://www.pantsbuild.org/',

@@ -3,7 +3,7 @@
 
 python_library(
   dependencies=[
-    'src/python/pants/base:deprecated',
-    'src/python/pants/testutil/option'
+    'src/python/pants/testutil/option',
+    'tests/python/pants_test:deprecated_testinfra',
   ],
 )
