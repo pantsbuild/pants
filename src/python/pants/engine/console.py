@@ -18,8 +18,9 @@ class NativeWriter:
   def write(self, payload: str):
     raise NotImplementedError
 
+  #TODO It's not clear yet what this function should do, it depends on how
+  # EngineDisplay in Rust ends up handling text.
   def flush(self):
-    #I dunno what if anything needs to happen here
     pass
 
 

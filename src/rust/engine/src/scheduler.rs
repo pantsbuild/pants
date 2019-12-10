@@ -103,6 +103,8 @@ impl Session {
     &self.0.build_id
   }
 
+  //TODO Thsese two functions should eventually hook up intelligently to EngineDisplay
+  //instead of just naively printing to stdout/stderr.
   pub fn write_stdout(&self, msg: &str) {
     print!(" {}", msg);
   }
