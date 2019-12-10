@@ -18,8 +18,7 @@ python_library(
   ],
   provides=pants_setup_py(
     name='pantsbuild.pants.testinfra',
-    description='DEPRECATED: use pantsbuild.pants.testutil instead.\n\n'
-                'Test support for writing Pants plugins.',
+    description='Test support for writing Pants plugins.',
     namespace_packages=['pants_test'],
     additional_classifiers=[
       'Topic :: Software Development :: Testing',

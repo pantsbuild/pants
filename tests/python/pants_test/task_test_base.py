@@ -11,5 +11,6 @@ from pants.testutil.task_test_base import is_exe as is_exe  # noqa
 
 deprecated_module(
   removal_version="1.25.0.dev0",
-  hint_message="Import pants.testutil.task_test_base instead."
+  hint_message="Import pants.testutil.task_test_base from the pantsbuild.pants.testutil "
+               "distribution instead."
 )

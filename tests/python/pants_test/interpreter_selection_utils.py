@@ -36,5 +36,6 @@ from pants.testutil.interpreter_selection_utils import (
 
 deprecated_module(
   removal_version="1.25.0.dev0",
-  hint_message="Import pants.testutil.interpreter_selection_utils instead."
+  hint_message="Import pants.testutil.interpreter_selection_utils from the "
+               "pantsbuild.pants.testutil distribution instead."
 )

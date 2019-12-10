@@ -7,5 +7,6 @@ from pants.testutil.console_rule_test_base import ConsoleRuleTestBase as Console
 
 deprecated_module(
   removal_version="1.25.0.dev0",
-  hint_message="Import pants.testutil.console_rule_test_base instead."
+  hint_message="Import pants.testutil.console_rule_test_base from the "
+               "pantsbuild.pants.testutil distribution instead."
 )

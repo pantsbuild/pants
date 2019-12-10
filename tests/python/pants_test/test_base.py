@@ -8,5 +8,6 @@ from pants.testutil.test_base import TestBase as TestBase  # noqa
 
 deprecated_module(
   removal_version="1.25.0.dev0",
-  hint_message="Import pants.testutil.test_base instead."
+  hint_message="Import pants.testutil.test_base from the pantsbuild.pants.testutil distribution "
+               "instead."
 )

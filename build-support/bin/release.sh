@@ -283,6 +283,15 @@ function install_and_test_packages() {
     --no-cache-dir
   )
 
+  export PANTS_PYTHON_REPOS_REPOS="${DEPLOY_PANTS_WHEEL_DIR}/${VERSION}"
+
+  start_travis_section "wheel_check" "Validating ${VERSION} pantsbuild.pants wheels"
+  activate_twine
+  trap deactivate RETURN
+  twine check "${PANTS_PYTHON_REPOS_REPOS}"/*.whl || die "Failed to validate wheels."
+  deactivate
+  end_travis_section
+
   pre_install || die "Failed to setup virtualenv while testing ${NAME}-${VERSION}!"
 
   # Avoid caching plugin installs.
@@ -296,7 +305,6 @@ function install_and_test_packages() {
     $(run_packages_script list | grep '.' | awk '{print $1}')
   ) || die "Failed to list packages!"
 
-  export PANTS_PYTHON_REPOS_REPOS="${DEPLOY_PANTS_WHEEL_DIR}/${VERSION}"
   for package in "${packages[@]}"
   do
     start_travis_section "${package}" "Installing and testing package ${package}-${VERSION}"
