@@ -40,7 +40,8 @@ object InputUtils {
   ): Inputs = {
     import settings._
 
-    val scalaJars = InputUtils.selectScalaJars(log)
+    val scalaJars = Defaults.scalaJars
+    log.debug(s"Selected scala jars: $scalaJars")
 
     val instance = ScalaUtils.scalaInstance(scalaJars.compiler, scalaJars.extra, scalaJars.library)
     val compiledBridgeJar = Defaults.compiledBridgeJar.get
@@ -148,18 +149,6 @@ object InputUtils {
   }
 
   /**
-   * Select the scala jars.
-   *
-   * Prefer the explicit scala-compiler, scala-library, and scala-extra settings,
-   * then the scala-path setting, then the scala-home setting. Default to bundled scala.
-   */
-  def selectScalaJars(log: Logger): ScalaJars = {
-    val jars = Defaults.scalaJars
-    log.debug(s"Selected scala jars: $jars")
-    jars
-  }
-
-  /**
    * Distinguish the compiler and library jars.
    */
   def splitScala(jars: Seq[File], excluded: Set[String] = Set.empty): Option[ScalaJars] = {
@@ -180,9 +169,7 @@ object InputUtils {
   val ScalaReflect             = JarFile("scala-reflect")
   val ScalaCompilerBridge      = JarFile("scala-compiler-bridge")
 
-  // TODO: The default jar locations here are definitely not helpful, but the existence
-  // of "some" value for each of these is assumed in a few places. Should remove and make
-  // them optional to more cleanly support Java-only compiles.
+  // Scala jars default to jars matching the JarFile patterns on the jvm classpath.
   object Defaults {
 
     val classpath = IO.parseClasspath(System.getProperty("java.class.path"))

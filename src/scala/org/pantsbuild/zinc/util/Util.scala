@@ -90,9 +90,9 @@ object Util {
   def normalizeIfExists(cwd: Option[File])(file: File): File = {
     if (cwd.isDefined) {
       val normed = normalise(cwd)(file)
-      if (!normed.exists()) return file
+      if (normed.exists()) normed else file
     }
-    return file
+    else file
   }
 
   /**
