@@ -12,6 +12,7 @@ from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.unpacked_whls import UnpackedWheels
 from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import DefaultFingerprintHashingMixin, FingerprintStrategy
+from pants.fs.archive import ZIP
 from pants.task.unpack_remote_sources_base import UnpackRemoteSourcesBase
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import mergetree, safe_concurrent_creation
@@ -50,30 +51,16 @@ class UnpackWheels(UnpackRemoteSourcesBase):
       PythonSetup,
     )
 
-  class SingleDistExtractionError(Exception): pass
+  class _NativeCodeExtractionSetupFailure(Exception): pass
 
   def _get_matching_wheel(self, pex_path, interpreter, requirements, module_name):
-    """Use PexBuilderWrapper to resolve a single wheel from the requirement specs using pex.
-
-    N.B.: The resolved wheel is already "unpacked" by PEX. More accurately, it's installed in a
-    chroot.
-    """
+    """Use PexBuilderWrapper to resolve a single wheel from the requirement specs using pex."""
     with self.context.new_workunit('extract-native-wheels'):
       with safe_concurrent_creation(pex_path) as chroot:
         pex_builder = PexBuilderWrapper.Factory.create(
           builder=PEXBuilder(path=chroot, interpreter=interpreter),
           log=self.context.log)
-
-        resolved_dists = pex_builder.resolve_distributions(requirements, platforms=['current'])
-
-        matched_dists = [resolved_dist.distribution for resolved_dist in resolved_dists
-                         if resolved_dist.distribution.key == module_name]
-        if len(matched_dists) != 1:
-          raise self.SingleDistExtractionError(
-            f"Exactly one dist was expected to match name {module_name} in requirements "
-            f"{requirements}, found {matched_dists}"
-          )
-        return matched_dists[0]
+        return pex_builder.extract_single_dist_for_current_platform(requirements, module_name)
 
   @memoized_method
   def _compatible_interpreter(self, unpacked_whls):
@@ -86,18 +73,22 @@ class UnpackWheels(UnpackRemoteSourcesBase):
   def unpack_target(self, unpacked_whls, unpack_dir):
     interpreter = self._compatible_interpreter(unpacked_whls)
 
-    with temporary_dir() as resolve_dir:
+    with temporary_dir() as resolve_dir,\
+         temporary_dir() as extract_dir:
       try:
         matched_dist = self._get_matching_wheel(resolve_dir, interpreter,
                                                 unpacked_whls.all_imported_requirements,
                                                 unpacked_whls.module_name)
-        wheel_chroot = matched_dist.location
+        ZIP.extract(matched_dist.location, extract_dir)
         if unpacked_whls.within_data_subdir:
-          # N.B.: Wheels with data dirs have the data installed under the top module.
-          dist_data_dir = os.path.join(wheel_chroot, unpacked_whls.module_name)
+          data_dir_prefix = '{name}-{version}.data/{subdir}'.format(
+            name=matched_dist.project_name,
+            version=matched_dist.version,
+            subdir=unpacked_whls.within_data_subdir,
+          )
+          dist_data_dir = os.path.join(extract_dir, data_dir_prefix)
         else:
-          dist_data_dir = wheel_chroot
-
+          dist_data_dir = extract_dir
         unpack_filter = self.get_unpack_filter(unpacked_whls)
         # Copy over the module's data files into `unpack_dir`.
         mergetree(dist_data_dir, unpack_dir, file_filter=unpack_filter)
