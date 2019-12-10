@@ -5,8 +5,8 @@ python_library(
   name = 'util',
   sources = ['util.py'],
   dependencies = [
-    'src/python/pants/base:deprecated',
     'src/python/pants/testutil/engine:util',
+    'tests/python/pants_test:deprecated_testinfra',
   ],
 )
 
@@ -14,8 +14,8 @@ python_library(
   name = 'engine_test_base',
   sources = ['base_engine_test.py'],
   dependencies = [
-    'src/python/pants/base:deprecated',
     'src/python/pants/testutil/engine:engine_test_base',
+    'tests/python/pants_test:deprecated_testinfra',
   ]
 )
 
