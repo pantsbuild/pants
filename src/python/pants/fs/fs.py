@@ -3,6 +3,7 @@
 
 import hashlib
 import os
+from pathlib import Path
 
 
 # The max filename length for HFS+, extX and NTFS is 255, but many systems also have limits on the
@@ -68,3 +69,9 @@ def expand_path(path):
   :API: public
   """
   return os.path.abspath(os.path.expandvars(os.path.expanduser(path)))
+
+
+def is_child_of(path: Path, directory: Path) -> bool:
+  abs_path = path if path.is_absolute() else directory.joinpath(path).resolve()
+  return directory == abs_path or directory in abs_path.parents
+
