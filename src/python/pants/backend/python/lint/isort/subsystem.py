@@ -10,7 +10,8 @@ from pants.option.option_util import flatten_shlexed_list
 
 class Isort(PythonToolBase):
   options_scope = 'isort'
-  default_requirements = ['isort==4.3.20', 'setuptools']
+  default_version = 'isort==4.3.20'
+  default_extra_requirements = ['setuptools']
   default_entry_point = 'isort.main'
 
   @classmethod
