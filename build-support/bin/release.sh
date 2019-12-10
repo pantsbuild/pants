@@ -287,7 +287,6 @@ function install_and_test_packages() {
 
   start_travis_section "wheel_check" "Validating ${VERSION} pantsbuild.pants wheels"
   activate_twine
-  trap deactivate RETURN
   twine check "${PANTS_PYTHON_REPOS_REPOS}"/*.whl || die "Failed to validate wheels."
   deactivate
   end_travis_section
