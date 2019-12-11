@@ -3,11 +3,7 @@
 
 
 from pants.backend.python.lint.isort import rules as isort_rules
-from pants.backend.python.targets import formattable_python_target
 
 
 def rules():
-  return (
-    *isort_rules.rules(),
-    *formattable_python_target.rules(),
-  )
+  return isort_rules.rules()

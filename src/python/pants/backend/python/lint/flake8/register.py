@@ -3,11 +3,7 @@
 
 
 from pants.backend.python.lint.flake8 import rules as flake8_rules
-from pants.backend.python.targets import formattable_python_target
 
 
 def rules():
-  return (
-    *flake8_rules.rules(),
-    *formattable_python_target.rules(),
-  )
+  return flake8_rules.rules()
