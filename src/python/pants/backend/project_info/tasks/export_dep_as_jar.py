@@ -131,6 +131,14 @@ class ExportDepAsJar(ConsoleTask):
       mapping[self._jar_id(jar_entry.coordinate)][conf] = jar_entry.cache_path
     return mapping
 
+  @staticmethod
+  def _zip_sources(target, location, suffix='.jar'):
+    with temporary_file(root_dir=location, cleanup=False, suffix=suffix) as f:
+      with zipfile.ZipFile(f, 'a') as zip_file:
+        for src_from_source_root, src_from_build_root in zip(target.sources_relative_to_source_root(), target.sources_relative_to_buildroot()):
+          zip_file.write(os.path.join(get_buildroot(), src_from_build_root), src_from_source_root)
+    return f
+
   def _process_target(self, current_target, target_roots_set, resource_target_map, runtime_classpath):
     """
     :type current_target:pants.build_graph.target.Target
@@ -268,13 +276,6 @@ class ExportDepAsJar(ConsoleTask):
       if preferred_distributions:
         graph_info['preferred_jvm_distributions'][platform_name] = preferred_distributions
 
-    def zip_sources(target, location, suffix='.jar'):
-      with temporary_file(root_dir=location, cleanup=False, suffix=suffix) as f:
-        with zipfile.ZipFile(f, 'a') as zip_file:
-          for src_from_source_root, src_from_build_root in zip(target.sources_relative_to_source_root(), target.sources_relative_to_buildroot()):
-            zip_file.write(os.path.join(get_buildroot(), src_from_build_root), src_from_source_root)
-      return f
-
     if runtime_classpath:
       graph_info['libraries'] = self._resolve_jars_info(targets, runtime_classpath)
       # Using resolved path in preparation for VCFS.
@@ -285,31 +286,28 @@ class ExportDepAsJar(ConsoleTask):
         if t in target_roots_set or targets_map[t.address.spec]['pants_target_type'] == 'jar_library':
           continue
 
+        targets_map[t.address.spec]['pants_target_type'] = 'jar_library'
+        targets_map[t.address.spec]['libraries'] = [t.id]
+
         if target_type == SourceRootTypes.RESOURCE or target_type == SourceRootTypes.TEST_RESOURCE:
           # yic assumed that the cost to fingerprint the target may not be that lower than
           # just zipping up the resources anyway.
-          jarred_resources = zip_sources(t, resource_jar_root)
-          targets_map[t.address.spec]['pants_target_type'] = 'jar_library'
-          targets_map[t.address.spec]['libraries'] = [t.id]
+          jarred_resources = ExportDepAsJar._zip_sources(t, resource_jar_root)
           graph_info['libraries'][t.id]['default'] = jarred_resources.name
-          continue
-
-        targets_map[t.address.spec]['pants_target_type'] = 'jar_library'
-        targets_map[t.address.spec]['libraries'] = [t.id]
-        jar_products = runtime_classpath.get_for_target(t)
-        for conf, jar_entry in jar_products:
-          # TODO(yic): check --compile-rsc-use-classpath-jars is enabled.
-          # If not, zip up the classes/ dir here.
-          if 'z.jar' in jar_entry:
-            graph_info['libraries'][t.id][conf] = jar_entry
-        if self.get_options().sources:
-          # NB: We create the jar in the same place as we create the resources
-          # (as opposed to where we store the z.jar), because the path to the z.jar depends
-          # on tasks outside of this one.
-          # In addition to that, we may not want to depend on z.jar existing to export source jars.
-          jarred_sources = zip_sources(t, resource_jar_root, suffix='-sources.jar')
-          graph_info['libraries'][t.id]['sources'] = jarred_sources.name
-
+        else:
+          jar_products = runtime_classpath.get_for_target(t)
+          for conf, jar_entry in jar_products:
+            # TODO(yic): check --compile-rsc-use-classpath-jars is enabled.
+            # If not, zip up the classes/ dir here.
+            if 'z.jar' in jar_entry:
+              graph_info['libraries'][t.id][conf] = jar_entry
+          if self.get_options().sources:
+            # NB: We create the jar in the same place as we create the resources
+            # (as opposed to where we store the z.jar), because the path to the z.jar depends
+            # on tasks outside of this one.
+            # In addition to that, we may not want to depend on z.jar existing to export source jars.
+            jarred_sources = ExportDepAsJar._zip_sources(t, resource_jar_root, suffix='-sources.jar')
+            graph_info['libraries'][t.id]['sources'] = jarred_sources.name
 
     return graph_info
 
