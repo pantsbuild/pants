@@ -47,8 +47,11 @@ class PythonToolBase(Subsystem):
     return self.get_options().interpreter_constraints
 
   def get_requirement_specs(self) -> Tuple[str, ...]:
+    defined_default_new_options = self.default_version is not None
+    defined_default_deprecated_options = self.default_requirements is not None
+
     deprecated_conditional(
-      lambda: self.default_requirements is not None,
+      lambda: defined_default_deprecated_options,
       removal_version="1.26.0.dev2",
       entity_description="Defining `default_requirements` for a subclass of `PythonToolBase`",
       hint_message="Instead of defining `default_requirements`, define `default_version` and, "
@@ -75,7 +78,7 @@ class PythonToolBase(Subsystem):
         f"only one approach (preferably the new approach of `--version` and "
         f"`--extra-requirements`)."
       )
-    if configured_deprecated_options:
+    if configured_deprecated_options or not defined_default_new_options:
       return tuple(opts.requirements)
     return (opts.version, *opts.extra_requirements)
 
