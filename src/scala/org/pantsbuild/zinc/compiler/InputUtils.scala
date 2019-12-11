@@ -40,10 +40,13 @@ object InputUtils {
   ): Inputs = {
     import settings._
 
-    val scalaJars = InputUtils.selectScalaJars(settings.scala)
+    val scalaJars = Defaults.scalaJars
+    log.debug(s"Selected scala jars: $scalaJars")
 
     val instance = ScalaUtils.scalaInstance(scalaJars.compiler, scalaJars.extra, scalaJars.library)
-    val compilers = ZincUtil.compilers(instance, ClasspathOptionsUtil.auto, settings.javaHome, newScalaCompiler(instance, settings.compiledBridgeJar.get))
+    val compiledBridgeJar = Defaults.compiledBridgeJar.get
+    log.debug(s"Selected CompiledBridgeJar $compiledBridgeJar")
+    val compilers = ZincUtil.compilers(instance, ClasspathOptionsUtil.auto, settings.javaHome, newScalaCompiler(instance, compiledBridgeJar))
 
     // TODO: Remove duplication once on Scala 2.12.x.
     val positionMapper =
@@ -146,25 +149,12 @@ object InputUtils {
   }
 
   /**
-   * Select the scala jars.
-   *
-   * Prefer the explicit scala-compiler, scala-library, and scala-extra settings,
-   * then the scala-path setting, then the scala-home setting. Default to bundled scala.
-   */
-  def selectScalaJars(scala: ScalaLocation): ScalaJars = {
-    val jars = splitScala(scala.path) getOrElse Defaults.scalaJars
-    ScalaJars(
-      scala.compiler getOrElse jars.compiler,
-      scala.library getOrElse jars.library,
-      scala.extra ++ jars.extra
-    )
-  }
-
-  /**
    * Distinguish the compiler and library jars.
    */
   def splitScala(jars: Seq[File], excluded: Set[String] = Set.empty): Option[ScalaJars] = {
-    val filtered = jars filterNot (excluded contains _.getName)
+    var  filtered = jars filterNot (excluded contains _.getName)
+    // Added because the jars can be the entire classpath if using the default value.
+    filtered = filtered filter (_.getName matches ".*scala.*")
     val (compiler, other) = filtered partition (_.getName matches ScalaCompiler.pattern)
     val (library, extra) = other partition (_.getName matches ScalaLibrary.pattern)
     if (compiler.nonEmpty && library.nonEmpty) Some(ScalaJars(compiler(0), library(0), extra)) else None
@@ -177,15 +167,20 @@ object InputUtils {
   val ScalaCompiler            = JarFile("scala-compiler")
   val ScalaLibrary             = JarFile("scala-library")
   val ScalaReflect             = JarFile("scala-reflect")
+  val ScalaCompilerBridge      = JarFile("scala-compiler-bridge")
 
-  // TODO: The default jar locations here are definitely not helpful, but the existence
-  // of "some" value for each of these is assumed in a few places. Should remove and make
-  // them optional to more cleanly support Java-only compiles.
+  // Scala jars default to jars matching the JarFile patterns on the jvm classpath.
   object Defaults {
+
+    val classpath = IO.parseClasspath(System.getProperty("java.class.path"))
+    val (maybeCompiledBridgeJar, other) = classpath partition (_.getName matches ScalaCompilerBridge.pattern)
+    val compiledBridgeJar = if (maybeCompiledBridgeJar.nonEmpty) Some(maybeCompiledBridgeJar(0)) else None
+    // try to locate scala jars from the current classpath.
+    val classpathScalaJars   = splitScala(other)
     val scalaCompiler        = ScalaCompiler.default
     val scalaLibrary         = ScalaLibrary.default
     val scalaExtra           = Seq(ScalaReflect.default)
-    val scalaJars            = ScalaJars(scalaCompiler, scalaLibrary, scalaExtra)
+    val scalaJars            = classpathScalaJars getOrElse ScalaJars(scalaCompiler, scalaLibrary, scalaExtra)
     val scalaExcluded = Set("jansi.jar", "jline.jar", "scala-partest.jar", "scala-swing.jar", "scalacheck.jar", "scalap.jar")
   }
 
