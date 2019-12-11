@@ -48,21 +48,17 @@ class PyTest(Subsystem):
       '--timeouts',
       type=bool,
       default=True,
-      help='Enable test target timeouts. If timeouts are enabled then tests with a '
+      help='Enable test target timeouts. If timeouts are enabled then test targets with a '
           'timeout= parameter set on their target will time out after the given number of '
           'seconds if not completed. If no timeout is set, then either the default timeout '
-          'is used or no timeout is configured. In the current implementation, all the '
-          'timeouts for the test targets to be run are summed and all tests are run with '
-          'the total timeout covering the entire run of tests. If a single target in a '
-          'test run has no timeout and there is no default, the entire run will have no '
-          'timeout. This should change in the future to provide more granularity.',
+          'is used or no timeout is configured.',
     )
     register(
       '--timeout-default',
       type=int,
       advanced=True,
       default=60,
-      help='The default timeout (in seconds) for a test if timeout is not set on the target.',
+      help='The default timeout (in seconds) for a test target if the timeout field is not set on the target.',
     )
     register(
       '--timeout-maximum',

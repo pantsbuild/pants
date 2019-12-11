@@ -1,6 +1,8 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from typing import Optional
+
 from pants.backend.python.rules.inject_init import InjectedInitDigest
 from pants.backend.python.rules.pex import (
   CreatePex,
@@ -22,21 +24,24 @@ from pants.rules.core.core_test_model import TestResult, TestTarget
 from pants.rules.core.strip_source_root import SourceRootStrippedSources
 
 
-def get_timeout_seconds_for_target(test_target_timeout, timeout_default, timeout_maximum):
+def calculate_timeout_seconds(
+  *,
+  timeouts: bool,
+  test_target_timeout_seconds: Optional[int],
+  timeout_default_seconds: Optional[int],
+  timeout_maximum_seconds: Optional[int],
+) -> Optional[int]:
   """Calculate the timeout for a test target.
 
   If a target has no timeout configured its timeout will be set to the default timeout.
-
-  :param test_target: A test target
-  :param timeout_default: the default timeout in seconds.
-  :param timeout_maximum: the maximum timeout in seconds.
-  :return: timeout in seconds.
   """
-  if test_target_timeout is None:
-    test_target_timeout = timeout_default
-  if timeout_maximum is not None and test_target_timeout > timeout_maximum:
-    return timeout_maximum
-  return test_target_timeout
+  if not timeouts:
+    return None
+  if test_target_timeout_seconds is None:
+    test_target_timeout_seconds = timeout_default_seconds
+  if timeout_maximum_seconds is not None and test_target_timeout_seconds is not None:
+    return min(test_target_timeout_seconds, timeout_maximum_seconds)
+  return test_target_timeout_seconds
 
 
 @rule(name="Run pytest")
@@ -108,6 +113,12 @@ async def run_python_test(
   )
 
   test_target_sources_file_names = sorted(source_root_stripped_test_target_sources.snapshot.files)
+  timeout_seconds = calculate_timeout_seconds(
+    timeouts=pytest.options.timeouts,
+    test_target_timeout_seconds=getattr(test_target, 'timeout', None),
+    timeout_default_seconds=pytest.options.timeout_default,
+    timeout_maximum_seconds=pytest.options.timeout_maximum,
+  )
   request = resolved_requirements_pex.create_execute_request(
     python_setup=python_setup,
     subprocess_encoding_environment=subprocess_encoding_environment,
@@ -115,11 +126,7 @@ async def run_python_test(
     pex_args=(*pytest.get_args(), *test_target_sources_file_names),
     input_files=merged_input_files,
     description=f'Run Pytest for {test_target.address.reference()}',
-    timeout_seconds=get_timeout_seconds_for_target(
-      test_target_timeout=getattr(test_target, 'timeout', None),
-      timeout_default=pytest.options.timeout_default,
-      timeout_maximum=pytest.options.timeout_maximum,
-    )
+    timeout_seconds=timeout_seconds if timeout_seconds is not None else 9999
   )
   result = await Get(FallibleExecuteProcessResult, ExecuteProcessRequest, request)
   return TestResult.from_fallible_execute_process_result(result)
