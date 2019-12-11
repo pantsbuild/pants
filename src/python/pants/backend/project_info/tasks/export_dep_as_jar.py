@@ -97,6 +97,23 @@ class ExportDepAsJar(ConsoleTask):
     """
     return '{0}:{1}'.format(jar.org, jar.name) if jar.name else jar.org
 
+  @staticmethod
+  def _get_target_type(tgt, resource_target_map):
+    def is_test(t):
+      return isinstance(t, JUnitTests)
+
+    if is_test(tgt):
+      return SourceRootTypes.TEST
+    else:
+      if (isinstance(tgt, Resources) and
+        tgt in resource_target_map and
+        is_test(resource_target_map[tgt])):
+        return SourceRootTypes.TEST_RESOURCE
+      elif isinstance(tgt, Resources):
+        return SourceRootTypes.RESOURCE
+      else:
+        return SourceRootTypes.SOURCE
+
   def _resolve_jars_info(self, targets, classpath_products):
     """Consults ivy_jar_products to export the external libraries.
 
@@ -114,6 +131,73 @@ class ExportDepAsJar(ConsoleTask):
       mapping[self._jar_id(jar_entry.coordinate)][conf] = jar_entry.cache_path
     return mapping
 
+  def _process_target(self, current_target, target_roots_set, resource_target_map, runtime_classpath):
+    """
+    :type current_target:pants.build_graph.target.Target
+    """
+    info = {
+      # this means 'dependencies'
+      'targets': [],
+      'libraries': [],
+      'roots': [],
+      'id': current_target.id,
+      'target_type': ExportDepAsJar._get_target_type(current_target, resource_target_map),
+      'is_synthetic': current_target.is_synthetic,
+      'pants_target_type': self._get_pants_target_alias(type(current_target)),
+      'is_target_root': current_target in target_roots_set,
+      'transitive': current_target.transitive,
+      'scope': str(current_target.scope)
+    }
+
+    if not current_target.is_synthetic:
+      info['globs'] = current_target.globs_relative_to_buildroot()
+
+    def iter_transitive_jars(jar_lib):
+      """
+      :type jar_lib: :class:`pants.backend.jvm.targets.jar_library.JarLibrary`
+      :rtype: :class:`collections.Iterator` of
+              :class:`pants.java.jar.M2Coordinate`
+      """
+      if runtime_classpath:
+        jar_products = runtime_classpath.get_artifact_classpath_entries_for_targets((jar_lib,))
+        for _, jar_entry in jar_products:
+          coordinate = jar_entry.coordinate
+          # We drop classifier and type_ since those fields are represented in the global
+          # libraries dict and here we just want the key into that dict (see `_jar_id`).
+          yield M2Coordinate(org=coordinate.org, name=coordinate.name, rev=coordinate.rev)
+
+    target_libraries = OrderedSet()
+    if isinstance(current_target, JarLibrary):
+      target_libraries = OrderedSet(iter_transitive_jars(current_target))
+    for dep in current_target.dependencies:
+      info['targets'].append(dep.address.spec)
+      if isinstance(dep, JarLibrary):
+        for jar in dep.jar_dependencies:
+          target_libraries.add(M2Coordinate(jar.org, jar.name, jar.rev))
+        # Add all the jars pulled in by this jar_library
+        target_libraries.update(iter_transitive_jars(dep))
+
+    if isinstance(current_target, ScalaLibrary):
+      for dep in current_target.java_sources:
+        info['targets'].append(dep.address.spec)
+
+    if isinstance(current_target, JvmTarget):
+      info['excludes'] = [self._exclude_id(exclude) for exclude in current_target.excludes]
+      info['platform'] = current_target.platform.name
+      if hasattr(current_target, 'test_platform'):
+        info['test_platform'] = current_target.test_platform.name
+
+    if runtime_classpath:
+      info['libraries'].extend(self._jar_id(lib) for lib in target_libraries)
+
+    if current_target in target_roots_set:
+      info['roots'] = [{
+        'source_root': os.path.realpath(source_root_package_prefix[0]),
+        'package_prefix': source_root_package_prefix[1]
+      } for source_root_package_prefix in self._source_roots_for_target(current_target)]
+
+    return info
+
   def generate_targets_map(self, targets, runtime_classpath):
     """Generates a dictionary containing all pertinent information about the target graph.
 
@@ -123,94 +207,9 @@ class ExportDepAsJar(ConsoleTask):
       option is `True`, this task will perform its own jar resolution.
     """
 
-    def _get_target_type(tgt):
-      def is_test(t):
-        return isinstance(t, JUnitTests)
-
-      if is_test(tgt):
-        return SourceRootTypes.TEST
-      else:
-        if (isinstance(tgt, Resources) and
-          tgt in resource_target_map and
-          is_test(resource_target_map[tgt])):
-          return SourceRootTypes.TEST_RESOURCE
-        elif isinstance(tgt, Resources):
-          return SourceRootTypes.RESOURCE
-        else:
-          return SourceRootTypes.SOURCE
-
     targets_map = {}
     resource_target_map = {}
     target_roots_set = set(self.context.target_roots)
-
-    def process_target(current_target):
-      """
-      :type current_target:pants.build_graph.target.Target
-      """
-      info = {
-        # this means 'dependencies'
-        'targets': [],
-        'libraries': [],
-        'roots': [],
-        'id': current_target.id,
-        'target_type': _get_target_type(current_target),
-        'is_synthetic': current_target.is_synthetic,
-        'pants_target_type': self._get_pants_target_alias(type(current_target)),
-        'is_target_root': current_target in target_roots_set,
-        'transitive': current_target.transitive,
-        'scope': str(current_target.scope)
-      }
-
-      if not current_target.is_synthetic:
-        info['globs'] = current_target.globs_relative_to_buildroot()
-
-      def iter_transitive_jars(jar_lib):
-        """
-        :type jar_lib: :class:`pants.backend.jvm.targets.jar_library.JarLibrary`
-        :rtype: :class:`collections.Iterator` of
-                :class:`pants.java.jar.M2Coordinate`
-        """
-        if runtime_classpath:
-          jar_products = runtime_classpath.get_artifact_classpath_entries_for_targets((jar_lib,))
-          for _, jar_entry in jar_products:
-            coordinate = jar_entry.coordinate
-            # We drop classifier and type_ since those fields are represented in the global
-            # libraries dict and here we just want the key into that dict (see `_jar_id`).
-            yield M2Coordinate(org=coordinate.org, name=coordinate.name, rev=coordinate.rev)
-
-      target_libraries = OrderedSet()
-      if isinstance(current_target, JarLibrary):
-        target_libraries = OrderedSet(iter_transitive_jars(current_target))
-      for dep in current_target.dependencies:
-        info['targets'].append(dep.address.spec)
-        if isinstance(dep, JarLibrary):
-          for jar in dep.jar_dependencies:
-            target_libraries.add(M2Coordinate(jar.org, jar.name, jar.rev))
-          # Add all the jars pulled in by this jar_library
-          target_libraries.update(iter_transitive_jars(dep))
-        if isinstance(dep, Resources):
-          resource_target_map[dep] = current_target
-
-      if isinstance(current_target, ScalaLibrary):
-        for dep in current_target.java_sources:
-          info['targets'].append(dep.address.spec)
-
-      if isinstance(current_target, JvmTarget):
-        info['excludes'] = [self._exclude_id(exclude) for exclude in current_target.excludes]
-        info['platform'] = current_target.platform.name
-        if hasattr(current_target, 'test_platform'):
-          info['test_platform'] = current_target.test_platform.name
-
-      if runtime_classpath:
-        info['libraries'].extend(self._jar_id(lib) for lib in target_libraries)
-
-      if current_target in target_roots_set:
-        info['roots'] = [{
-          'source_root': os.path.realpath(source_root_package_prefix[0]),
-          'package_prefix': source_root_package_prefix[1]
-        } for source_root_package_prefix in self._source_roots_for_target(current_target)]
-
-      targets_map[current_target.address.spec] = info
 
     additional_java_targets = []
     for t in targets:
@@ -220,7 +219,12 @@ class ExportDepAsJar(ConsoleTask):
     targets.extend(additional_java_targets)
 
     for target in targets:
-      process_target(target)
+      info = self._process_target(target, target_roots_set, resource_target_map, runtime_classpath)
+      targets_map[target.address.spec] = info
+
+      for dep in target.dependencies:
+        if isinstance(dep, Resources):
+          resource_target_map[dep] = target
 
     scala_platform = ScalaPlatform.global_instance()
     scala_platform_map = {
@@ -276,7 +280,7 @@ class ExportDepAsJar(ConsoleTask):
       # Using resolved path in preparation for VCFS.
       resource_jar_root = os.path.realpath(self.versioned_workdir)
       for t in targets:
-        target_type = _get_target_type(t)
+        target_type = ExportDepAsJar._get_target_type(t, resource_target_map)
         # If it is a target root or it is already a jar_library target, then no-op.
         if t in target_roots_set or targets_map[t.address.spec]['pants_target_type'] == 'jar_library':
           continue
