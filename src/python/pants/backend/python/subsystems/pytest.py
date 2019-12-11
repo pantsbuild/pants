@@ -18,7 +18,8 @@ class PyTest(Subsystem):
       '--args', type=list, member_type=str,
       help="Arguments to pass directly to Pytest, e.g. `--pytest-args=\"-k test_foo --quiet\"`",
     )
-    register('--version', default='pytest>=4.6.6,<4.7', help="Requirement string for Pytest.")
+    register('--version', default='pytest>=4.6.6,<4.7',
+             help="Requirement string for Pytest.", fingerprint=True)
     register(
       '--pytest-plugins',
       type=list,
@@ -29,6 +30,7 @@ class PyTest(Subsystem):
         "more-itertools<6.0.0 ; python_version<'3'",
       ],
       help="Requirement strings for any plugins or additional requirements you'd like to use.",
+      fingerprint=True
     )
     register('--requirements', advanced=True, default='pytest>=4.6.6,<4.7',
              help='Requirements string for the pytest library.',

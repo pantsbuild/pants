@@ -34,7 +34,7 @@ use bytes::Bytes;
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::TryFrom;
 use std::ops::AddAssign;
-use std::path::PathBuf;
+use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 use store::UploadSummary;
@@ -110,6 +110,48 @@ impl From<Platform> for String {
   }
 }
 
+#[derive(Derivative, Clone, Debug, Eq)]
+#[derivative(PartialEq, Hash)]
+pub struct RelativePath(PathBuf);
+
+impl RelativePath {
+  pub fn new<P: AsRef<Path>>(path: P) -> Result<RelativePath, String> {
+    let mut relative_path = PathBuf::new();
+    let candidate = path.as_ref();
+    for component in candidate.components() {
+      match component {
+        Component::Prefix(_) => {
+          return Err(format!("Windows paths are not allowed: {:?}", candidate))
+        }
+        Component::RootDir => {
+          return Err(format!("Absolute paths are not allowed: {:?}", candidate))
+        }
+        Component::CurDir => continue,
+        Component::ParentDir => {
+          if !relative_path.pop() {
+            return Err(format!(
+              "Relative paths that escape the root are not allowed: {:?}",
+              candidate
+            ));
+          }
+        }
+        Component::Normal(path) => relative_path.push(path),
+      }
+    }
+    Ok(RelativePath(relative_path))
+  }
+
+  pub fn to_str(&self) -> Option<&str> {
+    self.0.to_str()
+  }
+}
+
+impl AsRef<Path> for RelativePath {
+  fn as_ref(&self) -> &Path {
+    self.0.as_path()
+  }
+}
+
 ///
 /// A process to be executed.
 ///
@@ -132,6 +174,12 @@ pub struct ExecuteProcessRequest {
   /// No other environment variables will be set (except possibly for an empty PATH variable).
   ///
   pub env: BTreeMap<String, String>,
+
+  ///
+  /// A relative path to a directory existing in the `input_files` digest to execute the process
+  /// from. Defaults to the `input_files` root.
+  ///
+  pub working_directory: Option<RelativePath>,
 
   pub input_files: hashing::Digest,
 

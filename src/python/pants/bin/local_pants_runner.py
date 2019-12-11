@@ -300,6 +300,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
 
     return self._graph_session.run_console_rules(
       self._options_bootstrapper,
+      self._options,
       goals,
       self._target_roots,
     )

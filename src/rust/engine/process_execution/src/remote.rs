@@ -892,6 +892,15 @@ pub fn make_execute_request(
   output_directories.sort();
   command.set_output_directories(protobuf::RepeatedField::from_vec(output_directories));
 
+  if let Some(working_directory) = &req.working_directory {
+    command.set_working_directory(
+      working_directory
+        .to_str()
+        .map(str::to_owned)
+        .unwrap_or_else(|| panic!("Non-UTF8 working directory path: {:?}", working_directory)),
+    )
+  }
+
   if req.jdk_home.is_some() {
     // Ideally, the JDK would be brought along as part of the input directory, but we don't
     // currently have support for that. Scoot supports this property, and will symlink .jdk to a
