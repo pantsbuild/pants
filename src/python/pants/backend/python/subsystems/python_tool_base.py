@@ -26,7 +26,9 @@ class PythonToolBase(Subsystem):
              help="Requirement string for the tool.")
     register('--extra-requirements', type=list, member_type=str, advanced=True, fingerprint=True,
              default=cls.default_extra_requirements,
-             help="Requirement string for the tool.")
+             help="Any additional requirement strings to use with the tool. This is useful if the "
+                  "tool allows you to install plugins or if you need to constrain a dependency to "
+                  "a certain version.")
     register('--interpreter-constraints', type=list, advanced=True, fingerprint=True,
              default=cls.default_interpreter_constraints,
              help='Python interpreter constraints for this tool. An empty list uses the default '
