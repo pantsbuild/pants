@@ -207,34 +207,7 @@ class ExportDepAsJar(ConsoleTask):
 
     return info
 
-  def generate_targets_map(self, all_targets, runtime_classpath):
-    """Generates a dictionary containing all pertinent information about the target graph.
-
-    The return dictionary is suitable for serialization by json.dumps.
-    :param all_targets: The list of targets to generate the map for.
-    :param classpath_products: Optional classpath_products. If not provided when the --libraries
-      option is `True`, this task will perform its own jar resolution.
-    """
-
-    targets_map = {}
-    resource_target_map = {}
-    target_roots_set = set(self.context.target_roots)
-
-    additional_java_targets = []
-    for t in all_targets:
-      if isinstance(t, ScalaLibrary):
-        additional_java_targets.extend(t.java_sources)
-
-    all_targets.extend(additional_java_targets)
-
-    for target in all_targets:
-      info = self._process_target(target, target_roots_set, resource_target_map, runtime_classpath)
-      targets_map[target.address.spec] = info
-
-      for dep in target.dependencies:
-        if isinstance(dep, Resources):
-          resource_target_map[dep] = target
-
+  def initialize_graph_info(self, targets_map):
     scala_platform = ScalaPlatform.global_instance()
     scala_platform_map = {
       'scala_version': scala_platform.version,
@@ -277,7 +250,39 @@ class ExportDepAsJar(ConsoleTask):
       if preferred_distributions:
         graph_info['preferred_jvm_distributions'][platform_name] = preferred_distributions
 
+    return graph_info
+
+  def generate_targets_map(self, all_targets, runtime_classpath):
+    """Generates a dictionary containing all pertinent information about the target graph.
+
+    The return dictionary is suitable for serialization by json.dumps.
+    :param all_targets: The list of targets to generate the map for.
+    :param classpath_products: Optional classpath_products. If not provided when the --libraries
+      option is `True`, this task will perform its own jar resolution.
+    """
+
+    targets_map = {}
+    resource_target_map = {}
+    target_roots_set = set(self.context.target_roots)
+
+    additional_java_targets = []
+    for t in all_targets:
+      if isinstance(t, ScalaLibrary):
+        additional_java_targets.extend(t.java_sources)
+
+    all_targets.extend(additional_java_targets)
+
+    for target in all_targets:
+      info = self._process_target(target, target_roots_set, resource_target_map, runtime_classpath)
+      targets_map[target.address.spec] = info
+
+      for dep in target.dependencies:
+        if isinstance(dep, Resources):
+          resource_target_map[dep] = target
+
+    graph_info = self.initialize_graph_info(targets_map)
     graph_info['libraries'] = self._resolve_jars_info(all_targets, runtime_classpath)
+
     # Using resolved path in preparation for VCFS.
     resource_jar_root = os.path.realpath(self.versioned_workdir)
     for t in all_targets:
