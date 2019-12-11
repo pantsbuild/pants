@@ -10,7 +10,8 @@ from pants.option.option_util import flatten_shlexed_list
 
 class Black(PythonToolBase):
   options_scope = 'black'
-  default_requirements = ['black==19.3b0', 'setuptools']
+  default_version = 'black==19.3b0'
+  default_extra_requirements = ['setuptools']
   default_entry_point = 'black:patched_main'
   default_interpreter_constraints = ["CPython>=3.6"]
 
