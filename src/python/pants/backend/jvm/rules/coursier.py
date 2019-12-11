@@ -6,7 +6,7 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Iterable, List, Optional, Tuple
 
 from pants.backend.jvm.rules.hermetic_dist import HermeticDist
 from pants.backend.jvm.rules.jvm_options import JvmOptions
@@ -23,7 +23,7 @@ from pants.engine.fs import (Digest, DirectoriesToMerge, FileContent, FilesConte
 from pants.engine.goal import Goal
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
 from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
-from pants.engine.legacy.graph import HydratedTarget
+from pants.engine.legacy.graph import HydratedTarget, TransitiveHydratedTargets
 from pants.engine.rules import RootRule, console_rule, optionable_rule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.java.jar.jar_dependency import JarDependency
@@ -32,6 +32,7 @@ from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import fast_relpath
 from pants.util.memo import memoized_method, memoized_property
+from pants.util.meta import frozen_after_init
 
 
 logger = logging.getLogger(__name__)
@@ -54,8 +55,22 @@ async def snapshot_coursier(coursier: CoursierSubsystem) -> ResolvedCoursier:
 # CoursierMixin#resolve() for the missing pieces.
 @dataclass(frozen=True)
 class JarResolveRequest:
-  hydrated_targets: Tuple[HydratedTarget, ...]
-  jar_deps: Tuple[JarDependency, ...]
+  thts: TransitiveHydratedTargets
+
+  @memoized_property
+  def hydrated_targets(self) -> Tuple[HydratedTarget, ...]:
+    return [
+      t for t in self.thts.closure
+      if isinstance(t.adaptor.v1_target, JarLibrary)
+    ]
+
+  @memoized_property
+  def jar_deps(self) -> Tuple[JarDependency, ...]:
+    return [
+      jar_dep
+      for jar_lib_tht in self.hydrated_targets
+      for jar_dep in jar_lib_tht.adaptor.v1_target.jar_dependencies
+    ]
 
 
 @dataclass(frozen=True)
@@ -239,7 +254,7 @@ async def execute_coursier(
 
         return transitive_jar_path_for_coord
 
-      for jar in t.jar_dependencies:
+      for jar in t.v1_target.jar_dependencies:
         # if there are override classifiers, then force use of those.
         coord_candidates = []
         if override_classifiers:

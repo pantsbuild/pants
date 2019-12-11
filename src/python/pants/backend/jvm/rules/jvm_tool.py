@@ -9,7 +9,7 @@ from pants.backend.jvm.rules.coursier import (CoursierRequest, JarResolveRequest
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolRequest
 from pants.build_graph.address import Address
 from pants.engine.fs import Snapshot
-from pants.engine.legacy.graph import HydratedTarget
+from pants.engine.legacy.graph import HydratedTarget, TransitiveHydratedTargets
 from pants.engine.rules import UnionRule, rule, union
 from pants.engine.selectors import Get
 from pants.util.collections import Enum
@@ -44,16 +44,15 @@ async def snapshot_jar_library_classpath(req: JarLibraryClasspathRequest) -> Jvm
 
 @rule
 async def obtain_jvm_tool_classpath(jvm_tool_request: JvmToolRequest) -> JvmToolClasspathResult:
-  hydrated_target_from_jvm_tool = await Get[HydratedTarget](Address, jvm_tool_request.address)
-  target_adaptor = hydrated_target_from_jvm_tool.adaptor
+  jvm_tool_target = await Get[HydratedTarget](Address, jvm_tool_request.address)
+  thts = await Get[TransitiveHydratedTargets](HydratedTarget, jvm_tool_target)
 
   # Do an enum "pattern match" to obtain the appropriate strategy for resolving a classpath from the
   # target!
   try:
     jvm_tool_classpath_req = JvmToolBootstrapTargetTypes(target_adaptor.type_alias).match({
-      JvmToolBootstrapTargetTypes.jar_library: lambda: JarLibraryClasspathRequest(JarResolveRequest(
-        hydrated_targets=(hydrated_target_from_jvm_tool,),
-        jar_deps=tuple(target_adaptor.jars)))
+      JvmToolBootstrapTargetTypes.jar_library: lambda: JarLibraryClasspathRequest(
+        JarResolveRequest(thts))
     })()
   except ValueError as e:
     raise JvmToolBootstrapError(f'unrecognized target type: {e} for'

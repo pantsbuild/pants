@@ -285,26 +285,14 @@ async def export_v2(
 
   thts = await Get[TransitiveHydratedTargets](Specs, specs)
 
-  jar_targets = [
-    t for t in thts.closure
-    if isinstance(t.adaptor.v1_target, JarLibrary)
-  ]
-
   targets_map = {}
   resource_target_map = {}
   python_interpreter_targets_mapping = defaultdict(list)
 
   if export_options.libraries:
     # TODO: support excludes!
-    all_jar_deps = [
-      jar_dep
-      for jar_lib_tht in jar_targets
-      for jar_dep in jar_lib_tht.adaptor.jar_dependencies
-    ]
     resolve_result = await Get[SnapshottedResolveResult](CoursierRequest(
-      jar_resolution=JarResolveRequest(
-        hydrated_targets=tuple(jar_targets),
-        jar_deps=tuple(all_jar_deps)),
+      jar_resolution=JarResolveRequest(thts),
       jvm_options=JvmOptions(tuple(export_options.jvm_options)),
       jar_path_base=Path(export_options.output_dir),
     ))

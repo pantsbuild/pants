@@ -141,22 +141,7 @@ class TargetAdaptor(StructWithDeps):
     """Returns a tuple of Fields for captured fields which need additional treatment."""
     with exception_logging(logger, 'Exception in `field_adaptors` property'):
 
-      # Add all fields which are declared as properties on the v1 Target class to the v2
-      # TargetAdaptor. An ArbitraryField requires no extra processing to hydrate.
-      # TODO: profile to see whether accessing all the properties (including @memoized_property) is
-      # the bottleneck here!
-      property_fields = [
-        ArbitraryField.coerce_hashable_field(
-          address=self.address,
-          arg=k,
-          value=getattr(self.v1_target, k),
-        )
-        for k in self.v1_target_class._all_property_attribute_names
-        if (k not in self._only_v2_target_kwargs) and
-        (k not in self.v1_target_class._non_v2_target_kwargs)
-      ]
-
-      all_adaptors = tuple(property_fields)
+      all_adaptors = ()
 
       conjunction_globs = self.get_sources()
       if conjunction_globs is None:
