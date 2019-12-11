@@ -68,8 +68,8 @@ async def run_python_test(
   )
 
   source_root_stripped_sources = await MultiGet(
-    Get(SourceRootStrippedSources, HydratedTarget, target_adaptor)
-    for target_adaptor in all_targets
+    Get(SourceRootStrippedSources, HydratedTarget, hydrated_target)
+    for hydrated_target in all_targets
   )
 
   stripped_sources_digests = tuple(

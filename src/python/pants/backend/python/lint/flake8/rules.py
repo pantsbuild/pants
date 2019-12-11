@@ -47,7 +47,7 @@ async def lint(
   target = wrapped_target.target
 
   # NB: Flake8 output depends upon which Python interpreter version it's run with. We ensure that
-  # each target runs with its own interpreter constraints, which was not possible in V1. See
+  # each target runs with its own interpreter constraints. See
   # http://flake8.pycqa.org/en/latest/user/invocation.html.
   interpreter_constraints = PexInterpreterConstraints.create_from_adaptors(
     adaptors=[target] if isinstance(target, PythonTargetAdaptor) else [],
