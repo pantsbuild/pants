@@ -10,7 +10,8 @@ from pants.option.option_util import flatten_shlexed_list
 
 class Flake8(PythonToolBase):
   options_scope = 'flake8'
-  default_requirements = ['flake8', 'setuptools']
+  default_version = 'flake8'
+  default_extra_requirements = ['setuptools']
   default_entry_point = 'flake8'
   default_interpreter_constraints = ["CPython>=2.7,<3", "CPython>=3.4"]
 
