@@ -17,6 +17,7 @@ from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.project_info.tasks.export import SourceRootTypes
 from pants.backend.project_info.tasks.export_version import DEFAULT_EXPORT_VERSION
 from pants.base.build_environment import get_buildroot
+from pants.base.exceptions import TaskError
 from pants.build_graph.resources import Resources
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.jar.jar_dependency_utils import M2Coordinate
@@ -206,11 +207,11 @@ class ExportDepAsJar(ConsoleTask):
 
     return info
 
-  def generate_targets_map(self, targets, runtime_classpath):
+  def generate_targets_map(self, all_targets, runtime_classpath):
     """Generates a dictionary containing all pertinent information about the target graph.
 
     The return dictionary is suitable for serialization by json.dumps.
-    :param targets: The list of targets to generate the map for.
+    :param all_targets: The list of targets to generate the map for.
     :param classpath_products: Optional classpath_products. If not provided when the --libraries
       option is `True`, this task will perform its own jar resolution.
     """
@@ -220,13 +221,13 @@ class ExportDepAsJar(ConsoleTask):
     target_roots_set = set(self.context.target_roots)
 
     additional_java_targets = []
-    for t in targets:
+    for t in all_targets:
       if isinstance(t, ScalaLibrary):
         additional_java_targets.extend(t.java_sources)
 
-    targets.extend(additional_java_targets)
+    all_targets.extend(additional_java_targets)
 
-    for target in targets:
+    for target in all_targets:
       info = self._process_target(target, target_roots_set, resource_target_map, runtime_classpath)
       targets_map[target.address.spec] = info
 
@@ -276,43 +277,44 @@ class ExportDepAsJar(ConsoleTask):
       if preferred_distributions:
         graph_info['preferred_jvm_distributions'][platform_name] = preferred_distributions
 
-    if runtime_classpath:
-      graph_info['libraries'] = self._resolve_jars_info(targets, runtime_classpath)
-      # Using resolved path in preparation for VCFS.
-      resource_jar_root = os.path.realpath(self.versioned_workdir)
-      for t in targets:
-        target_type = ExportDepAsJar._get_target_type(t, resource_target_map)
-        # If it is a target root or it is already a jar_library target, then no-op.
-        if t in target_roots_set or targets_map[t.address.spec]['pants_target_type'] == 'jar_library':
-          continue
+    graph_info['libraries'] = self._resolve_jars_info(all_targets, runtime_classpath)
+    # Using resolved path in preparation for VCFS.
+    resource_jar_root = os.path.realpath(self.versioned_workdir)
+    for t in all_targets:
+      target_type = ExportDepAsJar._get_target_type(t, resource_target_map)
+      # If it is a target root or it is already a jar_library target, then no-op.
+      if t in target_roots_set or targets_map[t.address.spec]['pants_target_type'] == 'jar_library':
+        continue
 
-        targets_map[t.address.spec]['pants_target_type'] = 'jar_library'
-        targets_map[t.address.spec]['libraries'] = [t.id]
+      targets_map[t.address.spec]['pants_target_type'] = 'jar_library'
+      targets_map[t.address.spec]['libraries'] = [t.id]
 
-        if target_type == SourceRootTypes.RESOURCE or target_type == SourceRootTypes.TEST_RESOURCE:
-          # yic assumed that the cost to fingerprint the target may not be that lower than
-          # just zipping up the resources anyway.
-          jarred_resources = ExportDepAsJar._zip_sources(t, resource_jar_root)
-          graph_info['libraries'][t.id]['default'] = jarred_resources.name
-        else:
-          jar_products = runtime_classpath.get_for_target(t)
-          for conf, jar_entry in jar_products:
-            # TODO(yic): check --compile-rsc-use-classpath-jars is enabled.
-            # If not, zip up the classes/ dir here.
-            if 'z.jar' in jar_entry:
-              graph_info['libraries'][t.id][conf] = jar_entry
-          if self.get_options().sources:
-            # NB: We create the jar in the same place as we create the resources
-            # (as opposed to where we store the z.jar), because the path to the z.jar depends
-            # on tasks outside of this one.
-            # In addition to that, we may not want to depend on z.jar existing to export source jars.
-            jarred_sources = ExportDepAsJar._zip_sources(t, resource_jar_root, suffix='-sources.jar')
-            graph_info['libraries'][t.id]['sources'] = jarred_sources.name
+      if target_type == SourceRootTypes.RESOURCE or target_type == SourceRootTypes.TEST_RESOURCE:
+        # yic assumed that the cost to fingerprint the target may not be that lower than
+        # just zipping up the resources anyway.
+        jarred_resources = ExportDepAsJar._zip_sources(t, resource_jar_root)
+        graph_info['libraries'][t.id]['default'] = jarred_resources.name
+      else:
+        jar_products = runtime_classpath.get_for_target(t)
+        for conf, jar_entry in jar_products:
+          # TODO(yic): check --compile-rsc-use-classpath-jars is enabled.
+          # If not, zip up the classes/ dir here.
+          if 'z.jar' in jar_entry:
+            graph_info['libraries'][t.id][conf] = jar_entry
+        if self.get_options().sources:
+          # NB: We create the jar in the same place as we create the resources
+          # (as opposed to where we store the z.jar), because the path to the z.jar depends
+          # on tasks outside of this one.
+          # In addition to that, we may not want to depend on z.jar existing to export source jars.
+          jarred_sources = ExportDepAsJar._zip_sources(t, resource_jar_root, suffix='-sources.jar')
+          graph_info['libraries'][t.id]['sources'] = jarred_sources.name
 
     return graph_info
 
-  def console_output(self, targets, runtime_classpath=None):
-    runtime_classpath = runtime_classpath or self.context.products.get_data('runtime_classpath')
+  def console_output(self, targets):
+    runtime_classpath = self.context.products.get_data('runtime_classpath')
+    if runtime_classpath is None:
+      raise TaskError("There was an error compiling the targets - There is no runtime classpath")
     graph_info = self.generate_targets_map(targets, runtime_classpath=runtime_classpath)
     if self.get_options().formatted:
       return json.dumps(graph_info, indent=4, separators=(',', ': ')).splitlines()
