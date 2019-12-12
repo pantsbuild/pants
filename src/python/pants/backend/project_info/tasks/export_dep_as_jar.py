@@ -17,6 +17,7 @@ from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.project_info.tasks.export import SourceRootTypes
 from pants.backend.project_info.tasks.export_version import DEFAULT_EXPORT_VERSION
 from pants.base.build_environment import get_buildroot
+from pants.base.exceptions import TaskError
 from pants.build_graph.resources import Resources
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.jar.jar_dependency_utils import M2Coordinate
@@ -97,6 +98,23 @@ class ExportDepAsJar(ConsoleTask):
     """
     return '{0}:{1}'.format(jar.org, jar.name) if jar.name else jar.org
 
+  @staticmethod
+  def _get_target_type(tgt, resource_target_map):
+    def is_test(t):
+      return isinstance(t, JUnitTests)
+
+    if is_test(tgt):
+      return SourceRootTypes.TEST
+    else:
+      if (isinstance(tgt, Resources) and
+        tgt in resource_target_map and
+        is_test(resource_target_map[tgt])):
+        return SourceRootTypes.TEST_RESOURCE
+      elif isinstance(tgt, Resources):
+        return SourceRootTypes.RESOURCE
+      else:
+        return SourceRootTypes.SOURCE
+
   def _resolve_jars_info(self, targets, classpath_products):
     """Consults ivy_jar_products to export the external libraries.
 
@@ -114,114 +132,82 @@ class ExportDepAsJar(ConsoleTask):
       mapping[self._jar_id(jar_entry.coordinate)][conf] = jar_entry.cache_path
     return mapping
 
-  def generate_targets_map(self, targets, runtime_classpath):
-    """Generates a dictionary containing all pertinent information about the target graph.
+  @staticmethod
+  def _zip_sources(target, location, suffix='.jar'):
+    with temporary_file(root_dir=location, cleanup=False, suffix=suffix) as f:
+      with zipfile.ZipFile(f, 'a') as zip_file:
+        for src_from_source_root, src_from_build_root in zip(target.sources_relative_to_source_root(), target.sources_relative_to_buildroot()):
+          zip_file.write(os.path.join(get_buildroot(), src_from_build_root), src_from_source_root)
+    return f
 
-    The return dictionary is suitable for serialization by json.dumps.
-    :param targets: The list of targets to generate the map for.
-    :param classpath_products: Optional classpath_products. If not provided when the --libraries
-      option is `True`, this task will perform its own jar resolution.
+  def _process_target(self, current_target, target_roots_set, resource_target_map, runtime_classpath):
     """
+    :type current_target:pants.build_graph.target.Target
+    """
+    info = {
+      # this means 'dependencies'
+      'targets': [],
+      'libraries': [],
+      'roots': [],
+      'id': current_target.id,
+      'target_type': ExportDepAsJar._get_target_type(current_target, resource_target_map),
+      'is_synthetic': current_target.is_synthetic,
+      'pants_target_type': self._get_pants_target_alias(type(current_target)),
+      'is_target_root': current_target in target_roots_set,
+      'transitive': current_target.transitive,
+      'scope': str(current_target.scope)
+    }
 
-    def _get_target_type(tgt):
-      def is_test(t):
-        return isinstance(t, JUnitTests)
+    if not current_target.is_synthetic:
+      info['globs'] = current_target.globs_relative_to_buildroot()
 
-      if is_test(tgt):
-        return SourceRootTypes.TEST
-      else:
-        if (isinstance(tgt, Resources) and
-          tgt in resource_target_map and
-          is_test(resource_target_map[tgt])):
-          return SourceRootTypes.TEST_RESOURCE
-        elif isinstance(tgt, Resources):
-          return SourceRootTypes.RESOURCE
-        else:
-          return SourceRootTypes.SOURCE
-
-    targets_map = {}
-    resource_target_map = {}
-    target_roots_set = set(self.context.target_roots)
-
-    def process_target(current_target):
+    def iter_transitive_jars(jar_lib):
       """
-      :type current_target:pants.build_graph.target.Target
+      :type jar_lib: :class:`pants.backend.jvm.targets.jar_library.JarLibrary`
+      :rtype: :class:`collections.Iterator` of
+              :class:`pants.java.jar.M2Coordinate`
       """
-      info = {
-        # this means 'dependencies'
-        'targets': [],
-        'libraries': [],
-        'roots': [],
-        'id': current_target.id,
-        'target_type': _get_target_type(current_target),
-        'is_synthetic': current_target.is_synthetic,
-        'pants_target_type': self._get_pants_target_alias(type(current_target)),
-        'is_target_root': current_target in target_roots_set,
-        'transitive': current_target.transitive,
-        'scope': str(current_target.scope)
-      }
-
-      if not current_target.is_synthetic:
-        info['globs'] = current_target.globs_relative_to_buildroot()
-
-      def iter_transitive_jars(jar_lib):
-        """
-        :type jar_lib: :class:`pants.backend.jvm.targets.jar_library.JarLibrary`
-        :rtype: :class:`collections.Iterator` of
-                :class:`pants.java.jar.M2Coordinate`
-        """
-        if runtime_classpath:
-          jar_products = runtime_classpath.get_artifact_classpath_entries_for_targets((jar_lib,))
-          for _, jar_entry in jar_products:
-            coordinate = jar_entry.coordinate
-            # We drop classifier and type_ since those fields are represented in the global
-            # libraries dict and here we just want the key into that dict (see `_jar_id`).
-            yield M2Coordinate(org=coordinate.org, name=coordinate.name, rev=coordinate.rev)
-
-      target_libraries = OrderedSet()
-      if isinstance(current_target, JarLibrary):
-        target_libraries = OrderedSet(iter_transitive_jars(current_target))
-      for dep in current_target.dependencies:
-        info['targets'].append(dep.address.spec)
-        if isinstance(dep, JarLibrary):
-          for jar in dep.jar_dependencies:
-            target_libraries.add(M2Coordinate(jar.org, jar.name, jar.rev))
-          # Add all the jars pulled in by this jar_library
-          target_libraries.update(iter_transitive_jars(dep))
-        if isinstance(dep, Resources):
-          resource_target_map[dep] = current_target
-
-      if isinstance(current_target, ScalaLibrary):
-        for dep in current_target.java_sources:
-          info['targets'].append(dep.address.spec)
-
-      if isinstance(current_target, JvmTarget):
-        info['excludes'] = [self._exclude_id(exclude) for exclude in current_target.excludes]
-        info['platform'] = current_target.platform.name
-        if hasattr(current_target, 'test_platform'):
-          info['test_platform'] = current_target.test_platform.name
-
       if runtime_classpath:
-        info['libraries'].extend(self._jar_id(lib) for lib in target_libraries)
+        jar_products = runtime_classpath.get_artifact_classpath_entries_for_targets((jar_lib,))
+        for _, jar_entry in jar_products:
+          coordinate = jar_entry.coordinate
+          # We drop classifier and type_ since those fields are represented in the global
+          # libraries dict and here we just want the key into that dict (see `_jar_id`).
+          yield M2Coordinate(org=coordinate.org, name=coordinate.name, rev=coordinate.rev)
 
-      if current_target in target_roots_set:
-        info['roots'] = [{
-          'source_root': os.path.realpath(source_root_package_prefix[0]),
-          'package_prefix': source_root_package_prefix[1]
-        } for source_root_package_prefix in self._source_roots_for_target(current_target)]
+    target_libraries = OrderedSet()
+    if isinstance(current_target, JarLibrary):
+      target_libraries = OrderedSet(iter_transitive_jars(current_target))
+    for dep in current_target.dependencies:
+      info['targets'].append(dep.address.spec)
+      if isinstance(dep, JarLibrary):
+        for jar in dep.jar_dependencies:
+          target_libraries.add(M2Coordinate(jar.org, jar.name, jar.rev))
+        # Add all the jars pulled in by this jar_library
+        target_libraries.update(iter_transitive_jars(dep))
 
-      targets_map[current_target.address.spec] = info
+    if isinstance(current_target, ScalaLibrary):
+      for dep in current_target.java_sources:
+        info['targets'].append(dep.address.spec)
 
-    additional_java_targets = []
-    for t in targets:
-      if isinstance(t, ScalaLibrary):
-        additional_java_targets.extend(t.java_sources)
+    if isinstance(current_target, JvmTarget):
+      info['excludes'] = [self._exclude_id(exclude) for exclude in current_target.excludes]
+      info['platform'] = current_target.platform.name
+      if hasattr(current_target, 'test_platform'):
+        info['test_platform'] = current_target.test_platform.name
 
-    targets.extend(additional_java_targets)
+    if runtime_classpath:
+      info['libraries'].extend(self._jar_id(lib) for lib in target_libraries)
 
-    for target in targets:
-      process_target(target)
+    if current_target in target_roots_set:
+      info['roots'] = [{
+        'source_root': os.path.realpath(source_root_package_prefix[0]),
+        'package_prefix': source_root_package_prefix[1]
+      } for source_root_package_prefix in self._source_roots_for_target(current_target)]
 
+    return info
+
+  def initialize_graph_info(self, targets_map):
     scala_platform = ScalaPlatform.global_instance()
     scala_platform_map = {
       'scala_version': scala_platform.version,
@@ -264,34 +250,56 @@ class ExportDepAsJar(ConsoleTask):
       if preferred_distributions:
         graph_info['preferred_jvm_distributions'][platform_name] = preferred_distributions
 
-    def zip_sources(target, location, suffix='.jar'):
-      with temporary_file(root_dir=location, cleanup=False, suffix=suffix) as f:
-        with zipfile.ZipFile(f, 'a') as zip_file:
-          for src_from_source_root, src_from_build_root in zip(target.sources_relative_to_source_root(), target.sources_relative_to_buildroot()):
-            zip_file.write(os.path.join(get_buildroot(), src_from_build_root), src_from_source_root)
-      return f
+    return graph_info
 
-    if runtime_classpath:
-      graph_info['libraries'] = self._resolve_jars_info(targets, runtime_classpath)
-      # Using resolved path in preparation for VCFS.
-      resource_jar_root = os.path.realpath(self.versioned_workdir)
-      for t in targets:
-        target_type = _get_target_type(t)
-        # If it is a target root or it is already a jar_library target, then no-op.
-        if t in target_roots_set or targets_map[t.address.spec]['pants_target_type'] == 'jar_library':
-          continue
+  def generate_targets_map(self, all_targets, runtime_classpath):
+    """Generates a dictionary containing all pertinent information about the target graph.
 
-        if target_type == SourceRootTypes.RESOURCE or target_type == SourceRootTypes.TEST_RESOURCE:
-          # yic assumed that the cost to fingerprint the target may not be that lower than
-          # just zipping up the resources anyway.
-          jarred_resources = zip_sources(t, resource_jar_root)
-          targets_map[t.address.spec]['pants_target_type'] = 'jar_library'
-          targets_map[t.address.spec]['libraries'] = [t.id]
-          graph_info['libraries'][t.id]['default'] = jarred_resources.name
-          continue
+    The return dictionary is suitable for serialization by json.dumps.
+    :param all_targets: The list of targets to generate the map for.
+    :param classpath_products: Optional classpath_products. If not provided when the --libraries
+      option is `True`, this task will perform its own jar resolution.
+    """
 
-        targets_map[t.address.spec]['pants_target_type'] = 'jar_library'
-        targets_map[t.address.spec]['libraries'] = [t.id]
+    targets_map = {}
+    resource_target_map = {}
+    target_roots_set = set(self.context.target_roots)
+
+    additional_java_targets = []
+    for t in all_targets:
+      if isinstance(t, ScalaLibrary):
+        additional_java_targets.extend(t.java_sources)
+
+    all_targets.extend(additional_java_targets)
+
+    for target in all_targets:
+      info = self._process_target(target, target_roots_set, resource_target_map, runtime_classpath)
+      targets_map[target.address.spec] = info
+
+      for dep in target.dependencies:
+        if isinstance(dep, Resources):
+          resource_target_map[dep] = target
+
+    graph_info = self.initialize_graph_info(targets_map)
+    graph_info['libraries'] = self._resolve_jars_info(all_targets, runtime_classpath)
+
+    # Using resolved path in preparation for VCFS.
+    resource_jar_root = os.path.realpath(self.versioned_workdir)
+    for t in all_targets:
+      target_type = ExportDepAsJar._get_target_type(t, resource_target_map)
+      # If it is a target root or it is already a jar_library target, then no-op.
+      if t in target_roots_set or targets_map[t.address.spec]['pants_target_type'] == 'jar_library':
+        continue
+
+      targets_map[t.address.spec]['pants_target_type'] = 'jar_library'
+      targets_map[t.address.spec]['libraries'] = [t.id]
+
+      if target_type == SourceRootTypes.RESOURCE or target_type == SourceRootTypes.TEST_RESOURCE:
+        # yic assumed that the cost to fingerprint the target may not be that lower than
+        # just zipping up the resources anyway.
+        jarred_resources = ExportDepAsJar._zip_sources(t, resource_jar_root)
+        graph_info['libraries'][t.id]['default'] = jarred_resources.name
+      else:
         jar_products = runtime_classpath.get_for_target(t)
         for conf, jar_entry in jar_products:
           # TODO(yic): check --compile-rsc-use-classpath-jars is enabled.
@@ -303,14 +311,15 @@ class ExportDepAsJar(ConsoleTask):
           # (as opposed to where we store the z.jar), because the path to the z.jar depends
           # on tasks outside of this one.
           # In addition to that, we may not want to depend on z.jar existing to export source jars.
-          jarred_sources = zip_sources(t, resource_jar_root, suffix='-sources.jar')
+          jarred_sources = ExportDepAsJar._zip_sources(t, resource_jar_root, suffix='-sources.jar')
           graph_info['libraries'][t.id]['sources'] = jarred_sources.name
-
 
     return graph_info
 
-  def console_output(self, targets, runtime_classpath=None):
-    runtime_classpath = runtime_classpath or self.context.products.get_data('runtime_classpath')
+  def console_output(self, targets):
+    runtime_classpath = self.context.products.get_data('runtime_classpath')
+    if runtime_classpath is None:
+      raise TaskError("There was an error compiling the targets - There is no runtime classpath")
     graph_info = self.generate_targets_map(targets, runtime_classpath=runtime_classpath)
     if self.get_options().formatted:
       return json.dumps(graph_info, indent=4, separators=(',', ': ')).splitlines()
