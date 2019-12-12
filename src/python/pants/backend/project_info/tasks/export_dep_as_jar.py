@@ -207,7 +207,7 @@ class ExportDepAsJar(ConsoleTask):
 
     return info
 
-  def initialize_graph_info(self, targets_map):
+  def initialize_graph_info(self):
     scala_platform = ScalaPlatform.global_instance()
     scala_platform_map = {
       'scala_version': scala_platform.version,
@@ -229,7 +229,7 @@ class ExportDepAsJar(ConsoleTask):
 
     graph_info = {
       'version': DEFAULT_EXPORT_VERSION,
-      'targets': targets_map,
+      'targets': {},
       'jvm_platforms': jvm_platforms_map,
       'scala_platform': scala_platform_map,
       # `jvm_distributions` are static distribution settings from config,
@@ -280,7 +280,8 @@ class ExportDepAsJar(ConsoleTask):
         if isinstance(dep, Resources):
           resource_target_map[dep] = target
 
-    graph_info = self.initialize_graph_info(targets_map)
+    graph_info = self.initialize_graph_info()
+    graph_info['targets'] = targets_map
     graph_info['libraries'] = self._resolve_jars_info(all_targets, runtime_classpath)
 
     # Using resolved path in preparation for VCFS.
