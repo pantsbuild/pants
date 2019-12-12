@@ -20,12 +20,13 @@ def create_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
-  args= create_parser().parse_args()
+  args = create_parser().parse_args()
   merge_base = git_merge_base()
-  goal = "fmt-v2" if args.fix else "lint-v2"
+  goal = "fmt2" if args.fix else "lint2"
   command = ["./pants", f"--changed-parent={merge_base}", goal]
   process = subprocess.run(command)
   sys.exit(process.returncode)
+
 
 if __name__ == "__main__":
   main()

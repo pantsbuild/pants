@@ -13,7 +13,7 @@ from pants.engine.selectors import Get
 
 # TODO(#8762) Get this rule to feature parity with the dependencies task.
 class DependenciesOptions(LineOriented, GoalSubsystem):
-  name = 'fast-dependencies'
+  name = 'dependencies2'
 
   @classmethod
   def register_options(cls, register):

@@ -51,7 +51,7 @@ class LintOptions(GoalSubsystem):
 
   # TODO: make this "lint"
   # Blocked on https://github.com/pantsbuild/pants/issues/8351
-  name = 'lint-v2'
+  name = 'lint2'
 
 
 class Lint(Goal):
