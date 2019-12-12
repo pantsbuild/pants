@@ -131,7 +131,7 @@ class PythonBinaryCreateTest(PythonTaskTestBase):
                                        ])
 
     with temporary_dir() as td:
-      def test_binary_create(cache_monolithic_resolve, use_manylinux):
+      def test_binary_create(binary, cache_monolithic_resolve, use_manylinux):
         self._assert_pex(binary,
                          options={
                            'pex-builder-wrapper': dict(
@@ -145,12 +145,12 @@ class PythonBinaryCreateTest(PythonTaskTestBase):
         """))
 
       # Test that nothing is written to the cache unless the option is turned on.
-      test_binary_create(cache_monolithic_resolve=False, use_manylinux=True)
+      test_binary_create(binary, cache_monolithic_resolve=False, use_manylinux=True)
       json_resolve_files = glob.glob(os.path.join(td, '*/*.json'))
       self.assertEqual(len(json_resolve_files), 0)
 
       # Test that a cache entry is created for a resolve when the option is turned on.
-      test_binary_create(cache_monolithic_resolve=True, use_manylinux=True)
+      test_binary_create(binary, cache_monolithic_resolve=True, use_manylinux=True)
       json_resolve_files = glob.glob(os.path.join(td, '*/*.json'))
       first_resolve_file = assert_single_element(json_resolve_files)
       with open(first_resolve_file) as fp:
@@ -160,7 +160,7 @@ class PythonBinaryCreateTest(PythonTaskTestBase):
         self.assertEqual('ansicolors', all_dist_specs[0]['project_name'])
 
       # Assert that a separate json file is created if use_manylinux is toggled.
-      test_binary_create(cache_monolithic_resolve=True, use_manylinux=False)
+      test_binary_create(binary, cache_monolithic_resolve=True, use_manylinux=False)
       json_resolve_files = glob.glob(os.path.join(td, '*/*.json'))
       self.assertEqual(len(json_resolve_files), 2)
       new_json_resolve_file = assert_single_element(
@@ -173,7 +173,13 @@ class PythonBinaryCreateTest(PythonTaskTestBase):
 
       all_json_resolve_files = set(json_resolve_files)
 
-      # Assert that no new json file is created if we re-run a previously-cached resolve.
-      test_binary_create(cache_monolithic_resolve=True, use_manylinux=True)
+      # Assert that no new json file is created if we re-run a previously-cached resolve (modifying
+      # the python_library()'s cache key, which doesn't affect the resolve).
+      binary2 = self.create_python_binary('src/resolve-cache', 'bin2', 'main',
+                                          dependencies=[
+                                            '3rdparty/resolve-cache:ansicolors',
+                                            ':lib',
+                                          ])
+      test_binary_create(binary2, cache_monolithic_resolve=True, use_manylinux=False)
       json_resolve_files = glob.glob(os.path.join(td, '*/*.json'))
       self.assertEqual(all_json_resolve_files, set(json_resolve_files))
