@@ -39,7 +39,7 @@ from pants.util.memo import memoized_method
 
 
 @dataclass(frozen=True)
-class PexResolveOptions:
+class PexResolveRequest:
   interpreter: PythonInterpreter
   requirements: Tuple[Requirement, ...]
   indexes: Tuple[str, ...]
@@ -59,7 +59,7 @@ class PexResolveOptions:
   @memoized_method
   def as_cache_key(self) -> str:
     return stable_json_sha1((
-      self.interpreter.identity.version_str,
+      str(self.interpreter.identity),
       self.requirements,
       self.indexes,
       self.find_links,
@@ -384,7 +384,7 @@ class PexBuilderWrapper:
     platforms = platforms or python_setup.platforms
     find_links = find_links or []
 
-    pex_resolve_options = PexResolveOptions(
+    pex_resolve_options = PexResolveRequest(
       requirements=[str(req.requirement) for req in requirements],
       interpreter=interpreter,
       indexes=python_repos.indexes,
