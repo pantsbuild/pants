@@ -31,8 +31,6 @@ use termion;
 use std::collections::{BTreeMap, VecDeque};
 use std::io::Write;
 use std::io::{stdout, Result, Stdout};
-use std::thread;
-use std::time::Duration;
 
 use termion::cursor::DetectCursorPos;
 use termion::raw::IntoRawMode;
@@ -45,14 +43,26 @@ enum Console {
   Pipe(Stdout),
 }
 
+#[derive(Clone)]
+struct PrintableMsg {
+  msg: String,
+  output: PrintableMsgOutput,
+}
+
+#[derive(Clone)]
+enum PrintableMsgOutput {
+  Stdout,
+  Stderr,
+}
+
 pub struct EngineDisplay {
   sigil: char,
   divider: String,
-  poll_interval_ms: Duration,
   padding: String,
   terminal: Console,
   action_map: BTreeMap<String, String>,
   logs: VecDeque<String>,
+  printable_msgs: VecDeque<PrintableMsg>,
   running: bool,
   cursor_start: (u16, u16),
   terminal_size: (u16, u16),
@@ -62,33 +72,13 @@ pub struct EngineDisplay {
 // TODO: Better error handling for .flush() and .write() failure modes.
 // TODO: Permit scrollback in the terminal - both at exit and during the live run.
 impl EngineDisplay {
-  /// Create a EngineDisplay only if stdout is tty and v2 ui is enabled.
-  pub fn create(display_worker_count: usize, should_render_ui: bool) -> Option<EngineDisplay> {
-    if should_render_ui && termion::is_tty(&stdout()) {
-      let mut display = EngineDisplay::for_stdout(0);
-      display.initialize(display_worker_count);
-      Some(display)
-    } else {
-      None
-    }
-  }
-
-  fn initialize(&mut self, display_worker_count: usize) {
-    let worker_ids: Vec<String> = (0..display_worker_count)
-      .map(|s| format!("{}", s))
-      .collect();
-    for worker_id in worker_ids {
-      self.add_worker(worker_id);
-    }
-  }
-
-  pub fn for_stdout(indent_level: u16) -> EngineDisplay {
+  /// Create a new EngineDisplay
+  pub fn new(indent_level: u16) -> EngineDisplay {
     let write_handle = stdout();
 
     let mut display = EngineDisplay {
       sigil: '⚡',
       divider: "▵".to_string(),
-      poll_interval_ms: Duration::from_millis(55),
       padding: " ".repeat(indent_level.into()),
       terminal: match write_handle.into_raw_mode() {
         Ok(t) => Console::Terminal(t),
@@ -99,6 +89,7 @@ impl EngineDisplay {
       // The reason this can't be capped to e.g. the starting size is because of resizing - we
       // want to be able to fill the entire screen if resized much larger than when we started.
       logs: VecDeque::with_capacity(500),
+      printable_msgs: VecDeque::with_capacity(500),
       running: false,
       // N.B. This will cause the screen to clear - but with some improved position
       // tracking logic we could avoid screen clearing in favor of using the value
@@ -115,6 +106,33 @@ impl EngineDisplay {
 
     display.stop_raw_mode().unwrap();
     display
+  }
+
+  pub fn initialize(&mut self, display_worker_count: usize) {
+    let worker_ids: Vec<String> = (0..display_worker_count)
+      .map(|s| format!("{}", s))
+      .collect();
+    for worker_id in worker_ids {
+      self.add_worker(worker_id);
+    }
+  }
+
+  pub fn stdout_is_tty() -> bool {
+    termion::is_tty(&stdout())
+  }
+
+  pub fn write_stdout(&mut self, msg: &str) {
+    self.printable_msgs.push_back(PrintableMsg {
+      msg: msg.to_string(),
+      output: PrintableMsgOutput::Stdout,
+    });
+  }
+
+  pub fn write_stderr(&mut self, msg: &str) {
+    self.printable_msgs.push_back(PrintableMsg {
+      msg: msg.to_string(),
+      output: PrintableMsgOutput::Stderr,
+    });
   }
 
   fn stop_raw_mode(&mut self) -> Result<()> {
@@ -277,24 +295,13 @@ impl EngineDisplay {
   }
 
   // Paints one screen of rendering.
-  fn render_for_tty(&mut self) {
+  pub fn render(&mut self) {
     self.set_size();
     self.clear();
     let max_log_rows = self.get_max_log_rows();
     let rendered_count = self.render_logs(max_log_rows);
     self.render_actions(rendered_count);
     self.flush().expect("could not flush terminal!");
-  }
-
-  // Paints one screen of rendering.
-  pub fn render(&mut self) {
-    self.render_for_tty()
-  }
-
-  // Paints one screen of rendering and sleeps for the poll interval.
-  pub fn render_and_sleep(&mut self) {
-    self.render();
-    thread::sleep(self.poll_interval_ms);
   }
 
   // Starts the EngineDisplay at the current cursor position.
@@ -337,8 +344,10 @@ impl EngineDisplay {
     self.action_map.len()
   }
 
-  // Terminates the EngineDisplay and returns the cursor to a static position.
+  // Initiates one last screen render, then terminates the EngineDisplay and returns the cursor
+  // to a static position, then prints all buffered stdout/stderr output.
   pub fn finish(&mut self) {
+    self.render();
     self.running = false;
     let current_pos = self.get_cursor_pos();
     let action_count = self.action_map.len() as u16;
@@ -351,5 +360,11 @@ impl EngineDisplay {
       ))
       .expect("could not write to terminal");
     self.stop_raw_mode().unwrap();
+    for PrintableMsg { msg, output } in self.printable_msgs.iter() {
+      match output {
+        PrintableMsgOutput::Stdout => print!("{}", msg),
+        PrintableMsgOutput::Stderr => eprint!("{}", msg),
+      }
+    }
   }
 }
