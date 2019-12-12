@@ -1,6 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from dataclasses import dataclass
 from typing import Optional, Tuple
 
 from pants.backend.python.lint.flake8.subsystem import Flake8
@@ -15,13 +16,18 @@ from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
-from pants.engine.legacy.structs import PythonTargetAdaptor
-from pants.engine.rules import optionable_rule, rule
+from pants.engine.legacy.structs import PythonTargetAdaptor, TargetAdaptor
+from pants.engine.rules import UnionRule, optionable_rule, rule
 from pants.engine.selectors import Get
 from pants.rules.core.lint import LintResult
 
 
-def generate_args(wrapped_target: LintPythonTarget, flake8: Flake8) -> Tuple[str, ...]:
+@dataclass(frozen=True)
+class Flake8Target:
+  target: TargetAdaptor
+
+
+def generate_args(wrapped_target: Flake8Target, flake8: Flake8) -> Tuple[str, ...]:
   args = []
   if flake8.get_options().config is not None:
     args.append(f"--config={flake8.get_options().config}")
@@ -32,7 +38,7 @@ def generate_args(wrapped_target: LintPythonTarget, flake8: Flake8) -> Tuple[str
 
 @rule(name="Lint using Flake8")
 async def lint(
-  wrapped_target: LintPythonTarget,
+  wrapped_target: Flake8Target,
   flake8: Flake8,
   python_setup: PythonSetup,
   subprocess_encoding_environment: SubprocessEncodingEnvironment,
@@ -80,4 +86,4 @@ async def lint(
 
 
 def rules():
-  return [lint, optionable_rule(Flake8)]
+  return [lint, optionable_rule(Flake8), UnionRule(LintPythonTarget, Flake8Target)]
