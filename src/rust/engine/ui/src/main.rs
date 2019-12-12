@@ -38,7 +38,7 @@ use ui::EngineDisplay;
 // N.B. This is purely a demo/testing bin target for exercising the library.
 
 fn main() {
-  let mut display = EngineDisplay::for_stdout(0);
+  let mut display = EngineDisplay::new(0);
   display.start();
 
   let worker_ids = vec![
@@ -85,7 +85,8 @@ fn main() {
   thread::sleep(Duration::from_secs(1));
 
   while !done {
-    display.render_and_sleep();
+    display.render();
+    thread::sleep(Duration::from_millis(55));
 
     gen_display_work(
       &mut display,

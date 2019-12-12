@@ -31,8 +31,6 @@ use termion;
 use std::collections::{BTreeMap, VecDeque};
 use std::io::Write;
 use std::io::{stdout, Result, Stdout};
-use std::thread;
-use std::time::Duration;
 
 use termion::cursor::DetectCursorPos;
 use termion::raw::IntoRawMode;
@@ -48,7 +46,6 @@ enum Console {
 pub struct EngineDisplay {
   sigil: char,
   divider: String,
-  poll_interval_ms: Duration,
   padding: String,
   terminal: Console,
   action_map: BTreeMap<String, String>,
@@ -62,33 +59,13 @@ pub struct EngineDisplay {
 // TODO: Better error handling for .flush() and .write() failure modes.
 // TODO: Permit scrollback in the terminal - both at exit and during the live run.
 impl EngineDisplay {
-  /// Create a EngineDisplay only if stdout is tty and v2 ui is enabled.
-  pub fn create(display_worker_count: usize, should_render_ui: bool) -> Option<EngineDisplay> {
-    if should_render_ui && termion::is_tty(&stdout()) {
-      let mut display = EngineDisplay::for_stdout(0);
-      display.initialize(display_worker_count);
-      Some(display)
-    } else {
-      None
-    }
-  }
-
-  fn initialize(&mut self, display_worker_count: usize) {
-    let worker_ids: Vec<String> = (0..display_worker_count)
-      .map(|s| format!("{}", s))
-      .collect();
-    for worker_id in worker_ids {
-      self.add_worker(worker_id);
-    }
-  }
-
-  pub fn for_stdout(indent_level: u16) -> EngineDisplay {
+  /// Create a new EngineDisplay
+  pub fn new(indent_level: u16) -> EngineDisplay {
     let write_handle = stdout();
 
     let mut display = EngineDisplay {
       sigil: '⚡',
       divider: "▵".to_string(),
-      poll_interval_ms: Duration::from_millis(55),
       padding: " ".repeat(indent_level.into()),
       terminal: match write_handle.into_raw_mode() {
         Ok(t) => Console::Terminal(t),
@@ -115,6 +92,19 @@ impl EngineDisplay {
 
     display.stop_raw_mode().unwrap();
     display
+  }
+
+  pub fn initialize(&mut self, display_worker_count: usize) {
+    let worker_ids: Vec<String> = (0..display_worker_count)
+      .map(|s| format!("{}", s))
+      .collect();
+    for worker_id in worker_ids {
+      self.add_worker(worker_id);
+    }
+  }
+
+  pub fn stdout_is_tty() -> bool {
+    termion::is_tty(&stdout())
   }
 
   fn stop_raw_mode(&mut self) -> Result<()> {
@@ -277,24 +267,13 @@ impl EngineDisplay {
   }
 
   // Paints one screen of rendering.
-  fn render_for_tty(&mut self) {
+  pub fn render(&mut self) {
     self.set_size();
     self.clear();
     let max_log_rows = self.get_max_log_rows();
     let rendered_count = self.render_logs(max_log_rows);
     self.render_actions(rendered_count);
     self.flush().expect("could not flush terminal!");
-  }
-
-  // Paints one screen of rendering.
-  pub fn render(&mut self) {
-    self.render_for_tty()
-  }
-
-  // Paints one screen of rendering and sleeps for the poll interval.
-  pub fn render_and_sleep(&mut self) {
-    self.render();
-    thread::sleep(self.poll_interval_ms);
   }
 
   // Starts the EngineDisplay at the current cursor position.

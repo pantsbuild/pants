@@ -56,11 +56,18 @@ impl Session {
     build_id: String,
     should_report_workunits: bool,
   ) -> Session {
+    let display = if should_render_ui && EngineDisplay::stdout_is_tty() {
+      let mut display = EngineDisplay::new(0);
+      display.initialize(ui_worker_count);
+      Some(Arc::new(Mutex::new(display)))
+    } else {
+      None
+    };
+
     let inner_session = InnerSession {
       preceding_graph_size: scheduler.core.graph.len(),
       roots: Mutex::new(HashSet::new()),
-      display: EngineDisplay::create(ui_worker_count, should_render_ui)
-        .map(|x| Arc::new(Mutex::new(x))),
+      display,
       should_record_zipkin_spans,
       workunit_store: WorkUnitStore::new(),
       build_id,
