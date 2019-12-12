@@ -4,7 +4,7 @@
 from typing import Optional, Tuple
 
 from pants.backend.python.lint.flake8.subsystem import Flake8
-from pants.backend.python.lint.lintable_python_target import LintablePythonTarget
+from pants.backend.python.lint.lint_python_target import LintPythonTarget
 from pants.backend.python.rules.pex import (
   CreatePex,
   Pex,
@@ -21,7 +21,7 @@ from pants.engine.selectors import Get
 from pants.rules.core.lint import LintResult
 
 
-def generate_args(wrapped_target: LintablePythonTarget, flake8: Flake8) -> Tuple[str, ...]:
+def generate_args(wrapped_target: LintPythonTarget, flake8: Flake8) -> Tuple[str, ...]:
   args = []
   if flake8.get_options().config is not None:
     args.append(f"--config={flake8.get_options().config}")
@@ -32,7 +32,7 @@ def generate_args(wrapped_target: LintablePythonTarget, flake8: Flake8) -> Tuple
 
 @rule(name="Lint using Flake8")
 async def lint(
-  wrapped_target: LintablePythonTarget,
+  wrapped_target: LintPythonTarget,
   flake8: Flake8,
   python_setup: PythonSetup,
   subprocess_encoding_environment: SubprocessEncodingEnvironment,
