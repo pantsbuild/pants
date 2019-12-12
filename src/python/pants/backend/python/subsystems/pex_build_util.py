@@ -1,16 +1,21 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import json
 import logging
 import os
 from collections import defaultdict
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Sequence, Set
+from typing import Callable, Dict, Sequence, Set, Tuple, cast
 
-from pex.fetcher import Fetcher
+from pex.fetcher import Fetcher, PyPIFetcher
+from pex.interpreter import PythonInterpreter
 from pex.pex_builder import PEXBuilder
+from pex.platforms import Platform
 from pex.resolver import resolve
 from pex.util import DistributionHelper
+from pkg_resources import Distribution, Requirement
 from twitter.common.collections import OrderedSet
 
 from pants.backend.python.python_requirement import PythonRequirement
@@ -21,13 +26,48 @@ from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_tests import PythonTests
-from pants.base.build_environment import get_buildroot
+from pants.base.build_environment import get_buildroot, get_pants_cachedir
 from pants.base.exceptions import TaskError
+from pants.base.hash_utils import stable_json_sha1
 from pants.build_graph.files import Files
 from pants.build_graph.target import Target
 from pants.subsystem.subsystem import Subsystem
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_file
+from pants.util.dirutil import safe_open
+from pants.util.memo import memoized_method
+
+
+@dataclass(frozen=True)
+class PexResolveOptions:
+  interpreter: PythonInterpreter
+  requirements: Tuple[Requirement, ...]
+  indexes: Tuple[str, ...]
+  find_links: Tuple[str, ...]
+  allow_prereleases: bool
+  cache_ttl: int
+  use_manylinux: bool
+  platforms: Tuple[str, ...]
+
+  @memoized_method
+  def fetchers(self):
+    return [
+      *[PyPIFetcher(url) for url in self.indexes],
+      *[Fetcher([url]) for url in self.find_links],
+    ]
+
+  @memoized_method
+  def as_cache_key(self) -> str:
+    return stable_json_sha1(dict(
+      interpreter=self.interpreter.identity.version_str,
+      requirements=self.requirements,
+      indexes=self.indexes,
+      find_links=self.find_links,
+      allow_prereleases=self.allow_prereleases,
+      cache_ttl=self.cache_ttl,
+      use_manylinux=self.use_manylinux,
+      platforms=self.platforms,
+    ))
 
 
 def is_python_target(tgt: Target) -> bool:
@@ -132,6 +172,9 @@ class PexBuilderWrapper:
       register('--setuptools-version', advanced=True, default='40.6.3',
                help='The setuptools version to include in the pex if namespace packages need to be '
                     'injected.')
+      register('--cache-monolithic-resolve', type=bool, advanced=True, fingerprint=True,
+               help='Whether to use a shared cache for the result of a pex resolve. This avoids '
+                    're-running a pex resolve on the local machine, if the inputs are the same.')
 
     @classmethod
     def subsystem_dependencies(cls):
@@ -151,14 +194,16 @@ class PexBuilderWrapper:
                                python_repos_subsystem=PythonRepos.global_instance(),
                                python_setup_subsystem=PythonSetup.global_instance(),
                                setuptools_requirement=PythonRequirement(setuptools_requirement),
-                               log=log)
+                               log=log,
+                               cache_monolithic_resolve=cast(bool, options.cache_monolithic_resolve))
 
   def __init__(self,
                builder,
                python_repos_subsystem,
                python_setup_subsystem,
                setuptools_requirement,
-               log):
+               log,
+               cache_monolithic_resolve: bool = False):
     assert isinstance(builder, PEXBuilder)
     assert isinstance(python_repos_subsystem, PythonRepos)
     assert isinstance(python_setup_subsystem, PythonSetup)
@@ -171,8 +216,10 @@ class PexBuilderWrapper:
     self._setuptools_requirement = setuptools_requirement
     self._log = log
 
-    self._distributions = {}
+    self._distributions: Dict[str, Distribution] = {}
     self._frozen = False
+
+    self._cache_monolithic_resolve = cache_monolithic_resolve
 
   def add_requirement_libs_from(self, req_libs, platforms=None):
     """Multi-platform dependency resolution for PEX files.
@@ -246,6 +293,71 @@ class PexBuilderWrapper:
           self.add_distribution(dist)
         locations.add(dist.location)
 
+  @staticmethod
+  def _coerce_current_platform_string(platform: str) -> str:
+    return cast(str, Platform.current().platform) if platform == 'current' else platform
+
+  def _maybe_read_cached_resolve(self, cached_resolve_json_file):
+    if self._cache_monolithic_resolve and os.path.isfile(cached_resolve_json_file):
+      self._log.debug(f'found monolithic resolve at {cached_resolve_json_file}')
+      with open(cached_resolve_json_file) as fp:
+        json_payload = json.load(fp)
+        distributions = {
+          plat: [
+            Distribution(**init_args)
+            for init_args in dists
+          ]
+          for plat, dists in json_payload.items()
+        }
+        return distributions
+    return None
+
+  def _maybe_write_cached_resolve(self, cached_resolve_json_file, distributions):
+    if self._cache_monolithic_resolve:
+      with safe_open(cached_resolve_json_file, 'w') as fp:
+        json_payload = {
+          self._coerce_current_platform_string(plat): [
+            dict(location=dist.location,
+                 project_name=dist.project_name,
+                 version=dist.version,
+                 py_version=dist.py_version)
+            for dist in dists
+          ]
+          for plat, dists in distributions.items()
+        }
+        json.dump(json_payload, fp, indent=4)
+
+  def _maybe_cached_resolve(self, pex_resolve_options, resolver_cache_dir, network_context):
+    expected_cache_dir = os.path.join(get_pants_cachedir(), 'monolithic-pex-resolves',
+                                      pex_resolve_options.as_cache_key())
+    cached_resolve_json_file = os.path.join(expected_cache_dir, 'resolve-cache.json')
+
+    cached_resolve = self._maybe_read_cached_resolve(cached_resolve_json_file)
+    if cached_resolve:
+      return cached_resolve
+
+    requirements_cache_dir = os.path.join(resolver_cache_dir,
+                                          str(pex_resolve_options.interpreter.identity))
+
+    distributions = {}
+    for platform in pex_resolve_options.platforms:
+      resolved_dists = resolve(
+        requirements=pex_resolve_options.requirements,
+        interpreter=pex_resolve_options.interpreter,
+        fetchers=pex_resolve_options.fetchers(),
+        platform=platform,
+        context=network_context,
+        cache=requirements_cache_dir,
+        cache_ttl=pex_resolve_options.cache_ttl,
+        allow_prereleases=pex_resolve_options.allow_prereleases,
+        use_manylinux=pex_resolve_options.use_manylinux,
+      )
+      distributions[platform] = [resolved_dist.distribution for resolved_dist in resolved_dists]
+
+    self._maybe_write_cached_resolve(cached_resolve_json_file, distributions)
+
+    return distributions
+
   def _resolve_multi(self, interpreter, requirements, platforms, find_links):
     """Multi-platform dependency resolution for PEX files.
 
@@ -263,26 +375,21 @@ class PexBuilderWrapper:
     python_repos = self._python_repos_subsystem
     platforms = platforms or python_setup.platforms
     find_links = find_links or []
-    distributions = {}
-    fetchers = python_repos.get_fetchers()
-    fetchers.extend(Fetcher([path]) for path in find_links)
 
-    for platform in platforms:
-      requirements_cache_dir = os.path.join(python_setup.resolver_cache_dir,
-        str(interpreter.identity))
-      resolved_dists = resolve(
-        requirements=[str(req.requirement) for req in requirements],
-        interpreter=interpreter,
-        fetchers=fetchers,
-        platform=platform,
-        context=python_repos.get_network_context(),
-        cache=requirements_cache_dir,
-        cache_ttl=python_setup.resolver_cache_ttl,
-        allow_prereleases=python_setup.resolver_allow_prereleases,
-        use_manylinux=python_setup.use_manylinux)
-      distributions[platform] = [resolved_dist.distribution for resolved_dist in resolved_dists]
+    pex_resolve_options = PexResolveOptions(
+      requirements=[str(req.requirement) for req in requirements],
+      interpreter=interpreter,
+      indexes=python_repos.indexes,
+      find_links=find_links,
+      allow_prereleases=python_setup.resolver_allow_prereleases,
+      cache_ttl=python_setup.resolver_cache_ttl,
+      use_manylinux=python_setup.use_manylinux,
+      platforms=[self._coerce_current_platform_string(plat) for plat in platforms],
+    )
 
-    return distributions
+    return self._maybe_cached_resolve(pex_resolve_options,
+                                      resolver_cache_dir=python_setup.resolver_cache_dir,
+                                      network_context=python_repos.get_network_context())
 
   def add_sources_from(self, tgt: Target) -> None:
     dump_source = _create_source_dumper(self._builder, tgt)
