@@ -5,13 +5,13 @@ from typing import List, Optional, Sequence
 
 from pants.backend.python.lint.flake8.rules import rules as flake8_rules
 from pants.backend.python.lint.flake8.subsystem import Flake8
+from pants.backend.python.lint.lintable_python_target import LintablePythonTarget
 from pants.backend.python.rules import download_pex_bin, pex
 from pants.backend.python.rules.pex import CreatePex
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.subsystems.python_native_code import PythonNativeCode
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEnvironment
-from pants.backend.python.targets.formattable_python_target import FormattablePythonTarget
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
@@ -45,7 +45,7 @@ class Flake8IntegrationTest(TestBase):
       *python_native_code.rules(),
       *subprocess_environment.rules(),
       RootRule(CreatePex),
-      RootRule(FormattablePythonTarget),
+      RootRule(LintablePythonTarget),
       RootRule(Flake8),
       RootRule(PythonSetup),
       RootRule(PythonNativeCode),
@@ -67,7 +67,7 @@ class Flake8IntegrationTest(TestBase):
     if config is not None:
       self.create_file(relpath=".flake8", contents=config)
     input_snapshot = self.request_single_product(Snapshot, InputFilesContent(source_files))
-    target = FormattablePythonTarget(
+    target = LintablePythonTarget(
       PythonTargetAdaptor(
         sources=EagerFilesetWithSpec('test', {'globs': []}, snapshot=input_snapshot),
         address=Address.parse("test:target"),

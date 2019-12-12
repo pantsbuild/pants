@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Optional, Tuple
 
 from pants.backend.python.lint.black.subsystem import Black
+from pants.backend.python.lint.formattable_python_target import FormattablePythonTarget
 from pants.backend.python.rules.pex import (
   CreatePex,
   Pex,
@@ -15,7 +16,6 @@ from pants.backend.python.rules.pex import (
 )
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
-from pants.backend.python.targets.formattable_python_target import FormattablePythonTarget
 from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
 from pants.engine.isolated_process import (
   ExecuteProcessRequest,

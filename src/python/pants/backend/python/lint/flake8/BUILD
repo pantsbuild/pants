@@ -4,9 +4,9 @@
 python_library(
   dependencies=[
     '3rdparty/python:dataclasses',
+    'src/python/pants/backend/python/lint',
     'src/python/pants/backend/python/subsystems',
     'src/python/pants/backend/python/rules',
-    'src/python/pants/backend/python/targets',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:isolated_process',
     'src/python/pants/engine:rules',
@@ -21,8 +21,8 @@ python_tests(
   sources=globs('*_integration_test.py'),
   dependencies=[
     ':flake8',
+    'src/python/pants/backend/python/lint',
     'src/python/pants/backend/python/subsystems',
-    'src/python/pants/backend/python/targets',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:rules',
     'src/python/pants/engine:selectors',

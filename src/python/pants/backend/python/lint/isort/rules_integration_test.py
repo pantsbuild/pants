@@ -3,6 +3,7 @@
 
 from typing import List, Optional, Sequence, Tuple
 
+from pants.backend.python.lint.formattable_python_target import FormattablePythonTarget
 from pants.backend.python.lint.isort.rules import IsortSetup
 from pants.backend.python.lint.isort.rules import rules as isort_rules
 from pants.backend.python.lint.isort.subsystem import Isort
@@ -17,7 +18,6 @@ from pants.backend.python.subsystems.subprocess_environment import (
   SubprocessEnvironment,
   create_subprocess_encoding_environment,
 )
-from pants.backend.python.targets.formattable_python_target import FormattablePythonTarget
 from pants.build_graph.address import Address
 from pants.engine.fs import Digest, FileContent, InputFilesContent, Snapshot
 from pants.engine.legacy.structs import TargetAdaptor

@@ -6,6 +6,7 @@ from typing import List, Optional, Sequence, Tuple
 from pants.backend.python.lint.black.rules import BlackSetup
 from pants.backend.python.lint.black.rules import rules as black_rules
 from pants.backend.python.lint.black.subsystem import Black
+from pants.backend.python.lint.formattable_python_target import FormattablePythonTarget
 from pants.backend.python.rules.download_pex_bin import download_pex_bin
 from pants.backend.python.rules.pex import CreatePex, create_pex
 from pants.backend.python.subsystems.python_native_code import (
@@ -17,7 +18,6 @@ from pants.backend.python.subsystems.subprocess_environment import (
   SubprocessEnvironment,
   create_subprocess_encoding_environment,
 )
-from pants.backend.python.targets.formattable_python_target import FormattablePythonTarget
 from pants.build_graph.address import Address
 from pants.engine.fs import Digest, FileContent, InputFilesContent, Snapshot
 from pants.engine.legacy.structs import TargetAdaptor

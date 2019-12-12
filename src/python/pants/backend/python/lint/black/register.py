@@ -2,8 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 
+from pants.backend.python.lint import formattable_python_target
 from pants.backend.python.lint.black import rules as black_rules
-from pants.backend.python.targets import formattable_python_target
 
 
 def rules():

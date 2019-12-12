@@ -7,9 +7,26 @@ from pants.engine.console import Console
 from pants.engine.goal import Goal
 from pants.engine.isolated_process import FallibleExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTargets
-from pants.engine.rules import UnionMembership, console_rule
+from pants.engine.legacy.structs import TargetAdaptor
+from pants.engine.rules import UnionMembership, console_rule, union
 from pants.engine.selectors import Get, MultiGet
-from pants.rules.core.fmt import TargetWithSources
+
+
+@union
+class LintableTarget:
+  """A union for registration of a formattable target type."""
+
+  @staticmethod
+  def is_lintable(
+    target_adaptor: TargetAdaptor, *, union_membership: UnionMembership
+  ) -> bool:
+    return (
+      union_membership.is_member(LintableTarget, target_adaptor)
+      # TODO: make TargetAdaptor return a 'sources' field with an empty snapshot instead of
+      #  raising to remove the hasattr() checks here!
+      and hasattr(target_adaptor, "sources")
+      and target_adaptor.sources.snapshot.files  # i.e., sources is not empty
+    )
 
 
 @dataclass(frozen=True)
@@ -40,9 +57,9 @@ class Lint(Goal):
 @console_rule
 async def lint(console: Console, targets: HydratedTargets, union_membership: UnionMembership) -> Lint:
   results = await MultiGet(
-    Get(LintResult, TargetWithSources, target.adaptor)
+    Get[LintResult](LintableTarget, target.adaptor)
     for target in targets
-    if TargetWithSources.is_formattable_and_lintable(target.adaptor, union_membership=union_membership)
+    if LintableTarget.is_lintable(target.adaptor, union_membership=union_membership)
   )
 
   if not results:
