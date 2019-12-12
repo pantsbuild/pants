@@ -18,6 +18,12 @@ New Features
 * [experimental] Add export-dep-as-jar task (#8628)
   `PR #8628 <https://github.com/pantsbuild/pants/pull/8628>`_
 
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Fix pantsbuild wheel publishing. (#8782)
+  `PR #8782 <https://github.com/pantsbuild/pants/pull/8782>`_
+
 1.23.0rc0 (11/22/2019)
 ----------------------
 
