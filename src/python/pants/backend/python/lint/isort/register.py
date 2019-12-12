@@ -2,12 +2,14 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 
-from pants.backend.python.lint import format_python_target
+# from pants.backend.python.lint import format_python_target
+from pants.backend.python.lint import lint_python_target
 from pants.backend.python.lint.isort import rules as isort_rules
 
 
 def rules():
   return (
     *isort_rules.rules(),
-    *format_python_target.rules(),
+    # *format_python_target.rules(),
+    *lint_python_target.rules(),
   )

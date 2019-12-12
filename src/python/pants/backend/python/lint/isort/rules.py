@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
 from pants.backend.python.lint.format_python_target import FormatPythonTarget
+from pants.backend.python.lint.lint_python_target import LintPythonTarget
 from pants.backend.python.lint.isort.subsystem import Isort
 from pants.backend.python.rules.pex import (
   CreatePex,
@@ -60,7 +61,7 @@ class IsortArgs:
 
   @staticmethod
   def create(
-    *, wrapped_target: FormatPythonTarget, isort_setup: IsortSetup, check_only: bool,
+    *, wrapped_target: LintPythonTarget, isort_setup: IsortSetup, check_only: bool,
   ) -> "IsortArgs":
     # NB: isort auto-discovers config files. There is no way to hardcode them via command line
     # flags. So long as the files are in the Pex's input files, isort will use the config.
@@ -76,7 +77,7 @@ class IsortArgs:
 
 @rule
 async def create_isort_request(
-  wrapped_target: FormatPythonTarget,
+  wrapped_target: LintPythonTarget,
   isort_args: IsortArgs,
   isort_setup: IsortSetup,
   python_setup: PythonSetup,
@@ -112,7 +113,7 @@ async def fmt(wrapped_target: FormatPythonTarget, isort_setup: IsortSetup) -> Fm
 
 
 @rule(name="Lint using isort")
-async def lint(wrapped_target: FormatPythonTarget, isort_setup: IsortSetup) -> LintResult:
+async def lint(wrapped_target: LintPythonTarget, isort_setup: IsortSetup) -> LintResult:
   args = IsortArgs.create(wrapped_target=wrapped_target, isort_setup=isort_setup, check_only=True)
   request = await Get[ExecuteProcessRequest](IsortArgs, args)
   result = await Get(FallibleExecuteProcessResult, ExecuteProcessRequest, request)
@@ -120,4 +121,5 @@ async def lint(wrapped_target: FormatPythonTarget, isort_setup: IsortSetup) -> L
 
 
 def rules():
-  return [setup_isort, create_isort_request, fmt, lint, optionable_rule(Isort)]
+  return [setup_isort, create_isort_request, lint, optionable_rule(Isort)]
+  # return [setup_isort, create_isort_request, fmt, lint, optionable_rule(Isort)]

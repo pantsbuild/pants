@@ -93,5 +93,5 @@ async def fmt(
 
 def rules():
   return [
-    fmt,
+    # fmt,
   ]
