@@ -58,15 +58,15 @@ class PexResolveOptions:
 
   @memoized_method
   def as_cache_key(self) -> str:
-    return stable_json_sha1(dict(
-      interpreter=self.interpreter.identity.version_str,
-      requirements=self.requirements,
-      indexes=self.indexes,
-      find_links=self.find_links,
-      allow_prereleases=self.allow_prereleases,
-      cache_ttl=self.cache_ttl,
-      use_manylinux=self.use_manylinux,
-      platforms=self.platforms,
+    return stable_json_sha1((
+      self.interpreter.identity.version_str,
+      self.requirements,
+      self.indexes,
+      self.find_links,
+      self.allow_prereleases,
+      self.cache_ttl,
+      self.use_manylinux,
+      self.platforms,
     ))
 
 
@@ -175,6 +175,10 @@ class PexBuilderWrapper:
       register('--cache-monolithic-resolve', type=bool, advanced=True, fingerprint=True,
                help='Whether to use a shared cache for the result of a pex resolve. This avoids '
                     're-running a pex resolve on the local machine, if the inputs are the same.')
+      register('--monolithic-resolve-cache-dir', advanced=True,
+               default=os.path.join(get_pants_cachedir(), 'monolithic-pex-resolves'),
+               help='Cache json files representing the result of a pex resolve here when '
+                    '--cache-monolithic-resolve is on.')
 
     @classmethod
     def subsystem_dependencies(cls):
@@ -195,6 +199,7 @@ class PexBuilderWrapper:
                                python_setup_subsystem=PythonSetup.global_instance(),
                                setuptools_requirement=PythonRequirement(setuptools_requirement),
                                log=log,
+                               monolithic_resolve_cache_dir=Path(options.monolithic_resolve_cache_dir),
                                cache_monolithic_resolve=cast(bool, options.cache_monolithic_resolve))
 
   def __init__(self,
@@ -203,6 +208,7 @@ class PexBuilderWrapper:
                python_setup_subsystem,
                setuptools_requirement,
                log,
+               monolithic_resolve_cache_dir: Path,
                cache_monolithic_resolve: bool = False):
     assert isinstance(builder, PEXBuilder)
     assert isinstance(python_repos_subsystem, PythonRepos)
@@ -219,6 +225,7 @@ class PexBuilderWrapper:
     self._distributions: Dict[str, Distribution] = {}
     self._frozen = False
 
+    self._monolithic_resolve_cache_dir = monolithic_resolve_cache_dir
     self._cache_monolithic_resolve = cache_monolithic_resolve
 
   def add_requirement_libs_from(self, req_libs, platforms=None):
@@ -328,9 +335,10 @@ class PexBuilderWrapper:
         json.dump(json_payload, fp, indent=4)
 
   def _maybe_cached_resolve(self, pex_resolve_options, resolver_cache_dir, network_context):
-    expected_cache_dir = os.path.join(get_pants_cachedir(), 'monolithic-pex-resolves',
-                                      pex_resolve_options.as_cache_key())
-    cached_resolve_json_file = os.path.join(expected_cache_dir, 'resolve-cache.json')
+    cached_resolve_json_file = os.path.join(
+      str(self._monolithic_resolve_cache_dir),
+      pex_resolve_options.as_cache_key(),
+      'resolve-cache.json')
 
     cached_resolve = self._maybe_read_cached_resolve(cached_resolve_json_file)
     if cached_resolve:
@@ -381,7 +389,7 @@ class PexBuilderWrapper:
       interpreter=interpreter,
       indexes=python_repos.indexes,
       find_links=find_links,
-      allow_prereleases=python_setup.resolver_allow_prereleases,
+      allow_prereleases=bool(python_setup.resolver_allow_prereleases),
       cache_ttl=python_setup.resolver_cache_ttl,
       use_manylinux=python_setup.use_manylinux,
       platforms=[self._coerce_current_platform_string(plat) for plat in platforms],
