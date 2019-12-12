@@ -539,3 +539,10 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
       sorted(self.jvm_target_with_sources.sources_relative_to_source_root()),
       sorted(sources_jar_of_dep.namelist())
     )
+
+  def test_includes_targets_between_roots(self):
+    result = self.execute_export_json('project_info:scala_with_source_dep', 'project_info:jar_lib')
+    self.assertIn(
+      'project_info:jvm_target',
+      result['targets'].keys()
+    )
