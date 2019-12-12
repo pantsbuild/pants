@@ -15,6 +15,7 @@ from pants.backend.python.tasks.python_binary_create import PythonBinaryCreate
 from pants.backend.python.tasks.select_interpreter import SelectInterpreter
 from pants.base.run_info import RunInfo
 from pants.build_graph.register import build_file_aliases as register_core
+from pants.option.scope import GLOBAL_SCOPE_CONFIG_SECTION
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_dir
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
@@ -134,10 +135,8 @@ class PythonBinaryCreateTest(PythonTaskTestBase):
       def test_binary_create(binary, cache_monolithic_resolve, use_manylinux):
         self._assert_pex(binary,
                          options={
-                           'pex-builder-wrapper': dict(
-                             cache_monolithic_resolve=cache_monolithic_resolve,
-                             monolithic_resolve_cache_dir=td,
-                           ),
+                           GLOBAL_SCOPE_CONFIG_SECTION: dict(pants_bootstrapdir=td),
+                           'pex-builder-wrapper': dict(cache_monolithic_resolve=cache_monolithic_resolve),
                            'python-setup': dict(resolver_use_manylinux=use_manylinux),
                          },
                          expected_output=dedent(f"""\
@@ -146,12 +145,12 @@ class PythonBinaryCreateTest(PythonTaskTestBase):
 
       # Test that nothing is written to the cache unless the option is turned on.
       test_binary_create(binary, cache_monolithic_resolve=False, use_manylinux=True)
-      json_resolve_files = glob.glob(os.path.join(td, '*/*.json'))
+      json_resolve_files = glob.glob(os.path.join(td, 'monolithic-pex-resolves/*/resolve-cache.json'))
       self.assertEqual(len(json_resolve_files), 0)
 
       # Test that a cache entry is created for a resolve when the option is turned on.
       test_binary_create(binary, cache_monolithic_resolve=True, use_manylinux=True)
-      json_resolve_files = glob.glob(os.path.join(td, '*/*.json'))
+      json_resolve_files = glob.glob(os.path.join(td, 'monolithic-pex-resolves/*/resolve-cache.json'))
       first_resolve_file = assert_single_element(json_resolve_files)
       with open(first_resolve_file) as fp:
         json_payload = json.load(fp)
@@ -161,7 +160,7 @@ class PythonBinaryCreateTest(PythonTaskTestBase):
 
       # Assert that a separate json file is created if use_manylinux is toggled.
       test_binary_create(binary, cache_monolithic_resolve=True, use_manylinux=False)
-      json_resolve_files = glob.glob(os.path.join(td, '*/*.json'))
+      json_resolve_files = glob.glob(os.path.join(td, 'monolithic-pex-resolves/*/resolve-cache.json'))
       self.assertEqual(len(json_resolve_files), 2)
       new_json_resolve_file = assert_single_element(
         set(json_resolve_files) - set([first_resolve_file]))
@@ -181,5 +180,5 @@ class PythonBinaryCreateTest(PythonTaskTestBase):
                                             ':lib',
                                           ])
       test_binary_create(binary2, cache_monolithic_resolve=True, use_manylinux=False)
-      json_resolve_files = glob.glob(os.path.join(td, '*/*.json'))
+      json_resolve_files = glob.glob(os.path.join(td, 'monolithic-pex-resolves/*/resolve-cache.json'))
       self.assertEqual(all_json_resolve_files, set(json_resolve_files))
