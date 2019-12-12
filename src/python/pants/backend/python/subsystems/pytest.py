@@ -18,7 +18,8 @@ class PyTest(Subsystem):
       '--args', type=list, member_type=str,
       help="Arguments to pass directly to Pytest, e.g. `--pytest-args=\"-k test_foo --quiet\"`",
     )
-    register('--version', default='pytest>=4.6.6,<4.7', help="Requirement string for Pytest.")
+    register('--version', default='pytest>=4.6.6,<4.7',
+             help="Requirement string for Pytest.", fingerprint=True)
     register(
       '--pytest-plugins',
       type=list,
@@ -29,6 +30,7 @@ class PyTest(Subsystem):
         "more-itertools<6.0.0 ; python_version<'3'",
       ],
       help="Requirement strings for any plugins or additional requirements you'd like to use.",
+      fingerprint=True
     )
     register('--requirements', advanced=True, default='pytest>=4.6.6,<4.7',
              help='Requirements string for the pytest library.',
@@ -57,15 +59,15 @@ class PyTest(Subsystem):
       return ', '.join(cli_formatted)
 
     configured_new_options = configured_opts("version", "pytest_plugins")
-    configured_deprecated_option = configured_opts(
+    configured_deprecated_options = configured_opts(
       "requirements", "timeout_requirements", "cov_requirements", "unittest2_requirements",
     )
 
-    if configured_new_options and configured_deprecated_option:
+    if configured_new_options and configured_deprecated_options:
       raise ValueError(
         "Conflicting options for --pytest used. You provided these options in the new, preferred "
         f"style: `{format_opts(configured_new_options)}`, but also provided these options in the "
-        f"deprecated style: `{format_opts(configured_deprecated_option)}`.\nPlease use only one "
+        f"deprecated style: `{format_opts(configured_deprecated_options)}`.\nPlease use only one "
         f"approach (preferably the new approach of `--version` and `--pytest-plugins`)."
       )
 
@@ -81,7 +83,7 @@ class PyTest(Subsystem):
                    "tests with Python 2 and want the newest Pytest, set `version` to "
                    "`pytest>=5.2.4`."
     )
-    if configured_deprecated_option:
+    if configured_deprecated_options:
       return (
         "more-itertools<6.0.0 ; python_version<'3'",
         opts.requirements,

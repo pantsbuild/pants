@@ -20,7 +20,7 @@ python_tests(
   name='integration',
   sources=globs('*_integration_test.py'),
   dependencies=[
-    ':black',
+    ':flake8',
     'src/python/pants/backend/python/lint',
     'src/python/pants/backend/python/subsystems',
     'src/python/pants/engine:fs',
@@ -29,9 +29,10 @@ python_tests(
     'src/python/pants/engine/legacy:structs',
     'src/python/pants/rules/core',
     'src/python/pants/source',
+    'src/python/pants/testutil:interpreter_selection_utils',
     'src/python/pants/testutil:test_base',
     'src/python/pants/testutil/subsystem',
   ],
   tags = {'integration'},
-  timeout = 120,
+  timeout = 210,
 )

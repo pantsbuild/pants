@@ -6,6 +6,7 @@ from typing import List, Optional, Sequence, Tuple
 from pants.backend.python.lint.black.rules import BlackSetup
 from pants.backend.python.lint.black.rules import rules as black_rules
 from pants.backend.python.lint.black.subsystem import Black
+from pants.backend.python.lint.format_python_target import FormatPythonTarget
 from pants.backend.python.rules.download_pex_bin import download_pex_bin
 from pants.backend.python.rules.pex import CreatePex, create_pex
 from pants.backend.python.subsystems.python_native_code import (
@@ -17,7 +18,6 @@ from pants.backend.python.subsystems.subprocess_environment import (
   SubprocessEnvironment,
   create_subprocess_encoding_environment,
 )
-from pants.backend.python.targets.formattable_python_target import FormattablePythonTarget
 from pants.build_graph.address import Address
 from pants.engine.fs import Digest, FileContent, InputFilesContent, Snapshot
 from pants.engine.legacy.structs import TargetAdaptor
@@ -49,7 +49,7 @@ class BlackIntegrationTest(TestBase):
       create_pex_native_build_environment,
       download_pex_bin,
       RootRule(CreatePex),
-      RootRule(FormattablePythonTarget),
+      RootRule(FormatPythonTarget),
       RootRule(Black),
       RootRule(BlackSetup),
       RootRule(PythonSetup),
@@ -71,7 +71,7 @@ class BlackIntegrationTest(TestBase):
     if config is not None:
       self.create_file(relpath="pyproject.toml", contents=config)
     input_snapshot = self.request_single_product(Snapshot, InputFilesContent(source_files))
-    target = FormattablePythonTarget(
+    target = FormatPythonTarget(
       TargetAdaptor(
         sources=EagerFilesetWithSpec('test', {'globs': []}, snapshot=input_snapshot),
         address=Address.parse("test:target"),

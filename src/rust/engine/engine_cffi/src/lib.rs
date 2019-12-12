@@ -1093,6 +1093,22 @@ pub extern "C" fn write_log(msg: *const raw::c_char, level: u64, target: *const 
 }
 
 #[no_mangle]
+pub extern "C" fn write_stdout(session_ptr: *mut Session, msg: *const raw::c_char) {
+  with_session(session_ptr, |session| {
+    let message_str = unsafe { CStr::from_ptr(msg).to_string_lossy() };
+    session.write_stdout(&message_str);
+  });
+}
+
+#[no_mangle]
+pub extern "C" fn write_stderr(session_ptr: *mut Session, msg: *const raw::c_char) {
+  with_session(session_ptr, |session| {
+    let message_str = unsafe { CStr::from_ptr(msg).to_string_lossy() };
+    session.write_stderr(&message_str);
+  });
+}
+
+#[no_mangle]
 pub extern "C" fn flush_log() {
   LOGGER.flush();
 }

@@ -35,6 +35,7 @@ fn mock_nailgunnable_request(jdk_home: Option<PathBuf>) -> ExecuteProcessRequest
   ExecuteProcessRequest {
     argv: vec![],
     env: Default::default(),
+    working_directory: None,
     input_files: EMPTY_DIGEST,
     output_files: Default::default(),
     output_directories: Default::default(),

@@ -3,6 +3,8 @@
 
 import os
 
+import pytest
+
 from pants.fs.archive import archiver_for_path
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_walk
@@ -202,6 +204,7 @@ class JavaCompileIntegrationTest(BaseCompileIT):
       self.assertEqual(guava_16_artifact_dir, guava_15_artifact_dir)
       self.assertEqual(len(os.listdir(guava_16_artifact_dir)), 2)
 
+  @pytest.mark.flaky(retries=1)  # https://github.com/pantsbuild/pants/issues/8171
   def test_java_compile_with_corrupt_remote(self):
     """Tests that a corrupt artifact in the remote cache still results in a successful compile."""
     with self.temporary_workdir() as workdir, temporary_dir() as cachedir:

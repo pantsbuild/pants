@@ -285,8 +285,7 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
     bootstrap_task = BootstrapJvmTools(context, self.pants_workdir)
     bootstrap_task.execute()
     task = self.create_task(context)
-    return list(task.console_output(list(task.context.targets()),
-                                    context.products.get_data('runtime_classpath')))
+    return list(task.console_output(list(task.context.targets())))
 
   def execute_export_json(self, *specs, **options):
     return json.loads(''.join(self.execute_export(*specs, **options)))

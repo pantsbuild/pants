@@ -1,4 +1,4 @@
-# Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from typing import Tuple
@@ -8,23 +8,24 @@ from pants.option.custom_types import file_option
 from pants.option.option_util import flatten_shlexed_list
 
 
-class Isort(PythonToolBase):
-  options_scope = 'isort'
-  default_version = 'isort==4.3.20'
+class Flake8(PythonToolBase):
+  options_scope = 'flake8'
+  default_version = 'flake8'
   default_extra_requirements = ['setuptools']
-  default_entry_point = 'isort.main'
+  default_entry_point = 'flake8'
+  default_interpreter_constraints = ["CPython>=2.7,<3", "CPython>=3.4"]
 
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
     register(
       '--args', type=list, member_type=str,
-      help="Arguments to pass directly to isort, e.g. "
-           "`--isort-args=\"--case-sensitive --trailing-comma\"`",
+      help="Arguments to pass directly to Flake8, e.g. "
+           "`--flake8-args=\"--ignore E123,W456 --enable-extensions H111\"`",
     )
     register(
-      '--config', type=list, member_type=file_option,
-      help="Path to `isort.cfg` or alternative isort config file(s)"
+      '--config', type=file_option, default=None, advanced=True,
+      help="Path to `.flake8` or alternative Flake8 config file"
     )
 
   def get_args(self) -> Tuple[str, ...]:
