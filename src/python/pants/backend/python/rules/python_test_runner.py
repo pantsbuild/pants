@@ -26,22 +26,24 @@ from pants.rules.core.strip_source_root import SourceRootStrippedSources
 
 def calculate_timeout_seconds(
   *,
-  timeouts: bool,
-  test_target_timeout_seconds: Optional[int],
-  timeout_default_seconds: Optional[int],
-  timeout_maximum_seconds: Optional[int],
+  timeout_disabled: bool,
+  target_timeout: Optional[int],
+  timeout_default: Optional[int],
+  timeout_maximum: Optional[int],
 ) -> Optional[int]:
   """Calculate the timeout for a test target.
 
   If a target has no timeout configured its timeout will be set to the default timeout.
   """
-  if not timeouts:
+  if timeout_disabled:
     return None
-  if test_target_timeout_seconds is None:
-    test_target_timeout_seconds = timeout_default_seconds
-  if timeout_maximum_seconds is not None and test_target_timeout_seconds is not None:
-    return min(test_target_timeout_seconds, timeout_maximum_seconds)
-  return test_target_timeout_seconds
+  if target_timeout is None:
+    if timeout_default is None:
+      return None
+    target_timeout = timeout_default
+  if timeout_maximum is not None:
+    return min(target_timeout, timeout_maximum)
+  return target_timeout
 
 
 @rule(name="Run pytest")
@@ -114,10 +116,10 @@ async def run_python_test(
 
   test_target_sources_file_names = sorted(source_root_stripped_test_target_sources.snapshot.files)
   timeout_seconds = calculate_timeout_seconds(
-    timeouts=pytest.options.timeouts,
-    test_target_timeout_seconds=getattr(test_target, 'timeout', None),
-    timeout_default_seconds=pytest.options.timeout_default,
-    timeout_maximum_seconds=pytest.options.timeout_maximum,
+    timeout_disabled=pytest.options.timeout_disabled,
+    target_timeout=getattr(test_target, 'timeout', None),
+    timeout_default=pytest.options.timeout_default,
+    timeout_maximum=pytest.options.timeout_maximum,
   )
   request = resolved_requirements_pex.create_execute_request(
     python_setup=python_setup,

@@ -6,71 +6,71 @@ from pants.backend.python.rules.python_test_runner import calculate_timeout_seco
 
 def test_configured_timeout_greater_than_max():
   assert calculate_timeout_seconds(
-    timeouts=True,
-    test_target_timeout_seconds=10,
-    timeout_default_seconds=1,
-    timeout_maximum_seconds=2,
+    timeout_disabled=False,
+    target_timeout=10,
+    timeout_default=1,
+    timeout_maximum=2,
   ) == 2
 
 
-def test_good_test_target_timeout():
+def test_good_target_timeout():
   assert calculate_timeout_seconds(
-    timeouts=True,
-    test_target_timeout_seconds=2,
-    timeout_default_seconds=1,
-    timeout_maximum_seconds=10,
+    timeout_disabled=False,
+    target_timeout=2,
+    timeout_default=1,
+    timeout_maximum=10,
   ) == 2
 
 
-def test_no_configured_test_target_timeout():
+def test_no_configured_target_timeout():
   assert calculate_timeout_seconds(
-    timeouts=True,
-    test_target_timeout_seconds=None,
-    timeout_default_seconds=1,
-    timeout_maximum_seconds=2,
+    timeout_disabled=False,
+    target_timeout=None,
+    timeout_default=1,
+    timeout_maximum=2,
   ) == 1
 
 
-def test_no_configured_test_target_timeout_with_bad_default():
+def test_no_configured_target_timeout_with_bad_default():
   assert calculate_timeout_seconds(
-    timeouts=True,
-    test_target_timeout_seconds=None,
-    timeout_default_seconds=10,
-    timeout_maximum_seconds=2,
+    timeout_disabled=False,
+    target_timeout=None,
+    timeout_default=10,
+    timeout_maximum=2,
   ) == 2
 
 
 def test_no_default_timeout():
   assert calculate_timeout_seconds(
-    timeouts=True,
-    test_target_timeout_seconds=1,
-    timeout_default_seconds=None,
-    timeout_maximum_seconds=None,
+    timeout_disabled=False,
+    target_timeout=1,
+    timeout_default=None,
+    timeout_maximum=None,
   ) == 1
 
 
 def test_no_maximum_timeout():
   assert calculate_timeout_seconds(
-    timeouts=True,
-    test_target_timeout_seconds=1,
-    timeout_default_seconds=2,
-    timeout_maximum_seconds=None,
+    timeout_disabled=False,
+    target_timeout=1,
+    timeout_default=2,
+    timeout_maximum=None,
   ) == 1
 
 
 def test_no_configured_timeouts():
   assert calculate_timeout_seconds(
-    timeouts=True,
-    test_target_timeout_seconds=None,
-    timeout_default_seconds=None,
-    timeout_maximum_seconds=None,
+    timeout_disabled=False,
+    target_timeout=None,
+    timeout_default=None,
+    timeout_maximum=2,
   ) == None
 
 
 def test_no_timeouts():
   assert calculate_timeout_seconds(
-    timeouts=False,
-    test_target_timeout_seconds=10,
-    timeout_default_seconds=1,
-    timeout_maximum_seconds=2,
+    timeout_disabled=True,
+    target_timeout=10,
+    timeout_default=1,
+    timeout_maximum=2,
   ) == None

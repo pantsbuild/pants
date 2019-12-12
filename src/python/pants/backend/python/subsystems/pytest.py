@@ -45,10 +45,10 @@ class PyTest(Subsystem):
                   'may need.',
              removal_version="1.25.0.dev0", removal_hint="Use --pytest-plugins instead.")
     register(
-      '--timeouts',
+      '--timeout-disabled',
       type=bool,
-      default=True,
-      help='Enable test target timeouts. If timeouts are enabled then test targets with a '
+      default=False,
+      help='Disable test target timeouts. If timeouts are enabled then test targets with a '
           'timeout= parameter set on their target will time out after the given number of '
           'seconds if not completed. If no timeout is set, then either the default timeout '
           'is used or no timeout is configured.',
@@ -57,14 +57,12 @@ class PyTest(Subsystem):
       '--timeout-default',
       type=int,
       advanced=True,
-      default=60,
       help='The default timeout (in seconds) for a test target if the timeout field is not set on the target.',
     )
     register(
       '--timeout-maximum',
       type=int,
       advanced=True,
-      default=120,
       help='The maximum timeout (in seconds) that can be set on a test target.',
     )
 
