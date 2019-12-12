@@ -113,11 +113,17 @@ impl Session {
   //TODO Thsese two functions should eventually hook up intelligently to EngineDisplay
   //instead of just naively printing to stdout/stderr.
   pub fn write_stdout(&self, msg: &str) {
-    print!(" {}", msg);
+    if let Some(display) = self.maybe_display() {
+      let mut d = display.lock();
+      d.write_stdout(msg);
+    }
   }
 
   pub fn write_stderr(&self, msg: &str) {
-    eprint!("{}", msg);
+    if let Some(display) = self.maybe_display() {
+      let mut d = display.lock();
+      d.write_stderr(msg);
+    }
   }
 }
 
