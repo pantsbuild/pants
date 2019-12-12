@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from pants.engine.console import Console
 from pants.engine.fs import Digest, DirectoriesToMerge, DirectoryToMaterialize, Workspace
-from pants.engine.goal import Goal
+from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.isolated_process import ExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTargets
 from pants.engine.legacy.structs import TargetAdaptor
@@ -45,12 +45,16 @@ class FormatTarget:
     )
 
 
-class Fmt(Goal):
+class FmtOptions(GoalSubsystem):
   """Autoformat source code."""
 
   # TODO: make this "fmt"
   # Blocked on https://github.com/pantsbuild/pants/issues/8351
   name = 'fmt-v2'
+
+
+class Fmt(Goal):
+  subsystem_cls = FmtOptions
 
 
 @console_rule

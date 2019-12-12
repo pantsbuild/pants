@@ -4,7 +4,7 @@
 from dataclasses import dataclass
 
 from pants.engine.console import Console
-from pants.engine.goal import Goal
+from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.isolated_process import FallibleExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTargets
 from pants.engine.legacy.structs import TargetAdaptor
@@ -46,12 +46,16 @@ class LintTarget:
     )
 
 
-class Lint(Goal):
+class LintOptions(GoalSubsystem):
   """Lint source code."""
 
   # TODO: make this "lint"
   # Blocked on https://github.com/pantsbuild/pants/issues/8351
   name = 'lint-v2'
+
+
+class Lint(Goal):
+  subsystem_cls = LintOptions
 
 
 @console_rule

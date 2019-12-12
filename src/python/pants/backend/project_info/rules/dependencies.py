@@ -5,14 +5,14 @@ from typing import Set
 
 from pants.base.specs import Specs
 from pants.engine.console import Console
-from pants.engine.goal import Goal, LineOriented
+from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
 from pants.engine.rules import console_rule
 from pants.engine.selectors import Get
 
 
 # TODO(#8762) Get this rule to feature parity with the dependencies task.
-class Dependencies(LineOriented, Goal):
+class DependenciesOptions(LineOriented, GoalSubsystem):
   name = 'fast-dependencies'
 
   @classmethod
@@ -26,10 +26,15 @@ class Dependencies(LineOriented, Goal):
     )
 
 
+class Dependencies(Goal):
+  subsystem_cls = DependenciesOptions
+
 @console_rule
-async def dependencies(console: Console, specs: Specs, dependencies_options: Dependencies.Options) -> Dependencies:
+async def dependencies(
+  console: Console, specs: Specs, options: DependenciesOptions
+) -> Dependencies:
   addresses: Set[str] = set()
-  if dependencies_options.values.transitive:
+  if options.values.transitive:
     transitive_targets = await Get[TransitiveHydratedTargets](Specs, specs)
     addresses.update(hydrated_target.address.spec for hydrated_target in transitive_targets.closure)
     # transitive_targets.closure includes the initial target. To keep the behavior consistent with intransitive
@@ -44,7 +49,7 @@ async def dependencies(console: Console, specs: Specs, dependencies_options: Dep
       for dep in hydrated_target.dependencies
     )
 
-  with Dependencies.line_oriented(dependencies_options, console) as print_stdout:
+  with options.line_oriented(console) as print_stdout:
     for address in sorted(addresses):
       print_stdout(address)
 

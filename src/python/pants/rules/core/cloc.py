@@ -15,7 +15,7 @@ from pants.engine.fs import (
   Snapshot,
   UrlToFetch,
 )
-from pants.engine.goal import Goal
+from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
 from pants.engine.rules import console_rule, rule
@@ -40,7 +40,7 @@ async def download_cloc_script() -> DownloadedClocScript:
   return DownloadedClocScript(script_path=snapshot.files[0], digest=snapshot.directory_digest)
 
 
-class CountLinesOfCode(Goal):
+class CountLinesOfCodeOptions(GoalSubsystem):
   name = 'fast-cloc'
 
   @classmethod
@@ -53,8 +53,14 @@ class CountLinesOfCode(Goal):
              help='Show information about files ignored by cloc.')
 
 
+class CountLinesOfCode(Goal):
+  subsystem_cls = CountLinesOfCodeOptions
+
+
 @console_rule
-async def run_cloc(console: Console, options: CountLinesOfCode.Options, cloc_script: DownloadedClocScript, specs: Specs) -> CountLinesOfCode:
+async def run_cloc(
+  console: Console, options: CountLinesOfCodeOptions, cloc_script: DownloadedClocScript, specs: Specs
+) -> CountLinesOfCode:
   """Runs the cloc perl script in an isolated process"""
 
   transitive = options.values.transitive

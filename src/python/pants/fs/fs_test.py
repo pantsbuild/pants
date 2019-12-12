@@ -14,7 +14,7 @@ from pants.engine.fs import (
   MaterializeDirectoryResult,
   Workspace,
 )
-from pants.engine.goal import Goal
+from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.rules import RootRule, console_rule
 from pants.engine.selectors import Get
 from pants.fs.fs import is_child_of
@@ -27,8 +27,12 @@ class MessageToConsoleRule:
   input_files_content: InputFilesContent
 
 
-class MockWorkspaceGoal(Goal):
+class MockWorkspaceGoalOptions(GoalSubsystem):
   name = 'mock-workspace-goal'
+
+
+class MockWorkspaceGoal(Goal):
+  subsystem_cls = MockWorkspaceGoalOptions
 
 
 @console_rule

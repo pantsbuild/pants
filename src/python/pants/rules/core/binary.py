@@ -9,7 +9,7 @@ from pants.build_graph.address import Address
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.console import Console
 from pants.engine.fs import Digest, DirectoriesToMerge, DirectoryToMaterialize, Workspace
-from pants.engine.goal import Goal, LineOriented
+from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.legacy.graph import HydratedTarget
 from pants.engine.rules import console_rule, rule, union
 from pants.engine.selectors import Get, MultiGet
@@ -17,10 +17,13 @@ from pants.fs.fs import is_child_of
 from pants.option.options_bootstrapper import OptionsBootstrapper
 
 
-@dataclass(frozen=True)
-class Binary(LineOriented, Goal):
+class BinaryOptions(LineOriented, GoalSubsystem):
   """Create a runnable binary."""
   name = 'binary'
+
+
+class Binary(Goal):
+  subsystem_cls = BinaryOptions
 
 
 @union
@@ -40,16 +43,19 @@ async def create_binary(
     addresses: BuildFileAddresses,
     console: Console,
     workspace: Workspace,
-    options: Binary.Options,
+    options: BinaryOptions,
     options_bootstrapper: OptionsBootstrapper,
     build_root: BuildRoot
     ) -> Binary:
-  with Binary.line_oriented(options, console) as print_stdout:
+  with options.line_oriented(console) as print_stdout:
     global_options = options_bootstrapper.bootstrap_options.for_global_scope()
     pants_distdir = Path(global_options.pants_distdir)
     if not is_child_of(pants_distdir, build_root.pathlib_path):
-      console.print_stderr(f"When set to an absolute path, `--pants-distdir` must be relative to the build root."
-      "You set it to {pants_distdir}. Instead, use a relative path or an absolute path relative to the build root.")
+      console.print_stderr(
+        f"When set to an absolute path, `--pants-distdir` must be relative to the build root."
+        "You set it to {pants_distdir}. Instead, use a relative path or an absolute path relative "
+        "to the build root."
+      )
       return Binary(exit_code=1)
 
     relative_distdir = pants_distdir.relative_to(build_root.pathlib_path) if pants_distdir.is_absolute() else pants_distdir

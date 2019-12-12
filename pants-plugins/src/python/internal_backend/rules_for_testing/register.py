@@ -3,14 +3,17 @@
 
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.console import Console
-from pants.engine.goal import Goal
+from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.rules import console_rule
 
 
-class ListAndDieForTesting(Goal):
+class ListAndDieForTestingOptions(GoalSubsystem):
   """A fast and deadly variant of `./pants list`."""
-
   name = 'list-and-die-for-testing'
+
+
+class ListAndDieForTesting(Goal):
+  subsystem_cls = ListAndDieForTestingOptions
 
 
 @console_rule
