@@ -4,6 +4,7 @@
 from typing import Optional, Tuple
 
 from pants.backend.python.lint.flake8.subsystem import Flake8
+from pants.backend.python.lint.lint_python_target import LintPythonTarget
 from pants.backend.python.rules.pex import (
   CreatePex,
   Pex,
@@ -12,23 +13,15 @@ from pants.backend.python.rules.pex import (
 )
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
-from pants.backend.python.targets.formattable_python_target import FormattablePythonTarget
-from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, Digest, DirectoriesToMerge, PathGlobs, Snapshot
+from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.legacy.structs import PythonTargetAdaptor
 from pants.engine.rules import optionable_rule, rule
 from pants.engine.selectors import Get
-from pants.rules.core.fmt import FmtResult
 from pants.rules.core.lint import LintResult
 
 
-# TODO: allow registration of linters that do not have any rule to return `FmtResult`.
-@rule
-def fmt(_: FormattablePythonTarget) -> FmtResult:
-  return FmtResult(digest=EMPTY_DIRECTORY_DIGEST, stdout="", stderr="")
-
-
-def generate_args(wrapped_target: FormattablePythonTarget, flake8: Flake8) -> Tuple[str, ...]:
+def generate_args(wrapped_target: LintPythonTarget, flake8: Flake8) -> Tuple[str, ...]:
   args = []
   if flake8.get_options().config is not None:
     args.append(f"--config={flake8.get_options().config}")
@@ -39,7 +32,7 @@ def generate_args(wrapped_target: FormattablePythonTarget, flake8: Flake8) -> Tu
 
 @rule(name="Lint using Flake8")
 async def lint(
-  wrapped_target: FormattablePythonTarget,
+  wrapped_target: LintPythonTarget,
   flake8: Flake8,
   python_setup: PythonSetup,
   subprocess_encoding_environment: SubprocessEncodingEnvironment,
@@ -87,4 +80,4 @@ async def lint(
 
 
 def rules():
-  return [fmt, lint, optionable_rule(Flake8)]
+  return [lint, optionable_rule(Flake8)]

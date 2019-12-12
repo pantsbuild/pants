@@ -7,7 +7,7 @@ from pants.engine.legacy.graph import HydratedTarget, HydratedTargets
 from pants.engine.legacy.structs import JvmAppAdaptor, PythonTargetAdaptor
 from pants.engine.rules import UnionMembership
 from pants.rules.core.fmt_test import FmtTest
-from pants.rules.core.lint import Lint, LintResult, TargetWithSources, lint
+from pants.rules.core.lint import Lint, LintResult, LintTarget, lint
 from pants.testutil.engine.util import MockConsole, MockGet, run_rule
 from pants.testutil.test_base import TestBase
 
@@ -30,7 +30,7 @@ class LintTest(TestBase):
       rule_args=[
         console,
         HydratedTargets(targets),
-        UnionMembership(union_rules={TargetWithSources: [PythonTargetAdaptor]})
+        UnionMembership(union_rules={LintTarget: [PythonTargetAdaptor]})
       ],
       mock_gets=[
         MockGet(product_type=LintResult, subject_type=PythonTargetAdaptor, mock=mock_linter),

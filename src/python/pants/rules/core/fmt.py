@@ -29,15 +29,15 @@ class FmtResult:
 
 
 @union
-class TargetWithSources:
+class FormatTarget:
   """A union for registration of a formattable target type."""
 
   @staticmethod
-  def is_formattable_and_lintable(
+  def is_formattable(
     target_adaptor: TargetAdaptor, *, union_membership: UnionMembership
   ) -> bool:
     return (
-      union_membership.is_member(TargetWithSources, target_adaptor)
+      union_membership.is_member(FormatTarget, target_adaptor)
       # TODO: make TargetAdaptor return a 'sources' field with an empty snapshot instead of
       #  raising to remove the hasattr() checks here!
       and hasattr(target_adaptor, "sources")
@@ -61,11 +61,9 @@ async def fmt(
   union_membership: UnionMembership
 ) -> Fmt:
   results = await MultiGet(
-    Get[FmtResult](TargetWithSources, target.adaptor)
+    Get[FmtResult](FormatTarget, target.adaptor)
     for target in targets
-    if TargetWithSources.is_formattable_and_lintable(
-      target.adaptor, union_membership=union_membership
-    )
+    if FormatTarget.is_formattable(target.adaptor, union_membership=union_membership)
   )
 
   if not results:

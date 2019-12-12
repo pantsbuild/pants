@@ -16,7 +16,7 @@ from pants.engine.fs import (
 from pants.engine.legacy.graph import HydratedTarget, HydratedTargets
 from pants.engine.legacy.structs import JvmAppAdaptor, PythonTargetAdaptor, TargetAdaptor
 from pants.engine.rules import UnionMembership
-from pants.rules.core.fmt import Fmt, FmtResult, TargetWithSources, fmt
+from pants.rules.core.fmt import Fmt, FmtResult, FormatTarget, fmt
 from pants.source.wrapped_globs import EagerFilesetWithSpec
 from pants.testutil.engine.util import MockConsole, MockGet, run_rule
 from pants.testutil.test_base import TestBase
@@ -64,7 +64,7 @@ class FmtTest(TestBase):
         console,
         HydratedTargets(targets),
         Workspace(self.scheduler),
-        UnionMembership(union_rules={TargetWithSources: [PythonTargetAdaptor]})
+        UnionMembership(union_rules={FormatTarget: [PythonTargetAdaptor]})
       ],
       mock_gets=[
         MockGet(

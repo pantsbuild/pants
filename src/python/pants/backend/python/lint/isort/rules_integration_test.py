@@ -3,6 +3,7 @@
 
 from typing import List, Optional, Sequence, Tuple
 
+from pants.backend.python.lint.format_python_target import FormatPythonTarget
 from pants.backend.python.lint.isort.rules import IsortSetup
 from pants.backend.python.lint.isort.rules import rules as isort_rules
 from pants.backend.python.lint.isort.subsystem import Isort
@@ -17,7 +18,6 @@ from pants.backend.python.subsystems.subprocess_environment import (
   SubprocessEnvironment,
   create_subprocess_encoding_environment,
 )
-from pants.backend.python.targets.formattable_python_target import FormattablePythonTarget
 from pants.build_graph.address import Address
 from pants.engine.fs import Digest, FileContent, InputFilesContent, Snapshot
 from pants.engine.legacy.structs import TargetAdaptor
@@ -57,7 +57,7 @@ class IsortIntegrationTest(TestBase):
       create_pex_native_build_environment,
       download_pex_bin,
       RootRule(CreatePex),
-      RootRule(FormattablePythonTarget),
+      RootRule(FormatPythonTarget),
       RootRule(Isort),
       RootRule(IsortSetup),
       RootRule(PythonSetup),
@@ -79,7 +79,7 @@ class IsortIntegrationTest(TestBase):
     if config is not None:
       self.create_file(relpath=".isort.cfg", contents=config)
     input_snapshot = self.request_single_product(Snapshot, InputFilesContent(source_files))
-    target = FormattablePythonTarget(
+    target = FormatPythonTarget(
       TargetAdaptor(
         sources=EagerFilesetWithSpec('test', {'globs': []}, snapshot=input_snapshot),
         address=Address.parse("test:target"),
