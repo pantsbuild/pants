@@ -4,8 +4,10 @@
 from contextlib import contextmanager
 from dataclasses import dataclass
 
+from pants.backend.native.subsystems.binaries.gcc import GCC
 from pants.base.build_environment import get_buildroot
 from pants.base.workunit import WorkUnitLabel
+from pants.engine.platform import Platform
 from pants.task.testrunner_task_mixin import PartitionedTestRunnerTaskMixin, TestResult
 from pants.util.memo import memoized_property
 from pants.util.process_handler import SubprocessProcessHandler
@@ -30,8 +32,13 @@ class GoTest(PartitionedTestRunnerTaskMixin, GoWorkspaceTask):
     super().register_options(register)
     # TODO: make a shlexed flags option type!
     register('--shlexed-build-and-test-flags', type=list, member_type=str, fingerprint=True,
+             default=['-race'],
              help='Flags to pass in to `go test` tool. Each string is parsed as a shell would, '
                   'respecting quotes and backslashes.')
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super().subsystem_dependencies() + (GCC.scoped(cls),)
 
   @classmethod
   def supports_passthru_args(cls):
@@ -87,10 +94,15 @@ class GoTest(PartitionedTestRunnerTaskMixin, GoWorkspaceTask):
       for single_flag in safe_shlex_split(flags_section)
     ]
 
+  @memoized_property
+  def _c_compiler(self):
+    return GCC.scoped_instance(self).c_compiler(Platform.current)
+
   def _spawn(self, workunit, go_cmd, cwd):
     go_process = go_cmd.spawn(cwd=cwd,
                               stdout=workunit.output('stdout'),
-                              stderr=workunit.output('stderr'))
+                              stderr=workunit.output('stderr'),
+                              env=self._c_compiler.invocation_environment_dict)
     return SubprocessProcessHandler(go_process)
 
   @property

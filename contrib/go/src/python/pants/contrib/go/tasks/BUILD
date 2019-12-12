@@ -9,6 +9,7 @@ python_library(
     '3rdparty/python:dataclasses',
     'contrib/go/src/python/pants/contrib/go/subsystems',
     'contrib/go/src/python/pants/contrib/go/targets',
+    'src/python/pants/backend/native/subsystems/binaries',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:generator',
