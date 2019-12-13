@@ -9,9 +9,9 @@ from pants.backend.python.rules import (
   download_pex_bin,
   inject_init,
   pex,
+  pex_from_target_closure,
   python_create_binary,
-  python_test_runner,
-)
+  python_test_runner)
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.targets.python_app import PythonApp
 from pants.backend.python.targets.python_binary import PythonBinary
@@ -95,6 +95,7 @@ def rules():
     *download_pex_bin.rules(),
     *inject_init.rules(),
     *pex.rules(),
+    *pex_from_target_closure.rules(),
     *python_test_runner.rules(),
     *python_create_binary.rules(),
     *python_native_code.rules(),

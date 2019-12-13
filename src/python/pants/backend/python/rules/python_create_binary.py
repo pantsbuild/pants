@@ -1,7 +1,8 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.python.rules.pex import CreatePexFromTargetClosure, Pex
+from pants.backend.python.rules.pex import Pex
+from pants.backend.python.rules.pex_from_target_closure import CreatePexFromTargetClosure
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.build_graph.address import Address
 from pants.engine.legacy.graph import BuildFileAddresses, HydratedTarget
