@@ -263,7 +263,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     v1_goals, ambiguous_goals, _ = self._options.goals_by_version
     if not self._global_options.v1:
       if v1_goals:
-        HelpPrinter(self._options, UnknownGoalHelp(v1_goals)).print_help()
+        HelpPrinter(self._options, help_request=UnknownGoalHelp(v1_goals)).print_help()
         return PANTS_FAILED_EXIT_CODE
       return PANTS_SUCCEEDED_EXIT_CODE
 
@@ -271,7 +271,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
       return PANTS_SUCCEEDED_EXIT_CODE
 
     # Setup and run GoalRunner.
-    goal_runner_factory = GoalRunner.Factory(
+    return GoalRunner.Factory(
       self._build_root,
       self._options,
       self._build_config,
@@ -280,11 +280,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
       self._graph_session,
       self._target_roots,
       self._exiter
-    )
-    if self._options.help_request:
-      return goal_runner_factory.handle_help()
-
-    return goal_runner_factory.create().run()
+    ).create().run()
 
   def _maybe_run_v2(self):
     # N.B. For daemon runs, @console_rules are invoked pre-fork -
