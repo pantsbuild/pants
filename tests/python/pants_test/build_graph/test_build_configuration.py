@@ -10,6 +10,7 @@ from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
 from pants.build_graph.target import Target
+from pants.engine.rules import UnionRule, union
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import touch
 
@@ -112,6 +113,16 @@ class BuildConfigurationTest(unittest.TestCase):
   def test_register_exposed_context_aware_function(self):
     self.do_test_exposed_context_aware_function(lambda context: lambda: context.rel_path)
     self.do_test_exposed_context_aware_function(lambda context=None: lambda: context.rel_path)
+
+  def test_register_union_rules(self):
+    # Two calls to register_rules should merge relevant unions.
+    @union
+    class Base: pass
+    class A: pass
+    class B: pass
+    self.build_configuration.register_rules([UnionRule(Base, A)])
+    self.build_configuration.register_rules([UnionRule(Base, B)])
+    self.assertEqual(set(self.build_configuration.union_rules()[Base]), {A, B})
 
   def george_method(self, parse_context):
     return lambda: parse_context.rel_path
