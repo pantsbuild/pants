@@ -21,8 +21,8 @@ async def create_python_binary(python_binary_adaptor: PythonBinaryAdaptor) -> Cr
   else:
     sources_snapshot = python_binary_adaptor.sources.snapshot
     if len(sources_snapshot.files) == 1:
-      target = await Get(HydratedTarget, Address, python_binary_adaptor.address)
-      output = await Get(SourceRootStrippedSources, HydratedTarget, target)
+      target = await Get[HydratedTarget](Address, python_binary_adaptor.address)
+      output = await Get[SourceRootStrippedSources](HydratedTarget, target)
       root_filename = output.snapshot.files[0]
       entry_point = PythonBinary.translate_source_path_to_py_module_specifier(root_filename)
 
@@ -32,7 +32,7 @@ async def create_python_binary(python_binary_adaptor: PythonBinaryAdaptor) -> Cr
     output_filename=f'{python_binary_adaptor.address.target_name}.pex'
   )
 
-  pex = await Get(Pex, CreatePexFromTargetClosure, request)
+  pex = await Get[Pex](CreatePexFromTargetClosure, request)
   return CreatedBinary(digest=pex.directory_digest, binary_name=pex.output_filename)
 
 
