@@ -237,11 +237,7 @@ impl CapturedWorkdir for CommandRunner {
     // Streams to read child output from
     let (stdio_write, stdio_read) = child_channel::<ChildOutput>();
     let (_stdin_write, stdin_read) = child_channel::<ChildInput>();
-    let client_req = construct_nailgun_client_request(
-      req2,
-      client_main_class,
-      client_args,
-    )?;
+    let client_req = construct_nailgun_client_request(req2, client_main_class, client_args)?;
 
     // Get the port of a running nailgun server (or a new nailgun server if it doesn't exist)
     let nails_command = nailgun_pool
@@ -257,9 +253,12 @@ impl CapturedWorkdir for CommandRunner {
       )
       .map_err(|e| format!("Failed to connect to nailgun! {}", e))
       .inspect(move |_| debug!("Connected to nailgun instance {}", &nailgun_name3))
-      .and_then(move |(nailgun_port, nailgun_guard)| {
+      .and_then(move |nailgun_guard| {
         // Run the client request in the nailgun we have active.
-        debug!("Got nailgun port {} for {}", nailgun_port, nailgun_name2);
+        debug!(
+          "Got nailgun port {} for {}",
+          nailgun_guard.port, nailgun_name2
+        );
         let cmd = Command {
           command: client_req.argv[0].clone(),
           args: client_req.argv[1..].to_vec(),
@@ -271,7 +270,9 @@ impl CapturedWorkdir for CommandRunner {
           working_dir: client_workdir,
         };
         trace!("Client request: {:#?}", client_req);
-        let addr: SocketAddr = format!("127.0.0.1:{:?}", nailgun_port).parse().unwrap();
+        let addr: SocketAddr = format!("127.0.0.1:{:?}", nailgun_guard.port)
+          .parse()
+          .unwrap();
         debug!("Connecting to server at {}...", addr);
         TcpStream::connect(&addr)
           .and_then(move |stream| {

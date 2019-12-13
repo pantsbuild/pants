@@ -110,7 +110,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_oauth_bearer_token_path=None,
     remote_execution_extra_platform_properties=[],
     remote_execution_headers={},
-    process_execution_local_enable_nailgun=False,
+    process_execution_local_enable_nailgun=True,
   )
 
 
