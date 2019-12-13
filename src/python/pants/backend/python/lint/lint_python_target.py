@@ -44,7 +44,7 @@ class LintPythonTarget:
 
 
 @rule
-async def lint_python_target(target: LintPythonTarget, union_membership: UnionMembership) -> LintResults:
+async def lint_python_target(target: LintTarget, union_membership: UnionMembership) -> LintResults:
   """This aggregator allows us to have multiple linters operate over the same Python targets.
 
   We do not care if linters overlap in their execution as linters have no side-effects."""
@@ -59,11 +59,11 @@ def rules():
   return [
     lint_python_target,
     UnionRule(LintTarget, LintPythonTarget),
-    # UnionRule(LintPythonTarget, PythonTargetAdaptor),
-    # UnionRule(LintPythonTarget, PythonAppAdaptor),
-    # UnionRule(LintPythonTarget, PythonBinaryAdaptor),
-    # UnionRule(LintPythonTarget, PythonTestsAdaptor),
-    # UnionRule(LintPythonTarget, PantsPluginAdaptor),
+    UnionRule(LintPythonTarget, PythonTargetAdaptor),
+    UnionRule(LintPythonTarget, PythonAppAdaptor),
+    UnionRule(LintPythonTarget, PythonBinaryAdaptor),
+    UnionRule(LintPythonTarget, PythonTestsAdaptor),
+    UnionRule(LintPythonTarget, PantsPluginAdaptor),
     # target_adaptor,
     # app_adaptor,
     # binary_adaptor,

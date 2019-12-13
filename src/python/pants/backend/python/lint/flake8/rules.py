@@ -16,8 +16,7 @@ from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
-from pants.engine.legacy.structs import PythonTargetAdaptor, TargetAdaptor, PythonAppAdaptor, \
-  PythonBinaryAdaptor, PythonTestsAdaptor, PantsPluginAdaptor
+from pants.engine.legacy.structs import PythonTargetAdaptor, TargetAdaptor
 from pants.engine.rules import UnionRule, optionable_rule, rule
 from pants.engine.selectors import Get
 from pants.rules.core.lint import LintResult
@@ -26,30 +25,6 @@ from pants.rules.core.lint import LintResult
 @dataclass(frozen=True)
 class Flake8Target:
   target: TargetAdaptor
-
-@rule
-def target_adaptor(target: PythonTargetAdaptor) -> Flake8Target:
-  return Flake8Target(target)
-
-
-@rule
-def app_adaptor(target: PythonAppAdaptor) -> Flake8Target:
-  return Flake8Target(target)
-
-
-@rule
-def binary_adaptor(target: PythonBinaryAdaptor) -> Flake8Target:
-  return Flake8Target(target)
-
-
-@rule
-def tests_adaptor(target: PythonTestsAdaptor) -> Flake8Target:
-  return Flake8Target(target)
-
-
-@rule
-def plugin_adaptor(target: PantsPluginAdaptor) -> Flake8Target:
-  return Flake8Target(target)
 
 
 def generate_args(wrapped_target: Flake8Target, flake8: Flake8) -> Tuple[str, ...]:
