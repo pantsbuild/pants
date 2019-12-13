@@ -91,12 +91,12 @@ class Flake8IntegrationTest(TestBase):
       )
     )
 
-  def test_passing_single_source(self) -> None:
+  def test_single_passing_source(self) -> None:
     result = self.run_flake8([self.good_source])
     assert result.exit_code == 0
     assert result.stdout.strip() == ""
 
-  def test_failing_single_source(self) -> None:
+  def test_single_failing_source(self) -> None:
     result = self.run_flake8([self.bad_source])
     assert result.exit_code == 1
     assert "test/bad.py:1:1: F401" in result.stdout

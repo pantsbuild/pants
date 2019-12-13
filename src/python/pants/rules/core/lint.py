@@ -31,7 +31,7 @@ class LintResult:
 
 
 class LintResults(Collection[LintResult]):
-  """This collection allows us to aggregate multiple LintResults for a language."""
+  """This collection allows us to aggregate multiple `LintResult`s for a language."""
 
 
 @union

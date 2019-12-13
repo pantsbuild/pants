@@ -30,7 +30,7 @@ class FmtResult:
 
 
 class FmtResults(Collection[FmtResult]):
-  """This collection allows us to aggregate multiple LintResults for a language."""
+  """This collection allows us to aggregate multiple `FmtResult`s for a language."""
 
 
 @union
