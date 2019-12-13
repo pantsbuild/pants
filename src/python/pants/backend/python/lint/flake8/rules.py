@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Optional, Tuple
 
 from pants.backend.python.lint.flake8.subsystem import Flake8
-from pants.backend.python.lint.lint_python_target import PythonLintTarget
+from pants.backend.python.lint.python_lint_target import PythonLintTarget
 from pants.backend.python.rules.pex import (
   CreatePex,
   Pex,

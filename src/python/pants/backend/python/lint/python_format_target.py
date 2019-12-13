@@ -14,7 +14,6 @@ from pants.engine.legacy.structs import (
 from pants.engine.rules import UnionMembership, UnionRule, rule, union
 from pants.engine.selectors import Get, MultiGet
 from pants.rules.core.fmt import FmtResult, FmtResults, FormatTarget
-from pants.rules.core.lint import LintResult, LintResults, LintTarget
 
 
 @union
@@ -31,24 +30,12 @@ class ConcretePythonFormatTarget:
 async def format_python_target(
   wrapped_target: ConcretePythonFormatTarget, union_membership: UnionMembership
 ) -> FmtResults:
-  """This aggregator allows us to have multiple formatters format the same Python targets."""
+  """This aggregator allows us to have multiple formatters operate over the same Python targets."""
   results = await MultiGet(
     Get[FmtResult](PythonFormatTarget, member(wrapped_target.target))
     for member in union_membership.union_rules[PythonFormatTarget]
   )
   return FmtResults(results)
-
-
-@rule
-async def lint_python_target(
-  wrapped_target: ConcretePythonFormatTarget, union_membership: UnionMembership
-) -> LintResults:
-  """This aggregator allows us to have multiple formatters lint over the same Python targets."""
-  results = await MultiGet(
-    Get[LintResult](PythonFormatTarget, member(wrapped_target.target))
-    for member in union_membership.union_rules[PythonFormatTarget]
-  )
-  return LintResults(results)
 
 
 @rule
@@ -79,7 +66,6 @@ def plugin_adaptor(target: PantsPluginAdaptor) -> ConcretePythonFormatTarget:
 def rules():
   return [
     format_python_target,
-    lint_python_target,
     target_adaptor,
     app_adaptor,
     binary_adaptor,
@@ -90,13 +76,4 @@ def rules():
     UnionRule(FormatTarget, PythonBinaryAdaptor),
     UnionRule(FormatTarget, PythonTestsAdaptor),
     UnionRule(FormatTarget, PantsPluginAdaptor),
-    # NB: We assume that any formatter can also act as a linter, i.e. that they surface some flag
-    # like --check. If we ever encounter a tool that is only a formatter, then we would need to
-    # rename PythonFormatTarget to PythonFormatAndLintTarget, then have
-    # PythonFormatTarget only register UnionRules against FormatTarget.
-    UnionRule(LintTarget, PythonTargetAdaptor),
-    UnionRule(LintTarget, PythonAppAdaptor),
-    UnionRule(LintTarget, PythonBinaryAdaptor),
-    UnionRule(LintTarget, PythonTestsAdaptor),
-    UnionRule(LintTarget, PantsPluginAdaptor),
   ]

@@ -7,7 +7,8 @@ from pathlib import Path
 from typing import Optional, Tuple
 
 from pants.backend.python.lint.black.subsystem import Black
-from pants.backend.python.lint.format_python_target import PythonFormatTarget
+from pants.backend.python.lint.python_format_target import PythonFormatTarget
+from pants.backend.python.lint.python_lint_target import PythonLintTarget
 from pants.backend.python.rules.pex import (
   CreatePex,
   Pex,
@@ -140,5 +141,6 @@ def rules():
     fmt,
     lint,
     optionable_rule(Black),
-    UnionRule(PythonFormatTarget, BlackTarget)
+    UnionRule(PythonFormatTarget, BlackTarget),
+    UnionRule(PythonLintTarget, BlackTarget),
   ]
