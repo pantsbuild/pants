@@ -8,6 +8,7 @@ from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
+from pants.backend.jvm.subsystems.dependency_context import DependencyContext
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
@@ -32,6 +33,10 @@ class ExportDepAsJar(ConsoleTask):
   This is an experimental task that mimics export but uses the jars for
   jvm dependencies instead of sources.
   """
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super().subsystem_dependencies() + (DependencyContext,)
 
   @classmethod
   def register_options(cls, register):
@@ -252,7 +257,35 @@ class ExportDepAsJar(ConsoleTask):
 
     return graph_info
 
-  def generate_targets_map(self, all_targets, runtime_classpath):
+  def _get_all_targets(self, targets):
+    additional_java_targets = []
+    for t in targets:
+      if isinstance(t, ScalaLibrary):
+        additional_java_targets.extend(t.java_sources)
+    targets.extend(additional_java_targets)
+    return targets
+
+  def _get_targets_to_print(self, all_targets, target_roots_set):
+    def target_is_between_roots(t):
+      transitive_dependencies = set(
+        DependencyContext.global_instance().dependencies_respecting_strict_deps(t) if hasattr(t, 'strict_deps') else \
+          DependencyContext.global_instance().all_dependencies(t)
+      )
+      return len(transitive_dependencies.intersection(target_roots_set)) > 0
+
+    def target_is_a_resource(t):
+      return isinstance(t, Resources)
+
+    printable_targets = []
+    for target in all_targets:
+      print(f"BL: COnsidering target {target}, with target_root_set {target_roots_set}. is_a_resource {target_is_a_resource(target)}, is_between_roots {target_is_between_roots(target)}")
+      if (target in target_roots_set) or \
+        target_is_between_roots(target) or \
+        target_is_a_resource(target):
+        printable_targets.append(target)
+    return printable_targets
+
+  def generate_targets_map(self, targets, runtime_classpath):
     """Generates a dictionary containing all pertinent information about the target graph.
 
     The return dictionary is suitable for serialization by json.dumps.
@@ -260,60 +293,59 @@ class ExportDepAsJar(ConsoleTask):
     :param classpath_products: Optional classpath_products. If not provided when the --libraries
       option is `True`, this task will perform its own jar resolution.
     """
+    target_roots_set = set(self.context.target_roots)
+
+    all_targets = self._get_all_targets(targets)
+    libraries_map = self._resolve_jars_info(all_targets, runtime_classpath)
 
     targets_map = {}
     resource_target_map = {}
-    target_roots_set = set(self.context.target_roots)
-
-    additional_java_targets = []
-    for t in all_targets:
-      if isinstance(t, ScalaLibrary):
-        additional_java_targets.extend(t.java_sources)
-
-    all_targets.extend(additional_java_targets)
-
-    for target in all_targets:
-      info = self._process_target(target, target_roots_set, resource_target_map, runtime_classpath)
-      targets_map[target.address.spec] = info
-
-      for dep in target.dependencies:
-        if isinstance(dep, Resources):
-          resource_target_map[dep] = target
-
-    graph_info = self.initialize_graph_info()
-    graph_info['targets'] = targets_map
-    graph_info['libraries'] = self._resolve_jars_info(all_targets, runtime_classpath)
-
     # Using resolved path in preparation for VCFS.
     resource_jar_root = os.path.realpath(self.versioned_workdir)
+
+    for t in all_targets:
+      for dep in t.dependencies:
+        if isinstance(dep, Resources):
+          resource_target_map[dep] = t
+
     for t in all_targets:
       target_type = ExportDepAsJar._get_target_type(t, resource_target_map)
-      # If it is a target root or it is already a jar_library target, then no-op.
-      if t in target_roots_set or targets_map[t.address.spec]['pants_target_type'] == 'jar_library':
-        continue
-
-      targets_map[t.address.spec]['pants_target_type'] = 'jar_library'
-      targets_map[t.address.spec]['libraries'] = [t.id]
-
       if target_type == SourceRootTypes.RESOURCE or target_type == SourceRootTypes.TEST_RESOURCE:
         # yic assumed that the cost to fingerprint the target may not be that lower than
         # just zipping up the resources anyway.
         jarred_resources = ExportDepAsJar._zip_sources(t, resource_jar_root)
-        graph_info['libraries'][t.id]['default'] = jarred_resources.name
+        libraries_map[t.id]['default'] = jarred_resources.name
       else:
         jar_products = runtime_classpath.get_for_target(t)
         for conf, jar_entry in jar_products:
           # TODO(yic): check --compile-rsc-use-classpath-jars is enabled.
           # If not, zip up the classes/ dir here.
           if 'z.jar' in jar_entry:
-            graph_info['libraries'][t.id][conf] = jar_entry
+            libraries_map[t.id][conf] = jar_entry
         if self.get_options().sources:
           # NB: We create the jar in the same place as we create the resources
           # (as opposed to where we store the z.jar), because the path to the z.jar depends
           # on tasks outside of this one.
           # In addition to that, we may not want to depend on z.jar existing to export source jars.
           jarred_sources = ExportDepAsJar._zip_sources(t, resource_jar_root, suffix='-sources.jar')
-          graph_info['libraries'][t.id]['sources'] = jarred_sources.name
+          libraries_map[t.id]['sources'] = jarred_sources.name
+
+    printable_targets = self._get_targets_to_print(all_targets, target_roots_set)
+    for target in printable_targets:
+
+      info = self._process_target(target, target_roots_set, resource_target_map, runtime_classpath)
+      targets_map[target.address.spec] = info
+
+      # If it is a target root or it is already a jar_library target, then no-op.
+      if target in target_roots_set or targets_map[t.address.spec]['pants_target_type'] == 'jar_library':
+        continue
+
+      targets_map[t.address.spec]['pants_target_type'] = 'jar_library'
+      targets_map[t.address.spec]['libraries'] = [t.id]
+
+    graph_info = self.initialize_graph_info()
+    graph_info['targets'] = targets_map
+    graph_info['libraries'] = libraries_map
 
     return graph_info
 
