@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Optional, Tuple
 
 from pants.backend.python.lint.flake8.subsystem import Flake8
-from pants.backend.python.lint.lint_python_target import LintPythonTarget
+from pants.backend.python.lint.lint_python_target import PythonLinter
 from pants.backend.python.rules.pex import (
   CreatePex,
   Pex,
@@ -86,4 +86,8 @@ async def lint(
 
 
 def rules():
-  return [lint, optionable_rule(Flake8), UnionRule(LintPythonTarget, Flake8Target)]
+  return [
+    lint,
+    optionable_rule(Flake8),
+    UnionRule(PythonLinter, Flake8Target)
+  ]

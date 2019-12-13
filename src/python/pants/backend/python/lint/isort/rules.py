@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
 from pants.backend.python.lint.isort.subsystem import Isort
-from pants.backend.python.lint.lint_python_target import LintPythonTarget
+from pants.backend.python.lint.lint_python_target import PythonLinter
 from pants.backend.python.rules.pex import (
   CreatePex,
   Pex,
@@ -131,5 +131,5 @@ def rules():
     create_isort_request,
     lint,
     optionable_rule(Isort),
-    UnionRule(LintPythonTarget, IsortTarget),
+    UnionRule(PythonLinter, IsortTarget)
   ]
