@@ -26,7 +26,7 @@ from pants.rules.core.strip_source_root import SourceRootStrippedSources
 
 def calculate_timeout_seconds(
   *,
-  timeout_disabled: bool,
+  timeouts_enabled: bool,
   target_timeout: Optional[int],
   timeout_default: Optional[int],
   timeout_maximum: Optional[int],
@@ -35,7 +35,7 @@ def calculate_timeout_seconds(
 
   If a target has no timeout configured its timeout will be set to the default timeout.
   """
-  if timeout_disabled:
+  if not timeouts_enabled:
     return None
   if target_timeout is None:
     if timeout_default is None:
@@ -116,7 +116,7 @@ async def run_python_test(
 
   test_target_sources_file_names = sorted(source_root_stripped_test_target_sources.snapshot.files)
   timeout_seconds = calculate_timeout_seconds(
-    timeout_disabled=pytest.options.timeout_disabled,
+    timeouts_enabled=pytest.options.timeouts,
     target_timeout=getattr(test_target, 'timeout', None),
     timeout_default=pytest.options.timeout_default,
     timeout_maximum=pytest.options.timeout_maximum,
