@@ -4,27 +4,31 @@
 from textwrap import wrap
 from typing import List
 
-from colors import blue, cyan, green, red
+from colors import cyan, red
 
 from pants.help.help_info_extracter import HelpInfoExtracter, OptionHelpInfo
 
 
 class HelpFormatter:
 
-  def __init__(self, scope, show_recursive, show_advanced, color):
+  def __init__(self, *, scope: str, show_recursive: bool, show_advanced: bool, color: bool) -> None:
     self._scope = scope
     self._show_recursive = show_recursive
     self._show_advanced = show_advanced
     self._color = color
 
-  def _maybe_blue(self, s):
-    return self._maybe_color(blue, s)
-
   def _maybe_cyan(self, s):
     return self._maybe_color(cyan, s)
 
-  def _maybe_green(self, s):
-    return self._maybe_color(green, s)
+  def _maybe_bright_cyan(self, s):
+    def bright_cyan(s: str) -> str:
+      return f"\x1b[96m{s}\x1b[0m"
+    return self._maybe_color(bright_cyan, s)
+
+  def _maybe_bright_green(self, s):
+    def bright_green(s: str) -> str:
+      return f"\x1b[92m{s}\x1b[0m"
+    return self._maybe_color(bright_green, s)
 
   def _maybe_red(self, s):
     return self._maybe_color(red, s)
@@ -41,27 +45,28 @@ class HelpFormatter:
     oshi = HelpInfoExtracter(self._scope).get_option_scope_help_info(option_registrations_iter)
     lines = []
 
-    def add_option(category, ohis):
-      if not ohis:
-        return
+    def add_option(ohis, *, category=None):
       lines.append('')
       display_scope = scope or 'Global'
       if category:
-        lines.append(self._maybe_blue('{} {} options:'.format(display_scope, category)))
+        lines.append(self._maybe_bright_green(f'{display_scope} {category}:'))
       else:
-        lines.append(self._maybe_blue('{} options:'.format(display_scope)))
+        lines.append(self._maybe_bright_green(f'{display_scope}:'))
         if description:
           lines.append(description)
       lines.append(' ')
+      if not ohis:
+        lines.append('No options available.')
+        return
       for ohi in ohis:
         lines.extend(self.format_option(ohi))
 
-    add_option('', oshi.basic)
+    add_option(oshi.basic)
     if self._show_recursive:
-      add_option('recursive', oshi.recursive)
+      add_option(oshi.recursive, category='recursive')
     if self._show_advanced:
-      add_option('advanced', oshi.advanced)
-    return lines
+      add_option(oshi.advanced, category='advanced')
+    return [*lines, '\n']
 
   def format_option(self, ohi: OptionHelpInfo) -> List[str]:
     """Format the help output for a single option.
@@ -70,16 +75,17 @@ class HelpFormatter:
     :return: Formatted help text for this option
     """
     lines = []
-    choices = 'one of: [{}] '.format(ohi.choices) if ohi.choices else ''
-    arg_line = ('{args} {dflt}'
-                .format(args=self._maybe_cyan(', '.join(ohi.display_args)),
-                        dflt=self._maybe_green('({}default: {})'.format(choices, ohi.default))))
-    lines.append(arg_line)
+    choices = f'one of: [{ohi.choices}] ' if ohi.choices else ''
+    arg_line = '{args} {default}'.format(
+      args=self._maybe_bright_cyan(', '.join(ohi.display_args)),
+      default=self._maybe_cyan(f'({choices}default: {ohi.default})')
+    )
+    lines.append(f'  {arg_line}')
 
-    indent = '    '
-    lines.extend(['{}{}'.format(indent, s) for s in wrap(ohi.help, 76)])
+    indent = '      '
+    lines.extend([f'{indent}{s}' for s in wrap(ohi.help, 76)])
     if ohi.deprecated_message:
-      lines.append(self._maybe_red('{}{}.'.format(indent, ohi.deprecated_message)))
+      lines.append(self._maybe_red(f'{indent}{ohi.deprecated_message}.'))
       if ohi.removal_hint:
-        lines.append(self._maybe_red('{}{}'.format(indent, ohi.removal_hint)))
+        lines.append(self._maybe_red(f'{indent}{ohi.removal_hint}'))
     return lines
