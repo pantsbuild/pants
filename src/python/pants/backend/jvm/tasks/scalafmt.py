@@ -15,6 +15,7 @@ from pants.binaries.binary_util import BinaryToolUrlGenerator
 from pants.engine.platform import Platform
 from pants.java.jar.jar_dependency import JarDependency
 from pants.option.custom_types import file_option
+from pants.process.xargs import Xargs
 from pants.task.fmt_task_mixin import FmtTaskMixin
 from pants.task.lint_task_mixin import LintTaskMixin
 from pants.util.dirutil import chmod_plus_x
@@ -121,32 +122,39 @@ class ScalaFmt(RewriteBase):
       key='scalafmt',
       scope=subsystem.options_scope)
 
+  def _invoke_native_image_subprocess(self, prefix_args, workunit, all_source_paths):
+    return subprocess.run(
+      args=(prefix_args + all_source_paths),
+      stdout=workunit.output('stdout'),
+      stderr=workunit.output('stderr'),
+    ).returncode
+
   def invoke_tool(self, current_workunit, absolute_root, target_sources):
     self.context.log.debug(f'scalafmt called with sources: {target_sources}')
 
     # If no config file is specified use default scalafmt config.
     config_file = self.get_options().configuration
-    args = list(self.additional_args)
+    prefix_args = list(self.additional_args)
     if config_file is not None:
-      args.extend(['--config', config_file])
-    args.extend([source for _target, source in target_sources])
+      prefix_args.extend(['--config', config_file])
+
+    all_source_paths = [source for _target, source in target_sources]
 
     if self._use_native_image:
       with self.context.run_tracker.new_workunit(
           name='scalafmt',
           labels=[WorkUnitLabel.COMPILER],
       ) as workunit:
-        args = [self._native_image_path(), *args]
-        self.context.log.debug(f'executing scalafmt with native image with args: {args}')
-        return subprocess.run(
-          args=args,
-          stdout=workunit.output('stdout'),
-          stderr=workunit.output('stderr'),
-        ).returncode
+        prefix_args = [self._native_image_path()] + prefix_args
+        self.context.log.debug(f'executing scalafmt with native image with prefix args: {prefix_args}')
+        return Xargs(
+          self._invoke_native_image_subprocess,
+          constant_args=[prefix_args, workunit],
+        ).execute(all_source_paths)
     else:
       return self.runjava(classpath=self._tool_classpath(),
                           main='org.scalafmt.cli.Cli',
-                          args=args,
+                          args=(prefix_args + all_source_paths),
                           workunit_name='scalafmt',
                           jvm_options=self.get_options().jvm_options)
 

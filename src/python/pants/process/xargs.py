@@ -45,13 +45,14 @@ class Xargs:
 
     :param list args: Extra arguments to pass to cmd.
     """
-    all_args = list(args)
-    logger.debug(f'xargs all_args: {all_args}')
+    splittable_args = list(args)
+    all_args_for_command_function = self._constant_args + [splittable_args]
+    logger.debug(f'xargs all_args_for_command_function: {all_args_for_command_function}')
     try:
-      return self._cmd(*(*self._constant_args, all_args))
+      return self._cmd(*all_args_for_command_function)
     except OSError as e:
       if errno.E2BIG == e.errno:
-        args1, args2 = self._split_args(all_args)
+        args1, args2 = self._split_args(splittable_args)
         logger.debug(f'xargs split cmd line:\nargs1={args1},\nargs2={args2}!')
         result = self.execute(args1)
         if result != 0:

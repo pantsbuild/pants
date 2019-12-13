@@ -1,6 +1,8 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import itertools
+import math
 import os
 import shutil
 import threading
@@ -31,12 +33,12 @@ class RewriteBase(NailgunTask, metaclass=ABCMeta):
                help='Path to output directory. Any updated files will be written here. '
                'If not specified, files will be modified in-place.')
 
-    register('--files-per-process', type=int, fingerprint=False,
+    register('--files-per-worker', type=int, fingerprint=False,
              default=None,
-             help='Number of files to use per individual process execution for native-image.')
-    register('--total-number-parallel-processes', type=int, fingerprint=False,
+             help='Number of files to use per each scalafmt execution.')
+    register('--worker-count', type=int, fingerprint=False,
              default=None,
-             help='Total number of parallel scalafmt processes to run.')
+             help='Total number of parallel scalafmt threads or processes to run.')
 
   @classmethod
   def target_types(cls):
@@ -101,22 +103,22 @@ class RewriteBase(NailgunTask, metaclass=ABCMeta):
     if not target_sources:
       return
 
-    if self.get_options().files_per_process is not None:
-      # If --files-per-process is specified, split the target sources and run in separate threads!
-      n = self.get_options().files_per_process
+    if self.get_options().files_per_worker is not None:
+      # If --files-per-worker is specified, split the target sources and run in separate threads!
+      n = self.get_options().files_per_worker
       inputs_list_of_lists = [
         target_sources[i:i + n]
         for i in range(0, len(target_sources), n)
       ]
       self._split_by_threads(inputs_list_of_lists=inputs_list_of_lists, invoke_fn=self._invoke_tool)
-    elif self.get_options().total_number_parallel_processes is not None:
-      # If --total-number-parallel-processes is specified, split the target sources into that many
+    elif self.get_options().worker_count is not None:
+      # If --worker-count is specified, split the target sources into that many
       # threads, and run in separate threads!
-      num_processes = self.get_options().total_number_parallel_processes
-      n = len(target_sources) // (num_processes - 1)
+      num_processes = self.get_options().worker_count
+      sources_iterator = iter(target_sources)
       inputs_list_of_lists = [
-        target_sources[i:i + n]
-        for i in range(0, len(target_sources), n)
+        list(itertools.islice(sources_iterator, 0, math.ceil(len(target_sources) / num_processes)))
+        for _ in range(0, num_processes)
       ]
       self._split_by_threads(inputs_list_of_lists=inputs_list_of_lists, invoke_fn=self._invoke_tool)
     else:
@@ -128,6 +130,9 @@ class RewriteBase(NailgunTask, metaclass=ABCMeta):
                         'should raise an exception earlier.'.format(type(self).__name__))
 
   def _invoke_tool(self, parent_workunit, target_sources):
+    # We want to avoid executing anything if there are no sources to generate.
+    if not target_sources:
+      return 0
     self.context.run_tracker.register_thread(parent_workunit)
     buildroot = get_buildroot()
     toolroot = buildroot
