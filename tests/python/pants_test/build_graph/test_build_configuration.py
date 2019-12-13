@@ -13,6 +13,7 @@ from pants.build_graph.target import Target
 from pants.engine.rules import UnionRule, union
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import touch
+from pants.engine.rules import UnionRule, union
 
 
 class BuildConfigurationTest(unittest.TestCase):
