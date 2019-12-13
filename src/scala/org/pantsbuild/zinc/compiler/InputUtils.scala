@@ -156,7 +156,9 @@ object InputUtils {
     // Added because the jars can be the entire classpath if using the default value.
     filtered = filtered filter (_.getName matches ".*scala.*")
     val (compiler, other) = filtered partition (_.getName matches ScalaCompiler.pattern)
-    val (library, extra) = other partition (_.getName matches ScalaLibrary.pattern)
+    val ScalaCompiler.regex(library_version) = compiler(0).getName
+    val VersionedScalaLibraryJar = JarFile("scala-library", version=Some(library_version))
+    val (library, extra) = other partition (_.getName matches VersionedScalaLibraryJar.pattern)
     if (compiler.nonEmpty && library.nonEmpty) Some(ScalaJars(compiler(0), library(0), extra)) else None
   }
 
@@ -187,11 +189,12 @@ object InputUtils {
   /**
    * Jar file description for locating jars.
    */
-  case class JarFile(name: String, classifier: Option[String] = None) {
-    val versionPattern = "(-.*)?"
+  case class JarFile(name: String, version: Option[String] = None, classifier: Option[String] = None) {
+    val versionPattern = s"-?(${version getOrElse ".*"})?"
     val classifierString = classifier map ("-" + _) getOrElse ""
     val extension = "jar"
-    val pattern = name + versionPattern + classifierString + "." + extension
+    val pattern = name + versionPattern + classifierString + "\\." + extension
+    val regex = pattern.r
     val default = new File(name + classifierString + "." + extension)
   }
 
