@@ -10,6 +10,7 @@ import pkg_resources
 
 from pants.base.build_environment import pants_version
 from pants.base.exceptions import BuildConfigurationError
+from pants.build_graph.build_configuration import BuildConfiguration
 from pants.goal.goal import Goal
 from pants.init.extension_loader import load_backends_and_plugins
 from pants.init.global_subsystems import GlobalSubsystems
@@ -47,27 +48,26 @@ class BuildConfigInitializer:
     self._bootstrap_options = options_bootstrapper.get_bootstrap_options().for_global_scope()
     self._working_set = PluginResolver(self._options_bootstrapper).resolve()
 
-  def _load_plugins(self, working_set, python_paths, plugins, backend_packages):
+  def _load_plugins(self):
     # Add any extra paths to python path (e.g., for loading extra source backends).
-    for path in python_paths:
+    for path in self._bootstrap_options.pythonpath:
       if path not in sys.path:
         sys.path.append(path)
         pkg_resources.fixup_namespace_packages(path)
 
     # Load plugins and backends.
-    return load_backends_and_plugins(plugins, working_set, backend_packages)
+    return load_backends_and_plugins(self._bootstrap_options.plugins,
+                                     self._working_set,
+                                     self._bootstrap_options.backend_packages,
+                                     BuildConfiguration(),
+                                     self._bootstrap_options.v1_register)
 
   def setup(self):
     """Load backends and plugins.
 
     :returns: A `BuildConfiguration` object constructed during backend/plugin loading.
     """
-    return self._load_plugins(
-      self._working_set,
-      self._bootstrap_options.pythonpath,
-      self._bootstrap_options.plugins,
-      self._bootstrap_options.backend_packages
-    )
+    return self._load_plugins()
 
 
 class OptionsInitializer:

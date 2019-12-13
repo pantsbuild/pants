@@ -20,21 +20,22 @@ class PluginNotFound(PluginLoadingError): pass
 class PluginLoadOrderError(PluginLoadingError): pass
 
 
-def load_backends_and_plugins(plugins, working_set, backends, build_configuration=None):
+def load_backends_and_plugins(plugins, working_set, backends, build_configuration, v1_register):
   """Load named plugins and source backends
 
   :param list<str> plugins: Plugins to load (see `load_plugins`).  Plugins are loaded after
     backends.
   :param WorkingSet working_set: A pkg_resources.WorkingSet to load plugins from.
   :param list<str> backends: Source backends to load (see `load_build_configuration_from_source`).
+  :param BuildConfiguration build_configuration: The BuildConfiguration (for adding aliases).
+  :param bool v1_register: Whether to register v1 tasks.
   """
-  build_configuration = build_configuration or BuildConfiguration()
-  load_build_configuration_from_source(build_configuration, backends)
-  load_plugins(build_configuration, plugins or [], working_set)
+  load_build_configuration_from_source(build_configuration, backends, v1_register)
+  load_plugins(build_configuration, plugins or [], working_set, v1_register)
   return build_configuration
 
 
-def load_plugins(build_configuration, plugins, working_set):
+def load_plugins(build_configuration, plugins, working_set, v1_register):
   """Load named plugins from the current working_set into the supplied build_configuration
 
   "Loading" a plugin here refers to calling registration methods -- it is assumed each plugin
@@ -57,6 +58,7 @@ def load_plugins(build_configuration, plugins, working_set):
   :param list<str> plugins: A list of plugin names optionally with versions, in requirement format.
                             eg ['widgetpublish', 'widgetgen==1.2'].
   :param WorkingSet working_set: A pkg_resources.WorkingSet to load plugins from.
+  :param bool v1_register: Whether to register v1 tasks.
   """
   loaded = {}
   for plugin in plugins:
@@ -68,23 +70,26 @@ def load_plugins(build_configuration, plugins, working_set):
 
     entries = dist.get_entry_map().get('pantsbuild.plugin', {})
 
-    if 'load_after' in entries:
-      deps = entries['load_after'].load()()
-      for dep_name in deps:
-        dep = Requirement.parse(dep_name)
-        if dep.key not in loaded:
-          raise PluginLoadOrderError(f'Plugin {plugin} must be loaded after {dep}')
+    if v1_register:
+      # TODO: Might v2 plugins care about registration order? Hopefully not.
+      if 'load_after' in entries:
+        deps = entries['load_after'].load()()
+        for dep_name in deps:
+          dep = Requirement.parse(dep_name)
+          if dep.key not in loaded:
+            raise PluginLoadOrderError(f'Plugin {plugin} must be loaded after {dep}')
+
+      if 'register_goals' in entries:
+        entries['register_goals'].load()()
+
+      # TODO: Might v2 plugins need to register global subsystems? Hopefully not.
+      if 'global_subsystems' in entries:
+        subsystems = entries['global_subsystems'].load()()
+        build_configuration.register_optionables(subsystems)
 
     if 'build_file_aliases' in entries:
       aliases = entries['build_file_aliases'].load()()
       build_configuration.register_aliases(aliases)
-
-    if 'register_goals' in entries:
-      entries['register_goals'].load()()
-
-    if 'global_subsystems' in entries:
-      subsystems = entries['global_subsystems'].load()()
-      build_configuration.register_optionables(subsystems)
 
     if 'rules' in entries:
       rules = entries['rules'].load()()
@@ -93,11 +98,12 @@ def load_plugins(build_configuration, plugins, working_set):
     loaded[dist.as_requirement().key] = dist
 
 
-def load_build_configuration_from_source(build_configuration, backends=None):
+def load_build_configuration_from_source(build_configuration, backends, v1_register):
   """Installs pants backend packages to provide BUILD file symbols and cli goals.
 
   :param BuildConfiguration build_configuration: The BuildConfiguration (for adding aliases).
-  :param backends: An optional list of additional packages to load backends from.
+  :param backends: An list of packages to load backends from.
+  :param v1_register: Whether to register v1 tasks.
   :raises: :class:``pants.base.exceptions.BuildConfigurationError`` if there is a problem loading
     the build configuration.
   """
@@ -110,23 +116,25 @@ def load_build_configuration_from_source(build_configuration, backends=None):
       'pants.rules.core',
     ] + (backends or []))
   for backend_package in backend_packages:
-    load_backend(build_configuration, backend_package)
+    load_backend(build_configuration, backend_package, v1_register)
 
 
-def load_backend(build_configuration: BuildConfiguration, backend_package: str) -> None:
+def load_backend(build_configuration: BuildConfiguration, backend_package: str,
+                 v1_register: bool) -> None:
   """Installs the given backend package into the build configuration.
 
   :param build_configuration: the BuildConfiguration to install the backend plugin into.
   :param backend_package: the package name containing the backend plugin register module that
     provides the plugin entrypoints.
+  :param bool v1_register: Whether to register v1 tasks.
   :raises: :class:``pants.base.exceptions.BuildConfigurationError`` if there is a problem loading
     the build configuration."""
   backend_module = backend_package + '.register'
   try:
     module = importlib.import_module(backend_module)
-  except ImportError as e:
+  except ImportError as ex:
     traceback.print_exc()
-    raise BackendConfigurationError(f'Failed to load the {backend_module} backend: {e!r}')
+    raise BackendConfigurationError(f'Failed to load the {backend_module} backend: {ex!r}')
 
   def invoke_entrypoint(name):
     entrypoint = getattr(module, name, lambda: None)
@@ -138,16 +146,18 @@ def load_backend(build_configuration: BuildConfiguration, backend_package: str) 
         f'Entrypoint {name} in {backend_module} must be a zero-arg callable: {e!r}'
       )
 
+  if v1_register:
+    invoke_entrypoint('register_goals')
+
+    # TODO: Might v2 plugins need to register global subsystems? Hopefully not.
+    subsystems = invoke_entrypoint('global_subsystems')
+    if subsystems:
+      build_configuration.register_optionables(subsystems)
+
   build_file_aliases = invoke_entrypoint('build_file_aliases')
   if build_file_aliases:
     build_configuration.register_aliases(build_file_aliases)
 
-  subsystems = invoke_entrypoint('global_subsystems')
-  if subsystems:
-    build_configuration.register_optionables(subsystems)
-
   rules = invoke_entrypoint('rules')
   if rules:
     build_configuration.register_rules(rules)
-
-  invoke_entrypoint('register_goals')

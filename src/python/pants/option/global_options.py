@@ -178,7 +178,6 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--plugin-cache-dir', advanced=True,
              default=os.path.join(get_pants_cachedir(), 'plugins'),
              help='Cache resolved plugin requirements here.')
-
     register('--backend-packages', advanced=True, type=list,
              default=['pants.backend.graph_info',
                       'pants.backend.python',
@@ -196,6 +195,9 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                       'pants.backend.project_info'],
              help='Load backends from these packages that are already on the path. '
                   'Add contrib and custom backends to this list.')
+    register('--v1-register', advanced=True, type=bool, default=True,
+             help='Whether to register v1 tasks. If unset, v1 task registration hooks in backends '
+                  'will be ignored, meaning you cannot set any v1 task options in config files.')
 
     register('--pants-bootstrapdir', advanced=True, metavar='<dir>', default=get_pants_cachedir(),
              help='Use this dir for global cache.')
