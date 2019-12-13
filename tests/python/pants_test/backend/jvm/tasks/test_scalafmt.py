@@ -8,7 +8,7 @@ from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.subsystems.scoverage_platform import ScoveragePlatform
 from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
-from pants.backend.jvm.tasks.scalafmt import ScalaFmtCheckFormat, ScalaFmtFormat
+from pants.backend.jvm.tasks.scalafmt import ScalaFmtCheckFormat, ScalaFmtFormat, ScalaFmtSubsystem
 from pants.base.exceptions import TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.resources import Resources
@@ -32,6 +32,7 @@ class ScalaFmtTestBase(NailgunTaskTestBase):
     init_subsystem(ScalaPlatform)
     init_subsystem(ScoveragePlatform)
     init_subsystem(SourceRootConfig)
+    init_subsystem(ScalaFmtSubsystem)
 
     self.configuration = self.create_file(
       relpath='build-support/scalafmt/config',
@@ -165,3 +166,30 @@ class ScalaFmtFormatTest(ScalaFmtTestBase):
       relative_test_file = fast_relpath(self.test_file, self.build_root)
       with open(os.path.join(output_dir, relative_test_file), 'r') as fp:
         self.assertNotEqual(self.test_file_contents, fp.read())
+
+  def _execute_native_image(self, **kwargs):
+    self.set_options(skip=False, **kwargs)
+    self.set_options_for_scope('scalafmt', use_native_image=True)
+
+    context = self.context(target_roots=self.library)
+    task = self.execute(context)
+
+    # Assert that it ran successfully.
+    with open(self.test_file, 'r') as fp:
+      self.assertNotEqual(self.test_file_contents, fp.read())
+
+    # Assert that the native-image executable was most recently used.
+    scalafmt_native_image_basedir = ScalaFmtSubsystem.global_instance().select()
+    most_recent_command_line = task._all_command_lines[-1]
+    prefix_args, _workunit, _all_source_paths = most_recent_command_line
+    executable_file = prefix_args[0]
+    self.assertTrue(executable_file.startswith(scalafmt_native_image_basedir))
+
+  def test_native_image_execution(self):
+    self._execute_native_image()
+
+  def test_native_image_threading_worker_count(self):
+    self._execute_native_image(worker_count=4)
+
+  def test_native_image_threading_files_per_worker(self):
+    self._execute_native_image(files_per_worker=1)
