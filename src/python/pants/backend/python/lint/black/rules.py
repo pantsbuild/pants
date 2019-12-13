@@ -7,7 +7,8 @@ from pathlib import Path
 from typing import Optional, Tuple
 
 from pants.backend.python.lint.black.subsystem import Black
-from pants.backend.python.lint.format_python_target import FormatPythonTarget
+from pants.backend.python.lint.python_format_target import PythonFormatTarget
+from pants.backend.python.lint.python_lint_target import PythonLintTarget
 from pants.backend.python.rules.pex import (
   CreatePex,
   Pex,
@@ -22,10 +23,16 @@ from pants.engine.isolated_process import (
   ExecuteProcessResult,
   FallibleExecuteProcessResult,
 )
-from pants.engine.rules import optionable_rule, rule
+from pants.engine.legacy.structs import TargetAdaptor
+from pants.engine.rules import UnionRule, optionable_rule, rule
 from pants.engine.selectors import Get
 from pants.rules.core.fmt import FmtResult
 from pants.rules.core.lint import LintResult
+
+
+@dataclass(frozen=True)
+class BlackTarget:
+  target: TargetAdaptor
 
 
 @dataclass(frozen=True)
@@ -62,7 +69,7 @@ class BlackArgs:
 
   @staticmethod
   def create(
-    *, wrapped_target: FormatPythonTarget, black_setup: BlackSetup, check_only: bool,
+    *, wrapped_target: BlackTarget, black_setup: BlackSetup, check_only: bool,
   ) -> "BlackArgs":
     files = wrapped_target.target.sources.snapshot.files
     pex_args = []
@@ -84,7 +91,7 @@ class BlackArgs:
 
 @rule
 async def create_black_request(
-  wrapped_target: FormatPythonTarget,
+  wrapped_target: BlackTarget,
   black_args: BlackArgs,
   black_setup: BlackSetup,
   python_setup: PythonSetup,
@@ -112,7 +119,7 @@ async def create_black_request(
 
 
 @rule(name="Format using Black")
-async def fmt(wrapped_target: FormatPythonTarget, black_setup: BlackSetup) -> FmtResult:
+async def fmt(wrapped_target: BlackTarget, black_setup: BlackSetup) -> FmtResult:
   args = BlackArgs.create(black_setup=black_setup, wrapped_target=wrapped_target, check_only=False)
   request = await Get[ExecuteProcessRequest](BlackArgs, args)
   result = await Get[ExecuteProcessResult](ExecuteProcessRequest, request)
@@ -120,7 +127,7 @@ async def fmt(wrapped_target: FormatPythonTarget, black_setup: BlackSetup) -> Fm
 
 
 @rule(name="Lint using Black")
-async def lint(wrapped_target: FormatPythonTarget, black_setup: BlackSetup) -> LintResult:
+async def lint(wrapped_target: BlackTarget, black_setup: BlackSetup) -> LintResult:
   args = BlackArgs.create(black_setup=black_setup, wrapped_target=wrapped_target, check_only=True)
   request = await Get[ExecuteProcessRequest](BlackArgs, args)
   result = await Get[FallibleExecuteProcessResult](ExecuteProcessRequest, request)
@@ -128,4 +135,12 @@ async def lint(wrapped_target: FormatPythonTarget, black_setup: BlackSetup) -> L
 
 
 def rules():
-  return [setup_black, create_black_request, fmt, lint, optionable_rule(Black)]
+  return [
+    setup_black,
+    create_black_request,
+    fmt,
+    lint,
+    optionable_rule(Black),
+    UnionRule(PythonFormatTarget, BlackTarget),
+    UnionRule(PythonLintTarget, BlackTarget),
+  ]

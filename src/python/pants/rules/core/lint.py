@@ -8,6 +8,7 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.isolated_process import FallibleExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTargets
 from pants.engine.legacy.structs import TargetAdaptor
+from pants.engine.objects import Collection
 from pants.engine.rules import UnionMembership, console_rule, union
 from pants.engine.selectors import Get, MultiGet
 
@@ -27,6 +28,10 @@ class LintResult:
       stdout=process_result.stdout.decode(),
       stderr=process_result.stderr.decode(),
     )
+
+
+class LintResults(Collection[LintResult]):
+  """This collection allows us to aggregate multiple `LintResult`s for a language."""
 
 
 @union
@@ -60,11 +65,12 @@ class Lint(Goal):
 
 @console_rule
 async def lint(console: Console, targets: HydratedTargets, union_membership: UnionMembership) -> Lint:
-  results = await MultiGet(
-    Get[LintResult](LintTarget, target.adaptor)
+  nested_results = await MultiGet(
+    Get[LintResults](LintTarget, target.adaptor)
     for target in targets
     if LintTarget.is_lintable(target.adaptor, union_membership=union_membership)
   )
+  results = [result for results in nested_results for result in results]
 
   if not results:
     return Lint(exit_code=0)

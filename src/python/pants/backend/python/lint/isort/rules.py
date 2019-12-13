@@ -4,8 +4,9 @@
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
-from pants.backend.python.lint.format_python_target import FormatPythonTarget
 from pants.backend.python.lint.isort.subsystem import Isort
+from pants.backend.python.lint.python_format_target import PythonFormatTarget
+from pants.backend.python.lint.python_lint_target import PythonLintTarget
 from pants.backend.python.rules.pex import (
   CreatePex,
   Pex,
@@ -20,10 +21,16 @@ from pants.engine.isolated_process import (
   ExecuteProcessResult,
   FallibleExecuteProcessResult,
 )
-from pants.engine.rules import optionable_rule, rule
+from pants.engine.legacy.structs import TargetAdaptor
+from pants.engine.rules import UnionRule, optionable_rule, rule
 from pants.engine.selectors import Get
 from pants.rules.core.fmt import FmtResult
 from pants.rules.core.lint import LintResult
+
+
+@dataclass(frozen=True)
+class IsortTarget:
+  target: TargetAdaptor
 
 
 @dataclass(frozen=True)
@@ -60,7 +67,7 @@ class IsortArgs:
 
   @staticmethod
   def create(
-    *, wrapped_target: FormatPythonTarget, isort_setup: IsortSetup, check_only: bool,
+    *, wrapped_target: IsortTarget, isort_setup: IsortSetup, check_only: bool,
   ) -> "IsortArgs":
     # NB: isort auto-discovers config files. There is no way to hardcode them via command line
     # flags. So long as the files are in the Pex's input files, isort will use the config.
@@ -76,7 +83,7 @@ class IsortArgs:
 
 @rule
 async def create_isort_request(
-  wrapped_target: FormatPythonTarget,
+  wrapped_target: IsortTarget,
   isort_args: IsortArgs,
   isort_setup: IsortSetup,
   python_setup: PythonSetup,
@@ -104,7 +111,7 @@ async def create_isort_request(
 
 
 @rule(name="Format using isort")
-async def fmt(wrapped_target: FormatPythonTarget, isort_setup: IsortSetup) -> FmtResult:
+async def fmt(wrapped_target: IsortTarget, isort_setup: IsortSetup) -> FmtResult:
   args = IsortArgs.create(wrapped_target=wrapped_target, isort_setup=isort_setup, check_only=False)
   request = await Get[ExecuteProcessRequest](IsortArgs, args)
   result = await Get[ExecuteProcessResult](ExecuteProcessRequest, request)
@@ -112,7 +119,7 @@ async def fmt(wrapped_target: FormatPythonTarget, isort_setup: IsortSetup) -> Fm
 
 
 @rule(name="Lint using isort")
-async def lint(wrapped_target: FormatPythonTarget, isort_setup: IsortSetup) -> LintResult:
+async def lint(wrapped_target: IsortTarget, isort_setup: IsortSetup) -> LintResult:
   args = IsortArgs.create(wrapped_target=wrapped_target, isort_setup=isort_setup, check_only=True)
   request = await Get[ExecuteProcessRequest](IsortArgs, args)
   result = await Get(FallibleExecuteProcessResult, ExecuteProcessRequest, request)
@@ -120,4 +127,12 @@ async def lint(wrapped_target: FormatPythonTarget, isort_setup: IsortSetup) -> L
 
 
 def rules():
-  return [setup_isort, create_isort_request, fmt, lint, optionable_rule(Isort)]
+  return [
+    setup_isort,
+    create_isort_request,
+    fmt,
+    lint,
+    optionable_rule(Isort),
+    UnionRule(PythonFormatTarget, IsortTarget),
+    UnionRule(PythonLintTarget, IsortTarget),
+  ]

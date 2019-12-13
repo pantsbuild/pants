@@ -16,7 +16,7 @@ from pants.engine.fs import (
 from pants.engine.legacy.graph import HydratedTarget, HydratedTargets
 from pants.engine.legacy.structs import JvmAppAdaptor, PythonTargetAdaptor, TargetAdaptor
 from pants.engine.rules import UnionMembership
-from pants.rules.core.fmt import Fmt, FmtResult, FormatTarget, fmt
+from pants.rules.core.fmt import Fmt, FmtResult, FmtResults, FormatTarget, fmt
 from pants.source.wrapped_globs import EagerFilesetWithSpec
 from pants.testutil.engine.util import MockConsole, MockGet, run_rule
 from pants.testutil.test_base import TestBase
@@ -68,11 +68,11 @@ class FmtTest(TestBase):
       ],
       mock_gets=[
         MockGet(
-          product_type=FmtResult,
+          product_type=FmtResults,
           subject_type=PythonTargetAdaptor,
-          mock=lambda adaptor: FmtResult(
-            digest=result_digest, stdout=f"Formatted target `{adaptor.name}`", stderr=""
-          )
+          mock=lambda adaptor: FmtResults([
+            FmtResult(digest=result_digest, stdout=f"Formatted `{adaptor.name}`", stderr=""),
+          ])
         ),
         MockGet(product_type=Digest, subject_type=DirectoriesToMerge, mock=lambda _: result_digest),
       ],
@@ -106,7 +106,7 @@ class FmtTest(TestBase):
   def test_single_target(self) -> None:
     result, stdout = self.run_fmt_rule(targets=[self.make_hydrated_target()])
     assert result.exit_code == 0
-    assert stdout.strip() == "Formatted target `target`"
+    assert stdout.strip() == "Formatted `target`"
     self.assert_workspace_modified()
 
   def test_multiple_targets(self) -> None:
@@ -116,5 +116,5 @@ class FmtTest(TestBase):
       targets=[self.make_hydrated_target(name="t1"), self.make_hydrated_target(name="t2")]
     )
     assert result.exit_code == 0
-    assert stdout.splitlines() == ["Formatted target `t1`", "Formatted target `t2`"]
+    assert stdout.splitlines() == ["Formatted `t1`", "Formatted `t2`"]
     self.assert_workspace_modified()

@@ -3,9 +3,9 @@
 
 from typing import List, Optional, Sequence
 
+from pants.backend.python.lint.flake8.rules import Flake8Target
 from pants.backend.python.lint.flake8.rules import rules as flake8_rules
 from pants.backend.python.lint.flake8.subsystem import Flake8
-from pants.backend.python.lint.lint_python_target import LintPythonTarget
 from pants.backend.python.rules import download_pex_bin, pex
 from pants.backend.python.rules.pex import CreatePex
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
@@ -45,8 +45,8 @@ class Flake8IntegrationTest(TestBase):
       *python_native_code.rules(),
       *subprocess_environment.rules(),
       RootRule(CreatePex),
-      RootRule(LintPythonTarget),
       RootRule(Flake8),
+      RootRule(Flake8Target),
       RootRule(PythonSetup),
       RootRule(PythonNativeCode),
       RootRule(SubprocessEnvironment),
@@ -67,7 +67,7 @@ class Flake8IntegrationTest(TestBase):
     if config is not None:
       self.create_file(relpath=".flake8", contents=config)
     input_snapshot = self.request_single_product(Snapshot, InputFilesContent(source_files))
-    target = LintPythonTarget(
+    target = Flake8Target(
       PythonTargetAdaptor(
         sources=EagerFilesetWithSpec('test', {'globs': []}, snapshot=input_snapshot),
         address=Address.parse("test:target"),
@@ -91,12 +91,12 @@ class Flake8IntegrationTest(TestBase):
       )
     )
 
-  def test_passing_single_source(self) -> None:
+  def test_single_passing_source(self) -> None:
     result = self.run_flake8([self.good_source])
     assert result.exit_code == 0
     assert result.stdout.strip() == ""
 
-  def test_failing_single_source(self) -> None:
+  def test_single_failing_source(self) -> None:
     result = self.run_flake8([self.bad_source])
     assert result.exit_code == 1
     assert "test/bad.py:1:1: F401" in result.stdout
