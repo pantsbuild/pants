@@ -22,13 +22,13 @@ class PythonFormatTarget:
 
 
 @dataclass(frozen=True)
-class ConcretePythonFormatTarget:
+class _ConcretePythonFormatTarget:
   target: TargetAdaptor
 
 
 @rule
 async def format_python_target(
-  wrapped_target: ConcretePythonFormatTarget, union_membership: UnionMembership
+  wrapped_target: _ConcretePythonFormatTarget, union_membership: UnionMembership
 ) -> FmtResults:
   """This aggregator allows us to have multiple formatters operate over the same Python targets."""
   results = await MultiGet(
@@ -39,28 +39,28 @@ async def format_python_target(
 
 
 @rule
-def target_adaptor(target: PythonTargetAdaptor) -> ConcretePythonFormatTarget:
-  return ConcretePythonFormatTarget(target)
+def target_adaptor(target: PythonTargetAdaptor) -> _ConcretePythonFormatTarget:
+  return _ConcretePythonFormatTarget(target)
 
 
 @rule
-def app_adaptor(target: PythonAppAdaptor) -> ConcretePythonFormatTarget:
-  return ConcretePythonFormatTarget(target)
+def app_adaptor(target: PythonAppAdaptor) -> _ConcretePythonFormatTarget:
+  return _ConcretePythonFormatTarget(target)
 
 
 @rule
-def binary_adaptor(target: PythonBinaryAdaptor) -> ConcretePythonFormatTarget:
-  return ConcretePythonFormatTarget(target)
+def binary_adaptor(target: PythonBinaryAdaptor) -> _ConcretePythonFormatTarget:
+  return _ConcretePythonFormatTarget(target)
 
 
 @rule
-def tests_adaptor(target: PythonTestsAdaptor) -> ConcretePythonFormatTarget:
-  return ConcretePythonFormatTarget(target)
+def tests_adaptor(target: PythonTestsAdaptor) -> _ConcretePythonFormatTarget:
+  return _ConcretePythonFormatTarget(target)
 
 
 @rule
-def plugin_adaptor(target: PantsPluginAdaptor) -> ConcretePythonFormatTarget:
-  return ConcretePythonFormatTarget(target)
+def plugin_adaptor(target: PantsPluginAdaptor) -> _ConcretePythonFormatTarget:
+  return _ConcretePythonFormatTarget(target)
 
 
 def rules():

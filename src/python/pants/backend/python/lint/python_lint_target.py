@@ -22,13 +22,13 @@ class PythonLintTarget:
 
 
 @dataclass(frozen=True)
-class ConcretePythonLintTarget:
+class _ConcretePythonLintTarget:
   target: TargetAdaptor
 
 
 @rule
 async def lint_python_target(
-  wrapped_target: ConcretePythonLintTarget, union_membership: UnionMembership
+  wrapped_target: _ConcretePythonLintTarget, union_membership: UnionMembership
 ) -> LintResults:
   """This aggregator allows us to have multiple linters operate over the same Python targets.
 
@@ -41,28 +41,28 @@ async def lint_python_target(
 
 
 @rule
-def target_adaptor(target: PythonTargetAdaptor) -> ConcretePythonLintTarget:
-  return ConcretePythonLintTarget(target)
+def target_adaptor(target: PythonTargetAdaptor) -> _ConcretePythonLintTarget:
+  return _ConcretePythonLintTarget(target)
 
 
 @rule
-def app_adaptor(target: PythonAppAdaptor) -> ConcretePythonLintTarget:
-  return ConcretePythonLintTarget(target)
+def app_adaptor(target: PythonAppAdaptor) -> _ConcretePythonLintTarget:
+  return _ConcretePythonLintTarget(target)
 
 
 @rule
-def binary_adaptor(target: PythonBinaryAdaptor) -> ConcretePythonLintTarget:
-  return ConcretePythonLintTarget(target)
+def binary_adaptor(target: PythonBinaryAdaptor) -> _ConcretePythonLintTarget:
+  return _ConcretePythonLintTarget(target)
 
 
 @rule
-def tests_adaptor(target: PythonTestsAdaptor) -> ConcretePythonLintTarget:
-  return ConcretePythonLintTarget(target)
+def tests_adaptor(target: PythonTestsAdaptor) -> _ConcretePythonLintTarget:
+  return _ConcretePythonLintTarget(target)
 
 
 @rule
-def plugin_adaptor(target: PantsPluginAdaptor) -> ConcretePythonLintTarget:
-  return ConcretePythonLintTarget(target)
+def plugin_adaptor(target: PantsPluginAdaptor) -> _ConcretePythonLintTarget:
+  return _ConcretePythonLintTarget(target)
 
 
 def rules():
