@@ -20,6 +20,8 @@ def main() -> None:
       # error.
       "--tag=type_checked,partially_type_checked",
       "--backend-packages=pants.contrib.mypy",
+      "--pycheck-pyflakes-skip",
+      "--pycheck-newlines-skip",
       "lint",
       "--lint-mypy-config-file=build-support/mypy/mypy.ini",
       *globs,
