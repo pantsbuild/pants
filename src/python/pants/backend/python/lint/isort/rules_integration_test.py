@@ -3,8 +3,7 @@
 
 from typing import List, Optional, Sequence, Tuple
 
-from pants.backend.python.lint.format_python_target import FormatPythonTarget
-from pants.backend.python.lint.isort.rules import IsortSetup
+from pants.backend.python.lint.isort.rules import IsortSetup, IsortTarget
 from pants.backend.python.lint.isort.rules import rules as isort_rules
 from pants.backend.python.lint.isort.subsystem import Isort
 from pants.backend.python.rules.download_pex_bin import download_pex_bin
@@ -57,9 +56,9 @@ class IsortIntegrationTest(TestBase):
       create_pex_native_build_environment,
       download_pex_bin,
       RootRule(CreatePex),
-      RootRule(FormatPythonTarget),
       RootRule(Isort),
       RootRule(IsortSetup),
+      RootRule(IsortTarget),
       RootRule(PythonSetup),
       RootRule(PythonNativeCode),
       RootRule(SubprocessEnvironment),
@@ -79,7 +78,7 @@ class IsortIntegrationTest(TestBase):
     if config is not None:
       self.create_file(relpath=".isort.cfg", contents=config)
     input_snapshot = self.request_single_product(Snapshot, InputFilesContent(source_files))
-    target = FormatPythonTarget(
+    target = IsortTarget(
       TargetAdaptor(
         sources=EagerFilesetWithSpec('test', {'globs': []}, snapshot=input_snapshot),
         address=Address.parse("test:target"),

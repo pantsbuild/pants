@@ -9,6 +9,7 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.isolated_process import ExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTargets
 from pants.engine.legacy.structs import TargetAdaptor
+from pants.engine.objects import Collection
 from pants.engine.rules import UnionMembership, console_rule, union
 from pants.engine.selectors import Get, MultiGet
 
@@ -26,6 +27,10 @@ class FmtResult:
       stdout=process_result.stdout.decode(),
       stderr=process_result.stderr.decode(),
     )
+
+
+class FmtResults(Collection[FmtResult]):
+  """This collection allows us to aggregate multiple LintResults for a language."""
 
 
 @union
@@ -64,18 +69,20 @@ async def fmt(
   workspace: Workspace,
   union_membership: UnionMembership
 ) -> Fmt:
-  results = await MultiGet(
-    Get[FmtResult](FormatTarget, target.adaptor)
+  nested_results = await MultiGet(
+    Get[FmtResults](FormatTarget, target.adaptor)
     for target in targets
     if FormatTarget.is_formattable(target.adaptor, union_membership=union_membership)
   )
+  results = [result for results in nested_results for result in results]
 
   if not results:
     return Fmt(exit_code=0)
 
   # NB: this will fail if there are any conflicting changes, which we want to happen rather than
   # silently having one result override the other.
-  # TODO(#8722): how should we handle multiple auto-formatters touching the same files?
+  # TODO(#8722): get this working with multiple formatters for the same language. Right now, the
+  #  rule will fail if formatters touch the same file.
   merged_formatted_digest = await Get[Digest](
     DirectoriesToMerge(tuple(result.digest for result in results))
   )
@@ -93,5 +100,5 @@ async def fmt(
 
 def rules():
   return [
-    # fmt,
+    fmt,
   ]

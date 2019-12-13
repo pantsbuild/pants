@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
+
 from pants.engine.legacy.structs import (
   PantsPluginAdaptor,
   PythonAppAdaptor,
@@ -15,51 +16,53 @@ from pants.engine.selectors import Get, MultiGet
 from pants.rules.core.lint import LintResult, LintResults, LintTarget
 
 
+@union
+class PythonLintTarget:
+  pass
+
+
 @dataclass(frozen=True)
-class LintPythonTarget:
+class ConcretePythonLintTarget:
   target: TargetAdaptor
 
 
 @rule
-def target_adaptor(target: PythonTargetAdaptor) -> LintPythonTarget:
-  return LintPythonTarget(target)
-
-
-@rule
-def app_adaptor(target: PythonAppAdaptor) -> LintPythonTarget:
-  return LintPythonTarget(target)
-
-
-@rule
-def binary_adaptor(target: PythonBinaryAdaptor) -> LintPythonTarget:
-  return LintPythonTarget(target)
-
-
-@rule
-def tests_adaptor(target: PythonTestsAdaptor) -> LintPythonTarget:
-  return LintPythonTarget(target)
-
-
-@rule
-def plugin_adaptor(target: PantsPluginAdaptor) -> LintPythonTarget:
-  return LintPythonTarget(target)
-
-
-@union
-class PythonLinter:
-  pass
-
-
-@rule
-async def lint_python_target(target: LintPythonTarget, union_membership: UnionMembership) -> LintResults:
+async def lint_python_target(
+  wrapped_target: ConcretePythonLintTarget, union_membership: UnionMembership
+) -> LintResults:
   """This aggregator allows us to have multiple linters operate over the same Python targets.
 
   We do not care if linters overlap in their execution as linters have no side-effects."""
   results = await MultiGet(
-    Get[LintResult](PythonLinter, member(target.target))
-    for member in union_membership.union_rules[PythonLinter]
+    Get[LintResult](PythonLintTarget, member(wrapped_target.target))
+    for member in union_membership.union_rules[PythonLintTarget]
   )
   return LintResults(results)
+
+
+@rule
+def target_adaptor(target: PythonTargetAdaptor) -> ConcretePythonLintTarget:
+  return ConcretePythonLintTarget(target)
+
+
+@rule
+def app_adaptor(target: PythonAppAdaptor) -> ConcretePythonLintTarget:
+  return ConcretePythonLintTarget(target)
+
+
+@rule
+def binary_adaptor(target: PythonBinaryAdaptor) -> ConcretePythonLintTarget:
+  return ConcretePythonLintTarget(target)
+
+
+@rule
+def tests_adaptor(target: PythonTestsAdaptor) -> ConcretePythonLintTarget:
+  return ConcretePythonLintTarget(target)
+
+
+@rule
+def plugin_adaptor(target: PantsPluginAdaptor) -> ConcretePythonLintTarget:
+  return ConcretePythonLintTarget(target)
 
 
 def rules():
