@@ -49,6 +49,7 @@ class TestContext(Context):
 
     def __init__(self):
       self.logger = RunTrackerLogger(self)
+      self._cur_workunit = TestContext.DummyWorkUnit()
 
     class DummyArtifactCacheStats:
       def add_hits(self, cache_name, targets): pass
@@ -58,6 +59,16 @@ class TestContext(Context):
     artifact_cache_stats = DummyArtifactCacheStats()
 
     def report_target_info(self, scope, target, keys, val): pass
+
+    def get_current_workunit(self):
+      return self._cur_workunit
+
+    def register_thread(self, parent_workunit):
+      self._cur_workunit = parent_workunit
+
+    @contextmanager
+    def new_workunit(self, *args, **kwargs):
+      yield self.get_current_workunit()
 
 
   class TestLogger(logging.getLoggerClass()):  # type: ignore[misc] # MyPy does't understand this dynamic base class

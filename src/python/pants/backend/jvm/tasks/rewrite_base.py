@@ -1,6 +1,7 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import functools
 import itertools
 import math
 import os
@@ -77,15 +78,22 @@ class RewriteBase(NailgunTask, metaclass=ABCMeta):
   def _split_by_threads(self, inputs_list_of_lists: List[List[Any]], invoke_fn):
     parent_workunit = self.context.run_tracker.get_current_workunit()
 
-    def hacked_thread_excepthook(args):
-      raise args.exc_value
+    all_exceptions = []
+
+    def thread_exception_wrapper(fn):
+      @functools.wraps(fn)
+      def inner(*args, **kwargs):
+        try:
+          fn(*args, **kwargs)
+        except Exception as e:
+          all_exceptions.append(e)
 
     # Propagate exceptions in threads to the toplevel.
     threading.excepthook = hacked_thread_excepthook # type: ignore[attr-defined]
     all_threads = [
       threading.Thread(
         name=f'scalafmt invocation thread #{idx}/{len(inputs_list_of_lists)}',
-        target=invoke_fn,
+        target=thread_exception_wrapper(invoke_fn),
         args=[parent_workunit, inputs_single_list],
       )
       for idx, inputs_single_list in enumerate(inputs_list_of_lists)
@@ -96,7 +104,10 @@ class RewriteBase(NailgunTask, metaclass=ABCMeta):
       try:
         thread.join()
       except Exception as e:
-        raise TaskError(str(e), exit_code=1)
+        raise TaskError(str(e)) from e
+    if all_exceptions:
+      joined_str = ', '.join(str(e) for e in all_exceptions)
+      raise TaskError(f'all errors: {joined_str}') from all_exceptions[0]
 
   def _execute_for(self, targets):
     target_sources = self._calculate_sources(targets)

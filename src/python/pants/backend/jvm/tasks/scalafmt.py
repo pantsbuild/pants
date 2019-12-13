@@ -4,7 +4,7 @@
 import os
 import subprocess
 from abc import abstractmethod
-from typing import List, cast
+from typing import List
 
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.tasks.rewrite_base import RewriteBase
@@ -61,7 +61,7 @@ class ScalaFmtSubsystem(JvmToolMixin, NativeTool):
 
   @property
   def use_native_image(self) -> bool:
-    return cast(bool, self.get_options().use_native_image)
+    return bool(self.get_options().use_native_image)
 
   @classmethod
   def register_options(cls, register):
@@ -83,6 +83,10 @@ class ScalaFmt(RewriteBase):
   Classes that inherit from this should override additional_args and
   process_result to run different scalafmt commands.
   """
+
+  def __init__(self, *args, **kwargs):
+    super().__init__(*args, **kwargs)
+    self._all_command_lines = []
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -123,16 +127,24 @@ class ScalaFmt(RewriteBase):
       scope=subsystem.options_scope)
 
   def _invoke_native_image_subprocess(self, prefix_args, workunit, all_source_paths):
+    self._all_command_lines.append((prefix_args, all_source_paths))
     return subprocess.run(
       args=(prefix_args + all_source_paths),
       stdout=workunit.output('stdout'),
       stderr=workunit.output('stderr'),
     ).returncode
 
+  def _invoke_jvm_process(self, prefix_args, all_source_paths):
+    return self.runjava(classpath=self._tool_classpath(),
+                        main='org.scalafmt.cli.Cli',
+                        args=(prefix_args + all_source_paths),
+                        workunit_name='scalafmt',
+                        jvm_options=self.get_options().jvm_options)
+
   def invoke_tool(self, current_workunit, absolute_root, target_sources):
     self.context.log.debug(f'scalafmt called with sources: {target_sources}')
 
-    # If no config file is specified use default scalafmt config.
+    # If no config file is specified, use default scalafmt config.
     config_file = self.get_options().configuration
     prefix_args = list(self.additional_args)
     if config_file is not None:
@@ -152,11 +164,7 @@ class ScalaFmt(RewriteBase):
           constant_args=[prefix_args, workunit],
         ).execute(all_source_paths)
     else:
-      return self.runjava(classpath=self._tool_classpath(),
-                          main='org.scalafmt.cli.Cli',
-                          args=(prefix_args + all_source_paths),
-                          workunit_name='scalafmt',
-                          jvm_options=self.get_options().jvm_options)
+      return Xargs(self._invoke_jvm_process, constant_args=[prefix_args]).execute(all_source_paths)
 
   @property
   @abstractmethod
