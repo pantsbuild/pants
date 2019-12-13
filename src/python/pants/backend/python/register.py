@@ -11,7 +11,8 @@ from pants.backend.python.rules import (
   pex,
   pex_from_target_closure,
   python_create_binary,
-  python_test_runner)
+  python_test_runner,
+)
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.targets.python_app import PythonApp
 from pants.backend.python.targets.python_binary import PythonBinary

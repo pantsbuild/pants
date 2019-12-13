@@ -1,19 +1,19 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from dataclasses import dataclass
 from typing import Optional
 
-from dataclasses import dataclass
-
 from pants.backend.python.rules.inject_init import InjectedInitDigest
-from pants.backend.python.rules.pex import PexInterpreterConstraints, PexRequirements, CreatePex, \
-  Pex
+from pants.backend.python.rules.pex import (
+  CreatePex,
+  Pex,
+  PexInterpreterConstraints,
+  PexRequirements,
+)
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.engine.addressable import BuildFileAddresses
-from pants.engine.fs import (
-  Digest,
-  DirectoriesToMerge,
-)
+from pants.engine.fs import Digest, DirectoriesToMerge
 from pants.engine.legacy.graph import HydratedTarget, TransitiveHydratedTargets
 from pants.engine.rules import rule
 from pants.engine.selectors import Get, MultiGet
