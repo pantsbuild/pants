@@ -154,7 +154,6 @@ object InputUtils {
   def splitScala(jars: Seq[File], excluded: Set[String] = Set.empty): Option[ScalaJars] = {
     var  filtered = jars filterNot (excluded contains _.getName)
     // Added because the jars can be the entire classpath if using the default value.
-    filtered = filtered filter (_.getName matches ".*scala.*")
     val (compiler, other) = filtered partition (_.getName matches ScalaCompiler.pattern)
     val ScalaCompiler.regex(library_version) = compiler(0).getName
     val VersionedScalaLibraryJar = JarFile("scala-library", version=Some(library_version))
