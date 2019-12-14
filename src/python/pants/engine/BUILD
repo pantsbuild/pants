@@ -219,6 +219,7 @@ python_library(
     'src/python/pants/base:specs',
     'src/python/pants/rules/core:core',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(

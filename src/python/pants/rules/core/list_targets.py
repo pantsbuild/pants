@@ -1,6 +1,8 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from typing import Union
+
 from pants.base.specs import Specs
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.console import Console
@@ -36,9 +38,10 @@ async def list_targets(console: Console, list_options: ListOptions, specs: Specs
   provides = list_options.values.provides
   provides_columns = list_options.values.provides_columns
   documented = list_options.values.documented
+  collection: Union[HydratedTargets, BuildFileAddresses]
   if provides or documented:
     # To get provides clauses or documentation, we need hydrated targets.
-    collection = await Get(HydratedTargets, Specs, specs)
+    collection = await Get[HydratedTargets](Specs, specs)
     if provides:
       extractors = dict(
           address=lambda target: target.address.spec,
@@ -68,7 +71,7 @@ async def list_targets(console: Console, list_options: ListOptions, specs: Specs
       print_fn = print_documented
   else:
     # Otherwise, we can use only addresses.
-    collection = await Get(BuildFileAddresses, Specs, specs)
+    collection = await Get[BuildFileAddresses](Specs, specs)
     print_fn = lambda address: address.spec
 
   with list_options.line_oriented(console) as print_stdout:

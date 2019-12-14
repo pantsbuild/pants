@@ -18,6 +18,7 @@ python_library(
     'src/python/pants/source',
     'src/python/pants/util:collections',
   ],
+  tags = {"type_checked"},
 )
 
 python_tests(

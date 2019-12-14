@@ -224,4 +224,5 @@ python_tests(
   dependencies=[
     'src/python/pants/engine:objects',
   ],
+  tags = {"partially_type_checked"},
 )
