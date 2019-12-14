@@ -30,6 +30,7 @@ python_library(
     ':ossrh_publication_metadata',
     ':repository',
     ':scala_artifact',
+    'src/python/pants/backend/jvm/rules',
     'src/python/pants/backend/jvm/subsystems:jar_dependency_management',
     'src/python/pants/backend/jvm/subsystems:shader',
     'src/python/pants/backend/jvm/targets:all',

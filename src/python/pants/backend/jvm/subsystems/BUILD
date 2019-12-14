@@ -191,3 +191,14 @@ python_library(
   ],
   tags = {"partially_type_checked"},
 )
+
+python_library(
+  name='scalafmt',
+  sources=['scalafmt.py'],
+  dependencies=[
+    'src/python/pants/binaries',
+    'src/python/pants/engine:platform',
+    'src/python/pants/util:dirutil',
+    'src/python/pants/util:memo',
+  ]
+)

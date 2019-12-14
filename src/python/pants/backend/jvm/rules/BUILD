@@ -1,0 +1,13 @@
+python_library(
+  dependencies=[
+    '3rdparty/python:dataclasses',
+    'src/python/pants/backend/jvm/subsystems:scalafmt',
+    'src/python/pants/binaries',
+    'src/python/pants/engine:console',
+    'src/python/pants/engine:fs',
+    'src/python/pants/engine:goal',
+    'src/python/pants/engine:isolated_process',
+    'src/python/pants/engine:rules',
+    'src/python/pants/engine:selectors',
+  ],
+)

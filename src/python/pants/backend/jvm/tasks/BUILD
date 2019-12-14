@@ -702,6 +702,7 @@ python_library(
   sources = ['scalafmt.py'],
   dependencies = [
     ':rewrite_base',
+    'src/python/pants/backend/jvm/subsystems:scalafmt',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
