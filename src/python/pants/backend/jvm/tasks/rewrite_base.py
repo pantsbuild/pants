@@ -78,6 +78,8 @@ class RewriteBase(NailgunTask, metaclass=ABCMeta):
   def _split_by_threads(self, inputs_list_of_lists: List[List[Any]], invoke_fn):
     parent_workunit = self.context.run_tracker.get_current_workunit()
 
+    # Propagate exceptions in threads to the toplevel by checking this variable after joining all
+    # the threads.
     all_exceptions = []
 
     def thread_exception_wrapper(fn):
@@ -87,9 +89,8 @@ class RewriteBase(NailgunTask, metaclass=ABCMeta):
           fn(*args, **kwargs)
         except Exception as e:
           all_exceptions.append(e)
+      return inner
 
-    # Propagate exceptions in threads to the toplevel.
-    threading.excepthook = hacked_thread_excepthook # type: ignore[attr-defined]
     all_threads = [
       threading.Thread(
         name=f'scalafmt invocation thread #{idx}/{len(inputs_list_of_lists)}',
