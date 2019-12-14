@@ -3,6 +3,7 @@
 
 import os
 from textwrap import dedent
+from uuid import uuid4
 
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.subsystems.scoverage_platform import ScoveragePlatform
@@ -167,29 +168,75 @@ class ScalaFmtFormatTest(ScalaFmtTestBase):
       with open(os.path.join(output_dir, relative_test_file), 'r') as fp:
         self.assertNotEqual(self.test_file_contents, fp.read())
 
-  def _execute_native_image(self, **kwargs):
+  def _execute_native_image(self, num_sources=1, **kwargs):
     self.set_options(skip=False, **kwargs)
     self.set_options_for_scope('scalafmt', use_native_image=True)
 
-    context = self.context(target_roots=self.library)
+    uuid = '_' + str(uuid4()).replace('-', '_')
+
+    more_sources = [
+      self.create_file(relpath=f'src/scala/org/pantsbuild/badscalastyle/BadScalaStyle{i}.scala',
+                       contents=self.test_file_contents)
+      for i in range(0, num_sources)
+    ]
+    generated_library = self.make_target(spec=f'src/scala/org/pantsbuild/badscalastyle:{uuid}',
+                                         sources=[f'BadScalaStyle{i}.scala'
+                                                  for i in range(0, num_sources)],
+                                         target_type=ScalaLibrary)
+
+    context = self.context(target_roots=generated_library)
     task = self.execute(context)
 
     # Assert that it ran successfully.
-    with open(self.test_file, 'r') as fp:
-      self.assertNotEqual(self.test_file_contents, fp.read())
+    for src in more_sources:
+      with open(src, 'r') as fp:
+        self.assertNotEqual(self.test_file_contents, fp.read())
 
     # Assert that the native-image executable was most recently used.
     scalafmt_native_image_basedir = ScalaFmtSubsystem.global_instance().select()
-    most_recent_command_line = task._all_command_lines[-1]
-    prefix_args, _workunit, _all_source_paths = most_recent_command_line
-    executable_file = prefix_args[0]
-    self.assertTrue(executable_file.startswith(scalafmt_native_image_basedir))
+
+    all_source_paths = []
+    for prefix_args, source_paths in task._all_command_lines:
+      executable_file = prefix_args[0]
+      self.assertTrue(executable_file.startswith(scalafmt_native_image_basedir))
+      all_source_paths.append(source_paths)
+
+    return all_source_paths
+
+  def _assert_num_files_per_process_matches(self, all_source_paths, all_num_files):
+    self.assertEqual(len(all_source_paths), len(all_num_files))
+    for paths, expected_num_files in zip(all_source_paths, all_num_files):
+      self.assertEqual(len(paths), expected_num_files)
 
   def test_native_image_execution(self):
     self._execute_native_image()
 
   def test_native_image_threading_worker_count(self):
-    self._execute_native_image(worker_count=4)
+    all_source_paths = self._execute_native_image(num_sources=4, worker_count=2)
+    self._assert_num_files_per_process_matches(all_source_paths,
+                                               all_num_files=[2, 2])
+
+  def test_native_image_threading_uneven_divisor(self):
+    all_source_paths = self._execute_native_image(num_sources=5, worker_count=3)
+    self._assert_num_files_per_process_matches(all_source_paths,
+                                               all_num_files=[2, 2, 1])
+
+  def test_native_image_threading_massive_process_limit(self):
+    all_source_paths = self._execute_native_image(num_sources=2, worker_count=3)
+    self._assert_num_files_per_process_matches(all_source_paths,
+                                               all_num_files=[1, 1])
 
   def test_native_image_threading_files_per_worker(self):
-    self._execute_native_image(files_per_worker=1)
+    all_source_paths = self._execute_native_image(num_sources=2, files_per_worker=1)
+    self._assert_num_files_per_process_matches(all_source_paths,
+                                               all_num_files=[1, 1])
+
+  def test_native_image_threading_uneven_files_per_worker(self):
+    all_source_paths = self._execute_native_image(num_sources=5, files_per_worker=3)
+    self._assert_num_files_per_process_matches(all_source_paths,
+                                               all_num_files=[3, 2])
+
+  def test_native_image_threading_massive_files_per_process(self):
+    all_source_paths = self._execute_native_image(num_sources=2, files_per_worker=5)
+    self._assert_num_files_per_process_matches(all_source_paths,
+                                               all_num_files=[2])
