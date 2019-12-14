@@ -7,11 +7,17 @@ not undergone the vetting associated with ``stable`` releases.
 1.24.0.dev3 (12/13/2019)
 ------------------------
 
+API Changes
+~~~~~~~~~~~
+
+* Deprecate `--requirements` for PythonToolBase subclasses in favor of `--version` and `--extra-requirements` (#8789)
+  `PR #8789 <https://github.com/pantsbuild/pants/pull/8789>`_
+
+* Rename V2 goals to use the same naming scheme (#8774)
+  `PR #8774 <https://github.com/pantsbuild/pants/pull/8774>`_
+
 New Features
 ~~~~~~~~~~~~
-
-* A rule to create a pex from a target closure. (#8811)
-  `PR #8811 <https://github.com/pantsbuild/pants/pull/8811>`_
 
 * Add Flake8 linter to V2 (#8791)
   `PR #8791 <https://github.com/pantsbuild/pants/pull/8791>`_
@@ -22,11 +28,11 @@ New Features
 * Make v2 binary goal pay attention to --pants-distdir (#8775)
   `PR #8775 <https://github.com/pantsbuild/pants/pull/8775>`_
 
-* Fix V2 binary to work with multiple targets (#8781)
-  `PR #8781 <https://github.com/pantsbuild/pants/pull/8781>`_
-
 Bugfixes
 ~~~~~~~~
+
+* Fix V2 binary to work with multiple targets (#8781)
+  `PR #8781 <https://github.com/pantsbuild/pants/pull/8781>`_
 
 * Fix graph ambiguity of using multiple linters/formatters in V2 (#8801)
   `Issue #8722 <https://github.com/pantsbuild/pants/issues/8722>`_
@@ -57,11 +63,11 @@ Bugfixes
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+* A rule to create a pex from a target closure. (#8811)
+  `PR #8811 <https://github.com/pantsbuild/pants/pull/8811>`_
+
 * V2 console UI: Logging improvements (#8806)
   `PR #8806 <https://github.com/pantsbuild/pants/pull/8806>`_
-
-* Rename V2 goals to use the same naming scheme (#8774)
-  `PR #8774 <https://github.com/pantsbuild/pants/pull/8774>`_
 
 * Rework `Goal.Options` so that V2 goals work with MyPy (#8742)
   `PR #8742 <https://github.com/pantsbuild/pants/pull/8742>`_
@@ -74,9 +80,6 @@ Refactoring, Improvements, and Tooling
 
 * Load the bootstrapped zinc compiler from the zinc server's classpath. (#8753)
   `PR #8753 <https://github.com/pantsbuild/pants/pull/8753>`_
-
-* Deprecate `--requirements` for PythonToolBase subclasses in favor of `--version` and `--extra-requirements` (#8789)
-  `PR #8789 <https://github.com/pantsbuild/pants/pull/8789>`_
 
 * Curl in release script fails much more verbosely (#8780)
   `PR #8780 <https://github.com/pantsbuild/pants/pull/8780>`_
