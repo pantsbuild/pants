@@ -2,10 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from textwrap import wrap
+from typing import List
 
 from colors import blue, cyan, green, red
 
-from pants.help.help_info_extracter import HelpInfoExtracter
+from pants.help.help_info_extracter import HelpInfoExtracter, OptionHelpInfo
 
 
 class HelpFormatter:
@@ -39,19 +40,22 @@ class HelpFormatter:
     """
     oshi = HelpInfoExtracter(self._scope).get_option_scope_help_info(option_registrations_iter)
     lines = []
+
     def add_option(category, ohis):
-      if ohis:
-        lines.append('')
-        display_scope = scope or 'Global'
-        if category:
-          lines.append(self._maybe_blue('{} {} options:'.format(display_scope, category)))
-        else:
-          lines.append(self._maybe_blue('{} options:'.format(display_scope)))
-          if description:
-            lines.append(description)
-        lines.append(' ')
-        for ohi in ohis:
-          lines.extend(self.format_option(ohi))
+      if not ohis:
+        return
+      lines.append('')
+      display_scope = scope or 'Global'
+      if category:
+        lines.append(self._maybe_blue('{} {} options:'.format(display_scope, category)))
+      else:
+        lines.append(self._maybe_blue('{} options:'.format(display_scope)))
+        if description:
+          lines.append(description)
+      lines.append(' ')
+      for ohi in ohis:
+        lines.extend(self.format_option(ohi))
+
     add_option('', oshi.basic)
     if self._show_recursive:
       add_option('recursive', oshi.recursive)
@@ -59,12 +63,11 @@ class HelpFormatter:
       add_option('advanced', oshi.advanced)
     return lines
 
-  def format_option(self, ohi):
+  def format_option(self, ohi: OptionHelpInfo) -> List[str]:
     """Format the help output for a single option.
 
-    :param OptionHelpInfo ohi: Extracted information for option to print
+    :param ohi: Extracted information for option to print
     :return: Formatted help text for this option
-    :rtype: list of string
     """
     lines = []
     choices = 'one of: [{}] '.format(ohi.choices) if ohi.choices else ''
