@@ -112,7 +112,8 @@ python_tests(
   dependencies = [
     ':pants_ignore_test_base',
     'src/python/pants/base:project_tree',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -120,7 +121,8 @@ python_library(
   sources = ['pants_ignore_test_base.py'],
   dependencies = [
     ':project_tree_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -150,7 +152,8 @@ python_library(
   sources = ['project_tree_test_base.py'],
   dependencies = [
     'src/python/pants/util:dirutil',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(

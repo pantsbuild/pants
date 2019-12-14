@@ -7,6 +7,7 @@ python_tests(
   dependencies = [
     'src/python/pants/reporting',
   ],
+  tags = {"partially_type_checked"},
   timeout = 10,
 )
 
