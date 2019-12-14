@@ -2,7 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
+from typing import List, Optional
 
+from pants.engine.fs import Digest
 from pants.engine.legacy.structs import (
   PantsPluginAdaptor,
   PythonAppAdaptor,
@@ -12,8 +14,8 @@ from pants.engine.legacy.structs import (
   TargetAdaptor,
 )
 from pants.engine.rules import UnionMembership, UnionRule, rule, union
-from pants.engine.selectors import Get, MultiGet
-from pants.rules.core.fmt import FmtResult, FmtResults, FormatTarget
+from pants.engine.selectors import Get
+from pants.rules.core.fmt import AggregatedFmtResults, FmtResult, FormatTarget
 
 
 @union
@@ -29,13 +31,18 @@ class _ConcretePythonFormatTarget:
 @rule
 async def format_python_target(
   wrapped_target: _ConcretePythonFormatTarget, union_membership: UnionMembership
-) -> FmtResults:
-  """This aggregator allows us to have multiple formatters operate over the same Python targets."""
-  results = await MultiGet(
-    Get[FmtResult](PythonFormatTarget, member(wrapped_target.target))
-    for member in union_membership.union_rules[PythonFormatTarget]
-  )
-  return FmtResults(results)
+) -> AggregatedFmtResults:
+  """This aggregator allows us to have multiple formatters safely operate over the same Python
+  targets, even if they modify the same files."""
+  prior_formatter_result_digest: Optional[Digest] = None
+  results: List[FmtResult] = []
+  for member in union_membership.union_rules[PythonFormatTarget]:
+    result = await Get[FmtResult](
+      PythonFormatTarget, member(wrapped_target.target, prior_formatter_result_digest)
+    )
+    results.append(result)
+    prior_formatter_result_digest = result.digest
+  return AggregatedFmtResults(tuple(results), combined_digest=prior_formatter_result_digest)
 
 
 @rule

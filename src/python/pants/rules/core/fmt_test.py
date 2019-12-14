@@ -16,7 +16,7 @@ from pants.engine.fs import (
 from pants.engine.legacy.graph import HydratedTarget, HydratedTargets
 from pants.engine.legacy.structs import JvmAppAdaptor, PythonTargetAdaptor, TargetAdaptor
 from pants.engine.rules import UnionMembership
-from pants.rules.core.fmt import Fmt, FmtResult, FmtResults, FormatTarget, fmt
+from pants.rules.core.fmt import AggregatedFmtResults, Fmt, FmtResult, FormatTarget, fmt
 from pants.source.wrapped_globs import EagerFilesetWithSpec
 from pants.testutil.engine.util import MockConsole, MockGet, run_rule
 from pants.testutil.test_base import TestBase
@@ -68,11 +68,11 @@ class FmtTest(TestBase):
       ],
       mock_gets=[
         MockGet(
-          product_type=FmtResults,
+          product_type=AggregatedFmtResults,
           subject_type=PythonTargetAdaptor,
-          mock=lambda adaptor: FmtResults([
+          mock=lambda adaptor: AggregatedFmtResults((
             FmtResult(digest=result_digest, stdout=f"Formatted `{adaptor.name}`", stderr=""),
-          ])
+          ), combined_digest=result_digest)
         ),
         MockGet(product_type=Digest, subject_type=DirectoriesToMerge, mock=lambda _: result_digest),
       ],
@@ -110,8 +110,9 @@ class FmtTest(TestBase):
     self.assert_workspace_modified()
 
   def test_multiple_targets(self) -> None:
-    # NB: we do not test the case where FmtResults have conflicting changes, as that logic
-    # is handled by DirectoriesToMerge.
+    # NB: we do not test the case where AggregatedFmtResults have conflicting changes, as that
+    # logic is handled by DirectoriesToMerge and is avoided by each language having its own
+    # aggregator rule.
     result, stdout = self.run_fmt_rule(
       targets=[self.make_hydrated_target(name="t1"), self.make_hydrated_target(name="t2")]
     )
