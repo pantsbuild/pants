@@ -493,7 +493,9 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              help='The maximum number of times to loop when `{}` is specified.'.format(loop_flag))
 
     register('-t', '--timeout', advanced=True, type=int, metavar='<seconds>',
-             help='Number of seconds to wait for http connections.')
+            removal_version="1.26.0.dev2",
+            removal_hint="This option is not used and may be removed with no change in behavior. ",
+            help='Number of seconds to wait for http connections.')
     # TODO: After moving to the new options system these abstraction leaks can go away.
     register('-k', '--kill-nailguns', advanced=True, type=bool,
              help='Kill nailguns before exiting')
