@@ -26,6 +26,7 @@ class CreatePexFromTargetClosure:
   build_file_addresses: BuildFileAddresses
   output_filename: str
   entry_point: Optional[str] = None
+  additional_requirements: tuple = ()
 
 
 @rule(name="Create PEX from targets")
@@ -53,7 +54,10 @@ async def create_pex_from_target_closure(request: CreatePexFromTargetClosure,
   all_input_digests = [sources_digest, inits_digest.directory_digest]
   merged_input_files = await Get[Digest](DirectoriesToMerge,
                                          DirectoriesToMerge(directories=tuple(all_input_digests)))
-  requirements = PexRequirements.create_from_adaptors(all_target_adaptors)
+  requirements = PexRequirements.create_from_adaptors(
+    adaptors=all_target_adaptors,
+    additional_requirements=request.additional_requirements
+  )
 
   create_pex_request = CreatePex(
     output_filename=request.output_filename,
