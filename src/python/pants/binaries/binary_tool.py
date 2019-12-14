@@ -4,10 +4,13 @@
 import logging
 import os
 import threading
-from typing import Optional
+from dataclasses import dataclass
+from typing import List, Optional, cast
 
 from pants.binaries.binary_util import BinaryRequest, BinaryUtil
-from pants.engine.fs import PathGlobs, PathGlobsAndRoot
+from pants.engine.fs import Digest, PathGlobs, PathGlobsAndRoot, Snapshot, UrlToFetch
+from pants.engine.rules import RootRule, rule
+from pants.engine.selectors import Get
 from pants.fs.archive import XZCompressedTarArchiver, create_archiver
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method, memoized_property
@@ -115,6 +118,28 @@ class BinaryToolBase(Subsystem):
       version_registration_kwargs['fingerprint'] = True
     register('--version', **version_registration_kwargs)
 
+    register('--buildroot-path', type=str, default=None, fingerprint=True,
+             help='???')
+    register('--fingerprint', type=str, default=None, fingerprint=True,
+             help='???')
+    register('--size-bytes', type=int, default=None, fingerprint=True,
+             help='???')
+
+  @property
+  def _buildroot_globs(self) -> Optional[PathGlobs]:
+    path = self.get_options().buildroot_path
+    if not path:
+      return None
+    return PathGlobs([path])
+
+  @property
+  def _fetch_fingerprint(self) -> str:
+    return cast(str, self.get_options().fingerprint)
+
+  @property
+  def _fetch_size_bytes(self) -> int:
+    return cast(int, self.get_options().size_bytes)
+
   @memoized_method
   def select(self, context=None):
     """Returns the path to the specified binary tool.
@@ -175,6 +200,19 @@ class BinaryToolBase(Subsystem):
       external_url_generator=self.get_external_url_generator(),
       archiver=self._get_archiver())
 
+  def _get_url_to_fetch(self) -> UrlToFetch:
+    version = self.version()
+    req = self._make_binary_request(version)
+    url_generator = self._binary_util.get_url_generator(req)
+    host_platform = self._binary_util.host_platform()
+    urls: List[str] = url_generator.generate_urls(version, host_platform)
+
+    url_to_fetch = next(iter(urls))
+
+    digest = Digest(self._fetch_fingerprint, self._fetch_size_bytes)
+
+    return UrlToFetch(url_to_fetch, digest)
+
   def _select_for_version(self, version):
     binary_request = self._make_binary_request(version)
     return self._binary_util.select(binary_request)
@@ -230,3 +268,25 @@ class XZ(NativeTool):
 
   def _executable_location(self):
     return os.path.join(self.select(), 'bin', 'xz')
+
+
+@dataclass(frozen=True)
+class BinaryToolFetchRequest:
+  tool: BinaryToolBase
+
+
+@rule
+async def fetch_binary_tool(req: BinaryToolFetchRequest) -> Snapshot:
+  local_globs = req.tool._buildroot_globs
+  if local_globs:
+    return await Get[Snapshot](PathGlobs, local_globs)
+  else:
+    url_to_fetch = req.tool._get_url_to_fetch()
+    return await Get[Snapshot](UrlToFetch, url_to_fetch)
+
+
+def rules():
+  return [
+    RootRule(BinaryToolFetchRequest),
+    fetch_binary_tool,
+  ]

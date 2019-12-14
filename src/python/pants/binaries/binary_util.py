@@ -7,11 +7,11 @@ import os
 import posixpath
 import shutil
 import sys
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import reduce
-from typing import Any, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 from twitter.common.collections import OrderedSet
 
@@ -50,7 +50,7 @@ class HostPlatform:
     return [self.os_name, self.arch_or_version]
 
 
-class BinaryToolUrlGenerator:
+class BinaryToolUrlGenerator(ABC):
   """Encapsulates the selection of urls to download for some binary tool.
 
   :API: public
@@ -61,7 +61,7 @@ class BinaryToolUrlGenerator:
   """
 
   @abstractmethod
-  def generate_urls(self, version, host_platform):
+  def generate_urls(self, version, host_platform) -> List[str]:
     """Return a list of urls to download some binary tool from given a version and platform.
 
     Each url is tried in order to resolve the binary -- if the list of urls is empty, or downloading
@@ -324,7 +324,7 @@ class BinaryUtil:
   # to fail until a binary is requested. The HostPlatform should be a parameter that gets lazily
   # resolved by the v2 engine.
   @memoized_method
-  def _host_platform(self):
+  def host_platform(self):
     uname_result = self._uname_func()
     sysname, _, release, _, machine = uname_result
     os_id_key = sysname.lower()
@@ -364,9 +364,9 @@ class BinaryUtil:
         .format(os_id_tuple, self._path_by_id))
 
   def _get_download_path(self, binary_request):
-    return binary_request.get_download_path(self._host_platform())
+    return binary_request.get_download_path(self.host_platform())
 
-  def _get_url_generator(self, binary_request):
+  def get_url_generator(self, binary_request):
 
     external_url_generator = binary_request.external_url_generator
 
@@ -384,7 +384,7 @@ class BinaryUtil:
     return url_generator
 
   def _get_urls(self, url_generator, binary_request):
-    return url_generator.generate_urls(binary_request.version, self._host_platform())
+    return url_generator.generate_urls(binary_request.version, self.host_platform())
 
   def select(self, binary_request):
     """Fetches a file, unpacking it if necessary."""
@@ -397,7 +397,7 @@ class BinaryUtil:
       raise self.BinaryResolutionError(binary_request, e)
 
     try:
-      url_generator = self._get_url_generator(binary_request)
+      url_generator = self.get_url_generator(binary_request)
     except self.NoBaseUrlsError as e:
       raise self.BinaryResolutionError(binary_request, e)
 
