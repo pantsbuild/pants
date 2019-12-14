@@ -4,6 +4,98 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.24.0.dev3 (12/13/2019)
+------------------------
+
+New Features
+~~~~~~~~~~~~
+
+* A rule to create a pex from a target closure. (#8811)
+  `PR #8811 <https://github.com/pantsbuild/pants/pull/8811>`_
+
+* Add Flake8 linter to V2 (#8791)
+  `PR #8791 <https://github.com/pantsbuild/pants/pull/8791>`_
+
+* Support working_directory in EPRs. (#8784)
+  `PR #8784 <https://github.com/pantsbuild/pants/pull/8784>`_
+
+* Make v2 binary goal pay attention to --pants-distdir (#8775)
+  `PR #8775 <https://github.com/pantsbuild/pants/pull/8775>`_
+
+* Fix V2 binary to work with multiple targets (#8781)
+  `PR #8781 <https://github.com/pantsbuild/pants/pull/8781>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix graph ambiguity of using multiple linters/formatters in V2 (#8801)
+  `Issue #8722 <https://github.com/pantsbuild/pants/issues/8722>`_
+  `PR #8801 <https://github.com/pantsbuild/pants/pull/8801>`_
+
+* Fix registration of unions that are split across multiple backends (#8810)
+  `PR #8810 <https://github.com/pantsbuild/pants/pull/8810>`_
+
+* Fix enginedisplay printing (#8799)
+  `PR #8799 <https://github.com/pantsbuild/pants/pull/8799>`_
+
+* Add cherry-picked commit to 1.23.0 (#8804)
+  `PR #8804 <https://github.com/pantsbuild/pants/pull/8804>`_
+
+* Version changes should invalidate pytest runs. (#8790)
+  `PR #8790 <https://github.com/pantsbuild/pants/pull/8790>`_
+
+* Fix pantsbuild wheel publishing. (#8782)
+  `PR #8782 <https://github.com/pantsbuild/pants/pull/8782>`_
+
+* Revert "Upgrade to Pex 2.0.3. (#8704)" (#8787)
+  `PR #8704 <https://github.com/pantsbuild/pants/pull/8704>`_
+  `PR #8787 <https://github.com/pantsbuild/pants/pull/8787>`_
+
+* Add parent-build-id option to know what runs are inner runs and not to run them with pantsd (#8724)
+  `PR #8724 <https://github.com/pantsbuild/pants/pull/8724>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* V2 console UI: Logging improvements (#8806)
+  `PR #8806 <https://github.com/pantsbuild/pants/pull/8806>`_
+
+* Rename V2 goals to use the same naming scheme (#8774)
+  `PR #8774 <https://github.com/pantsbuild/pants/pull/8774>`_
+
+* Rework `Goal.Options` so that V2 goals work with MyPy (#8742)
+  `PR #8742 <https://github.com/pantsbuild/pants/pull/8742>`_
+
+* Fix V2 linters needing to implement a formatter no-op (#8795)
+  `PR #8795 <https://github.com/pantsbuild/pants/pull/8795>`_
+
+* [IntelliJ] Refactor some code in export-dep-as-jar goal (#8792)
+  `PR #8792 <https://github.com/pantsbuild/pants/pull/8792>`_
+
+* Load the bootstrapped zinc compiler from the zinc server's classpath. (#8753)
+  `PR #8753 <https://github.com/pantsbuild/pants/pull/8753>`_
+
+* Deprecate `--requirements` for PythonToolBase subclasses in favor of `--version` and `--extra-requirements` (#8789)
+  `PR #8789 <https://github.com/pantsbuild/pants/pull/8789>`_
+
+* Curl in release script fails much more verbosely (#8780)
+  `PR #8780 <https://github.com/pantsbuild/pants/pull/8780>`_
+
+* This test has been flaky far too long. (#8788)
+  `PR #8788 <https://github.com/pantsbuild/pants/pull/8788>`_
+
+* [V2 UI] Pipe Python-side `Console` to the engine when --v2-ui is set (#8771)
+  `PR #8771 <https://github.com/pantsbuild/pants/pull/8771>`_
+
+* Prep for 1.23.0 (#8785)
+  `PR #8785 <https://github.com/pantsbuild/pants/pull/8785>`_
+
+* Cleanup type ignore. (#8777)
+  `PR #8777 <https://github.com/pantsbuild/pants/pull/8777>`_
+
+* Remove deprecated `./pants mypy` in favor of `./pants lint.mypy` (#8773)
+  `PR #8773 <https://github.com/pantsbuild/pants/pull/8773>`_
+
 1.24.0.dev2 (12/08/2019)
 ------------------------
 
