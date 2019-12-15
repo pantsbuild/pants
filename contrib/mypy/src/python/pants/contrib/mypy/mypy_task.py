@@ -4,7 +4,7 @@
 import os
 from pathlib import Path
 from textwrap import dedent
-from typing import Iterable, List
+from typing import Iterable, List, Optional
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.targets.python_binary import PythonBinary
@@ -24,6 +24,8 @@ from pants.util.memo import memoized_property
 from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 from pex.pex_info import PexInfo
+
+from pants.contrib.mypy.subsystem import MyPy
 
 
 class MypyTaskError(TaskError):
@@ -54,15 +56,23 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
 
   @classmethod
   def register_options(cls, register):
-    register('--version', default='0.740', help='The version of mypy to use.')
+    register('--version', default='0.740', help='The version of MyPy to use.',
+             removal_version='1.26.0.dev3',
+             removal_hint="Use `--mypy-version` instead and specify the full requirement string. "
+                          "For example, rather than `--lint-mypy-version=0.740`, set "
+                          "`--mypy-version='mypy==0.740`. This change aligns MyPy with the "
+                          "Pants interface for other Python linters like isort, Black, and Flake8.")
     register('--include-requirements', type=bool, default=False,
              help='Whether to include the transitive requirements of targets being checked. This is'
                   'useful if those targets depend on mypy plugins or distributions that provide '
                   'type stubs that should be active in the check.')
     register('--config-file', default=None,
-             help='Path mypy configuration file, relative to buildroot.')
+             help='Path to MyPy configuration file, relative to buildroot.',
+             removal_version='1.26.0.dev3',
+             removal_hint="Use `--mypy-config` instead. This change aligns MyPy with the Pants "
+                          "interface for other Python linters like isort, Black, and Flake8.")
     register('--whitelist-tag-name', default=None,
-             help='Tag name to identify python targets to execute MyPy')
+             help='Tag name to identify Python targets to execute MyPy')
     register('--verbose', type=bool, default=False,
              help='Extra detail showing non-whitelisted targets')
 
@@ -72,7 +82,7 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super().subsystem_dependencies() + (PythonInterpreterCache,)
+    return super().subsystem_dependencies() + (PythonInterpreterCache, MyPy)
 
   def find_mypy_interpreter(self):
     interpreters = self._interpreter_cache.setup(
@@ -149,21 +159,33 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
   def _interpreter_cache(self):
     return PythonInterpreterCache.global_instance()
 
+  @memoized_property
+  def _mypy_subsystem(self):
+    return MyPy.global_instance()
+
   def _get_mypy_pex(self, py3_interpreter: PythonInterpreter, *extra_pexes: PEX) -> PEX:
-    options = self.get_options()
-    mypy_version = options.version
+
+    def get_mypy_version() -> str:
+      task_version_configured = not self.get_options().is_default('version')
+      subsystem_version_configured = not self._mypy_subsystem.get_options().is_default('version')
+      if task_version_configured and subsystem_version_configured:
+        raise ValueError(
+          "Conflicting options for the MyPy version used. You used the new, preferred "
+          "`--mypy-version`, but also used the deprecated `--lint-mypy-version`.\nPlease use "
+          "only one of these (preferably `--mypy-version`)."
+        )
+      if task_version_configured:
+        return f"mypy=={self.get_options().version}"
+      return self._mypy_subsystem.get_options().version
+
+    mypy_version = get_mypy_version()
     extras_hash = hash_utils.hash_all(hash_utils.hash_dir(Path(extra_pex.path()))
                                       for extra_pex in extra_pexes)
 
-    path = Path(self.workdir,
-                str(py3_interpreter.identity),
-                f'{mypy_version}-{extras_hash}')
+    path = Path(self.workdir, str(py3_interpreter.identity), f'{mypy_version}-{extras_hash}')
     pex_dir = str(path)
     if not path.is_dir():
-      mypy_requirement_pex = self.resolve_requirement_strings(
-        py3_interpreter,
-        [f'mypy=={mypy_version}']
-      )
+      mypy_requirement_pex = self.resolve_requirement_strings(py3_interpreter, [mypy_version])
       pex_info = PexInfo.default()
       pex_info.entry_point = 'pants_mypy_launcher'
       with self.merged_pex(path=pex_dir,
@@ -234,9 +256,23 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
           f.write(f'{source}\n')
       # Construct the mypy command line.
       cmd = [f'--python-version={interpreter_for_targets.identity.python}']
-      if self.get_options().config_file:
-        cmd.append(f'--config-file={os.path.join(get_buildroot(), self.get_options().config_file)}')
+
+      def get_config() -> Optional[str]:
+        task_config = self.get_options().config_file
+        subsystem_config = self._mypy_subsystem.get_options().config
+        if task_config and subsystem_config:
+          raise ValueError(
+            "Conflicting options for the config file used. You used the new, preferred "
+            "`--mypy-config`, but also used the deprecated `--lint-mypy-config-file`.\nPlease use "
+            "only one of these (preferably `--mypy-config`)."
+          )
+        return subsystem_config or task_config or None
+
+      config = get_config()
+      if config:
+        cmd.append(f'--config-file={os.path.join(get_buildroot(), config)}')
       cmd.extend(self.get_passthru_args())
+      cmd.extend(self._mypy_subsystem.get_args())
       cmd.append(f'@{sources_list_path}')
 
       with self.context.new_workunit(name='create_mypy_pex', labels=[WorkUnitLabel.PREP]):

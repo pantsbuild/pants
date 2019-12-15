@@ -3,7 +3,7 @@
 
 from pants.goal.task_registrar import TaskRegistrar as task
 
-from pants.contrib.mypy.tasks.mypy_task import MypyTask
+from pants.contrib.mypy.mypy_task import MypyTask
 
 
 def register_goals():
