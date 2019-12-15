@@ -6,13 +6,10 @@ import subprocess
 from abc import abstractmethod
 from typing import List
 
-from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.subsystems.scalafmt import ScalaFmtSubsystem
 from pants.backend.jvm.tasks.rewrite_base import RewriteBase
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
-from pants.java.jar.jar_dependency import JarDependency
-from pants.option.custom_types import file_option
 from pants.process.xargs import Xargs
 from pants.task.fmt_task_mixin import FmtTaskMixin
 from pants.task.lint_task_mixin import LintTaskMixin
@@ -34,12 +31,6 @@ class ScalaFmt(RewriteBase):
     return super().subsystem_dependencies() + (
       ScalaFmtSubsystem.scoped(cls),
     )
-
-  @classmethod
-  def register_options(cls, register):
-    super().register_options(register)
-    register('--configuration', advanced=True, type=file_option, fingerprint=True,
-              help='Path to scalafmt config file, if not specified default scalafmt config used')
 
   @classmethod
   def target_types(cls):
@@ -86,10 +77,10 @@ class ScalaFmt(RewriteBase):
     self.context.log.debug(f'scalafmt called with sources: {target_sources}')
 
     # If no config file is specified, use default scalafmt config.
-    config_file = self.get_options().configuration
+    config_file = ScalaFmtSubsystem.scoped_instance(self).configuration
     prefix_args = list(self.additional_args)
     if config_file is not None:
-      prefix_args.extend(['--config', config_file])
+      prefix_args.extend(['--config', str(config_file)])
 
     all_source_paths = [source for _target, source in target_sources]
 

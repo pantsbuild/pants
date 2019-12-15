@@ -7,7 +7,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Iterable, Optional, Tuple
 
 from pants.engine.objects import Collection
-from pants.engine.rules import RootRule
+from pants.engine.rules import RootRule, rule
+from pants.engine.selectors import Get
 from pants.option.custom_types import GlobExpansionConjunction as GlobExpansionConjunction
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.util.dirutil import maybe_read_file, safe_delete, safe_file_dump
@@ -239,6 +240,52 @@ EMPTY_SNAPSHOT = Snapshot(
 )
 
 
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class SingleFile:
+  digest: Digest
+  file_path: Path
+
+  def __init__(self, snapshot: Snapshot) -> None:
+    # if snapshot.dirs:
+    #   raise TypeError(f'snapshot {snapshot} for {self.__class__} must have no directories!')
+    if len(snapshot.files) != 1:
+      raise TypeError(f'snapshot {snapshot} for {self.__class__} must have exactly one file!')
+    self.file_path = Path(snapshot.files[0])
+    self.digest = snapshot.directory_digest
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class FileCollection:
+  digest: Digest
+  file_paths: Tuple[Path, ...]
+
+  def __init__(self, snapshot: Snapshot) -> None:
+    # if snapshot.dirs:
+    #   raise TypeError(f'snapshot {snapshot} for {self.__class__} must have no directories!')
+    self.digest = snapshot.directory_digest
+    self.file_paths = [Path(f) for f in snapshot.files]
+
+
+class ManyFileCollections(Collection[FileCollection]):
+  """???"""
+
+
+@rule
+async def merge_file_collections(many_file_collections: ManyFileCollections) -> FileCollection:
+  all_file_paths = [p for coll in many_file_collections for p in coll.file_paths]
+  all_digests = [coll.digest for coll in many_file_collections]
+
+  merged_digest = await Get[Digest](DirectoriesToMerge(tuple(all_digests)))
+  synthesized_merged_snapshot = Snapshot(
+    directory_digest=merged_digest,
+    files=tuple(str(p) for p in all_file_paths),
+    dirs=(),
+  )
+  return FileCollection(synthesized_merged_snapshot)
+
+
 def create_fs_rules():
   """Creates rules that consume the intrinsic filesystem types."""
   return [
@@ -250,4 +297,6 @@ def create_fs_rules():
     RootRule(DirectoryWithPrefixToStrip),
     RootRule(DirectoryWithPrefixToAdd),
     RootRule(UrlToFetch),
+    RootRule(ManyFileCollections),
+    merge_file_collections,
   ]

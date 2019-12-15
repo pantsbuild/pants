@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import List, Optional, cast
 
 from pants.binaries.binary_util import BinaryRequest, BinaryUtil
-from pants.engine.fs import Digest, PathGlobs, PathGlobsAndRoot, Snapshot, UrlToFetch
+from pants.engine.fs import Digest, PathGlobs, PathGlobsAndRoot, SingleFile, Snapshot, UrlToFetch
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get
 from pants.fs.archive import XZCompressedTarArchiver, create_archiver
@@ -120,10 +120,13 @@ class BinaryToolBase(Subsystem):
 
     register('--buildroot-path', type=str, default=None, fingerprint=True,
              help='???')
-    register('--fingerprint', type=str, default=None, fingerprint=True,
+    register('--fingerprint', type=str, default=cls.default_fingerprint, fingerprint=True,
              help='???')
-    register('--size-bytes', type=int, default=None, fingerprint=True,
+    register('--size-bytes', type=int, default=cls.default_size_bytes, fingerprint=True,
              help='???')
+
+  default_fingerprint: Optional[str] = None
+  default_size_bytes: Optional[int] = None
 
   @property
   def _buildroot_globs(self) -> Optional[PathGlobs]:
@@ -276,13 +279,15 @@ class BinaryToolFetchRequest:
 
 
 @rule
-async def fetch_binary_tool(req: BinaryToolFetchRequest) -> Snapshot:
+async def fetch_binary_tool(req: BinaryToolFetchRequest) -> SingleFile:
   local_globs = req.tool._buildroot_globs
   if local_globs:
-    return await Get[Snapshot](PathGlobs, local_globs)
+    ret = await Get[Snapshot](PathGlobs, local_globs)
   else:
     url_to_fetch = req.tool._get_url_to_fetch()
-    return await Get[Snapshot](UrlToFetch, url_to_fetch)
+    ret = await Get[Snapshot](UrlToFetch, url_to_fetch)
+
+  return SingleFile(ret)
 
 
 def rules():
