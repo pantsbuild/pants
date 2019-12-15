@@ -49,6 +49,32 @@ class PyTest(Subsystem):
       advanced=True,
       help='The maximum timeout (in seconds) that can be set on a test target.',
     )
+    register('--cov', type=str, default=None) # TODO Get rid of this.
+    register(
+      '--coverage',
+      help='Emit coverage information for specified packages or directories (absolute or '
+           'relative to the build root).  The special value "auto" indicates that Pants '
+           'should attempt to deduce which packages to emit coverage for.',
+    )
+    register( # TODO wire this up.
+      '--coverage-include-test-sources',
+      type=bool,
+      help='Whether to include test source files in coverage measurement.',
+    )
+    register( # TODO wire this up
+      '--coverage-reports',
+      choices=('xml', 'html'),
+      type=list,
+      member_type=str,
+      default=('xml', 'html'),
+      help='Which coverage reports to emit.',
+    )
+    register(
+      '--coverage-output-dir',
+      metavar='<DIR>',
+      default=None,
+      help='Directory to emit coverage reports to. If not specified, a default within dist is used.',
+    )
 
   def get_requirement_strings(self) -> Tuple[str, ...]:
     """Returns a tuple of requirements-style strings for Pytest and Pytest plugins."""

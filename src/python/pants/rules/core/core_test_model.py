@@ -1,0 +1,50 @@
+# Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from dataclasses import dataclass
+from enum import Enum
+
+from pants.engine.fs import Digest
+from pants.engine.isolated_process import FallibleExecuteProcessResult
+from pants.engine.objects import union
+
+
+class Status(Enum):
+  SUCCESS = "SUCCESS"
+  FAILURE = "FAILURE"
+
+
+@dataclass(frozen=True)
+class TestResult:
+  status: Status
+  stdout: str
+  stderr: str
+  coverage_digest: Digest
+
+  # Prevent this class from being detected by pytest as a test class.
+  __test__ = False
+
+  @staticmethod
+  def from_fallible_execute_process_result(
+    process_result: FallibleExecuteProcessResult
+  ) -> "TestResult":
+    return TestResult(
+      status=Status.SUCCESS if process_result.exit_code == 0 else Status.FAILURE,
+      stdout=process_result.stdout.decode(),
+      stderr=process_result.stderr.decode(),
+      coverage_digest=process_result.output_directory_digest,
+    )
+
+
+@union
+class TestTarget:
+  """A union for registration of a testable target type."""
+
+  # Prevent this class from being detected by pytest as a test class.
+  __test__ = False
+
+  @staticmethod
+  def non_member_error_message(subject):
+    if hasattr(subject, 'address'):
+      return f'{subject.address.reference()} is not a testable target.'
+    return None

@@ -6,6 +6,7 @@ from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.python_requirements import PythonRequirements
 from pants.backend.python.rules import (
+  coverage,
   download_pex_bin,
   inject_init,
   pex,
@@ -95,6 +96,7 @@ def register_goals():
 
 def rules():
   return (
+    *coverage.rules(),
     *download_pex_bin.rules(),
     *inject_init.rules(),
     *prepare_chrooted_python_sources.rules(),

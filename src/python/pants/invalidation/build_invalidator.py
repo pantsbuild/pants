@@ -17,7 +17,7 @@ from pants.util.dirutil import safe_mkdir
 # Bump this to invalidate all existing keys in artifact caches across all pants deployments in the
 # world. Do this if you've made a change that invalidates existing artifacts, e.g.,  fixed a bug
 # that caused bad artifacts to be cached.
-GLOBAL_CACHE_KEY_GEN_VERSION = '7'
+GLOBAL_CACHE_KEY_GEN_VERSION = '9'
 
 
 class CacheKey(namedtuple('CacheKey', ['id', 'hash'])):
