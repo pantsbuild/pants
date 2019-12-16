@@ -265,25 +265,10 @@ class ExportDepAsJar(ConsoleTask):
     targets.extend(additional_java_targets)
     return targets
 
-  def _get_targets_to_print(self, all_targets, target_roots_set):
-    def target_is_between_roots(t):
-      transitive_dependencies = set(
-        DependencyContext.global_instance().dependencies_respecting_strict_deps(t) if hasattr(t, 'strict_deps') else \
-          DependencyContext.global_instance().all_dependencies(t)
-      )
-      return len(transitive_dependencies.intersection(target_roots_set)) > 0
-
-    def target_is_a_resource(t):
-      return isinstance(t, Resources)
-
-    printable_targets = []
-    for target in all_targets:
-      print(f"BL: COnsidering target {target}, with target_root_set {target_roots_set}. is_a_resource {target_is_a_resource(target)}, is_between_roots {target_is_between_roots(target)}")
-      if (target in target_roots_set) or \
-        target_is_between_roots(target) or \
-        target_is_a_resource(target):
-        printable_targets.append(target)
-    return printable_targets
+  def _get_targets_to_make_into_modules(self, target_roots_set):
+    target_root_addresses = [t.address for t in target_roots_set]
+    dependees_of_target_roots = self.context.build_graph.transitive_dependees_of_addresses(target_root_addresses)
+    return dependees_of_target_roots
 
   def generate_targets_map(self, targets, runtime_classpath):
     """Generates a dictionary containing all pertinent information about the target graph.
@@ -330,18 +315,19 @@ class ExportDepAsJar(ConsoleTask):
           jarred_sources = ExportDepAsJar._zip_sources(t, resource_jar_root, suffix='-sources.jar')
           libraries_map[t.id]['sources'] = jarred_sources.name
 
-    printable_targets = self._get_targets_to_print(all_targets, target_roots_set)
-    for target in printable_targets:
+    modulizable_targets = self._get_targets_to_make_into_modules(target_roots_set)
+    print(f"BL: Printable targets: {modulizable_targets}")
+    for target in modulizable_targets:
 
       info = self._process_target(target, target_roots_set, resource_target_map, runtime_classpath)
       targets_map[target.address.spec] = info
 
       # If it is a target root or it is already a jar_library target, then no-op.
-      if target in target_roots_set or targets_map[t.address.spec]['pants_target_type'] == 'jar_library':
+      if target in target_roots_set or targets_map[target.address.spec]['pants_target_type'] == 'jar_library':
         continue
 
-      targets_map[t.address.spec]['pants_target_type'] = 'jar_library'
-      targets_map[t.address.spec]['libraries'] = [t.id]
+      targets_map[target.address.spec]['pants_target_type'] = 'jar_library'
+      targets_map[target.address.spec]['libraries'] = [t.id]
 
     graph_info = self.initialize_graph_info()
     graph_info['targets'] = targets_map
