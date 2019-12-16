@@ -22,15 +22,16 @@ def print_to_stderr(message):
 class OwnerPrintingInterProcessFileLock(InterProcessLock):
   @property
   def message_path(self):
-    return '{}.lock_message'.format(self.path)
+    return f'{self.path_str}.lock_message'
+
+  @property
+  def path_str(self):
+    return self.path.decode()
 
   @property
   def missing_message_output(self):
-    return (
-      'Pid {} waiting for a file lock ({}), but there was no message at {} indicating who is holding it.'
-      .format(os.getpid(), self.path, self.message_path)
-    )
-
+    return f'Pid {os.getpid()} waiting for a file lock ({self.path_str}), but there was no message at {self.message_path} indicating who is holding it.'
+      
   def acquire(self, message_fn=print_to_stderr, **kwargs):
     logger.debug('acquiring lock: {!r}'.format(self))
     super().acquire(blocking=False)
@@ -38,7 +39,7 @@ class OwnerPrintingInterProcessFileLock(InterProcessLock):
       try:
         with open(self.message_path, 'rb') as f:
           message = f.read().decode('utf-8', 'replace')
-          output = 'PID {} waiting for a file lock ({}) held by: {}'.format(os.getpid(), self.path, message)
+          output = f'PID {os.getpid()} waiting for a file lock ({self.path_str}) held by: {message}'
       except IOError as e:
         if e.errno == errno.ENOENT:
           output = self.missing_message_output
@@ -49,14 +50,15 @@ class OwnerPrintingInterProcessFileLock(InterProcessLock):
 
     if self.acquired:
       current_process = psutil.Process()
-      message = '{} ({})'.format(current_process.pid, ' '.join(current_process.cmdline()))
+      cmd_line = ' '.join(current_process.cmdline())
+      message = f'{current_process.pid} ({cmd_line})'
       with open(self.message_path, 'wb') as f:
         f.write(message.encode())
 
     return self.acquired
 
   def release(self):
-    logger.debug('releasing lock: {!r}'.format(self))
+    logger.debug(f'releasing lock: {self!r}')
     if self.acquired:
       safe_delete(self.message_path)
     return super().release()

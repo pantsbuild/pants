@@ -7,7 +7,7 @@ coverage>=4.5,<4.6
 cryptography==2.7
 dataclasses==0.6
 docutils==0.14
-fasteners==0.14.1
+fasteners==0.15.0
 Markdown==2.1.1
 packaging==16.8
 parameterized==0.6.1
