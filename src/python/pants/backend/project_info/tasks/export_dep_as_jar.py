@@ -145,7 +145,7 @@ class ExportDepAsJar(ConsoleTask):
           zip_file.write(os.path.join(get_buildroot(), src_from_build_root), src_from_source_root)
     return f
 
-  def _process_target(self, current_target, target_roots_set, resource_target_map, runtime_classpath):
+  def _process_target(self, current_target, target_roots_set, modulizable_target_set, resource_target_map, runtime_classpath):
     """
     :type current_target:pants.build_graph.target.Target
     """
@@ -184,12 +184,13 @@ class ExportDepAsJar(ConsoleTask):
     if isinstance(current_target, JarLibrary):
       target_libraries = OrderedSet(iter_transitive_jars(current_target))
     for dep in current_target.dependencies:
-      info['targets'].append(dep.address.spec)
-      if isinstance(dep, JarLibrary):
-        for jar in dep.jar_dependencies:
-          target_libraries.add(M2Coordinate(jar.org, jar.name, jar.rev))
-        # Add all the jars pulled in by this jar_library
-        target_libraries.update(iter_transitive_jars(dep))
+      if dep in modulizable_target_set:
+        info['targets'].append(dep.address.spec)
+        if isinstance(dep, JarLibrary):
+          for jar in dep.jar_dependencies:
+            target_libraries.add(M2Coordinate(jar.org, jar.name, jar.rev))
+          # Add all the jars pulled in by this jar_library
+          target_libraries.update(iter_transitive_jars(dep))
 
     if isinstance(current_target, ScalaLibrary):
       for dep in current_target.java_sources:
@@ -203,6 +204,13 @@ class ExportDepAsJar(ConsoleTask):
 
     if runtime_classpath:
       info['libraries'].extend(self._jar_id(lib) for lib in target_libraries)
+
+    def _transitive_deps(t):
+      return set(
+        DependencyContext.global_instance().dependencies_respecting_strict_deps(t) if hasattr(t, 'strict_deps') else \
+          DependencyContext.global_instance().all_dependencies(t)
+      )
+    info['libraries'].extend([dep.id for dep in _transitive_deps(current_target)])
 
     if current_target in target_roots_set:
       info['roots'] = [{
@@ -319,7 +327,7 @@ class ExportDepAsJar(ConsoleTask):
     print(f"BL: Printable targets: {modulizable_targets}")
     for target in modulizable_targets:
 
-      info = self._process_target(target, target_roots_set, resource_target_map, runtime_classpath)
+      info = self._process_target(target, target_roots_set, modulizable_targets, resource_target_map, runtime_classpath)
       targets_map[target.address.spec] = info
 
       # If it is a target root or it is already a jar_library target, then no-op.
