@@ -209,7 +209,7 @@ class ExportDepAsJar(ConsoleTask):
       return set(
         DependencyContext.global_instance().dependencies_respecting_strict_deps(t) if hasattr(t, 'strict_deps') else \
           DependencyContext.global_instance().all_dependencies(t)
-      )
+      ).difference({t}) # The transitive deps include the target itself, which we don't want
     info['libraries'].extend([dep.id for dep in _transitive_deps(current_target)])
 
     if current_target in target_roots_set:
