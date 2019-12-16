@@ -400,10 +400,12 @@ impl Scheduler {
       }
     }
 
-    for (i, id) in tasks_to_display.iter().enumerate() {
-      // TODO Maybe we want to print something else besides the ID here.
+    for (i, item) in tasks_to_display.iter().enumerate() {
+      let label = item.0;
+      let duration = item.1;
+      let duration_secs: f64 = (duration.as_millis() as f64) / 1000.0;
       let mut d = display.lock();
-      d.update(i.to_string(), format!("{:?}", id));
+      d.update(i.to_string(), format!("{:.2}s {}", duration_secs, label));
     }
 
     // If the number of ongoing tasks is less than the number of workers,
