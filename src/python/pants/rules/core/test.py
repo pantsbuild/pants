@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
+from pants.base.specs import SingleAddress, Specs
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.build_files import AddressProvenanceMap
@@ -14,7 +15,7 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.legacy.graph import HydratedTarget
 from pants.engine.rules import UnionMembership, console_rule, rule
 from pants.engine.selectors import Get, MultiGet
-from pants.rules.core.core_test_model import Status, TestResult, TestTarget
+from pants.rules.core.core_test_model import Status, TestDebugResult, TestResult, TestTarget
 
 
 # TODO(#6004): use proper Logging singleton, rather than static logger.
@@ -24,6 +25,12 @@ logger = logging.getLogger(__name__)
 class TestOptions(GoalSubsystem):
   """Runs tests."""
   name = "test"
+
+  @classmethod
+  def register_options(cls, register) -> None:
+    super().register_options(register)
+    register('--debug', type=bool, fingerprint=True, default=False,
+             help='Run a single test target in an interactive process.')
 
 
 class Test(Goal):
@@ -50,9 +57,22 @@ class AddressAndTestResult:
     return is_valid_target_type and has_sources
 
 
+@dataclass(frozen=True)
+class AddressAndDebugResult:
+  address: BuildFileAddress
+  test_result: TestDebugResult
+
+
 @console_rule
-async def fast_test(console: Console, addresses: BuildFileAddresses) -> Test:
-  results = await MultiGet(Get[AddressAndTestResult](Address, addr.to_address()) for addr in addresses)
+async def fast_test(console: Console, options: TestOptions, addresses: BuildFileAddresses) -> Test:
+  if options.values.debug:
+    dependencies = tuple(SingleAddress(addr.spec_path, addr.target_name) for addr in addresses)
+    address = await Get[BuildFileAddress](Specs(dependencies=dependencies))
+    result = await Get[AddressAndDebugResult](Address, address.to_address())
+    return Test(result.test_result.exit_code)
+  else:
+    results = await MultiGet(Get(AddressAndTestResult, Address, addr.to_address()) for addr in addresses)
+
   did_any_fail = False
   filtered_results = [(x.address, x.test_result) for x in results if x.test_result is not None]
 
@@ -120,8 +140,16 @@ async def coordinator_of_tests(
   return AddressAndTestResult(target.address, result)
 
 
+@rule
+async def coordinator_of_debug_tests(target: HydratedTarget) -> AddressAndDebugResult:
+  logger.info(f"Starting tests in debug mode: {target.address.reference()}")
+  result = await Get[TestDebugResult](TestTarget, target.adaptor)
+  return AddressAndDebugResult(target.address, result)
+
+
 def rules():
   return [
       coordinator_of_tests,
+      coordinator_of_debug_tests,
       fast_test,
     ]
