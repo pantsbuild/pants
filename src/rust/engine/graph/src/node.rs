@@ -38,6 +38,15 @@ pub trait Node: Clone + Debug + Display + Eq + Hash + Send + 'static {
   /// If the node result is cacheable, return true.
   ///
   fn cacheable(&self) -> bool;
+
+  /// Nodes optionally have a user-facing name (distinct from their Debug and Display
+  /// implementations). This user-facing name is intended to provide high-level information
+  /// to end users of pants about what computation pants is currently doing. Not all
+  /// `Node`s need a user-facing name. For `Node`s derived from Python `@rule`s, the
+  /// user-facing name should be the same as the `name` annotation on the rule decorator.
+  fn user_facing_name(&self) -> Option<String> {
+    None
+  }
 }
 
 pub trait NodeError: Clone + Debug + Eq + Send {
