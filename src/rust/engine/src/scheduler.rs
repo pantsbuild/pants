@@ -338,6 +338,7 @@ impl Scheduler {
     // This map keeps the k most relevant jobs in assigned possitions.
     // Keys are positions in the display (display workers) and the values are the actual jobs to print.
     let mut tasks_to_display = IndexMap::new();
+    let refresh_interval = Duration::from_millis(100);
 
     match session.maybe_display() {
       Some(display) => {
@@ -348,7 +349,7 @@ impl Scheduler {
         let unique_handle = LOGGER.register_engine_display(display.clone());
 
         let results = loop {
-          if let Ok(res) = receiver.recv_timeout(Duration::from_millis(100)) {
+          if let Ok(res) = receiver.recv_timeout(refresh_interval) {
             break res;
           } else {
             Scheduler::display_ongoing_tasks(
@@ -367,7 +368,7 @@ impl Scheduler {
         results
       }
       None => loop {
-        if let Ok(res) = receiver.recv_timeout(Duration::from_millis(100)) {
+        if let Ok(res) = receiver.recv_timeout(refresh_interval) {
           break res;
         }
       },
