@@ -184,13 +184,13 @@ class ExportDepAsJar(ConsoleTask):
     if isinstance(current_target, JarLibrary):
       target_libraries = OrderedSet(iter_transitive_jars(current_target))
     for dep in current_target.dependencies:
+      if isinstance(dep, JarLibrary):
+        for jar in dep.jar_dependencies:
+          target_libraries.add(M2Coordinate(jar.org, jar.name, jar.rev))
+        # Add all the jars pulled in by this jar_library
+        target_libraries.update(iter_transitive_jars(dep))
       if dep in modulizable_target_set:
         info['targets'].append(dep.address.spec)
-        if isinstance(dep, JarLibrary):
-          for jar in dep.jar_dependencies:
-            target_libraries.add(M2Coordinate(jar.org, jar.name, jar.rev))
-          # Add all the jars pulled in by this jar_library
-          target_libraries.update(iter_transitive_jars(dep))
 
     if isinstance(current_target, ScalaLibrary):
       for dep in current_target.java_sources:
