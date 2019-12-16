@@ -213,6 +213,21 @@ pub struct ExecuteProcessRequest {
   pub is_nailgunnable: bool,
 }
 
+impl ExecuteProcessRequest {
+  fn user_facing_name(&self) -> String {
+    let mut buf = String::new();
+    buf.push_str("Exec: [");
+    for (i, item) in self.argv.iter().enumerate() {
+      if i != 0 {
+        buf.push(' ');
+      }
+      buf.push_str(&item);
+    }
+    buf.push_str("]");
+    buf
+  }
+}
+
 impl TryFrom<MultiPlatformExecuteProcessRequest> for ExecuteProcessRequest {
   type Error = String;
 
@@ -233,6 +248,16 @@ impl TryFrom<MultiPlatformExecuteProcessRequest> for ExecuteProcessRequest {
 pub struct MultiPlatformExecuteProcessRequest(
   pub BTreeMap<(Platform, Platform), ExecuteProcessRequest>,
 );
+
+impl MultiPlatformExecuteProcessRequest {
+  pub fn user_facing_name(&self) -> Option<String> {
+    let mut buf = String::new();
+    for (_, epr) in self.0.iter() {
+      buf.push_str(&epr.user_facing_name())
+    }
+    Some(buf)
+  }
+}
 
 impl From<ExecuteProcessRequest> for MultiPlatformExecuteProcessRequest {
   fn from(req: ExecuteProcessRequest) -> Self {

@@ -1291,6 +1291,7 @@ impl Node for NodeKey {
     match self {
       NodeKey::Task(ref task) => task.get_display_info().map(|s| s.to_owned()),
       NodeKey::Snapshot(_) => Some(format!("{}", self)),
+      NodeKey::MultiPlatformExecuteProcess(mp_epr) => mp_epr.0.user_facing_name(),
       _ => None,
     }
   }
