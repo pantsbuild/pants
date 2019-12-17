@@ -32,14 +32,15 @@ use std::collections::{BTreeMap, VecDeque};
 use std::io::Write;
 use std::io::{stdout, Result, Stdout};
 
-use termion::cursor::DetectCursorPos;
 use termion::raw::IntoRawMode;
 use termion::raw::RawTerminal;
+use termion::screen::AlternateScreen;
 use termion::{clear, color, cursor};
 use unicode_segmentation::UnicodeSegmentation;
 
 enum Console {
-  Terminal(RawTerminal<Stdout>),
+  Uninitialized,
+  Terminal(RawTerminal<AlternateScreen<Stdout>>),
   Pipe(Stdout),
 }
 
@@ -74,16 +75,11 @@ pub struct EngineDisplay {
 impl EngineDisplay {
   /// Create a new EngineDisplay
   pub fn new(indent_level: u16) -> EngineDisplay {
-    let write_handle = stdout();
-
-    let mut display = EngineDisplay {
+    EngineDisplay {
       sigil: '⚡',
       divider: "▵".to_string(),
       padding: " ".repeat(indent_level.into()),
-      terminal: match write_handle.into_raw_mode() {
-        Ok(t) => Console::Terminal(t),
-        Err(_) => Console::Pipe(stdout()),
-      },
+      terminal: Console::Uninitialized,
       action_map: BTreeMap::new(),
       // This is arbitrary based on a guesstimated peak terminal row size for modern displays.
       // The reason this can't be capped to e.g. the starting size is because of resizing - we
@@ -102,10 +98,7 @@ impl EngineDisplay {
       // as we've done here is the safest way to avoid terminal oddness.
       cursor_start: (1, 1),
       terminal_size: EngineDisplay::get_size(),
-    };
-
-    display.stop_raw_mode().unwrap();
-    display
+    }
   }
 
   pub fn initialize(&mut self, display_worker_count: usize) {
@@ -135,26 +128,10 @@ impl EngineDisplay {
     });
   }
 
-  fn stop_raw_mode(&mut self) -> Result<()> {
-    match self.terminal {
-      Console::Terminal(ref mut t) => t.suspend_raw_mode(),
-      _ => Ok(()),
-    }
-  }
-
   fn start_raw_mode(&mut self) -> Result<()> {
     match self.terminal {
       Console::Terminal(ref mut t) => t.activate_raw_mode(),
       _ => Ok(()),
-    }
-  }
-
-  // Gets the current terminal's cursor position, if applicable.
-  fn get_cursor_pos(&mut self) -> (u16, u16) {
-    match self.terminal {
-      // N.B. Real TTY coordinates start at (1, 1).
-      Console::Terminal(ref mut t) => t.cursor_pos().unwrap_or((0, 0)),
-      Console::Pipe(_) => (0, 0),
     }
   }
 
@@ -197,6 +174,7 @@ impl EngineDisplay {
     match self.terminal {
       Console::Terminal(ref mut t) => t.flush(),
       Console::Pipe(ref mut p) => p.flush(),
+      Console::Uninitialized => Ok(()),
     }
   }
 
@@ -205,6 +183,7 @@ impl EngineDisplay {
     let res = match self.terminal {
       Console::Terminal(ref mut t) => t.write(msg.as_bytes()),
       Console::Pipe(ref mut p) => p.write(msg.as_bytes()),
+      Console::Uninitialized => Ok(0),
     };
     self.flush()?;
     res
@@ -306,7 +285,13 @@ impl EngineDisplay {
 
   // Starts the EngineDisplay at the current cursor position.
   pub fn start(&mut self) {
+    let write_handle = termion::screen::AlternateScreen::from(stdout());
     self.running = true;
+    self.terminal = match write_handle.into_raw_mode() {
+      Ok(t) => Console::Terminal(t),
+      Err(_) => Console::Pipe(stdout()),
+    };
+
     self.start_raw_mode().unwrap();
     let cursor_start = self.cursor_start;
     self
@@ -349,17 +334,14 @@ impl EngineDisplay {
   pub fn finish(&mut self) {
     self.render();
     self.running = false;
-    let current_pos = self.get_cursor_pos();
-    let action_count = self.action_map.len() as u16;
-    self
-      .write(&format!(
-        "{park_cursor}{clear_after_cursor}{reveal_cursor}",
-        park_cursor = cursor::Goto(1, current_pos.1 - action_count),
-        clear_after_cursor = clear::AfterCursor,
-        reveal_cursor = termion::cursor::Show
-      ))
-      .expect("could not write to terminal");
-    self.stop_raw_mode().unwrap();
+    {
+      self.terminal = Console::Uninitialized; //This forces the AlternateScreen to drop, restoring the original terminal state.
+    }
+
+    println!("{}", termion::cursor::Show);
+    for log in self.logs.iter() {
+      println!("{}", log);
+    }
     for PrintableMsg { msg, output } in self.printable_msgs.iter() {
       match output {
         PrintableMsgOutput::Stdout => print!("{}", msg),
