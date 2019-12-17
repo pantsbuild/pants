@@ -26,7 +26,7 @@ async def get_distdir(options_bootstrapper: OptionsBootstrapper, buildroot: Buil
   return validate_distdir(Path(global_options.pants_distdir), buildroot.pathlib_path)
 
 
-def validate_distdir(distdir: Path, buildroot: Path):
+def validate_distdir(distdir: Path, buildroot: Path) -> DistDir:
   if not is_child_of(distdir, buildroot):
     raise InvalidDistDir(
       f"When set to an absolute path, `--pants-distdir` must be relative to the build root."
