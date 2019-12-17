@@ -4,7 +4,7 @@
 from textwrap import wrap
 from typing import List
 
-from colors import cyan, red
+from colors import cyan, magenta, red
 
 from pants.help.help_info_extracter import HelpInfoExtracter, OptionHelpInfo
 
@@ -20,11 +20,6 @@ class HelpFormatter:
   def _maybe_cyan(self, s):
     return self._maybe_color(cyan, s)
 
-  def _maybe_bright_cyan(self, s):
-    def bright_cyan(s: str) -> str:
-      return f"\x1b[96m{s}\x1b[0m"
-    return self._maybe_color(bright_cyan, s)
-
   def _maybe_bright_green(self, s):
     def bright_green(s: str) -> str:
       return f"\x1b[92m{s}\x1b[0m"
@@ -32,6 +27,9 @@ class HelpFormatter:
 
   def _maybe_red(self, s):
     return self._maybe_color(red, s)
+
+  def _maybe_magenta(self, s):
+    return self._maybe_color(magenta, s)
 
   def _maybe_color(self, color, s):
     return color(s) if self._color else s
@@ -77,7 +75,7 @@ class HelpFormatter:
     lines = []
     choices = f'one of: [{ohi.choices}] ' if ohi.choices else ''
     arg_line = '{args} {default}'.format(
-      args=self._maybe_bright_cyan(', '.join(ohi.display_args)),
+      args=self._maybe_magenta(', '.join(ohi.display_args)),
       default=self._maybe_cyan(f'({choices}default: {ohi.default})')
     )
     lines.append(f'  {arg_line}')
