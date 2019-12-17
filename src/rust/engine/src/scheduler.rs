@@ -110,8 +110,6 @@ impl Session {
     &self.0.build_id
   }
 
-  //TODO Thsese two functions should eventually hook up intelligently to EngineDisplay
-  //instead of just naively printing to stdout/stderr.
   pub fn write_stdout(&self, msg: &str) {
     if let Some(display) = self.maybe_display() {
       let mut d = display.lock();
@@ -123,6 +121,23 @@ impl Session {
     if let Some(display) = self.maybe_display() {
       let mut d = display.lock();
       d.write_stderr(msg);
+    }
+  }
+
+  pub fn with_console_ui_disabled<F: FnOnce() -> T, T>(&self, f: F) -> T {
+    if let Some(display) = self.maybe_display() {
+      {
+        let mut d = display.lock();
+        d.suspend()
+      }
+      let output = f();
+      {
+        let mut d = display.lock();
+        d.unsuspend();
+      }
+      output
+    } else {
+      f()
     }
   }
 }

@@ -329,6 +329,21 @@ impl EngineDisplay {
     self.action_map.len()
   }
 
+  pub fn suspend(&mut self) {
+    {
+      self.terminal = Console::Uninitialized;
+    }
+    println!("{}", termion::cursor::Show);
+  }
+
+  pub fn unsuspend(&mut self) {
+    let write_handle = termion::screen::AlternateScreen::from(stdout());
+    self.terminal = match write_handle.into_raw_mode() {
+      Ok(t) => Console::Terminal(t),
+      Err(_) => Console::Pipe(stdout()),
+    };
+  }
+
   // Initiates one last screen render, then terminates the EngineDisplay and returns the cursor
   // to a static position, then prints all buffered stdout/stderr output.
   pub fn finish(&mut self) {
