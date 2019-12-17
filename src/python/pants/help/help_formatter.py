@@ -4,7 +4,7 @@
 from textwrap import wrap
 from typing import List
 
-from colors import cyan, magenta, red
+from colors import cyan, green, magenta, red
 
 from pants.help.help_info_extracter import HelpInfoExtracter, OptionHelpInfo
 
@@ -20,10 +20,8 @@ class HelpFormatter:
   def _maybe_cyan(self, s):
     return self._maybe_color(cyan, s)
 
-  def _maybe_bright_green(self, s):
-    def bright_green(s: str) -> str:
-      return f"\x1b[92m{s}\x1b[0m"
-    return self._maybe_color(bright_green, s)
+  def _maybe_green(self, s):
+    return self._maybe_color(green, s)
 
   def _maybe_red(self, s):
     return self._maybe_color(red, s)
@@ -47,9 +45,9 @@ class HelpFormatter:
       lines.append('')
       display_scope = scope or 'Global'
       if category:
-        lines.append(self._maybe_bright_green(f'{display_scope} {category}:'))
+        lines.append(self._maybe_green(f'{display_scope} {category}:'))
       else:
-        lines.append(self._maybe_bright_green(f'{display_scope}:'))
+        lines.append(self._maybe_green(f'{display_scope}:'))
         if description:
           lines.append(description)
       lines.append(' ')
