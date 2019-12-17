@@ -8,4 +8,5 @@ python_library(
     'src/python/pants/engine:rules',
     'src/python/pants/rules/core',
   ],
+  tags = {"type_checked"},
 )

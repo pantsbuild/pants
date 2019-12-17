@@ -18,6 +18,7 @@ python_library(
     'src/python/pants/source',
     'src/python/pants/util:collections',
   ],
+  tags = {"type_checked"},
 )
 
 python_tests(
@@ -36,7 +37,7 @@ python_tests(
     'src/python/pants/testutil:console_rule_test_base',
     'src/python/pants/testutil/engine:util',
     'src/python/pants/testutil/subsystem',
-  ]
+  ],
 )
 
 python_tests(

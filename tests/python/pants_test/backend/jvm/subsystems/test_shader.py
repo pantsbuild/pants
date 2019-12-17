@@ -141,7 +141,7 @@ class ShaderTest(unittest.TestCase):
                      Shading.create_relocate(from_pattern='com.foo.bar.**',
                                       shade_prefix='__my_prefix__.'))
 
-    self.assertEqual(('com.foo.bar.**', 'org.biz.baz.@1'.format('__my_prefix__.')),
+    self.assertEqual(('com.foo.bar.**', 'org.biz.baz.@1'),
                      Shading.create_relocate(from_pattern='com.foo.bar.**',
                                       shade_prefix='__my_prefix__.',
                                       shade_pattern='org.biz.baz.@1'))
