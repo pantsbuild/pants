@@ -64,7 +64,6 @@ pub struct EngineDisplay {
   action_map: BTreeMap<String, String>,
   logs: VecDeque<String>,
   printable_msgs: VecDeque<PrintableMsg>,
-  running: bool,
   cursor_start: (u16, u16),
   terminal_size: (u16, u16),
 }
@@ -86,7 +85,6 @@ impl EngineDisplay {
       // want to be able to fill the entire screen if resized much larger than when we started.
       logs: VecDeque::with_capacity(500),
       printable_msgs: VecDeque::with_capacity(500),
-      running: false,
       // N.B. This will cause the screen to clear - but with some improved position
       // tracking logic we could avoid screen clearing in favor of using the value
       // of `EngineDisplay::get_cursor_pos()` as initialization here. From there, the
@@ -138,11 +136,6 @@ impl EngineDisplay {
   // Gets the current terminal's width and height, if applicable.
   fn get_size() -> (u16, u16) {
     termion::terminal_size().unwrap_or((0, 0))
-  }
-
-  // Whether or not the EngineDisplay is running (whether .start() has been called).
-  pub fn is_running(&self) -> bool {
-    self.running
   }
 
   // Sets the terminal size per-render for signal-free resize detection.
@@ -286,7 +279,6 @@ impl EngineDisplay {
   // Starts the EngineDisplay at the current cursor position.
   pub fn start(&mut self) {
     let write_handle = termion::screen::AlternateScreen::from(stdout());
-    self.running = true;
     self.terminal = match write_handle.into_raw_mode() {
       Ok(t) => Console::Terminal(t),
       Err(_) => Console::Pipe(stdout()),
@@ -348,7 +340,6 @@ impl EngineDisplay {
   // to a static position, then prints all buffered stdout/stderr output.
   pub fn finish(&mut self) {
     self.render();
-    self.running = false;
     {
       self.terminal = Console::Uninitialized; //This forces the AlternateScreen to drop, restoring the original terminal state.
     }
