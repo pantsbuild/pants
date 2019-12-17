@@ -6,7 +6,7 @@ python_tests(
   source = 'test_mypy.py',
   dependencies=[
     'src/python/pants/testutil:task_test_base',
-    'contrib/mypy/src/python/pants/contrib/mypy/tasks',
+    'contrib/mypy/src/python/pants/contrib/mypy:plugin',
   ],
 )
 

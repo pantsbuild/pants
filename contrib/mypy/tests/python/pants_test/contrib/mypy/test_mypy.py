@@ -8,7 +8,7 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.build_graph.target import Target
 from pants.testutil.task_test_base import TaskTestBase
 
-from pants.contrib.mypy.tasks.mypy_task import MypyTask
+from pants.contrib.mypy.mypy_task import MypyTask
 
 
 class MyPyWhitelistMechanismTest(TaskTestBase):
