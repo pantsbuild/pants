@@ -25,7 +25,7 @@ from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 from pex.pex_info import PexInfo
 
-from pants.contrib.mypy.subsystem import MyPy
+from pants.contrib.mypy.subsystems.subsystem import MyPy
 
 
 class MypyTaskError(TaskError):
