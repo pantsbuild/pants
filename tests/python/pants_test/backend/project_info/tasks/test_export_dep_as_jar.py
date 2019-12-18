@@ -247,6 +247,17 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
       sources=[]
     )
 
+    # A build graph where a -(depends on)-> b -> ... -> e
+    self.linear_build_graph = {}
+    last_target = None
+    for letter in reversed(['a', 'b', 'c', 'd', 'e']):
+      last_target = self.make_target(
+        f'project_info:{letter}',
+        target_type=ScalaLibrary,
+        dependencies=[] if last_target is None else [last_target]
+      )
+      self.linear_build_graph[letter] = last_target
+
   def create_runtime_classpath_for_targets(self, target):
     def path_to_zjar_with_workdir(address: Address):
       return os.path.join(self.pants_workdir, address.path_safe_spec, "z.jar")
@@ -569,4 +580,39 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
     self.assertNotIn(
       'project_info.jvm_target',
       result['libraries'].keys()
+    )
+
+  def test_transitive_libs_only_added_if_dependency_is_not_modulizable(self):
+    a_spec = self.linear_build_graph['a'].address.spec
+    b_spec = self.linear_build_graph['b'].address.spec
+    result_a = self.execute_export_json(a_spec)
+    self.assertEquals(
+      sorted([
+        'project_info.b',
+        'project_info.c',
+        'project_info.d',
+        'project_info.e',
+        'org.scala-lang:scala-library:2.10.5',
+        '.scala-library',
+      ]),
+      sorted(result_a['targets'][a_spec]['libraries'])
+    )
+    result_ab = self.execute_export_json(a_spec, b_spec)
+    self.assertEquals(
+      sorted(['org.scala-lang:scala-library:2.10.5', '.scala-library']),
+      sorted(result_ab['targets'][a_spec]['libraries'])
+    )
+    self.assertIn(
+      b_spec,
+      result_ab['targets'][a_spec]['targets']
+    )
+    self.assertEquals(
+      sorted([
+        'project_info.c',
+        'project_info.d',
+        'project_info.e',
+        'org.scala-lang:scala-library:2.10.5',
+        '.scala-library',
+      ]),
+      sorted(result_ab['targets'][b_spec]['libraries'])
     )

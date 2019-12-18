@@ -205,12 +205,17 @@ class ExportDepAsJar(ConsoleTask):
     if runtime_classpath:
       info['libraries'].extend(self._jar_id(lib) for lib in target_libraries)
 
-    def _transitive_deps(t):
-      return set(
-        DependencyContext.global_instance().dependencies_respecting_strict_deps(t) if hasattr(t, 'strict_deps') else \
-          DependencyContext.global_instance().all_dependencies(t)
-      ).difference(modulizable_target_set) # Modulizable targets won't generate libraries
-    info['libraries'].extend([dep.id for dep in _transitive_deps(current_target)])
+    def _libraries_to_include(t):
+      libraries_to_include = set([])
+      self.context.build_graph.walk_transitive_dependency_graph(
+        [direct_dep.address for direct_dep in t.dependencies],
+        # NB: Dependency graph between modulizable targets is represented with modules,
+        #     so we don't need to expand those branches of the tree.
+        predicate=lambda dep: dep not in modulizable_target_set,
+        work=lambda dep: libraries_to_include.add(dep.id),
+      )
+      return libraries_to_include
+    info['libraries'].extend(_libraries_to_include(current_target))
 
     if current_target in target_roots_set:
       info['roots'] = [{
