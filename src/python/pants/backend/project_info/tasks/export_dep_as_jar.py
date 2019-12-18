@@ -209,7 +209,7 @@ class ExportDepAsJar(ConsoleTask):
       return set(
         DependencyContext.global_instance().dependencies_respecting_strict_deps(t) if hasattr(t, 'strict_deps') else \
           DependencyContext.global_instance().all_dependencies(t)
-      ).difference({t}) # The transitive deps include the target itself, which we don't want
+      ).difference(modulizable_target_set) # Modulizable targets won't generate libraries
     info['libraries'].extend([dep.id for dep in _transitive_deps(current_target)])
 
     if current_target in target_roots_set:
@@ -271,12 +271,38 @@ class ExportDepAsJar(ConsoleTask):
       if isinstance(t, ScalaLibrary):
         additional_java_targets.extend(t.java_sources)
     targets.extend(additional_java_targets)
-    return targets
+    return set(targets)
 
   def _get_targets_to_make_into_modules(self, target_roots_set):
     target_root_addresses = [t.address for t in target_roots_set]
     dependees_of_target_roots = self.context.build_graph.transitive_dependees_of_addresses(target_root_addresses)
     return dependees_of_target_roots
+
+  def _make_libraries_entry(self, target, resource_target_map, runtime_classpath):
+    # Using resolved path in preparation for VCFS.
+    resource_jar_root = os.path.realpath(self.versioned_workdir)
+    library_entry = {}
+    target_type = ExportDepAsJar._get_target_type(target, resource_target_map)
+    if target_type == SourceRootTypes.RESOURCE or target_type == SourceRootTypes.TEST_RESOURCE:
+      # yic assumed that the cost to fingerprint the target may not be that lower than
+      # just zipping up the resources anyway.
+      jarred_resources = ExportDepAsJar._zip_sources(target, resource_jar_root)
+      library_entry['default'] = jarred_resources.name
+    else:
+      jar_products = runtime_classpath.get_for_target(target)
+      for conf, jar_entry in jar_products:
+        # TODO(yic): check --compile-rsc-use-classpath-jars is enabled.
+        # If not, zip up the classes/ dir here.
+        if 'z.jar' in jar_entry:
+          library_entry[conf] = jar_entry
+      if self.get_options().sources:
+        # NB: We create the jar in the same place as we create the resources
+        # (as opposed to where we store the z.jar), because the path to the z.jar depends
+        # on tasks outside of this one.
+        # In addition to that, we may not want to depend on z.jar existing to export source jars.
+        jarred_sources = ExportDepAsJar._zip_sources(target, resource_jar_root, suffix='-sources.jar')
+        library_entry['sources'] = jarred_sources.name
+    return library_entry
 
   def generate_targets_map(self, targets, runtime_classpath):
     """Generates a dictionary containing all pertinent information about the target graph.
@@ -293,40 +319,19 @@ class ExportDepAsJar(ConsoleTask):
 
     targets_map = {}
     resource_target_map = {}
-    # Using resolved path in preparation for VCFS.
-    resource_jar_root = os.path.realpath(self.versioned_workdir)
 
     for t in all_targets:
       for dep in t.dependencies:
         if isinstance(dep, Resources):
           resource_target_map[dep] = t
 
-    for t in all_targets:
-      target_type = ExportDepAsJar._get_target_type(t, resource_target_map)
-      if target_type == SourceRootTypes.RESOURCE or target_type == SourceRootTypes.TEST_RESOURCE:
-        # yic assumed that the cost to fingerprint the target may not be that lower than
-        # just zipping up the resources anyway.
-        jarred_resources = ExportDepAsJar._zip_sources(t, resource_jar_root)
-        libraries_map[t.id]['default'] = jarred_resources.name
-      else:
-        jar_products = runtime_classpath.get_for_target(t)
-        for conf, jar_entry in jar_products:
-          # TODO(yic): check --compile-rsc-use-classpath-jars is enabled.
-          # If not, zip up the classes/ dir here.
-          if 'z.jar' in jar_entry:
-            libraries_map[t.id][conf] = jar_entry
-        if self.get_options().sources:
-          # NB: We create the jar in the same place as we create the resources
-          # (as opposed to where we store the z.jar), because the path to the z.jar depends
-          # on tasks outside of this one.
-          # In addition to that, we may not want to depend on z.jar existing to export source jars.
-          jarred_sources = ExportDepAsJar._zip_sources(t, resource_jar_root, suffix='-sources.jar')
-          libraries_map[t.id]['sources'] = jarred_sources.name
-
     modulizable_targets = self._get_targets_to_make_into_modules(target_roots_set)
-    print(f"BL: Printable targets: {modulizable_targets}")
-    for target in modulizable_targets:
+    non_modulizable_targets = all_targets.difference(modulizable_targets)
 
+    for t in non_modulizable_targets:
+      libraries_map[t.id] = self._make_libraries_entry(t, resource_target_map, runtime_classpath)
+
+    for target in modulizable_targets:
       info = self._process_target(target, target_roots_set, modulizable_targets, resource_target_map, runtime_classpath)
       targets_map[target.address.spec] = info
 

@@ -551,3 +551,22 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
       'project_info:jvm_target',
       result['targets'].keys()
     )
+
+  def test_target_roots_dont_generate_libs(self):
+    result = self.execute_export_json('project_info:scala_with_source_dep', 'project_info:jvm_target')
+    self.assertNotIn(
+      'project_info.scala_with_source_dep',
+      result['targets']['project_info:scala_with_source_dep']['libraries']
+    )
+    self.assertNotIn(
+      'project_info.jvm_target',
+      result['targets']['project_info:scala_with_source_dep']['libraries']
+    )
+    self.assertNotIn(
+      'project_info.scala_with_source_dep',
+      result['libraries'].keys()
+    )
+    self.assertNotIn(
+      'project_info.jvm_target',
+      result['libraries'].keys()
+    )
