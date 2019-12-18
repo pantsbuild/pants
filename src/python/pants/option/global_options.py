@@ -173,11 +173,11 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                   'Useful when printing help messages.')
 
     register('--plugins', advanced=True, type=list,
-             help='Allow v1 backends to be loaded from these v1 plugins.  The default backends for '
+             help='Allow v1 backends to be loaded from these plugins.  The default backends for '
                   'each plugin will be loaded automatically. Other backends in a plugin can be '
                   'loaded by listing them in --backend-packages.')
     register('--plugins2', advanced=True, type=list,
-             help='Allow v2 backends to be loaded from these v2 plugins.  The default backends for '
+             help='Allow v2 backends to be loaded from these plugins.  The default backends for '
                   'each plugin will be loaded automatically. Other backends in a plugin can be '
                   'loaded by listing them in --backend-packages.')
     register('--plugins-force-resolve', advanced=True, type=bool, default=False,
@@ -201,12 +201,12 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                       'pants.backend.codegen.grpcio.python',
                       'pants.backend.codegen.wire.java',
                       'pants.backend.project_info'],
-             help='Register tasks from these v1 backends. The backend packages must be present on '
+             help='Register v1 tasks from these backends. The backend packages must be present on '
                   'the PYTHONPATH, typically because they are in the pants core dist, in a '
                   'plugin dist, or available as sources in the repo.')
     register('--backend-packages2', advanced=True, type=list,
              default=[],
-             help='Register rules from these v2 backends. The backend packages must be present on '
+             help='Register v2 rules from these backends. The backend packages must be present on '
                   'the PYTHONPATH, typically because they are in the pants core dist, in a '
                   'plugin dist, or available as sources in the repo.')
 
