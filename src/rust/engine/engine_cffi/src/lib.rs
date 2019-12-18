@@ -918,51 +918,56 @@ pub extern "C" fn merge_directories(
 #[no_mangle]
 pub extern "C" fn run_local_interactive_process(
   scheduler_ptr: *mut Scheduler,
+  session_ptr: *mut Session,
   request: Handle,
 ) -> PyResult {
   use std::process;
 
   with_scheduler(scheduler_ptr, |scheduler| {
-    let types = &scheduler.core.types;
-    let construct_interactive_process_result = types.construct_interactive_process_result;
+    with_session(session_ptr, |session| {
+      session.with_console_ui_disabled(|| {
+        let types = &scheduler.core.types;
+        let construct_interactive_process_result = types.construct_interactive_process_result;
 
-    let value: Value = request.into();
+        let value: Value = request.into();
 
-    let argv: Vec<String> = externs::project_multi_strs(&value, "argv");
-    if argv.is_empty() {
-      return Err("Empty argv list not permitted".to_string());
-    }
+        let argv: Vec<String> = externs::project_multi_strs(&value, "argv");
+        if argv.is_empty() {
+          return Err("Empty argv list not permitted".to_string());
+        }
 
-    let mut command = process::Command::new(argv[0].clone());
-    for arg in argv[1..].iter() {
-      command.arg(arg);
-    }
+        let mut command = process::Command::new(argv[0].clone());
+        for arg in argv[1..].iter() {
+          command.arg(arg);
+        }
 
-    let env = externs::project_tuple_encoded_map(&value, "env")?;
-    for (key, value) in env.iter() {
-      command.env(key, value);
-    }
+        let env = externs::project_tuple_encoded_map(&value, "env")?;
+        for (key, value) in env.iter() {
+          command.env(key, value);
+        }
 
-    let run_in_workspace = externs::project_bool(&value, "run_in_workspace");
-    let maybe_tempdir = if run_in_workspace {
-      None
-    } else {
-      Some(TempDir::new().map_err(|err| format!("Error creating tempdir: {}", err))?)
-    };
+        let run_in_workspace = externs::project_bool(&value, "run_in_workspace");
+        let maybe_tempdir = if run_in_workspace {
+          None
+        } else {
+          Some(TempDir::new().map_err(|err| format!("Error creating tempdir: {}", err))?)
+        };
 
-    if let Some(ref tempdir) = maybe_tempdir {
-      command.current_dir(tempdir.path());
-    }
+        if let Some(ref tempdir) = maybe_tempdir {
+          command.current_dir(tempdir.path());
+        }
 
-    let mut subprocess = command.spawn().map_err(|e| e.to_string())?;
-    let exit_status = subprocess.wait().map_err(|e| e.to_string())?;
-    let code = exit_status.code().unwrap_or(-1);
+        let mut subprocess = command.spawn().map_err(|e| e.to_string())?;
+        let exit_status = subprocess.wait().map_err(|e| e.to_string())?;
+        let code = exit_status.code().unwrap_or(-1);
 
-    let output: Result<Value, String> = Ok(externs::unsafe_call(
-      &construct_interactive_process_result,
-      &[externs::store_i64(i64::from(code))],
-    ));
-    output
+        let output: Result<Value, String> = Ok(externs::unsafe_call(
+          &construct_interactive_process_result,
+          &[externs::store_i64(i64::from(code))],
+        ));
+        output
+      })
+    })
   })
   .into()
 }

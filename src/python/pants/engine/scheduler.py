@@ -570,9 +570,11 @@ class SchedulerSession:
     self, request: 'InteractiveProcessRequest'
   ) -> 'InteractiveProcessResult':
     sched_pointer = self._scheduler._scheduler
+    session_pointer = self._session
 
     wrapped_result = self._scheduler._native.lib.run_local_interactive_process(
       sched_pointer,
+      session_pointer,
       self._scheduler._to_value(request)
     )
     result: 'InteractiveProcessResult' = self._scheduler._raise_or_return(wrapped_result)
