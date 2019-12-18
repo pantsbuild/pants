@@ -110,8 +110,6 @@ impl Session {
     &self.0.build_id
   }
 
-  //TODO Thsese two functions should eventually hook up intelligently to EngineDisplay
-  //instead of just naively printing to stdout/stderr.
   pub fn write_stdout(&self, msg: &str) {
     if let Some(display) = self.maybe_display() {
       let mut d = display.lock();
@@ -123,6 +121,23 @@ impl Session {
     if let Some(display) = self.maybe_display() {
       let mut d = display.lock();
       d.write_stderr(msg);
+    }
+  }
+
+  pub fn with_console_ui_disabled<F: FnOnce() -> T, T>(&self, f: F) -> T {
+    if let Some(display) = self.maybe_display() {
+      {
+        let mut d = display.lock();
+        d.suspend()
+      }
+      let output = f();
+      {
+        let mut d = display.lock();
+        d.unsuspend();
+      }
+      output
+    } else {
+      f()
     }
   }
 }
@@ -338,6 +353,7 @@ impl Scheduler {
     // This map keeps the k most relevant jobs in assigned possitions.
     // Keys are positions in the display (display workers) and the values are the actual jobs to print.
     let mut tasks_to_display = IndexMap::new();
+    let refresh_interval = Duration::from_millis(100);
 
     match session.maybe_display() {
       Some(display) => {
@@ -348,7 +364,7 @@ impl Scheduler {
         let unique_handle = LOGGER.register_engine_display(display.clone());
 
         let results = loop {
-          if let Ok(res) = receiver.recv_timeout(Duration::from_millis(100)) {
+          if let Ok(res) = receiver.recv_timeout(refresh_interval) {
             break res;
           } else {
             Scheduler::display_ongoing_tasks(
@@ -367,7 +383,7 @@ impl Scheduler {
         results
       }
       None => loop {
-        if let Ok(res) = receiver.recv_timeout(Duration::from_millis(100)) {
+        if let Ok(res) = receiver.recv_timeout(refresh_interval) {
           break res;
         }
       },
@@ -399,10 +415,12 @@ impl Scheduler {
       }
     }
 
-    for (i, id) in tasks_to_display.iter().enumerate() {
-      // TODO Maybe we want to print something else besides the ID here.
+    for (i, item) in tasks_to_display.iter().enumerate() {
+      let label = item.0;
+      let duration = item.1;
+      let duration_secs: f64 = (duration.as_millis() as f64) / 1000.0;
       let mut d = display.lock();
-      d.update(i.to_string(), format!("{:?}", id));
+      d.update(i.to_string(), format!("{:.2}s {}", duration_secs, label));
     }
 
     // If the number of ongoing tasks is less than the number of workers,
