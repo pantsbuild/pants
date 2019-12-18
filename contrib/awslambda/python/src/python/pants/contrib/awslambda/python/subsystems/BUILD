@@ -3,7 +3,6 @@
 
 python_library(
   dependencies = [
-    'contrib/awslambda/python/src/python/pants/contrib/awslambda/python/subsystems',
-    'src/python/pants/backend/python/tasks',
-  ]
+    'src/python/pants/backend/python/subsystems',
+  ],
 )

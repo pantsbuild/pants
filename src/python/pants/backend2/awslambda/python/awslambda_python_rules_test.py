@@ -104,12 +104,12 @@ class TestPythonAWSLambdaCreation(TestBase):
 
     self.create_file('src/python/foo/bar/BUILD', textwrap.dedent("""
       python_library(
-        name='hello_world', 
+        name='hello_world',
         sources=['hello_world.py']
       )
-      
+
       python_awslambda(
-        name='hello_world_lambda', 
+        name='hello_world_lambda',
         dependencies=[':hello_world'],
         handler='foo.bar.hello_world'
       )
