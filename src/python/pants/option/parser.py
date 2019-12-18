@@ -80,13 +80,13 @@ class Parser:
       elif s.lower() == 'false':
         return False
       else:
-        raise Parser.BooleanConversionError('Got "{0}". Expected "True" or "False".'.format(s))
+        raise Parser.BooleanConversionError(f'Got "{s}". Expected "True" or "False".')
     if s is True:
       return True
     elif s is False:
       return False
     else:
-      raise Parser.BooleanConversionError('Got {0}. Expected True or False.'.format(s))
+      raise Parser.BooleanConversionError(f'Got {s}. Expected True or False.')
 
   @classmethod
   def _invert(cls, s):
@@ -282,7 +282,7 @@ class Parser:
 
         if len(mutex_map[dest]) > 1:
           raise self.MutuallyExclusiveOptionError(
-            "Can only provide one of the mutually exclusive options {}".format(mutex_map[dest]))
+            f"Can only provide one of the mutually exclusive options {mutex_map[dest]}")
 
       setattr(namespace, dest, val)
 
@@ -304,7 +304,7 @@ class Parser:
       # short and long-form options.
       flag_normalized_unscoped_name = re.sub(r'^-+', '', flag_name)
       flag_normalized_scoped_name = (
-        '{}-{}'.format(self.scope.replace('.', '-'), flag_normalized_unscoped_name)
+        f"{self.scope.replace('.', '-')}-{flag_normalized_unscoped_name}"
         if self.scope != GLOBAL_SCOPE
         else flag_normalized_unscoped_name)
 
@@ -467,7 +467,7 @@ class Parser:
     if removal_version is not None:
       warn_or_error(
         removal_version=removal_version,
-        deprecated_entity_description="option '{}' in {}".format(dest, self._scope_str()),
+        deprecated_entity_description=f"option '{dest}' in {self._scope_str()}",
         deprecation_start_version=kwargs.get('deprecation_start_version', None),
         hint=kwargs.get('removal_hint', None),
         stacklevel=9999,  # Out of range stacklevel to suppress printing src line.
@@ -620,7 +620,7 @@ class Parser:
         self._config.get_source_for_option(Config.DEFAULT_SECTION, dest))
     if config_source_file is not None:
       config_source_file = os.path.relpath(config_source_file)
-      config_details = 'in {}'.format(config_source_file)
+      config_details = f'in {config_source_file}'
 
     # Get value from environment, and capture details about its derivation.
     udest = dest.upper()
@@ -631,12 +631,12 @@ class Parser:
       # itself starts with 'pants-' then we also allow simply FOO. E.g., PANTS_WORKDIR instead of
       # PANTS_PANTS_WORKDIR or PANTS_GLOBAL_PANTS_WORKDIR. We take the first specified value we
       # find, in this order: PANTS_GLOBAL_FOO, PANTS_FOO, FOO.
-      env_vars = ['PANTS_GLOBAL_{0}'.format(udest), 'PANTS_{0}'.format(udest)]
+      env_vars = [f'PANTS_GLOBAL_{udest}', f'PANTS_{udest}']
       if udest.startswith('PANTS_'):
         env_vars.append(udest)
     else:
       sanitized_env_var_scope = self._ENV_SANITIZER_RE.sub('_', self._scope.upper())
-      env_vars = ['PANTS_{0}_{1}'.format(sanitized_env_var_scope, udest)]
+      env_vars = [f'PANTS_{sanitized_env_var_scope}_{udest}']
 
     env_val_or_str = None
     env_details = None
@@ -644,7 +644,7 @@ class Parser:
       for env_var in env_vars:
         if env_var in self._env:
           env_val_or_str = expand(self._env.get(env_var))
-          env_details = 'from env var {}'.format(env_var)
+          env_details = f'from env var {env_var}'
           break
 
     # Get value from cmd-line flags.
@@ -752,7 +752,7 @@ class Parser:
     if arg.startswith('--'):
       if arg.startswith('--no-'):
         raise BooleanOptionNameWithNo(self.scope, arg)
-      return '--no-{}'.format(arg[2:])
+      return f'--no-{arg[2:]}'
     else:
       return None
 
@@ -764,7 +764,7 @@ class Parser:
 
   def _scope_str(self, scope=None):
     scope = scope or self.scope
-    return 'global scope' if scope == GLOBAL_SCOPE else "scope '{}'".format(scope)
+    return 'global scope' if scope == GLOBAL_SCOPE else f"scope '{scope}'"
 
   def __str__(self):
-    return 'Parser({})'.format(self._scope)
+    return f'Parser({self._scope})'

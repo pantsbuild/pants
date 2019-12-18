@@ -115,4 +115,4 @@ class RankedValue:
     return self._rank == other._rank and self._value == other._value
 
   def __repr__(self):
-    return '({0}, {1})'.format(self.get_rank_name(self._rank), self._value)
+    return f'({self.get_rank_name(self._rank)}, {self._value})'

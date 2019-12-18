@@ -219,7 +219,7 @@ class Options:
     """
     v1, ambiguous, v2 = [], [], []
     for goal in self._goals:
-      goal_dot = '{}.'.format(goal)
+      goal_dot = f'{goal}.'
       scope_categories = {s.category
                           for s in self.known_scope_to_info.values()
                           if s.scope == goal or s.scope.startswith(goal_dot)}
@@ -296,7 +296,7 @@ class Options:
 
   def _assert_not_frozen(self):
     if self._frozen:
-      raise self.FrozenOptionsError('cannot mutate frozen Options instance {!r}.'.format(self))
+      raise self.FrozenOptionsError(f'cannot mutate frozen Options instance {self!r}.')
 
   def register(self, scope, *args, **kwargs):
     """Register an option in the given scope."""
@@ -349,7 +349,7 @@ class Options:
       if explicit_keys:
         warn_or_error(
             removal_version=si.removal_version,
-            deprecated_entity_description='scope {}'.format(scope),
+            deprecated_entity_description=f'scope {scope}',
             hint=si.removal_hint,
           )
 
@@ -372,8 +372,8 @@ class Options:
 
         warn_or_error(
             removal_version=self.known_scope_to_info[scope].deprecated_scope_removal_version,
-            deprecated_entity_description='scope {}'.format(deprecated_scope),
-            hint='Use scope {} instead (options: {})'.format(scope, ', '.join(explicit_keys))
+            deprecated_entity_description=f'scope {deprecated_scope}',
+            hint=f"Use scope {scope} instead (options: {', '.join(explicit_keys)})"
           )
 
   @frozen_after_init

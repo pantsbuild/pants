@@ -43,7 +43,7 @@ class OptionableFactory(ABC):
     """
     snake_scope = cls.options_scope.replace('-', '_')
     partial_construct_optionable = functools.partial(_construct_optionable, cls)
-    partial_construct_optionable.__name__ = 'construct_scope_{}'.format(snake_scope)
+    partial_construct_optionable.__name__ = f'construct_scope_{snake_scope}'
     return dict(
         output_type=cls.optionable_cls,
         input_selectors=tuple(),
@@ -90,13 +90,13 @@ class Optionable(OptionableFactory, metaclass=ABCMeta):
     """Returns a ScopeInfo instance representing this Optionable's options scope."""
     if cls.options_scope is None or cls.options_scope_category is None:
       raise OptionsError(
-        '{} must set options_scope and options_scope_category.'.format(cls.__name__))
+        f'{cls.__name__} must set options_scope and options_scope_category.')
     return ScopeInfo(cls.options_scope, cls.options_scope_category, cls)
 
   @classmethod
   def subscope(cls, scope):
     """Create a subscope under this Optionable's scope."""
-    return '{0}.{1}'.format(cls.options_scope, scope)
+    return f'{cls.options_scope}.{scope}'
 
   @classmethod
   def known_scope_infos(cls):

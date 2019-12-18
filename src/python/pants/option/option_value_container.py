@@ -106,7 +106,7 @@ class OptionValueContainer:
     if isinstance(value, RankedValue):
       new_rank = value.rank
     else:
-      raise AttributeError('Value must be of type RankedValue: {}'.format(value))
+      raise AttributeError(f'Value must be of type RankedValue: {value}')
 
     if new_rank >= existing_rank:
       # We set values from outer scopes before values from inner scopes, so
