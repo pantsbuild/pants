@@ -8,7 +8,8 @@ python_tests(
     'contrib/node/src/python/pants/contrib/node/subsystems',
     'src/python/pants/testutil/base:context_utils',
     'src/python/pants/testutil/subsystem',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -16,5 +17,6 @@ python_tests(
   sources=['test_package_managers.py'],
   dependencies=[
     'contrib/node/src/python/pants/contrib/node/subsystems',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )

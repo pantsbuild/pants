@@ -11,6 +11,7 @@ python_tests(
     'src/python/pants/util:dirutil',
     'src/python/pants/testutil/subsystem',
   ],
+  tags = {"partially_type_checked"},
   timeout = 15,
 )
 

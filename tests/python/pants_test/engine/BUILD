@@ -20,7 +20,7 @@ python_library(
 )
 
 python_tests(
-  name = 'test_legacy_engine',
+  name = 'legacy_engine',
   sources = ['test_legacy_engine.py'],
   dependencies = [
     ':engine_test_base',
@@ -31,7 +31,7 @@ python_tests(
 )
 
 python_tests(
-  name='test_round_engine',
+  name='round_engine',
   sources=['test_round_engine.py'],
   dependencies = [
     ':engine_test_base',
@@ -76,7 +76,7 @@ python_tests(
     'src/python/pants/testutil:test_base',
     'tests/python/pants_test/engine/examples:fs_test',
     'tests/python/pants_test/engine/examples:scheduler_inputs',
-  ]
+  ],
 )
 
 python_tests(
@@ -114,6 +114,7 @@ python_tests(
     'src/python/pants/testutil/engine:util',
     'src/python/pants/reporting',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -132,6 +133,7 @@ python_tests(
     'tests/python/pants_test/engine/examples:graph_test',
     'tests/python/pants_test/engine/examples:parsers',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -149,6 +151,7 @@ python_tests(
     'tests/python/pants_test/engine/examples:mapper_test',
     'tests/python/pants_test/engine/examples:parsers',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -176,7 +179,7 @@ python_tests(
     'tests/python/pants_test/engine/examples:parsers',
     'src/python/pants/testutil/subsystem',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
 )
 
 python_tests(
@@ -191,7 +194,7 @@ python_tests(
     'src/python/pants/engine:scheduler',
     'tests/python/pants_test/engine/examples:scheduler_inputs',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
 )
 
 python_tests(
@@ -215,7 +218,8 @@ python_library(
     'src/python/pants/engine:parser',
     'src/python/pants/engine:scheduler',
     'src/python/pants/util:dirutil',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -224,4 +228,5 @@ python_tests(
   dependencies=[
     'src/python/pants/engine:objects',
   ],
+  tags = {"partially_type_checked"},
 )

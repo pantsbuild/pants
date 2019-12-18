@@ -33,10 +33,10 @@ async def run(
   bfa: BuildFileAddress,
 ) -> Run:
   target = bfa.to_address()
-  binary = await Get(CreatedBinary, Address, target)
+  binary = await Get[CreatedBinary](Address, target)
 
   with temporary_dir(root_dir=str(Path(build_root.path, ".pants.d")), cleanup=True) as tmpdir:
-    path_relative_to_build_root = Path(tmpdir).relative_to(build_root.path)
+    path_relative_to_build_root = str(Path(tmpdir).relative_to(build_root.path))
     workspace.materialize_directory(
       DirectoryToMaterialize(binary.digest, path_prefix=path_relative_to_build_root)
     )
@@ -44,7 +44,7 @@ async def run(
     console.write_stdout(f"Running target: {target}\n")
     full_path = str(Path(tmpdir, binary.binary_name))
     run_request = InteractiveProcessRequest(
-      argv=[full_path],
+      argv=(full_path,),
       run_in_workspace=True,
     )
 

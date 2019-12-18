@@ -27,4 +27,5 @@ python_tests(
   dependencies=[
     ':option',
   ],
+  tags = {"partially_type_checked"},
 )

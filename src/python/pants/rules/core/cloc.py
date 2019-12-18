@@ -36,7 +36,7 @@ async def download_cloc_script() -> DownloadedClocScript:
   url = "https://binaries.pantsbuild.org/bin/cloc/1.80/cloc"
   sha_256 = "2b23012b1c3c53bd6b9dd43cd6aa75715eed4feb2cb6db56ac3fbbd2dffeac9d"
   digest = Digest(sha_256, 546279)
-  snapshot = await Get(Snapshot, UrlToFetch(url, digest))
+  snapshot = await Get[Snapshot](UrlToFetch(url, digest))
   return DownloadedClocScript(script_path=snapshot.files[0], digest=snapshot.directory_digest)
 
 
@@ -67,11 +67,11 @@ async def run_cloc(
   ignored = options.values.ignored
 
   if transitive:
-    targets = await Get(TransitiveHydratedTargets, Specs, specs)
-    all_target_adaptors = {t.adaptor for t in targets.closure}
+    transitive_hydrated_targets = await Get[TransitiveHydratedTargets](Specs, specs)
+    all_target_adaptors = {ht.adaptor for ht in transitive_hydrated_targets.closure}
   else:
-    targets = await Get(HydratedTargets, Specs, specs)
-    all_target_adaptors = {t.adaptor for t in targets}
+    hydrated_targets = await Get[HydratedTargets](Specs, specs)
+    all_target_adaptors = {ht.adaptor for ht in hydrated_targets}
 
   digests_to_merge = []
 
@@ -90,10 +90,10 @@ async def run_cloc(
   ignore_filename = 'ignored.txt'
 
   input_file_list = InputFilesContent(FilesContent((FileContent(path=input_files_filename, content=file_content, is_executable=False),)))
-  input_file_digest = await Get(Digest, InputFilesContent, input_file_list)
+  input_file_digest = await Get[Digest](InputFilesContent, input_file_list)
   cloc_script_digest = cloc_script.digest
   digests_to_merge.extend([cloc_script_digest, input_file_digest])
-  digest = await Get(Digest, DirectoriesToMerge(directories=tuple(digests_to_merge)))
+  digest = await Get[Digest](DirectoriesToMerge(directories=tuple(digests_to_merge)))
 
   cmd = (
     '/usr/bin/perl',
@@ -111,8 +111,8 @@ async def run_cloc(
     description='cloc',
   )
 
-  exec_result = await Get(ExecuteProcessResult, ExecuteProcessRequest, req)
-  files_content = await Get(FilesContent, Digest, exec_result.output_directory_digest)
+  exec_result = await Get[ExecuteProcessResult](ExecuteProcessRequest, req)
+  files_content = await Get[FilesContent](Digest, exec_result.output_directory_digest)
 
   file_outputs = {fc.path: fc.content.decode() for fc in files_content.dependencies}
 

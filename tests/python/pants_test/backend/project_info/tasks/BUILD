@@ -7,6 +7,7 @@ python_library(
   dependencies = [
     'src/python/pants/util:contextutil',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(

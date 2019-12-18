@@ -52,7 +52,7 @@ class AddressAndTestResult:
 
 @console_rule
 async def fast_test(console: Console, addresses: BuildFileAddresses) -> Test:
-  results = await MultiGet(Get(AddressAndTestResult, Address, addr.to_address()) for addr in addresses)
+  results = await MultiGet(Get[AddressAndTestResult](Address, addr.to_address()) for addr in addresses)
   did_any_fail = False
   filtered_results = [(x.address, x.test_result) for x in results if x.test_result is not None]
 
@@ -112,7 +112,7 @@ async def coordinator_of_tests(
   # NB: This has the effect of "casting" a TargetAdaptor to a member of the TestTarget union.
   # The adaptor will always be a member because of the union membership check above, but if
   # it were not it would fail at runtime with a useful error message.
-  result = await Get(TestResult, TestTarget, target.adaptor)
+  result = await Get[TestResult](TestTarget, target.adaptor)
   logger.info("Tests {}: {}".format(
     "succeeded" if result.status == Status.SUCCESS else "failed",
     target.address.reference(),

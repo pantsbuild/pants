@@ -20,6 +20,7 @@ python_library(
     'testprojects/src/scala/org/pantsbuild/testproject:sharedsources_directory',
     'testprojects/src/scala/org/pantsbuild/testproject:unicode_directory',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(

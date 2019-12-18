@@ -12,6 +12,7 @@ contrib_plugin(
     ':thrifty',
     'src/python/pants/goal:task_registrar',
   ],
+  tags = {"partially_type_checked"},
   distribution_name='pantsbuild.pants.contrib.thrifty',
   description='Microsoft Thrifty thrift generator pants plugins.',
   additional_classifiers=[

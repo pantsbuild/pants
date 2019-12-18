@@ -221,7 +221,7 @@ class MultiMatcher:
 async def validate(
   console: Console, hydrated_targets: HydratedTargets, validate_options: ValidateOptions
 ) -> Validate:
-  per_tgt_rmrs = await MultiGet(Get(RegexMatchResults, HydratedTarget, ht) for ht in hydrated_targets)
+  per_tgt_rmrs = await MultiGet(Get[RegexMatchResults](HydratedTarget, ht) for ht in hydrated_targets)
   regex_match_results = list(itertools.chain(*per_tgt_rmrs))
 
   detail_level = validate_options.values.detail_level
@@ -264,8 +264,7 @@ async def match_regexes_for_one_target(
   multi_matcher = source_file_validation.get_multi_matcher()
   rmrs = []
   if hasattr(hydrated_target.adaptor, 'sources'):
-    files_content = await Get(FilesContent,
-                              Digest, hydrated_target.adaptor.sources.snapshot.directory_digest)
+    files_content = await Get[FilesContent](Digest, hydrated_target.adaptor.sources.snapshot.directory_digest)
     for file_content in files_content:
       rmrs.append(multi_matcher.check_source_file(file_content.path, file_content.content))
   return RegexMatchResults(rmrs)

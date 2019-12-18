@@ -19,7 +19,7 @@ python_library(
     'contrib/python/src/python/pants/contrib/python/checks/checker/3rdparty:pycodestyle',
     'contrib/python/src/python/pants/contrib/python/checks/checker/3rdparty:pyflakes',
     'contrib/python/src/python/pants/contrib/python/checks/checker/3rdparty:six',
-  ]
+  ],
 )
 
 python_binary(
@@ -27,5 +27,5 @@ python_binary(
   entry_point='pants.contrib.python.checks.checker.checker:main',
   dependencies=[
     ':checker',
-  ]
+  ],
 )

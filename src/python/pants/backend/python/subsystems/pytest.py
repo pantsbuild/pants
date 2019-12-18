@@ -46,6 +46,27 @@ class PyTest(Subsystem):
              help='Requirements string for the unittest2 library, which some python versions '
                   'may need.',
              removal_version="1.25.0.dev0", removal_hint="Use --pytest-plugins instead.")
+    register(
+      '--timeouts',
+      type=bool,
+      default=True,
+      help='Enable test target timeouts. If timeouts are enabled then test targets with a '
+          'timeout= parameter set on their target will time out after the given number of '
+          'seconds if not completed. If no timeout is set, then either the default timeout '
+          'is used or no timeout is configured.',
+    )
+    register(
+      '--timeout-default',
+      type=int,
+      advanced=True,
+      help='The default timeout (in seconds) for a test target if the timeout field is not set on the target.',
+    )
+    register(
+      '--timeout-maximum',
+      type=int,
+      advanced=True,
+      help='The maximum timeout (in seconds) that can be set on a test target.',
+    )
 
   def get_requirement_strings(self) -> Tuple[str, ...]:
     """Returns a tuple of requirements-style strings for Pytest and Pytest plugins."""

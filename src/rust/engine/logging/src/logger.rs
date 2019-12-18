@@ -2,12 +2,12 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use crate::PythonLogLevel;
+use chrono;
 use futures::task_local;
 use lazy_static::lazy_static;
 use log::{log, set_logger, set_max_level, LevelFilter, Log, Metadata, Record};
 use parking_lot::Mutex;
-use simplelog::Config;
-use simplelog::WriteLogger;
+use simplelog::{ConfigBuilder, LevelPadding, WriteLogger};
 use std::collections::HashMap;
 use std::convert::TryInto;
 use std::fs::File;
@@ -18,6 +18,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use ui::EngineDisplay;
 use uuid::Uuid;
+
+const TIME_FORMAT_STR: &str = "%H:%M:%S";
 
 lazy_static! {
   pub static ref LOGGER: Logger = Logger::new();
@@ -144,7 +146,9 @@ impl Log for Logger {
       Destination::Stderr => {
         let mut handles_map = self.engine_display_handles.lock();
         for handle in handles_map.values_mut() {
-          let log_string: String = format!("{}", record.args());
+          let cur_time = chrono::Utc::now().format(TIME_FORMAT_STR);
+          let level = record.level();
+          let log_string: String = format!("{} [{}] {}", cur_time, level, record.args());
           let mut display_engine = handle.lock();
           display_engine.log(log_string);
         }
@@ -183,14 +187,17 @@ impl<W: Write + Send + 'static> MaybeWriteLogger<W> {
     // We initialize the inner WriteLogger with no filters so that we don't
     // have to create a new one every time we change the level of the outer
     // MaybeWriteLogger.
+
+    let config = ConfigBuilder::new()
+      .set_time_format_str(TIME_FORMAT_STR)
+      .set_thread_level(LevelFilter::Off)
+      .set_level_padding(LevelPadding::Off)
+      .build();
+
     MaybeWriteLogger {
       level,
       show_rust_3rdparty_logs,
-      inner: Some(WriteLogger::new(
-        LevelFilter::max(),
-        Config::default(),
-        writable,
-      )),
+      inner: Some(WriteLogger::new(LevelFilter::max(), config, writable)),
     }
   }
 
