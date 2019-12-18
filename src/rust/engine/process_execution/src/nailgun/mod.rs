@@ -54,6 +54,7 @@ fn construct_nailgun_server_request(
   ExecuteProcessRequest {
     argv: full_args,
     env: BTreeMap::new(),
+    working_directory: None,
     input_files: hashing::EMPTY_DIGEST,
     output_files: BTreeSet::new(),
     output_directories: BTreeSet::new(),
@@ -77,6 +78,7 @@ fn construct_nailgun_client_request(
     input_files,
     description,
     env: original_request_env,
+    working_directory,
     output_files,
     output_directories,
     timeout,
@@ -91,6 +93,7 @@ fn construct_nailgun_client_request(
     input_files,
     description,
     env: original_request_env,
+    working_directory,
     output_files,
     output_directories,
     timeout,
@@ -218,7 +221,11 @@ impl CapturedWorkdir for CommandRunner {
     let nailgun_name = CommandRunner::calculate_nailgun_name(&client_main_class);
     let nailgun_name2 = nailgun_name.clone();
     let nailgun_name3 = nailgun_name.clone();
-    let client_workdir = workdir_path.to_path_buf();
+    let client_workdir = if let Some(working_directory) = &req.working_directory {
+      workdir_path.join(working_directory)
+    } else {
+      workdir_path.to_path_buf()
+    };
 
     let jdk_home = req
       .jdk_home

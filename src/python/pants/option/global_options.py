@@ -173,6 +173,8 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                   'Useful when printing help messages.')
 
     register('--plugins', advanced=True, type=list, help='Load these plugins.')
+    register('--plugins-force-resolve', advanced=True, type=bool, default=False,
+             help='Re-resolve plugins even if previously resolved.')
     register('--plugin-cache-dir', advanced=True,
              default=os.path.join(get_pants_cachedir(), 'plugins'),
              help='Cache resolved plugin requirements here.')
@@ -286,6 +288,15 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              help='Enable concurrent runs of pants. Without this enabled, pants will '
                   'start up all concurrent invocations (e.g. in other terminals) without pantsd. '
                   'Enabling this option requires parallel pants invocations to block on the first')
+
+    # Calling pants command (inner run) from other pants command is unusual behaviour,
+    # and most users should never set this flag.
+    # It is automatically set by pants when an inner run is detected.
+    # Currently, pants commands with this option set don't use pantsd,
+    # but this effect should not be relied upon.
+    # This option allows us to know who was the parent of pants inner runs for informational purposes.
+    register('--parent-build-id', advanced=True, default=None,
+             help='The build ID of the other pants run which spawned this one, if any.')
 
     # Shutdown pantsd after the current run.
     # This needs to be accessed at the same time as enable_pantsd,
@@ -482,7 +493,9 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              help='The maximum number of times to loop when `{}` is specified.'.format(loop_flag))
 
     register('-t', '--timeout', advanced=True, type=int, metavar='<seconds>',
-             help='Number of seconds to wait for http connections.')
+            removal_version="1.26.0.dev2",
+            removal_hint="This option is not used and may be removed with no change in behavior. ",
+            help='Number of seconds to wait for http connections.')
     # TODO: After moving to the new options system these abstraction leaks can go away.
     register('-k', '--kill-nailguns', advanced=True, type=bool,
              help='Kill nailguns before exiting')
@@ -500,6 +513,12 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--lock', advanced=True, type=bool, default=True,
              help='Use a global lock to exclude other versions of pants from running during '
                   'critical operations.')
+    register('--streaming-workunits-handlers', type=list, member_type=str, default=[],
+        advanced=True,
+        help="Use this option to name Subsystems which will receive streaming workunit events. "
+        "For instance, `--streaming-workunits-handlers=\"['pants.reporting.workunit.Workunits']\"` will "
+        "register a Subsystem called Workunits defined in the module \"pants.reporting.workunit\"."
+    )
 
   @classmethod
   def validate_instance(cls, opts):

@@ -4,12 +4,14 @@
 import logging
 import os
 import subprocess
+from pathlib import Path
 
 from pants.backend.jvm import argfile
 from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
+from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.engine.fs import DirectoryToMaterialize
@@ -169,11 +171,13 @@ class JavacCompile(JvmCompile):
           workunit.set_outcome(WorkUnit.FAILURE if return_code else WorkUnit.SUCCESS)
           if return_code:
             raise TaskError(f'javac exited with return code {return_code}')
-        self.context._scheduler.materialize_directories((
+        classes_directory = Path(ctx.classes_dir.path).relative_to(get_buildroot())
+        self.context._scheduler.materialize_directory(
           DirectoryToMaterialize(
-            ctx.classes_dir.path,
-            self.post_compile_extra_resources_digest(ctx, prepend_post_merge_relative_path=False)),
-        ))
+            self.post_compile_extra_resources_digest(ctx, prepend_post_merge_relative_path=False),
+            path_prefix=str(classes_directory),
+          ),
+        )
 
     self._create_context_jar(ctx)
 
@@ -230,7 +234,7 @@ class JavacCompile(JvmCompile):
         exec_result.output_directory_digest,
         self.post_compile_extra_resources_digest(ctx, prepend_post_merge_relative_path=False),
       ])
-    classes_directory = ctx.classes_dir.path
-    self.context._scheduler.materialize_directories((
-      DirectoryToMaterialize(classes_directory, merged_directories),
-    ))
+    classes_directory = Path(ctx.classes_dir.path).relative_to(get_buildroot())
+    self.context._scheduler.materialize_directory(
+      DirectoryToMaterialize(merged_directories, path_prefix=str(classes_directory)),
+    )

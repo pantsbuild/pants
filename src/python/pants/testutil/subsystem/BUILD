@@ -6,4 +6,5 @@ python_library(
     'src/python/pants/subsystem',
     'src/python/pants/testutil/option',
   ],
+  tags = {"partially_type_checked"},
 )

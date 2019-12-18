@@ -6,7 +6,8 @@ python_tests(
   sources = ['test_jar_dependency_utils.py'],
   dependencies = [
     'src/python/pants/java/jar',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(

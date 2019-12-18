@@ -2,6 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import sys
+from typing import Optional, cast
+
+from typing_extensions import Literal
 
 from pants.base.build_environment import pants_release, pants_version
 from pants.goal.goal import Goal
@@ -9,33 +12,33 @@ from pants.help.help_formatter import HelpFormatter
 from pants.help.scope_info_iterator import ScopeInfoIterator
 from pants.option.arg_splitter import (
   GoalsHelp,
+  HelpRequest,
   NoGoalHelp,
   OptionsHelp,
   UnknownGoalHelp,
   VersionHelp,
 )
+from pants.option.options import Options
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 
 
 class HelpPrinter:
   """Prints help to the console."""
 
-  def __init__(self, options, help_request=None):
+  def __init__(self, options: Options, *, help_request: Optional[HelpRequest] = None) -> None:
     self._options = options
     self._help_request = help_request or self._options.help_request
 
   @property
-  def bin_name(self):
-    return self._options.for_global_scope().pants_bin_name
+  def bin_name(self) -> str:
+    return cast(str, self._options.for_global_scope().pants_bin_name)
 
-  def print_help(self):
-    """Print help to the console.
-
-    :return: 0 on success, 1 on failure
-    """
-    def print_hint():
+  def print_help(self) -> Literal[0, 1]:
+    """Print help to the console."""
+    def print_hint() -> None:
       print(f'Use `{self.bin_name} goals` to list goals.')
       print(f'Use `{self.bin_name} help` to get help.')
+
     if isinstance(self._help_request, VersionHelp):
       print(pants_version())
     elif isinstance(self._help_request, OptionsHelp):
@@ -118,9 +121,13 @@ class HelpPrinter:
     """
     scope = scope_info.scope
     description = scope_info.description
-    show_recursive = self._help_request.advanced
-    show_advanced = self._help_request.advanced
-    color = sys.stdout.isatty()
-    help_formatter = HelpFormatter(scope, show_recursive, show_advanced, color)
-    return '\n'.join(help_formatter.format_options(scope, description,
-        self._options.get_parser(scope).option_registrations_iter()))
+    help_formatter = HelpFormatter(
+      scope=scope,
+      show_recursive=self._help_request.advanced,
+      show_advanced=self._help_request.advanced,
+      color=sys.stdout.isatty(),
+    )
+    formatted_lines = help_formatter.format_options(
+      scope, description, self._options.get_parser(scope).option_registrations_iter()
+    )
+    return '\n'.join(formatted_lines)

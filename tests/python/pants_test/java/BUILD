@@ -9,7 +9,8 @@ python_tests(
     'src/python/pants/java:executor',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -18,7 +19,8 @@ python_tests(
   coverage = ['pants.java.nailgun_client'],
   dependencies = [
     'src/python/pants/java:nailgun_client',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -38,7 +40,8 @@ python_tests(
   coverage = ['pants.java.nailgun_io'],
   dependencies = [
     'src/python/pants/java:nailgun_io',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -47,7 +50,8 @@ python_tests(
   coverage = ['pants.java.nailgun_protocol'],
   dependencies = [
     'src/python/pants/java:nailgun_protocol',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -56,7 +60,8 @@ python_tests(
   dependencies = [
     'src/python/pants/java:util',
     'src/python/pants/util:dirutil',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(

@@ -6,19 +6,18 @@ from typing import Set
 
 from pants.base.build_root import BuildRoot
 from pants.engine.console import Console
-from pants.engine.goal import Goal, LineOriented
+from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.legacy.graph import TransitiveHydratedTargets
 from pants.engine.rules import console_rule
 
 
-class Filedeps(LineOriented, Goal):
+class FiledepsOptions(LineOriented, GoalSubsystem):
   """List all source and BUILD files a target transitively depends on.
 
   Files may be listed with absolute or relative paths and any BUILD files implied in the transitive
   closure of targets are also included.
   """
-
-  name = 'fast-filedeps'
+  name = 'filedeps2'
 
   @classmethod
   def register_options(cls, register):
@@ -33,10 +32,14 @@ class Filedeps(LineOriented, Goal):
     )
 
 
+class Filedeps(Goal):
+  subsystem_cls = FiledepsOptions
+
+
 @console_rule
 def file_deps(
   console: Console,
-  filedeps_options: Filedeps.Options,
+  filedeps_options: FiledepsOptions,
   build_root: BuildRoot,
   transitive_hydrated_targets: TransitiveHydratedTargets
 ) -> Filedeps:
@@ -58,7 +61,7 @@ def file_deps(
       )
       unique_rel_paths.update(sources_paths)
 
-  with Filedeps.line_oriented(filedeps_options, console) as print_stdout:
+  with filedeps_options.line_oriented(console) as print_stdout:
     for rel_path in sorted(unique_rel_paths):
       final_path = str(Path(build_root.path, rel_path)) if absolute else rel_path
       print_stdout(final_path)

@@ -189,8 +189,6 @@ class AddressableDescriptor:
         .format(self._name, instance),
         e)
 
-    return value
-
   def _resolve_value(self, instance, value):
     if not isinstance(value, Resolvable):
       # The value is concrete which means we type-checked on set so no need to do so again, its a
@@ -207,8 +205,6 @@ class AddressableDescriptor:
           "The value resolved from {} for the {} property of {} was invalid"
           .format(value.address, self._name, instance),
           e)
-
-      return resolved_value
 
 
 def _addressable_wrapper(addressable_descriptor, type_constraint):

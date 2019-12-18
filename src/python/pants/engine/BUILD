@@ -18,6 +18,7 @@ python_library(
     'src/python/pants/base:workunit',
     'src/python/pants/goal',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -218,6 +219,7 @@ python_library(
     'src/python/pants/base:specs',
     'src/python/pants/rules/core:core',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -243,6 +245,7 @@ python_library(
   name='console',
   sources=['console.py'],
   dependencies=[
+    ':native',
     '3rdparty/python:ansicolors',
   ],
   tags = {'partially_type_checked'},

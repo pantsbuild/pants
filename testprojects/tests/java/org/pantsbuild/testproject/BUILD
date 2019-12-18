@@ -11,7 +11,6 @@ target(
     ':cwdexample_directory',
     ':depman_directory',
     ':dummies_directory',
-    ':empty_directory',
     ':exports_directory',
     ':fail256_directory',
     ':htmlreport_directory',
@@ -79,11 +78,6 @@ files(
 files(
   name='dummies_directory',
   sources=rglobs('dummies/*'),
-)
-
-files(
-  name='empty_directory',
-  sources=rglobs('empty/*'),
 )
 
 files(

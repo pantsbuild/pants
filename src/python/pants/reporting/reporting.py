@@ -63,8 +63,6 @@ class Reporting(Subsystem):
     register('--zipkin-max-span-batch-size', advanced=True, type=int, default=100,
               help='Spans in a Zipkin trace are sent to the Zipkin server in batches.' 
                    'zipkin-max-span-batch-size sets the max size of one batch.')
-    register('--stream-workunits', advanced=True, type=bool, default=False,
-        help="If set to true, report workunit information while pants is running")
 
   def initialize(self, run_tracker, all_options, start_time=None):
     """Initialize with the given RunTracker.

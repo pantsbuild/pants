@@ -33,8 +33,7 @@ use workunit_store::WorkUnitStore;
 pub struct CommandRunner {
   pub store: Store,
   executor: task_executor::Executor,
-  // TODO: change work_dir to work_dir_base
-  pub work_dir: PathBuf,
+  work_dir_base: PathBuf,
   cleanup_local_dirs: bool,
   platform: Platform,
 }
@@ -43,13 +42,13 @@ impl CommandRunner {
   pub fn new(
     store: Store,
     executor: task_executor::Executor,
-    work_dir: PathBuf,
+    work_dir_base: PathBuf,
     cleanup_local_dirs: bool,
   ) -> CommandRunner {
     CommandRunner {
       store,
       executor,
-      work_dir,
+      work_dir_base,
       cleanup_local_dirs,
       platform: Platform::current_platform().unwrap(),
     }
@@ -246,7 +245,7 @@ impl super::CommandRunner for CommandRunner {
       self.store.clone(),
       self.executor.clone(),
       self.cleanup_local_dirs,
-      &self.work_dir,
+      &self.work_dir_base,
     )
   }
 }
@@ -259,7 +258,11 @@ impl CapturedWorkdir for CommandRunner {
   ) -> Result<Box<dyn Stream<Item = ChildOutput, Error = String> + Send>, String> {
     StreamedHermeticCommand::new(&req.argv[0])
       .args(&req.argv[1..])
-      .current_dir(&workdir_path)
+      .current_dir(if let Some(working_directory) = req.working_directory {
+        workdir_path.join(working_directory)
+      } else {
+        workdir_path.to_owned()
+      })
       .envs(&req.env)
       .stream()
       .map(|s| {

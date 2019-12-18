@@ -32,7 +32,7 @@ class HelpRequest(ABC):
 
 
 class OptionsHelp(HelpRequest):
-  def __init__(self, advanced=False, all_scopes=False):
+  def __init__(self, advanced: bool = False, all_scopes: bool = False) -> None:
     """The user requested help for cmd-line options.
 
     :param advanced: Did the user ask for advanced help (e.g., using --help-advanced).

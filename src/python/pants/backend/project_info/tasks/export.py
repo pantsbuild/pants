@@ -18,6 +18,7 @@ from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.coursier_resolve import CoursierMixin
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
+from pants.backend.project_info.tasks.export_version import DEFAULT_EXPORT_VERSION
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.subsystems.pex_build_util import has_python_requirements
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
@@ -28,12 +29,23 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
+from pants.help.build_dictionary_info_extracter import BuildDictionaryInfoExtracter
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.java.jar.jar_dependency_utils import M2Coordinate
 from pants.task.console_task import ConsoleTask
 from pants.util.memo import memoized_property
+
+
+class SourceRootTypes:
+  """Defines SourceRoot Types Constants"""
+  SOURCE = 'SOURCE'  # Source Target
+  TEST = 'TEST'  # Test Target
+  SOURCE_GENERATED = 'SOURCE_GENERATED'  # Code Gen Source Targets
+  EXCLUDED = 'EXCLUDED'  # Excluded Target
+  RESOURCE = 'RESOURCE'  # Resource belonging to Source Target
+  TEST_RESOURCE = 'TEST_RESOURCE'  # Resource belonging to Test Target
 
 
 # Changing the behavior of this task may affect the IntelliJ Pants plugin.
@@ -45,33 +57,11 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
   (dicts, lists, strings) that can be easily read and exported to various formats.
   """
 
-  # FORMAT_VERSION_NUMBER: Version number for identifying the export file format output. This
-  # version number should change when there is a change to the output format.
-  #
-  # Major Version 1.x.x : Increment this field when there is a major format change
-  # Minor Version x.1.x : Increment this field when there is a minor change that breaks backward
-  #   compatibility for an existing field or a field is removed.
-  # Patch version x.x.1 : Increment this field when a minor format change that just adds information
-  #   that an application can safely ignore.
-  #
-  # Note format changes in src/docs/export.md and update the Changelog section.
-  #
-  DEFAULT_EXPORT_VERSION = '1.0.11'
-
   @classmethod
   def subsystem_dependencies(cls):
     return super().subsystem_dependencies() + (
       DistributionLocator, JvmPlatform, PythonInterpreterCache, ScalaPlatform
     )
-
-  class SourceRootTypes:
-    """Defines SourceRoot Types Constants"""
-    SOURCE = 'SOURCE'  # Source Target
-    TEST = 'TEST'  # Test Target
-    SOURCE_GENERATED = 'SOURCE_GENERATED'  # Code Gen Source Targets
-    EXCLUDED = 'EXCLUDED'  # Excluded Target
-    RESOURCE = 'RESOURCE'  # Resource belonging to Source Target
-    TEST_RESOURCE = 'TEST_RESOURCE'  # Resource belonging to Test Target
 
   @staticmethod
   def _is_jvm(dep):
@@ -105,6 +95,9 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
              help='Causes libraries with sources to be output.')
     register('--libraries-javadocs', type=bool,
              help='Causes libraries with javadocs to be output.')
+    register('--available-target-types', type=bool,
+             default=False,
+             help='Causes a list of available target types to be output.')
     register('--sources', type=bool,
              help='Causes sources to be output.')
     register('--formatted', type=bool, implicit_value=False,
@@ -122,6 +115,11 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
   @memoized_property
   def _interpreter_cache(self):
     return PythonInterpreterCache.global_instance()
+
+  def _target_types(self):
+    buildfile_aliases = self.context.build_configuration.registered_aliases()
+    extracter = BuildDictionaryInfoExtracter(buildfile_aliases)
+    return [ x.symbol for x in extracter.get_target_type_info()]
 
   def check_artifact_cache_for(self, invalidation_check):
     # Export is an output dependent on the entire target set, and is not divisible
@@ -187,16 +185,16 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
         def is_test(t):
           return isinstance(t, JUnitTests) or isinstance(t, PythonTests)
         if is_test(tgt):
-          return ExportTask.SourceRootTypes.TEST
+          return SourceRootTypes.TEST
         else:
           if (isinstance(tgt, Resources) and
               tgt in resource_target_map and
                 is_test(resource_target_map[tgt])):
-            return ExportTask.SourceRootTypes.TEST_RESOURCE
+            return SourceRootTypes.TEST_RESOURCE
           elif isinstance(tgt, Resources):
-            return ExportTask.SourceRootTypes.RESOURCE
+            return SourceRootTypes.RESOURCE
           else:
-            return ExportTask.SourceRootTypes.SOURCE
+            return SourceRootTypes.SOURCE
 
       info = {
         'targets': [],
@@ -303,7 +301,7 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
     }
 
     graph_info = {
-      'version': self.DEFAULT_EXPORT_VERSION,
+      'version': DEFAULT_EXPORT_VERSION,
       'targets': targets_map,
       'jvm_platforms': jvm_platforms_map,
       'scala_platform': scala_platform_map,
@@ -359,7 +357,10 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
         'default_interpreter': str(default_interpreter.identity),
         'interpreters': interpreters_info
       }
-
+    
+    if self.get_options().available_target_types:
+      graph_info['available_target_types'] = self._target_types()
+    
     return graph_info
 
   def _resolve_jars_info(self, targets, classpath_products):

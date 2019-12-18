@@ -4,6 +4,275 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.24.0.dev3 (12/13/2019)
+------------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Deprecate `--requirements` for PythonToolBase subclasses in favor of `--version` and `--extra-requirements` (#8789)
+  `PR #8789 <https://github.com/pantsbuild/pants/pull/8789>`_
+
+* Rename V2 goals to use the same naming scheme (#8774)
+  `PR #8774 <https://github.com/pantsbuild/pants/pull/8774>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Add Flake8 linter to V2 (#8791)
+  `PR #8791 <https://github.com/pantsbuild/pants/pull/8791>`_
+
+* Support working_directory in EPRs. (#8784)
+  `PR #8784 <https://github.com/pantsbuild/pants/pull/8784>`_
+
+* Make v2 binary goal pay attention to --pants-distdir (#8775)
+  `PR #8775 <https://github.com/pantsbuild/pants/pull/8775>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix V2 binary to work with multiple targets (#8781)
+  `PR #8781 <https://github.com/pantsbuild/pants/pull/8781>`_
+
+* Fix graph ambiguity of using multiple linters/formatters in V2 (#8801)
+  `Issue #8722 <https://github.com/pantsbuild/pants/issues/8722>`_
+  `PR #8801 <https://github.com/pantsbuild/pants/pull/8801>`_
+
+* Fix registration of unions that are split across multiple backends (#8810)
+  `PR #8810 <https://github.com/pantsbuild/pants/pull/8810>`_
+
+* Fix enginedisplay printing (#8799)
+  `PR #8799 <https://github.com/pantsbuild/pants/pull/8799>`_
+
+* Add cherry-picked commit to 1.23.0 (#8804)
+  `PR #8804 <https://github.com/pantsbuild/pants/pull/8804>`_
+
+* Version changes should invalidate pytest runs. (#8790)
+  `PR #8790 <https://github.com/pantsbuild/pants/pull/8790>`_
+
+* Fix pantsbuild wheel publishing. (#8782)
+  `PR #8782 <https://github.com/pantsbuild/pants/pull/8782>`_
+
+* Revert "Upgrade to Pex 2.0.3. (#8704)" (#8787)
+  `PR #8704 <https://github.com/pantsbuild/pants/pull/8704>`_
+  `PR #8787 <https://github.com/pantsbuild/pants/pull/8787>`_
+
+* Add parent-build-id option to know what runs are inner runs and not to run them with pantsd (#8724)
+  `PR #8724 <https://github.com/pantsbuild/pants/pull/8724>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* A rule to create a pex from a target closure. (#8811)
+  `PR #8811 <https://github.com/pantsbuild/pants/pull/8811>`_
+
+* V2 console UI: Logging improvements (#8806)
+  `PR #8806 <https://github.com/pantsbuild/pants/pull/8806>`_
+
+* Rework `Goal.Options` so that V2 goals work with MyPy (#8742)
+  `PR #8742 <https://github.com/pantsbuild/pants/pull/8742>`_
+
+* Fix V2 linters needing to implement a formatter no-op (#8795)
+  `PR #8795 <https://github.com/pantsbuild/pants/pull/8795>`_
+
+* [IntelliJ] Refactor some code in export-dep-as-jar goal (#8792)
+  `PR #8792 <https://github.com/pantsbuild/pants/pull/8792>`_
+
+* Load the bootstrapped zinc compiler from the zinc server's classpath. (#8753)
+  `PR #8753 <https://github.com/pantsbuild/pants/pull/8753>`_
+
+* Curl in release script fails much more verbosely (#8780)
+  `PR #8780 <https://github.com/pantsbuild/pants/pull/8780>`_
+
+* This test has been flaky far too long. (#8788)
+  `PR #8788 <https://github.com/pantsbuild/pants/pull/8788>`_
+
+* [V2 UI] Pipe Python-side `Console` to the engine when --v2-ui is set (#8771)
+  `PR #8771 <https://github.com/pantsbuild/pants/pull/8771>`_
+
+* Prep for 1.23.0 (#8785)
+  `PR #8785 <https://github.com/pantsbuild/pants/pull/8785>`_
+
+* Cleanup type ignore. (#8777)
+  `PR #8777 <https://github.com/pantsbuild/pants/pull/8777>`_
+
+* Remove deprecated `./pants mypy` in favor of `./pants lint.mypy` (#8773)
+  `PR #8773 <https://github.com/pantsbuild/pants/pull/8773>`_
+
+1.24.0.dev2 (12/08/2019)
+------------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Add option to attach Subsystems to streaming workunits (#8720)
+  `PR #8720 <https://github.com/pantsbuild/pants/pull/8720>`_
+
+* Allow passing arguments to Pytest, isort, and Black in V2 (#8729)
+  `PR #8729 <https://github.com/pantsbuild/pants/pull/8729>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Add `fast-depedencies` V2 rule (#8759)
+  `PR #8759 <https://github.com/pantsbuild/pants/pull/8759>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix V2 Black not being distributed to end users (#8776)
+  `PR #8776 <https://github.com/pantsbuild/pants/pull/8776>`_
+
+* Fix V2 isort config option when only using a single config file (#8768)
+  `PR #8768 <https://github.com/pantsbuild/pants/pull/8768>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Bump test_pytest_run.py timeout. (#8778)
+  `PR #8778 <https://github.com/pantsbuild/pants/pull/8778>`_
+
+* Upgrade to Pex 2.0.3. (#8704)
+  `PR #8704 <https://github.com/pantsbuild/pants/pull/8704>`_
+
+* Deprecate `--dependencies-external-only` and the default including external dependencies (#8763)
+  `PR #8763 <https://github.com/pantsbuild/pants/pull/8763>`_
+
+* Update reqwests dependency to 0.9.22
+  `PR #8755 <https://github.com/pantsbuild/pants/pull/8755>`_
+
+* Simplify `.travis.yml` setup now that more shards can use remote execution (#8754)
+  `PR #8754 <https://github.com/pantsbuild/pants/pull/8754>`_
+
+* Fix internal unmatched globs warnings (#8735)
+  `PR #8735 <https://github.com/pantsbuild/pants/pull/8735>`_
+
+* Partially type check 300 more files (#8741)
+  `PR #8741 <https://github.com/pantsbuild/pants/pull/8741>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Update "powered by" page. (#8761)
+  `PR #8761 <https://github.com/pantsbuild/pants/pull/8761>`_
+
+1.24.0.dev1 (12/02/2019)
+------------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Remove deprecated option mypy_version (#8751)
+  `PR #8751 <https://github.com/pantsbuild/pants/pull/8751>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Add missing source file (#8737)
+  `PR #8737 <https://github.com/pantsbuild/pants/pull/8737>`_
+
+1.24.0.dev0 (11/29/2019)
+------------------------
+
+Note: This was not published due to infrastructure issues. dev1 is effectively identical.
+
+API Changes
+~~~~~~~~~~~
+
+* Deprecate `--run-py-args` and `--run-cpp-args` (#8726)
+  `PR #8726 <https://github.com/pantsbuild/pants/pull/8726>`_
+
+* Treat all `MaterializeToDirectories` paths as relative to the buildroot (#8696)
+  `PR #8696 <https://github.com/pantsbuild/pants/pull/8696>`_
+
+* Use default argument for `DirectoryToMaterialize`'s `path_prefix` (#8711)
+  `PR #8711 <https://github.com/pantsbuild/pants/pull/8711>`_
+
+New Features
+~~~~~~~~~~~~
+
+* [IntelliJ] Export source jars of dependencies in `export-dep-as-jar` (#8723)
+  `PR #8723 <https://github.com/pantsbuild/pants/pull/8723>`_
+
+* Add available targets to the exported json in order to support proper highlighting in the BUILD files (#8688)
+  `PR #8688 <https://github.com/pantsbuild/pants/pull/8688>`_
+
+* Add --dep-as-jar option for idea-plugin (#8632)
+  `PR #8632 <https://github.com/pantsbuild/pants/pull/8632>`_
+
+* Add `SchedulerSession.materialize_directory()` for less boilerplate in V2 rules (#8709)
+  `PR #8709 <https://github.com/pantsbuild/pants/pull/8709>`_
+
+* [experimental] Add export-dep-as-jar task (#8628)
+  `PR #8628 <https://github.com/pantsbuild/pants/pull/8628>`_
+
+* Support publishing plugins that expose rules. (#8693)
+  `PR #8693 <https://github.com/pantsbuild/pants/pull/8693>`_
+
+* Allow @rule-authors to give rules names (#8592)
+  `PR #8592 <https://github.com/pantsbuild/pants/pull/8592>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix unused variable breaking master branch (#8734)
+  `PR #8734 <https://github.com/pantsbuild/pants/pull/8734>`_
+
+* Don't check that plugins are exact requirements. (#8721)
+  `PR #8721 <https://github.com/pantsbuild/pants/pull/8721>`_
+
+* Don't choke on plugin requirements that are URLs. (#8708)
+  `PR #8708 <https://github.com/pantsbuild/pants/pull/8708>`_
+
+* Fix bug in create_html_page - undefined variable (#8700)
+  `PR #8700 <https://github.com/pantsbuild/pants/pull/8700>`_
+
+* No-op when V2 `fmt`, `lint`, and `test` have a target with empty sources (#8730)
+  `PR #8730 <https://github.com/pantsbuild/pants/pull/8730>`_
+
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Allow V2 isort to use multiple config files (#8731)
+  `PR #8731 <https://github.com/pantsbuild/pants/pull/8731>`_
+
+* Refactor V2 Black and isort for better de-duplication (#8732)
+  `PR #8732 <https://github.com/pantsbuild/pants/pull/8732>`_
+
+* Refactor `fmt-v2` to use Workspace (#8691)
+  `PR #8691 <https://github.com/pantsbuild/pants/pull/8691>`_
+
+* add types to await Get[X](...)!! (#8697)
+  `PR #8697 <https://github.com/pantsbuild/pants/pull/8697>`_
+
+* Add V2 implementation of isort  (#8689)
+  `PR #8689 <https://github.com/pantsbuild/pants/pull/8689>`_
+
+* Assign some names to rules (#8695)
+  `PR #8695 <https://github.com/pantsbuild/pants/pull/8695>`_
+
+* Convert `contrib/confluence`, `contrib/thrifty`, `contrib/cpp`, `contrib/scrooge`, `contrib/scalajs` to use f-strings (#8702)
+  `PR #8702 <https://github.com/pantsbuild/pants/pull/8702>`_
+
+* Add `TestBase.request_single_product()` for less boilerplate when writing V2 tests (#8698)
+  `PR #8698 <https://github.com/pantsbuild/pants/pull/8698>`_
+
+* Convert `contrib/node` and `contrib/go` to use f-strings. (#8699)
+  `PR #8699 <https://github.com/pantsbuild/pants/pull/8699>`_
+
+* Remove yielding @rules (#8652)
+  `PR #8652 <https://github.com/pantsbuild/pants/pull/8652>`_
+
+Version updates
+~~~~~~~~~~~~~~~
+
+* Bump default MyPy to 0.740 (#8358)
+  `PR #8358 <https://github.com/pantsbuild/pants/pull/8358>`_
+
+* Bump to latest junit-runner to pull in #8674. (#8692)
+  `PR #8692 <https://github.com/pantsbuild/pants/pull/8692>`_
+
 1.23.0rc0 (11/22/2019)
 ----------------------
 

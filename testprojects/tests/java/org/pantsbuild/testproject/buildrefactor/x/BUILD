@@ -3,4 +3,5 @@
 
 java_library(
     name = "X",
+    sources = [],
 )

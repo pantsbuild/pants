@@ -16,5 +16,6 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/task',
     'src/python/pants/backend/docgen/tasks'
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )

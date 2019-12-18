@@ -61,6 +61,7 @@ python_library(
     'src/python/pants/task',
     'src/python/pants/util:memo',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -75,6 +76,7 @@ python_library(
     'src/python/pants/java:util',
     'src/python/pants/task',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -85,6 +87,7 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/util:dirutil',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -95,6 +98,7 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/util:dirutil',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -134,6 +138,7 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:fileutil',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -144,6 +149,7 @@ python_library(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/task',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -208,6 +214,7 @@ python_library(
     'src/python/pants/option',
     'src/python/pants/util:memo',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -271,6 +278,7 @@ python_library(
     'src/python/pants/java/jar',
     'src/python/pants/util:memo',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -289,6 +297,7 @@ python_library(
     'src/python/pants/util:strutil',
     'src/python/pants/backend/jvm/subsystems:resolve_subsystem'
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -300,6 +309,7 @@ python_library(
     'src/python/pants/base:workunit',
     'src/python/pants/backend/jvm/targets:jvm',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -307,7 +317,8 @@ python_library(
   sources=['jar_import_products.py'],
   dependencies=[
     'src/python/pants/backend/jvm/targets:jvm',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -333,6 +344,7 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:strutil',
   ],
+  tags = {"partially_type_checked"},
 )
 
 resources(
@@ -356,6 +368,7 @@ python_library(
     'src/python/pants/java/jar',
     'src/python/pants/util:contextutil',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -368,6 +381,7 @@ python_library(
     'src/python/pants/java:executor',
     'src/python/pants/util:memo',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -403,6 +417,7 @@ python_library(
     'src/python/pants/util:memo',
     'src/python/pants/util:strutil',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -421,6 +436,7 @@ python_library(
     'src/python/pants/util:fileutil',
     'src/python/pants/util:memo',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -435,7 +451,8 @@ python_library(
     'src/python/pants/java/distribution',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -455,6 +472,7 @@ python_library(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:memo',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -469,7 +487,8 @@ python_library(
     'src/python/pants/task',
     'src/python/pants/util:fileutil',
     'src/python/pants/util:memo',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -481,7 +500,8 @@ python_library(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/task',
     'src/python/pants/util:memo',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -499,6 +519,7 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:strutil',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -510,6 +531,7 @@ python_library(
     'src/python/pants/build_graph',
     'src/python/pants/task',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -534,6 +556,7 @@ python_library(
     'src/python/pants/util:desktop',
     'src/python/pants/util:dirutil',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -564,6 +587,7 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/util:dirutil',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -577,11 +601,13 @@ python_library(
     'src/python/pants/base:payload_field',
     'src/python/pants/util:dirutil',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
   name = 'properties',
   sources = ['properties.py'],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -595,6 +621,7 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -604,11 +631,13 @@ python_library(
     'src/python/pants/option',
     'src/python/pants/task',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
   name = 'resolve_shared',
   sources = ['resolve_shared.py'],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -623,6 +652,7 @@ python_library(
     'src/python/pants/java:executor',
     'src/python/pants/task',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -637,6 +667,7 @@ python_library(
     'src/python/pants/java/distribution',
     'src/python/pants/task',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -649,6 +680,7 @@ python_library(
     'src/python/pants/java/distribution',
     'src/python/pants/util:memo',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -662,7 +694,7 @@ python_library(
     'src/python/pants/java/jar',
     'src/python/pants/option',
     'src/python/pants/task',
-  ]
+  ],
 )
 
 python_library(
@@ -676,7 +708,7 @@ python_library(
     'src/python/pants/java/jar',
     'src/python/pants/option',
     'src/python/pants/task',
-  ]
+  ],
 )
 
 python_library(
@@ -690,7 +722,8 @@ python_library(
     'src/python/pants/option',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -719,7 +752,8 @@ python_library(
     'src/python/pants/base:fingerprint_strategy',
     'src/python/pants/fs',
     'src/python/pants/task',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -730,4 +764,5 @@ python_library(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/task',
   ],
+  tags = {"partially_type_checked"},
 )

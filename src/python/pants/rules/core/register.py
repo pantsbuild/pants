@@ -4,8 +4,10 @@
 from pants.rules.core import (
   binary,
   cloc,
+  distdir,
   filedeps,
   fmt,
+  generate_pants_ini,
   lint,
   list_roots,
   list_targets,
@@ -20,11 +22,13 @@ def rules():
     *cloc.rules(),
     *binary.rules(),
     *fmt.rules(),
+    *generate_pants_ini.rules(),
     *lint.rules(),
     *list_roots.rules(),
     *list_targets.rules(),
     *filedeps.rules(),
     *run.rules(),
     *strip_source_root.rules(),
+    *distdir.rules(),
     *test.rules()
   ]

@@ -41,14 +41,12 @@ async def strip_source_root(
   if target_adaptor.type_alias == Files.alias():
     source_root = None
 
-  resulting_digest = await Get(
-    Digest,
+  resulting_digest = await Get[Digest](
     DirectoryWithPrefixToStrip(
-      directory_digest=digest,
-      prefix=source_root.path if source_root else ""
+      directory_digest=digest, prefix=source_root.path if source_root else ""
     )
   )
-  resulting_snapshot = await Get(Snapshot, Digest, resulting_digest)
+  resulting_snapshot = await Get[Snapshot](Digest, resulting_digest)
   return SourceRootStrippedSources(snapshot=resulting_snapshot)
 
 

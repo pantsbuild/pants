@@ -51,7 +51,8 @@ python_tests(
   coverage=['pants.task.scm_publish_mixin'],
   dependencies=[
     'src/python/pants/task',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(

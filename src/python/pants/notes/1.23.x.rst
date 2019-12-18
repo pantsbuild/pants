@@ -3,6 +3,27 @@
 
 This document describes releases leading up to the ``1.23.x`` ``stable`` series.
 
+1.23.0 (12/10/2019)
+-------------------
+
+New Features
+~~~~~~~~~~~~
+
+* [IntelliJ] Export source jars of dependencies in `export-dep-as-jar` (#8723)
+  `PR #8723 <https://github.com/pantsbuild/pants/pull/8723>`_
+
+* Add --dep-as-jar option for idea-plugin (#8632)
+  `PR #8632 <https://github.com/pantsbuild/pants/pull/8632>`_
+
+* [experimental] Add export-dep-as-jar task (#8628)
+  `PR #8628 <https://github.com/pantsbuild/pants/pull/8628>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Fix pantsbuild wheel publishing. (#8782)
+  `PR #8782 <https://github.com/pantsbuild/pants/pull/8782>`_
+
 1.23.0rc0 (11/22/2019)
 ----------------------
 

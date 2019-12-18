@@ -7,6 +7,7 @@ target(
     ':dependencies',
     ':depmap',
     ':export',
+    ':export_dep_as_jar',
     ':filedeps',
     ':idea_plugin_gen',
   ],
@@ -22,6 +23,7 @@ python_library(
     'src/python/pants/base:payload_field',
     'src/python/pants/task',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -32,12 +34,14 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/task',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
   name = 'export',
   sources = ['export.py'],
   dependencies = [
+    ':export_version',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/jvm/subsystems:jvm_platform',
     'src/python/pants/backend/jvm/targets:jvm',
@@ -61,6 +65,33 @@ python_library(
 )
 
 python_library(
+  name = 'export_dep_as_jar',
+  sources = ['export_dep_as_jar.py'],
+  dependencies = [
+    ':export_version',
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/backend/jvm/subsystems:jvm_platform',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/targets:scala',
+    'src/python/pants/backend/jvm/tasks:classpath_products',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/base:revision',
+    'src/python/pants/build_graph',
+    'src/python/pants/java/distribution',
+    'src/python/pants/java:executor',
+    'src/python/pants/task',
+    'src/python/pants/util:memo',
+  ],
+)
+
+python_library(
+  name = 'export_version',
+  sources = ['export_version.py'],
+  tags = {"partially_type_checked"},
+)
+
+python_library(
   name = 'filedeps',
   sources = ['filedeps.py'],
   dependencies = [
@@ -70,6 +101,7 @@ python_library(
     'src/python/pants/build_graph',
     'src/python/pants/task',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(

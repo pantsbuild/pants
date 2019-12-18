@@ -14,32 +14,32 @@ from pants.engine.fs import (
   MaterializeDirectoryResult,
   Workspace,
 )
-from pants.engine.goal import Goal
+from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.rules import RootRule, console_rule
 from pants.engine.selectors import Get
+from pants.fs.fs import is_child_of
 from pants.testutil.console_rule_test_base import ConsoleRuleTestBase
 from pants.testutil.test_base import TestBase
-from pants.util.contextutil import temporary_dir
 
 
 @dataclass(frozen=True)
 class MessageToConsoleRule:
-  tmp_dir: str
   input_files_content: InputFilesContent
 
 
-class MockWorkspaceGoal(Goal):
+class MockWorkspaceGoalOptions(GoalSubsystem):
   name = 'mock-workspace-goal'
+
+
+class MockWorkspaceGoal(Goal):
+  subsystem_cls = MockWorkspaceGoalOptions
 
 
 @console_rule
 async def workspace_console_rule(console: Console, workspace: Workspace, msg: MessageToConsoleRule) -> MockWorkspaceGoal:
   digest = await Get(Digest, InputFilesContent, msg.input_files_content)
-  output = workspace.materialize_directories((
-    DirectoryToMaterialize(path=msg.tmp_dir, directory_digest=digest),
-  ))
-  output_path = output.dependencies[0].output_paths[0]
-  console.print_stdout(str(Path(msg.tmp_dir, output_path)), end='')
+  output = workspace.materialize_directory(DirectoryToMaterialize(digest))
+  console.print_stdout(output.output_paths[0], end='')
   return MockWorkspaceGoal(exit_code=0)
 
 
@@ -54,16 +54,12 @@ class WorkspaceInConsoleRuleTest(ConsoleRuleTestBase):
     return super().rules() + [RootRule(MessageToConsoleRule), workspace_console_rule]
 
   def test(self):
-    with temporary_dir() as tmp_dir:
-      input_files_content = InputFilesContent((
-        FileContent(path='a.txt', content=b'hello'),
-      ))
-
-      msg = MessageToConsoleRule(tmp_dir=tmp_dir, input_files_content=input_files_content)
-      output_path = str(Path(tmp_dir, 'a.txt'))
-      self.assert_console_output_contains(output_path, additional_params=[msg])
-      contents = open(output_path).read()
-      self.assertEqual(contents, 'hello')
+    msg = MessageToConsoleRule(
+      input_files_content=InputFilesContent([FileContent(path='a.txt', content=b'hello')])
+    )
+    output_path = Path(self.build_root, 'a.txt')
+    self.assert_console_output_contains(str(output_path), additional_params=[msg])
+    assert output_path.read_text() == "hello"
 
 
 #TODO(gshuflin) - it would be nice if this test, which tests that the MaterializeDirectoryResults value
@@ -79,22 +75,34 @@ class FileSystemTest(TestBase):
       FileContent(path='subdir/b.txt', content=b'goodbye'),
     ))
 
-    digest, = self.scheduler.product_request(Digest, [input_files_content])
+    digest = self.request_single_product(Digest, input_files_content)
 
-    with temporary_dir() as tmp_dir:
-      path1 = Path(tmp_dir, 'a.txt')
-      path2 = Path(tmp_dir, 'subdir', 'b.txt')
+    path1 = Path('a.txt')
+    path2 = Path('subdir/b.txt')
 
-      self.assertFalse(path1.is_file())
-      self.assertFalse(path2.is_file())
+    assert not path1.is_file()
+    assert not path2.is_file()
 
-      output = workspace.materialize_directories((
-        DirectoryToMaterialize(path=tmp_dir, directory_digest=digest),
-      ))
+    output = workspace.materialize_directories((DirectoryToMaterialize(digest),))
 
-      self.assertEqual(type(output), MaterializeDirectoriesResult)
-      materialize_result = output.dependencies[0]
-      self.assertEqual(type(materialize_result), MaterializeDirectoryResult)
-      self.assertEqual(materialize_result.output_paths,
-        (str(Path(tmp_dir, 'a.txt')), str(Path(tmp_dir, 'subdir/b.txt')),)
-      )
+    assert type(output) == MaterializeDirectoriesResult
+    materialize_result = output.dependencies[0]
+    assert type(materialize_result) == MaterializeDirectoryResult
+    assert materialize_result.output_paths == tuple(
+      str(Path(self.build_root, p)) for p in [path1, path2]
+    )
+
+
+class IsChildOfTest(TestBase):
+  def test_is_child_of(self):
+    mock_build_root = Path("/mock/build/root")
+
+    assert is_child_of(Path("/mock/build/root/dist/dir"), mock_build_root)
+    assert is_child_of(Path("dist/dir"), mock_build_root)
+    assert is_child_of(Path("./dist/dir"), mock_build_root)
+    assert is_child_of(Path("../root/dist/dir"), mock_build_root)
+    assert is_child_of(Path(""), mock_build_root)
+    assert is_child_of(Path("./"), mock_build_root)
+
+    assert not is_child_of(Path("/other/random/directory/root/dist/dir"), mock_build_root)
+    assert not is_child_of(Path("../not_root/dist/dir"), mock_build_root)

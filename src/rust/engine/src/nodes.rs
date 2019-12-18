@@ -28,7 +28,7 @@ use fs::{
 };
 use hashing;
 use process_execution::{
-  self, ExecuteProcessRequest, MultiPlatformExecuteProcessRequest, Platform,
+  self, ExecuteProcessRequest, MultiPlatformExecuteProcessRequest, Platform, RelativePath,
 };
 use rule_graph;
 
@@ -410,6 +410,16 @@ impl MultiPlatformExecuteProcess {
     target_platform: Platform,
   ) -> Result<ExecuteProcessRequest, String> {
     let env = externs::project_tuple_encoded_map(&value, "env")?;
+
+    let working_directory = {
+      let val = externs::project_str(&value, "working_directory");
+      if val.is_empty() {
+        None
+      } else {
+        Some(RelativePath::new(val.as_str())?)
+      }
+    };
+
     let digest = lift_digest(&externs::project_ignoring_type(&value, "input_files"))
       .map_err(|err| format!("Error parsing digest {}", err))?;
 
@@ -454,19 +464,20 @@ impl MultiPlatformExecuteProcess {
 
     Ok(process_execution::ExecuteProcessRequest {
       argv: externs::project_multi_strs(&value, "argv"),
-      env: env,
+      env,
+      working_directory,
       input_files: digest,
-      output_files: output_files,
-      output_directories: output_directories,
+      output_files,
+      output_directories,
       timeout: Duration::from_millis((timeout_in_seconds * 1000.0) as u64),
-      description: description,
-      unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
-        unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule,
-      jdk_home: jdk_home,
-      target_platform: target_platform,
-      is_nailgunnable: is_nailgunnable,
+      description,
+      unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule,
+      jdk_home,
+      target_platform,
+      is_nailgunnable,
     })
   }
+
   fn lift(value: &Value) -> Result<MultiPlatformExecuteProcess, String> {
     let constraint_parts = externs::project_multi_strs(&value, "platform_constraints");
     if constraint_parts.len() % 2 != 0 {
@@ -1213,13 +1224,7 @@ impl Node for NodeKey {
 
     let (node_workunit_params, maybe_span_id) = if handle_workunits {
       let span_id = generate_random_64bit_string();
-      let maybe_display_info: Option<String> = match self {
-        NodeKey::Task(ref task) => task.get_display_info().map(|s| s.to_owned()),
-        NodeKey::Snapshot(_) => Some(format!("{}", self)),
-        _ => None,
-      };
-
-      let node_workunit_params = match maybe_display_info {
+      let node_workunit_params = match self.user_facing_name() {
         Some(ref node_name) => {
           let start_time = std::time::SystemTime::now();
           Some((node_name.clone(), start_time, span_id.clone()))
@@ -1279,6 +1284,19 @@ impl Node for NodeKey {
       // TODO Select nodes are made uncacheable as a workaround to #6146. Will be worked on in #6598
       &NodeKey::Select(_) => false,
       _ => true,
+    }
+  }
+
+  fn user_facing_name(&self) -> Option<String> {
+    match self {
+      NodeKey::Task(ref task) => task.get_display_info().map(|s| s.to_owned()),
+      NodeKey::Snapshot(_) => Some(format!("{}", self)),
+      NodeKey::MultiPlatformExecuteProcess(mp_epr) => mp_epr.0.user_facing_name(),
+      NodeKey::DigestFile(..) => None,
+      NodeKey::DownloadedFile(..) => None,
+      NodeKey::ReadLink(..) => None,
+      NodeKey::Scandir(..) => None,
+      NodeKey::Select(..) => None,
     }
   }
 }

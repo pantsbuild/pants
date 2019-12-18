@@ -17,7 +17,8 @@ python_tests(
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/java/jar',
     'src/python/pants/testutil/subsystem',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(

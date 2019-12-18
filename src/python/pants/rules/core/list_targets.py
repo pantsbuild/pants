@@ -1,19 +1,20 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from typing import Union
+
 from pants.base.specs import Specs
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.console import Console
-from pants.engine.goal import Goal, LineOriented
+from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.legacy.graph import HydratedTargets
 from pants.engine.rules import console_rule
 from pants.engine.selectors import Get
 
 
-class List(LineOriented, Goal):
+class ListOptions(LineOriented, GoalSubsystem):
   """Lists all targets matching the target specs."""
-
-  name = 'list'
+  name = "list"
 
   @classmethod
   def register_options(cls, register):
@@ -28,14 +29,19 @@ class List(LineOriented, Goal):
              help='Print only targets that are documented with a description.')
 
 
+class List(Goal):
+  subsystem_cls = ListOptions
+
+
 @console_rule
-async def list_targets(console: Console, list_options: List.Options, specs: Specs) -> List:
+async def list_targets(console: Console, list_options: ListOptions, specs: Specs) -> List:
   provides = list_options.values.provides
   provides_columns = list_options.values.provides_columns
   documented = list_options.values.documented
+  collection: Union[HydratedTargets, BuildFileAddresses]
   if provides or documented:
     # To get provides clauses or documentation, we need hydrated targets.
-    collection = await Get(HydratedTargets, Specs, specs)
+    collection = await Get[HydratedTargets](Specs, specs)
     if provides:
       extractors = dict(
           address=lambda target: target.address.spec,
@@ -65,10 +71,10 @@ async def list_targets(console: Console, list_options: List.Options, specs: Spec
       print_fn = print_documented
   else:
     # Otherwise, we can use only addresses.
-    collection = await Get(BuildFileAddresses, Specs, specs)
+    collection = await Get[BuildFileAddresses](Specs, specs)
     print_fn = lambda address: address.spec
 
-  with List.line_oriented(list_options, console) as print_stdout:
+  with list_options.line_oriented(console) as print_stdout:
     if not collection.dependencies:
       console.print_stderr('WARNING: No targets were matched in goal `{}`.'.format('list'))
 

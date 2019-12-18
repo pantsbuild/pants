@@ -10,5 +10,6 @@ python_library(
     'src/python/pants/base:revision',
     'src/python/pants/build_graph',
     'src/python/pants/java/jar',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )

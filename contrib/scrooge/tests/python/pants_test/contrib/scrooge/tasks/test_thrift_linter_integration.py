@@ -17,7 +17,7 @@ class ThriftLinterTest(PantsRunIntegrationTest):
 
   @classmethod
   def thrift_test_target(cls, name):
-    return '{}:{}'.format(cls.thrift_folder_root, name)
+    return f'{cls.thrift_folder_root}:{name}'
 
   def rename_build_file(func):
     """This decorator implements the TEST_BUILD pattern.

@@ -35,7 +35,7 @@ def fn_raises(x):
 
 
 @rule
-def nested_raise(x: B) -> A:
+def nested_raise(x: B) -> A:  # type: ignore[return]
   fn_raises(x)
 
 
@@ -48,7 +48,7 @@ class Fib:
 async def fib(n: int) -> Fib:
   if n < 2:
     return Fib(n)
-  x, y = tuple(await MultiGet([Get(Fib, int(n-2)), Get(Fib, int(n-1))]))
+  x, y = tuple(await MultiGet([Get[Fib](int(n-2)), Get[Fib](int(n-1))]))
   return Fib(x.val + y.val)
 
 
@@ -155,11 +155,11 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
     # Tests that when multiple distinct failures occur, they are each rendered.
 
     @rule
-    def d_from_b_nested_raise(b: B) -> D:
+    def d_from_b_nested_raise(b: B) -> D:  # type: ignore[return]
       fn_raises(b)
 
     @rule
-    def c_from_b_nested_raise(b: B) -> C:
+    def c_from_b_nested_raise(b: B) -> C:  # type: ignore[return]
       fn_raises(b)
 
     @rule
@@ -249,7 +249,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
         self.workunits.extend(workunits)
 
     tracker = Tracker()
-    async_reporter = StreamingWorkunitHandler(scheduler, callback=tracker.add, report_interval_seconds=0.01)
+    async_reporter = StreamingWorkunitHandler(scheduler, callbacks=[tracker.add], report_interval_seconds=0.01)
     with async_reporter.session():
       scheduler.product_request(Fib, subjects=[0])
 

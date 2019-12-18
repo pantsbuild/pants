@@ -155,7 +155,12 @@ class BuildConfiguration:
 
     # Store the rules and record their dependency Optionables.
     self._rules.update(indexed_rules)
-    self._union_rules.update(union_rules)
+    for union_base, new_members in union_rules.items():
+      existing_members = self._union_rules.get(union_base, None)
+      if existing_members is None:
+        self._union_rules[union_base] = new_members
+      else:
+        existing_members.update(new_members)
     dependency_optionables = {do
                               for rule in indexed_rules
                               for do in rule.dependency_optionables

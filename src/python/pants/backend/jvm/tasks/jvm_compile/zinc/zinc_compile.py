@@ -378,9 +378,9 @@ class BaseZincCompile(JvmCompile):
   def _compile_nonhermetic(self, jvm_options, ctx, classes_directory):
     # Populate the resources to merge post compile onto disk for the nonhermetic case,
     # where `--post-compile-merge-dir` was added is the relevant part.
-    self.context._scheduler.materialize_directories((
-      DirectoryToMaterialize(get_buildroot(), self.post_compile_extra_resources_digest(ctx)),
-    ))
+    self.context._scheduler.materialize_directory(
+      DirectoryToMaterialize(self.post_compile_extra_resources_digest(ctx)),
+    )
 
     exit_code = self.runjava(classpath=self.get_zinc_compiler_classpath(),
                              main=Zinc.ZINC_COMPILE_MAIN,
@@ -516,9 +516,9 @@ class BaseZincCompile(JvmCompile):
       req, self.name(), [WorkUnitLabel.COMPILER])
 
     # TODO: Materialize as a batch in do_compile or somewhere
-    self.context._scheduler.materialize_directories((
-      DirectoryToMaterialize(get_buildroot(), res.output_directory_digest),
-    ))
+    self.context._scheduler.materialize_directory(
+      DirectoryToMaterialize(res.output_directory_digest)
+    )
 
     # TODO: This should probably return a ClasspathEntry rather than a Digest
     return res.output_directory_digest

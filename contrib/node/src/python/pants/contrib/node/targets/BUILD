@@ -18,6 +18,7 @@ python_library(
     'src/python/pants/base:payload',
     'src/python/pants/fs',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -27,6 +28,7 @@ python_library(
     ':node_package',
     'src/python/pants/base:payload',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -37,6 +39,7 @@ python_library(
     'src/python/pants/base:payload',
     'src/python/pants/base:payload_field',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -47,6 +50,7 @@ python_library(
     'src/python/pants/base:payload',
     'src/python/pants/base:payload_field',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -56,7 +60,8 @@ python_library(
     'src/python/pants/base:payload',
     'src/python/pants/base:payload_field',
     'src/python/pants/build_graph',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -66,5 +71,6 @@ python_library(
     'src/python/pants/base:payload',
     'src/python/pants/base:payload_field',
     'src/python/pants/build_graph',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )

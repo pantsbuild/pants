@@ -28,4 +28,5 @@ python_library(
     'src/python/pants/engine:struct',
     'src/python/pants/util:objects',
   ],
+  tags = {"partially_type_checked"},
 )

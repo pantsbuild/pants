@@ -9,4 +9,5 @@ python_library(
     'src/python/pants/subsystem',
     'src/python/pants/util:dirutil',
   ],
+  tags = {"partially_type_checked"},
 )

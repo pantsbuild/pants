@@ -971,20 +971,24 @@ pub extern "C" fn run_local_interactive_process(
 pub extern "C" fn materialize_directories(
   scheduler_ptr: *mut Scheduler,
   session_ptr: *mut Session,
-  directories_paths_and_digests_value: Handle,
+  directories_digests_and_path_prefixes_value: Handle,
 ) -> PyResult {
-  let values = externs::project_multi(&directories_paths_and_digests_value.into(), "dependencies");
-  let directories_paths_and_digests_results: Result<Vec<(PathBuf, Digest)>, String> = values
-    .iter()
-    .map(|value| {
-      let dir = PathBuf::from(externs::project_str(&value, "path"));
-      let dir_digest =
-        nodes::lift_digest(&externs::project_ignoring_type(&value, "directory_digest"));
-      dir_digest.map(|dir_digest| (dir, dir_digest))
-    })
-    .collect();
+  let values = externs::project_multi(
+    &directories_digests_and_path_prefixes_value.into(),
+    "dependencies",
+  );
+  let directories_digests_and_path_prefixes_results: Result<Vec<(Digest, PathBuf)>, String> =
+    values
+      .iter()
+      .map(|value| {
+        let dir_digest =
+          nodes::lift_digest(&externs::project_ignoring_type(&value, "directory_digest"));
+        let path_prefix = PathBuf::from(externs::project_str(&value, "path_prefix"));
+        dir_digest.map(|dir_digest| (dir_digest, path_prefix))
+      })
+      .collect();
 
-  let dir_and_digests = match directories_paths_and_digests_results {
+  let digests_and_path_prefixes = match directories_digests_and_path_prefixes_results {
     Ok(d) => d,
     Err(err) => {
       let e: Result<Value, String> = Err(err);
@@ -997,15 +1001,20 @@ pub extern "C" fn materialize_directories(
     let construct_materialize_directories_results = types.construct_materialize_directories_results;
     let construct_materialize_directory_result = types.construct_materialize_directory_result;
     let work_future = futures::future::join_all(
-      dir_and_digests
+      digests_and_path_prefixes
         .into_iter()
-        .map(|(dir, digest)| {
+        .map(|(digest, path_prefix)| {
+          // NB: all DirectoryToMaterialize paths are validated in Python to be relative paths.
+          // Here, we join them with the build root.
+          let mut destination = PathBuf::new();
+          destination.push(scheduler.core.build_root.clone());
+          destination.push(path_prefix);
           let metadata = scheduler.core.store().materialize_directory(
-            dir.clone(),
+            destination.clone(),
             digest,
             workunit_store.clone(),
           );
-          metadata.map(|m| (dir, m))
+          metadata.map(|m| (destination, m))
         })
         .collect::<Vec<_>>(),
     )
@@ -1081,6 +1090,22 @@ pub extern "C" fn write_log(msg: *const raw::c_char, level: u64, target: *const 
   LOGGER
     .log_from_python(message_str.borrow(), level, target_str.borrow())
     .expect("Error logging message");
+}
+
+#[no_mangle]
+pub extern "C" fn write_stdout(session_ptr: *mut Session, msg: *const raw::c_char) {
+  with_session(session_ptr, |session| {
+    let message_str = unsafe { CStr::from_ptr(msg).to_string_lossy() };
+    session.write_stdout(&message_str);
+  });
+}
+
+#[no_mangle]
+pub extern "C" fn write_stderr(session_ptr: *mut Session, msg: *const raw::c_char) {
+  with_session(session_ptr, |session| {
+    let message_str = unsafe { CStr::from_ptr(msg).to_string_lossy() };
+    session.write_stderr(&message_str);
+  });
 }
 
 #[no_mangle]

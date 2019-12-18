@@ -7,18 +7,20 @@ Here are a few of the organizations and projects that use Pants in their
 Organizations
 -------------
 
-- [Twitter](http://twitter.com)
-- [Foursquare](http://foursquare.com)
+- [Twitter](https://twitter.com)
+- [Toolchain](https://www.toolchain.com/)
+- [Foursquare](https://foursquare.com)
 - [Square](https://squareup.com)
 - [Compass](https://www.compass.com)
 - [Medium](https://medium.com/)
-- [Football Radar](http://www.footballradar.com/)
+- [Football Radar](https://www.footballradar.com/)
 - [Oscar](https://www.hioscar.com/)
 - [Whisk](https://whisk.com)
-- [Clover Health](http://www.cloverhealth.com/)
+- [Clover Health](https://www.cloverhealth.com/)
 - [QuizUp](https://www.quizup.com/)
 - [Grapeshot](https://www.grapeshot.com)
 - [Sigma](https://sig.ma)
+- [mediarithmics](https://www.mediarithmics.com/)
 
 Open Source Projects
 --------------------

@@ -4,9 +4,9 @@
 python_library(
   dependencies=[
     '3rdparty/python:dataclasses',
+    'src/python/pants/backend/python/lint',
     'src/python/pants/backend/python/subsystems',
     'src/python/pants/backend/python/rules',
-    'src/python/pants/backend/python/targets',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:isolated_process',
     'src/python/pants/engine:rules',
@@ -17,21 +17,12 @@ python_library(
 )
 
 python_tests(
-  name='tests',
-  sources=globs('*_test.py', exclude=[globs('*_integration_test.py')]),
-  dependencies=[
-    ':black',
-  ],
-)
-
-
-python_tests(
   name='integration',
   sources=globs('*_integration_test.py'),
   dependencies=[
     ':black',
+    'src/python/pants/backend/python/lint',
     'src/python/pants/backend/python/subsystems',
-    'src/python/pants/backend/python/targets',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:rules',
     'src/python/pants/engine:selectors',
@@ -42,5 +33,5 @@ python_tests(
     'src/python/pants/testutil/subsystem',
   ],
   tags = {'integration'},
-  timeout = 90,
+  timeout = 120,
 )

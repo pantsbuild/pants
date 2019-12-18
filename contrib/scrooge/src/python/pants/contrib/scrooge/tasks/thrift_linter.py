@@ -70,7 +70,7 @@ class ThriftLinter(LintTaskMixin, NailgunTask):
     return self._to_bool(self.get_options().strict_default)
 
   def _lint(self, target, classpath):
-    self.context.log.debug('Linting {0}'.format(target.address.spec))
+    self.context.log.debug(f'Linting {target.address.spec}')
 
     config_args = []
 
@@ -103,7 +103,7 @@ class ThriftLinter(LintTaskMixin, NailgunTask):
 
     if returncode != 0:
       raise ThriftLintError(
-        'Lint errors in target {0} for {1}.'.format(target.address.spec, paths))
+        f'Lint errors in target {target.address.spec} for {paths}.')
 
   def execute(self):
     thrift_targets = self.get_targets(self._is_thrift)

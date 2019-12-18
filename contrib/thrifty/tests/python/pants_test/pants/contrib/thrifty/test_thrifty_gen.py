@@ -34,8 +34,8 @@ class JavaThriftyGenTest(TaskTestBase):
     context = self.context(target_roots=[target])
     task = self.create_task(context)
     self.assertEqual([
-      '--out={}'.format(self.TARGET_WORKDIR),
-      '--path={}/src/thrifty'.format(self.build_root),
+      f'--out={self.TARGET_WORKDIR}',
+      f'--path={self.build_root}/src/thrifty',
       'src/thrifty/foo.thrift'],
       task.format_args_for_target(target, self.TARGET_WORKDIR))
 
@@ -48,7 +48,7 @@ class JavaThriftyGenTest(TaskTestBase):
     context = self.context(target_roots=[upstream, downstream])
     task = self.create_task(context)
     self.assertEqual([
-      '--out={}'.format(self.TARGET_WORKDIR),
-      '--path={}/src/thrifty'.format(self.build_root),
+      f'--out={self.TARGET_WORKDIR}',
+      f'--path={self.build_root}/src/thrifty',
       'src/thrifty/downstream.thrift'],
       task.format_args_for_target(downstream, self.TARGET_WORKDIR))

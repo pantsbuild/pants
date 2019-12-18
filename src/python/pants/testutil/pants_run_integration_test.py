@@ -357,6 +357,10 @@ class PantsRunIntegrationTest(unittest.TestCase):
       env.update(extra_env)
     env.update(PYTHONPATH=os.pathsep.join(sys.path))
 
+    # Pants command that was called from the test shouldn't have a parent.
+    if 'PANTS_PARENT_BUILD_ID' in env:
+      del env['PANTS_PARENT_BUILD_ID']
+
     # Don't overwrite the profile of this process in the called process.
     # Instead, write the profile into a sibling file.
     if env.get('PANTS_PROFILE'):
@@ -598,6 +602,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
     files_to_copy = ('BUILD.tools',)
     files_to_link = (
       'BUILD_ROOT',
+      '.isort.cfg',
       '.pants.d',
       'build-support',
       # NB: when running with --chroot or the V2 engine, `pants` refers to the source root-stripped

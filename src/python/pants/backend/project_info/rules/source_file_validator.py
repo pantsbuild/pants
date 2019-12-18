@@ -9,7 +9,7 @@ from typing import Tuple
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.engine.console import Console
 from pants.engine.fs import Digest, FilesContent
-from pants.engine.goal import Goal
+from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.legacy.graph import HydratedTarget, HydratedTargets
 from pants.engine.objects import Collection
 from pants.engine.rules import console_rule, optionable_rule, rule
@@ -33,7 +33,7 @@ class DetailLevel(Enum):
   all = "all"
 
 
-class Validate(Goal):
+class ValidateOptions(GoalSubsystem):
   name = 'validate'
 
   @classmethod
@@ -41,6 +41,10 @@ class Validate(Goal):
     super().register_options(register)
     register('--detail-level', type=DetailLevel, default=DetailLevel.nonmatching,
              help='How much detail to emit to the console.')
+
+
+class Validate(Goal):
+  subsystem_cls = ValidateOptions
 
 
 class SourceFileValidation(Subsystem):
@@ -215,9 +219,9 @@ class MultiMatcher:
 # to share goal names.
 @console_rule
 async def validate(
-  console: Console, hydrated_targets: HydratedTargets, validate_options: Validate.Options
+  console: Console, hydrated_targets: HydratedTargets, validate_options: ValidateOptions
 ) -> Validate:
-  per_tgt_rmrs = await MultiGet(Get(RegexMatchResults, HydratedTarget, ht) for ht in hydrated_targets)
+  per_tgt_rmrs = await MultiGet(Get[RegexMatchResults](HydratedTarget, ht) for ht in hydrated_targets)
   regex_match_results = list(itertools.chain(*per_tgt_rmrs))
 
   detail_level = validate_options.values.detail_level
@@ -260,8 +264,7 @@ async def match_regexes_for_one_target(
   multi_matcher = source_file_validation.get_multi_matcher()
   rmrs = []
   if hasattr(hydrated_target.adaptor, 'sources'):
-    files_content = await Get(FilesContent,
-                              Digest, hydrated_target.adaptor.sources.snapshot.directory_digest)
+    files_content = await Get[FilesContent](Digest, hydrated_target.adaptor.sources.snapshot.directory_digest)
     for file_content in files_content:
       rmrs.append(multi_matcher.check_source_file(file_content.path, file_content.content))
   return RegexMatchResults(rmrs)

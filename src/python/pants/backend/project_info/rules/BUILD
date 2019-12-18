@@ -12,11 +12,13 @@ python_library(
     'src/python/pants/util:collections',
     'src/python/pants/util:memo',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
-  name='rules_tests',
+  name='tests',
   dependencies=[
-    ':rules'
+    ':rules',
+    'src/python/pants/testutil:console_rule_test_base',
   ]
 )

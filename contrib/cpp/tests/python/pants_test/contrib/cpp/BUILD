@@ -17,9 +17,7 @@ python_tests(
 
 python_tests(
   name='cpp_toolchain',
-  sources=[
-    'test_cpp_toolchain.py',
-  ],
+  sources=['test_cpp_toolchain.py'],
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'contrib/cpp/src/python/pants/contrib/cpp/toolchain:toolchain',
@@ -27,4 +25,5 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
   ],
+  tags = {"partially_type_checked"},
 )

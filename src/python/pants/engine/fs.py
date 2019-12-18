@@ -3,7 +3,8 @@
 
 import os
 from dataclasses import dataclass
-from typing import Any, Iterable, Optional, Tuple
+from pathlib import Path
+from typing import TYPE_CHECKING, Iterable, Optional, Tuple
 
 from pants.engine.objects import Collection
 from pants.engine.rules import RootRule
@@ -11,6 +12,10 @@ from pants.option.custom_types import GlobExpansionConjunction as GlobExpansionC
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.util.dirutil import maybe_read_file, safe_delete, safe_file_dump
 from pants.util.meta import frozen_after_init
+
+
+if TYPE_CHECKING:
+  from pants.engine.scheduler import SchedulerSession
 
 
 @dataclass(frozen=True)
@@ -149,7 +154,7 @@ class Snapshot:
 
 @dataclass(frozen=True)
 class DirectoriesToMerge:
-  directories: Tuple
+  directories: Tuple[Digest, ...]
 
 
 @dataclass(frozen=True)
@@ -166,9 +171,17 @@ class DirectoryWithPrefixToAdd:
 
 @dataclass(frozen=True)
 class DirectoryToMaterialize:
-  """A request to materialize the contents of a directory digest at the provided path."""
-  path: str
+  """A request to materialize the contents of a directory digest at the build root, optionally with
+  a path prefix (relative to the build root)."""
   directory_digest: Digest
+  path_prefix: str = ""  # i.e., we default to the root level of the build root
+
+  def __post_init__(self) -> None:
+    if Path(self.path_prefix).is_absolute():
+      raise ValueError(
+        f"The path_prefix must be relative for {self}, as the engine materializes directories "
+        f"relative to the build root."
+      )
 
 
 class DirectoriesToMaterialize(Collection[DirectoryToMaterialize]):
@@ -194,11 +207,20 @@ class UrlToFetch:
 @dataclass(frozen=True)
 class Workspace:
   """Abstract handle for operations that touch the real local filesystem."""
-  _scheduler: Any
+  _scheduler: "SchedulerSession"
 
-  def materialize_directories(self, directories_to_materialize: Tuple[DirectoryToMaterialize, ...]) -> MaterializeDirectoriesResult:
-    result: MaterializeDirectoriesResult = self._scheduler.materialize_directories(directories_to_materialize)
-    return result
+  def materialize_directory(
+    self, directory_to_materialize: DirectoryToMaterialize
+  ) -> MaterializeDirectoryResult:
+    """Materialize one single directory digest to disk. If you need to materialize multiple, you
+    should use the parallel materialize_directories() instead."""
+    return self._scheduler.materialize_directory(directory_to_materialize)
+
+  def materialize_directories(
+    self, directories_to_materialize: Tuple[DirectoryToMaterialize, ...]
+  ) -> MaterializeDirectoriesResult:
+    """Materialize multiple directory digests to disk in parallel."""
+    return self._scheduler.materialize_directories(directories_to_materialize)
 
 
 # TODO: don't recreate this in python, get this from fs::EMPTY_DIGEST somehow.

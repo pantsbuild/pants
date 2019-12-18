@@ -6,6 +6,18 @@ set -e
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd "$(git rev-parse --show-toplevel)" && pwd)
 
+function safe_curl() {
+  real_curl="$(command -v curl)"
+  set +e
+  "${real_curl}" --fail -SL "$@"
+  exit_code=$?
+  set -e
+  if [[ "${exit_code}" -ne 0 ]]; then
+    echo >&2 "Curl failed with args: $*"
+    exit 1
+  fi
+}
+
 # shellcheck source=build-support/common.sh
 source "${ROOT}/build-support/common.sh"
 
@@ -67,7 +79,7 @@ function run_pex() {
 
     pex="${pexdir}/pex"
 
-    curl --fail -sSL "${PEX_DOWNLOAD_PREFIX}/v${PEX_VERSION}/pex" > "${pex}"
+    safe_curl -s "${PEX_DOWNLOAD_PREFIX}/v${PEX_VERSION}/pex" > "${pex}"
     "${PY}" "${pex}" "$@"
   )
 }
@@ -283,6 +295,14 @@ function install_and_test_packages() {
     --no-cache-dir
   )
 
+  export PANTS_PYTHON_REPOS_REPOS="${DEPLOY_PANTS_WHEEL_DIR}/${VERSION}"
+
+  start_travis_section "wheel_check" "Validating ${VERSION} pantsbuild.pants wheels"
+  activate_twine
+  twine check "${PANTS_PYTHON_REPOS_REPOS}"/*.whl || die "Failed to validate wheels."
+  deactivate
+  end_travis_section
+
   pre_install || die "Failed to setup virtualenv while testing ${NAME}-${VERSION}!"
 
   # Avoid caching plugin installs.
@@ -296,7 +316,6 @@ function install_and_test_packages() {
     $(run_packages_script list | grep '.' | awk '{print $1}')
   ) || die "Failed to list packages!"
 
-  export PANTS_PYTHON_REPOS_REPOS="${DEPLOY_PANTS_WHEEL_DIR}/${VERSION}"
   for package in "${packages[@]}"
   do
     start_travis_section "${package}" "Installing and testing package ${package}-${VERSION}"
@@ -436,7 +455,7 @@ function list_prebuilt_wheels() {
   trap 'rm -f "${wheel_listing}"' RETURN
 
   for wheels_path in "${DEPLOY_PANTS_WHEELS_PATH}" "${DEPLOY_3RDPARTY_WHEELS_PATH}"; do
-    curl --fail -sSL "${BINARY_BASE_URL}/?prefix=${wheels_path}" > "${wheel_listing}"
+    safe_curl -s "${BINARY_BASE_URL}/?prefix=${wheels_path}" > "${wheel_listing}"
     "${PY}" << EOF
 from __future__ import print_function
 import sys
@@ -472,7 +491,7 @@ function fetch_prebuilt_wheels() {
         echo "${BINARY_BASE_URL}/${url_path}:"
         local dest="${to_dir}/${file_path}"
         mkdir -p "$(dirname "${dest}")"
-        curl --fail --progress-bar -o "${dest}" "${BINARY_BASE_URL}/${url_path}" \
+        safe_curl --progress-bar -o "${dest}" "${BINARY_BASE_URL}/${url_path}" \
           || die "Could not fetch ${dest}."
       done
     }

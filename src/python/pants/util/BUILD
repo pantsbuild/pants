@@ -118,20 +118,14 @@ python_library(
   tags = {'partially_type_checked'},
 )
 
-python_library(
+python_binary(
   name = 's3_log_aggregator',
-  sources = ['s3_log_aggregator.py'],
+  source = 's3_log_aggregator.py',
+  entry_point = 'pants.util.s3_log_aggregator',
   dependencies = [
     '3rdparty/python:s3logparse'
   ],
-)
-
-python_binary(
-  name = 's3_log_aggregator_bin',
-  entry_point = 'pants.util.s3_log_aggregator',
-  dependencies = [
-    ':s3_log_aggregator'
-  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(

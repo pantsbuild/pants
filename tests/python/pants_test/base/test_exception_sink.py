@@ -7,9 +7,9 @@ import re
 import unittest.mock
 
 from pants.base.exception_sink import ExceptionSink
+from pants.engine.platform import Platform
 from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir
-from pants.util.osutil import get_normalized_os_name
 
 
 class TestExceptionSink(TestBase):
@@ -33,23 +33,20 @@ class TestExceptionSink(TestBase):
   def test_set_invalid_log_location(self):
     self.assertFalse(os.path.isdir('/does/not/exist'))
     sink = self._gen_sink_subclass()
-    err_rx = re.escape(
-      "The provided exception sink path at '/does/not/exist' is not writable or could not be created: [Errno 13]")
-    with self.assertRaisesRegexp(ExceptionSink.ExceptionSinkError, err_rx):
+    with self.assertRaisesWithMessageContaining(
+        ExceptionSink.ExceptionSinkError,
+        "The provided exception sink path at '/does/not/exist' is not writable or could not be created"):
       sink.reset_log_location('/does/not/exist')
-
 
     # NB: This target is marked with 'platform_specific_behavior' because OSX errors out here at
     # creating a new directory with safe_mkdir(), Linux errors out trying to create the directory
     # for its log files with safe_open(). This may be due to differences in the filesystems.
     # TODO: figure out why we error out at different points here!
-    if get_normalized_os_name() == 'darwin':
-      err_rx = re.escape("The provided exception sink path at '/' is not writable or could not be created: [Errno 21] Is a directory: '/'.")
-    else:
-      err_rx = '.*'.join([
-        re.escape("Error opening fatal error log streams for log location '/': [Errno 13] Permission denied: '/logs'"),
-      ])
-    with self.assertRaisesRegexp(ExceptionSink.ExceptionSinkError, err_rx):
+    err_str = Platform.current.match({
+      Platform.darwin: "The provided exception sink path at '/' is not writable or could not be created: [Errno 21] Is a directory: '/'.",
+      Platform.linux: "Error opening fatal error log streams for log location '/': [Errno 13] Permission denied: '/.pids'"
+    })
+    with self.assertRaisesWithMessageContaining(ExceptionSink.ExceptionSinkError, err_str):
       sink.reset_log_location('/')
 
   def test_log_exception(self):
@@ -69,7 +66,7 @@ class TestExceptionSink(TestBase):
         getproctitle_mock.assert_called_once()
 
       # This should have created two log files, one specific to the current pid.
-      self.assertEqual(os.listdir(tmpdir), ['logs'])
+      self.assertEqual(os.listdir(tmpdir), ['.pids'])
 
       cur_process_error_log_path = ExceptionSink.exceptions_log_path(for_pid=pid, in_dir=tmpdir)
       self.assertTrue(os.path.isfile(cur_process_error_log_path))

@@ -20,7 +20,8 @@ python_library(
     'src/python/pants/java:nailgun_protocol',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:socket'
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -31,7 +32,8 @@ python_library(
     'src/python/pants/util:retry',
     ':process_manager',
     ':watchman_client'
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -41,7 +43,8 @@ python_library(
     ':watchman',
     'src/python/pants/binaries',
     'src/python/pants/util:memo',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -49,7 +52,8 @@ python_library(
   sources = ['watchman_client.py'],
   dependencies = [
     '3rdparty/python:pywatchman'
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(

@@ -171,7 +171,7 @@ class Parser:
       """
       self.flag_value_map = self._create_flag_value_map(flags_in_scope)
       self.namespace = namespace
-      self.get_all_scoped_flag_names = get_all_scoped_flag_names  # type: ignore
+      self.get_all_scoped_flag_names = get_all_scoped_flag_names  # type: ignore[assignment,misc] # cannot assign a method + MyPy says "does not accept self argument"
       self.levenshtein_max_distance = levenshtein_max_distance
 
     @staticmethod

@@ -110,7 +110,7 @@ class RscCompileContext(CompileContext):
 class RscCompile(ZincCompile, MirroredTargetOptionMixin):
   """Compile Scala and Java code to classfiles using Rsc."""
 
-  _name = 'mixed' # noqa
+  _name = 'mixed'
   compiler_name = 'rsc'
 
   @classmethod
@@ -797,12 +797,9 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     # TODO: parse the output of -Xprint:timings for rsc and write it to self._record_target_stats()!
 
     res.output_directory_digest.dump(ctx.rsc_jar_file.path)
-    self.context._scheduler.materialize_directories((
-      DirectoryToMaterialize(
-        # NB the first element here is the root to materialize into, not the dir to snapshot
-        get_buildroot(),
-        res.output_directory_digest),
-    ))
+    self.context._scheduler.materialize_directory(
+      DirectoryToMaterialize(res.output_directory_digest),
+    )
     ctx.rsc_jar_file.hydrate_missing_directory_digest(res.output_directory_digest)
 
     return res

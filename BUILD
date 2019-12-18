@@ -27,6 +27,11 @@ files(
 )
 
 files(
+  name = 'isort_cfg',
+  source = '.isort.cfg',
+)
+
+files(
   name = 'scalajs_3rdparty_directory',
   sources = rglobs('contrib/scalajs/3rdparty/*'),
 )

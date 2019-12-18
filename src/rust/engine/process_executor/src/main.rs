@@ -33,7 +33,7 @@ use process_execution;
 
 use clap::{value_t, App, AppSettings, Arg};
 use hashing::{Digest, Fingerprint};
-use process_execution::{Context, ExecuteProcessRequestMetadata, Platform};
+use process_execution::{Context, ExecuteProcessRequestMetadata, Platform, RelativePath};
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::TryFrom;
 use std::iter::{FromIterator, Iterator};
@@ -80,6 +80,13 @@ fn main() {
         .takes_value(true)
         .required(true)
         .help("Length of the proto-bytes whose digest to use as the input file tree."),
+    )
+    .arg(
+      Arg::with_name("working-directory")
+        .long("working-directory")
+        .takes_value(true)
+        .required(false)
+        .help("Path to execute the binary at relative to its input digest root.")
     )
     .arg(
       Arg::with_name("server")
@@ -237,7 +244,7 @@ fn main() {
     .values_of("extra-platform-property")
     .map(collection_from_keyvalues::<_, Vec<_>>)
     .unwrap_or_default();
-  let work_dir = args
+  let work_dir_base = args
     .value_of("work-dir")
     .map(PathBuf::from)
     .unwrap_or_else(std::env::temp_dir);
@@ -314,11 +321,15 @@ fn main() {
     Digest(fingerprint, length)
   };
 
+  let working_directory = args
+    .value_of("working-directory")
+    .map(|path| RelativePath::new(path).expect("working-directory must be a relative path"));
   let is_nailgunnable: bool = args.value_of("use-nailgun").unwrap().parse().unwrap();
 
   let request = process_execution::ExecuteProcessRequest {
     argv,
     env,
+    working_directory,
     input_files,
     output_files,
     output_directories,
@@ -371,7 +382,7 @@ fn main() {
     None => Box::new(process_execution::local::CommandRunner::new(
       store.clone(),
       executor,
-      work_dir,
+      work_dir_base,
       true,
     )) as Box<dyn process_execution::CommandRunner>,
   };

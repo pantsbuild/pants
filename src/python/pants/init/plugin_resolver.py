@@ -5,18 +5,17 @@ import hashlib
 import logging
 import os
 import site
+import uuid
 
 from pex import resolver
-from pex.base import requirement_is_exact
 from pex.interpreter import PythonInterpreter
-from pkg_resources import Requirement
 from pkg_resources import working_set as global_working_set
 from wheel.install import WheelFile
 
 from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import safe_mkdir, safe_open
+from pants.util.dirutil import safe_delete, safe_mkdir, safe_open
 from pants.util.memo import memoized_property
 from pants.util.strutil import ensure_text
 from pants.version import PANTS_SEMVER
@@ -60,6 +59,7 @@ class PluginResolver:
     bootstrap_options = self._options_bootstrapper.get_bootstrap_options().for_global_scope()
     self._plugin_requirements = bootstrap_options.plugins
     self._plugin_cache_dir = bootstrap_options.plugin_cache_dir
+    self._plugins_force_resolve = bootstrap_options.plugins_force_resolve
 
   def resolve(self, working_set=None):
     """Resolves any configured plugins and adds them to the global working set.
@@ -77,15 +77,6 @@ class PluginResolver:
     return working_set
 
   def _resolve_plugin_locations(self):
-    # We jump through some hoops here to avoid a live resolve if possible for purposes of speed.
-    # Even with a local resolve cache fully up to date, running a resolve to activate a plugin
-    # takes ~250ms whereas loading from a pre-cached list takes ~50ms.
-    if all(requirement_is_exact(Requirement.parse(req)) for req in self._plugin_requirements):
-      return self._resolve_exact_plugin_locations()
-    else:
-      return (plugin.location for plugin in self._resolve_plugins())
-
-  def _resolve_exact_plugin_locations(self):
     hasher = hashlib.sha1()
 
     # Assume we have platform-specific plugin requirements and pessimistically mix the ABI
@@ -97,8 +88,11 @@ class PluginResolver:
     resolve_hash = hasher.hexdigest()
     resolved_plugins_list = os.path.join(self.plugin_cache_dir, f'plugins-{resolve_hash}.txt')
 
+    if self._plugins_force_resolve:
+      safe_delete(resolved_plugins_list)
+
     if not os.path.exists(resolved_plugins_list):
-      tmp_plugins_list = resolved_plugins_list + '~'
+      tmp_plugins_list = f'{resolved_plugins_list}.{uuid.uuid4().hex}'
       with safe_open(tmp_plugins_list, 'w') as fp:
         for plugin in self._resolve_plugins():
           fp.write(ensure_text(plugin.location))
@@ -123,7 +117,7 @@ class PluginResolver:
                                       use_manylinux=True)
     return [resolved_dist.distribution for resolved_dist in resolved_dists]
 
-  @memoized_property
+  @property
   def plugin_cache_dir(self):
     """The path of the directory pants plugins bdists are cached in."""
     return self._plugin_cache_dir

@@ -1,6 +1,7 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import itertools
 import logging
 from dataclasses import dataclass
 from typing import Dict, Optional, Tuple, Union
@@ -31,6 +32,7 @@ class ExecuteProcessRequest:
   argv: Tuple[str, ...]
   input_files: Digest
   description: str
+  working_directory: Optional[str]
   env: Tuple[str, ...]
   output_files: Tuple[str, ...]
   output_directories: Tuple[str, ...]
@@ -45,6 +47,7 @@ class ExecuteProcessRequest:
     *,
     input_files: Digest,
     description: str,
+    working_directory: Optional[str] = None,
     env: Optional[Dict[str, str]] = None,
     output_files: Optional[Tuple[str, ...]] = None,
     output_directories: Optional[Tuple[str, ...]] = None,
@@ -56,7 +59,8 @@ class ExecuteProcessRequest:
     self.argv = argv
     self.input_files = input_files
     self.description = description
-    self.env = tuple(item for pair in env.items() for item in pair) if env is not None else ()  # type: ignore
+    self.working_directory = working_directory
+    self.env = tuple(itertools.chain.from_iterable((env or {}).items()))
     self.output_files = output_files or ()
     self.output_directories = output_directories or ()
     self.timeout_seconds = timeout_seconds
