@@ -5,7 +5,6 @@ from pants.core_tasks.bash_completion import BashCompletion
 from pants.core_tasks.clean import Clean
 from pants.core_tasks.deferred_sources_mapper import DeferredSourcesMapper
 from pants.core_tasks.explain_options_task import ExplainOptionsTask
-from pants.core_tasks.generate_pants_ini import GeneratePantsIni
 from pants.core_tasks.login import Login
 from pants.core_tasks.noop import NoopCompile, NoopTest
 from pants.core_tasks.pantsd_kill import PantsDaemonKill
@@ -72,9 +71,6 @@ def register_goals():
   # Getting help.
   task(name='options', action=ExplainOptionsTask).install()
   task(name='targets', action=TargetsHelp).install()
-
-  # Set up pants.ini.
-  task(name="generate-pants-ini", action=GeneratePantsIni).install()
 
   # Stub for other goals to schedule 'compile'. See noop_exec_task.py for why this is useful.
   task(name='compile', action=NoopCompile).install('compile')
