@@ -19,5 +19,5 @@ python_awslambda(
     ':pycountry',
     ':hello-lib',
   ],
-  handler='pants.backend2.awslambda.python.examples.hello_handler:handler'
+  handler='pants.backend.awslambda.python.examples.hello_handler:handler'
 )

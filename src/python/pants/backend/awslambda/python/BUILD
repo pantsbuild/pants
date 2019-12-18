@@ -6,7 +6,7 @@ python_library(
   dependencies=[
     'src/python/pants/backend/python/rules',
     'src/python/pants/backend/python/subsystems',
-    'src/python/pants/backend2/awslambda/common',
+    'src/python/pants/backend/awslambda/common',
     'src/python/pants/engine:addressable',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:isolated_process',
@@ -22,7 +22,7 @@ python_tests(
     ':python',
     'src/python/pants/backend/python/rules',
     'src/python/pants/backend/python/subsystems',
-    'src/python/pants/backend2/awslambda/common',
+    'src/python/pants/backend/awslambda/common',
     'src/python/pants/build_graph',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:rules',

@@ -6,13 +6,13 @@ from io import BytesIO
 from typing import Tuple
 from zipfile import ZipFile
 
-from pants.backend2.awslambda.common.awslambda_common_rules import CreatedAWSLambda
-from pants.backend2.awslambda.python.awslambda_python_rules import (
+from pants.backend.awslambda.common.awslambda_common_rules import CreatedAWSLambda
+from pants.backend.awslambda.python.awslambda_python_rules import (
   LambdexSetup,
   create_python_awslambda,
   setup_lambdex,
 )
-from pants.backend2.awslambda.python.lambdex import Lambdex
+from pants.backend.awslambda.python.lambdex import Lambdex
 from pants.backend.python.rules.download_pex_bin import download_pex_bin
 from pants.backend.python.rules.inject_init import inject_init
 from pants.backend.python.rules.pex import create_pex

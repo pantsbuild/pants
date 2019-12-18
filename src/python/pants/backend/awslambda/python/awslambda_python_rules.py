@@ -3,8 +3,8 @@
 
 from dataclasses import dataclass
 
-from pants.backend2.awslambda.common.awslambda_common_rules import AWSLambdaTarget, CreatedAWSLambda
-from pants.backend2.awslambda.python.lambdex import Lambdex
+from pants.backend.awslambda.common.awslambda_common_rules import AWSLambdaTarget, CreatedAWSLambda
+from pants.backend.awslambda.python.lambdex import Lambdex
 from pants.backend.python.rules.pex import (
   CreatePex,
   Pex,
