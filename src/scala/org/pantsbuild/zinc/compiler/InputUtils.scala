@@ -157,8 +157,12 @@ object InputUtils {
     val (compiler, other) = filtered partition (_.getName matches ScalaCompiler.pattern)
     val ScalaCompiler.regex(library_version) = compiler(0).getName
     val VersionedScalaLibraryJar = JarFile("scala-library", version=Some(library_version))
-    val (library, extra) = other partition (_.getName matches VersionedScalaLibraryJar.pattern)
-    if (compiler.nonEmpty && library.nonEmpty) Some(ScalaJars(compiler(0), library(0), extra)) else None
+    val VersionedScalaReflectJar = JarFile("scala-reflect", version=Some(library_version))
+    val ScalaXML = JarFile("scala-xml")
+    val (library, _) = other partition (_.getName matches VersionedScalaLibraryJar.pattern)
+    val (reflect, _) = other partition (_.getName matches VersionedScalaReflectJar.pattern)
+    val (xml, _) = other partition (_.getName matches ScalaXML.pattern)
+    if (compiler.nonEmpty && library.nonEmpty) Some(ScalaJars(compiler(0), library(0), reflect ++ xml)) else None
   }
 
   //
