@@ -172,12 +172,14 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              help='The name of the script or binary used to invoke pants. '
                   'Useful when printing help messages.')
 
-    register('--plugins', advanced=True, type=list, help='Load these plugins.')
+    register('--plugins', advanced=True, type=list, help='Load these v1 plugins.')
+    register('--plugins2', advanced=True, type=list, help='Load these v2 plugins.')
     register('--plugins-force-resolve', advanced=True, type=bool, default=False,
              help='Re-resolve plugins even if previously resolved.')
     register('--plugin-cache-dir', advanced=True,
              default=os.path.join(get_pants_cachedir(), 'plugins'),
              help='Cache resolved plugin requirements here.')
+
     register('--backend-packages', advanced=True, type=list,
              default=['pants.backend.graph_info',
                       'pants.backend.python',
@@ -193,11 +195,12 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                       'pants.backend.codegen.grpcio.python',
                       'pants.backend.codegen.wire.java',
                       'pants.backend.project_info'],
-             help='Load backends from these packages that are already on the path. '
+             help='Load v1 backends from these packages that are already on the path. '
                   'Add contrib and custom backends to this list.')
-    register('--v1-register', advanced=True, type=bool, default=True,
-             help='Whether to register v1 tasks. If unset, v1 task registration hooks in backends '
-                  'will be ignored, meaning you cannot set any v1 task options in config files.')
+    register('--backend-packages2', advanced=True, type=list,
+             default=[],
+             help='Load v2 backends from these packages, which must already be on the PYTHONPATH,'
+                  'either because they are in the pants core, in a plugin, or in the repo.')
 
     register('--pants-bootstrapdir', advanced=True, metavar='<dir>', default=get_pants_cachedir(),
              help='Use this dir for global cache.')

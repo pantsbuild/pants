@@ -3,12 +3,12 @@
 
 import sys
 import types
+import unittest
 import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any
 
-import pytest
 from pkg_resources import (
   Distribution,
   EmptyProvider,
@@ -39,7 +39,6 @@ from pants.task.task import Task
 class MockMetadata(EmptyProvider):
 
   def __init__(self, metadata):
-    super().__init__()
     self.metadata = metadata
 
   def has_metadata(self, name):
@@ -115,15 +114,117 @@ def example_plugin_rule(root_type: RootType) -> PluginProduct:
   return PluginProduct()
 
 
-class LoaderTestBase:
-  def setup_method(self):
+class LoaderTest(unittest.TestCase):
+
+  def setUp(self):
     self.build_configuration = BuildConfiguration()
     self.working_set = WorkingSet()
     for entry in working_set.entries:
       self.working_set.add_entry(entry)
 
-  def teardown_method(self):
+  def tearDown(self):
     Goal.clear()
+
+  @contextmanager
+  def create_register(self, build_file_aliases=None, register_goals=None, global_subsystems=None,
+                      rules=None, module_name='register'):
+
+    package_name = f'__test_package_{uuid.uuid4().hex}'
+    self.assertFalse(package_name in sys.modules)
+
+    package_module = types.ModuleType(package_name)
+    sys.modules[package_name] = package_module
+    try:
+      register_module_fqn = f'{package_name}.{module_name}'
+      register_module = types.ModuleType(register_module_fqn)
+      setattr(package_module, module_name, register_module)
+      sys.modules[register_module_fqn] = register_module
+
+      def register_entrypoint(function_name, function):
+        if function:
+          setattr(register_module, function_name, function)
+
+      register_entrypoint('build_file_aliases', build_file_aliases)
+      register_entrypoint('global_subsystems', global_subsystems)
+      register_entrypoint('register_goals', register_goals)
+      register_entrypoint('rules', rules)
+
+      yield package_name
+    finally:
+      del sys.modules[package_name]
+
+  def assert_empty_aliases(self):
+    registered_aliases = self.build_configuration.registered_aliases()
+    self.assertEqual(0, len(registered_aliases.target_types))
+    self.assertEqual(0, len(registered_aliases.target_macro_factories))
+    self.assertEqual(0, len(registered_aliases.objects))
+    self.assertEqual(0, len(registered_aliases.context_aware_object_factories))
+    self.assertEqual(self.build_configuration.optionables(), set())
+    self.assertEqual(0, len(self.build_configuration.rules()))
+
+  def test_load_valid_empty(self):
+    with self.create_register() as backend_package:
+      load_backend(self.build_configuration, backend_package, is_v1_backend=True)
+      self.assert_empty_aliases()
+
+  def test_load_valid_partial_aliases(self):
+    aliases = BuildFileAliases(targets={'bob': DummyTarget},
+                               objects={'obj1': DummyObject1,
+                                        'obj2': DummyObject2})
+    with self.create_register(build_file_aliases=lambda: aliases) as backend_package:
+      load_backend(self.build_configuration, backend_package, is_v1_backend=False)
+      self.assert_empty_aliases()
+
+      load_backend(self.build_configuration, backend_package, is_v1_backend=True)
+      registered_aliases = self.build_configuration.registered_aliases()
+      self.assertEqual(DummyTarget, registered_aliases.target_types['bob'])
+      self.assertEqual(DummyObject1, registered_aliases.objects['obj1'])
+      self.assertEqual(DummyObject2, registered_aliases.objects['obj2'])
+      self.assertEqual(self.build_configuration.optionables(), {DummySubsystem1, DummySubsystem2})
+
+  def test_load_valid_partial_goals(self):
+    def register_goals():
+      Goal.by_name('jack').install(TaskRegistrar('jill', DummyTask))
+
+    with self.create_register(register_goals=register_goals) as backend_package:
+      Goal.clear()
+      self.assertEqual(0, len(Goal.all()))
+
+      load_backend(self.build_configuration, backend_package, is_v1_backend=False)
+      self.assertEqual(0, len(Goal.all()))
+
+      load_backend(self.build_configuration, backend_package, is_v1_backend=True)
+      self.assert_empty_aliases()
+      self.assertEqual(1, len(Goal.all()))
+
+      task_names = Goal.by_name('jack').ordered_task_names()
+      self.assertEqual(1, len(task_names))
+
+      task_name = task_names[0]
+      self.assertEqual('jill', task_name)
+
+  def test_load_invalid_entrypoint(self):
+    def build_file_aliases(bad_arg):
+      return BuildFileAliases()
+
+    with self.create_register(build_file_aliases=build_file_aliases) as backend_package:
+      # Loading as v2 shouldn't raise.
+      load_backend(self.build_configuration, backend_package, is_v1_backend=False)
+      with self.assertRaises(BuildConfigurationError):
+        load_backend(self.build_configuration, backend_package, is_v1_backend=True)
+
+  def test_load_invalid_module(self):
+    with self.create_register(module_name='register2') as backend_package:
+      with self.assertRaises(BuildConfigurationError):
+        load_backend(self.build_configuration, backend_package, is_v1_backend=False)
+      with self.assertRaises(BuildConfigurationError):
+        load_backend(self.build_configuration, backend_package, is_v1_backend=True)
+
+  def test_load_missing_plugin(self):
+    with self.assertRaises(PluginNotFound):
+      self.load_plugins(['Foobar'], is_v1_plugin=True)
+    with self.assertRaises(PluginNotFound):
+      self.load_plugins(['Foobar'], is_v1_plugin=False)
 
   @staticmethod
   def get_mock_plugin(name, version, reg=None, alias=None, after=None, rules=None):
@@ -178,86 +279,57 @@ class LoaderTestBase:
 
     return Distribution(project_name=name, version=version, metadata=MockMetadata(metadata))
 
-  def load_plugins(self, plugins, v1_register):
-    load_plugins(self.build_configuration, plugins, self.working_set, v1_register=v1_register)
+  def load_plugins(self, plugins, is_v1_plugin):
+    load_plugins(self.build_configuration, plugins, self.working_set, is_v1_plugin)
 
-  @contextmanager
-  def create_register(self, build_file_aliases=None, register_goals=None, global_subsystems=None,
-                      rules=None, module_name='register'):
+  def test_plugin_load_and_order(self):
+    d1 = self.get_mock_plugin('demo1', '0.0.1', after=lambda: ['demo2'])
+    d2 = self.get_mock_plugin('demo2', '0.0.3')
+    self.working_set.add(d1)
 
-    package_name = f'__test_package_{uuid.uuid4().hex}'
-    assert package_name not in sys.modules
+    # Attempting to load 'demo1' then 'demo2' should fail as 'demo1' requires 'after'=['demo2'].
+    with self.assertRaises(PluginLoadOrderError):
+      self.load_plugins(['demo1', 'demo2'], is_v1_plugin=False)
+    with self.assertRaises(PluginLoadOrderError):
+      self.load_plugins(['demo1', 'demo2'], is_v1_plugin=True)
 
-    package_module = types.ModuleType(package_name)
-    sys.modules[package_name] = package_module
-    try:
-      register_module_fqn = f'{package_name}.{module_name}'
-      register_module = types.ModuleType(register_module_fqn)
-      setattr(package_module, module_name, register_module)
-      sys.modules[register_module_fqn] = register_module
+    # Attempting to load 'demo2' first should fail as it is not (yet) installed.
+    with self.assertRaises(PluginNotFound):
+      self.load_plugins(['demo2', 'demo1'], is_v1_plugin=False)
+    with self.assertRaises(PluginNotFound):
+      self.load_plugins(['demo2', 'demo1'], is_v1_plugin=True)
 
-      def register_entrypoint(function_name, function):
-        if function:
-          setattr(register_module, function_name, function)
+    # Installing demo2 and then loading in correct order should work though.
+    self.working_set.add(d2)
+    self.load_plugins(['demo2>=0.0.2', 'demo1'], is_v1_plugin=False)
+    self.load_plugins(['demo2>=0.0.2', 'demo1'], is_v1_plugin=True)
 
-      register_entrypoint('build_file_aliases', build_file_aliases)
-      register_entrypoint('global_subsystems', global_subsystems)
-      register_entrypoint('register_goals', register_goals)
-      register_entrypoint('rules', rules)
+    # But asking for a bad (not installed) version fails.
+    with self.assertRaises(VersionConflict):
+      self.load_plugins(['demo2>=0.0.5'], is_v1_plugin=False)
+    with self.assertRaises(VersionConflict):
+      self.load_plugins(['demo2>=0.0.5'], is_v1_plugin=True)
 
-      yield package_name
-    finally:
-      del sys.modules[package_name]
+  def test_plugin_installs_goal(self):
+    def reg_goal():
+      Goal.by_name('plugindemo').install(TaskRegistrar('foo', DummyTask))
+    self.working_set.add(self.get_mock_plugin('regdemo', '0.0.1', reg=reg_goal))
 
-  def assert_empty_aliases(self):
-    registered_aliases = self.build_configuration.registered_aliases()
-    assert 0 == len(registered_aliases.target_types)
-    assert 0 == len(registered_aliases.target_macro_factories)
-    assert 0 == len(registered_aliases.objects)
-    assert 0 == len(registered_aliases.context_aware_object_factories)
-    assert self.build_configuration.optionables() == set()
-    assert 0 == len(self.build_configuration.rules())
+    # Start without the custom goal.
+    self.assertEqual(0, len(Goal.by_name('plugindemo').ordered_task_names()))
 
+    # Ensure goal isn't created in a v2 world.
+    self.load_plugins(['regdemo'], is_v1_plugin=False)
+    self.assertEqual(0, len(Goal.by_name('plugindemo').ordered_task_names()))
 
-@pytest.mark.parametrize('v1_register', [False, True])
-class TestV1V2Loader(LoaderTestBase):
-  """Tests for functionality that is expected not to differ based on the v1_register option."""
+    # Load plugin which registers custom goal.
+    self.load_plugins(['regdemo'], is_v1_plugin=True)
 
-  def test_load_valid_empty(self, v1_register):
-    with self.create_register() as backend_package:
-      load_backend(self.build_configuration, backend_package, v1_register=v1_register)
-      self.assert_empty_aliases()
+    # Now the custom goal exists.
+    self.assertEqual(1, len(Goal.by_name('plugindemo').ordered_task_names()))
+    self.assertEqual('foo', Goal.by_name('plugindemo').ordered_task_names()[0])
 
-  def test_load_valid_partial_aliases(self, v1_register):
-    aliases = BuildFileAliases(targets={'bob': DummyTarget},
-                               objects={'obj1': DummyObject1,
-                                        'obj2': DummyObject2})
-    with self.create_register(build_file_aliases=lambda: aliases) as backend_package:
-      load_backend(self.build_configuration, backend_package, v1_register=v1_register)
-      registered_aliases = self.build_configuration.registered_aliases()
-      assert DummyTarget == registered_aliases.target_types['bob']
-      assert DummyObject1 == registered_aliases.objects['obj1']
-      assert DummyObject2 == registered_aliases.objects['obj2']
-      assert self.build_configuration.optionables() == {DummySubsystem1, DummySubsystem2}
-
-  def test_load_invalid_entrypoint(self, v1_register):
-    def build_file_aliases(bad_arg):
-      return BuildFileAliases()
-
-    with self.create_register(build_file_aliases=build_file_aliases) as backend_package:
-      with pytest.raises(BuildConfigurationError):
-        load_backend(self.build_configuration, backend_package, v1_register=v1_register)
-
-  def test_load_invalid_module(self, v1_register):
-    with self.create_register(module_name='register2') as backend_package:
-      with pytest.raises(BuildConfigurationError):
-        load_backend(self.build_configuration, backend_package, v1_register=v1_register)
-
-  def test_load_missing_plugin(self, v1_register):
-    with pytest.raises(PluginNotFound):
-      self.load_plugins(['Foobar'], v1_register=v1_register)
-
-  def test_plugin_installs_alias(self, v1_register):
+  def test_plugin_installs_alias(self):
     def reg_alias():
       return BuildFileAliases(targets={'pluginalias': DummyTarget},
                               objects={'FROMPLUGIN1': DummyObject1,
@@ -267,31 +339,54 @@ class TestV1V2Loader(LoaderTestBase):
     # Start with no aliases.
     self.assert_empty_aliases()
 
+    # Ensure alias isn't created in a v2 world.
+    self.load_plugins(['aliasdemo'], is_v1_plugin=False)
+    self.assert_empty_aliases()
+
     # Now load the plugin which defines aliases.
-    self.load_plugins(['aliasdemo'], v1_register=v1_register)
+    self.load_plugins(['aliasdemo'], is_v1_plugin=True)
 
     # Aliases now exist.
     registered_aliases = self.build_configuration.registered_aliases()
-    assert DummyTarget == registered_aliases.target_types['pluginalias']
-    assert DummyObject1 == registered_aliases.objects['FROMPLUGIN1']
-    assert DummyObject2 == registered_aliases.objects['FROMPLUGIN2']
-    assert self.build_configuration.optionables() == {DummySubsystem1, DummySubsystem2}
+    self.assertEqual(DummyTarget, registered_aliases.target_types['pluginalias'])
+    self.assertEqual(DummyObject1, registered_aliases.objects['FROMPLUGIN1'])
+    self.assertEqual(DummyObject2, registered_aliases.objects['FROMPLUGIN2'])
+    self.assertEqual(self.build_configuration.optionables(), {DummySubsystem1, DummySubsystem2})
 
-  def test_rules(self, v1_register):
+  def test_subsystems(self):
+    def global_subsystems():
+      return {DummySubsystem1, DummySubsystem2}
+    with self.create_register(global_subsystems=global_subsystems) as backend_package:
+      load_backend(self.build_configuration, backend_package, is_v1_backend=False)
+      self.assertEqual(self.build_configuration.optionables(), set())
+
+      load_backend(self.build_configuration, backend_package, is_v1_backend=True)
+      self.assertEqual(self.build_configuration.optionables(),
+                       {DummySubsystem1, DummySubsystem2})
+
+  def test_rules(self):
     def backend_rules():
       return [example_rule, RootRule(RootType)]
     with self.create_register(rules=backend_rules) as backend_package:
-      load_backend(self.build_configuration, backend_package, v1_register=v1_register)
-      assert self.build_configuration.rules() == [example_rule.rule, RootRule(RootType)]
+      load_backend(self.build_configuration, backend_package, is_v1_backend=True)
+      self.assertEqual(self.build_configuration.rules(), [])
+
+      load_backend(self.build_configuration, backend_package, is_v1_backend=False)
+      self.assertEqual(self.build_configuration.rules(),
+                       [example_rule.rule, RootRule(RootType)])
 
     def plugin_rules():
       return [example_plugin_rule]
 
     self.working_set.add(self.get_mock_plugin('this-plugin-rules', '0.0.1', rules=plugin_rules))
-    self.load_plugins(['this-plugin-rules'], v1_register=v1_register)
-    assert self.build_configuration.rules() == [example_rule.rule, RootRule(RootType), example_plugin_rule.rule]
+    self.load_plugins(['this-plugin-rules'], is_v1_plugin=True)
+    self.assertEqual(self.build_configuration.rules(), [example_rule.rule, RootRule(RootType)])
 
-  def test_backend_plugin_ordering(self, v1_register):
+    self.load_plugins(['this-plugin-rules'], is_v1_plugin=False)
+    self.assertEqual(self.build_configuration.rules(),
+                     [example_rule.rule, RootRule(RootType), example_plugin_rule.rule])
+
+  def test_backend_plugin_ordering(self):
     def reg_alias():
       return BuildFileAliases(targets={'override-alias': DummyTarget2})
     self.working_set.add(self.get_mock_plugin('pluginalias', '0.0.1', alias=reg_alias))
@@ -299,84 +394,9 @@ class TestV1V2Loader(LoaderTestBase):
     aliases = BuildFileAliases(targets={'override-alias': DummyTarget})
     with self.create_register(build_file_aliases=lambda: aliases) as backend_module:
       backends=[backend_module]
-      load_backends_and_plugins(plugins, self.working_set, backends,
-                                self.build_configuration, v1_register=v1_register)
+      load_backends_and_plugins(plugins, [], self.working_set, backends, [],
+                                build_configuration=self.build_configuration)
     # The backend should load first, then the plugins, therefore the alias registered in
     # the plugin will override the alias registered by the backend
     registered_aliases = self.build_configuration.registered_aliases()
-    assert DummyTarget2 == registered_aliases.target_types['override-alias']
-
-
-class TestV1Loader(LoaderTestBase):
-  """Tests for functionality that is expected to differ based on the v1_register option."""
-
-  def test_load_valid_partial_goals(self):
-    def register_goals():
-      Goal.by_name('jack').install(TaskRegistrar('jill', DummyTask))
-
-    with self.create_register(register_goals=register_goals) as backend_package:
-      Goal.clear()
-      assert 0 == len(Goal.all())
-
-      load_backend(self.build_configuration, backend_package, v1_register=True)
-      self.assert_empty_aliases()
-      assert 1 == len(Goal.all())
-
-      task_names = Goal.by_name('jack').ordered_task_names()
-      assert 1 == len(task_names)
-
-      task_name = task_names[0]
-      assert 'jill' == task_name
-
-  def test_plugin_load_and_order(self):
-    d1 = self.get_mock_plugin('demo1', '0.0.1', after=lambda: ['demo2'])
-    d2 = self.get_mock_plugin('demo2', '0.0.3')
-    self.working_set.add(d1)
-
-    # Attempting to load 'demo1' then 'demo2' should fail as 'demo1' requires 'after'=['demo2'].
-    with pytest.raises(PluginLoadOrderError):
-      self.load_plugins(['demo1', 'demo2'], v1_register=True)
-
-    # Attempting to load 'demo2' first should fail as it is not (yet) installed.
-    with pytest.raises(PluginNotFound):
-      self.load_plugins(['demo2', 'demo1'], v1_register=True)
-
-    # Installing demo2 and then loading in correct order should work though.
-    self.working_set.add(d2)
-    self.load_plugins(['demo2>=0.0.2', 'demo1'], v1_register=True)
-
-    # But asking for a bad (not installed) version fails.
-    with pytest.raises(VersionConflict):
-      self.load_plugins(['demo2>=0.0.5'], v1_register=True)
-
-  def test_plugin_installs_goal(self):
-    def reg_goal():
-      Goal.by_name('plugindemo').install(TaskRegistrar('foo', DummyTask))
-    self.working_set.add(self.get_mock_plugin('regdemo', '0.0.1', reg=reg_goal))
-
-    # Start without the custom goal.
-    assert 0 == len(Goal.by_name('plugindemo').ordered_task_names())
-
-    # Load plugin which registers custom goal, but with v1_register=False.
-    self.load_plugins(['regdemo'], v1_register=False)
-
-    # The custom goal isn't registered.
-    assert 0 == len(Goal.by_name('plugindemo').ordered_task_names())
-
-    # Load plugin which registers custom goal, with v1_register=True.
-    self.load_plugins(['regdemo'], v1_register=True)
-
-    # Now the custom goal exists.
-    assert 1 == len(Goal.by_name('plugindemo').ordered_task_names())
-    assert 'foo' == Goal.by_name('plugindemo').ordered_task_names()[0]
-
-  def test_subsystems(self):
-    def global_subsystems():
-      return {DummySubsystem1, DummySubsystem2}
-    with self.create_register(global_subsystems=global_subsystems) as backend_package:
-      # Don't register global subsystems if v1_register=False.
-      load_backend(self.build_configuration, backend_package, v1_register=False)
-      assert self.build_configuration.optionables() == set()
-      # Do register them otherwise.
-      load_backend(self.build_configuration, backend_package, v1_register=True)
-      assert self.build_configuration.optionables() == {DummySubsystem1, DummySubsystem2}
+    self.assertEqual(DummyTarget2, registered_aliases.target_types['override-alias'])

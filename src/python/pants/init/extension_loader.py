@@ -20,22 +20,24 @@ class PluginNotFound(PluginLoadingError): pass
 class PluginLoadOrderError(PluginLoadingError): pass
 
 
-def load_backends_and_plugins(plugins, working_set, backends, build_configuration, v1_register):
+def load_backends_and_plugins(plugins1, plugins2, working_set, backends1, backends2,
+                              build_configuration):
   """Load named plugins and source backends
 
-  :param list<str> plugins: Plugins to load (see `load_plugins`).  Plugins are loaded after
-    backends.
+  :param list<str> plugins1: v1 plugins to load.
+  :param list<str> plugins2: v2 plugins to load.
   :param WorkingSet working_set: A pkg_resources.WorkingSet to load plugins from.
-  :param list<str> backends: Source backends to load (see `load_build_configuration_from_source`).
+  :param list<str> backends1: v1 backends to load.
+  :param list<str> backends2: v2 backends to load.
   :param BuildConfiguration build_configuration: The BuildConfiguration (for adding aliases).
-  :param bool v1_register: Whether to register v1 tasks.
   """
-  load_build_configuration_from_source(build_configuration, backends, v1_register)
-  load_plugins(build_configuration, plugins or [], working_set, v1_register)
+  load_build_configuration_from_source(build_configuration, backends1, backends2)
+  load_plugins(build_configuration, plugins1, working_set, is_v1_plugin=True)
+  load_plugins(build_configuration, plugins2, working_set, is_v1_plugin=False)
   return build_configuration
 
 
-def load_plugins(build_configuration, plugins, working_set, v1_register):
+def load_plugins(build_configuration, plugins, working_set, is_v1_plugin):
   """Load named plugins from the current working_set into the supplied build_configuration
 
   "Loading" a plugin here refers to calling registration methods -- it is assumed each plugin
@@ -58,10 +60,10 @@ def load_plugins(build_configuration, plugins, working_set, v1_register):
   :param list<str> plugins: A list of plugin names optionally with versions, in requirement format.
                             eg ['widgetpublish', 'widgetgen==1.2'].
   :param WorkingSet working_set: A pkg_resources.WorkingSet to load plugins from.
-  :param bool v1_register: Whether to register v1 tasks.
+  :param bool is_v1_plugin: Whether this is a v1 or v2 plugin.
   """
   loaded = {}
-  for plugin in plugins:
+  for plugin in plugins or []:
     req = Requirement.parse(plugin)
     dist = working_set.find(req)
 
@@ -70,15 +72,14 @@ def load_plugins(build_configuration, plugins, working_set, v1_register):
 
     entries = dist.get_entry_map().get('pantsbuild.plugin', {})
 
-    if v1_register:
-      # TODO: Might v2 plugins care about registration order? Hopefully not.
-      if 'load_after' in entries:
-        deps = entries['load_after'].load()()
-        for dep_name in deps:
-          dep = Requirement.parse(dep_name)
-          if dep.key not in loaded:
-            raise PluginLoadOrderError(f'Plugin {plugin} must be loaded after {dep}')
+    if 'load_after' in entries:
+      deps = entries['load_after'].load()()
+      for dep_name in deps:
+        dep = Requirement.parse(dep_name)
+        if dep.key not in loaded:
+          raise PluginLoadOrderError(f'Plugin {plugin} must be loaded after {dep}')
 
+    if is_v1_plugin:
       if 'register_goals' in entries:
         entries['register_goals'].load()()
 
@@ -87,46 +88,51 @@ def load_plugins(build_configuration, plugins, working_set, v1_register):
         subsystems = entries['global_subsystems'].load()()
         build_configuration.register_optionables(subsystems)
 
-    if 'build_file_aliases' in entries:
-      aliases = entries['build_file_aliases'].load()()
-      build_configuration.register_aliases(aliases)
-
-    if 'rules' in entries:
-      rules = entries['rules'].load()()
-      build_configuration.register_rules(rules)
-
+      # The v2 target API is still TBD, so we keep build_file_aliases as a v1-only thing.
+      # Having thus no overlap between v1 and v2 backend entrypoints makes things much simpler.
+      # TODO: Revisit, ideally with a v2-only entry point, once the v2 target API is a thing.
+      if 'build_file_aliases' in entries:
+        aliases = entries['build_file_aliases'].load()()
+        build_configuration.register_aliases(aliases)
+    else:
+      if 'rules' in entries:
+        rules = entries['rules'].load()()
+        build_configuration.register_rules(rules)
     loaded[dist.as_requirement().key] = dist
 
 
-def load_build_configuration_from_source(build_configuration, backends, v1_register):
+def load_build_configuration_from_source(build_configuration, backends1, backends2):
   """Installs pants backend packages to provide BUILD file symbols and cli goals.
 
   :param BuildConfiguration build_configuration: The BuildConfiguration (for adding aliases).
-  :param backends: An list of packages to load backends from.
-  :param v1_register: Whether to register v1 tasks.
+  :param backends1: An list of packages to load v1 backends from.
+  :param backends2: An list of packages to load v2 backends from.
   :raises: :class:``pants.base.exceptions.BuildConfigurationError`` if there is a problem loading
     the build configuration.
   """
   # pants.build_graph and pants.core_task must always be loaded, and before any other backends.
-  # TODO: Consider replacing the "backend" nomenclature here. pants.build_graph and
-  # pants.core_tasks aren't really backends.
-  backend_packages = OrderedSet([
+  backend_packages1 = OrderedSet([
       'pants.build_graph',
       'pants.core_tasks',
+    ] + (backends1 or []))
+  for backend_package in backend_packages1:
+    load_backend(build_configuration, backend_package, is_v1_backend=True)
+
+  backend_packages2 = OrderedSet([
       'pants.rules.core',
-    ] + (backends or []))
-  for backend_package in backend_packages:
-    load_backend(build_configuration, backend_package, v1_register)
+    ] + (backends2 or []))
+  for backend_package in backend_packages2:
+    load_backend(build_configuration, backend_package, is_v1_backend=False)
 
 
 def load_backend(build_configuration: BuildConfiguration, backend_package: str,
-                 v1_register: bool) -> None:
+                 is_v1_backend: bool) -> None:
   """Installs the given backend package into the build configuration.
 
   :param build_configuration: the BuildConfiguration to install the backend plugin into.
   :param backend_package: the package name containing the backend plugin register module that
     provides the plugin entrypoints.
-  :param bool v1_register: Whether to register v1 tasks.
+  :param bool is_v1_backend: Is this a v1 or v2 backend.
   :raises: :class:``pants.base.exceptions.BuildConfigurationError`` if there is a problem loading
     the build configuration."""
   backend_module = backend_package + '.register'
@@ -146,7 +152,7 @@ def load_backend(build_configuration: BuildConfiguration, backend_package: str,
         f'Entrypoint {name} in {backend_module} must be a zero-arg callable: {e!r}'
       )
 
-  if v1_register:
+  if is_v1_backend:
     invoke_entrypoint('register_goals')
 
     # TODO: Might v2 plugins need to register global subsystems? Hopefully not.
@@ -154,10 +160,13 @@ def load_backend(build_configuration: BuildConfiguration, backend_package: str,
     if subsystems:
       build_configuration.register_optionables(subsystems)
 
-  build_file_aliases = invoke_entrypoint('build_file_aliases')
-  if build_file_aliases:
-    build_configuration.register_aliases(build_file_aliases)
-
-  rules = invoke_entrypoint('rules')
-  if rules:
-    build_configuration.register_rules(rules)
+    # The v2 target API is still TBD, so we keep build_file_aliases as a v1-only thing.
+    # Having thus no overlap between v1 and v2 backend entrypoints makes things much simpler.
+    # TODO: Revisit, ideally with a v2-only entry point, once the v2 target API is a thing.
+    build_file_aliases = invoke_entrypoint('build_file_aliases')
+    if build_file_aliases:
+      build_configuration.register_aliases(build_file_aliases)
+  else:
+    rules = invoke_entrypoint('rules')
+    if rules:
+      build_configuration.register_rules(rules)
