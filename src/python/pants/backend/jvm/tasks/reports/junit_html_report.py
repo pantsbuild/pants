@@ -112,7 +112,7 @@ class ReportTestSuite:
   def success_rate(test_count, error_count, failure_count, skipped_count):
     if test_count:
       unsuccessful_count = error_count + failure_count + skipped_count
-      return f'{((test_count - unsuccessful_count) * 100.0 / test_count):.2f}%'
+      return f'{(test_count - unsuccessful_count) * 100.0 / test_count:.2f}%'
     return '0.00%'
 
   @staticmethod

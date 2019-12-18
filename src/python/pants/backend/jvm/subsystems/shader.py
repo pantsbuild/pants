@@ -40,7 +40,7 @@ class RelocateRule(namedtuple('Rule', ['from_pattern', 'to_pattern'])):
     last = 0
     for i, match in enumerate(cls._wildcard_pattern.finditer(from_pattern)):
       yield from_pattern[last:match.start()]
-      yield f'@{(i + 1)}'
+      yield f'@{i + 1}'
       last = match.end()
     yield from_pattern[last:]
 
@@ -212,7 +212,7 @@ class Shading:
 
   @classmethod
   def _format_package_glob(cls, package_name, recursive=True):
-    return f"{package_name}.{('**' if recursive else '*')}"
+    return f"{package_name}.{'**' if recursive else '*'}"
 
 
 class Shader:

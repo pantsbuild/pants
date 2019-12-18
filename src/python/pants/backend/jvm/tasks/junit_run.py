@@ -366,7 +366,7 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       for target in failed_targets:
         error_message_lines.append(f"\n{(' ' * 4)}{render_owning_target(target)}")
         for test in sorted(target_to_failed_test[target]):
-          error_message_lines.append(f"{(' ' * 8)}{test.classname}#{test.methodname}")
+          error_message_lines.append(f"{' ' * 8}{test.classname}#{test.methodname}")
     error_message_lines.append(
       '\njava {main} ... exited non-zero ({code}); {failed} failed {targets}.'
         .format(main=JUnit.RUNNER_MAIN, code=result, failed=len(failed_targets),

@@ -410,7 +410,7 @@ class CoursierMixin(JvmResolverBase):
       for ex in jar.excludes:
         # `--` means exclude. See --local-exclude-file in `coursier fetch --help`
         # If ex.name does not exist, that means the whole org needs to be excluded.
-        ex_arg = f"{jar.org}:{jar.name}--{ex.org}:{(ex.name or '*')}"
+        ex_arg = f"{jar.org}:{jar.name}--{ex.org}:{ex.name or '*'}"
         local_exclude_args.append(ex_arg)
 
     if local_exclude_args:
@@ -424,7 +424,7 @@ class CoursierMixin(JvmResolverBase):
 
     for ex in global_excludes:
       cmd_args.append('-E')
-      cmd_args.append(f"{ex.org}:{(ex.name or '*')}")
+      cmd_args.append(f"{ex.org}:{ex.name or '*'}")
 
     return cmd_args
 

@@ -198,7 +198,7 @@ class ClasspathProducts:
     classpath_entries = []
     for jar in resolved_jars:
       if not jar.pants_path:
-        raise TaskError(f'Jar: {jar.coordinate!s} has no specified path.')
+        raise TaskError(f'Jar: {jar.coordinate} has no specified path.')
       cp_entry = ArtifactClasspathEntry(jar.pants_path, jar.coordinate, jar.cache_path, jar.directory_digest)
       classpath_entries.append((conf, cp_entry))
 
