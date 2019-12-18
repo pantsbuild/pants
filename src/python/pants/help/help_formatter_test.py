@@ -15,27 +15,30 @@ class OptionHelpFormatterTest(unittest.TestCase):
                          deprecated_message=None, removal_version=None, removal_hint=None,
                          choices=None)
     ohi = ohi._replace(**kwargs)
-    lines = HelpFormatter(scope='', show_recursive=False, show_advanced=False,
-                          color=False).format_option(ohi)
-    self.assertEqual(len(lines), 2)
-    self.assertIn('help for foo', lines[1])
+    lines = HelpFormatter(
+      scope='', show_recursive=False, show_advanced=False, color=False
+    ).format_option(ohi)
+    assert len(lines) == 2
+    assert 'help for foo' in lines[1]
     return lines[0]
 
   def test_format_help(self):
     line = self.format_help_for_foo(default='MYDEFAULT')
-    self.assertEqual('--foo (default: MYDEFAULT)', line)
+    assert line.lstrip() == '--foo (default: MYDEFAULT)'
 
   def test_suppress_advanced(self):
     args = ['--foo']
     kwargs = {'advanced': True}
-    lines = HelpFormatter(scope='', show_recursive=False, show_advanced=False,
-                          color=False).format_options('', '', [(args, kwargs)])
-    self.assertEqual(0, len(lines))
-    lines = HelpFormatter(scope='', show_recursive=True, show_advanced=True,
-                          color=False).format_options('', '', [(args, kwargs)])
-    print(lines)
-    self.assertEqual(5, len(lines))
+    lines = HelpFormatter(
+      scope='', show_recursive=False, show_advanced=False, color=False
+    ).format_options(scope='', description='', option_registrations_iter=[(args, kwargs)])
+    assert len(lines) == 5
+    assert not any("--foo" in line for line in lines)
+    lines = HelpFormatter(
+      scope='', show_recursive=True, show_advanced=True, color=False
+    ).format_options(scope='', description='', option_registrations_iter=[(args, kwargs)])
+    assert len(lines) == 14
 
   def test_format_help_choices(self):
     line = self.format_help_for_foo(typ=str, default='kiwi', choices='apple, banana, kiwi')
-    self.assertEqual('--foo (one of: [apple, banana, kiwi] default: kiwi)', line)
+    assert line.lstrip() == '--foo (one of: [apple, banana, kiwi] default: kiwi)'
