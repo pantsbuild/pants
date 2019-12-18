@@ -4,6 +4,7 @@
 python_library(
   dependencies = [
     '3rdparty/python:dataclasses',
+    'src/python/pants:version',
     'src/python/pants/base:build_root',
     'src/python/pants/base:exiter',
     'src/python/pants/build_graph',
@@ -26,6 +27,7 @@ python_tests(
   sources=globs('*_test.py', exclude=[globs('*_integration_test.py')]),
   dependencies = [
     ':core',
+    'src/python/pants:version',
     'src/python/pants/backend/codegen/thrift/java',
     'src/python/pants/backend/jvm/targets:all',
     'src/python/pants/backend/python/targets',
