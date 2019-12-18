@@ -55,9 +55,6 @@ class TestResolveRequirements(TestBase):
       entry_point=None,
       interpreter_constraints=PexInterpreterConstraints(),
       input_files: Digest = None) -> (Dict, List[str]):
-    def hashify_optional_collection(iterable):
-      return tuple(sorted(iterable)) if iterable is not None else tuple()
-
     request = CreatePex(
       output_filename="test.pex",
       requirements=requirements,
