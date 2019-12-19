@@ -40,7 +40,7 @@ class JarDependencyParseContextWrapper:
     """
     self._parse_context = parse_context
 
-  def __call__(self, org, name, rev=None, force=False, ext=None, url=None, apidocs=None,
+  def __call__(self, org, name, rev=None, force=True, ext=None, url=None, apidocs=None,
               classifier=None, mutable=None, intransitive=False, excludes=None):
     """
     :param string org: The Maven ``groupId`` of this dependency.
@@ -102,7 +102,7 @@ class JarDependency:
     org: str,
     name: str,
     rev: Optional[str] = None,
-    force: bool = False,
+    force: bool = True,
     ext: Optional[str] = None,
     url: Optional[str] = None,
     apidocs: Optional[str] = None,
