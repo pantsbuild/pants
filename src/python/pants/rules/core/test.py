@@ -70,9 +70,8 @@ async def fast_test(console: Console, options: TestOptions, addresses: BuildFile
     address = await Get[BuildFileAddress](Specs(dependencies=dependencies))
     result = await Get[AddressAndDebugResult](Address, address.to_address())
     return Test(result.test_result.exit_code)
-  else:
-    results = await MultiGet(Get(AddressAndTestResult, Address, addr.to_address()) for addr in addresses)
 
+  results = await MultiGet(Get[AddressAndTestResult](Address, addr.to_address()) for addr in addresses)
   did_any_fail = False
   filtered_results = [(x.address, x.test_result) for x in results if x.test_result is not None]
 
