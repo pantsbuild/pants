@@ -56,7 +56,7 @@ class CompilerOptionSetsMixin:
     # If no option sets are provided, use the default value.
     if not compiler_option_sets:
       compiler_option_sets = self.get_options().default_compiler_option_sets
-      logger.debug('using default option sets: {}'.format(compiler_option_sets))
+      logger.debug(f'using default option sets: {compiler_option_sets}')
 
     compiler_options = []
 

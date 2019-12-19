@@ -117,7 +117,7 @@ class OptionsBootstrapper:
         if len(arg) == 2:
           short_flags.add(arg)
         elif kwargs.get('type') == bool:
-          flags.add('--no-{}'.format(arg[2:]))
+          flags.add(f'--no-{arg[2:]}')
 
     GlobalOptionsRegistrar.register_bootstrap_options(capture_the_flags)
 
@@ -226,14 +226,14 @@ class OptionsBootstrapper:
           valid_options_under_scope = set(options.for_scope(scope))
         # Only catch ConfigValidationError. Other exceptions will be raised directly.
         except Config.ConfigValidationError:
-          error_log.append("Invalid scope [{}] in {}".format(section, config.configpath))
+          error_log.append(f"Invalid scope [{section}] in {config.configpath}")
         else:
           # All the options specified under [`section`] in `config` excluding bootstrap defaults.
           all_options_under_scope = (set(config.configparser.options(section)) -
                                      set(config.configparser.defaults()))
           for option in all_options_under_scope:
             if option not in valid_options_under_scope:
-              error_log.append("Invalid option '{}' under [{}] in {}".format(option, section, config.configpath))
+              error_log.append(f"Invalid option '{option}' under [{section}] in {config.configpath}")
 
     if error_log:
       for error in error_log:
