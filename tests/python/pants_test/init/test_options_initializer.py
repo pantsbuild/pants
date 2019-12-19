@@ -11,7 +11,8 @@ from pants.option.options_bootstrapper import OptionsBootstrapper
 
 class OptionsInitializerTest(unittest.TestCase):
   def test_invalid_version(self):
-    options_bootstrapper = OptionsBootstrapper.create(args=['--backend-packages=[]', '--pants-version=99.99.9999'])
+    options_bootstrapper = OptionsBootstrapper.create(
+      args=['--backend-packages=[]', '--backend-packages2=[]', '--pants-version=99.99.9999'])
     build_config = BuildConfigInitializer.get(options_bootstrapper)
 
     with self.assertRaises(BuildConfigurationError):
@@ -19,7 +20,8 @@ class OptionsInitializerTest(unittest.TestCase):
 
   def test_global_options_validation(self):
     # Specify an invalid combination of options.
-    ob = OptionsBootstrapper.create(args=['--backend-packages=[]', '--loop', '--v1'])
+    ob = OptionsBootstrapper.create(
+      args=['--backend-packages=[]', '--backend-packages2=[]', '--loop', '--v1'])
     build_config = BuildConfigInitializer.get(ob)
     with self.assertRaises(OptionsError) as exc:
       OptionsInitializer.create(ob, build_config)
