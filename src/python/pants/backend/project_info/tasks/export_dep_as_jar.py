@@ -184,11 +184,6 @@ class ExportDepAsJar(ConsoleTask):
     if isinstance(current_target, JarLibrary):
       target_libraries = OrderedSet(iter_transitive_jars(current_target))
     for dep in current_target.dependencies:
-      if isinstance(dep, JarLibrary):
-        for jar in dep.jar_dependencies:
-          target_libraries.add(M2Coordinate(jar.org, jar.name, jar.rev))
-        # Add all the jars pulled in by this jar_library
-        target_libraries.update(iter_transitive_jars(dep))
       if dep in modulizable_target_set:
         info['targets'].append(dep.address.spec)
 
@@ -205,17 +200,29 @@ class ExportDepAsJar(ConsoleTask):
     if runtime_classpath:
       info['libraries'].extend(self._jar_id(lib) for lib in target_libraries)
 
-    def _libraries_to_include(t):
+    def _full_library_set_for_dep(dep):
+      """
+      Get the full library set for a dependency, including jar dependencies and jars of the library itself.
+      """
+      libraries = {dep.id}
+      if isinstance(dep, JarLibrary):
+        for jar in dep.jar_dependencies:
+          libraries.add(self._jar_id(M2Coordinate(jar.org, jar.name, jar.rev)))
+        # Add all the jars pulled in by this jar_library
+        libraries.update(iter_transitive_jars(dep))
+      return libraries
+
+    def _libraries_to_include_from_dependencies(t):
       libraries_to_include = set([])
       self.context.build_graph.walk_transitive_dependency_graph(
         [direct_dep.address for direct_dep in t.dependencies],
         # NB: Dependency graph between modulizable targets is represented with modules,
         #     so we don't need to expand those branches of the tree.
         predicate=lambda dep: dep not in modulizable_target_set,
-        work=lambda dep: libraries_to_include.add(dep.id),
+        work=lambda dep: libraries_to_include.update(_full_library_set_for_dep(dep)),
       )
       return libraries_to_include
-    info['libraries'].extend(_libraries_to_include(current_target))
+    info['libraries'].extend(_libraries_to_include_from_dependencies(current_target))
 
     if current_target in target_roots_set:
       info['roots'] = [{

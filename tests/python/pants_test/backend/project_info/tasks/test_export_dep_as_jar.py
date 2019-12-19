@@ -244,19 +244,24 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
       'project_info:scala_with_source_dep',
       target_type=ScalaLibrary,
       dependencies=[self.jvm_target_with_sources],
-      sources=[]
+      sources=[],
     )
 
-    # A build graph where a -(depends on)-> b -> ... -> e
-    self.linear_build_graph = {}
-    last_target = None
-    for letter in reversed(['a', 'b', 'c', 'd', 'e']):
-      last_target = self.make_target(
-        f'project_info:{letter}',
-        target_type=ScalaLibrary,
-        dependencies=[] if last_target is None else [last_target]
-      )
-      self.linear_build_graph[letter] = last_target
+    def _make_linear_graph(names, **additional_target_args):
+      # A build graph where a -(depends on)-> b -> ... -> e
+      graph = {}
+      last_target = None
+      for name in reversed(names):
+        last_target = self.make_target(
+          f'project_info:{name}',
+          target_type=ScalaLibrary,
+          dependencies=[] if last_target is None else [last_target],
+          **additional_target_args,
+        )
+        graph[name] = last_target
+      return graph
+
+    self.linear_build_graph = _make_linear_graph(['a', 'b', 'c', 'd', 'e'])
 
   def create_runtime_classpath_for_targets(self, target):
     def path_to_zjar_with_workdir(address: Address):
@@ -615,4 +620,12 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
         '.scala-library',
       ]),
       sorted(result_ab['targets'][b_spec]['libraries'])
+    )
+
+  def test_imports_3rdparty_jars_from_transitive_dependencies(self):
+    spec = self.scala_with_source_dep.address.spec
+    result = self.execute_export_json(spec)
+    self.assertIn(
+      'org.apache:apache-jar:12.12.2012',
+      result['targets'][spec]['libraries']
     )
