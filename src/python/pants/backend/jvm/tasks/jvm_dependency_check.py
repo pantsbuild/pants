@@ -239,7 +239,7 @@ class JvmDependencyCheck(Task):
     flat_replacements = {r for replacements in replacement_deps.values() for r in replacements}
     replacements_msg = ''
     if flat_replacements:
-      replacements_msg = 'Suggested replacements:\n  {}\n'.format(joined_dep_msg(flat_replacements))
+      replacements_msg = f'Suggested replacements:\n  {joined_dep_msg(flat_replacements)}\n'
     unused_msg = (
         'unnecessary BUILD dependencies:\n  {}\n{}'
         '(If you\'re seeing this message in error, you might need to '
@@ -248,7 +248,7 @@ class JvmDependencyCheck(Task):
           replacements_msg,
         )
       )
-    log_fn('Target {} had {}'.format(target.address.spec, unused_msg))
+    log_fn(f'Target {target.address.spec} had {unused_msg}')
     return True
 
   def _compute_unnecessary_deps(self, target, actual_deps):

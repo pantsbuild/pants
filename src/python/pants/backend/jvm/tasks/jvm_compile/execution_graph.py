@@ -104,7 +104,7 @@ class ExecutionFailure(Exception):
 
   def __init__(self, message, cause=None):
     if cause:
-      message = "{}: {}".format(message, str(cause))
+      message = f"{message}: {str(cause)}"
     super().__init__(message)
     self.cause = cause
 
@@ -113,7 +113,7 @@ class UnexecutableGraphError(Exception):
   """Base exception class for errors that make an ExecutionGraph not executable"""
 
   def __init__(self, msg):
-    super().__init__("Unexecutable graph: {}".format(msg))
+    super().__init__(f"Unexecutable graph: {msg}")
 
 
 class NoRootJobError(UnexecutableGraphError):
@@ -130,8 +130,7 @@ class UnknownJobError(UnexecutableGraphError):
 
 class JobExistsError(UnexecutableGraphError):
   def __init__(self, key):
-    super().__init__("Job already scheduled {!r}"
-                                          .format(key))
+    super().__init__(f"Job already scheduled {key!r}")
 
 
 class ThreadSafeCounter:
@@ -189,7 +188,7 @@ class ExecutionGraph:
       if dependees:
         return "{} <- {{\n  {}\n}}".format(key, ',\n  '.join(dependees))
       else:
-        return "{} <- {{}}".format(key)
+        return f"{key} <- {{}}"
     return "\n".join([
       entry(key)
       for key in self._job_keys_as_scheduled
@@ -323,7 +322,7 @@ class ExecutionGraph:
             finished_job.run_success_callback()
           except Exception as e:
             log.debug(traceback.format_exc())
-            raise ExecutionFailure("Error in on_success for {}".format(finished_key), e)
+            raise ExecutionFailure(f"Error in on_success for {finished_key}", e)
 
           ready_dependees = []
           for dependee in direct_dependees:
@@ -337,7 +336,7 @@ class ExecutionGraph:
             finished_job.run_failure_callback()
           except Exception as e:
             log.debug(traceback.format_exc())
-            raise ExecutionFailure("Error in on_failure for {}".format(finished_key), e)
+            raise ExecutionFailure(f"Error in on_failure for {finished_key}", e)
 
           # Propagate failures downstream.
           for dependee in direct_dependees:
@@ -348,7 +347,7 @@ class ExecutionGraph:
         # Log success or failure for this job.
         if result_status is FAILED:
           exception, tb = value
-          log.error("{} failed: {} in {}".format(finished_key, exception, finished_job.duration))
+          log.error(f"{finished_key} failed: {exception} in {finished_job.duration}")
           if self._print_stack_trace:
             log.error('Traceback:\n{}'.format('\n'.join(tb)))
         else:
@@ -364,7 +363,7 @@ class ExecutionGraph:
       raise ExecutionFailure("Error running job", e)
 
     if status_table.has_failures():
-      raise ExecutionFailure("Failed jobs: {}".format(', '.join(status_table.failed_keys())))
+      raise ExecutionFailure(f"Failed jobs: {', '.join(status_table.failed_keys())}")
 
   def log_progress(self, log, status_table):
     running_jobs = sorted(i for (i, s) in status_table.unfinished_items() if s is RUNNING)

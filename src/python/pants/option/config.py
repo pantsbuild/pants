@@ -142,7 +142,7 @@ class Config(ABC):
     if type_ == str or issubclass(type_, str):
       return raw_value
 
-    key = '{}.{}'.format(section, option)
+    key = f'{section}.{option}'
     return parse_expression(name=key, val=raw_value, acceptable_types=type_,
                             raise_type=self.ConfigError)
 

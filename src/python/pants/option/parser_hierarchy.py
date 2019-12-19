@@ -17,7 +17,7 @@ _empty_scope_component_re = re.compile(r'\.\.')
 def _validate_full_scope(scope):
   if _empty_scope_component_re.search(scope):
     raise InvalidScopeError(
-      "full scope '{}' has at least one empty component".format(scope))
+      f"full scope '{scope}' has at least one empty component")
 
 
 def enclosing_scope(scope):
@@ -67,7 +67,7 @@ class ParserHierarchy:
     try:
       return self._parser_by_scope[scope]
     except KeyError:
-      raise Config.ConfigValidationError('No such options scope: {}'.format(scope))
+      raise Config.ConfigValidationError(f'No such options scope: {scope}')
 
   def walk(self, callback):
     """Invoke callback on each parser, in pre-order depth-first order."""

@@ -101,7 +101,7 @@ class Properties:
 
     def write(out):
       for k, v in props.items():
-        out.write('%s=%s\n' % (escape(str(k)), escape(str(v))))
+        out.write(f'{escape(str(k))}={escape(str(v))}\n')
 
     if hasattr(output, 'write') and callable(output.write):
       write(output)
@@ -109,4 +109,4 @@ class Properties:
       with open(output, 'w+') as out:
         write(out)
     else:
-      raise TypeError('Can only dump data to a path or a writable object, given: %s' % output)
+      raise TypeError(f'Can only dump data to a path or a writable object, given: {output}')

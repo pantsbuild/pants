@@ -94,7 +94,7 @@ class OptionsFingerprinter:
   def _fingerprint_target_specs(self, specs):
     """Returns a fingerprint of the targets resolved from given target specs."""
     assert self._build_graph is not None, (
-      'cannot fingerprint specs `{}` without a `BuildGraph`'.format(specs)
+      f'cannot fingerprint specs `{specs}` without a `BuildGraph`'
     )
     hasher = sha1()
     for spec in sorted(specs):

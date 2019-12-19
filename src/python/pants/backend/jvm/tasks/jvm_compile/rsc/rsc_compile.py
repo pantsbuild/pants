@@ -64,16 +64,16 @@ def _create_desandboxify_fn(possible_path_patterns):
   # if it finds a matching prefix, strips the path prior to the prefix and returns it
   # if it doesn't it returns the original path
   # TODO remove this after https://github.com/scalameta/scalameta/issues/1791 is released
-  regexes = [re.compile('/({})'.format(p)) for p in possible_path_patterns]
+  regexes = [re.compile(f'/({p})') for p in possible_path_patterns]
   def desandboxify(path):
     if not path:
       return path
     for r in regexes:
       match = r.search(path)
       if match:
-        logger.debug('path-cleanup: matched {} with {} against {}'.format(match, r.pattern, path))
+        logger.debug(f'path-cleanup: matched {match} with {r.pattern} against {path}')
         return match.group(1)
-    logger.debug('path-cleanup: no match for {}'.format(path))
+    logger.debug(f'path-cleanup: no match for {path}')
     return path
   return desandboxify
 
@@ -158,9 +158,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
   @memoized_property
   def _compiler_tags(self):
     return {
-      '{prefix}:{workflow_name}'.format(
-        prefix=self.get_options().force_compiler_tag_prefix,
-        workflow_name=workflow.value): workflow
+      f'{self.get_options().force_compiler_tag_prefix}:{workflow.value}': workflow
       for workflow in self.JvmCompileWorkflowType.all_values()
     }
 
@@ -357,21 +355,21 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     })()
 
   def _rsc_key_for_target(self, target):
-    return 'rsc({})'.format(target.address.spec)
+    return f'rsc({target.address.spec})'
 
   def _outline_key_for_target(self, target):
-    return 'outline({})'.format(target.address.spec)
+    return f'outline({target.address.spec})'
 
   def _zinc_key_for_target(self, target, workflow):
     return workflow.match({
-      self.JvmCompileWorkflowType.zinc_only: lambda: 'zinc[zinc-only]({})'.format(target.address.spec),
-      self.JvmCompileWorkflowType.zinc_java: lambda: 'zinc[zinc-java]({})'.format(target.address.spec),
-      self.JvmCompileWorkflowType.rsc_and_zinc: lambda: 'zinc[rsc-and-zinc]({})'.format(target.address.spec),
-      self.JvmCompileWorkflowType.outline_and_zinc: lambda: 'zinc[outline-and-zinc]({})'.format(target.address.spec),
+      self.JvmCompileWorkflowType.zinc_only: lambda: f'zinc[zinc-only]({target.address.spec})',
+      self.JvmCompileWorkflowType.zinc_java: lambda: f'zinc[zinc-java]({target.address.spec})',
+      self.JvmCompileWorkflowType.rsc_and_zinc: lambda: f'zinc[rsc-and-zinc]({target.address.spec})',
+      self.JvmCompileWorkflowType.outline_and_zinc: lambda: f'zinc[outline-and-zinc]({target.address.spec})',
     })()
 
   def _write_to_cache_key_for_target(self, target):
-    return 'write_to_cache({})'.format(target.address.spec)
+    return f'write_to_cache({target.address.spec})'
 
   def create_compile_jobs(self,
                           compile_target,
@@ -397,13 +395,13 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       # If we didn't hit the cache in the cache job, run rsc.
       if not vts.valid:
         counter_val = str(counter()).rjust(counter.format_length(), ' ')
-        counter_str = '[{}/{}] '.format(counter_val, counter.size)
+        counter_str = f'[{counter_val}/{counter.size}] '
         action_str = 'Outlining ' if use_youtline else 'Rsc-ing '
 
         self.context.log.info(
           counter_str,
           action_str,
-          items_to_report_element(ctx.sources, '{} source'.format(self.name())),
+          items_to_report_element(ctx.sources, f'{self.name()} source'),
           ' in ',
           items_to_report_element([t.address.reference() for t in vts.targets], 'target'),
           ' (',
@@ -758,7 +756,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         ),
       ])
 
-    cmd = initial_args + ['@{}'.format(argfile_snapshot.files[0])]
+    cmd = initial_args + [f'@{argfile_snapshot.files[0]}']
 
     pathglobs = list(tool_classpath)
 
@@ -781,7 +779,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       output_files=(fast_relpath(ctx.rsc_jar_file.path, get_buildroot()),),
       output_directories=tuple(),
       timeout_seconds=15*60,
-      description='run {} for {}'.format(tool_name, ctx.target),
+      description=f'run {tool_name} for {ctx.target}',
       # TODO: These should always be unicodes
       # Since this is always hermetic, we need to use `underlying.home` because
       # ExecuteProcessRequest requires an existing, local jdk location.
@@ -817,14 +815,14 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       classpath=classpath,
       main=main,
       jvm_options=self.get_options().jvm_options,
-      args=['@{}'.format(ctx.args_file)],
+      args=[f'@{ctx.args_file}'],
       workunit_name=tool_name,
       workunit_labels=[WorkUnitLabel.COMPILER],
       dist=distribution,
       force_subprocess=use_youtline
     )
     if result != 0:
-      raise TaskError('Running {} failed'.format(tool_name))
+      raise TaskError(f'Running {tool_name} failed')
     runjava_workunit = None
     for c in parent_workunit.children:
       if c.name is tool_name:
@@ -868,7 +866,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     jvm_options = []
 
     if self.javac_classpath():
-      jvm_options.extend(['-Xbootclasspath/p:{}'.format(':'.join(self.javac_classpath()))])
+      jvm_options.extend([f"-Xbootclasspath/p:{':'.join(self.javac_classpath())}"])
 
     jvm_options.extend(self._jvm_options)
 

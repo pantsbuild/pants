@@ -37,10 +37,10 @@ def safe_args(args,
   max_args = max_args or options.max_subprocess_args
   if len(args) > max_args:
     def create_argfile(f):
-      logger.debug('Creating argfile {} with contents {}'.format(f.name, ' '.join(args)))
+      logger.debug(f"Creating argfile {f.name} with contents {' '.join(args)}")
       f.write(delimiter.join(args))
       f.close()
-      return [quoter(f.name) if quoter else '@{}'.format(f.name)]
+      return [quoter(f.name) if quoter else f'@{f.name}']
 
     if argfile:
       try:

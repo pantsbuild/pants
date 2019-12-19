@@ -168,7 +168,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
         xml_path = xml_path[:-4] + "-empty.xml"
         make_empty_report(xml_path, org, name, conf)
       out = os.path.join(self._outdir,
-                         '{org}-{name}-{conf}.html'.format(org=org, name=name, conf=conf))
+                         f'{org}-{name}-{conf}.html')
       args = ['-IN', xml_path, '-XSL', xsl, '-OUT', out]
 
       # The ivy-report.xsl genrates tab links to files with extension 'xml' by default, we

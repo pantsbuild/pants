@@ -20,8 +20,8 @@ def main() -> None:
       # error.
       "--tag=type_checked,partially_type_checked",
       "--backend-packages=pants.contrib.mypy",
+      "--mypy-config=build-support/mypy/mypy.ini",
       "lint",
-      "--lint-mypy-config-file=build-support/mypy/mypy.ini",
       *globs,
     ], check=True)
   except subprocess.CalledProcessError:

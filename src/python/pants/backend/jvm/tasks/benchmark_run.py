@@ -98,4 +98,4 @@ class BenchmarkRun(JvmToolTaskMixin, JvmTask):
                              executor=java_executor,
                              create_synthetic_jar=self.synthetic_classpath)
     if exit_code != 0:
-      raise TaskError('java {} ... exited non-zero ({})'.format(self._CALIPER_MAIN, exit_code))
+      raise TaskError(f'java {self._CALIPER_MAIN} ... exited non-zero ({exit_code})')

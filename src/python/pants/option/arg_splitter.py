@@ -102,7 +102,7 @@ class ArgSplitter:
                                 key=lambda si: si.scope, reverse=True)
 
     # List of pairs (prefix, ScopeInfo).
-    self._known_scoping_prefixes = [('{0}-'.format(si.scope.replace('.', '-')), si)
+    self._known_scoping_prefixes = [(f"{si.scope.replace('.', '-')}-", si)
                                     for si in sorted_scope_infos]
 
   @property
@@ -251,7 +251,7 @@ class ArgSplitter:
             # Note that this means that we can't set a task option on the cmd-line if its
             # name happens to start with a subsystem scope.
             # TODO: Either fix this or at least detect such options and warn.
-            task_subsystem_scope = '{}.{}'.format(scope_info.scope, default_scope)
+            task_subsystem_scope = f'{scope_info.scope}.{default_scope}'
             if task_subsystem_scope in self._known_scopes:  # Such a task subsystem actually exists.
               scope = task_subsystem_scope
           return scope, flag_prefix + flag[len(prefix):]

@@ -70,7 +70,7 @@ class JvmRun(JvmTask):
       working_dir = self.get_options().cwd
       if not working_dir:
         working_dir = target.address.spec_path
-    logger.debug("Working dir is {0}".format(working_dir))
+    logger.debug(f"Working dir is {working_dir}")
 
     if isinstance(target, JvmApp):
       binary = target.binary
@@ -106,5 +106,5 @@ class JvmRun(JvmTask):
         with safe_open(expand_path(self.only_write_cmd_line), 'w') as outfile:
           outfile.write(' '.join(executor.cmd))
       elif result != 0:
-        raise TaskError('java {} ... exited non-zero ({})'.format(binary.main, result),
+        raise TaskError(f'java {binary.main} ... exited non-zero ({result})',
                         exit_code=result)
