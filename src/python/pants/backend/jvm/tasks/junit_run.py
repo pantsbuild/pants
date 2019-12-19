@@ -277,7 +277,7 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
 
       batch_output_dir = output_dir
       if self._batched:
-        batch_output_dir = os.path.join(batch_output_dir, 'batch-{}'.format(batch_id))
+        batch_output_dir = os.path.join(batch_output_dir, f'batch-{batch_id}')
 
       run_modifications = coverage.run_modifications(batch_output_dir)
 
@@ -315,8 +315,8 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       batch_test_specs = [test.render_test_spec() for test in batch]
       with argfile.safe_args(batch_test_specs, self.get_options()) as batch_tests:
         with self.chroot(relevant_targets, workdir) as chroot:
-          self.context.log.debug('CWD = {}'.format(chroot))
-          self.context.log.debug('platform = {}'.format(platform))
+          self.context.log.debug(f'CWD = {chroot}')
+          self.context.log.debug(f'platform = {platform}')
           with environment_as(**dict(target_env_vars)):
             subprocess_result = self.spawn_and_wait(
               relevant_targets,
@@ -364,13 +364,9 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
         return t.address.reference() if t else '<Unknown Target>'
 
       for target in failed_targets:
-        error_message_lines.append('\n{indent}{owner}'.format(indent=' ' * 4,
-                                                              owner=render_owning_target(target)))
+        error_message_lines.append(f"\n{(' ' * 4)}{render_owning_target(target)}")
         for test in sorted(target_to_failed_test[target]):
-          error_message_lines.append('{indent}{classname}#{methodname}'
-                                     .format(indent=' ' * 8,
-                                             classname=test.classname,
-                                             methodname=test.methodname))
+          error_message_lines.append(f"{' ' * 8}{test.classname}#{test.methodname}")
     error_message_lines.append(
       '\njava {main} ... exited non-zero ({code}); {failed} failed {targets}.'
         .format(main=JUnit.RUNNER_MAIN, code=result, failed=len(failed_targets),

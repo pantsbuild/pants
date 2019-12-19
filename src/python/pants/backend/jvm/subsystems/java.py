@@ -18,7 +18,7 @@ class Java(JvmToolMixin, ZincLanguageMixin, InjectablesMixin, Subsystem):
   options_scope = 'java'
 
   _javac_tool_name = 'javac'
-  _default_javac_spec = '//:{}'.format(_javac_tool_name)
+  _default_javac_spec = f'//:{_javac_tool_name}'
 
   @classmethod
   def register_options(cls, register):

@@ -84,7 +84,7 @@ class BundleCreate(BundleMixin, JvmBinaryTask):
   def _add_product(self, deployable_archive, app, path):
     deployable_archive.add(
       app.target, os.path.dirname(path)).append(os.path.basename(path))
-    self.context.log.debug('created {}'.format(os.path.relpath(path, get_buildroot())))
+    self.context.log.debug(f'created {os.path.relpath(path, get_buildroot())}')
 
   def execute(self):
     targets_to_bundle = self.context.targets(self.App.is_app)
@@ -105,7 +105,7 @@ class BundleCreate(BundleMixin, JvmBinaryTask):
 
         bundle_dir = self.get_bundle_dir(app.id, vt.results_dir)
         ext = archive.archive_extensions.get(app.archive, app.archive)
-        filename = '{}.{}'.format(app.id, ext)
+        filename = f'{app.id}.{ext}'
         archive_path = os.path.join(vt.results_dir, filename) if app.archive else ''
         if not vt.valid:
           self.bundle(app, vt.results_dir)
@@ -138,7 +138,7 @@ class BundleCreate(BundleMixin, JvmBinaryTask):
     assert(isinstance(app, BundleCreate.App))
 
     bundle_dir = self.get_bundle_dir(app.id, results_dir)
-    self.context.log.debug('creating {}'.format(os.path.relpath(bundle_dir, get_buildroot())))
+    self.context.log.debug(f'creating {os.path.relpath(bundle_dir, get_buildroot())}')
 
     safe_mkdir(bundle_dir, clean=True)
 
@@ -158,7 +158,7 @@ class BundleCreate(BundleMixin, JvmBinaryTask):
         excludes=app.binary.deploy_excludes,
       ))
 
-    bundle_jar = os.path.join(bundle_dir, '{}.jar'.format(app.binary.basename))
+    bundle_jar = os.path.join(bundle_dir, f'{app.binary.basename}.jar')
     with self.monolithic_jar(app.binary, bundle_jar,
                              manifest_classpath=classpath) as jar:
       self.add_main_manifest_entry(jar, app.binary)

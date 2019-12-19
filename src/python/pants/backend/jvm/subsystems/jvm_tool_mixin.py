@@ -119,13 +119,13 @@ class JvmToolMixin:
         return ('Target address spec for overriding the classpath of the {} jvm tool which is, '
                 'by default: {}'.format(key, classpath))
       else:
-        return 'Target address spec for specifying the classpath of the {} jvm tool.'.format(key)
+        return f'Target address spec for specifying the classpath of the {key} jvm tool.'
     help = help or formulate_help()
 
-    register('--{}'.format(key),
+    register(f'--{key}',
              advanced=True,
              type=target_option,
-             default='//:{}'.format(key) if classpath_spec is None else classpath_spec,
+             default=f'//:{key}' if classpath_spec is None else classpath_spec,
              help=help,
              fingerprint=fingerprint,
              removal_version=removal_version,
@@ -221,6 +221,5 @@ class JvmToolMixin:
     callback_product_map = products.get_data('jvm_build_tools_classpath_callbacks') or {}
     callback = callback_product_map.get(scope, {}).get(key)
     if not callback:
-      raise TaskError('No bootstrap callback registered for {key} in {scope}'
-                      .format(key=key, scope=scope))
+      raise TaskError(f'No bootstrap callback registered for {key} in {scope}')
     return callback()

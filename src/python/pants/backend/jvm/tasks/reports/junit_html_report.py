@@ -112,7 +112,7 @@ class ReportTestSuite:
   def success_rate(test_count, error_count, failure_count, skipped_count):
     if test_count:
       unsuccessful_count = error_count + failure_count + skipped_count
-      return '{:.2f}%'.format((test_count - unsuccessful_count) * 100.0 / test_count)
+      return f'{(test_count - unsuccessful_count) * 100.0 / test_count:.2f}%'
     return '0.00%'
 
   @staticmethod
@@ -214,7 +214,7 @@ class JUnitHtmlReport(JUnitHtmlReportInterface):
     safe_mkdir_for(report_file_path)
     with open(report_file_path, 'w') as fp:
       fp.write(self._generate_html(testsuites))
-    self._logger.debug('JUnit HTML report generated to {}'.format(report_file_path))
+    self._logger.debug(f'JUnit HTML report generated to {report_file_path}')
     if self._open_report:
       return report_file_path
 

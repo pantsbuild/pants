@@ -139,7 +139,7 @@ class Cobertura(CoverageEngine):
         instrumentation_classpath.remove_for_target(target, [(config, path)])
         instrumentation_classpath.add_for_target(target, [(config, new_path)])
         settings.log.debug(
-          "runtime_classpath ({}) cloned to instrument_classpath ({})".format(path, new_path))
+          f"runtime_classpath ({path}) cloned to instrument_classpath ({new_path})")
 
   def _iter_datafiles(self, output_dir):
     for root, _, files in safe_walk(output_dir):
@@ -162,7 +162,7 @@ class Cobertura(CoverageEngine):
     for datafile in self._iter_datafiles(output_dir):
       os.unlink(datafile)
 
-    self._canonical_datafile = os.path.join(output_dir, '{}.canonical'.format(self._DATAFILE_NAME))
+    self._canonical_datafile = os.path.join(output_dir, f'{self._DATAFILE_NAME}.canonical')
     # It's conceivable we'll be executing a test that has no source file dependencies; ie: we'll
     # never generate a canonical coverage datafile below. Create an empty one here to allow the
     # test run to proceeed normally.
@@ -223,7 +223,7 @@ class Cobertura(CoverageEngine):
 
         main = 'net.sourceforge.cobertura.instrument.InstrumentMain'
         self._settings.log.debug(
-          "executing cobertura instrumentation with the following args: {}".format(args))
+          f"executing cobertura instrumentation with the following args: {args}")
         result = self._execute_java(classpath=cobertura_cp,
                                     main=main,
                                     jvm_options=self._settings.coverage_jvm_options,
@@ -238,13 +238,13 @@ class Cobertura(CoverageEngine):
     datafile = os.path.join(output_dir, self._DATAFILE_NAME)
     safe_mkdir_for(datafile)
     shutil.copy(self.canonical_datafile, datafile)
-    datafile_option = '-Dnet.sourceforge.cobertura.datafile={datafile}'.format(datafile=datafile)
+    datafile_option = f'-Dnet.sourceforge.cobertura.datafile={datafile}'
     return self.RunModifications(classpath_prepend=self._settings.tool_classpath('cobertura-run'),
                                  extra_jvm_options=[datafile_option])
 
   def should_report(self, execution_failed_exception=None):
     if execution_failed_exception:
-      self._settings.log.warn('Test failed: {0}'.format(execution_failed_exception))
+      self._settings.log.warn(f'Test failed: {execution_failed_exception}')
       if self._settings.coverage_force:
         self._settings.log.warn('Generating report even though tests failed.')
         return True
@@ -270,7 +270,7 @@ class Cobertura(CoverageEngine):
       if len(datafiles) == 1:
         datafile = datafiles[0]
       else:
-        datafile = os.path.join(output_dir, '{}.merged'.format(self._DATAFILE_NAME))
+        datafile = os.path.join(output_dir, f'{self._DATAFILE_NAME}.merged')
         self._execute_cobertura(workunit_name='cobertura-merge',
                                 tool_classpath='cobertura-merge',
                                 main='net.sourceforge.cobertura.merge.MergeMain',
@@ -284,7 +284,7 @@ class Cobertura(CoverageEngine):
       for report_format in ('xml', 'html'):
         report_dir = os.path.join(base_report_dir, report_format)
         safe_mkdir(report_dir, clean=True)
-        self._execute_cobertura(workunit_name='cobertura-report-{}'.format(report_format),
+        self._execute_cobertura(workunit_name=f'cobertura-report-{report_format}',
                                 tool_classpath='cobertura-report',
                                 main='net.sourceforge.cobertura.reporting.ReportMain',
                                 args=base_args + ['--destination', report_dir,

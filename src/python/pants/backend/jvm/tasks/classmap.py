@@ -32,7 +32,7 @@ class ClassmapTask(ConsoleTask):
     for target in targets:
       if not should_ignore(target):
         for file in self.classname_for_classfile(target, classpath_product):
-          yield '{} {}'.format(file, target.address.spec)
+          yield f'{file} {target.address.spec}'
 
   @classmethod
   def prepare(cls, options, round_manager):

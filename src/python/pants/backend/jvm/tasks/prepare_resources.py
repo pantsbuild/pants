@@ -51,5 +51,5 @@ class PrepareResources(ResourcesTask):
       # TODO(Benjy Weinberger): Symlink instead?
       src = os.path.join(self._buildroot, target.target_base, resource_file_from_source_root)
       dst = os.path.join(chroot, resource_file_from_source_root)
-      self.context.log.debug('Copying resource from {} to {}'.format(src, dst))
+      self.context.log.debug(f'Copying resource from {src} to {dst}')
       shutil.copy(src, dst)

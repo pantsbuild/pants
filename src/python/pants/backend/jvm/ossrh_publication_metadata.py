@@ -13,7 +13,7 @@ def _validate_maybe_string(name, item):
 
 def _validate_string(name, item):
   if not item:
-    raise ValueError('{} is a required field'.format(name))
+    raise ValueError(f'{name} is a required field')
   return _validate_maybe_string(name, item)
 
 
@@ -133,7 +133,7 @@ class OSSRHPublicationMetadata(PublicationMetadata):
     def validate_nonempty_list(list_name, item, expected_type):
       assert_list(item, expected_type=expected_type, can_be_none=False, key_arg='roles', allowable=(list,))
       if not item:
-        raise ValueError('At least 1 entry is required in the {} list.'.format(list_name))
+        raise ValueError(f'At least 1 entry is required in the {list_name} list.')
       return item
 
     self.description = _validate_string('description', description)

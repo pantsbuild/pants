@@ -267,7 +267,7 @@ class BootstrapJvmTools(IvyTaskMixin, CoursierMixin, JarTask):
         return []
 
       tool_vts = self.tool_vts(invalidation_check)
-      jar_name = '{main}-{hash}.jar'.format(main=jvm_tool.main, hash=tool_vts.cache_key.hash)
+      jar_name = f'{jvm_tool.main}-{tool_vts.cache_key.hash}.jar'
       shaded_jar = os.path.join(self._tool_cache_path, 'shaded_jars', jar_name)
 
       if not invalidation_check.invalid_vts and os.path.exists(shaded_jar):
@@ -296,7 +296,7 @@ class BootstrapJvmTools(IvyTaskMixin, CoursierMixin, JarTask):
         try:
           result = util.execute_runner(shader,
                                        workunit_factory=self.context.new_workunit,
-                                       workunit_name='shade-{}'.format(jvm_tool.key))
+                                       workunit_name=f'shade-{jvm_tool.key}')
           if result != 0:
             raise TaskError("Shading of tool '{key}' with main class {main} for {scope} failed "
                             "with exit code {result}, command run was:\n\t{cmd}"
