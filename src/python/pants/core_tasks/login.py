@@ -6,6 +6,7 @@ import getpass
 from colors import cyan, green, red
 
 from pants.auth.basic_auth import BasicAuth, BasicAuthCreds, Challenged
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.task.console_task import ConsoleTask
 
@@ -27,12 +28,27 @@ class Login(ConsoleTask):
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--to', fingerprint=True,
-             help='Log in to this provider.  Can also be specified as a passthru arg.')
+    register(
+      '--to', type=str, fingerprint=True,
+      help='Log in to the given provider from the `--basic-auth-providers` option. For '
+           'example, if you had defined in `--basic-auth-providers` that the provider `prod` '
+           'points to the URL `https://app.pantsbuild.org/auth`, then you '
+           'could here use the option `--login-to=prod` to login at '
+           '`https://app.pantsbuild.org/auth`.'
+    )
 
   def console_output(self, targets):
     if targets:
       raise TaskError('The login task does not take any target arguments.')
+
+    deprecated_conditional(
+      lambda: self.get_passthru_args(),
+      removal_version='1.26.0.dev3',
+      entity_description='Using passthrough args with `./pants login`',
+      hint_message="Instead of passing the provider through `--login-passthrough-args` or the "
+                   "style `./pants login -- prod`, use the option `--login-to`, such as "
+                   "`./pants login --to=prod`.",
+    )
 
     # TODO: When we have other auth methods (e.g., OAuth2), select one by provider name.
     requested_providers = list(filter(None, [self.get_options().to] + self.get_passthru_args()))
