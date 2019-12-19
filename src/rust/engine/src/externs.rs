@@ -77,18 +77,11 @@ pub fn store_set<I: Iterator<Item = Value>>(values: I) -> Value {
   with_externs(|e| (e.store_set)(e.context, handles.as_ptr(), handles.len() as u64).into())
 }
 
-///
-/// Store a dict of values, which are stored in a slice alternating interleaved keys and values,
-/// i.e. stored (key0, value0, key1, value1, ...)
-///
-/// The underlying slice _must_ contain an even number of elements.
-///
-pub fn store_dict(keys_and_values_interleaved: &[(Value)]) -> Value {
-  if keys_and_values_interleaved.len() % 2 != 0 {
-    panic!("store_dict requires an even number of elements");
-  }
-  let handles: Vec<_> = keys_and_values_interleaved
+/// Store a slice containing 2-tuples of (key, value) as a Python dictionary.
+pub fn store_dict(keys_and_values: &[(Value, Value)]) -> Value {
+  let handles: Vec<_> = keys_and_values
     .iter()
+    .flat_map(|(k, v)| vec![k, v].into_iter())
     .map(|v| v as &Handle as *const Handle)
     .collect();
   with_externs(|e| (e.store_dict)(e.context, handles.as_ptr(), handles.len() as u64).into())

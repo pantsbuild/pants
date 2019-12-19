@@ -393,24 +393,38 @@ fn workunits_to_py_tuple_value<'a>(workunits: impl Iterator<Item = &'a WorkUnit>
   let workunit_values = workunits
     .map(|workunit: &WorkUnit| {
       let mut workunit_zipkin_trace_info = vec![
-        externs::store_utf8("name"),
-        externs::store_utf8(&workunit.name),
-        externs::store_utf8("start_secs"),
-        externs::store_u64(workunit.time_span.start.secs),
-        externs::store_utf8("start_nanos"),
-        externs::store_u64(u64::from(workunit.time_span.start.nanos)),
-        externs::store_utf8("duration_secs"),
-        externs::store_u64(workunit.time_span.duration.secs),
-        externs::store_utf8("duration_nanos"),
-        externs::store_u64(u64::from(workunit.time_span.duration.nanos)),
-        externs::store_utf8("span_id"),
-        externs::store_utf8(&workunit.span_id),
+        (
+          externs::store_utf8("name"),
+          externs::store_utf8(&workunit.name),
+        ),
+        (
+          externs::store_utf8("start_secs"),
+          externs::store_u64(workunit.time_span.start.secs),
+        ),
+        (
+          externs::store_utf8("start_nanos"),
+          externs::store_u64(u64::from(workunit.time_span.start.nanos)),
+        ),
+        (
+          externs::store_utf8("duration_secs"),
+          externs::store_u64(workunit.time_span.duration.secs),
+        ),
+        (
+          externs::store_utf8("duration_nanos"),
+          externs::store_u64(u64::from(workunit.time_span.duration.nanos)),
+        ),
+        (
+          externs::store_utf8("span_id"),
+          externs::store_utf8(&workunit.span_id),
+        ),
       ];
       if let Some(parent_id) = &workunit.parent_id {
-        workunit_zipkin_trace_info.push(externs::store_utf8("parent_id"));
-        workunit_zipkin_trace_info.push(externs::store_utf8(parent_id));
+        workunit_zipkin_trace_info.push((
+          externs::store_utf8("parent_id"),
+          externs::store_utf8(parent_id),
+        ));
       }
-      externs::store_dict(&workunit_zipkin_trace_info)
+      externs::store_dict(&workunit_zipkin_trace_info.as_slice())
     })
     .collect::<Vec<_>>();
 
@@ -447,17 +461,16 @@ pub extern "C" fn scheduler_metrics(
       let mut values = scheduler
         .metrics(session)
         .into_iter()
-        .flat_map(|(metric, value)| vec![externs::store_utf8(metric), externs::store_i64(value)])
+        .map(|(metric, value)| (externs::store_utf8(metric), externs::store_i64(value)))
         .collect::<Vec<_>>();
       if session.should_record_zipkin_spans() {
         let workunits = session.workunit_store().get_workunits();
         let locked = workunits.lock();
         let mut iter = locked.workunits.iter();
         let value = workunits_to_py_tuple_value(&mut iter);
-        values.push(externs::store_utf8("engine_workunits"));
-        values.push(value);
+        values.push((externs::store_utf8("engine_workunits"), value));
       };
-      externs::store_dict(&values).into()
+      externs::store_dict(values.as_slice()).into()
     })
   })
 }
