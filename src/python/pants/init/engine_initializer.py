@@ -37,6 +37,7 @@ from pants.engine.legacy.structs import (
   PageAdaptor,
   PantsPluginAdaptor,
   PythonAppAdaptor,
+  PythonAWSLambdaAdaptor,
   PythonBinaryAdaptor,
   PythonTargetAdaptor,
   PythonTestsAdaptor,
@@ -140,6 +141,7 @@ def _legacy_symbol_table(build_file_aliases):
   table['python_binary'] = PythonBinaryAdaptor
   table['remote_sources'] = RemoteSourcesAdaptor
   table['page'] = PageAdaptor
+  table['python_awslambda'] = PythonAWSLambdaAdaptor
 
   # Note that these don't call _make_target_adaptor because we don't have a handy reference to the
   # types being constructed. They don't have any default_sources behavior, so this should be ok,

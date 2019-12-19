@@ -297,6 +297,9 @@ class PythonBinaryAdaptor(PythonTargetAdaptor):
 class PythonTestsAdaptor(PythonTargetAdaptor): pass
 
 
+class PythonAWSLambdaAdaptor(TargetAdaptor): pass
+
+
 class PantsPluginAdaptor(PythonTargetAdaptor):
   def get_sources(self):
     return GlobsWithConjunction.for_literal_files(['register.py'], self.address.spec_path)
