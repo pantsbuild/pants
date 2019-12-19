@@ -36,5 +36,5 @@ workunit_store = {path = "../../workunit_store" }
 maplit = "*"
 mock = { path = "../../testutil/mock" }
 testutil = { path = "../../testutil" }
-tokio = "0.1"
+tokio-compat = { version = "0.1", features = ["rt-full"] }
 walkdir = "2"

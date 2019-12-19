@@ -14,4 +14,4 @@ tokio-timer = "0.2"
 [dev-dependencies]
 maplit = "1"
 testutil = { path = "../testutil" }
-tokio = "0.1"
+tokio-compat = { version = "0.1", features = ["rt-full"] }

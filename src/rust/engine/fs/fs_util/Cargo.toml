@@ -21,5 +21,5 @@ serde_json = "1.0"
 serde_derive = "1.0"
 store = { path = "../store" }
 task_executor = { path = "../../task_executor" }
-tokio = "0.1"
+tokio-compat = { version = "0.1", features = ["rt-full"] }
 workunit_store = { path = "../../workunit_store" }

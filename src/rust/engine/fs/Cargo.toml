@@ -19,4 +19,4 @@ tempfile = "3"
 
 [dev-dependencies]
 testutil = { path = "../testutil" }
-tokio = "0.1"
+tokio-compat = { version = "0.1", features = ["rt-full"] }

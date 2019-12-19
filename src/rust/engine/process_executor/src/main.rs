@@ -41,7 +41,7 @@ use std::path::PathBuf;
 use std::process::exit;
 use std::time::Duration;
 use store::{BackoffConfig, Store};
-use tokio::runtime::Runtime;
+use tokio_compat::runtime::Runtime;
 use workunit_store::WorkUnitStore;
 
 /// A binary which takes args of format:

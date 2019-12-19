@@ -159,7 +159,7 @@ fn scandir_empty() {
   let posix_fs = new_posixfs(&dir.path());
   let path = PathBuf::from("empty_enclosure");
   std::fs::create_dir(dir.path().join(&path)).unwrap();
-  let mut runtime = tokio::runtime::Runtime::new().unwrap();
+  let mut runtime = tokio_compat::runtime::Runtime::new().unwrap();
   assert_eq!(
     runtime.block_on(posix_fs.scandir(Dir(path))).unwrap(),
     DirectoryListing(vec![])
@@ -195,7 +195,7 @@ fn scandir() {
     0o600,
   );
 
-  let mut runtime = tokio::runtime::Runtime::new().unwrap();
+  let mut runtime = tokio_compat::runtime::Runtime::new().unwrap();
 
   // Symlink aware.
   assert_eq!(

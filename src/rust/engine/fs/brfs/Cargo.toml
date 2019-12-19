@@ -22,7 +22,7 @@ serverset = { path = "../../serverset" }
 store = { path = "../store" }
 task_executor = { path = "../../task_executor" }
 time = "0.1.39"
-tokio = "0.1"
+tokio-compat = { version = "0.1", features = ["rt-full"] }
 workunit_store = { path = "../../workunit_store" }
 
 [dev-dependencies]
