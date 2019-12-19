@@ -490,7 +490,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              help='Run v2 @console_rules continuously as file changes are detected. Requires '
                   '`--v2`, and is best utilized with `--v2 --no-v1`.')
     register('--loop-max', type=int, default=2**32, advanced=True,
-             help='The maximum number of times to loop when `{}` is specified.'.format(loop_flag))
+             help=f'The maximum number of times to loop when `{loop_flag}` is specified.')
 
     register('-t', '--timeout', advanced=True, type=int, metavar='<seconds>',
             removal_version="1.26.0.dev2",

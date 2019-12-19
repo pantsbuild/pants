@@ -186,7 +186,7 @@ class ListValueComponent:
         appends.extend(component._appends)
         filters.extend(component._filters)
       else:
-        raise ParseError('Unknown action for list value: {}'.format(component.action))
+        raise ParseError(f'Unknown action for list value: {component.action}')
     return cls(action, appends, filters)
 
   def __init__(self, action, appends, filters):
@@ -242,11 +242,11 @@ class ListValueComponent:
     elif isinstance(value, str):
       appends = [value]
     else:
-      appends = _convert('[{}]'.format(value), list)
+      appends = _convert(f'[{value}]', list)
     return cls(action, list(appends), list(filters))
 
   def __repr__(self):
-    return '{} +{} -{}'.format(self._action, self._appends, self._filters)
+    return f'{self._action} +{self._appends} -{self._filters}'
 
 
 class DictValueComponent:
@@ -281,7 +281,7 @@ class DictValueComponent:
       elif component.action is cls.EXTEND:
         val.update(component.val)
       else:
-        raise ParseError('Unknown action for dict value: {}'.format(component.action))
+        raise ParseError(f'Unknown action for dict value: {component.action}')
     return cls(action, val)
 
   def __init__(self, action, val):
@@ -311,11 +311,11 @@ class DictValueComponent:
       action = cls.EXTEND
       val = _convert(value[1:], dict)
     else:
-      raise ParseError('Invalid dict value: {}'.format(value))
+      raise ParseError(f'Invalid dict value: {value}')
     return cls(action, dict(val))
 
   def __repr__(self):
-    return '{} {}'.format(self.action, self.val)
+    return f'{self.action} {self.val}'
 
 
 class GlobExpansionConjunction(Enum):

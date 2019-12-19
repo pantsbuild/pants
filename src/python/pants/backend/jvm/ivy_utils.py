@@ -87,7 +87,7 @@ class IvyResolutionStep:
 
   @property
   def ivy_cache_classpath_filename(self):
-    return '{}.raw'.format(self.hardlink_classpath_filename)
+    return f'{self.hardlink_classpath_filename}.raw'
 
   @property
   def frozen_resolve_file(self):
@@ -137,7 +137,7 @@ class IvyFetchStep(IvyResolutionStep):
                 os.path.isfile(self.frozen_resolve_file))
 
   def resolve_report_path(self, conf):
-    return os.path.join(self.workdir, 'fetch-report-{}.xml'.format(conf))
+    return os.path.join(self.workdir, f'fetch-report-{conf}.xml')
 
   @property
   def ivy_xml_path(self):
@@ -151,7 +151,7 @@ class IvyFetchStep(IvyResolutionStep):
       frozen_resolutions = FrozenResolution.load_from_file(self.frozen_resolve_file,
                                                          targets)
     except Exception as e:
-      logger.debug('Failed to load {}: {}'.format(self.frozen_resolve_file, e))
+      logger.debug(f'Failed to load {self.frozen_resolve_file}: {e!r}')
       return NO_RESOLVE_RUN_RESULT
     return self._load_from_fetch(frozen_resolutions)
 
@@ -161,7 +161,7 @@ class IvyFetchStep(IvyResolutionStep):
       frozen_resolutions = FrozenResolution.load_from_file(self.frozen_resolve_file,
                                                          targets)
     except Exception as e:
-      logger.debug('Failed to load {}: {}'.format(self.frozen_resolve_file, e))
+      logger.debug(f'Failed to load {self.frozen_resolve_file}: {e!r}')
       return NO_RESOLVE_RUN_RESULT
 
     self._do_fetch(executor, extra_args, frozen_resolutions, jvm_options,
@@ -170,8 +170,7 @@ class IvyFetchStep(IvyResolutionStep):
 
     if not result.all_linked_artifacts_exist():
       raise IvyResolveMappingError(
-        'Some artifacts were not linked to {} for {}'.format(self.ivy_workdir,
-                                                             result))
+        f'Some artifacts were not linked to {self.ivy_workdir} for {result}')
     return result
 
   def _load_from_fetch(self, frozen_resolutions):
@@ -186,7 +185,7 @@ class IvyFetchStep(IvyResolutionStep):
                         workunit_factory):
     # It's important for fetches to have a different ivy report from resolves as their
     # contents differ.
-    hash_name_for_report = '{}-fetch'.format(self.hash_name)
+    hash_name_for_report = f'{self.hash_name}-fetch'
 
     ivyxml = self.ivy_xml_path
     self._prepare_ivy_xml(frozen_resolution, ivyxml, hash_name_for_report)
@@ -205,7 +204,7 @@ class IvyFetchStep(IvyResolutionStep):
       jars = default_resolution.jar_dependencies
       IvyUtils.generate_fetch_ivy(jars, ivyxml, self.confs, resolve_hash_name_for_report)
     except Exception as e:
-      raise IvyUtils.IvyError('Failed to prepare ivy resolve: {}'.format(e))
+      raise IvyUtils.IvyError(f'Failed to prepare ivy resolve: {e!r}')
 
 
 class IvyResolveStep(IvyResolutionStep):
@@ -216,7 +215,7 @@ class IvyResolveStep(IvyResolutionStep):
                 os.path.isfile(self.ivy_cache_classpath_filename))
 
   def resolve_report_path(self, conf):
-    return os.path.join(self.workdir, 'resolve-report-{}.xml'.format(conf))
+    return os.path.join(self.workdir, f'resolve-report-{conf}.xml')
 
   @property
   def ivy_xml_path(self):
@@ -236,8 +235,7 @@ class IvyResolveStep(IvyResolutionStep):
 
     if not result.all_linked_artifacts_exist():
       raise IvyResolveMappingError(
-        'Some artifacts were not linked to {} for {}'.format(self.ivy_workdir,
-                                                             result))
+        f'Some artifacts were not linked to {self.ivy_workdir} for {result}')
 
     frozen_resolutions_by_conf = result.get_frozen_resolutions_by_conf(targets)
     FrozenResolution.dump_to_file(self.frozen_resolve_file, frozen_resolutions_by_conf)
@@ -245,7 +243,7 @@ class IvyResolveStep(IvyResolutionStep):
 
   def _do_resolve(self, executor, extra_args, targets, jvm_options, workunit_name, workunit_factory):
     ivyxml = self.ivy_xml_path
-    hash_name = '{}-resolve'.format(self.hash_name)
+    hash_name = f'{self.hash_name}-resolve'
     self._prepare_ivy_xml(targets, ivyxml, hash_name)
 
     self._call_ivy(executor, extra_args, ivyxml, jvm_options, hash_name,
@@ -541,7 +539,7 @@ class IvyModuleRef:
     return hash(self._id)
 
   def __str__(self):
-    return 'IvyModuleRef({})'.format(':'.join((x or '') for x in self._id))
+    return f"IvyModuleRef({':'.join(x or '' for x in self._id)})"
 
   def __repr__(self):
     return ('IvyModuleRef(org={!r}, name={!r}, rev={!r}, classifier={!r}, ext={!r})'
@@ -677,7 +675,7 @@ class IvyInfo:
     return resolved_jars
 
   def __repr__(self):
-    return 'IvyInfo(conf={}, refs={})'.format(self._conf, self.modules_by_ref.keys())
+    return f'IvyInfo(conf={self._conf}, refs={self.modules_by_ref.keys()})'
 
 
 class IvyUtils:
@@ -764,8 +762,7 @@ class IvyUtils:
 
       cls._copy_ivy_reports(workdir_report_paths_by_conf, confs, ivy_resolution_cache_dir, resolve_hash_name)
 
-    logger.debug('Moved ivy classfile file to {dest}'
-                 .format(dest=ivy_cache_classpath_filename))
+    logger.debug(f'Moved ivy classfile file to {ivy_cache_classpath_filename}')
 
   @classmethod
   def _copy_ivy_reports(cls, workdir_report_paths_by_conf, confs, ivy_resolution_cache_dir, resolve_hash_name):
@@ -800,8 +797,7 @@ class IvyUtils:
         result = execute_runner(runner, workunit_factory=workunit_factory,
                                 workunit_name=workunit_name)
       if result != 0:
-        raise IvyUtils.IvyError('Ivy returned {result}. cmd={cmd}'.format(result=result,
-                                                                          cmd=runner.cmd))
+        raise IvyUtils.IvyError(f'Ivy returned {result}. cmd={runner.cmd}')
     except runner.executor.Error as e:
       raise IvyUtils.IvyError(e)
 
@@ -891,9 +887,9 @@ class IvyUtils:
     :raises: :class:`IvyResolveMappingError` if no report exists.
     """
     if not os.path.exists(path):
-      raise cls.IvyResolveReportError('Missing expected ivy output file {}'.format(path))
+      raise cls.IvyResolveReportError(f'Missing expected ivy output file {path}')
 
-    logger.debug("Parsing ivy report {}".format(path))
+    logger.debug(f"Parsing ivy report {path}")
     ret = IvyInfo(conf)
     etree = ET.parse(path)
     doc = etree.getroot()

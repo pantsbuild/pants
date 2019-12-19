@@ -51,7 +51,7 @@ class ProvideToolsJar(JvmToolTaskMixin):
   def _tools_classpath_pairs(self, dest_dir):
     """Given a destination directory, returns a list of tuples of (src, dst) symlink pairs."""
     tools_classpath = self._tools_classpath
-    return [(entry, os.path.join(dest_dir, '{}-{}'.format(idx, os.path.basename(entry))))
+    return [(entry, os.path.join(dest_dir, f'{idx}-{os.path.basename(entry)}'))
             for idx, entry in enumerate(tools_classpath)]
 
   @memoized_property

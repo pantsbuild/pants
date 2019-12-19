@@ -8,6 +8,6 @@ contrib_plugin(
     'src/python/pants/goal:task_registrar',
   ],
   distribution_name='pantsbuild.pants.contrib.mypy',
-  description='mypy static type analyzer',
+  description='MyPy static type analyzer',
   register_goals=True,
 )

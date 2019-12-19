@@ -88,7 +88,7 @@ class JvmDependencyUsage(Task):
                                         else self.context.target_roots)
     output_file = self.get_options().output_file
     if output_file:
-      self.context.log.info('Writing dependency usage to {}'.format(output_file))
+      self.context.log.info(f'Writing dependency usage to {output_file}')
       with open(output_file, 'w') as fh:
         self._render(graph, fh)
     else:
@@ -187,10 +187,10 @@ class JvmDependencyUsage(Task):
               lambda spec: next(self.context.resolve(spec).__iter__())
             )
         except Exception:
-          self.context.log.warn("Can't deserialize json for target {}".format(target))
+          self.context.log.warn(f"Can't deserialize json for target {target}")
           return Node(target.concrete_derived_from)
       else:
-        self.context.log.warn("No cache entry for {}".format(target))
+        self.context.log.warn(f"No cache entry for {target}")
         return Node(target.concrete_derived_from)
 
     return creator

@@ -105,8 +105,7 @@ class Jacoco(CoverageEngine):
 
   def run_modifications(self, output_dir):
     datafile = os.path.join(output_dir, self._DATAFILE_NAME)
-    agent_option = '-javaagent:{agent}=destfile={destfile}'.format(agent=self._agent_path,
-                                                                   destfile=datafile)
+    agent_option = f'-javaagent:{self._agent_path}=destfile={datafile}'
     return self.RunModifications.create(extra_jvm_options=[agent_option])
 
   def _execute_jacoco_cli(self, workunit_name, args):
@@ -123,7 +122,7 @@ class Jacoco(CoverageEngine):
 
   def report(self, output_dir, execution_failed_exception=None):
     if execution_failed_exception:
-      self._settings.log.warn('Test failed: {}'.format(execution_failed_exception))
+      self._settings.log.warn(f'Test failed: {execution_failed_exception}')
       if self._coverage_force:
         self._settings.log.warn('Generating report even though tests failed, because the'
                                 'coverage-force flag is set.')
@@ -137,8 +136,8 @@ class Jacoco(CoverageEngine):
     if len(datafiles) == 1:
       datafile = datafiles[0]
     else:
-      datafile = os.path.join(output_dir, '{}.merged'.format(self._DATAFILE_NAME))
-      args = ['merge'] + datafiles + ['--destfile={}'.format(datafile)]
+      datafile = os.path.join(output_dir, f'{self._DATAFILE_NAME}.merged')
+      args = ['merge'] + datafiles + [f'--destfile={datafile}']
       self._execute_jacoco_cli(workunit_name='jacoco-merge', args=args)
 
     for report_format in ('xml', 'csv', 'html'):
@@ -146,8 +145,7 @@ class Jacoco(CoverageEngine):
       args = (['report', datafile] +
               self._get_target_classpaths() +
               self._get_source_roots() +
-              ['--{report_format}={target_path}'.format(report_format=report_format,
-                                                        target_path=target_path)])
+              [f'--{report_format}={target_path}'])
       self._execute_jacoco_cli(workunit_name='jacoco-report-' + report_format, args=args)
 
     if self._settings.coverage_open:
@@ -156,7 +154,7 @@ class Jacoco(CoverageEngine):
   def _get_jacoco_coverage_targets(self, targets):
     coverage_targets = {t for t in targets if (self.is_coverage_target(t) and self._include_target(t))}
     if len(coverage_targets) == 0:
-      raise TaskError("No coverage target specs matched jacoco report filters ({0})".format(self._target_filters))
+      raise TaskError(f"No coverage target specs matched jacoco report filters ({self._target_filters})")
     return coverage_targets
 
   def _get_target_classpaths(self):

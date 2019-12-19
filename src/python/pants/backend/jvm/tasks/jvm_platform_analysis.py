@@ -361,31 +361,29 @@ class JvmPlatformExplain(JvmPlatformAnalysisMixin, ConsoleTask):
         continue
 
       if min_version and max_version:
-        range_text = '{} to {}'.format(min_version, max_version)
+        range_text = f'{min_version} to {max_version}'
         if min_version > max_version:
           range_text = self._format_error(range_text)
       elif min_version:
-        range_text = '{}+'.format(min_version)
+        range_text = f'{min_version}+'
       elif max_version:
-        range_text = '<={}'.format(max_version)
+        range_text = f'<={max_version}'
       else:
         range_text = '*'
-      yield '{address}: {range}  (is {current})'.format(address=target.address.spec,
-                                                        range=range_text,
-                                                        current=current_text,)
+      yield f'{target.address.spec}: {range_text}  (is {current_text})'
       if self.get_options().detailed or not current_valid:
         if min_version:
           min_because = [t for t in ranges.target_dependencies[target]
                          if self.jvm_version(t) == min_version]
-          yield '  min={} because of dependencies:'.format(min_version)
+          yield f'  min={min_version} because of dependencies:'
           for dep in sorted(min_because):
-            yield '    {}'.format(dep.address.spec)
+            yield f'    {dep.address.spec}'
         if max_version:
           max_because = [t for t in ranges.target_dependees[target]
                          if self.jvm_version(t) == max_version]
-          yield '  max={} because of dependees:'.format(max_version)
+          yield f'  max={max_version} because of dependees:'
           for dep in sorted(max_because):
-            yield '    {}'.format(dep.address.spec)
+            yield f'    {dep.address.spec}'
         yield ''
 
   def _changeable(self, change_name, can_change, change_getter):
@@ -400,9 +398,7 @@ class JvmPlatformExplain(JvmPlatformAnalysisMixin, ConsoleTask):
       plural='' if len(changes) == 1 else 's',
     )
     for target, allowed in sorted(changes.items()):
-      yield '{target} can {change} to {allowed}'.format(target=target.address.spec,
-                                                        allowed=allowed or '*',
-                                                        change=change_name)
+      yield f"{target.address.spec} can {change_name} to {(allowed or '*')}"
     yield ''
 
   def downgradeable(self):

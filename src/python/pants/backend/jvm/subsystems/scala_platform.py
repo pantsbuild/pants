@@ -56,7 +56,7 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, InjectablesMixin, Subsystem
     if version == 'custom':
       return tool
     else:
-      return '{}_{}'.format(tool, version.replace('.', '_'))
+      return f"{tool}_{version.replace('.', '_')}"
 
   @classmethod
   def register_options(cls, register):
@@ -122,7 +122,7 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, InjectablesMixin, Subsystem
     # scala platforms). However if the custom tool is actually resolved, we want that to
     # fail with a useful error, hence the dummy jardep with rev=None.
     def register_custom_tool(key):
-      dummy_jardep = JarDependency('missing spec', ' //:{}'.format(key))
+      dummy_jardep = JarDependency('missing spec', f' //:{key}')
       cls.register_jvm_tool(register, cls.versioned_tool_name(key, 'custom'),
                             classpath=[dummy_jardep])
     register_custom_tool('scalac')
@@ -158,7 +158,7 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, InjectablesMixin, Subsystem
     if self.version == 'custom':
       suffix = self.get_options().suffix_version
       if suffix:
-        return '{0}_{1}'.format(name, suffix)
+        return f'{name}_{suffix}'
       else:
         raise RuntimeError('Suffix version must be specified if using a custom scala version. '
                            'Suffix version is used for bootstrapping jars.  If a custom '
@@ -169,7 +169,7 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, InjectablesMixin, Subsystem
     elif name.endswith(self.version):
       raise ValueError('The name "{0}" should not be suffixed with the scala platform version '
                       '({1}): it will be added automatically.'.format(name, self.version))
-    return '{0}_{1}'.format(name, self.version)
+    return f'{name}_{self.version}'
 
   @property
   def repl(self):
@@ -202,7 +202,7 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, InjectablesMixin, Subsystem
     maybe_suffix = '' if self.version == 'custom' else '-synthetic'
     return {
       # Target spec for the scala compiler library.
-      'scalac': ['//:scalac{}'.format(maybe_suffix)],
+      'scalac': [f'//:scalac{maybe_suffix}'],
       # Target spec for the scala runtime library.
-      'scala-library': ['//:scala-library{}'.format(maybe_suffix)]
+      'scala-library': [f'//:scala-library{maybe_suffix}']
     }

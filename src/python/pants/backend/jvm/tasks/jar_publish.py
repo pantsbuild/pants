@@ -125,7 +125,7 @@ class PushDb:
       raise ValueError
 
     def key(prefix):
-      return '{}.{}%{}'.format(prefix, jar_dep.org, jar_dep.name)
+      return f'{prefix}.{jar_dep.org}%{jar_dep.name}'
 
     def getter(prefix, default=None):
       return self._props.get(key(prefix), default)
@@ -183,7 +183,7 @@ class PomWriter:
       # Forming the project name from the coordinates like this is acceptable as a fallback when
       # the user supplies no project name.
       # See: http://central.sonatype.org/pages/requirements.html#project-name-description-and-url
-      name = pom.name or '{}:{}'.format(jar_dependency.org, jar_dependency.name)
+      name = pom.name or f'{jar_dependency.org}:{jar_dependency.name}'
 
       template_data = template_data.extend(name=name,
                                            description=pom.description,
@@ -205,7 +205,7 @@ class PomWriter:
 
 
 def coordinate(org, name, rev=None):
-  return '{}#{};{}'.format(org, name, rev) if rev else '{}#{}'.format(org, name)
+  return f'{org}#{name};{rev}' if rev else f'{org}#{name}'
 
 
 def jar_coordinate(jar, rev=None):
@@ -392,7 +392,7 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
           credentials = next(iter(self.context.resolve(auth)))
           user = credentials.username(data['resolver'])
           password = credentials.password(data['resolver'])
-          self.context.log.debug('Found auth for repo={} user={}'.format(repo, user))
+          self.context.log.debug(f'Found auth for repo={repo} user={user}')
           self.repos[repo]['username'] = user
           self.repos[repo]['password'] = password
       self.commit = self.get_options().commit
@@ -426,13 +426,12 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
             raise TaskError('{} => {}?:\n    {}'.format(address, prompt,
                                                         '\n    '.join(str(a) for a in siblings)))
           if not self._is_exported(target):
-            raise TaskError('{} is not an exported target'.format(coordinate))
+            raise TaskError(f'{coordinate} is not an exported target')
           return target.provides.org, target.provides.name
         except (BuildFile.BuildFileError,
                 BuildFileParser.BuildFileParserError,
                 AddressLookupError) as e:
-          raise TaskError('{message}\n  Problem identifying target at {spec}'
-                          .format(message=e, spec=spec))
+          raise TaskError(f'{e!r}\n  Problem identifying target at {spec}')
 
     self.overrides = {}
     if self.get_options().override:
@@ -446,10 +445,10 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
             # overrides imply semantic versioning
             rev = Semver.parse(rev)
           except ValueError as e:
-            raise TaskError('Invalid version {}: {}'.format(rev, e))
+            raise TaskError(f'Invalid version {rev}: {e!r}')
           return parse_jarcoordinate(coordinate), rev
         except ValueError:
-          raise TaskError('Invalid override: {}'.format(override))
+          raise TaskError(f'Invalid override: {override}')
 
       self.overrides.update(parse_override(o) for o in self.get_options().override)
 
@@ -469,9 +468,7 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
       isatty = False
     if not isatty:
       return True
-    push = input('\nPublish {} with revision {} ? [y|N] '.format(
-      coord, version
-    ))
+    push = input(f'\nPublish {coord} with revision {version} ? [y|N] ')
     print('\n')
     return push.strip().lower() == 'y'
 
@@ -502,8 +499,8 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
     user = repo.get('username')
     password = repo.get('password')
     if user and password:
-      jvm_options.append('-Dlogin={}'.format(user))
-      jvm_options.append('-Dpassword={}'.format(password))
+      jvm_options.append(f'-Dlogin={user}')
+      jvm_options.append(f'-Dpassword={password}')
     else:
       raise TaskError('Unable to publish to {}. {}'
                       .format(repo.get('resolver'), repo.get('help', '')))
@@ -516,7 +513,7 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
     try:
       ivy = Bootstrapper.default_ivy()
     except Bootstrapper.Error as e:
-      raise TaskError('Failed to push {0}! {1}'.format(pushdb_coordinate(jar, entry), e))
+      raise TaskError(f'Failed to push {pushdb_coordinate(jar, entry)}! {e!r}')
 
     path = repo.get('path')
     ivysettings = self.generate_ivysettings(ivy, published, publish_local=path)
@@ -555,7 +552,7 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
       ivy.execute(jvm_options=jvm_options, args=args,
                   workunit_factory=self.context.new_workunit, workunit_name='ivy-publish')
     except Ivy.Error as e:
-      raise TaskError('Failed to push {0}! {1}'.format(pushdb_coordinate(jar, entry), e))
+      raise TaskError(f'Failed to push {pushdb_coordinate(jar, entry)}! {e!r}')
 
   def execute(self):
     self.check_clean_master(commit=(not self.dryrun and self.commit))
@@ -568,7 +565,7 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
     def get_db(tgt):
       # TODO(tdesai) Handle resource type in get_db.
       if tgt.provides is None:
-        raise TaskError('trying to publish target {!r} which does not provide an artifact'.format(tgt))
+        raise TaskError(f'trying to publish target {tgt!r} which does not provide an artifact')
       dbfile = tgt.provides.repo.push_db(tgt)
       result = pushdbs.get(dbfile)
       if not result:
@@ -639,7 +636,7 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
         suffix = ''
         if 'classifier' in extra_config:
           classifier = extra_config['classifier']
-          suffix = "-{0}".format(classifier)
+          suffix = f"-{classifier}"
 
         extension = extra_config.get('extension', 'jar')
 
@@ -672,7 +669,7 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
     if self.overrides:
       print('\nPublishing with revision overrides:')
       for (org, name), rev in self.overrides.items():
-        print('{0}={1}'.format(coordinate(org, name), rev))
+        print(f'{coordinate(org, name)}={rev}')
 
     head_sha = self.scm.commit_id if self.scm else None
 
@@ -711,17 +708,17 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
       changelog = ''
       if self.publish_changelog:
         if no_changes:
-          changelog = 'No changes for {0} - forced push.\n'.format(pushdb_coordinate(jar, oldentry))
+          changelog = f'No changes for {pushdb_coordinate(jar, oldentry)} - forced push.\n'
         else:
           changelog = self.changelog(target, oldentry.sha) or 'Direct dependencies changed.\n'
 
       org = jar.org
       name = jar.name
       rev = newentry.version().version()
-      tag_name = '{org}-{name}-{rev}'.format(org=org, name=name, rev=rev) if self.commit else None
+      tag_name = f'{org}-{name}-{rev}' if self.commit else None
 
       if no_changes and not self.force:
-        print('No changes for {0}'.format(pushdb_coordinate(jar, oldentry)))
+        print(f'No changes for {pushdb_coordinate(jar, oldentry)}')
         stage_artifacts(target, jar, oldentry.version().version(), tag_name, changelog)
       elif skip:
         print('Skipping {} to resume at {}'.format(
@@ -753,7 +750,7 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
         publications = stage_artifacts(target, jar, rev, tag_name, changelog)
 
         if self.dryrun:
-          print('Skipping publish of {0} in test mode.'.format(pushdb_coordinate(jar, newentry)))
+          print(f'Skipping publish of {pushdb_coordinate(jar, newentry)} in test mode.')
         else:
           self.publish(publications, jar=jar, entry=newentry, repo=repo, published=published)
 
@@ -792,8 +789,8 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
       targets_by_artifact[artifact].append(target)
 
     def duplication_message(artifact):
-      specs = sorted('\n    {}'.format(t.address.spec) for t in targets_by_artifact[artifact])
-      return '\n  {artifact} is defined by:{specs}'.format(artifact=artifact, specs=''.join(specs))
+      specs = sorted(f'\n    {t.address.spec}' for t in targets_by_artifact[artifact])
+      return f"\n  {artifact} is defined by:{''.join(specs)}"
 
     if duplicates:
       raise self.DuplicateArtifactError('Multiple targets define the same artifacts!\n{}'.format(
@@ -835,12 +832,12 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
         return str(first.address)
 
       for publish_target, invalid_targets in sorted(invalid.items(), key=first_address):
-        msg.append('\n  Cannot publish {} due to:'.format(publish_target.address))
+        msg.append(f'\n  Cannot publish {publish_target.address} due to:')
         for invalid_target, reasons in sorted(invalid_targets.items(), key=first_address):
           for reason in sorted(reasons):
-            msg.append('\n    {} - {}'.format(invalid_target.address, reason))
+            msg.append(f'\n    {invalid_target.address} - {reason}')
 
-      raise TaskError('The following errors must be resolved to publish.{}'.format(''.join(msg)))
+      raise TaskError(f"The following errors must be resolved to publish.{''.join(msg)}")
 
   def exported_targets(self):
     candidates = set(self.get_targets())

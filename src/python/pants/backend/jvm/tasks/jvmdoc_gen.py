@@ -44,7 +44,7 @@ class JvmdocGen(SkipAndTransitiveOptionsRegistrar, HasSkipAndTransitiveOptionsMi
 
     register('--include-codegen', type=bool,
              fingerprint=True,
-             help='Create {0} for generated code.'.format(tool_name))
+             help=f'Create {tool_name} for generated code.')
 
     register('--combined', type=bool,
              fingerprint=True,
@@ -52,11 +52,11 @@ class JvmdocGen(SkipAndTransitiveOptionsRegistrar, HasSkipAndTransitiveOptionsMi
                   'individually.'.format(tool_name))
 
     register('--open', type=bool,
-             help='Open the generated {0} in a browser (implies --combined).'.format(tool_name))
+             help=f'Open the generated {tool_name} in a browser (implies --combined).')
 
     register('--ignore-failure', type=bool,
              fingerprint=True,
-             help='Do not consider {0} errors to be build errors.'.format(tool_name))
+             help=f'Do not consider {tool_name} errors to be build errors.')
 
     register('--exclude-patterns', type=list, default=[], fingerprint=True,
              help='Patterns for targets to be excluded from doc generation.')
@@ -90,19 +90,19 @@ class JvmdocGen(SkipAndTransitiveOptionsRegistrar, HasSkipAndTransitiveOptionsMi
     catalog = self.context.products.isrequired(self.jvmdoc().product_type)
     if catalog and self.combined:
       raise TaskError(
-          'Cannot provide {} target mappings for combined output'.format(self.jvmdoc().product_type))
+          f'Cannot provide {self.jvmdoc().product_type} target mappings for combined output')
 
     def docable(target):
       if not language_predicate(target):
-        self.context.log.debug('Skipping [{}] because it is does not pass the language predicate'.format(target.address.spec))
+        self.context.log.debug(f'Skipping [{target.address.spec}] because it is does not pass the language predicate')
         return False
       if not self._include_codegen and target.is_synthetic:
-        self.context.log.debug('Skipping [{}] because it is a synthetic target'.format(target.address.spec))
+        self.context.log.debug(f'Skipping [{target.address.spec}] because it is a synthetic target')
         return False
       for pattern in self._exclude_patterns:
         if pattern.search(target.address.spec):
           self.context.log.debug(
-            "Skipping [{}] because it matches exclude pattern '{}'".format(target.address.spec, pattern.pattern))
+            f"Skipping [{target.address.spec}] because it matches exclude pattern '{pattern.pattern}'")
           return False
       return True
 
@@ -145,7 +145,7 @@ class JvmdocGen(SkipAndTransitiveOptionsRegistrar, HasSkipAndTransitiveOptionsMi
       safe_mkdir(gendir, clean=True)
       command = create_jvmdoc_command(classpath, gendir, *targets)
       if command:
-        self.context.log.debug("Running create_jvmdoc in {} with {}".format(gendir, " ".join(command)))
+        self.context.log.debug(f"Running create_jvmdoc in {gendir} with {' '.join(command)}")
         result, gendir = create_jvmdoc(command, gendir)
         self._handle_create_jvmdoc_result(targets, result, command)
 

@@ -102,8 +102,7 @@ class ClasspathProducts:
       output_dir = basedir
       # TODO(peiyu) improve readability once we deprecate the old naming style.
       # For example, `-` is commonly placed in string format as opposed to here.
-      classpath_prefix_for_target = '{basedir}/{target_id}-'.format(basedir=basedir,
-                                                                    target_id=target.id)
+      classpath_prefix_for_target = f'{basedir}/{target.id}-'
 
       if os.path.exists(output_dir):
         delete_old_target_output_files(classpath_prefix_for_target)
@@ -141,7 +140,7 @@ class ClasspathProducts:
           # Create a unique symlink path by prefixing the base file name with a monotonic
           # increasing `index` to avoid name collisions.
           _, ext = os.path.splitext(entry.path)
-          symlink_path = '{}{}{}'.format(classpath_prefix_for_target, index, ext)
+          symlink_path = f'{classpath_prefix_for_target}{index}{ext}'
           real_entry_path = os.path.realpath(entry.path)
           if not os.path.exists(real_entry_path):
             raise MissingClasspathEntryError('Could not find {realpath} when attempting to link '
@@ -153,7 +152,7 @@ class ClasspathProducts:
 
         if save_classpath_file:
           classpath = [entry.path for entry in classpath_entries_for_target]
-          with safe_open('{}classpath.txt'.format(classpath_prefix_for_target), 'w') as classpath_file:
+          with safe_open(f'{classpath_prefix_for_target}classpath.txt', 'w') as classpath_file:
             classpath_file.write(os.pathsep.join(classpath))
             classpath_file.write('\n')
 
@@ -199,7 +198,7 @@ class ClasspathProducts:
     classpath_entries = []
     for jar in resolved_jars:
       if not jar.pants_path:
-        raise TaskError('Jar: {!s} has no specified path.'.format(jar.coordinate))
+        raise TaskError(f'Jar: {jar.coordinate} has no specified path.')
       cp_entry = ArtifactClasspathEntry(jar.pants_path, jar.coordinate, jar.cache_path, jar.directory_digest)
       classpath_entries.append((conf, cp_entry))
 
@@ -311,7 +310,7 @@ class ClasspathProducts:
   def update(self, other):
     """Adds the contents of other to this ClasspathProducts."""
     if self._pants_workdir != other._pants_workdir:
-      raise ValueError('Other ClasspathProducts from a different pants workdir {}'.format(other._pants_workdir))
+      raise ValueError(f'Other ClasspathProducts from a different pants workdir {other._pants_workdir}')
     for target, products in other._classpaths._products_by_target.items():
       self._classpaths.add_for_target(target, products)
     for target, products in other._excludes._products_by_target.items():
