@@ -6,8 +6,6 @@ import os
 import zipfile
 from collections import defaultdict
 
-from twitter.common.collections import OrderedSet
-
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
@@ -145,6 +143,17 @@ class ExportDepAsJar(ConsoleTask):
           zip_file.write(os.path.join(get_buildroot(), src_from_build_root), src_from_source_root)
     return f
 
+  def _dependencies_to_include_in_libraries(self, t, modulizable_target_set):
+    dependencies_to_include = set([])
+    self.context.build_graph.walk_transitive_dependency_graph(
+      [direct_dep.address for direct_dep in t.dependencies],
+      # NB: Dependency graph between modulizable targets is represented with modules,
+      #     so we don't need to expand those branches of the dep graph.
+      predicate=lambda dep: dep not in modulizable_target_set,
+      work=lambda dep: dependencies_to_include.add(dep),
+    )
+    return dependencies_to_include
+
   def _process_target(self, current_target, target_roots_set, modulizable_target_set, resource_target_map, runtime_classpath):
     """
     :type current_target:pants.build_graph.target.Target
@@ -180,9 +189,33 @@ class ExportDepAsJar(ConsoleTask):
           # libraries dict and here we just want the key into that dict (see `_jar_id`).
           yield M2Coordinate(org=coordinate.org, name=coordinate.name, rev=coordinate.rev)
 
-    target_libraries = OrderedSet()
-    if isinstance(current_target, JarLibrary):
-      target_libraries = OrderedSet(iter_transitive_jars(current_target))
+    def _full_library_set_for_target(target):
+      """
+      Get the full library set for a target, including jar dependencies and jars of the library itself.
+      """
+      libraries = set([])
+      if isinstance(target, JarLibrary):
+        jars = set([])
+        for jar in target.jar_dependencies:
+          jars.add(M2Coordinate(jar.org, jar.name, jar.rev))
+        # Add all the jars pulled in by this jar_library
+        jars.update(iter_transitive_jars(target))
+        libraries = [self._jar_id(jar) for jar in jars]
+      else:
+        libraries.add(target.id)
+      return libraries
+
+    libraries_for_target = set([self._jar_id(jar) for jar in iter_transitive_jars(current_target)])
+    for dep in self._dependencies_to_include_in_libraries(current_target, modulizable_target_set):
+      libraries_for_target.update(_full_library_set_for_target(dep))
+    info['libraries'].extend(libraries_for_target)
+
+    if current_target in target_roots_set:
+      info['roots'] = [{
+        'source_root': os.path.realpath(source_root_package_prefix[0]),
+        'package_prefix': source_root_package_prefix[1]
+      } for source_root_package_prefix in self._source_roots_for_target(current_target)]
+
     for dep in current_target.dependencies:
       if dep in modulizable_target_set:
         info['targets'].append(dep.address.spec)
@@ -196,39 +229,6 @@ class ExportDepAsJar(ConsoleTask):
       info['platform'] = current_target.platform.name
       if hasattr(current_target, 'test_platform'):
         info['test_platform'] = current_target.test_platform.name
-
-    if runtime_classpath:
-      info['libraries'].extend(self._jar_id(lib) for lib in target_libraries)
-
-    def _full_library_set_for_dep(dep):
-      """
-      Get the full library set for a dependency, including jar dependencies and jars of the library itself.
-      """
-      libraries = {dep.id}
-      if isinstance(dep, JarLibrary):
-        for jar in dep.jar_dependencies:
-          libraries.add(self._jar_id(M2Coordinate(jar.org, jar.name, jar.rev)))
-        # Add all the jars pulled in by this jar_library
-        libraries.update(iter_transitive_jars(dep))
-      return libraries
-
-    def _libraries_to_include_from_dependencies(t):
-      libraries_to_include = set([])
-      self.context.build_graph.walk_transitive_dependency_graph(
-        [direct_dep.address for direct_dep in t.dependencies],
-        # NB: Dependency graph between modulizable targets is represented with modules,
-        #     so we don't need to expand those branches of the tree.
-        predicate=lambda dep: dep not in modulizable_target_set,
-        work=lambda dep: libraries_to_include.update(_full_library_set_for_dep(dep)),
-      )
-      return libraries_to_include
-    info['libraries'].extend(_libraries_to_include_from_dependencies(current_target))
-
-    if current_target in target_roots_set:
-      info['roots'] = [{
-        'source_root': os.path.realpath(source_root_package_prefix[0]),
-        'package_prefix': source_root_package_prefix[1]
-      } for source_root_package_prefix in self._source_roots_for_target(current_target)]
 
     return info
 
