@@ -14,29 +14,47 @@ from pants.engine.legacy.structs import PythonBinaryAdaptor, PythonTestsAdaptor
 from pants.engine.rules import UnionMembership
 from pants.rules.core.core_test_model import TestTarget
 from pants.rules.core.test import (
+  AddressAndDebugResult,
   AddressAndTestResult,
+  Specs,
   Status,
+  TestDebugResult,
   TestResult,
   coordinator_of_tests,
   fast_test,
 )
 from pants.source.wrapped_globs import EagerFilesetWithSpec
-from pants.testutil.engine.util import MockConsole, MockGet, run_rule
+from pants.testutil.engine.util import MockConsole, MockGet, MockOptions, run_rule
 from pants.testutil.test_base import TestBase
 
 
 class TestTest(TestBase):
-  def single_target_test(self, result, expected_console_output, success=True):
+  def single_target_test(self, result, expected_console_output, success=True, debug=False):
     console = MockConsole(use_colors=False)
+    options = MockOptions(debug=debug)
     addr = self.make_build_target_address("some/target")
     res = run_rule(
       fast_test,
-      rule_args=[console, (addr,)],
+      rule_args=[console, options, (addr,)],
       mock_gets=[
         MockGet(
           product_type=AddressAndTestResult,
           subject_type=Address,
           mock=lambda _: AddressAndTestResult(addr, result),
+        ),
+        MockGet(
+          product_type=AddressAndDebugResult,
+          subject_type=Address,
+          mock=lambda _: AddressAndDebugResult(addr, TestDebugResult(exit_code=0 if success else 1))
+        ),
+        MockGet(
+          product_type=BuildFileAddress,
+          subject_type=Specs,
+          mock=lambda _: BuildFileAddress(
+            build_file=None,
+            target_name=addr.target_name,
+            rel_path=f'{addr.spec_path}/BUILD'
+          )
         ),
       ],
     )
@@ -77,6 +95,7 @@ class TestTest(TestBase):
 
   def test_output_mixed(self):
     console = MockConsole(use_colors=False)
+    options = MockOptions(debug=False)
     target1 = self.make_build_target_address("testprojects/tests/python/pants/passes")
     target2 = self.make_build_target_address("testprojects/tests/python/pants/fails")
 
@@ -89,11 +108,25 @@ class TestTest(TestBase):
         raise Exception("Unrecognised target")
       return AddressAndTestResult(target, tr)
 
+    def make_debug_result(target):
+      result = TestDebugResult(exit_code=0 if target == target1 else 1)
+      return AddressAndDebugResult(target, result)
+
     res = run_rule(
       fast_test,
-      rule_args=[console, (target1, target2)],
+      rule_args=[console, options, (target1, target2)],
       mock_gets=[
         MockGet(product_type=AddressAndTestResult, subject_type=Address, mock=make_result),
+        MockGet(product_type=AddressAndDebugResult, subject_type=Address, mock=make_debug_result),
+        MockGet(
+          product_type=BuildFileAddress,
+          subject_type=Specs,
+          mock=lambda tgt: BuildFileAddress(
+            build_file=None,
+            target_name=tgt.target_name,
+            rel_path=f'{tgt.spec_path}/BUILD'
+          )
+        ),
       ],
     )
 
@@ -120,6 +153,14 @@ class TestTest(TestBase):
         some/target                                                                     .....   FAILURE
         """),
       success=False,
+    )
+
+  def test_debug_options(self):
+    self.single_target_test(
+      result=None,
+      expected_console_output='',
+      success=False,
+      debug=True
     )
 
   def run_coordinator_of_tests(
