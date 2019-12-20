@@ -61,6 +61,9 @@ Bugfixes
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+* Use rule-author-supplied description for UI (#8846)
+  `PR #8846 <https://github.com/pantsbuild/pants/pull/8846>`_
+
 * Change signature of store_dict extern (#8844)
   `PR #8844 <https://github.com/pantsbuild/pants/pull/8844>`_
 
