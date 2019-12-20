@@ -347,13 +347,6 @@ class ExportDepAsJar(ConsoleTask):
       info = self._process_target(target, modulizable_targets, resource_target_map, runtime_classpath)
       targets_map[target.address.spec] = info
 
-      # If it is a target root or it is already a jar_library target, then no-op.
-      if target in modulizable_targets or targets_map[target.address.spec]['pants_target_type'] == 'jar_library':
-        continue
-
-      targets_map[target.address.spec]['pants_target_type'] = 'jar_library'
-      targets_map[target.address.spec]['libraries'] = [t.id]
-
     graph_info = self.initialize_graph_info()
     graph_info['targets'] = targets_map
     graph_info['libraries'] = libraries_map
