@@ -5,6 +5,7 @@ from collections import namedtuple
 
 from pants.base import deprecated
 from pants.option.option_util import is_list_option
+from pants.util.collections import Enum
 
 
 class OptionHelpInfo(namedtuple('_OptionHelpInfo',
@@ -92,6 +93,18 @@ class HelpInfoExtracter:
 
     return metavar
 
+  @staticmethod
+  def compute_choices(kwargs):
+    """Compute the option choices to display based on an Enum or list type."""
+    choices = kwargs.get('choices', [])
+    if isinstance(choices, list):
+      values = (str(choice) for choice in choices)
+    elif issubclass(choices, Enum):
+      values = (choice.value for choice in choices)
+    else:
+      raise ValueError(f'Type {type(choices)} not supported for option choices')
+    return ', '.join(values) or None
+
   def __init__(self, scope):
     self._scope = scope
     self._scope_prefix = scope.replace('.', '-')
@@ -165,7 +178,7 @@ class HelpInfoExtracter:
       deprecated_message = 'DEPRECATED. {} removed in version: {}'.format(deprecated_tense,
                                                                           removal_version)
     removal_hint = kwargs.get('removal_hint')
-    choices = ', '.join(str(choice) for choice in kwargs.get('choices', [])) or None
+    choices = self.compute_choices(kwargs)
 
     ret = OptionHelpInfo(registering_class=kwargs.get('registering_class', type(None)),
                          display_args=display_args,

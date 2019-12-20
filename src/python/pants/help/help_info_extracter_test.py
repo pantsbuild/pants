@@ -8,6 +8,7 @@ from pants.option.config import Config
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_tracker import OptionTracker
 from pants.option.parser import Parser
+from pants.util.collections import Enum
 
 
 class HelpInfoExtracterTest(unittest.TestCase):
@@ -95,6 +96,14 @@ class HelpInfoExtracterTest(unittest.TestCase):
     self.assertEqual('999.99.9', ohi.removal_version)
     self.assertEqual('do not use this', ohi.removal_hint)
     self.assertIsNotNone(ohi.deprecated_message)
+
+  def test_enum(self):
+    class LogLevel(Enum):
+      INFO = 'info'
+      DEBUG = 'debug'
+    kwargs = {'choices': LogLevel}
+    ohi = HelpInfoExtracter('').get_option_help_info([], kwargs)
+    self.assertEqual(', '.join(e.value for e in LogLevel), ohi.choices)
 
   def test_grouping(self):
     def do_test(kwargs, expected_basic=False, expected_recursive=False, expected_advanced=False):
