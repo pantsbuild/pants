@@ -4,6 +4,7 @@
 from dataclasses import dataclass
 from enum import Enum
 
+from pants.engine.fs import Digest
 from pants.engine.isolated_process import FallibleExecuteProcessResult
 from pants.engine.objects import union
 
@@ -18,6 +19,7 @@ class TestResult:
   status: Status
   stdout: str
   stderr: str
+  coverage_digest: Digest
 
   # Prevent this class from being detected by pytest as a test class.
   __test__ = False
@@ -30,6 +32,7 @@ class TestResult:
       status=Status.SUCCESS if process_result.exit_code == 0 else Status.FAILURE,
       stdout=process_result.stdout.decode(),
       stderr=process_result.stderr.decode(),
+      coverage_digest=process_result.output_directory_digest,
     )
 
 
