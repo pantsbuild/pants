@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Tuple
 
 from pants.engine.console import Console
 from pants.engine.fs import Digest, DirectoriesToMerge, DirectoryToMaterialize, Workspace
@@ -35,9 +35,10 @@ class AggregatedFmtResults:
 
   The `combined_digest` is used to ensure that none of the formatters overwrite each other. The
   language implementation should run each formatter one at a time and pipe the resulting digest of
-  one formatter into the next."""
+  one formatter into the next. The `combined_digest` must contain all files for the target,
+  including any which were not re-formatted."""
   results: Tuple[FmtResult, ...]
-  combined_digest: Optional[Digest]
+  combined_digest: Digest
 
 
 @union

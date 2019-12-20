@@ -2,9 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List
 
-from pants.engine.fs import Digest
 from pants.engine.legacy.structs import (
   PantsPluginAdaptor,
   PythonAppAdaptor,
@@ -34,11 +33,12 @@ async def format_python_target(
 ) -> AggregatedFmtResults:
   """This aggregator allows us to have multiple formatters safely operate over the same Python
   targets, even if they modify the same files."""
-  prior_formatter_result_digest: Optional[Digest] = None
+  prior_formatter_result_digest = wrapped_target.target.sources.snapshot.directory_digest
   results: List[FmtResult] = []
   for member in union_membership.union_rules[PythonFormatTarget]:
     result = await Get[FmtResult](
-      PythonFormatTarget, member(wrapped_target.target, prior_formatter_result_digest)
+      PythonFormatTarget,
+      member(wrapped_target.target, prior_formatter_result_digest=prior_formatter_result_digest),
     )
     results.append(result)
     prior_formatter_result_digest = result.digest
