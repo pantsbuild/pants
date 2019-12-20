@@ -154,7 +154,7 @@ class ExportDepAsJar(ConsoleTask):
     )
     return dependencies_to_include
 
-  def _process_target(self, current_target, target_roots_set, modulizable_target_set, resource_target_map, runtime_classpath):
+  def _process_target(self, current_target, modulizable_target_set, resource_target_map, runtime_classpath):
     """
     :type current_target:pants.build_graph.target.Target
     """
@@ -167,7 +167,7 @@ class ExportDepAsJar(ConsoleTask):
       'target_type': ExportDepAsJar._get_target_type(current_target, resource_target_map),
       'is_synthetic': current_target.is_synthetic,
       'pants_target_type': self._get_pants_target_alias(type(current_target)),
-      'is_target_root': current_target in target_roots_set,
+      'is_target_root': current_target in modulizable_target_set,
       'transitive': current_target.transitive,
       'scope': str(current_target.scope)
     }
@@ -210,7 +210,7 @@ class ExportDepAsJar(ConsoleTask):
       libraries_for_target.update(_full_library_set_for_target(dep))
     info['libraries'].extend(libraries_for_target)
 
-    if current_target in target_roots_set:
+    if current_target in modulizable_target_set:
       info['roots'] = [{
         'source_root': os.path.realpath(source_root_package_prefix[0]),
         'package_prefix': source_root_package_prefix[1]
@@ -344,11 +344,11 @@ class ExportDepAsJar(ConsoleTask):
       libraries_map[t.id] = self._make_libraries_entry(t, resource_target_map, runtime_classpath)
 
     for target in modulizable_targets:
-      info = self._process_target(target, target_roots_set, modulizable_targets, resource_target_map, runtime_classpath)
+      info = self._process_target(target, modulizable_targets, resource_target_map, runtime_classpath)
       targets_map[target.address.spec] = info
 
       # If it is a target root or it is already a jar_library target, then no-op.
-      if target in target_roots_set or targets_map[target.address.spec]['pants_target_type'] == 'jar_library':
+      if target in modulizable_targets or targets_map[target.address.spec]['pants_target_type'] == 'jar_library':
         continue
 
       targets_map[target.address.spec]['pants_target_type'] = 'jar_library'
