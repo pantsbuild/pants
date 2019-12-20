@@ -51,7 +51,7 @@ class _FakeOptionValues(object):
 
 def _options_registration_function(defaults, fingerprintables):
   def register(*args, **kwargs):
-    option_name = Parser.parse_dest(*args, **kwargs)
+    _, option_dest = Parser.parse_name_and_dest(*args, **kwargs)
 
     default = kwargs.get('default')
     if default is None:
@@ -59,7 +59,7 @@ def _options_registration_function(defaults, fingerprintables):
         default = False
       if kwargs.get('type') == list:
         default = []
-    defaults[option_name] = RankedValue(RankedValue.HARDCODED, default)
+    defaults[option_dest] = RankedValue(RankedValue.HARDCODED, default)
 
     fingerprint = kwargs.get('fingerprint', False)
     if fingerprint:
@@ -67,7 +67,7 @@ def _options_registration_function(defaults, fingerprintables):
         val_type = kwargs.get('member_type', str)
       else:
         val_type = kwargs.get('type', str)
-      fingerprintables[option_name] = val_type
+      fingerprintables[option_dest] = val_type
 
   return register
 
