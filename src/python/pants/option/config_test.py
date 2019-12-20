@@ -10,7 +10,7 @@ from pants.util.contextutil import temporary_file, temporary_file_path
 
 class ConfigTest(unittest.TestCase):
 
-  def setUp(self):
+  def setUp(self) -> None:
     self.ini1_content = textwrap.dedent(
       """
       [DEFAULT]
@@ -62,7 +62,7 @@ class ConfigTest(unittest.TestCase):
       )
       self.assertEqual([ini1.name, ini2.name], self.config.sources())
 
-  def test_getstring(self):
+  def test_getstring(self) -> None:
     self.assertEqual('/a/b/42', self.config.get('a', 'path'))
     self.assertEqual('/a/b/42::foo', self.config.get('a', 'embed'))
     self.assertEqual('[1, 2, 3, 42]', self.config.get('a', 'list'))
@@ -73,21 +73,21 @@ Let it be known
 that.""",
       self.config.get('b', 'disclaimer'))
 
-    self._check_defaults(self.config.get, '')
-    self._check_defaults(self.config.get, '42')
+    def check_defaults(default: str) -> None:
+      assert self.config.get('c', 'fast') is None
+      assert self.config.get('c', 'preempt', None) is None
+      assert self.config.get('c', 'jake', default=default) == default
 
-  def test_default_section(self):
+    check_defaults('')
+    check_defaults('42')
+
+  def test_default_section(self) -> None:
     self.assertEqual('foo', self.config.get(Config.DEFAULT_SECTION, 'name'))
     self.assertEqual('foo', self.config.get(Config.DEFAULT_SECTION, 'name'))
 
-  def test_sections(self):
+  def test_sections(self) -> None:
     self.assertEqual(['a', 'b', 'defined_section'], self.config.sections())
 
-  def test_empty(self):
+  def test_empty(self) -> None:
     config = Config.load([])
     self.assertEqual([], config.sections())
-
-  def _check_defaults(self, accessor, default):
-    self.assertEqual(None, accessor('c', 'fast'))
-    self.assertEqual(None, accessor('c', 'preempt', None))
-    self.assertEqual(default, accessor('c', 'jake', default=default))

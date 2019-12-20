@@ -7,7 +7,8 @@ from pants.option.optionable import Optionable
 
 
 class OptionableTest(unittest.TestCase):
-  def test_optionable(self):
+
+  def test_optionable(self) -> None:
     class NoScope(Optionable):
       pass
     with self.assertRaises(NotImplementedError):
@@ -34,11 +35,11 @@ class OptionableTest(unittest.TestCase):
       options_scope = 'good'
     self.assertEqual('good', Indirect.options_scope)
 
-  def test_is_valid_scope_name_component(self):
-    def check_true(s):
+  def test_is_valid_scope_name_component(self) -> None:
+    def check_true(s: str) -> None:
       self.assertTrue(Optionable.is_valid_scope_name_component(s))
 
-    def check_false(s):
+    def check_false(s: str) -> None:
       self.assertFalse(Optionable.is_valid_scope_name_component(s))
 
     check_true('foo')
