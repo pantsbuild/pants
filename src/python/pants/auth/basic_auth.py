@@ -45,9 +45,10 @@ class BasicAuth(Subsystem):
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--providers', advanced=True, type=dict,
+    register('--providers', type=dict,
              help='Map from provider name to config dict. This dict contains the following items: '
-                  '{url: <url of endpoint that accepts basic auth and sets a session cookie>}')
+                  '{provider_name: <url of endpoint that accepts basic auth and sets a session '
+                  "cookie>}. For example, `{'prod': 'https://app.pantsbuild.org/auth'}`.")
     register('--allow-insecure-urls', advanced=True, type=bool, default=False,
              help='Allow auth against non-HTTPS urls. Must only be set when testing!')
 
