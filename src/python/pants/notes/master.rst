@@ -10,6 +10,9 @@ not undergone the vetting associated with ``stable`` releases.
 API Changes
 ~~~~~~~~~~~
 
+* Upgrade fasteners (#8826)
+  `PR #8826 <https://github.com/pantsbuild/pants/pull/8826>`_
+
 * Separate v1/v2 backend and plugin registration (#8817)
   `PR #8817 <https://github.com/pantsbuild/pants/pull/8817>`_
 

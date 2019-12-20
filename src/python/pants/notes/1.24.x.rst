@@ -9,6 +9,9 @@ This document describes releases leading up to the ``1.24.x`` ``stable`` series.
 API Changes
 ~~~~~~~~~~~
 
+* Upgrade fasteners (#8826)
+  `PR #8826 <https://github.com/pantsbuild/pants/pull/8826>`_
+
 * Separate v1/v2 backend and plugin registration (#8817)
   `PR #8817 <https://github.com/pantsbuild/pants/pull/8817>`_
 
