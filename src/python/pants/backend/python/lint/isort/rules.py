@@ -31,6 +31,7 @@ from pants.rules.core.lint import LintResult
 @dataclass(frozen=True)
 class IsortTarget:
   target: TargetAdaptor
+  prior_formatter_result_digest: Digest
 
 
 @dataclass(frozen=True)
@@ -90,10 +91,11 @@ async def create_isort_request(
   subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> ExecuteProcessRequest:
   target = wrapped_target.target
+  sources_digest = wrapped_target.prior_formatter_result_digest
   merged_input_files = await Get[Digest](
     DirectoriesToMerge(
       directories=(
-        target.sources.snapshot.directory_digest,
+        sources_digest,
         isort_setup.requirements_pex.directory_digest,
         isort_setup.config_snapshot.directory_digest,
       )
