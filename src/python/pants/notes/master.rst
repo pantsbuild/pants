@@ -4,6 +4,94 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.24.0rc0 (12/19/2019)
+----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Upgrade fasteners (#8826)
+  `PR #8826 <https://github.com/pantsbuild/pants/pull/8826>`_
+
+* Separate v1/v2 backend and plugin registration (#8817)
+  `PR #8817 <https://github.com/pantsbuild/pants/pull/8817>`_
+
+* Deprecate old style of passthrough args for isort, Pytest, and MyPy (#8842)
+  `PR #8842 <https://github.com/pantsbuild/pants/pull/8842>`_
+
+* Deprecate passthrough args for `./pants login` (#8843)
+  `PR #8843 <https://github.com/pantsbuild/pants/pull/8843>`_
+
+* Upgrade ansicolors to 1.1.8 (#8839)
+  `PR #8839 <https://github.com/pantsbuild/pants/pull/8839>`_
+
+* Add new MyPy subsystem and deprecate `--lint-mypy-config-file` and `--lint-mypy-version` (#8829)
+  `PR #8829 <https://github.com/pantsbuild/pants/pull/8829>`_
+
+* Deprecate unused global `--timeout` option (#8805)
+  `PR #8805 <https://github.com/pantsbuild/pants/pull/8805>`_
+
+New Features
+~~~~~~~~~~~~
+
+* A v2 backend for generating AWS Lambdas. (#8835)
+  `PR #8835 <https://github.com/pantsbuild/pants/pull/8835>`_
+
+* Add user-facing-name abstraction to Node and use it in v2 console UI (#8828)
+  `PR #8828 <https://github.com/pantsbuild/pants/pull/8828>`_
+
+* Add timeout options to Pytest rule (#8783)
+  `PR #8783 <https://github.com/pantsbuild/pants/pull/8783>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix V2 formatters failing when formatting the same file (#8823)
+  `Issue #8722 <https://github.com/pantsbuild/pants/issues/8722>`_
+  `PR #8823 <https://github.com/pantsbuild/pants/pull/8823>`_
+
+* V2 console UI: fix bug with InteractiveProcessRequest (#8833)
+  `PR #8833 <https://github.com/pantsbuild/pants/pull/8833>`_
+
+* Fix terminal display with v2 UI (#8821)
+  `PR #8821 <https://github.com/pantsbuild/pants/pull/8821>`_
+
+* move the subdirectory for exception logs to .pids/ (#8511)
+  `PR #8511 <https://github.com/pantsbuild/pants/pull/8511>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Use rule-author-supplied description for UI (#8846)
+  `PR #8846 <https://github.com/pantsbuild/pants/pull/8846>`_
+
+* Change signature of store_dict extern (#8844)
+  `PR #8844 <https://github.com/pantsbuild/pants/pull/8844>`_
+
+* Use f-strings on src/python/pants/option (#8837)
+  `PR #8837 <https://github.com/pantsbuild/pants/pull/8837>`_
+
+* Convert `src/python/pants/backend/jvm` to use f-strings (#8703)
+  `PR #8703 <https://github.com/pantsbuild/pants/pull/8703>`_
+
+* Update itertools to 0.8.2 (#8840)
+  `PR #8840 <https://github.com/pantsbuild/pants/pull/8840>`_
+
+* Port `./pants generate-pants-ini` to V2 (#8830)
+  `PR #8830 <https://github.com/pantsbuild/pants/pull/8830>`_
+
+* Improve output of `./pants help` (#8820)
+  `PR #8820 <https://github.com/pantsbuild/pants/pull/8820>`_
+
+* A rule to produce a Distdir product. (#8831)
+  `PR #8831 <https://github.com/pantsbuild/pants/pull/8831>`_
+
+* Typecheck `rules/core`, `testutil/engine/util.py`, and 30 more files (#8824)
+  `PR #8824 <https://github.com/pantsbuild/pants/pull/8824>`_
+
+* Refactor `help` (#8816)
+  `PR #8816 <https://github.com/pantsbuild/pants/pull/8816>`_
+
 1.24.0.dev3 (12/13/2019)
 ------------------------
 
