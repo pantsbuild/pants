@@ -213,19 +213,6 @@ pub struct ExecuteProcessRequest {
   pub is_nailgunnable: bool,
 }
 
-impl ExecuteProcessRequest {
-  fn command_representation(&self) -> String {
-    let mut buf = String::new();
-    for (i, item) in self.argv.iter().enumerate() {
-      if i != 0 {
-        buf.push(' ');
-      }
-      buf.push_str(&item);
-    }
-    buf
-  }
-}
-
 impl TryFrom<MultiPlatformExecuteProcessRequest> for ExecuteProcessRequest {
   type Error = String;
 
@@ -249,21 +236,11 @@ pub struct MultiPlatformExecuteProcessRequest(
 
 impl MultiPlatformExecuteProcessRequest {
   pub fn user_facing_name(&self) -> Option<String> {
-    let mut buf = String::new();
-    buf.push_str("Exec(");
-    for (i, ((_, target_platform), _)) in self.0.iter().enumerate() {
-      let platform: String = (*target_platform).into();
-      if i != 0 {
-        buf.push(',');
-      }
-      buf.push_str(&platform);
-    }
-    buf.push_str("): ");
-
-    for (_, epr) in self.0.iter() {
-      buf.push_str(&epr.command_representation())
-    }
-    Some(buf)
+    self
+      .0
+      .iter()
+      .next()
+      .map(|(_platforms, epr)| format!("Executing process: {}", epr.description))
   }
 }
 
