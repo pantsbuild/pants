@@ -45,7 +45,7 @@ use engine::{
   Scheduler, Session, Tasks, TypeId, Types, Value,
 };
 use futures::Future;
-use hashing::Digest;
+use hashing::{Digest, EMPTY_DIGEST};
 use log::{error, Log};
 use logging::logger::LOGGER;
 use logging::{Destination, Logger};
@@ -965,6 +965,27 @@ pub extern "C" fn run_local_interactive_process(
         } else {
           Some(TempDir::new().map_err(|err| format!("Error creating tempdir: {}", err))?)
         };
+
+        let input_files_value = externs::project_ignoring_type(&value, "input_files");
+        let digest: Digest = nodes::lift_digest(&input_files_value)?;
+        if digest != EMPTY_DIGEST {
+          if run_in_workspace {
+            return Err("When running an interactive process in the workspace, use the Workspace type to materialize files.".to_string());
+          } else {
+            let destination = match maybe_tempdir {
+              Some(ref dir) => dir.path().to_path_buf(),
+              None => unreachable!()
+            };
+
+            let write_operation = scheduler.core.store().materialize_directory(
+              destination,
+              digest,
+              session.workunit_store().clone(),
+            );
+
+            let _ = scheduler.core.executor.spawn_on_io_pool(write_operation).wait()?;
+          }
+        }
 
         if let Some(ref tempdir) = maybe_tempdir {
           command.current_dir(tempdir.path());

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Tuple
 
 from pants.base.exception_sink import ExceptionSink
+from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, Digest
 from pants.engine.rules import RootRule
 
 
@@ -21,6 +22,7 @@ class InteractiveProcessResult:
 class InteractiveProcessRequest:
   argv: Tuple[str, ...]
   env: Tuple[str, ...] = ()
+  input_files: Digest = EMPTY_DIRECTORY_DIGEST
   run_in_workspace: bool = False
 
 
