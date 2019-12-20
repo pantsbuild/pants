@@ -175,12 +175,6 @@ pub struct ExecuteProcessRequest {
   ///
   pub env: BTreeMap<String, String>,
 
-  ///
-  /// A relative path to a directory existing in the `input_files` digest to execute the process
-  /// from. Defaults to the `input_files` root.
-  ///
-  pub working_directory: Option<RelativePath>,
-
   pub input_files: hashing::Digest,
 
   pub output_files: BTreeSet<PathBuf>,

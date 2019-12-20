@@ -33,7 +33,7 @@ use process_execution;
 
 use clap::{value_t, App, AppSettings, Arg};
 use hashing::{Digest, Fingerprint};
-use process_execution::{Context, ExecuteProcessRequestMetadata, Platform, RelativePath};
+use process_execution::{Context, ExecuteProcessRequestMetadata, Platform};
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::TryFrom;
 use std::iter::{FromIterator, Iterator};
@@ -321,15 +321,11 @@ fn main() {
     Digest(fingerprint, length)
   };
 
-  let working_directory = args
-    .value_of("working-directory")
-    .map(|path| RelativePath::new(path).expect("working-directory must be a relative path"));
   let is_nailgunnable: bool = args.value_of("use-nailgun").unwrap().parse().unwrap();
 
   let request = process_execution::ExecuteProcessRequest {
     argv,
     env,
-    working_directory,
     input_files,
     output_files,
     output_directories,

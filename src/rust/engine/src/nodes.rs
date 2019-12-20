@@ -28,7 +28,7 @@ use fs::{
 };
 use hashing;
 use process_execution::{
-  self, ExecuteProcessRequest, MultiPlatformExecuteProcessRequest, Platform, RelativePath,
+  self, ExecuteProcessRequest, MultiPlatformExecuteProcessRequest, Platform,
 };
 use rule_graph;
 
@@ -411,15 +411,6 @@ impl MultiPlatformExecuteProcess {
   ) -> Result<ExecuteProcessRequest, String> {
     let env = externs::project_tuple_encoded_map(&value, "env")?;
 
-    let working_directory = {
-      let val = externs::project_str(&value, "working_directory");
-      if val.is_empty() {
-        None
-      } else {
-        Some(RelativePath::new(val.as_str())?)
-      }
-    };
-
     let digest = lift_digest(&externs::project_ignoring_type(&value, "input_files"))
       .map_err(|err| format!("Error parsing digest {}", err))?;
 
@@ -465,7 +456,6 @@ impl MultiPlatformExecuteProcess {
     Ok(process_execution::ExecuteProcessRequest {
       argv: externs::project_multi_strs(&value, "argv"),
       env,
-      working_directory,
       input_files: digest,
       output_files,
       output_directories,

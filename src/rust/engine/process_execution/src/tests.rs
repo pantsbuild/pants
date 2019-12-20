@@ -11,7 +11,6 @@ fn execute_process_request_equality() {
         |description: String, timeout: Duration, unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: hashing::Digest| ExecuteProcessRequest {
             argv: vec![],
             env: BTreeMap::new(),
-            working_directory: None,
             input_files: hashing::EMPTY_DIGEST,
             output_files: BTreeSet::new(),
             output_directories: BTreeSet::new(),

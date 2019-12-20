@@ -258,11 +258,7 @@ impl CapturedWorkdir for CommandRunner {
   ) -> Result<Box<dyn Stream<Item = ChildOutput, Error = String> + Send>, String> {
     StreamedHermeticCommand::new(&req.argv[0])
       .args(&req.argv[1..])
-      .current_dir(if let Some(working_directory) = req.working_directory {
-        workdir_path.join(working_directory)
-      } else {
-        workdir_path.to_owned()
-      })
+      .current_dir(workdir_path.to_owned())
       .envs(&req.env)
       .stream()
       .map(|s| {

@@ -56,7 +56,6 @@ fn local_only_scratch_files_ignored() {
     env: vec![("SOME".to_owned(), "value".to_owned())]
       .into_iter()
       .collect(),
-    working_directory: None,
     input_files: input_directory.digest(),
     // Intentionally poorly sorted:
     output_files: vec!["path/to/file", "other/file"]
@@ -81,7 +80,6 @@ fn local_only_scratch_files_ignored() {
     env: vec![("SOME".to_owned(), "value".to_owned())]
       .into_iter()
       .collect(),
-    working_directory: None,
     input_files: input_directory.digest(),
     // Intentionally poorly sorted:
     output_files: vec!["path/to/file", "other/file"]
@@ -115,7 +113,6 @@ fn make_execute_request() {
     env: vec![("SOME".to_owned(), "value".to_owned())]
       .into_iter()
       .collect(),
-    working_directory: None,
     input_files: input_directory.digest(),
     // Intentionally poorly sorted:
     output_files: vec!["path/to/file", "other/file"]
@@ -199,7 +196,6 @@ fn make_execute_request_with_instance_name() {
     env: vec![("SOME".to_owned(), "value".to_owned())]
       .into_iter()
       .collect(),
-    working_directory: None,
     input_files: input_directory.digest(),
     // Intentionally poorly sorted:
     output_files: vec!["path/to/file", "other/file"]
@@ -291,7 +287,6 @@ fn make_execute_request_with_cache_key_gen_version() {
     env: vec![("SOME".to_owned(), "value".to_owned())]
       .into_iter()
       .collect(),
-    working_directory: None,
     input_files: input_directory.digest(),
     // Intentionally poorly sorted:
     output_files: vec!["path/to/file", "other/file"]
@@ -386,7 +381,6 @@ fn make_execute_request_with_jdk() {
   let req = ExecuteProcessRequest {
     argv: owned_string_vec(&["/bin/echo", "yo"]),
     env: BTreeMap::new(),
-    working_directory: None,
     input_files: input_directory.digest(),
     output_files: BTreeSet::new(),
     output_directories: BTreeSet::new(),
@@ -452,7 +446,6 @@ fn make_execute_request_with_jdk_and_extra_platform_properties() {
   let req = ExecuteProcessRequest {
     argv: owned_string_vec(&["/bin/echo", "yo"]),
     env: BTreeMap::new(),
-    working_directory: None,
     input_files: input_directory.digest(),
     output_files: BTreeSet::new(),
     output_directories: BTreeSet::new(),
@@ -560,7 +553,6 @@ fn server_rejecting_execute_request_gives_error() {
           &ExecuteProcessRequest {
             argv: owned_string_vec(&["/bin/echo", "-n", "bar"]),
             env: BTreeMap::new(),
-            working_directory: None,
             input_files: EMPTY_DIGEST,
             output_files: BTreeSet::new(),
             output_directories: BTreeSet::new(),
@@ -1045,7 +1037,6 @@ fn timeout_after_sufficiently_delayed_getoperations() {
   let execute_request = ExecuteProcessRequest {
     argv: owned_string_vec(&["/bin/echo", "-n", "foo"]),
     env: BTreeMap::new(),
-    working_directory: None,
     input_files: EMPTY_DIGEST,
     output_files: BTreeSet::new(),
     output_directories: BTreeSet::new(),
@@ -1098,7 +1089,6 @@ fn dropped_request_cancels() {
   let execute_request = ExecuteProcessRequest {
     argv: owned_string_vec(&["/bin/echo", "-n", "foo"]),
     env: BTreeMap::new(),
-    working_directory: None,
     input_files: EMPTY_DIGEST,
     output_files: BTreeSet::new(),
     output_directories: BTreeSet::new(),
@@ -2279,7 +2269,6 @@ pub fn echo_foo_request() -> MultiPlatformExecuteProcessRequest {
   let req = ExecuteProcessRequest {
     argv: owned_string_vec(&["/bin/echo", "-n", "foo"]),
     env: BTreeMap::new(),
-    working_directory: None,
     input_files: EMPTY_DIGEST,
     output_files: BTreeSet::new(),
     output_directories: BTreeSet::new(),
@@ -2593,7 +2582,6 @@ fn cat_roland_request() -> MultiPlatformExecuteProcessRequest {
   let req = ExecuteProcessRequest {
     argv: owned_string_vec(&["/bin/cat", "roland"]),
     env: BTreeMap::new(),
-    working_directory: None,
     input_files: TestDirectory::containing_roland().digest(),
     output_files: BTreeSet::new(),
     output_directories: BTreeSet::new(),
@@ -2612,7 +2600,6 @@ fn echo_roland_request() -> MultiPlatformExecuteProcessRequest {
   let req = ExecuteProcessRequest {
     argv: owned_string_vec(&["/bin/echo", "meoooow"]),
     env: BTreeMap::new(),
-    working_directory: None,
     input_files: EMPTY_DIGEST,
     output_files: BTreeSet::new(),
     output_directories: BTreeSet::new(),
