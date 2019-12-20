@@ -24,8 +24,26 @@ python_library(
 
 python_tests(
   name="tests",
+  sources=globs('*_test.py', exclude=[globs('*_integration_test.py')]),
   dependencies=[
     ':option',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/base:hash_utils',
+    'src/python/pants/base:deprecated',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/testutil/option',
+    'src/python/pants/testutil:test_base',
   ],
-  tags = {"partially_type_checked"},
+)
+
+python_tests(
+  name='integration',
+  sources=globs('*_integration_test.py'),
+  dependencies=[
+    'src/python/pants/util:contextutil',
+    'src/python/pants/testutil:int-test',
+    'testprojects/src/python:plugins_directory',
+  ],
+  tags = {'integration'},
+  timeout=90,
 )
