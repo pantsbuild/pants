@@ -11,9 +11,7 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm import argfile
 from pants.backend.jvm.subsystems.junit import JUnit
-from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.junit_tests import JUnitTests
-from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.coverage.manager import CodeCoverage
 from pants.backend.jvm.tasks.jvm_task import JvmTask
@@ -78,10 +76,6 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
              help='Set the working directory. If no argument is passed, use the build root. '
                   'If cwd is set on a target, it will supersede this option. It is an error to '
                   'use this option in combination with `--chroot`')
-    register('--strict-jvm-version', type=bool, advanced=True, fingerprint=True,
-             help='If true, will strictly require running junits with the same version of java as '
-                  'the platform -target level. Otherwise, the platform -target level will be '
-                  'treated as the minimum jvm to run.')
     register('--failure-summary', type=bool, default=True,
              help='If true, includes a summary of which test-cases failed at the end of a failed '
                   'junit run.')
@@ -130,7 +124,6 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     else:
       self._working_dir = options.cwd or get_buildroot()
 
-    self._strict_jvm_version = options.strict_jvm_version
     self._failure_summary = options.failure_summary
     self._open = options.open
     self._html_report = self._open or options.html_report
@@ -193,14 +186,13 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
 
   def classpath(self, targets, classpath_product=None, **kwargs):
     return super().classpath(targets,
-                                           classpath_product=classpath_product,
-                                           include_scopes=Scopes.JVM_TEST_SCOPES,
-                                           **kwargs)
+                             classpath_product=classpath_product,
+                             include_scopes=Scopes.JVM_TEST_SCOPES,
+                             **kwargs)
 
-  def preferred_jvm_distribution_for_targets(self, targets):
-    return JvmPlatform.preferred_jvm_distribution([target.platform for target in targets
-                                                  if isinstance(target, JvmTarget)],
-                                                  self._strict_jvm_version)
+  def _jvm_platforms_from_targets(self, targets):
+    return [target.test_platform for target in targets
+            if isinstance(target, JUnitTests)]
 
   def _spawn(self, distribution, executor=None, *args, **kwargs):
     """Returns a processhandler to a process executing java.
@@ -292,7 +284,7 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       complete_classpath.update(self.classpath(relevant_targets,
                                                classpath_product=classpath_product))
 
-      distribution = JvmPlatform.preferred_jvm_distribution([platform], self._strict_jvm_version)
+      distribution = self.preferred_jvm_distribution([platform])
 
       # Override cmdline args with values from junit_test() target that specify concurrency:
       args = self._args(fail_fast, batch_output_dir) + [u'-xmlreport']

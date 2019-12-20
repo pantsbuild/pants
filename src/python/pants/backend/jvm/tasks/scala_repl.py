@@ -42,9 +42,10 @@ class ScalaRepl(JvmToolTaskMixin, ReplTaskMixin, JvmTask):
     repl_name = ScalaPlatform.global_instance().repl
     return (self.tool_classpath('pants-runner') +
             self.tool_classpath(repl_name, scope=ScalaPlatform.options_scope) +
-            self.classpath(targets))
+            self.classpath(targets),
+            self.preferred_jvm_distribution_for_targets(targets))
 
-  def launch_repl(self, classpath):
+  def launch_repl(self, classpath, distribution):
     # The scala repl requires -Dscala.usejavacp=true since Scala 2.8 when launching in the way
     # we do here (not passing -classpath as a program arg to scala.tools.nsc.MainGenericRunner).
     jvm_options = self.jvm_options
@@ -55,9 +56,9 @@ class ScalaRepl(JvmToolTaskMixin, ReplTaskMixin, JvmTask):
     #
     # NOTE: Using PantsRunner class because the classLoader used by REPL
     # does not load Class-Path from manifest.
-    DistributionLocator.cached().execute_java(classpath=classpath,
-                                              main=ScalaRepl._RUNNER_MAIN,
-                                              jvm_options=jvm_options,
-                                              args=[self.get_options().main] + self.args,
-                                              create_synthetic_jar=True,
-                                              stdin=sys.stdin)
+    distribution.execute_java(classpath=classpath,
+                              main=ScalaRepl._RUNNER_MAIN,
+                              jvm_options=jvm_options,
+                              args=[self.get_options().main] + self.args,
+                              create_synthetic_jar=True,
+                              stdin=sys.stdin)

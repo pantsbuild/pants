@@ -68,7 +68,7 @@ class JvmPlatform(Subsystem):
                                name=name)
 
   @classmethod
-  def preferred_jvm_distribution(cls, platforms, strict=False):
+  def preferred_jvm_distribution(cls, platforms, strict=False, jdk=False):
     """Returns a jvm Distribution with a version that should work for all the platforms.
 
     Any one of those distributions whose version is >= all requested platforms' versions
@@ -78,13 +78,17 @@ class JvmPlatform(Subsystem):
     :param bool strict: If true, only distribution whose version matches the minimum
       required version can be returned, i.e, the max target_level of all the requested
       platforms.
+    :param bool jdk: If true, the distribution must be a JDK.
     :returns: Distribution one of the selected distributions.
     """
     if not platforms:
-      return DistributionLocator.cached()
+      return DistributionLocator.cached(jdk=jdk)
     min_version = max(platform.target_level for platform in platforms)
     max_version = Revision(*(min_version.components + [9999])) if strict else None
-    return DistributionLocator.cached(minimum_version=min_version, maximum_version=max_version)
+    return DistributionLocator.cached(
+      minimum_version=min_version,
+      maximum_version=max_version,
+      jdk=jdk)
 
   @memoized_property
   def platforms_by_name(self):
