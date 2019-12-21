@@ -215,7 +215,7 @@ class Parser:
     mutex_map = defaultdict(list)
     for args, kwargs in self._unnormalized_option_registrations_iter():
       self._validate(args, kwargs)
-      dest = self.parse_dest(*args, **kwargs)
+      name, dest = self.parse_name_and_dest(*args, **kwargs)
 
       # Compute the values provided on the command line for this option.  Note that there may be
       # multiple values, for any combination of the following reasons:
@@ -271,7 +271,7 @@ class Parser:
 
       # If the option is explicitly given, check deprecation and mutual exclusion.
       if val.rank > RankedValue.HARDCODED:
-        self._check_deprecated(dest, kwargs)
+        self._check_deprecated(name, kwargs)
 
         mutex_dest = kwargs.get('mutually_exclusive_group')
         if mutex_dest:
@@ -371,7 +371,7 @@ class Parser:
     """
     def normalize_kwargs(args, orig_kwargs):
       nkwargs = copy.copy(orig_kwargs)
-      dest = self.parse_dest(*args, **nkwargs)
+      _, dest = self.parse_name_and_dest(*args, **nkwargs)
       nkwargs['dest'] = dest
       if not ('default' in nkwargs and isinstance(nkwargs['default'], RankedValue)):
         nkwargs['default'] = self._compute_value(dest, nkwargs, [])
@@ -430,8 +430,8 @@ class Parser:
       raise FrozenRegistration(self.scope, args[0])
 
     if args:
-      dest = self.parse_dest(*args, **kwargs)
-      self._check_deprecated(dest, kwargs, print_warning=False)
+      name, dest = self.parse_name_and_dest(*args, **kwargs)
+      self._check_deprecated(name, kwargs, print_warning=False)
     
     # Prevent further registration in enclosing scopes.
     ancestor = self._parent_parser
@@ -461,13 +461,13 @@ class Parser:
         raise OptionAlreadyRegistered(self.scope, arg)
     self._known_args.update(args)
 
-  def _check_deprecated(self, dest, kwargs, print_warning=True):
+  def _check_deprecated(self, name, kwargs, print_warning=True):
     """Checks option for deprecation and issues a warning/error if necessary."""
     removal_version = kwargs.get('removal_version', None)
     if removal_version is not None:
       warn_or_error(
         removal_version=removal_version,
-        deprecated_entity_description=f"option '{dest}' in {self._scope_str()}",
+        deprecated_entity_description=f"option '{name}' in {self._scope_str()}",
         deprecation_start_version=kwargs.get('deprecation_start_version', None),
         hint=kwargs.get('removal_hint', None),
         stacklevel=9999,  # Out of range stacklevel to suppress printing src line.
@@ -538,18 +538,17 @@ class Parser:
   _ENV_SANITIZER_RE = re.compile(r'[.-]')
 
   @staticmethod
-  def parse_dest(*args, **kwargs):
-    """Select the dest name for an option registration.
+  def parse_name_and_dest(*args, **kwargs):
+    """Return the name and dest for an option registration.
 
     If an explicit `dest` is specified, returns that and otherwise derives a default from the
     option flags where '--foo-bar' -> 'foo_bar' and '-x' -> 'x'.
     """
-    explicit_dest = kwargs.get('dest')
-    if explicit_dest:
-      return explicit_dest
-
     arg = next((a for a in args if a.startswith('--')), args[0])
-    return arg.lstrip('-').replace('-', '_')
+    name = arg.lstrip('-').replace('-', '_')
+
+    dest = kwargs.get('dest')
+    return (name, dest if dest else name)
 
   @staticmethod
   def _wrap_type(t):

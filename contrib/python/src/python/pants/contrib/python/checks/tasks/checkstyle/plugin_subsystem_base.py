@@ -24,7 +24,8 @@ class PluginSubsystemBase(Subsystem):
     option_names = []
 
     def recording_register(*args, **kwargs):
-      option_names.append(Parser.parse_dest(*args, **kwargs))
+      _, dest = Parser.parse_name_and_dest(*args, **kwargs)
+      option_names.append(dest)
       register(*args, **kwargs)
 
     super().register_options(recording_register)
