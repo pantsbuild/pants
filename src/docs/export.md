@@ -181,7 +181,9 @@ The following is an abbreviated export file from a command in the pants repo:
 
 Export only modulizable targets for `export-dep-as-jar`, and the rest of targets will appears as libraries.
 
-Definition of `modulizable targets`: targets that should appear as modules in IntelliJ.
+Definition of `modulizable_targets`:
+1. Conceptually: targets that should appear as modules in IntelliJ.
+2. Computationally: dependees of target roots within the transitive context.
 
 For example, A -> B -> C -> D
 Given `./panst export-dep-as-jar A`,
