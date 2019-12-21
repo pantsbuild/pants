@@ -1,17 +1,16 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from collections import namedtuple
+from dataclasses import dataclass
+from typing import List, Type
 
 from pants.base import deprecated
 from pants.option.option_util import is_list_option
 from pants.util.collections import Enum
 
 
-class OptionHelpInfo(namedtuple('_OptionHelpInfo',
-    ['registering_class', 'display_args', 'scoped_cmd_line_args', 'unscoped_cmd_line_args',
-     'typ', 'default', 'help', 'deprecated_message', 'removal_version',
-     'removal_hint', 'choices'])):
+@dataclass(frozen=True)
+class OptionHelpInfo:
   """A container for help information for a single option.
 
   registering_class: The type that registered the option.
@@ -30,19 +29,33 @@ class OptionHelpInfo(namedtuple('_OptionHelpInfo',
   removal_hint: If deprecated: The removal hint message registered for this option.
   choices: If this option has a constrained list of choices, a csv list of the choices.
   """
+  registering_class: Type
+  display_args: List[str]
+  scoped_cmd_line_args: List[str]
+  unscoped_cmd_line_args: List[str]
+  typ: Type
+  default: str
+  help: str
+  deprecated_message: str
+  removal_version: str
+  removal_hint: str
+  choices: List[str]
 
   def comma_separated_display_args(self):
     return ', '.join(self.display_args)
 
 
-class OptionScopeHelpInfo(namedtuple('_OptionScopeHelpInfo',
-                                     ['scope', 'basic', 'recursive', 'advanced'])):
+@dataclass(frozen=True)
+class OptionScopeHelpInfo:
   """A container for help information for a scope of options.
 
   scope: The scope of the described options.
   basic|recursive|advanced: A list of OptionHelpInfo for the options in that group.
   """
-  pass
+  scope: str
+  basic: List[OptionHelpInfo]
+  recursive: List[OptionHelpInfo]
+  advanced: List[OptionHelpInfo]
 
 
 class HelpInfoExtracter:
