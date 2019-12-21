@@ -179,7 +179,7 @@ The following is an abbreviated export file from a command in the pants repo:
 
 ## 1.0.14
 
-Export only modulizable targets for `export-dep-as-jar`, and the rest of targets will appears as libraries.
+Export only modulizable targets for `export-dep-as-jar`, and the rest of targets will appear as libraries.
 
 Definition of `modulizable_targets`:
 1. Conceptually: targets that should appear as modules in IntelliJ.
