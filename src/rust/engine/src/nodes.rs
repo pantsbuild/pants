@@ -15,7 +15,7 @@ use futures01::Stream;
 use url::Url;
 
 use crate::context::{Context, Core};
-use crate::core::{throw, Failure, Key, Params, TypeId, Value};
+use crate::core::{cyclic_throw, throw, Failure, Key, Params, TypeId, Value};
 use crate::externs;
 use crate::intrinsics;
 use crate::selectors;
@@ -928,6 +928,7 @@ impl NodeVisualizer<NodeKey> for Visualizer {
     match entry.peek(context) {
       None => "white".to_string(),
       Some(Err(Failure::Throw(..))) => "4".to_string(),
+      Some(Err(Failure::Cyclic(..))) => "4".to_string(),
       Some(Err(Failure::Invalidated)) => "12".to_string(),
       Some(Ok(_)) => {
         let viz_colors_len = self.viz_colors.len();
@@ -948,6 +949,7 @@ impl NodeTracer<NodeKey> for Tracer {
     match result {
       Some(Err(Failure::Invalidated)) => false,
       Some(Err(Failure::Throw(..))) => false,
+      Some(Err(Failure::Cyclic(..))) => false,
       Some(Ok(_)) => true,
       None => {
         // A Node with no state is either still running, or effectively cancelled
@@ -962,7 +964,8 @@ impl NodeTracer<NodeKey> for Tracer {
     match result {
       None => "<None>".to_string(),
       Some(Ok(ref x)) => format!("{:?}", x),
-      Some(Err(Failure::Throw(ref x, ref traceback))) => format!(
+      Some(Err(Failure::Throw(ref x, ref traceback)))
+      | Some(Err(Failure::Cyclic(ref x, ref traceback))) => format!(
         "Throw({})\n{}",
         externs::val_to_str(x),
         traceback
@@ -1136,10 +1139,18 @@ impl NodeError for Failure {
       path[0] += " <-";
       path[path_len - 1] += " <-"
     }
-    throw(&format!(
+    cyclic_throw(&format!(
       "Dep graph contained a cycle:\n  {}",
       path.join("\n  ")
     ))
+  }
+
+  fn indicates_that_the_graph_is_invalid(&self) -> bool {
+    match self {
+      Failure::Cyclic(_, _) => true,
+      Failure::Invalidated => false,
+      Failure::Throw(_, _) => false,
+    }
   }
 }
 

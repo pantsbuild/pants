@@ -296,6 +296,36 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
       str(cm.exception)
     )
 
+  def test_no_memoize_exceptions(self):
+    """Validate that an @rule invocation which throws an exception isn't memoized.
+
+    Re-defining function_to_call() mimics an @rule that intermittently throws exceptions:
+    1. The first time we call scheduler.product_request(), we hit the ValueError-throwing version of
+       function_to_call() and so scheduler.product_request() throws an ExecutionError.
+    2. The second time, we redefine function_to_call() to not throw an exception -- so instead of
+       caching the ValueError from the first definition of function_to_call(), the engine re-runs
+       the f @rule, this time successfully.
+    """
+
+    def function_to_call() -> B:
+      raise ValueError('this exception should not be cached!!')
+
+    @rule
+    def f(a: A) -> B:
+      return function_to_call()
+
+    scheduler = self.scheduler([f, RootRule(A)], include_trace_on_error=False)
+
+    a = A()
+
+    with self.assertRaises(ExecutionError):
+      scheduler.product_request(B, subjects=[a])
+
+    def function_to_call() -> B: # noqa: F811
+      return B()
+
+    result, = scheduler.product_request(B, subjects=[a])
+    assert isinstance(result, B)
 
   @dataclass
   class WorkunitTracker:

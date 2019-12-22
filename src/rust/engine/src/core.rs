@@ -287,6 +287,8 @@ pub enum Failure {
   /// A Node failed because a filesystem change invalidated it or its inputs.
   /// A root requestor should usually immediately retry their request.
   Invalidated,
+  /// A rule raised an exception about the graph being cyclic.
+  Cyclic(Value, String),
   /// A rule raised an exception.
   Throw(Value, String),
 }
@@ -296,8 +298,19 @@ impl fmt::Display for Failure {
     match self {
       Failure::Invalidated => write!(f, "Exhausted retries due to changed files."),
       Failure::Throw(exc, _) => write!(f, "{}", externs::val_to_str(exc)),
+      Failure::Cyclic(exc, _) => write!(f, "{}", externs::val_to_str(exc)),
     }
   }
+}
+
+pub fn cyclic_throw(msg: &str) -> Failure {
+  Failure::Cyclic(
+    externs::create_exception(msg),
+    format!(
+      "Traceback (no traceback):\n  <pants native internals>\nException: {}",
+      msg
+    ),
+  )
 }
 
 pub fn throw(msg: &str) -> Failure {

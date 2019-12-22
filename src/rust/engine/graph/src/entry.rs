@@ -66,12 +66,9 @@ impl Generation {
 ///
 #[derive(Clone, Debug)]
 pub(crate) enum EntryResult<N: Node> {
-  Clean(Result<N::Item, N::Error>),
-  Dirty(Result<N::Item, N::Error>),
-  Uncacheable(
-    Result<N::Item, N::Error>,
-    <<N as Node>::Context as NodeContext>::SessionId,
-  ),
+  Clean(N::Item),
+  Dirty(N::Item),
+  Uncacheable(N::Item, <<N as Node>::Context as NodeContext>::SessionId),
 }
 
 impl<N: Node> EntryResult<N> {
@@ -83,7 +80,7 @@ impl<N: Node> EntryResult<N> {
     }
   }
 
-  fn peek(&self, context: &N::Context) -> Option<Result<N::Item, N::Error>> {
+  fn peek(&self, context: &N::Context) -> Option<N::Item> {
     if self.is_clean(context) {
       Some(self.as_ref().clone())
     } else {
@@ -106,8 +103,8 @@ impl<N: Node> EntryResult<N> {
   }
 }
 
-impl<N: Node> AsRef<Result<N::Item, N::Error>> for EntryResult<N> {
-  fn as_ref(&self) -> &Result<N::Item, N::Error> {
+impl<N: Node> AsRef<N::Item> for EntryResult<N> {
+  fn as_ref(&self) -> &N::Item {
     match self {
       EntryResult::Clean(v) => v,
       EntryResult::Dirty(v) => v,
@@ -116,7 +113,9 @@ impl<N: Node> AsRef<Result<N::Item, N::Error>> for EntryResult<N> {
   }
 }
 
-#[allow(clippy::type_complexity)]
+pub(crate) type Waiter<N> =
+  oneshot::Sender<Result<(<N as Node>::Item, Generation), <N as Node>::Error>>;
+
 #[derive(Debug)]
 pub(crate) enum EntryState<N: Node> {
   // A node that has either been explicitly cleared, or has not yet started Running. In this state
@@ -126,20 +125,38 @@ pub(crate) enum EntryState<N: Node> {
   // The previous_result value is _not_ a valid value for this Entry: rather, it is preserved in
   // order to compute the generation value for this Node by comparing it to the new result the next
   // time the Node runs.
-  NotStarted {
+  //
+  // Similarly, because exceptions are not cached in the graph, previous_error does not affect the
+  // value for this Entry, and is only used in .peek() so we can e.g. generate a scheduler stack
+  // trace before exiting from an uncaught exception. If the exception is caught, this value is
+  // ignored and eventually cleared when this Entry completes successfully.
+  Dormant {
     run_token: RunToken,
     generation: Generation,
     previous_result: Option<EntryResult<N>>,
+    previous_error: Option<N::Error>,
+  },
+  // A node which previously received an error which indicated that the node would be unable to
+  // satisfy any further inputs. This will occur if a node ever errors out with a cyclic graph
+  // exception.
+  //
+  // This exists as a distinct EntryState so that we can accurately reconstruct the graph to
+  // e.g. print the scheduler stack trace to the terminal to describe a cyclic graph error before
+  // pants exits. A node is only expected to ever be in this state immediately before pants exits.
+  Erroneous {
+    run_token: RunToken,
+    generation: Generation,
+    error: N::Error,
   },
   // A node that is running. A running node that has been marked dirty re-runs rather than
   // completing.
   //
-  // The `previous_result` value for a Running node is not a valid value. See NotStarted.
+  // The `previous_result` value for a Running node is not a valid value. See Dormant.
   Running {
     run_token: RunToken,
     generation: Generation,
     start_time: Instant,
-    waiters: Vec<oneshot::Sender<Result<(N::Item, Generation), N::Error>>>,
+    waiters: Vec<Waiter<N>>,
     previous_result: Option<EntryResult<N>>,
     dirty: bool,
   },
@@ -156,10 +173,11 @@ pub(crate) enum EntryState<N: Node> {
 
 impl<N: Node> EntryState<N> {
   fn initial() -> EntryState<N> {
-    EntryState::NotStarted {
+    EntryState::Dormant {
       run_token: RunToken::initial(),
       generation: Generation::initial(),
       previous_result: None,
+      previous_error: None,
     }
   }
 }
@@ -199,8 +217,10 @@ impl<N: Node> Entry<N> {
   ///
   pub fn peek(&self, context: &N::Context) -> Option<Result<N::Item, N::Error>> {
     let state = self.state.lock();
-    match *state {
-      EntryState::Completed { ref result, .. } => result.peek(context),
+    match &*state {
+      EntryState::Completed { ref result, .. } => result.peek(context).map(Ok),
+      EntryState::Erroneous { error, .. } => Some(Err(error.clone())),
+      EntryState::Dormant { previous_error, .. } => previous_error.as_ref().map(|e| Err(e.clone())),
       _ => None,
     }
   }
@@ -318,9 +338,7 @@ impl<N: Node> Entry<N> {
           generation,
           ..
         } if result.is_clean(context) => {
-          return future::result(result.as_ref().clone())
-            .map(move |res| (res, generation))
-            .to_boxed();
+          return future::ok((result.as_ref().clone(), generation)).to_boxed();
         }
         _ => {
           // Fall through to the second match.
@@ -329,10 +347,11 @@ impl<N: Node> Entry<N> {
 
       // Otherwise, we'll need to swap the state of the Node, so take it by value.
       let next_state = match mem::replace(&mut *state, EntryState::initial()) {
-        EntryState::NotStarted {
+        EntryState::Dormant {
           run_token,
           generation,
           previous_result,
+          ..
         } => Self::run(
           context,
           &self.node,
@@ -342,6 +361,11 @@ impl<N: Node> Entry<N> {
           None,
           previous_result,
         ),
+        // When an Entry is marked Erroneous with some error, it is out of commission from then on,
+        // and will always immediately return that error.
+        EntryState::Erroneous { error, .. } => {
+          return future::err(error).to_boxed();
+        }
         EntryState::Completed {
           run_token,
           generation,
@@ -390,6 +414,82 @@ impl<N: Node> Entry<N> {
   }
 
   ///
+  /// The node was dirtied while it was running. The dep_generations and new result cannot
+  /// be trusted and were never published. We continue to use the previous result.
+  ///
+  fn apply_dirty(
+    &self,
+    context: &N::Context,
+    entry_id: EntryId,
+    run_token: RunToken,
+    generation: Generation,
+    mut previous_result: Option<EntryResult<N>>,
+  ) -> EntryState<N> {
+    trace!(
+      "Not completing node {:?} because it was dirtied before completing.",
+      self.node
+    );
+    if let Some(previous_result) = previous_result.as_mut() {
+      previous_result.dirty();
+    }
+    Self::run(
+      context,
+      &self.node,
+      entry_id,
+      run_token,
+      generation,
+      None,
+      previous_result,
+    )
+  }
+
+  ///
+  /// Notify all waiters (ignoring any that have gone away), and then store the value.
+  /// A waiter will go away whenever they drop the `Future` `Receiver` of the value, perhaps
+  /// due to failure of another Future in a `join` or `join_all`, or due to a timeout at the
+  /// root of a request.
+  ///
+  fn complete_if_not_dirty(
+    &self,
+    run_token: RunToken,
+    generation: Generation,
+    dep_generations: Vec<Generation>,
+    next_result: EntryResult<N>,
+    waiters: Vec<Waiter<N>>,
+  ) -> EntryState<N> {
+    trace!(
+      "Completing node {:?} with {} waiters.",
+      self.node,
+      waiters.len()
+    );
+    for waiter in waiters {
+      let _ = waiter.send(Ok((next_result.as_ref().clone(), generation)));
+    }
+    EntryState::Completed {
+      result: next_result,
+      dep_generations,
+      run_token,
+      generation,
+    }
+  }
+
+  fn send_error(
+    error: &N::Error,
+    previous_result: &mut Option<EntryResult<N>>,
+    waiters: Vec<Waiter<N>>,
+  ) {
+    if let Some(previous_result) = previous_result.as_mut() {
+      previous_result.dirty();
+    }
+
+    if error != &N::Error::invalidated() {
+      for waiter in waiters {
+        let _ = waiter.send(Err(error.clone()));
+      }
+    }
+  }
+
+  ///
   /// Called from the Executor when a Node completes.
   ///
   /// A `result` value of `None` indicates that the Node was found to be clean, and its previous
@@ -434,92 +534,79 @@ impl<N: Node> Entry<N> {
         mut previous_result,
         dirty,
         ..
-      } => {
-        if result == Some(Err(N::Error::invalidated())) {
-          // Because it is always ephemeral, invalidation is the only type of Err that we do not
-          // persist in the Graph. Instead, swap the Node to NotStarted to drop all waiters,
-          // causing them to also experience invalidation (transitively).
-          trace!(
-            "Not completing node {:?} because it was invalidated before completing.",
-            self.node
-          );
-          if let Some(previous_result) = previous_result.as_mut() {
-            previous_result.dirty();
-          }
-          EntryState::NotStarted {
-            run_token: run_token.next(),
-            generation,
-            previous_result,
-          }
-        } else if dirty {
-          // The node was dirtied while it was running. The dep_generations and new result cannot
-          // be trusted and were never published. We continue to use the previous result.
-          trace!(
-            "Not completing node {:?} because it was dirtied before completing.",
-            self.node
-          );
-          if let Some(previous_result) = previous_result.as_mut() {
-            previous_result.dirty();
-          }
-          Self::run(
-            context,
-            &self.node,
-            entry_id,
-            run_token,
-            generation,
-            None,
-            previous_result,
-          )
-        } else {
-          // If the new result does not match the previous result, the generation increments.
-          let (generation, next_result) = if let Some(result) = result {
-            let next_result = if !self.node.cacheable(context) {
-              EntryResult::Uncacheable(result, context.session_id().clone())
-            } else if has_dirty_dependencies {
-              EntryResult::Dirty(result)
-            } else {
-              EntryResult::Clean(result)
-            };
-            if Some(next_result.as_ref()) == previous_result.as_ref().map(EntryResult::as_ref) {
-              // Node was re-executed, but had the same result value.
-              (generation, next_result)
-            } else {
-              (generation.next(), next_result)
+      } => match result {
+        Some(Err(error)) => {
+          // We only persist errors which indicate that the graph is invalid, i.e. that the error is
+          // non-ephemeral and will continue to occur.
+          if error.indicates_that_the_graph_is_invalid() {
+            trace!(
+              "Marking node {:?} as being left in an invalid (erroneous) state from error: {:?}.",
+              self.node,
+              error,
+            );
+
+            Self::send_error(&error, &mut previous_result, waiters);
+
+            EntryState::Erroneous {
+              run_token,
+              generation,
+              error,
             }
+          } else {
+            // Otherwise, we do not persist invalidations or errors in the Graph. In this case, we
+            // swap the Node to Dormant to drop all waiters, causing them to also experience
+            // invalidation (transitively).
+            trace!(
+              "Not completing node {:?} because it was invalidated before completing (error: {:?}).",
+              self.node, error
+            );
+
+            Self::send_error(&error, &mut previous_result, waiters);
+
+            EntryState::Dormant {
+              run_token: run_token.next(),
+              generation,
+              previous_result,
+              previous_error: Some(error),
+            }
+          }
+        }
+        None => {
+          if dirty {
+            self.apply_dirty(context, entry_id, run_token, generation, previous_result)
           } else {
             // Node was marked clean.
             // NB: The `expect` here avoids a clone and a comparison: see the method docs.
-            let mut result =
+            let mut next_result =
               previous_result.expect("A Node cannot be marked clean without a previous result.");
-            if has_dirty_dependencies {
-              result.dirty();
-            } else {
-              result.clean();
-            }
-            (generation, result)
-          };
-          // Notify all waiters (ignoring any that have gone away), and then store the value.
-          // A waiter will go away whenever they drop the `Future` `Receiver` of the value, perhaps
-          // due to failure of another Future in a `join` or `join_all`, or due to a timeout at the
-          // root of a request.
-          trace!(
-            "Completing node {:?} (generation {:?}) with {} waiters: {:?}",
-            self.node,
-            generation,
-            waiters.len(),
-            next_result,
-          );
-          for waiter in waiters {
-            let _ = waiter.send(next_result.as_ref().clone().map(|res| (res, generation)));
-          }
-          EntryState::Completed {
-            result: next_result,
-            dep_generations,
-            run_token,
-            generation,
+            next_result.clean();
+            self.complete_if_not_dirty(run_token, generation, dep_generations, next_result, waiters)
           }
         }
-      }
+        Some(Ok(result)) => {
+          if dirty {
+            self.apply_dirty(context, entry_id, run_token, generation, previous_result)
+          } else {
+            // If the new result does not match the previous result, the generation increments.
+            let (generation, next_result): (_, EntryResult<N>) = {
+              let next_result = if !self.node.cacheable(context) {
+                EntryResult::Uncacheable(result, context.session_id().clone())
+              } else if has_dirty_dependencies {
+                EntryResult::Dirty(result)
+              } else {
+                EntryResult::Clean(result)
+              };
+              if Some(next_result.as_ref()) == previous_result.as_ref().map(EntryResult::as_ref) {
+                // Node was re-executed, but had the same result value.
+                (generation, next_result)
+              } else {
+                (generation.next(), next_result)
+              }
+            };
+            self.complete_if_not_dirty(run_token, generation, dep_generations, next_result, waiters)
+          }
+        }
+      },
       s => s,
     };
   }
@@ -532,7 +619,8 @@ impl<N: Node> Entry<N> {
   ///
   pub(crate) fn generation(&self) -> Generation {
     match *self.state.lock() {
-      EntryState::NotStarted { generation, .. }
+      EntryState::Dormant { generation, .. }
+      | EntryState::Erroneous { generation, .. }
       | EntryState::Running { generation, .. }
       | EntryState::Completed { generation, .. } => generation,
     }
@@ -546,7 +634,8 @@ impl<N: Node> Entry<N> {
   ///
   pub(crate) fn run_token(&self) -> RunToken {
     match *self.state.lock() {
-      EntryState::NotStarted { run_token, .. }
+      EntryState::Dormant { run_token, .. }
+      | EntryState::Erroneous { run_token, .. }
       | EntryState::Running { run_token, .. }
       | EntryState::Completed { run_token, .. } => run_token,
     }
@@ -586,7 +675,7 @@ impl<N: Node> Entry<N> {
 
     let (run_token, generation, mut previous_result) =
       match mem::replace(&mut *state, EntryState::initial()) {
-        EntryState::NotStarted {
+        EntryState::Dormant {
           run_token,
           generation,
           previous_result,
@@ -598,6 +687,11 @@ impl<N: Node> Entry<N> {
           previous_result,
           ..
         } => (run_token, generation, previous_result),
+        EntryState::Erroneous {
+          run_token,
+          generation,
+          ..
+        } => (run_token, generation, None),
         EntryState::Completed {
           run_token,
           generation,
@@ -615,10 +709,11 @@ impl<N: Node> Entry<N> {
     }
 
     // Swap in a state with a new RunToken value, which invalidates any outstanding work.
-    *state = EntryState::NotStarted {
+    *state = EntryState::Dormant {
       run_token: run_token.next(),
       generation,
       previous_result,
+      previous_error: None,
     };
   }
 
@@ -638,13 +733,14 @@ impl<N: Node> Entry<N> {
       &mut EntryState::Completed { ref mut result, .. } => {
         result.dirty();
       }
-      &mut EntryState::NotStarted { .. } => {}
+      &mut EntryState::Dormant { .. } => {}
+      &mut EntryState::Erroneous { .. } => {}
     }
   }
 
   pub fn is_clean(&self, context: &N::Context) -> bool {
     match *self.state.lock() {
-      EntryState::NotStarted {
+      EntryState::Dormant {
         ref previous_result,
         ..
       }
@@ -659,6 +755,7 @@ impl<N: Node> Entry<N> {
         }
       }
       EntryState::Completed { ref result, .. } => result.is_clean(context),
+      EntryState::Erroneous { .. } => true,
     }
   }
 

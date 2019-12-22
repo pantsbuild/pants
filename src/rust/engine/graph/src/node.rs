@@ -60,6 +60,12 @@ pub trait NodeError: Clone + Debug + Eq + Send {
   /// Creates an instance that represents that a Node dependency was cyclic along the given path.
   ///
   fn cyclic(path: Vec<String>) -> Self;
+
+  ///
+  /// If this error indicates an erroneous state of the underlying graph. A cyclic graph error
+  /// generated with Self::cyclic() will return true for this.
+  ///
+  fn indicates_that_the_graph_is_invalid(&self) -> bool;
 }
 
 ///

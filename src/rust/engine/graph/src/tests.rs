@@ -662,4 +662,8 @@ impl NodeError for TError {
   fn cyclic(_path: Vec<String>) -> Self {
     TError::Cyclic
   }
+
+  fn indicates_that_the_graph_is_invalid(&self) -> bool {
+    self == &TError::Cyclic
+  }
 }
