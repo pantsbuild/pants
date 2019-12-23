@@ -239,6 +239,31 @@ EMPTY_SNAPSHOT = Snapshot(
 )
 
 
+# FIXME: make pex and cloc rulesets produce this instead of doing snapshot.files[0]!
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class SingleFileExecutable:
+  exe_filename: Path
+  directory_digest: Digest
+
+  class ValidationError(ValueError): pass
+
+  @classmethod
+  def _raise_validation_error(cls, snapshot: Snapshot, should_message: str) -> None:
+    raise cls.ValidationError(f'snapshot {snapshot} used for {cls} should {should_message}')
+
+  def __init__(self, snapshot: Snapshot) -> None:
+    if snapshot.dirs:
+      self._raise_validation_error(snapshot, 'have no dirs!')
+    if len(snapshot.files) != 1:
+      self._raise_validation_error(snapshot, 'have only 1 file!')
+    if snapshot.directory_digest == EMPTY_DIRECTORY_DIGEST:
+      self._raise_validation_error(snapshot, 'have a non-empty digest!')
+
+    self.exe_filename = Path(snapshot.files[0])
+    self.directory_digest = snapshot.directory_digest
+
+
 def create_fs_rules():
   """Creates rules that consume the intrinsic filesystem types."""
   return [
