@@ -120,6 +120,7 @@ def load_build_configuration_from_source(build_configuration, backends1, backend
 
   backend_packages2 = OrderedSet([
       'pants.rules.core',
+      'pants.rules.shell_scripts',
     ] + (backends2 or []))
   for backend_package in backend_packages2:
     load_backend(build_configuration, backend_package, is_v1_backend=False)

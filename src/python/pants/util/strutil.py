@@ -3,6 +3,7 @@
 
 import re
 import shlex
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Union
 
 
@@ -127,3 +128,7 @@ def strip_prefix(string: str, prefix: str) -> str:
     return string[len(prefix):]
   else:
     return string
+
+
+def ensure_relative_file_name(path: Path) -> str:
+  return f'./{path}'

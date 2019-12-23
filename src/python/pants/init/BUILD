@@ -35,6 +35,7 @@ python_library(
     'src/python/pants/process',
     'src/python/pants/python',
     'src/python/pants/rules/core',
+    'src/python/pants/rules/shell_scripts',
     'src/python/pants/subsystem',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',

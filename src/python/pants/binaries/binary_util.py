@@ -49,8 +49,12 @@ class HostPlatform:
   def empty(cls):
     return cls(None, None)
 
-  def as_engine_platform(self):
-    return Platform(self.os_name)
+  def as_engine_platform(self) -> Platform:
+    if self.os_name == 'mac':
+      return Platform.darwin
+    if self.os_name == 'linux':
+      return Platform.linux
+    raise ValueError(f'unrecognized platform {self.os_name} -- could not create {Platform}')
 
   def binary_path_components(self):
     """These strings are used as consecutive components of the path where a binary is fetched.

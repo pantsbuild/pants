@@ -1,0 +1,21 @@
+python_library(
+  dependencies=[
+    '3rdparty/python:dataclasses',
+    'src/python/pants/binaries',
+    'src/python/pants/engine:console',
+    'src/python/pants/engine:fs',
+    'src/python/pants/engine:goal',
+    'src/python/pants/engine:isolated_process',
+    'src/python/pants/engine:platform',
+    'src/python/pants/engine:rules',
+    'src/python/pants/engine:selectors',
+    'src/python/pants/util:pkg_util',
+    'src/python/pants/util:strutil',
+    ':move-output-file',
+  ]
+)
+
+resources(
+  name='move-output-file',
+  sources=['move_output_file_path.bash'],
+)
