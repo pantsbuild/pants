@@ -8,6 +8,7 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/engine:fs',
+    'src/python/pants/engine:platform',
     'src/python/pants/engine:rules',
     'src/python/pants/engine:selectors',
     'src/python/pants/fs',

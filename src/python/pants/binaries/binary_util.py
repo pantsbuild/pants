@@ -17,6 +17,7 @@ from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.engine.platform import Platform
 from pants.engine.rules import rule
 from pants.fs.archive import archiver_for_path
 from pants.net.http.fetcher import Fetcher
@@ -47,6 +48,9 @@ class HostPlatform:
   @memoized_classproperty
   def empty(cls):
     return cls(None, None)
+
+  def as_engine_platform(self):
+    return Platform(self.os_name)
 
   def binary_path_components(self):
     """These strings are used as consecutive components of the path where a binary is fetched.
