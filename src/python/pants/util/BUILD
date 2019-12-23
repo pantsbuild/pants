@@ -157,3 +157,13 @@ python_library(
   sources = ['xml_parser.py'],
   tags = {'partially_type_checked'},
 )
+
+python_library(
+  name = 'pkg_util',
+  sources = ['pkg_util.py'],
+  dependencies = [
+    '3rdparty/python:setuptools',
+    ':memo',
+  ],
+  tags = {'partially_type_checked'},
+)
