@@ -6,12 +6,7 @@ import inspect
 from contextlib import contextmanager
 from typing import Any, Callable, Optional, TypeVar
 
-from pants.util.meta import P, classproperty, staticproperty
-
-
-# NB: We liberally ignore MyPy issues in the implementations of these decorators. This is because
-#  it would be hard to both type the implementation correctly and get the call sites of the
-#  decorators properly typed. We care far more about the latter use case.
+from pants.util.meta import T, classproperty, staticproperty
 
 
 FuncType = Callable[..., Any]
@@ -66,7 +61,7 @@ def per_instance(*args, **kwargs):
 
 
 def memoized(
-  func: Optional[F] = None, *, key_factory=equal_args, cache_factory=dict,
+  func: Optional[F] = None, key_factory=equal_args, cache_factory=dict,
 ) -> F:
   """Memoizes the results of a function call.
 
@@ -150,7 +145,7 @@ def memoized(
 
 
 def memoized_method(
-  func: Optional[F] = None, *, key_factory=per_instance, cache_factory=dict,
+  func: Optional[F] = None, key_factory=per_instance, cache_factory=dict,
 ) -> F:
   """A convenience wrapper for memoizing instance methods.
 
@@ -190,8 +185,8 @@ def memoized_method(
 
 
 def memoized_property(
-  func: Optional[Callable[..., P]] = None, *, key_factory=per_instance, cache_factory=dict,
-) -> P:
+  func: Optional[Callable[..., T]] = None, key_factory=per_instance, cache_factory=dict,
+) -> T:
   """A convenience wrapper for memoizing properties.
 
   Applied like so:
@@ -261,7 +256,7 @@ def memoized_property(
 
 
 def memoized_classmethod(
-  func: Optional[F] = None, *, key_factory=per_instance, cache_factory=dict,
+  func: Optional[F] = None, key_factory=per_instance, cache_factory=dict,
 ) -> F:
   return classmethod(  # type: ignore[return-value]
     memoized_method(func, key_factory=key_factory, cache_factory=cache_factory)
@@ -269,15 +264,15 @@ def memoized_classmethod(
 
 
 def memoized_classproperty(
-  func: Optional[Callable[..., P]] = None, *, key_factory=per_instance, cache_factory=dict,
-) -> P:
+  func: Optional[Callable[..., T]] = None, key_factory=per_instance, cache_factory=dict,
+) -> T:
   return classproperty(
     memoized_classmethod(func, key_factory=key_factory, cache_factory=cache_factory)
   )
 
 
 def memoized_staticmethod(
-  func: Optional[F] = None, *, key_factory=equal_args, cache_factory=dict,
+  func: Optional[F] = None, key_factory=equal_args, cache_factory=dict,
 ) -> F:
   return staticmethod(  # type: ignore[return-value]
     memoized(func, key_factory=key_factory, cache_factory=cache_factory)
@@ -285,16 +280,16 @@ def memoized_staticmethod(
 
 
 def memoized_staticproperty(
-  func: Optional[Callable[..., P]] = None, *, key_factory=equal_args, cache_factory=dict,
-) -> P:
+  func: Optional[Callable[..., T]] = None, key_factory=equal_args, cache_factory=dict,
+) -> T:
   return staticproperty(
     memoized_staticmethod(func, key_factory=key_factory, cache_factory=cache_factory)
   )
 
 
 def testable_memoized_property(
-  func: Optional[Callable[..., P]] = None, key_factory=per_instance, cache_factory=dict,
-) -> P:
+  func: Optional[Callable[..., T]] = None, key_factory=per_instance, cache_factory=dict,
+) -> T:
   """A variant of `memoized_property` that allows for setting of properties (for tests, etc)."""
   getter = memoized_method(func=func, key_factory=key_factory, cache_factory=cache_factory)
 

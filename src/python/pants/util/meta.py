@@ -7,10 +7,7 @@ from typing import Any, Callable, Optional, Type, TypeVar, Union
 
 
 T = TypeVar("T")
-C = TypeVar("C")
-# This TypeVar is used to annotate property decorators. The decorator should take the parameter
-# func=Callable[..., P] and return P.
-P = TypeVar("P")
+C = TypeVar("C", bound=Type)
 
 
 class SingletonMetaclass(type):
@@ -58,7 +55,7 @@ with an @classproperty decorator."""
     return callable_field()
 
 
-def classproperty(func: Callable[..., P]) -> P:
+def classproperty(func: Callable[..., T]) -> T:
   """Use as a decorator on a method definition to make it a class-level attribute.
 
   This decorator can be applied to a method, a classmethod, or a staticmethod. This decorator will
@@ -91,7 +88,7 @@ def classproperty(func: Callable[..., P]) -> P:
   return ClassPropertyDescriptor(func, doc)  # type: ignore[arg-type, return-value]
 
 
-def staticproperty(func: Callable[..., P]) -> P:
+def staticproperty(func: Callable[..., T]) -> T:
   """Use as a decorator on a method definition to make it a class-level attribute (without binding).
 
   This decorator can be applied to a method or a staticmethod. This decorator does not bind any
@@ -125,7 +122,7 @@ def staticproperty(func: Callable[..., P]) -> P:
   return ClassPropertyDescriptor(func, doc)  # type: ignore[arg-type, return-value]
 
 
-def frozen_after_init(cls: Type[C]) -> Type[C]:
+def frozen_after_init(cls: C) -> C:
   """Class decorator to freeze any modifications to the object after __init__() is done.
 
   The primary use case is for @dataclasses who cannot use frozen=True due to the need for a custom
@@ -138,7 +135,7 @@ def frozen_after_init(cls: Type[C]) -> Type[C]:
 
   @wraps(prev_init)
   def new_init(self, *args: Any, **kwargs: Any) -> None:
-    prev_init(self, *args, **kwargs)  # type: ignore[call-arg]
+    prev_init(self, *args, **kwargs)
     self._is_frozen = True
 
   @wraps(prev_setattr)
@@ -147,8 +144,8 @@ def frozen_after_init(cls: Type[C]) -> Type[C]:
       raise FrozenInstanceError(
         f"Attempting to modify the attribute {key} after the object {self} was created."
       )
-    prev_setattr(self, key, value)
+    prev_setattr(self, key, value)  # type: ignore[call-arg]
 
-  cls.__init__ = new_init  # type: ignore[assignment]
-  cls.__setattr__ = new_setattr  # type: ignore[assignment]
+  cls.__init__ = new_init
+  cls.__setattr__ = new_setattr
   return cls
