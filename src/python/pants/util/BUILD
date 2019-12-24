@@ -70,7 +70,7 @@ python_library(
   dependencies = [
     ':meta'
   ],
-  tags = {'partially_type_checked'},
+  tags = {'type_checked'},
 )
 
 python_library(
