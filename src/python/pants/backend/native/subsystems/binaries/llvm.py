@@ -9,8 +9,8 @@ from pants.binaries.binary_tool import NativeTool
 from pants.binaries.binary_util import BinaryToolUrlGenerator
 from pants.engine.platform import Platform
 from pants.engine.rules import RootRule, rule
-from pants.util import enums
 from pants.util.dirutil import is_readable_dir
+from pants.util.enums import match
 from pants.util.memo import memoized_method, memoized_property
 
 
@@ -82,7 +82,7 @@ class LLVM(NativeTool):
   def linker(self, platform: Platform) -> Linker:
     return Linker(
       path_entries=self.path_entries,
-      exe_filename=enums.match(platform, {
+      exe_filename=match(platform, {
         Platform.darwin: "ld64.lld",
         Platform.linux: "lld",
       }),

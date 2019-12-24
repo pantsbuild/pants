@@ -8,7 +8,7 @@ from pants.build_graph.mirrored_target_option_mixin import MirroredTargetOptionM
 from pants.engine.platform import Platform
 from pants.option.compiler_option_sets_mixin import CompilerOptionSetsMixin
 from pants.subsystem.subsystem import Subsystem
-from pants.util import enums
+from pants.util.enums import match
 from pants.util.memo import memoized_property
 from pants.util.meta import classproperty
 
@@ -38,7 +38,7 @@ class NativeBuildStep(CompilerOptionSetsMixin, MirroredTargetOptionMixin, Subsys
                   'for targets of this language.')
 
     register('--toolchain-variant', advanced=True,
-             default=enums.match(Platform.current, {
+             default=match(Platform.current, {
                Platform.darwin: ToolchainVariant.llvm,
                Platform.linux: ToolchainVariant.gnu,
              }),

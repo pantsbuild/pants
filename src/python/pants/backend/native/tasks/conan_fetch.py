@@ -13,9 +13,9 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.engine.platform import Platform
 from pants.task.simple_codegen_task import SimpleCodegenTask
-from pants.util import enums
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import mergetree, safe_file_dump, safe_mkdir
+from pants.util.enums import match
 from pants.util.memo import memoized_property
 
 
@@ -119,7 +119,7 @@ class ConanFetch(SimpleCodegenTask):
 
   @memoized_property
   def _conan_os_name(self):
-    return enums.match(Platform.current, {
+    return match(Platform.current, {
       Platform.darwin: "Macos",
       Platform.linux: "Linux",
     })
