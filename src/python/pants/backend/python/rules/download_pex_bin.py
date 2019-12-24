@@ -20,7 +20,7 @@ class DownloadedPexBin(HermeticPex):
 
   @property
   def executable(self) -> str:
-    return str(self.exe.exe_filename)
+    return self.exe.exe_filename
 
   @property
   def directory_digest(self) -> Digest:

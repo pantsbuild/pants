@@ -56,6 +56,7 @@ python_library(
     'src/python/pants/base:project_tree',
     'src/python/pants/option',
     'src/python/pants/util:meta',
+    'src/python/pants/util:strutil',
   ],
   tags = {'partially_type_checked'},
 )

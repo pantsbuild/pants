@@ -12,6 +12,7 @@ from pants.option.custom_types import GlobExpansionConjunction as GlobExpansionC
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.util.dirutil import maybe_read_file, safe_delete, safe_file_dump
 from pants.util.meta import frozen_after_init
+from pants.util.strutil import ensure_relative_file_name
 
 
 if TYPE_CHECKING:
@@ -242,8 +243,13 @@ EMPTY_SNAPSHOT = Snapshot(
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class SingleFileExecutable:
-  exe_filename: Path
+  """Wraps a `Snapshot` and ensures that it only contains a single file."""
+  _exe_filename: Path
   directory_digest: Digest
+
+  @property
+  def exe_filename(self) -> str:
+    return ensure_relative_file_name(self._exe_filename)
 
   class ValidationError(ValueError): pass
 
@@ -252,14 +258,12 @@ class SingleFileExecutable:
     raise cls.ValidationError(f'snapshot {snapshot} used for {cls} should {should_message}')
 
   def __init__(self, snapshot: Snapshot) -> None:
-    if snapshot.dirs:
-      self._raise_validation_error(snapshot, 'have no dirs!')
     if len(snapshot.files) != 1:
-      self._raise_validation_error(snapshot, 'have only 1 file!')
+      self._raise_validation_error(snapshot, 'have exactly 1 file!')
     if snapshot.directory_digest == EMPTY_DIRECTORY_DIGEST:
       self._raise_validation_error(snapshot, 'have a non-empty digest!')
 
-    self.exe_filename = Path(snapshot.files[0])
+    self._exe_filename = Path(snapshot.files[0])
     self.directory_digest = snapshot.directory_digest
 
 
