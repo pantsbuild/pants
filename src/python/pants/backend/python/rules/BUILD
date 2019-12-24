@@ -14,6 +14,7 @@ python_library(
     'src/python/pants/rules/core',
     'src/python/pants/source:source',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(

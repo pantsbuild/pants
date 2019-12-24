@@ -46,7 +46,9 @@ class BlackSetup:
 @rule
 async def setup_black(black: Black) -> BlackSetup:
   config_path: Optional[str] = black.get_options().config
-  config_snapshot = await Get[Snapshot](PathGlobs(include=(config_path,)))
+  config_snapshot = await Get[Snapshot](
+    PathGlobs(include=tuple([config_path] if config_path else []))
+  )
   requirements_pex = await Get[Pex](
     CreatePex(
       output_filename="black.pex",

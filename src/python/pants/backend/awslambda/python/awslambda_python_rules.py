@@ -35,13 +35,13 @@ async def create_python_awslambda(
     subprocess_encoding_environment: SubprocessEncodingEnvironment) -> CreatedAWSLambda:
   # TODO: We must enforce that everything is built for Linux, no matter the local platform.
   pex_filename = f'{lambda_tgt_adaptor.address.target_name}.pex'
-  request = CreatePexFromTargetClosure(
+  pex_request = CreatePexFromTargetClosure(
     build_file_addresses=BuildFileAddresses((lambda_tgt_adaptor.address,)),
     entry_point=None,
     output_filename=pex_filename
   )
 
-  pex = await Get[Pex](CreatePexFromTargetClosure, request)
+  pex = await Get[Pex](CreatePexFromTargetClosure, pex_request)
   merged_input_files = await Get[Digest](
     DirectoriesToMerge(directories=(
     pex.directory_digest,
@@ -50,7 +50,7 @@ async def create_python_awslambda(
 
   # NB: Lambdex modifies its input pex in-place, so the input file is also the output file.
   lambdex_args = ('build', '-e', lambda_tgt_adaptor.handler, pex_filename)
-  request = lambdex_setup.requirements_pex.create_execute_request(
+  process_request = lambdex_setup.requirements_pex.create_execute_request(
     python_setup=python_setup,
     subprocess_encoding_environment=subprocess_encoding_environment,
     pex_path="./lambdex.pex",
@@ -59,7 +59,7 @@ async def create_python_awslambda(
     output_files=(pex_filename,),
     description=f'Run Lambdex for {lambda_tgt_adaptor.address.reference()}',
   )
-  result = await Get[ExecuteProcessResult](ExecuteProcessRequest, request)
+  result = await Get[ExecuteProcessResult](ExecuteProcessRequest, process_request)
   return CreatedAWSLambda(digest=result.output_directory_digest, name=pex_filename)
 
 

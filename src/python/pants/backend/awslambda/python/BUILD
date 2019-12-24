@@ -1,7 +1,6 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-
 python_library(
   dependencies=[
     'src/python/pants/backend/python/rules',
@@ -13,7 +12,8 @@ python_library(
     'src/python/pants/engine:rules',
     'src/python/pants/engine:selectors',
     'src/python/pants/engine/legacy:structs',
-  ]
+  ],
+  tags = {"type_checked"},
 )
 
 python_tests(
@@ -41,6 +41,7 @@ pants_plugin(
   dependencies=[
     ':python',
   ],
+  tags = {"type_checked"},
   distribution_name='pantsbuild.pants.awslambda.python',
   description='Pants plugin for creating deployable AWS Lambdas out of python code.',
   build_file_aliases=True,

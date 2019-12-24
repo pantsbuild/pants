@@ -5,6 +5,7 @@ import logging
 import os
 import subprocess
 from contextlib import contextmanager
+from typing import Optional, Type
 
 from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
@@ -12,6 +13,7 @@ from pex.pex_builder import PEXBuilder
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.subsystems.pex_build_util import PexBuilderWrapper
+from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.base.build_environment import get_pants_cachedir
 from pants.base.exceptions import TaskError
 from pants.base.hash_utils import stable_json_sha1
@@ -83,13 +85,13 @@ class PythonToolPrepBase(Task):
   """Base class for tasks that resolve a python tool to be invoked out-of-process."""
 
   # Subclasses must set to a subclass of `pants.backend.python.subsystems.PythonToolBase`.
-  tool_subsystem_cls = None
+  tool_subsystem_cls: Optional[Type[PythonToolBase]] = None
 
   # Subclasses must set to a subclass of `PythonToolInstance`.  This is the type of the
   # product produced by this task.  It is distinct from the subsystem type so that multiple
   # instances of the same tool, possibly at different versions, can be resolved by different
   # prep tasks, if necessary.
-  tool_instance_cls = None
+  tool_instance_cls: Optional[Type[PythonToolInstance]] = None
 
   @classmethod
   def subsystem_dependencies(cls):

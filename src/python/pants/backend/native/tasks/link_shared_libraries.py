@@ -6,7 +6,7 @@ import subprocess
 from dataclasses import dataclass
 from typing import Any, Tuple
 
-from pants.backend.native.config.environment import Linker, Platform
+from pants.backend.native.config.environment import Linker
 from pants.backend.native.targets.native_artifact import NativeArtifact
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.native.tasks.native_compile import ObjectFiles
@@ -14,6 +14,7 @@ from pants.backend.native.tasks.native_task import NativeTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
+from pants.engine.platform import Platform
 from pants.util.memo import memoized_property
 
 

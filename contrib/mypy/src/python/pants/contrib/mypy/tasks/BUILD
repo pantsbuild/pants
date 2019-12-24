@@ -18,4 +18,5 @@ python_library(
     'src/python/pants/build_graph',
     'contrib/mypy/src/python/pants/contrib/mypy/subsystems',
   ],
+  tags = {"partially_type_checked"},
 )
