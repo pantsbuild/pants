@@ -187,7 +187,7 @@ def frozen_after_init(cls: C) -> C:
       )
     prev_setattr(self, key, value)  # type: ignore[call-arg]
 
-  cls.__init__ = new_init  # type: ignore[assignment]
-  cls.__setattr__ = new_setattr  # type: ignore[assignment]
+  cls.__init__ = new_init
+  cls.__setattr__ = new_setattr
 
-  return frozen_after_init.define_instance_of(cls)
+  return cls

@@ -266,6 +266,19 @@ class SentinelAttributeTest(unittest.TestCase):
     self.assertEqual(C._decorated_type_checkable_type, type(f))
     self.assertTrue(f.is_instance(C))
 
+    # Check that .is_instance() is only true for exactly the decorator @g used on the class D!
+    @decorated_type_checkable
+    def g(cls):
+      return g.define_instance_of(cls)
+
+    @g
+    class D:
+      pass
+
+    self.assertEqual(D._decorated_type_checkable_type, type(g))
+    self.assertTrue(g.is_instance(D))
+    self.assertFalse(f.is_instance(D))
+
 
 class FrozenAfterInitTest(unittest.TestCase):
 
