@@ -150,7 +150,7 @@ def memoized(
 
 
 def memoized_method(
-  func: Optional[F] = None, *, key_factory=per_instance, cache_factory=dict
+  func: Optional[F] = None, *, key_factory=per_instance, cache_factory=dict,
 ) -> F:
   """A convenience wrapper for memoizing instance methods.
 
@@ -261,7 +261,7 @@ def memoized_property(
 
 
 def memoized_classmethod(
-  func: Optional[F] = None, *, key_factory=per_instance, cache_factory=dict
+  func: Optional[F] = None, *, key_factory=per_instance, cache_factory=dict,
 ) -> F:
   return classmethod(  # type: ignore[return-value]
     memoized_method(func, key_factory=key_factory, cache_factory=cache_factory)
@@ -277,7 +277,7 @@ def memoized_classproperty(
 
 
 def memoized_staticmethod(
-  func: Optional[F] = None, *, key_factory=per_instance, cache_factory=dict,
+  func: Optional[F] = None, *, key_factory=equal_args, cache_factory=dict,
 ) -> F:
   return staticmethod(  # type: ignore[return-value]
     memoized(func, key_factory=key_factory, cache_factory=cache_factory)
@@ -285,7 +285,7 @@ def memoized_staticmethod(
 
 
 def memoized_staticproperty(
-  func: Optional[Callable[..., P]] = None, *, key_factory=per_instance, cache_factory=dict,
+  func: Optional[Callable[..., P]] = None, *, key_factory=equal_args, cache_factory=dict,
 ) -> P:
   return staticproperty(
     memoized_staticmethod(func, key_factory=key_factory, cache_factory=cache_factory)
