@@ -4,7 +4,7 @@
 import unittest
 from enum import Enum
 
-from pants.util.enums import match
+from pants.util.enums import InexhaustiveMatchError, UnrecognizedMatchError, match
 
 
 class EnumMatchTest(unittest.TestCase):
@@ -25,13 +25,13 @@ class EnumMatchTest(unittest.TestCase):
     self.assertEqual("oink", match(EnumMatchTest.Test.pig, match_mapping))
 
   def test_inexhaustive_match(self) -> None:
-    with self.assertRaises(enums.InexhaustiveMatchError):
+    with self.assertRaises(InexhaustiveMatchError):
       match(EnumMatchTest.Test.pig, {
         EnumMatchTest.Test.pig: "oink",
       })
 
   def test_unrecognized_match(self) -> None:
-    with self.assertRaises(enums.UnrecognizedMatchError):
+    with self.assertRaises(UnrecognizedMatchError):
       match(EnumMatchTest.Test.pig, {  # type: ignore[type-var]
         EnumMatchTest.Test.dog: "woof",
         EnumMatchTest.Test.cat: "meow",

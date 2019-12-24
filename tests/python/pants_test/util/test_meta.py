@@ -4,10 +4,15 @@
 import unittest
 from abc import ABC, abstractmethod
 from dataclasses import FrozenInstanceError, dataclass
-from enum import Enum
 
 from pants.testutil.test_base import TestBase
-from pants.util.meta import InexhaustiveMatchError, SingletonMetaclass, UnrecognizedMatchError, classproperty, decorated_type_checkable, frozen_after_init, staticproperty
+from pants.util.meta import (
+  SingletonMetaclass,
+  classproperty,
+  decorated_type_checkable,
+  frozen_after_init,
+  staticproperty,
+)
 
 
 class AbstractClassTest(TestBase):
