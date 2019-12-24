@@ -239,7 +239,6 @@ EMPTY_SNAPSHOT = Snapshot(
 )
 
 
-# FIXME: make pex and cloc rulesets produce this instead of doing snapshot.files[0]!
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class SingleFileExecutable:

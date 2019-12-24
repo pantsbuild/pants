@@ -12,6 +12,7 @@ from pants.engine.fs import (
   FileContent,
   FilesContent,
   InputFilesContent,
+  SingleFileExecutable,
   Snapshot,
   UrlToFetch,
 )
@@ -25,8 +26,15 @@ from pants.engine.selectors import Get
 @dataclass(frozen=True)
 class DownloadedClocScript:
   """Cloc script as downloaded from the pantsbuild binaries repo."""
-  script_path: str
-  digest: Digest
+  exe: SingleFileExecutable
+
+  @property
+  def script_path(self) -> str:
+    return str(self.exe.exe_filename)
+
+  @property
+  def digest(self) -> Digest:
+    return self.exe.directory_digest
 
 
 #TODO(#7790) - We can't call this feature-complete with the v1 version of cloc
@@ -37,7 +45,7 @@ async def download_cloc_script() -> DownloadedClocScript:
   sha_256 = "2b23012b1c3c53bd6b9dd43cd6aa75715eed4feb2cb6db56ac3fbbd2dffeac9d"
   digest = Digest(sha_256, 546279)
   snapshot = await Get[Snapshot](UrlToFetch(url, digest))
-  return DownloadedClocScript(script_path=snapshot.files[0], digest=snapshot.directory_digest)
+  return DownloadedClocScript(SingleFileExecutable(snapshot))
 
 
 class CountLinesOfCodeOptions(GoalSubsystem):
