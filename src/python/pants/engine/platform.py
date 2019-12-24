@@ -22,8 +22,8 @@ class Platform(Enum):
   @memoized_property
   def runtime_lib_path_env_var(self) -> str:
     return enums.match(self, {
-      self.darwin: "DYLD_LIBRARY_PATH",
-      self.linux: "LD_LIBRARY_PATH",
+      Platform.darwin: "DYLD_LIBRARY_PATH",
+      Platform.linux: "LD_LIBRARY_PATH",
     })
 
 
