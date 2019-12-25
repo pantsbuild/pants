@@ -47,6 +47,6 @@ python_tests(
     'tests/python/pants_test/engine:scheduler_test_base',
     'testprojects/src/python:python_distribution_directory',
   ],
-  tags={'platform_specific_behavior', 'integration'},
+  tags={'platform_specific_behavior', 'integration', 'partially_type_checked'},
   timeout=240,
 )

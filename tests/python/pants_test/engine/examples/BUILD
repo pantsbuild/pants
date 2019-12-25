@@ -14,7 +14,8 @@ python_library(
     'src/python/pants/engine:objects',
     'src/python/pants/engine:parser',
     'src/python/pants/util:memo',
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )
 
 resources(

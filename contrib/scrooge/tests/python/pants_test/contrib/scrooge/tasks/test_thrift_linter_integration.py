@@ -2,8 +2,13 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from functools import wraps
+from typing import Any, Callable, TypeVar
 
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
+
+
+FuncType = Callable[..., Any]
+F = TypeVar("F", bound=FuncType)
 
 
 class ThriftLinterTest(PantsRunIntegrationTest):
@@ -19,7 +24,7 @@ class ThriftLinterTest(PantsRunIntegrationTest):
   def thrift_test_target(cls, name):
     return f'{cls.thrift_folder_root}:{name}'
 
-  def rename_build_file(func):
+  def rename_build_file(func: F) -> F:
     """This decorator implements the TEST_BUILD pattern.
 
     Because these tests use files that intentionally should fail linting, the goal `./pants lint ::`
@@ -30,7 +35,7 @@ class ThriftLinterTest(PantsRunIntegrationTest):
     def wrapper(self, *args, **kwargs):
       with self.file_renamed(self.thrift_folder_root, test_name='TEST_BUILD', real_name='BUILD'):
         func(self, *args, **kwargs)
-    return wrapper
+    return wrapper  # type: ignore[return-value]
 
   def run_pants(self, command, config=None, stdin_data=None, extra_env=None, **kwargs):
     full_config = {

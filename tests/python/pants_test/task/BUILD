@@ -18,7 +18,7 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'tests/python/pants_test/task/echo_plugin:plugin',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )
 
 python_tests(

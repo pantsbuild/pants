@@ -25,5 +25,5 @@ python_tests(
     'testprojects/src/python:antlr_directory',
     'testprojects/src/antlr/python:test_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )

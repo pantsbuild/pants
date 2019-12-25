@@ -5,14 +5,14 @@ python_requirement_library(
   name='django',
   requirements=[
     python_requirement('Django==2.2.5'),
-  ]
+  ],
 )
 
 python_requirement_library(
   name='django-stubs',
   requirements=[
     python_requirement('django-stubs==1.1.0'),
-  ]
+  ],
 )
 
 python_library(
@@ -21,6 +21,7 @@ python_library(
   dependencies=[
     ':django-stubs',
   ],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -30,6 +31,7 @@ python_library(
     ':django',
     ':settings',
   ],
+  tags = {'partially_type_checked'},
 )
 
 python_library(

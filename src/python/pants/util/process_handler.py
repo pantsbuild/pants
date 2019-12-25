@@ -3,8 +3,8 @@
 
 import io
 import multiprocessing
-import sys
 import subprocess
+import sys
 from abc import ABC, abstractmethod
 from typing import Optional
 

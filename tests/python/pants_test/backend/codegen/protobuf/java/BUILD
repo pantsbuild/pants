@@ -27,6 +27,6 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:proto-ordering_directory',
     'testprojects/src/protobuf/org/pantsbuild/testproject:import_from_buildroot_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 330,
 )

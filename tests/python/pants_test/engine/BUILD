@@ -8,6 +8,7 @@ python_library(
     'src/python/pants/testutil/engine:util',
     'tests/python/pants_test:deprecated_testinfra',
   ],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -16,7 +17,8 @@ python_library(
   dependencies = [
     'src/python/pants/testutil/engine:engine_test_base',
     'tests/python/pants_test:deprecated_testinfra',
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )
 
 python_tests(
@@ -211,7 +213,7 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'examples/src/scala/org/pantsbuild/example:hello_directory',
   ],
-  tags={'integration'},
+  tags={'integration', 'partially_type_checked'},
 )
 
 python_library(

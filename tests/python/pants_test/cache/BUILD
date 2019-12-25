@@ -88,6 +88,7 @@ python_tests(
     'src/python/pants/cache',
     'src/python/pants/testutil:test_base',
   ],
+  tags = {'partially_type_checked'},
   timeout = 90
 )
 
@@ -111,6 +112,6 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'testprojects/src/java/org/pantsbuild/testproject:unicode_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 600,
 )

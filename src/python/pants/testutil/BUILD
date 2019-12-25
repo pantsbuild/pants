@@ -16,6 +16,7 @@ python_library(
     'src/python/pants/testutil/option',
     'src/python/pants/testutil/subsystem',
   ],
+  tags = {'partially_type_checked'},
   provides=pants_setup_py(
     name='pantsbuild.pants.testutil',
     description='Test support for writing Pants plugins.',

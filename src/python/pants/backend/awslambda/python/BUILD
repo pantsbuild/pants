@@ -17,7 +17,7 @@ python_library(
 )
 
 python_tests(
-  name='test',
+  name='tests',
   dependencies=[
     ':python',
     'src/python/pants/backend/python/rules',
@@ -33,7 +33,8 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil:test_base',
     'src/python/pants/testutil/subsystem',
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )
 
 pants_plugin(

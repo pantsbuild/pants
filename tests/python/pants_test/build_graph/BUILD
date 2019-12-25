@@ -33,7 +33,7 @@ python_tests(
   dependencies = [
     'src/python/pants/testutil:int-test',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )
 
 
@@ -80,7 +80,7 @@ python_tests(
     'testprojects/src/python:build_file_imports_function_directory',
     'testprojects/src/python:build_file_imports_module_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 75,
 )
 
@@ -94,7 +94,7 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:intransitive_directory',
     'testprojects/src/java/org/pantsbuild/testproject:runtime_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )
 
 python_tests(

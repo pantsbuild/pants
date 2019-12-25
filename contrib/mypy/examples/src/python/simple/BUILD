@@ -3,10 +3,11 @@
 
 python_library(
   name = 'valid',
-  source = 'valid.py'
+  source = 'valid.py',
+  tags = {'partially_type_checked'},
 )
 
 python_library(
   name = 'invalid',
-  source = 'invalid.py'
+  source = 'invalid.py',
 )

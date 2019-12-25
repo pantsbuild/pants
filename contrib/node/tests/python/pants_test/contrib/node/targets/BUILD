@@ -7,7 +7,8 @@ python_tests(
   dependencies=[
     'contrib/node/src/python/pants/contrib/node/targets:node_remote_module',
     'src/python/pants/testutil:test_base'
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )
 
 python_tests(
@@ -16,7 +17,8 @@ python_tests(
   dependencies=[
     'contrib/node/src/python/pants/contrib/node/targets:node_package',
     'src/python/pants/testutil:test_base'
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )
 
 python_tests(
@@ -25,5 +27,6 @@ python_tests(
   dependencies=[
     'contrib/node/src/python/pants/contrib/node/targets:node_module',
     'src/python/pants/testutil:test_base'
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )

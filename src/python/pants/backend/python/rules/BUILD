@@ -48,6 +48,6 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'testprojects/tests/python/pants:dummies_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 120,
 )

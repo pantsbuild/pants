@@ -33,6 +33,7 @@ python_library(
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil:int-test',
   ],
+  tags = {'partially_type_checked'},
 )
 
 python_tests(
@@ -43,7 +44,7 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:missingdirectdepswhitelist_directory',
     'testprojects/src/java/org/pantsbuild/testproject:missingjardepswhitelist_directory',
   ],
-  tags={'integration'},
+  tags={'integration', 'partially_type_checked'},
   timeout=540,
 )
 
@@ -58,7 +59,7 @@ python_tests(
     'testprojects/tests/scala/org/pantsbuild/testproject:non_exports_directory',
     'testprojects/src/thrift/org/pantsbuild:thrift_exports_directory',
   ],
-  tags={'integration'},
+  tags={'integration', 'partially_type_checked'},
   timeout=600,
 )
 
@@ -80,6 +81,6 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:dummies_directory',
     'testprojects/src/java/org/pantsbuild/testproject:missingjardepswhitelist_directory',
   ],
-  tags={'integration'},
+  tags={'integration', 'partially_type_checked'},
   timeout = 240,
 )

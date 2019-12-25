@@ -46,6 +46,6 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:extra_jvm_options_directory',
     'testprojects/src/java/org/pantsbuild/testproject:unicode_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 180,
 )

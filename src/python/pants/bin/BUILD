@@ -59,6 +59,7 @@ python_binary(
   dependencies=[
     ':bin',
   ],
+  tags = {'partially_type_checked'},
   # We depend on twitter.common libraries that trigger pex warnings for not properly declaring their
   # dependency on setuptools (for namespace package support).
   emit_warnings=False,
@@ -90,6 +91,7 @@ python_binary(
     'contrib:plugins',
     'pants-plugins/src/python/internal_backend:plugins',
   ],
+  tags = {'partially_type_checked'},
   # We depend on twitter.common libraries that trigger pex warnings for not properly declaring their
   # dependency on setuptools (for namespace package support).
   emit_warnings=False,

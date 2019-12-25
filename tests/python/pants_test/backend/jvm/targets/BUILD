@@ -29,7 +29,7 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'testprojects/3rdparty:org_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )
 
 python_tests(

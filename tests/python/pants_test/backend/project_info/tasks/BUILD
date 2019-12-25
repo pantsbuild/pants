@@ -125,7 +125,7 @@ python_tests(
     'testprojects/tests/java/org/pantsbuild/testproject:testjvms_directory',
     ':resolve_jars_test_mixin',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 630,
 )
 
@@ -162,5 +162,5 @@ python_tests(
     'examples/src/scala/org/pantsbuild/example:hello_directory',
     'testprojects/src/python:antlr_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )

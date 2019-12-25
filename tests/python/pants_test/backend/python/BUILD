@@ -51,7 +51,7 @@ python_tests(
     'examples/tests/python/example_test:hello_directory',
     'testprojects:pants_plugins_directory',
   ],
-  tags={'integration'},
+  tags={'integration', 'partially_type_checked'},
   timeout = 120,
 )
 
@@ -64,4 +64,5 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants/testutil:int-test',
   ],
+  tags = {'partially_type_checked'},
 )

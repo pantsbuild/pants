@@ -33,7 +33,7 @@ def create_parser() -> argparse.ArgumentParser:
   parser.add_argument(
     "globs",
     nargs='*',
-    default=["build-support::", "contrib::", "src/python::", "tests/python::", "pants-plugins::"]
+    default=["build-support::", "contrib::", "src/python::", "tests/python::", "pants-plugins::"],
   )
   return parser
 

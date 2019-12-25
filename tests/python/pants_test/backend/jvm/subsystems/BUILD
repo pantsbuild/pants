@@ -59,7 +59,7 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'testprojects/src/scala/org/pantsbuild/testproject:custom_scala_platform_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout=500,
 )
 
@@ -75,7 +75,7 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:shading_directory',
     'testprojects/3rdparty:managed_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 370,
 )
 
@@ -109,6 +109,6 @@ python_tests(
     'testprojects/tests/java/org/pantsbuild/testproject:depman_directory',
     'testprojects/3rdparty:managed_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout=800,
 )

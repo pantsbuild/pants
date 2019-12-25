@@ -8,7 +8,8 @@ python_tests(
     'src/python/pants/testutil/jvm:nailgun_task_test_base',
     'src/python/pants/testutil/option',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )
 
 python_tests(
@@ -18,6 +19,6 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'contrib/errorprone:java_tests_directory',
   ],
-  tags={'integration'},
+  tags={'integration', 'partially_type_checked'},
   timeout=420,
 )

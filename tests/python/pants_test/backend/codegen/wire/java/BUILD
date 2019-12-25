@@ -32,6 +32,6 @@ python_tests(
     'src/python/pants/testutil:file_test_util',
     'examples/src/java/org/pantsbuild/example:wire_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 300,
 )

@@ -23,7 +23,7 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'testprojects/src/python:python_targets_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )
 
 python_tests(
@@ -115,7 +115,7 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'testprojects/src/python:python_targets_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )
 
 python_tests(
