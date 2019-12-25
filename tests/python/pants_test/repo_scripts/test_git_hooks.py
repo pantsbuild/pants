@@ -74,7 +74,7 @@ subdir/__init__.py
       # Check that a valid __init__.py with `pkg_resources` setup succeeds.
       safe_file_dump(
         init_py_path,
-        '__import__("pkg_resources").declare_namespace(__name__)  # type: ignore[attr-defined]'
+        '__import__("pkg_resources").declare_namespace(__name__)'
       )
       self._assert_subprocess_success(worktree, [package_check_script, 'subdir'])
 
