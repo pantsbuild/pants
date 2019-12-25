@@ -10,9 +10,13 @@ from pants.engine.objects import Collection
 from pants.engine.rules import RootRule
 from pants.option.custom_types import GlobExpansionConjunction as GlobExpansionConjunction
 from pants.option.global_options import GlobMatchErrorBehavior
-from pants.util.dirutil import maybe_read_file, safe_delete, safe_file_dump
+from pants.util.dirutil import (
+  ensure_relative_file_name,
+  maybe_read_file,
+  safe_delete,
+  safe_file_dump,
+)
 from pants.util.meta import frozen_after_init
-from pants.util.strutil import ensure_relative_file_name
 
 
 if TYPE_CHECKING:

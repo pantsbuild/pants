@@ -140,13 +140,11 @@ class SingleFileExecutableTest(TestBase):
     ))
     snapshot = self.request_single_product(Snapshot, input_files_content)
 
-    self.assertEquals(SingleFileExecutable(snapshot).exe_filename,
-                      './subdir/a.txt')
+    assert SingleFileExecutable(snapshot).exe_filename == './subdir/a.txt'
 
     input_files_content = InputFilesContent((
       FileContent(path='some_silly_file_name', content=b'test file contents'),
     ))
     snapshot = self.request_single_product(Snapshot, input_files_content)
 
-    self.assertEquals(SingleFileExecutable(snapshot).exe_filename,
-                      './some_silly_file_name')
+    assert SingleFileExecutable(snapshot).exe_filename == './some_silly_file_name'

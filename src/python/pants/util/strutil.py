@@ -3,7 +3,6 @@
 
 import re
 import shlex
-from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Union
 
 
@@ -128,14 +127,3 @@ def strip_prefix(string: str, prefix: str) -> str:
     return string[len(prefix):]
   else:
     return string
-
-
-def ensure_relative_file_name(path: Path) -> str:
-  """Return a string representing the `path`, with a leading './'.
-
-  This ensures that the returned string can be used as the executable file when executing a
-  subprocess, without putting the executable file on the PATH.
-  """
-  if path.is_absolute():
-    raise ValueError(f'path {path} is expected to be relative!')
-  return f'./{path}'
