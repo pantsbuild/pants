@@ -4,55 +4,56 @@
 import io
 import multiprocessing
 import sys
+import subprocess
 from abc import ABC, abstractmethod
+from typing import Optional
 
 
 class ProcessHandler(ABC):
-  """An abstraction of process handling calls using the same interface as subprocess(32).Popen.
+  """An abstraction of process handling calls using the same interface as subprocess.Popen.
 
   See SubprocessProcessHandler below for an example.
   """
 
   @abstractmethod
-  def wait(self, timeout=None):
+  def wait(self, timeout: Optional[float] = None) -> int:
     """Wait for the underlying process to terminate.
 
-    :param float timeout: The time to wait for the process to terminate in fractional seconds. Wait
-                          forever by default.
+    :param timeout: The time to wait for the process to terminate in fractional seconds. Wait
+                    forever by default.
     :returns: The process exit code is it has terminated.
-    :rtype: int
     :raises: :class:`subprocess.TimeoutExpired`
     """
 
   @abstractmethod
-  def kill(self):
+  def kill(self) -> None:
     pass
 
   @abstractmethod
-  def terminate(self):
+  def terminate(self) -> None:
     pass
 
   @abstractmethod
-  def poll(self):
+  def poll(self) -> int:
     pass
 
 
 class SubprocessProcessHandler(ProcessHandler):
-  """A `ProcessHandler` that delegates directly to a subprocess(32).Popen object."""
+  """A `ProcessHandler` that delegates directly to a subprocess.Popen object."""
 
-  def __init__(self, process):
+  def __init__(self, process: subprocess.Popen) -> None:
     self._process = process
 
-  def wait(self, timeout=None):
+  def wait(self, timeout: Optional[float] = None) -> int:
     return self._process.wait(timeout=timeout)
 
-  def kill(self):
-    return self._process.kill()
+  def kill(self) -> None:
+    self._process.kill()
 
-  def terminate(self):
-    return self._process.terminate()
+  def terminate(self) -> None:
+    self._process.terminate()
 
-  def poll(self):
+  def poll(self) -> int:
     return self._process.poll()
 
   def communicate_teeing_stdout_and_stderr(self, stdin=None):
@@ -72,6 +73,7 @@ class SubprocessProcessHandler(ProcessHandler):
       queue = multiprocessing.Queue()
       process = multiprocessing.Process(target=_tee, args=(infile, outfile, queue.put))
       process.start()
+
       def join_and_get_output():
         process.join()
         return queue.get()

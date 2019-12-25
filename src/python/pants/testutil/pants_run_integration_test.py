@@ -57,7 +57,12 @@ class PantsJoinHandle:
 
     communicate_fn = self.process.communicate
     if tee_output:
-      communicate_fn = SubprocessProcessHandler(self.process).communicate_teeing_stdout_and_stderr
+      # TODO: MyPy complains that SubprocessProcessHandler.communicate_teeing_stdout_and_stderr does
+      # not have the same type signature as subprocess.Popen.communicate_teeing_stdout_and_stderr.
+      # It's possibly not worth trying to fix this because the type stubs for subprocess.Popen are
+      # very complex and also not very precise, given how many different configurations Popen can
+      # take.
+      communicate_fn = SubprocessProcessHandler(self.process).communicate_teeing_stdout_and_stderr  # type: ignore[assignment]
     if stdin_data is not None:
       stdin_data = ensure_binary(stdin_data)
     (stdout_data, stderr_data) = communicate_fn(stdin_data)
@@ -293,7 +298,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
 
   def run_pants_with_workdir_without_waiting(self, command, workdir, config=None, extra_env=None,
                                              build_root=None, print_exception_stacktrace=True,
-                                             **kwargs):
+                                             **kwargs) -> PantsJoinHandle:
     args = [
       '--no-pantsrc',
       f'--pants-workdir={workdir}',
@@ -350,7 +355,9 @@ class PantsRunIntegrationTest(unittest.TestCase):
       hermetic_env = os.getenv('HERMETIC_ENV')
       if hermetic_env:
         for h in hermetic_env.strip(',').split(','):
-          env[h] = os.getenv(h)
+          value = os.getenv(h)
+          if value is not None:
+            env[h] = value
     else:
       env = os.environ.copy()
     if extra_env:
