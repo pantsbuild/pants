@@ -51,7 +51,7 @@ class SourceRootTypes:
 # Changing the behavior of this task may affect the IntelliJ Pants plugin.
 # Please add @yic to reviews for this file.
 # NB: IvyTaskMixin conflicts with the resolve() method of CoursierMixin. IvyTaskMixin.resolve()
-#  will be used because it appears first in the MRO.
+# will be used because it appears first in the MRO.
 class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):  # type: ignore[misc]
   """Base class for generating a json-formattable blob of data about the target graph.
 
@@ -411,7 +411,7 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):  # t
 
 
 # NB: ExportTask's IvyTaskMixin conflicts with the resolve() method of ExportTask's CoursierMixin.
-#  IvyTaskMixin.resolve() will be used because it appears first in the MRO.
+# IvyTaskMixin.resolve() will be used because it appears first in the MRO.
 class Export(ExportTask, ConsoleTask):  # type: ignore[misc]
   """Export project information in JSON format.
 

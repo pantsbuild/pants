@@ -317,9 +317,8 @@ class EngineInitializer:
       import statements. Valid values: "allow", "warn", "error".
     :type build_file_imports_behavior: string
     :param build_root: A path to be used as the build root. If None, then default is used.
-    :param Native native: An instance of the native-engine subsystem.
+    :param native: An instance of the native-engine subsystem.
     :param options_bootstrapper: A `OptionsBootstrapper` object containing bootstrap options.
-    :type options_bootstrapper: :class:`pants.options.options_bootstrapper.OptionsBootstrapper`
     :param build_configuration: The `BuildConfiguration` object to get build file aliases from.
     :param glob_match_error_behavior: How to behave if a glob specified for a target's sources or
                                       bundles does not expand to anything.

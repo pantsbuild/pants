@@ -71,7 +71,7 @@ class ShadedToolFingerprintStrategy(IvyResolveFingerprintStrategy):
 
 
 # NB: IvyTaskMixin conflicts with the resolve() method of CoursierMixin. IvyTaskMixin.resolve()
-#  will be used because it appears first in the MRO.
+# will be used because it appears first in the MRO.
 class BootstrapJvmTools(IvyTaskMixin, CoursierMixin, JarTask):  # type: ignore[misc]
   class ToolUnderspecified(Exception):
     pass
