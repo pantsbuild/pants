@@ -6,6 +6,7 @@ python_library(
     ':scrooge_gen',
     ':thrift_linter',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -44,6 +45,7 @@ python_library(
     'src/python/pants/option',
     'src/python/pants/task'
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
