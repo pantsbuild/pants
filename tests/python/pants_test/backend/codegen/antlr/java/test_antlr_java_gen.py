@@ -174,7 +174,7 @@ class AntlrJavaGenTest(NailgunTaskTestBase):
       )
     """.format(**self.PARTS)))
 
-    with self.assertRaisesRegexp(TaskError, r'.*Antlr sources in multiple directories.*'):
+    with self.assertRaisesRegex(TaskError, r'.*Antlr sources in multiple directories.*'):
       self.execute(self.create_context())
 
   def test_generated_target_fingerprint_stable_v3(self):

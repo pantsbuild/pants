@@ -159,7 +159,7 @@ class CoercingJsonEncodingTest(unittest.TestCase):
     self.assertEqual(self._coercing_json_encode(set([1])), '[1]')
 
   def test_rejects_ordered_dict(self):
-    with self.assertRaisesRegexp(TypeError, r'CoercingEncoder does not support OrderedDict inputs'):
+    with self.assertRaisesRegex(TypeError, r'CoercingEncoder does not support OrderedDict inputs'):
       self._coercing_json_encode(OrderedDict([('a', 3)]))
 
   def test_non_string_dict_key_coercion(self):
@@ -207,10 +207,10 @@ class JsonHashingTest(unittest.TestCase):
     self.assertEqual(stable_json_sha1({1}), 'f629ae44b7b3dcfed444d363e626edf411ec69a8')
 
   def test_rejects_ordered_collections(self):
-    with self.assertRaisesRegexp(TypeError,
+    with self.assertRaisesRegex(TypeError,
                                  re.escape('CoercingEncoder does not support OrderedDict inputs')):
       stable_json_sha1(OrderedDict([('a', 3)]))
-    with self.assertRaisesRegexp(TypeError,
+    with self.assertRaisesRegex(TypeError,
                                  re.escape('CoercingEncoder does not support OrderedSet inputs')):
       stable_json_sha1(OrderedSet([3]))
 

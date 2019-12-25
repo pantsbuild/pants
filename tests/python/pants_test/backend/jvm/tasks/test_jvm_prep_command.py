@@ -33,11 +33,11 @@ class JvmPrepCommandTest(TaskTestBase):
     self.make_target('foo', JvmPrepCommand, mainclass='org.pantsbuild.FooMain')
 
   def test_invalid_target(self):
-    with self.assertRaisesRegexp(TargetDefinitionException,
+    with self.assertRaisesRegex(TargetDefinitionException,
                                  r'mainclass must be specified'):
       self.make_target('foo', JvmPrepCommand,)
 
-    with self.assertRaisesRegexp(TargetDefinitionException,
+    with self.assertRaisesRegex(TargetDefinitionException,
                                  r'.*Got goal "baloney". Goal must be one of.*'):
       self.make_target('foo', JvmPrepCommand, mainclass='org.pantsbuild.FooMain', goal='baloney')
 

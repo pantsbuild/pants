@@ -396,7 +396,7 @@ class NodeResolveTest(TaskTestBase):
 
     def test_resolve_default_no_options_npm_local(self):
       unsupported = 'not supported for NPM'
-      with self.assertRaisesRegexp(TaskError, unsupported):
+      with self.assertRaisesRegex(TaskError, unsupported):
         self._test_resolve_options_helper(
           install_optional=False,
           force_option_override=False,
