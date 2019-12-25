@@ -46,6 +46,7 @@ python_library(
     'src/python/pants/util:memo',
     'src/python/pants/util:osutil',
   ],
+  tags = {'partially_type_checked'},
 )
 
 # This binary's entry_point is used by the pantsbuild.pants sdist to setup a binary for

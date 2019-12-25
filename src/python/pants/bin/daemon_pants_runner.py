@@ -6,7 +6,7 @@ import sys
 import termios
 import time
 from contextlib import contextmanager
-from typing import Callable
+from typing import Callable, Iterator, Optional
 
 from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode, Exiter
@@ -36,20 +36,25 @@ class DaemonExiter(Exiter):
 
   @classmethod
   @contextmanager
-  def override_global_exiter(cls, maybe_shutdown_socket: MaybeShutdownSocket, finalizer: Callable[[], None]) -> None:
-    with ExceptionSink.exiter_as(lambda previous_exiter: cls(maybe_shutdown_socket, finalizer, previous_exiter)):
+  def override_global_exiter(
+    cls, maybe_shutdown_socket: MaybeShutdownSocket, finalizer: Callable[[], None],
+  ) -> Iterator[None]:
+    with ExceptionSink.exiter_as(
+      lambda previous_exiter: cls(maybe_shutdown_socket, finalizer, previous_exiter)
+    ):
       yield
 
-  def __init__(self,
+  def __init__(
+    self,
     maybe_shutdown_socket: MaybeShutdownSocket,
     finalizer: Callable[[], None],
-    previous_exiter: Exiter):
-
-    super().__init__(exiter=previous_exiter)
+    previous_exiter: Optional[Exiter],
+  ) -> None:
+    super().__init__(exiter=previous_exiter or sys.exit)
     self._maybe_shutdown_socket = maybe_shutdown_socket
     self._finalizer = finalizer
 
-  def exit(self, result: ExitCode = 0, msg: str = None, *args, **kwargs):
+  def exit(self, result: ExitCode = 0, msg: Optional[str] = None, *args, **kwargs):
     """Exit the runtime."""
     if self._finalizer:
       try:

@@ -9,6 +9,7 @@ contrib_plugin(
     'src/python/pants/build_graph',
     'src/python/pants/goal:task_registrar',
   ],
+  tags = {'partially_type_checked'},
   distribution_name='pantsbuild.pants.contrib.go',
   description='Go language support for pants.',
   build_file_aliases=True,

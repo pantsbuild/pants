@@ -40,6 +40,7 @@ python_library(
     'src/python/pants/goal:task_registrar',
     'src/python/pants/java/jar',
   ],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -83,6 +84,7 @@ python_library(
     'src/python/pants/backend/jvm/subsystems:scala_platform',
     'src/python/pants/util:memo',
   ],
+  tags = {'partially_type_checked'},
 )
 
 python_library(

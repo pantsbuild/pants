@@ -50,7 +50,9 @@ class SourceRootTypes:
 
 # Changing the behavior of this task may affect the IntelliJ Pants plugin.
 # Please add @yic to reviews for this file.
-class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
+# NB: IvyTaskMixin conflicts with the resolve() method of CoursierMixin. IvyTaskMixin.resolve()
+#  will be used because it appears first in the MRO.
+class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):  # type: ignore[misc]
   """Base class for generating a json-formattable blob of data about the target graph.
 
   Subclasses can invoke the generate_targets_map method to get a dictionary of plain datastructures
@@ -408,7 +410,9 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
     return {root_package_prefix(source) for source in target.sources_relative_to_source_root()}
 
 
-class Export(ExportTask, ConsoleTask):
+# NB: ExportTask's IvyTaskMixin conflicts with the resolve() method of ExportTask's CoursierMixin.
+#  IvyTaskMixin.resolve() will be used because it appears first in the MRO.
+class Export(ExportTask, ConsoleTask):  # type: ignore[misc]
   """Export project information in JSON format.
 
   Intended for exporting project information for IDE, such as the IntelliJ Pants plugin.

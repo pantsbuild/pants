@@ -55,7 +55,10 @@ class ImportOrder(CheckstylePlugin):
   def name(cls):
     return 'import-order'
 
-  STANDARD_LIB_PATH = os.path.realpath(sysconfig.get_python_lib(standard_lib=1))
+  STANDARD_LIB_PATH = os.path.realpath(
+    # standard_lib=1 is not in the official type stubs but is in-fact implemented in distutils
+    sysconfig.get_python_lib(standard_lib=1)  # type: ignore[arg-type]
+  )
 
   @classmethod
   def extract_import_modules(cls, node):
