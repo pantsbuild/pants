@@ -8,6 +8,7 @@ import unittest
 import unittest.mock
 from contextlib import contextmanager
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Iterator, Tuple, Union
 
 from pants.util import dirutil
@@ -18,6 +19,7 @@ from pants.util.dirutil import (
   _mkdtemp_unregister_cleaner,
   absolute_symlink,
   check_no_overlapping_paths,
+  ensure_relative_file_name,
   fast_relpath,
   get_basedir,
   longest_dir_prefix,
@@ -91,6 +93,20 @@ class DirutilTest(unittest.TestCase):
       fast_relpath('/a/b', '/a/baseball')
     with self.assertRaises(ValueError):
       fast_relpath('/a/baseball', '/a/b')
+
+  def test_ensure_relative_file_name(self) -> None:
+    path = Path('./subdir/a.txt')
+    assert str(path) == 'subdir/a.txt'
+    assert ensure_relative_file_name(path) == './subdir/a.txt'
+
+    path = Path('./a.txt')
+    assert ensure_relative_file_name(path) == './a.txt'
+
+    path = Path('some_exe')
+    assert ensure_relative_file_name(path) == './some_exe'
+
+    path = Path('./leading_slash')
+    assert ensure_relative_file_name(path) == './leading_slash'
 
   @strict_patch('atexit.register')
   @strict_patch('os.getpid')
