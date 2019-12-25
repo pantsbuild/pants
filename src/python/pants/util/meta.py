@@ -1,6 +1,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from abc import ABC, abstractmethod
 from dataclasses import FrozenInstanceError
 from functools import wraps
 from typing import Any, Callable, Optional, Type, TypeVar, Union
@@ -122,6 +123,46 @@ def staticproperty(func: Callable[..., T]) -> T:
   return ClassPropertyDescriptor(func, doc)  # type: ignore[arg-type, return-value]
 
 
+class _ClassDecoratorWithSentinelAttribute(ABC):
+  """Base class to wrap a class decorator which sets a "sentinel attribute".
+
+  This functionality is exposed via the `@decorated_type_checkable` decorator.
+  """
+
+  @abstractmethod
+  def __call__(self, cls: Type) -> Type: ...
+
+  def define_instance_of(self, obj: Type, **kwargs) -> Type:
+    return type(obj.__name__, (obj,), {
+      '_decorated_type_checkable_type': type(self),
+      **kwargs
+    })
+
+  def is_instance(self, obj: Type) -> bool:
+    return getattr(obj, '_decorated_type_checkable_type', None) is type(self)
+
+
+def decorated_type_checkable(decorator: Callable[[Type], Type]) -> _ClassDecoratorWithSentinelAttribute:
+  """Wraps a class decorator to add a "sentinel attribute" to decorated classes.
+
+  A "sentinel attribute" is an attribute added to the wrapped class decorator's result with
+  `.define_instance_of()`. The wrapped class decorator can then be imported and used to check
+  whether some class object was wrapped with that decorator with `.is_instance()`.
+
+  When used on a class decorator method, the method should return
+  `<method name>.define_instance_of(cls)`, where `cls` is the class object that the decorator would
+  otherwise return.
+  """
+
+  class WrappedFunction(_ClassDecoratorWithSentinelAttribute):
+    @wraps(decorator)
+    def __call__(self, cls: Type) -> Type:
+      return decorator(cls)
+
+  return WrappedFunction()
+
+
+@decorated_type_checkable
 def frozen_after_init(cls: C) -> C:
   """Class decorator to freeze any modifications to the object after __init__() is done.
 
@@ -148,4 +189,5 @@ def frozen_after_init(cls: C) -> C:
 
   cls.__init__ = new_init
   cls.__setattr__ = new_setattr
+
   return cls

@@ -4,7 +4,7 @@
 from dataclasses import dataclass
 
 from pants.engine.isolated_process import FallibleExecuteProcessResult
-from pants.engine.rules import union
+from pants.engine.objects import union
 from pants.util.collections import Enum
 
 

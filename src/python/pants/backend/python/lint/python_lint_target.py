@@ -11,7 +11,8 @@ from pants.engine.legacy.structs import (
   PythonTestsAdaptor,
   TargetAdaptor,
 )
-from pants.engine.rules import UnionMembership, UnionRule, rule, union
+from pants.engine.objects import union
+from pants.engine.rules import UnionMembership, UnionRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.rules.core.lint import LintResult, LintResults, LintTarget
 

@@ -11,8 +11,8 @@ from typing import Any, Callable
 from pants.build_graph.target import Target
 from pants.engine.addressable import addressable_list
 from pants.engine.fs import GlobExpansionConjunction, PathGlobs
-from pants.engine.objects import Locatable
-from pants.engine.rules import UnionRule, union
+from pants.engine.objects import Locatable, union
+from pants.engine.rules import UnionRule
 from pants.engine.struct import Struct, StructWithDeps
 from pants.source import wrapped_globs
 from pants.util.contextutil import exception_logging

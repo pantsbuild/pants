@@ -10,7 +10,8 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.isolated_process import ExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTargets
 from pants.engine.legacy.structs import TargetAdaptor
-from pants.engine.rules import UnionMembership, console_rule, union
+from pants.engine.objects import union
+from pants.engine.rules import UnionMembership, console_rule
 from pants.engine.selectors import Get, MultiGet
 
 

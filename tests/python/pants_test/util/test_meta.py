@@ -6,7 +6,13 @@ from abc import ABC, abstractmethod
 from dataclasses import FrozenInstanceError, dataclass
 
 from pants.testutil.test_base import TestBase
-from pants.util.meta import SingletonMetaclass, classproperty, frozen_after_init, staticproperty
+from pants.util.meta import (
+  SingletonMetaclass,
+  classproperty,
+  decorated_type_checkable,
+  frozen_after_init,
+  staticproperty,
+)
 
 
 class AbstractClassTest(TestBase):
@@ -244,6 +250,34 @@ with an @classproperty decorator."""):
       def f(cls):
         return 'hello'
     self.assertEqual(Concrete2.f, 'hello')
+
+
+class SentinelAttributeTest(unittest.TestCase):
+
+  def test_decorated_type_checkable(self):
+    @decorated_type_checkable
+    def f(cls):
+      return f.define_instance_of(cls)
+
+    @f
+    class C:
+      pass
+
+    self.assertEqual(C._decorated_type_checkable_type, type(f))
+    self.assertTrue(f.is_instance(C))
+
+    # Check that .is_instance() is only true for exactly the decorator @g used on the class D!
+    @decorated_type_checkable
+    def g(cls):
+      return g.define_instance_of(cls)
+
+    @g
+    class D:
+      pass
+
+    self.assertEqual(D._decorated_type_checkable_type, type(g))
+    self.assertTrue(g.is_instance(D))
+    self.assertFalse(f.is_instance(D))
 
 
 class FrozenAfterInitTest(unittest.TestCase):

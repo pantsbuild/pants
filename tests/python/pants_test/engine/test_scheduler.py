@@ -10,7 +10,8 @@ from textwrap import dedent
 from typing import List
 
 from pants.engine.native import Native
-from pants.engine.rules import RootRule, UnionRule, rule, union
+from pants.engine.objects import union
+from pants.engine.rules import RootRule, UnionRule, rule
 from pants.engine.scheduler import ExecutionError, SchedulerSession
 from pants.engine.selectors import Get, Params
 from pants.testutil.engine.util import assert_equal_with_printing, remove_locations_from_traceback
