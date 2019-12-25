@@ -21,7 +21,7 @@ class ConsoleRuleTestBase(TestBase):
   :API: public
   """
 
-  _implicit_args = tuple(['--pants-config-files=[]'])
+  _implicit_args = ('--pants-config-files=[]',)
 
   @classproperty
   def goal_cls(cls):
@@ -62,16 +62,13 @@ class ConsoleRuleTestBase(TestBase):
 
     # Flush and capture console output.
     console.flush()
-    stdout = stdout.getvalue()
-    stderr = stderr.getvalue()
+    stdout_val = stdout.getvalue()
+    stderr_val = stderr.getvalue()
 
-    self.assertEqual(
-        exit_code,
-        actual_exit_code,
-        "Exited with {} (expected {}):\nstdout:\n{}\nstderr:\n{}".format(actual_exit_code, exit_code, stdout, stderr)
-      )
+    assert exit_code == actual_exit_code, \
+      f"Exited with {actual_exit_code} (expected {exit_code}):\nstdout:\n{stdout_val}\nstderr:\n{stderr_val}"
 
-    return stdout
+    return stdout_val
 
   def assert_entries(self, sep, *output, **kwargs):
     """Verifies the expected output text is flushed by the console task under test.

@@ -12,14 +12,8 @@ from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, Snapshot
 from pants.engine.legacy.graph import HydratedTarget
 from pants.engine.legacy.structs import PythonBinaryAdaptor, PythonTestsAdaptor
 from pants.engine.rules import UnionMembership
-from pants.rules.core.core_test_model import TestTarget
-from pants.rules.core.test import (
-  AddressAndTestResult,
-  Status,
-  TestResult,
-  coordinator_of_tests,
-  fast_test,
-)
+from pants.rules.core.core_test_model import Status, TestResult, TestTarget
+from pants.rules.core.test import AddressAndTestResult, coordinator_of_tests, fast_test
 from pants.source.wrapped_globs import EagerFilesetWithSpec
 from pants.testutil.engine.util import MockConsole, MockGet, run_rule
 from pants.testutil.test_base import TestBase
@@ -137,7 +131,7 @@ class TestTest(TestBase):
         # TODO: this is not robust to set as an empty digest. Add a test util that provides
         #  some premade snapshots and possibly a generalized make_hydrated_target function.
         directory_digest=EMPTY_DIRECTORY_DIGEST,
-        files=("test.py",) if include_sources else (),
+        files=tuple(["test.py"] if include_sources else []),
         dirs=()
       )
     )
@@ -147,7 +141,7 @@ class TestTest(TestBase):
       PythonBinaryAdaptor(type_alias='python_binary', sources=mocked_fileset)
     )
     with self.captured_logging(logging.INFO):
-      result = run_rule(
+      result: AddressAndTestResult = run_rule(
         coordinator_of_tests,
         rule_args=[
           HydratedTarget(address, target_adaptor, ()),

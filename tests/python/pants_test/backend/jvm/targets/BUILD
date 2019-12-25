@@ -7,7 +7,8 @@ python_tests(
   dependencies=[
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -39,7 +40,8 @@ python_tests(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/build_graph',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -52,6 +54,7 @@ python_tests(
     'src/python/pants/testutil:test_base',
     'src/python/pants/testutil/subsystem',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -64,7 +67,8 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/source',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -77,7 +81,8 @@ python_tests(
     'src/python/pants/base:payload_field',
     'src/python/pants/build_graph',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -87,5 +92,6 @@ python_tests(
     'src/python/pants/java/jar',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )

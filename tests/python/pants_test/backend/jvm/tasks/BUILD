@@ -20,7 +20,8 @@ python_tests(
     'src/python/pants/java/jar',
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil/jvm:jvm_tool_task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -38,7 +39,8 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil/jvm:jvm_tool_task_test_base',
     'src/python/pants/testutil/subsystem',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -58,7 +60,8 @@ python_tests(
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
     'src/python/pants/testutil/jvm:jvm_tool_task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -101,7 +104,8 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -117,7 +121,8 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -130,7 +135,8 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/testutil/jvm:nailgun_task_test_base',
     'src/python/pants/testutil:task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -158,7 +164,8 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:check_published_deps',
     'src/python/pants/build_graph',
     'src/python/pants/testutil:task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -178,7 +185,8 @@ python_tests(
     'src/python/pants/testutil:test_base',
     'src/python/pants/testutil/subsystem',
     'src/python/pants/testutil:file_test_util',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -191,7 +199,8 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:classpath_util',
     'src/python/pants/goal:products',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -209,6 +218,7 @@ python_tests(
     'src/python/pants/testutil/jvm:jvm_task_test_base',
     'src/python/pants/testutil/subsystem',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -224,6 +234,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -247,7 +258,8 @@ python_tests(
     'src/python/pants/java/jar',
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil/jvm:nailgun_task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -278,14 +290,13 @@ python_tests(
     'src/python/pants/testutil/jvm:nailgun_task_test_base',
     'src/python/pants/testutil/subsystem',
     'src/python/pants/testutil:task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
   name = 'coursier_resolve',
-  sources = [
-    'test_coursier_resolve.py',
-  ],
+  sources = ['test_coursier_resolve.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/jvm/subsystems:jar_dependency_management',
@@ -300,7 +311,8 @@ python_tests(
     'src/python/pants/testutil/jvm:nailgun_task_test_base',
     'src/python/pants/testutil/subsystem',
     'src/python/pants/testutil:task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -343,7 +355,8 @@ python_tests(
     'tests/python/pants_test/backend/jvm/tasks/ivy_utils_resources',
     'src/python/pants/testutil:test_base',
     'src/python/pants/testutil/subsystem',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -365,6 +378,7 @@ python_tests(
     'src/python/pants/testutil:task_test_base',
     'src/python/pants/testutil/subsystem',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -382,6 +396,7 @@ python_tests(
     'src/python/pants/testutil/jvm:nailgun_task_test_base',
     'src/python/pants/testutil:mock_logger',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -414,7 +429,8 @@ python_tests(
     'src/python/pants/util:dirutil',
     'src/python/pants/testutil/jvm:jar_task_test_base',
     'src/python/pants/testutil/jvm:jvm_tool_task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -501,7 +517,8 @@ python_library(
     'src/python/pants/backend/jvm/tasks:classpath_products',
     'src/python/pants/java/jar',
     'src/python/pants/testutil/jvm:nailgun_task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -527,7 +544,8 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:jvm_dependency_usage',
     'src/python/pants/util:dirutil',
     'src/python/pants/testutil:task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -551,7 +569,8 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:jvm_platform_analysis',
     'src/python/pants/build_graph',
     'src/python/pants/testutil:task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -574,7 +593,8 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:run_jvm_prep_command',
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil:task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -598,7 +618,8 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:jvm_task',
     'src/python/pants/testutil/jvm:jvm_task_test_base',
     'src/python/pants/testutil:task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -610,7 +631,8 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:jvm_run',
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil/jvm:jvm_task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -635,7 +657,8 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:jvmdoc_gen',
     'src/python/pants/base:exceptions',
     'src/python/pants/testutil/jvm:jvm_task_test_base'
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 resources(
@@ -656,7 +679,8 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/util:dirutil',
     'src/python/pants/testutil:task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -669,7 +693,8 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil:task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -682,7 +707,8 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:prepare_services',
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil:task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -709,6 +735,7 @@ python_tests(
     'src/python/pants/testutil/jvm:nailgun_task_test_base',
     'src/python/pants/testutil/subsystem'
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -739,7 +766,8 @@ python_tests(
     'src/python/pants/testutil/jvm:nailgun_task_test_base',
     'src/python/pants/testutil/subsystem',
     'src/python/pants/testutil:task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -802,7 +830,8 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/testutil:task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -831,6 +860,7 @@ python_tests(
     'src/python/pants/testutil/subsystem',
     'src/python/pants/testutil:task_test_base',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -858,4 +888,5 @@ python_tests(
     'src/python/pants/util:dirutil',
     'src/python/pants/testutil/jvm:jvm_tool_task_test_base',
   ],
+  tags = {"partially_type_checked"},
 )

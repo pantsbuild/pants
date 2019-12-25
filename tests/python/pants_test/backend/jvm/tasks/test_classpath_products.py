@@ -7,12 +7,8 @@ from pants.backend.jvm.artifact import Artifact
 from pants.backend.jvm.repository import Repository
 from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
-from pants.backend.jvm.tasks.classpath_products import (
-  ArtifactClasspathEntry,
-  ClasspathEntry,
-  ClasspathProducts,
-  MissingClasspathEntryError,
-)
+from pants.backend.jvm.tasks.classpath_entry import ArtifactClasspathEntry, ClasspathEntry
+from pants.backend.jvm.tasks.classpath_products import ClasspathProducts, MissingClasspathEntryError
 from pants.base.exceptions import TaskError
 from pants.build_graph.target import Target
 from pants.java.jar.exclude import Exclude

@@ -13,9 +13,7 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/testutil:task_test_base',
   ],
-  coverage = [
-    'pants.backend.docgen.tasks.markdown_to_html',
-  ]
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -26,9 +24,6 @@ python_tests(
     'src/python/pants/util:dirutil',
     'src/python/pants/testutil:int-test',
     'testprojects/src/java/org/pantsbuild/testproject:page_directory',
-  ],
-  coverage = [
-    'pants.backend.docgen.tasks.markdown_to_html',
   ],
   tags = {'integration'},
 )

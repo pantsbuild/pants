@@ -8,7 +8,8 @@ python_tests(
   dependencies=[
     'src/python/pants/core_tasks',
     'src/python/pants/testutil:task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -44,7 +45,8 @@ python_tests(
     'src/python/pants/util:dirutil',
     'src/python/pants/testutil:task_test_base',
     'src/python/pants/testutil/subsystem',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(

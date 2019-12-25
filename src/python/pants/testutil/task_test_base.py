@@ -335,7 +335,7 @@ class DeclarativeTaskTestMixin:
     this_task: Task
     after_tasks: Tuple[Task, ...]
 
-  def invoke_tasks(self, target_closure=None, **context_kwargs) -> 'TaskInvocationResult':
+  def invoke_tasks(self, target_closure=None, **context_kwargs):
     """Create and execute the declaratively specified tasks in order.
 
     Create instances of and execute task types in `self.run_before_task_types()`, then
@@ -359,7 +359,7 @@ class DeclarativeTaskTestMixin:
       for_task_types=all_synthesized_task_types,
       **context_kwargs)
     if target_closure is not None:
-      self.assertEqual(set(target_closure), set(context.build_graph.targets()))
+      assert set(target_closure) == set(context.build_graph.targets())
 
     run_before_task_instances = [
       self._create_task(task_type, context)

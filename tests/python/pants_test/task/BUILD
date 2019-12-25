@@ -7,7 +7,8 @@ python_tests(
   dependencies = [
     'src/python/pants/task',
     'src/python/pants/testutil:task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -28,7 +29,8 @@ python_tests(
     'src/python/pants/task',
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -43,6 +45,7 @@ python_tests(
     'src/python/pants/util:dirutil',
     'src/python/pants/testutil:task_test_base',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -65,7 +68,8 @@ python_tests(
     'src/python/pants/task',
     'src/python/pants/util:dirutil',
     'src/python/pants/testutil:task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -75,7 +79,8 @@ python_tests(
     'src/python/pants/task',
     'src/python/pants/util:process_handler',
     'src/python/pants/testutil:task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -85,4 +90,5 @@ python_tests(
     'src/python/pants/task',
     'src/python/pants/testutil:test_base',
   ],
+  tags = {"partially_type_checked"},
 )

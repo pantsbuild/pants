@@ -12,6 +12,6 @@ python_tests(
     'tests/python/pants_test/engine:scheduler_test_base',
     'src/python/pants/testutil/subsystem',
   ],
-  tags={'platform_specific_behavior'},
+  tags={'platform_specific_behavior', 'partially_type_checked'},
   timeout=120,
 )

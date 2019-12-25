@@ -26,5 +26,5 @@ python_tests(
     'tests/python/pants_test:interpreter_selection_utils',
     'src/python/pants/testutil:test_base',
   ],
-  coverage = ['pants.init'],
+  tags = {"partially_type_checked"},
 )

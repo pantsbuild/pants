@@ -9,5 +9,6 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil:test_base',
     'src/python/pants/testutil:pexrc_util',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )

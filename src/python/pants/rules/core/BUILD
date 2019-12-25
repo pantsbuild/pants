@@ -40,6 +40,7 @@ python_tests(
     'src/python/pants/testutil/engine:util',
     'src/python/pants/testutil/subsystem',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(

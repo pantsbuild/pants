@@ -27,7 +27,7 @@ python_tests(
     'tests/python/pants_test:interpreter_selection_utils',
     'src/python/pants/testutil:task_test_base',
   ],
-  tags={'platform_specific_behavior'},
+  tags={'platform_specific_behavior', 'partially_type_checked'},
   timeout=600,
 )
 

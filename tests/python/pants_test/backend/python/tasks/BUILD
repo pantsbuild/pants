@@ -11,7 +11,8 @@ python_library(
     'src/python/pants/subsystem',
     'src/python/pants/testutil/subsystem',
     'src/python/pants/testutil:task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -23,6 +24,7 @@ python_tests(
     'src/python/pants/backend/python/targets',
     'tests/python/pants_test/backend/python/tasks/util',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -53,6 +55,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil:task_test_base',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -79,6 +82,7 @@ python_tests(
     'tests/python/pants_test:interpreter_selection_utils',
     ':python_task_test_base',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -108,6 +112,7 @@ python_tests(
     'src/python/pants/testutil/subsystem',
     ':python_task_test_base',
   ],
+  tags = {"partially_type_checked"},
   timeout=480,
 )
 
@@ -138,6 +143,7 @@ python_tests(
     'src/python/pants/build_graph',
     ':python_task_test_base',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -164,6 +170,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     ':python_task_test_base',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -203,6 +210,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     ':python_task_test_base',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -220,6 +228,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil:task_test_base',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -235,6 +244,7 @@ python_tests(
     'src/python/pants/util:dirutil',
     'src/python/pants/testutil:task_test_base',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -256,6 +266,7 @@ python_tests(
     'src/python/pants/testutil/subsystem',
     'tests/python/pants_test:interpreter_selection_utils',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -284,4 +295,5 @@ python_tests(
     'src/python/pants/util:collections',
     'src/python/pants/testutil:task_test_base',
   ],
+  tags = {"partially_type_checked"},
 )
