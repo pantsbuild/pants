@@ -48,9 +48,9 @@ class DaemonExiter(Exiter):
     self,
     maybe_shutdown_socket: MaybeShutdownSocket,
     finalizer: Callable[[], None],
-    previous_exiter: Optional[Exiter],
+    previous_exiter: Exiter,
   ) -> None:
-    super().__init__(exiter=previous_exiter or sys.exit)
+    super().__init__(exiter=previous_exiter)
     self._maybe_shutdown_socket = maybe_shutdown_socket
     self._finalizer = finalizer
 

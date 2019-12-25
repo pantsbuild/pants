@@ -38,7 +38,7 @@ class LocalExiter(Exiter):
     with ExceptionSink.exiter_as(lambda previous_exiter: cls(run_tracker, repro, previous_exiter)):
       yield
 
-  def __init__(self, run_tracker, repro, previous_exiter):
+  def __init__(self, run_tracker, repro, previous_exiter: Exiter) -> None:
     self._run_tracker = run_tracker
     self._repro = repro
     super().__init__(previous_exiter)

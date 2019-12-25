@@ -111,8 +111,9 @@ class ExceptionSink:
   # to properly setup global state.
   _log_dir = None
   # We need an exiter in order to know what to do after we log a fatal exception or handle a
-  # catchable signal.
-  _exiter: Optional[Exiter] = None
+  # catchable signal. We default to `sys.exit` to configure the behavior for import time, but expect
+  # this to changed for later in the Pants bootstrap process.
+  _exiter: Exiter = Exiter(exiter=sys.exit)
   # Where to log stacktraces to in a SIGUSR2 handler.
   _interactive_output_stream = None
   # Whether to print a stacktrace in any fatal error message printed to the terminal.
@@ -183,16 +184,16 @@ class ExceptionSink:
 
   class AccessGlobalExiterMixin:
     @property
-    def _exiter(self) -> Optional[Exiter]:
+    def _exiter(self) -> Exiter:
       return ExceptionSink.get_global_exiter()
 
   @classmethod
-  def get_global_exiter(cls) -> Optional[Exiter]:
+  def get_global_exiter(cls) -> Exiter:
     return cls._exiter
 
   @classmethod
   @contextmanager
-  def exiter_as(cls, new_exiter_fun: Callable[[Optional[Exiter]], Exiter]) -> Iterator[None]:
+  def exiter_as(cls, new_exiter_fun: Callable[[Exiter], Exiter]) -> Iterator[None]:
     """Temporarily override the global exiter.
 
     NB: We don't want to try/finally here, because we want exceptions to propagate
@@ -207,7 +208,7 @@ class ExceptionSink:
 
   @classmethod
   @contextmanager
-  def exiter_as_until_exception(cls, new_exiter_fun: Callable[[Optional[Exiter]], Exiter]) -> Iterator[None]:
+  def exiter_as_until_exception(cls, new_exiter_fun: Callable[[Exiter], Exiter]) -> Iterator[None]:
     """Temporarily override the global exiter, except this will unset it when an exception happens."""
     previous_exiter = cls._exiter
     new_exiter = new_exiter_fun(previous_exiter)
@@ -218,7 +219,7 @@ class ExceptionSink:
       cls._reset_exiter(previous_exiter)
 
   @classmethod
-  def _reset_exiter(cls, exiter: Optional[Exiter]) -> None:
+  def _reset_exiter(cls, exiter: Exiter) -> None:
     """
     Class state:
     - Overwrites `cls._exiter`.
@@ -542,8 +543,6 @@ Signal {signum} ({signame}) was raised. Exiting with failure.{formatted_tracebac
 # import time.
 # Set the log location for writing logs before bootstrap options are parsed.
 ExceptionSink.reset_log_location(os.getcwd())
-# Sets except hook for exceptions at import time.
-ExceptionSink._reset_exiter(Exiter(exiter=sys.exit))
 # Sets a SIGUSR2 handler.
 ExceptionSink.reset_interactive_output_stream(sys.stderr.buffer)
 # Sets a handler that logs nonfatal signals to the exception sink before exiting.
