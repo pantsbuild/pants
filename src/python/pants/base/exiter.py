@@ -4,6 +4,7 @@
 import logging
 import sys
 import traceback
+from typing import Callable, Union
 
 from pants.util.strutil import ensure_binary
 
@@ -27,9 +28,9 @@ class Exiter:
   .exit() or .exit_and_fail() on an Exiter instance when you wish to exit the runtime.
   """
 
-  def __init__(self, exiter=sys.exit):
+  def __init__(self, exiter: Callable[[Union[ExitCode, str, object]], None] = sys.exit):
     """
-    :param func exiter: A function to be called to conduct the final exit of the runtime. (Optional)
+    :param exiter: A function to be called to conduct the final exit of the runtime. (Optional)
     """
     # Since we have some exit paths that run via the sys.excepthook,
     # symbols we use can become garbage collected before we use them; ie:
