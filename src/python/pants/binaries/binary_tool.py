@@ -13,7 +13,7 @@ from pants.binaries.binary_util import (
   BinaryUtil,
   HostPlatform,
 )
-from pants.engine.fs import Digest, PathGlobs, PathGlobsAndRoot, Snapshot, UrlToFetch
+from pants.engine.fs import Digest, PathGlobs, PathGlobsAndRoot, SingleFileExecutable, Snapshot, UrlToFetch
 from pants.engine.platform import Platform, PlatformConstraint
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get
@@ -398,11 +398,18 @@ async def fetch_binary_tool(req: BinaryToolFetchRequest, url_set: BinaryToolUrlS
   return await Get[Snapshot](UrlToFetch(url_to_fetch, digest))
 
 
+@rule
+async def fetch_binary_tool_single_file_exe(req: BinaryToolFetchRequest) -> SingleFileExecutable:
+  snapshot = await Get[Snapshot](BinaryToolFetchRequest, req)
+  return SingleFileExecutable(snapshot)
+
+
 def rules():
   return [
     RootRule(PlatformConstraint),
     translate_host_platform,
     get_binary_tool_urls,
     fetch_binary_tool,
+    fetch_binary_tool_single_file_exe,
     RootRule(BinaryToolFetchRequest),
   ]
