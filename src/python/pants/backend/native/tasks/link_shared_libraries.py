@@ -15,6 +15,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.engine.platform import Platform
+from pants.util.enums import match
 from pants.util.memo import memoized_property
 
 
@@ -167,7 +168,7 @@ class LinkSharedLibraries(NativeTask):
     # We are executing in the results_dir, so get absolute paths for everything.
     cmd = (
       [linker.exe_filename] +
-      self.platform.match(
+      match(self.platform,
         {Platform.darwin: ['-Wl,-dylib'], Platform.linux: ['-shared']}
       ) +
       list(linker.extra_args) +

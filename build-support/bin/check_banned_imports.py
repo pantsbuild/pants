@@ -11,20 +11,7 @@ from common import die
 
 def main() -> None:
   rust_files = find_files("src/rust/engine", extension=".rs")
-  python_files = find_files(
-    "src", "tests", "pants-plugins", "contrib", extension=".py"
-  )
 
-  check_banned_import(
-    python_files - {
-      "src/python/pants/base/hash_utils.py",
-      "src/python/pants/option/parser.py",
-      "src/python/pants/util/collections.py",
-      "tests/python/pants_test/base/test_hash_utils.py",
-    },
-    bad_import_regex=r"^from enum import.*Enum|^import enum$",
-    correct_import_message="from pants.util.collections import Enum",
-  )
   check_banned_import(
     rust_files,
     bad_import_regex=r"^use std::sync::.*(Mutex|RwLock)",

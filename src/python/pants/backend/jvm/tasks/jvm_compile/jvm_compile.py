@@ -3,6 +3,7 @@
 
 import functools
 import os
+from enum import Enum
 from multiprocessing import cpu_count
 from typing import Optional
 
@@ -39,7 +40,6 @@ from pants.java.distribution.distribution import DistributionLocator
 from pants.option.compiler_option_sets_mixin import CompilerOptionSetsMixin
 from pants.option.ranked_value import RankedValue
 from pants.reporting.reporting_utils import items_to_report_element
-from pants.util.collections import Enum
 from pants.util.contextutil import Timer, temporary_dir
 from pants.util.dirutil import (
   fast_relpath,
@@ -49,6 +49,7 @@ from pants.util.dirutil import (
   safe_mkdir,
   safe_rmtree,
 )
+from pants.util.enums import match
 from pants.util.fileutil import create_size_estimators
 from pants.util.memo import memoized_method, memoized_property
 
@@ -958,7 +959,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     # See: https://github.com/pantsbuild/pants/issues/6416 for covering using
     #      different jdks in remote builds.
     local_distribution = self._local_jvm_distribution()
-    return self.execution_strategy.match({
+    return match(self.execution_strategy, {
       self.ExecutionStrategy.subprocess: lambda: local_distribution,
       self.ExecutionStrategy.nailgun: lambda: local_distribution,
       self.ExecutionStrategy.hermetic: lambda: self._HermeticDistribution('.jdk', local_distribution),

@@ -151,7 +151,7 @@ async def hydrate_struct(address_mapper: AddressMapper, address: Address) -> Hyd
 
   # NB: Some pythons throw an UnboundLocalError for `idx` if it is a simple local variable.
   # TODO(#8496): create a decorator for functions which declare a sentinel variable like this!
-  maybe_consume.idx = 0         # type: ignore
+  maybe_consume.idx = 0         # type: ignore[attr-defined]
 
   # 'zip' the previously-requested dependencies back together as struct fields.
   def consume_dependencies(item, args=None):

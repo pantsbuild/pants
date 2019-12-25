@@ -7,6 +7,7 @@ import os
 import shlex
 import unittest.mock
 from contextlib import contextmanager
+from enum import Enum
 from textwrap import dedent
 
 import yaml
@@ -41,7 +42,7 @@ from pants.option.ranked_value import RankedValue
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.testutil.option.fakes import create_options
 from pants.testutil.test_base import TestBase
-from pants.util.collections import Enum, assert_single_element
+from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_file, temporary_file_path
 from pants.util.dirutil import safe_mkdtemp
 from pants.util.strutil import safe_shlex_join

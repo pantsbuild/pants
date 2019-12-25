@@ -10,6 +10,7 @@ from pants.base.exception_sink import ExceptionSink
 from pants.engine.platform import Platform
 from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir
+from pants.util.enums import match
 
 
 class TestExceptionSink(TestBase):
@@ -42,7 +43,7 @@ class TestExceptionSink(TestBase):
     # creating a new directory with safe_mkdir(), Linux errors out trying to create the directory
     # for its log files with safe_open(). This may be due to differences in the filesystems.
     # TODO: figure out why we error out at different points here!
-    err_str = Platform.current.match({
+    err_str = match(Platform.current, {
       Platform.darwin: "The provided exception sink path at '/' is not writable or could not be created: [Errno 21] Is a directory: '/'.",
       Platform.linux: "Error opening fatal error log streams for log location '/': [Errno 13] Permission denied: '/.pids'"
     })

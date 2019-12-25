@@ -44,6 +44,12 @@ python_library(
 )
 
 python_library(
+  name = 'enums',
+  sources = ['enums.py'],
+  tags = {'type_checked'},
+)
+
+python_library(
   name = 'eval',
   sources = ['eval.py'],
   tags = {'type_checked'},

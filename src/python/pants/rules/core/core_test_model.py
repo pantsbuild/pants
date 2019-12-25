@@ -2,10 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
+from enum import Enum
 
 from pants.engine.isolated_process import FallibleExecuteProcessResult
 from pants.engine.objects import union
-from pants.util.collections import Enum
 
 
 class Status(Enum):
