@@ -10,7 +10,7 @@ from contextlib import contextmanager
 from enum import Enum
 from functools import partial
 from textwrap import dedent
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, cast
 
 import yaml
 from packaging.version import Version
@@ -53,15 +53,15 @@ from pants.util.strutil import safe_shlex_join
 _FAKE_CUR_VERSION = '1.0.0.dev0'
 
 
-def task(scope: str) -> ScopeInfo:
+def task(scope):
   return ScopeInfo(scope, ScopeInfo.TASK)
 
 
-def intermediate(scope: str) -> ScopeInfo:
+def intermediate(scope):
   return ScopeInfo(scope, ScopeInfo.INTERMEDIATE)
 
 
-def subsystem(scope: str) -> ScopeInfo:
+def subsystem(scope):
   return ScopeInfo(scope, ScopeInfo.SUBSYSTEM)
 
 
@@ -77,14 +77,14 @@ class OptionsTest(TestBase):
   def _create_config(self, config: Optional[Dict[str, Dict[str, str]]] = None) -> Config:
     with open(os.path.join(safe_mkdtemp(), 'test_config.ini'), 'w') as fp:
       self._write_config_to_file(fp, config or {})
-    return Config.load(config_paths=[fp.name])
+    return cast(Config, Config.load(config_paths=[fp.name]))
 
   def _parse(
     self,
     args_str: str,
     *,
     env: Optional[Dict[str, str]] = None,
-    config: Optional[Dict[str, Dict]] = None,
+    config: Optional[Dict[str, Dict[str, Any]]] = None,
     bootstrap_option_values=None,
   ) -> Options:
     args = shlex.split(args_str)
@@ -96,7 +96,7 @@ class OptionsTest(TestBase):
       bootstrap_option_values=bootstrap_option_values,
     )
     self._register(options)
-    return options
+    return cast(Options, options)
 
   _known_scope_infos = [intermediate('compile'),
                         task('compile.java'),
@@ -1375,7 +1375,12 @@ class OptionsTest(TestBase):
 
   def test_pants_global_with_default(self) -> None:
     """This test makes sure values under [DEFAULT] still gets read."""
-    config = {'DEFAULT': {'b': '99'}, 'GLOBAL': {'store_true_flag': True}}
+    # This cast shouldn't be necessary - likely a bug in MyPy. Once this gets fixed, MyPy will
+    # tell us that we can remove the cast.
+    config = cast(
+      Dict[str, Dict[str, Any]],
+      {'DEFAULT': {'b': '99'}, 'GLOBAL': {'store_true_flag': True}}
+    )
     global_options = self._parse('./pants', config=config).for_global_scope()
     self.assertEqual(99, global_options.b)
     self.assertTrue(global_options.store_true_flag)

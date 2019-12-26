@@ -50,7 +50,7 @@ def si(scope, subsystem_cls):
 
 
 class SubsystemTest(TestBase):
-  def setUp(self) -> None:
+  def setUp(self):
     DummySubsystem._options = DummyOptions()
     WorkunitSubscriptableSubsystem._options = DummyOptions()
 
@@ -65,7 +65,7 @@ class SubsystemTest(TestBase):
     task_instance = DummySubsystem.scoped_instance(task)
     self.assertIs(task_instance, DummySubsystem.scoped_instance(task))
 
-  def test_invalid_subsystem_class(self) -> None:
+  def test_invalid_subsystem_class(self):
     class NoScopeSubsystem(Subsystem):
       pass
     NoScopeSubsystem._options = DummyOptions()

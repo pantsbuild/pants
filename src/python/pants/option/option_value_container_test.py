@@ -83,7 +83,8 @@ class OptionValueContainerTest(unittest.TestCase):
     self.assertFalse(hasattr(p, 'baz'))  # Does not have attribute added after the copy.
 
     # Verify that it's a shallow copy by modifying a referent in o and reading it in p.
-    o.bar['b'] = 222
+    # TODO: add type hints to ranked_value.py and option_value_container.py so that this works.
+    o.bar['b'] = 222  # type: ignore[index]
     self.assertEqual({'a': 111, 'b': 222}, p.bar)
 
   def test_deepcopy(self) -> None:
@@ -100,5 +101,6 @@ class OptionValueContainerTest(unittest.TestCase):
     self.assertFalse(hasattr(p, 'baz'))  # Does not have attribute added after the copy.
 
     # Verify that it's a deep copy by modifying a referent in o and reading it in p.
-    o.bar['b'] = 222
+    # TODO: add type hints to ranked_value.py and option_value_container.py so that this works.
+    o.bar['b'] = 222  # type: ignore[index]
     self.assertEqual({'a': 111}, p.bar)

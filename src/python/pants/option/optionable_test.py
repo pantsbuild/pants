@@ -20,7 +20,7 @@ class OptionableTest(unittest.TestCase):
       NoneScope()
 
     class NonStringScope(Optionable):
-      options_scope = 42
+      options_scope = 42  # type: ignore[assignment]
     with self.assertRaises(NotImplementedError):
       NonStringScope()
 

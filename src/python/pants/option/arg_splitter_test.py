@@ -18,15 +18,15 @@ from pants.option.scope import ScopeInfo
 from pants.util.contextutil import pushd, temporary_dir
 
 
-def task(scope: str) -> ScopeInfo:
+def task(scope):
   return ScopeInfo(scope, ScopeInfo.TASK)
 
 
-def intermediate(scope: str) -> ScopeInfo:
+def intermediate(scope):
   return ScopeInfo(scope, ScopeInfo.INTERMEDIATE)
 
 
-def subsys(scope: str) -> ScopeInfo:
+def subsys(scope):
   return ScopeInfo(scope, ScopeInfo.SUBSYSTEM)
 
 
