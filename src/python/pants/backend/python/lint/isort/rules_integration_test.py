@@ -82,7 +82,8 @@ class IsortIntegrationTest(TestBase):
       TargetAdaptor(
         sources=EagerFilesetWithSpec('test', {'globs': []}, snapshot=input_snapshot),
         address=Address.parse("test:target"),
-      )
+      ),
+      prior_formatter_result_digest=input_snapshot.directory_digest,
     )
     isort_subsystem = global_subsystem_instance(
       Isort, options={Isort.options_scope: {

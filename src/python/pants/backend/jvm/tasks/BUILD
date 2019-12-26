@@ -573,6 +573,7 @@ python_library(
     'src/python/pants/java:util',
     'src/python/pants/process',
     'src/python/pants/task',
+    'src/python/pants/util:enums',
   ],
   tags = {"partially_type_checked"},
 )

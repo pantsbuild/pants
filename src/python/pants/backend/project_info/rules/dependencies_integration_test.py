@@ -37,8 +37,11 @@ class FastDependenciesTest(ConsoleRuleTestBase):
     )
 
   def assert_dependencies(self, *, target: str, expected: List[str], transitive: bool = True) -> None:
-    args = ["--no-transitive"] if not transitive else []
-    self.assert_console_output(*expected, args=[*args, target])
+    env = {
+      'PANTS_BACKEND_PACKAGES2': 'pants.backend.project_info'
+    }
+    args = ['--no-transitive'] if not transitive else []
+    self.assert_console_output(*expected, args=[*args, target], env=env)
 
   def test_no_target(self):
     self.assert_dependencies(

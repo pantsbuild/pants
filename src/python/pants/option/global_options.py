@@ -5,6 +5,7 @@ import multiprocessing
 import os
 import sys
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any
 
 from pants.base.build_environment import (
@@ -19,7 +20,6 @@ from pants.option.errors import OptionsError
 from pants.option.optionable import Optionable
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
-from pants.util.collections import Enum
 
 
 class GlobMatchErrorBehavior(Enum):
@@ -172,7 +172,14 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              help='The name of the script or binary used to invoke pants. '
                   'Useful when printing help messages.')
 
-    register('--plugins', advanced=True, type=list, help='Load these plugins.')
+    register('--plugins', advanced=True, type=list,
+             help='Allow v1 backends to be loaded from these plugins.  The default backends for '
+                  'each plugin will be loaded automatically. Other backends in a plugin can be '
+                  'loaded by listing them in --backend-packages.')
+    register('--plugins2', advanced=True, type=list,
+             help='Allow v2 backends to be loaded from these plugins.  The default backends for '
+                  'each plugin will be loaded automatically. Other backends in a plugin can be '
+                  'loaded by listing them in --backend-packages.')
     register('--plugins-force-resolve', advanced=True, type=bool, default=False,
              help='Re-resolve plugins even if previously resolved.')
     register('--plugin-cache-dir', advanced=True,
@@ -194,8 +201,14 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                       'pants.backend.codegen.grpcio.python',
                       'pants.backend.codegen.wire.java',
                       'pants.backend.project_info'],
-             help='Load backends from these packages that are already on the path. '
-                  'Add contrib and custom backends to this list.')
+             help='Register v1 tasks from these backends. The backend packages must be present on '
+                  'the PYTHONPATH, typically because they are in the pants core dist, in a '
+                  'plugin dist, or available as sources in the repo.')
+    register('--backend-packages2', advanced=True, type=list,
+             default=[],
+             help='Register v2 rules from these backends. The backend packages must be present on '
+                  'the PYTHONPATH, typically because they are in the pants core dist, in a '
+                  'plugin dist, or available as sources in the repo.')
 
     register('--pants-bootstrapdir', advanced=True, metavar='<dir>', default=get_pants_cachedir(),
              help='Use this dir for global cache.')

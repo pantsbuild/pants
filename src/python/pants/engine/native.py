@@ -37,6 +37,7 @@ from pants.engine.isolated_process import (
   FallibleExecuteProcessResult,
   MultiPlatformExecuteProcessRequest,
 )
+from pants.engine.objects import union
 from pants.engine.selectors import Get
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import read_file, safe_mkdir, safe_mkdtemp
@@ -315,7 +316,7 @@ class _FFISpecification(object):
     """Return whether or not a type is a member of a union"""
     c = self._ffi.from_handle(context_handle)
     input_type = c.from_id(type_id.tup_0)
-    return bool(getattr(input_type, '_is_union', None))
+    return union.is_instance(input_type)
 
   _do_raise_keyboardinterrupt_on_identify = bool(os.environ.get('_RAISE_KEYBOARDINTERRUPT_IN_CFFI_IDENTIFY', False))
 

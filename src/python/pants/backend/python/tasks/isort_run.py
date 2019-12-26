@@ -10,6 +10,7 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.isort_prep import IsortPrep
 from pants.base.build_environment import get_buildroot
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.task.fmt_task_mixin import FmtTaskMixin
@@ -50,6 +51,19 @@ class IsortRun(FmtTaskMixin, Task):
 
       isort = self.context.products.get_data(IsortPrep.tool_instance_cls)
       isort_subsystem = IsortPrep.tool_subsystem_cls.global_instance()
+      deprecated_conditional(
+        lambda: self.get_passthru_args(),
+        removal_version='1.26.0.dev3',
+        entity_description='Using the old style of passthrough args for isort',
+        hint_message="You passed arguments to isort through either the "
+                     "`--fmt-isort-passthrough-args` option or the style "
+                     "`./pants fmt.isort -- --case-sensitive --trailing-comma`. Instead, pass any "
+                     "arguments to isort like this: `./pants fmt :: "
+                     "--isort-args='--case-sensitive --trailing-comma'`.\n\n"
+                     "This change is meant to reduce confusion in how option scopes work with "
+                     "passthrough args and to prepare for isort eventually exclusively using the "
+                     "V2 implementation, which only supports `--isort-args`.",
+      )
       args = [
         *self.get_passthru_args(), *isort_subsystem.get_args(), '--filter-files', *sources
       ]

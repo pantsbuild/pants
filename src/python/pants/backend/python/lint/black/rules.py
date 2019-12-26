@@ -33,6 +33,7 @@ from pants.rules.core.lint import LintResult
 @dataclass(frozen=True)
 class BlackTarget:
   target: TargetAdaptor
+  prior_formatter_result_digest: Digest
 
 
 @dataclass(frozen=True)
@@ -45,7 +46,9 @@ class BlackSetup:
 @rule
 async def setup_black(black: Black) -> BlackSetup:
   config_path: Optional[str] = black.get_options().config
-  config_snapshot = await Get[Snapshot](PathGlobs(include=(config_path,)))
+  config_snapshot = await Get[Snapshot](
+    PathGlobs(include=tuple([config_path] if config_path else []))
+  )
   requirements_pex = await Get[Pex](
     CreatePex(
       output_filename="black.pex",
@@ -98,10 +101,11 @@ async def create_black_request(
   subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> ExecuteProcessRequest:
   target = wrapped_target.target
+  sources_digest = wrapped_target.prior_formatter_result_digest
   merged_input_files = await Get[Digest](
     DirectoriesToMerge(
       directories=(
-        target.sources.snapshot.directory_digest,
+        sources_digest,
         black_setup.requirements_pex.directory_digest,
         black_setup.config_snapshot.directory_digest,
       )

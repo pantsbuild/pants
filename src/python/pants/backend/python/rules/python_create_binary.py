@@ -5,7 +5,8 @@ from pants.backend.python.rules.pex import Pex
 from pants.backend.python.rules.pex_from_target_closure import CreatePexFromTargetClosure
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.build_graph.address import Address
-from pants.engine.legacy.graph import BuildFileAddresses, HydratedTarget
+from pants.engine.addressable import BuildFileAddresses
+from pants.engine.legacy.graph import HydratedTarget
 from pants.engine.legacy.structs import PythonBinaryAdaptor
 from pants.engine.rules import UnionRule, rule
 from pants.engine.selectors import Get

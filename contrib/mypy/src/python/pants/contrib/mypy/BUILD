@@ -10,4 +10,5 @@ contrib_plugin(
   distribution_name='pantsbuild.pants.contrib.mypy',
   description='MyPy static type analyzer',
   register_goals=True,
+  tags = {"partially_type_checked"},
 )

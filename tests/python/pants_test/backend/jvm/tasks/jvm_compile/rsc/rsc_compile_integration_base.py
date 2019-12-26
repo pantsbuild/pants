@@ -13,7 +13,7 @@ def ensure_compile_rsc_execution_strategy(workflow, **env_kwargs):
 
   def decorator(f):
     def wrapper(self, *args, **kwargs):
-      for strategy in RscCompile.ExecutionStrategy.all_values():
+      for strategy in RscCompile.ExecutionStrategy:
         with environment_as(
           HERMETIC_ENV='PANTS_COMPILE_RSC_EXECUTION_STRATEGY',
           PANTS_COMPILE_RSC_EXECUTION_STRATEGY=strategy.value,
@@ -24,7 +24,7 @@ def ensure_compile_rsc_execution_strategy(workflow, **env_kwargs):
 
     return wrapper
   return decorator
-  
+
 
 class RscCompileIntegrationBase(BaseCompileIT):
 

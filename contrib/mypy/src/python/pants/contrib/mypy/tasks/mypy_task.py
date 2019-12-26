@@ -4,7 +4,7 @@
 import os
 from pathlib import Path
 from textwrap import dedent
-from typing import Iterable, List, Optional
+from typing import Iterable, List, Optional, Set, cast
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.targets.python_binary import PythonBinary
@@ -15,6 +15,7 @@ from pants.backend.python.tasks.resolve_requirements import ResolveRequirements
 from pants.backend.python.tasks.resolve_requirements_task_base import ResolveRequirementsTaskBase
 from pants.base import hash_utils
 from pants.base.build_environment import get_buildroot
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.target import Target
@@ -137,7 +138,7 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
     else:
       eval_targets = all_targets
 
-    sources = set()
+    sources: Set[str] = set()
     for target in eval_targets:
       sources.update(
         source for source in target.sources_relative_to_buildroot()
@@ -176,7 +177,7 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
         )
       if task_version_configured:
         return f"mypy=={self.get_options().version}"
-      return self._mypy_subsystem.get_options().version
+      return cast(str, self._mypy_subsystem.get_options().version)
 
     mypy_version = get_mypy_version()
     extras_hash = hash_utils.hash_all(hash_utils.hash_dir(Path(extra_pex.path()))
@@ -271,6 +272,19 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
       config = get_config()
       if config:
         cmd.append(f'--config-file={os.path.join(get_buildroot(), config)}')
+      deprecated_conditional(
+        lambda: self.get_passthru_args(),
+        removal_version='1.26.0.dev3',
+        entity_description='Using the old style of passthrough args for MyPy',
+        hint_message="You passed arguments to MyPy through either the "
+                     "`--lint-mypy-passthrough-args` option or the style "
+                     "`./pants lint.mypy -- --python-version 3.7 --disallow-any-expr`. Instead, "
+                     "pass any arguments to MyPy like this: "
+                     "`./pants lint :: --mypy-args='--python-version 3.7 --disallow-any-expr'`.\n\n"
+                     "This change is meant to reduce confusion in how option scopes work with "
+                     "passthrough args and to prepare for MyPy eventually exclusively using the "
+                     "V2 implementation, which only supports `--mypy-args`.",
+      )
       cmd.extend(self.get_passthru_args())
       cmd.extend(self._mypy_subsystem.get_args())
       cmd.append(f'@{sources_list_path}')

@@ -44,6 +44,16 @@ python_tests(
 )
 
 python_tests(
+  name = 'enums',
+  sources = ['test_enums.py'],
+  coverage = ['pants.util.enums'],
+  dependencies = [
+    'src/python/pants/util:enums',
+  ],
+  tags = {'type_checked'},
+)
+
+python_tests(
   name = 'eval',
   sources = ['test_eval.py'],
   dependencies = [

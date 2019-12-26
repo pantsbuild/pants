@@ -14,6 +14,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Type
 from twitter.common.collections import OrderedSet
 
 from pants.engine.goal import Goal
+from pants.engine.objects import union
 from pants.engine.selectors import Get
 from pants.util.collections import assert_single_element
 from pants.util.memo import memoized
@@ -250,44 +251,6 @@ def console_rule(*args, **kwargs) -> Callable:
   return inner_rule(*args, **kwargs, cacheable=False)
 
 
-def union(cls):
-  """A class decorator which other classes can specify that they can resolve to with `UnionRule`.
-
-  Annotating a class with @union allows other classes to use a UnionRule() instance to indicate that
-  they can be resolved to this base union class. This class will never be instantiated, and should
-  have no members -- it is used as a tag only, and will be replaced with whatever object is passed
-  in as the subject of a `await Get(...)`. See the following example:
-
-  @union
-  class UnionBase: pass
-
-  @rule
-  def get_some_union_type(x: X) -> B:
-    result = await Get(ResultType, UnionBase, x.f())
-    # ...
-
-  If there exists a single path from (whatever type the expression `x.f()` returns) -> `ResultType`
-  in the rule graph, the engine will retrieve and execute that path to produce a `ResultType` from
-  `x.f()`. This requires also that whatever type `x.f()` returns was registered as a union member of
-  `UnionBase` with a `UnionRule`.
-
-  Unions allow @rule bodies to be written without knowledge of what types may eventually be provided
-  as input -- rather, they let the engine check that there is a valid path to the desired result.
-  """
-  # TODO: Check that the union base type is used as a tag and nothing else (e.g. no attributes)!
-  assert isinstance(cls, type)
-  def non_member_error_message(subject):
-    if hasattr(cls, 'non_member_error_message'):
-      return cls.non_member_error_message(subject)
-    desc = f' ("{cls.__doc__}")' if cls.__doc__ else ''
-    return f'Type {type(subject).__name__} is not a member of the {cls.__name__} @union{desc}'
-
-  return type(cls.__name__, (cls,), {
-    '_is_union': True,
-    'non_member_error_message': non_member_error_message,
-  })
-
-
 @dataclass(frozen=True)
 class UnionRule:
   """Specify that an instance of `union_member` can be substituted wherever `union_base` is used."""
@@ -295,7 +258,7 @@ class UnionRule:
   union_member: Type
 
   def __post_init__(self) -> None:
-    if not getattr(self.union_base, '_is_union', False):
+    if not union.is_instance(self.union_base):
       raise ValueError(
         f'union_base must be a type annotated with @union: was {self.union_base} '
         f'(type {type(self.union_base).__name__})'
@@ -465,7 +428,7 @@ class RuleIndex:
       # NB: This does not require that union bases be supplied to `def rules():`, as the union type
       # is never instantiated!
       union_base = union_rule.union_base
-      assert union_base._is_union
+      assert union.is_instance(union_base)
       union_member = union_rule.union_member
       if union_base not in union_rules:
         union_rules[union_base] = OrderedSet()

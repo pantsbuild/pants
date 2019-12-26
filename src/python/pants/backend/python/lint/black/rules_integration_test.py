@@ -74,7 +74,8 @@ class BlackIntegrationTest(TestBase):
       TargetAdaptor(
         sources=EagerFilesetWithSpec('test', {'globs': []}, snapshot=input_snapshot),
         address=Address.parse("test:target"),
-      )
+      ),
+      prior_formatter_result_digest=input_snapshot.directory_digest,
     )
     black_subsystem = global_subsystem_instance(
       Black, options={Black.options_scope: {

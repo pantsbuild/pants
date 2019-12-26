@@ -10,6 +10,7 @@ python_library(
     'src/python/pants/rules/core',
     'src/python/pants/subsystem',
     'src/python/pants/util:collections',
+    'src/python/pants/util:enums',
     'src/python/pants/util:memo',
   ],
   tags = {"partially_type_checked"},

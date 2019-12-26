@@ -55,6 +55,7 @@ python_library(
     ':selectors',
     'src/python/pants/base:project_tree',
     'src/python/pants/option',
+    'src/python/pants/util:dirutil',
     'src/python/pants/util:meta',
   ],
   tags = {'partially_type_checked'},
@@ -170,10 +171,11 @@ python_library(
   name='platform',
   sources=['platform.py'],
   dependencies=[
-      ':rules',
-      'src/python/pants/util:collections',
-      'src/python/pants/util:memo',
-      'src/python/pants/util:osutil',
+    ':rules',
+    'src/python/pants/util:collections',
+    'src/python/pants/util:enums',
+    'src/python/pants/util:memo',
+    'src/python/pants/util:osutil',
   ],
   tags = {"type_checked"},
 )

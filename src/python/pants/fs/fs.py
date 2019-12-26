@@ -74,4 +74,3 @@ def expand_path(path):
 def is_child_of(path: Path, directory: Path) -> bool:
   abs_path = path if path.is_absolute() else directory.joinpath(path).resolve()
   return directory == abs_path or directory in abs_path.parents
-

@@ -13,7 +13,9 @@ python_library(
     'src/python/pants/engine:selectors',
     'src/python/pants/subsystem',
     'src/python/pants/util:collections',
+    'src/python/pants/util:enums',
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
   ],
+  tags = {"partially_type_checked"},
 )

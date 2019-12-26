@@ -6,7 +6,7 @@ import subprocess
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Optional
 
 from pants.backend.native.tasks.native_task import NativeTask
 from pants.base.build_environment import get_buildroot
@@ -14,6 +14,7 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.meta import classproperty
+from pants.util.objects import TypeConstraint
 
 
 @dataclass(frozen=True)
@@ -41,7 +42,7 @@ class NativeCompile(NativeTask, metaclass=ABCMeta):
   # to compile, and the `dependent_target_constraint` to determine which dependent targets to
   # operate on for `strict_deps` calculation.
   # NB: `source_target_constraint` must be overridden.
-  source_target_constraint = None
+  source_target_constraint: Optional[TypeConstraint] = None
 
   @classproperty
   @abstractmethod

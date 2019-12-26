@@ -14,7 +14,8 @@ python_library(
     'src/python/pants/backend/python/tasks',
     'src/python/pants/build_graph',
     'src/python/pants/goal:task_registrar',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -25,7 +26,8 @@ python_library(
     ':python_artifact',
     ':python_requirement',
     ':python_requirements',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 page(

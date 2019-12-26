@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from io import StringIO
-from typing import Any, List
+from typing import Any, Iterable
 
 from pants.engine.console import Console
 from pants.engine.fs import Workspace
@@ -37,7 +37,7 @@ class ConsoleRuleTestBase(TestBase):
     if not issubclass(self.goal_cls, Goal):
       raise AssertionError('goal_cls() must return a Goal subclass, got {}'.format(self.goal_cls))
 
-  def execute_rule(self, args=tuple(), env=tuple(), exit_code=0, additional_params: List[Any]=[]):
+  def execute_rule(self, args=tuple(), env=tuple(), exit_code=0, additional_params: Iterable[Any]=tuple()):
     """Executes the @console_rule for this test class.
 
     :API: public

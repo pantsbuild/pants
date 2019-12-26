@@ -69,7 +69,7 @@ class HelpPrinter:
                                 for goal in Goal.all()
                                 if goal.description})
 
-    max_width = max(len(name) for name in goal_descriptions.keys())
+    max_width = max(len(name) for name in goal_descriptions.keys()) if goal_descriptions else 0
     for name, description in sorted(goal_descriptions.items()):
       print('  {}: {}'.format(name.rjust(max_width), description))
     print()

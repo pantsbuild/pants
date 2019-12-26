@@ -3,9 +3,9 @@
 
 import os
 import re
+from enum import Enum
 
 from pants.option.errors import ParseError
-from pants.util.collections import Enum
 from pants.util.eval import parse_expression
 from pants.util.memo import memoized_method
 

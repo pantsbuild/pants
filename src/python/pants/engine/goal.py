@@ -127,7 +127,7 @@ class Outputting:
 
   @contextmanager
   def output(self, console):
-    """Given Goal.Options and a Console, yields a function for writing data to stdout, or a file.
+    """Given a Console, yields a function for writing data to stdout, or a file.
 
     The passed options instance will generally be the `Goal.Options` of an `Outputting` `Goal`.
     """
@@ -159,7 +159,7 @@ class LineOriented(Outputting):
 
   @contextmanager
   def line_oriented(self, console):
-    """Given Goal.Options and a Console, yields a function for printing lines to stdout or a file.
+    """Given a Console, yields a function for printing lines to stdout or a file.
 
     The passed options instance will generally be the `Goal.Options` of an `Outputting` `Goal`.
     """

@@ -5,7 +5,7 @@ import os
 import re
 import shutil
 import subprocess
-from typing import Optional
+from typing import Dict, Optional
 
 from twitter.common.collections import OrderedSet
 
@@ -24,7 +24,7 @@ class ApacheThriftGenBase(SimpleCodegenTask):
   thrift_generator: Optional[str] = None
 
   # Subclasses may set their own default generator options.
-  default_gen_options_map = None
+  default_gen_options_map: Optional[Dict[str, Optional[str]]] = None
 
   @classmethod
   def register_options(cls, register):

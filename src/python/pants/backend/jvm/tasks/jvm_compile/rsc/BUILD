@@ -21,6 +21,7 @@ python_library(
     'src/python/pants/util:collections',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:enums',
     'src/python/pants/util:memo',
     'src/python/pants/util:strutil',
   ],
