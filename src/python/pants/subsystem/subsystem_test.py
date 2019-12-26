@@ -277,7 +277,7 @@ class SubsystemTest(TestBase):
       list(SubsystemB.subsystem_closure_iter())
 
   def test_get_streaming_workunit_callbacks(self):
-    import_str = "pants_test.subsystem.test_subsystem.WorkunitSubscriptableSubsystem"
+    import_str = "pants.subsystem.subsystem_test.WorkunitSubscriptableSubsystem"
     callables_list = Subsystem.get_streaming_workunit_callbacks([import_str])
     assert len(callables_list) == 1
 
@@ -291,16 +291,16 @@ class SubsystemTest(TestBase):
       assert "No module named 'nonexistent_module'" in warnings[0]
 
   def test_streaming_workunit_callbacks_good_module_bad_class(self):
-    import_str = "pants_test.subsystem.test_subsystem.ANonexistentClass"
+    import_str = "pants.subsystem.subsystem_test.ANonexistentClass"
     with self.captured_logging(level = logging.WARNING) as captured:
       callables_list = Subsystem.get_streaming_workunit_callbacks([import_str])
       warnings = captured.warnings()
       assert len(warnings) == 1
       assert len(callables_list) == 0
-      assert "module 'pants_test.subsystem.test_subsystem' has no attribute 'ANonexistentClass'" in warnings[0]
+      assert "module 'pants.subsystem.subsystem_test' has no attribute 'ANonexistentClass'" in warnings[0]
 
   def test_streaming_workunit_callbacks_with_invalid_subsystem(self):
-    import_str = "pants_test.subsystem.test_subsystem.DummySubsystem"
+    import_str = "pants.subsystem.subsystem_test.DummySubsystem"
     with self.captured_logging(level = logging.WARNING) as captured:
       callables_list = Subsystem.get_streaming_workunit_callbacks([import_str])
       warnings = captured.warnings()
