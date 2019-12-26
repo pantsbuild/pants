@@ -42,6 +42,7 @@ python_tests(
     'src/python/pants/backend/python/tasks',
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil:int-test',
+    'src/python/pants/util:enums',
     'tests/python/pants_test/backend/python/tasks/util',
     'tests/python/pants_test/engine:scheduler_test_base',
     'testprojects/src/python:python_distribution_directory',

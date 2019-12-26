@@ -201,6 +201,7 @@ python_tests(
     'src/python/pants/base:exception_sink',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:enums',
     'src/python/pants/util:osutil',
     'src/python/pants/testutil:test_base',
     'src/python/pants/testutil/option',

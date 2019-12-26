@@ -2,13 +2,13 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Any, Iterable
+from typing import Any, Iterable, Optional
 
 from pants.backend.python.rules.hermetic_pex import HermeticPex
 from pants.backend.python.subsystems.python_native_code import PexBuildEnvironment
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
-from pants.engine.fs import Digest, Snapshot, UrlToFetch
+from pants.engine.fs import Digest, SingleFileExecutable, Snapshot, UrlToFetch
 from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.engine.rules import rule
 from pants.engine.selectors import Get
@@ -16,17 +16,25 @@ from pants.engine.selectors import Get
 
 @dataclass(frozen=True)
 class DownloadedPexBin(HermeticPex):
-  executable: str
-  directory_digest: Digest
+  exe: SingleFileExecutable
 
-  def create_execute_request(self,
+  @property
+  def executable(self) -> str:
+    return self.exe.exe_filename
+
+  @property
+  def directory_digest(self) -> Digest:
+    return self.exe.directory_digest
+
+  def create_execute_request(  # type: ignore[override]
+    self,
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
     pex_build_environment: PexBuildEnvironment,
     *,
     pex_args: Iterable[str],
     description: str,
-    input_files: Digest = None,
+    input_files: Optional[Digest] = None,
     **kwargs: Any
   ) -> ExecuteProcessRequest:
     """Creates an ExecuteProcessRequest that will run the pex CLI tool hermetically.
@@ -61,8 +69,8 @@ async def download_pex_bin() -> DownloadedPexBin:
   # TODO: Inject versions and digests here through some option, rather than hard-coding it.
   url = 'https://github.com/pantsbuild/pex/releases/download/v1.6.12/pex'
   digest = Digest('ce64cb72cd23d2123dd48126af54ccf2b718d9ecb98c2ed3045ed1802e89e7e1', 1842359)
-  snapshot = await Get(Snapshot, UrlToFetch(url, digest))
-  return DownloadedPexBin(executable=snapshot.files[0], directory_digest=snapshot.directory_digest)
+  snapshot = await Get[Snapshot](UrlToFetch(url, digest))
+  return DownloadedPexBin(SingleFileExecutable(snapshot))
 
 
 def rules():

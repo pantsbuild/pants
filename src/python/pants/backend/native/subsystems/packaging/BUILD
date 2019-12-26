@@ -6,4 +6,5 @@ python_library(
   dependencies=[
     'src/python/pants/backend/python/subsystems',
   ],
+  tags = {"partially_type_checked"},
 )

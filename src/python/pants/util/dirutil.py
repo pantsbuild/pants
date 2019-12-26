@@ -11,6 +11,7 @@ import threading
 import uuid
 from collections import defaultdict
 from contextlib import contextmanager
+from pathlib import Path
 from typing import (
   Any,
   Callable,
@@ -72,6 +73,17 @@ def fast_relpath_optional(path: str, start: str) -> Optional[str]:
     # the prefix is a directory.
     return path[pref_end+1:]
   return None
+
+
+def ensure_relative_file_name(path: Path) -> str:
+  """Return a string representing the `path`, with a leading './'.
+
+  This ensures that the returned string can be used as the executable file when executing a
+  subprocess, without putting the executable file on the PATH.
+  """
+  if path.is_absolute():
+    raise ValueError(f'path {path} is expected to be relative!')
+  return f'./{path}'
 
 
 def safe_mkdir(directory: str, clean: bool = False) -> None:

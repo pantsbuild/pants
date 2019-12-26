@@ -7,6 +7,7 @@ from typing import Any
 
 from pants.base.payload_field import PayloadField
 from pants.engine.platform import Platform
+from pants.util.enums import match
 
 
 # NB: We manually implement __hash__(), rather than using unsafe_hash=True, because PayloadField
@@ -38,7 +39,7 @@ class NativeArtifact(PayloadField):
 
   def as_shared_lib(self, platform):
     # TODO: check that the name conforms to some format in the constructor (e.g. no dots?).
-    return platform.match({
+    return match(platform, {
       Platform.darwin: f"lib{self.lib_name}.dylib",
       Platform.linux: f"lib{self.lib_name}.so",
     })

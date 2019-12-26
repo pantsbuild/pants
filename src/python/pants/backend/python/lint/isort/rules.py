@@ -124,7 +124,7 @@ async def fmt(wrapped_target: IsortTarget, isort_setup: IsortSetup) -> FmtResult
 async def lint(wrapped_target: IsortTarget, isort_setup: IsortSetup) -> LintResult:
   args = IsortArgs.create(wrapped_target=wrapped_target, isort_setup=isort_setup, check_only=True)
   request = await Get[ExecuteProcessRequest](IsortArgs, args)
-  result = await Get(FallibleExecuteProcessResult, ExecuteProcessRequest, request)
+  result = await Get[FallibleExecuteProcessResult](ExecuteProcessRequest, request)
   return LintResult.from_fallible_execute_process_result(result)
 
 

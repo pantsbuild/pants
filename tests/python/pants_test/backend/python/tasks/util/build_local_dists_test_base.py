@@ -3,6 +3,7 @@
 
 import re
 from abc import abstractmethod
+from enum import Enum
 
 from pants.backend.native.register import rules as native_backend_rules
 from pants.backend.native.subsystems.libc_dev import LibcDev
@@ -14,7 +15,8 @@ from pants.backend.python.tasks.build_local_python_distributions import (
 from pants.backend.python.tasks.resolve_requirements import ResolveRequirements
 from pants.backend.python.tasks.select_interpreter import SelectInterpreter
 from pants.testutil.task_test_base import DeclarativeTaskTestMixin
-from pants.util.collections import Enum, assert_single_element
+from pants.util.collections import assert_single_element
+from pants.util.enums import match
 from pants.util.meta import classproperty
 from pants_test.backend.python.tasks.python_task_test_base import (
   PythonTaskTestBase,
@@ -119,7 +121,7 @@ class BuildLocalPythonDistributionsTestBase(PythonTaskTestBase, DeclarativeTaskT
     self.assertEquals(dist, expected_name)
     self.assertEquals(version, expected_snapshot_version)
 
-    expected_platform = expected_platform.match({
+    expected_platform = match(expected_platform, {
       BuildLocalPythonDistributionsTestBase.ExpectedPlatformType.any: "any",
       BuildLocalPythonDistributionsTestBase.ExpectedPlatformType.current: normalized_current_platform(),
     })

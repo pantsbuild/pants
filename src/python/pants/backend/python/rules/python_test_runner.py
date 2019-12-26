@@ -10,9 +10,10 @@ from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.build_graph.address import Address
+from pants.engine.addressable import BuildFileAddresses
 from pants.engine.fs import Digest, DirectoriesToMerge
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
-from pants.engine.legacy.graph import BuildFileAddresses, HydratedTarget, TransitiveHydratedTargets
+from pants.engine.legacy.graph import HydratedTarget, TransitiveHydratedTargets
 from pants.engine.legacy.structs import PythonTestsAdaptor
 from pants.engine.rules import UnionRule, optionable_rule, rule
 from pants.engine.selectors import Get, MultiGet
@@ -112,7 +113,7 @@ async def run_python_test(
     description=f'Run Pytest for {test_target.address.reference()}',
     timeout_seconds=timeout_seconds if timeout_seconds is not None else 9999
   )
-  result = await Get(FallibleExecuteProcessResult, ExecuteProcessRequest, request)
+  result = await Get[FallibleExecuteProcessResult](ExecuteProcessRequest, request)
   return TestResult.from_fallible_execute_process_result(result)
 
 

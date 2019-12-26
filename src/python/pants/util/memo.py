@@ -4,8 +4,13 @@
 import functools
 import inspect
 from contextlib import contextmanager
+from typing import Any, Callable, Optional, TypeVar
 
-from pants.util.meta import classproperty, staticproperty
+from pants.util.meta import T, classproperty, staticproperty
+
+
+FuncType = Callable[..., Any]
+F = TypeVar("F", bound=FuncType)
 
 
 # Used as a sentinel that disambiguates tuples passed in *args from coincidentally matching tuples
@@ -55,7 +60,9 @@ def per_instance(*args, **kwargs):
   return equal_args(*instance_and_rest, **kwargs)
 
 
-def memoized(func=None, key_factory=equal_args, cache_factory=dict):
+def memoized(
+  func: Optional[F] = None, key_factory=equal_args, cache_factory=dict,
+) -> F:
   """Memoizes the results of a function call.
 
   By default, exactly one result is memoized for each unique combination of function arguments.
@@ -99,7 +106,9 @@ def memoized(func=None, key_factory=equal_args, cache_factory=dict):
     # application forms.  Without this trick, ie: using a decorator class or nested decorator
     # function, the no-params application would have to be `@memoized()`.  It still can, but need
     # not be and a bare `@memoized` will work as well as a `@memoized()`.
-    return functools.partial(memoized, key_factory=key_factory, cache_factory=cache_factory)
+    return functools.partial(  # type: ignore[return-value]
+      memoized, key_factory=key_factory, cache_factory=cache_factory
+    )
 
   if not inspect.isfunction(func):
     raise ValueError('The @memoized decorator must be applied innermost of all decorators.')
@@ -120,22 +129,24 @@ def memoized(func=None, key_factory=equal_args, cache_factory=dict):
   def put(*args, **kwargs):
     key = key_func(*args, **kwargs)
     yield functools.partial(memoized_results.__setitem__, key)
-  memoize.put = put
+  memoize.put = put  # type: ignore[attr-defined]
 
   def forget(*args, **kwargs):
     key = key_func(*args, **kwargs)
     if key in memoized_results:
       del memoized_results[key]
-  memoize.forget = forget
+  memoize.forget = forget  # type: ignore[attr-defined]
 
   def clear():
     memoized_results.clear()
-  memoize.clear = clear
+  memoize.clear = clear  # type: ignore[attr-defined]
 
-  return memoize
+  return memoize  # type: ignore[return-value]
 
 
-def memoized_method(func=None, key_factory=per_instance, **kwargs):
+def memoized_method(
+  func: Optional[F] = None, key_factory=per_instance, cache_factory=dict,
+) -> F:
   """A convenience wrapper for memoizing instance methods.
 
   Typically you'd expect a memoized instance method to hold a cached value per class instance;
@@ -168,10 +179,14 @@ def memoized_method(func=None, key_factory=per_instance, **kwargs):
   :raises: `ValueError` if the wrapper is applied to anything other than a function.
   :returns: A wrapped function that memoizes its results or else a function wrapper that does this.
   """
-  return memoized(func=func, key_factory=key_factory, **kwargs)
+  return memoized(
+    func=func, key_factory=key_factory, cache_factory=cache_factory
+  )
 
 
-def memoized_property(func=None, key_factory=per_instance, **kwargs):
+def memoized_property(
+  func: Optional[Callable[..., T]] = None, key_factory=per_instance, cache_factory=dict,
+) -> T:
   """A convenience wrapper for memoizing properties.
 
   Applied like so:
@@ -233,34 +248,57 @@ def memoized_property(func=None, key_factory=per_instance, **kwargs):
   :returns: A read-only property that memoizes its calculated value and un-caches its value when
             `del`ed.
   """
-  getter = memoized_method(func=func, key_factory=key_factory, **kwargs)
-  return property(fget=getter, fdel=lambda self: getter.forget(self))
+  getter = memoized_method(func=func, key_factory=key_factory, cache_factory=cache_factory)
+  return property(  # type: ignore[return-value]
+    fget=getter,
+    fdel=lambda self: getter.forget(self),  # type: ignore[attr-defined, no-any-return]
+  )
 
 
-def memoized_classmethod(*args, **kwargs):
-  return classmethod(memoized_method(*args, **kwargs))
+def memoized_classmethod(
+  func: Optional[F] = None, key_factory=per_instance, cache_factory=dict,
+) -> F:
+  return classmethod(  # type: ignore[return-value]
+    memoized_method(func, key_factory=key_factory, cache_factory=cache_factory)
+  )
 
 
-def memoized_classproperty(*args, **kwargs):
-  return classproperty(memoized_classmethod(*args, **kwargs))
+def memoized_classproperty(
+  func: Optional[Callable[..., T]] = None, key_factory=per_instance, cache_factory=dict,
+) -> T:
+  return classproperty(
+    memoized_classmethod(func, key_factory=key_factory, cache_factory=cache_factory)
+  )
 
 
-def memoized_staticmethod(*args, **kwargs):
-  return staticmethod(memoized(*args, **kwargs))
+def memoized_staticmethod(
+  func: Optional[F] = None, key_factory=equal_args, cache_factory=dict,
+) -> F:
+  return staticmethod(  # type: ignore[return-value]
+    memoized(func, key_factory=key_factory, cache_factory=cache_factory)
+  )
 
 
-def memoized_staticproperty(*args, **kwargs):
-  return staticproperty(memoized_staticmethod(*args, **kwargs))
+def memoized_staticproperty(
+  func: Optional[Callable[..., T]] = None, key_factory=equal_args, cache_factory=dict,
+) -> T:
+  return staticproperty(
+    memoized_staticmethod(func, key_factory=key_factory, cache_factory=cache_factory)
+  )
 
 
-def testable_memoized_property(func=None, key_factory=per_instance, **kwargs):
+def testable_memoized_property(
+  func: Optional[Callable[..., T]] = None, key_factory=per_instance, cache_factory=dict,
+) -> T:
   """A variant of `memoized_property` that allows for setting of properties (for tests, etc)."""
-  getter = memoized_method(func=func, key_factory=key_factory, **kwargs)
+  getter = memoized_method(func=func, key_factory=key_factory, cache_factory=cache_factory)
 
   def setter(self, val):
     with getter.put(self) as putter:
       putter(val)
 
-  return property(fget=getter,
-                  fset=setter,
-                  fdel=lambda self: getter.forget(self))
+  return property(  # type: ignore[return-value]
+    fget=getter,
+    fset=setter,
+    fdel=lambda self: getter.forget(self),  # type: ignore[attr-defined, no-any-return]
+  )

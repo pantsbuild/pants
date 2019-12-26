@@ -14,7 +14,7 @@ bad_files=()
 for package_file in ${non_empty_files}
 do
   if [[ "$(sed -E -e 's/^[[:space:]]+//' -e 's/[[:space:]]+$//' "${package_file}")" != \
-        '__import__("pkg_resources").declare_namespace(__name__)  # type: ignore[attr-defined]' ]]
+        '__import__("pkg_resources").declare_namespace(__name__)' ]]
   then
     bad_files+=("${package_file}")
   fi

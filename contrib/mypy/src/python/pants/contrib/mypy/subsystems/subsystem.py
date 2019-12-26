@@ -10,7 +10,7 @@ from pants.option.option_util import flatten_shlexed_list
 
 class MyPy(PythonToolBase):
   options_scope = 'mypy'
-  default_version = 'mypy==0.740'
+  default_version = 'mypy==0.761'
   default_entry_point = 'mypy'
   default_interpreter_constraints = ["CPython>=3.5"]
 

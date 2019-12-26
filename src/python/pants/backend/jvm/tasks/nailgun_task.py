@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+from enum import Enum
 
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.build_environment import get_buildroot
@@ -12,7 +13,6 @@ from pants.java.jar.jar_dependency import JarDependency
 from pants.java.nailgun_executor import NailgunExecutor, NailgunProcessGroup
 from pants.process.subprocess import Subprocess
 from pants.task.task import Task, TaskBase
-from pants.util.collections import Enum
 
 
 class NailgunTaskBase(JvmToolTaskMixin, TaskBase):

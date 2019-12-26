@@ -7,6 +7,7 @@ import os
 import shlex
 import unittest.mock
 from contextlib import contextmanager
+from enum import Enum
 from textwrap import dedent
 
 import yaml
@@ -41,7 +42,7 @@ from pants.option.ranked_value import RankedValue
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.testutil.option.fakes import create_options
 from pants.testutil.test_base import TestBase
-from pants.util.collections import Enum, assert_single_element
+from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_file, temporary_file_path
 from pants.util.dirutil import safe_mkdtemp
 from pants.util.strutil import safe_shlex_join
@@ -604,6 +605,10 @@ class OptionsTest(TestBase):
 
     options = self._parse('./pants --int-choices=42 --int-choices=99')
     self.assertEqual([42, 99], options.for_global_scope().int_choices)
+
+  def test_parse_name_and_dest(self):
+    self.assertEqual(('thing', 'thing'), Parser.parse_name_and_dest('--thing'))
+    self.assertEqual(('thing', 'other_thing'), Parser.parse_name_and_dest('--thing', dest='other_thing'))
 
   def test_validation(self):
     def assertError(expected_error, *args, **kwargs):

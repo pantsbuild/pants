@@ -16,8 +16,10 @@ python_library(
     'src/python/pants/task',
     'src/python/pants/util:collections',
     'src/python/pants/util:contextutil',
+    'src/python/pants/util:enums',
     'src/python/pants/util:memo',
     'src/python/pants/util:objects',
     'src/python/pants/util:strutil',
   ],
+  tags = {"partially_type_checked"},
 )

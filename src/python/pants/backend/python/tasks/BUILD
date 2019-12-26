@@ -34,5 +34,6 @@ python_library(
     'src/python/pants/util:memo',
     'src/python/pants/util:objects',
     'src/python/pants/util:xml_parser',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )

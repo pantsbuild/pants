@@ -6,6 +6,7 @@ import logging
 import os
 import re
 from dataclasses import dataclass
+from enum import Enum
 
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext  # noqa
 from pants.backend.jvm.subsystems.rsc import Rsc
@@ -30,9 +31,10 @@ from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecute
 from pants.java.jar.jar_dependency import JarDependency
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.task.scm_publish_mixin import Semver
-from pants.util.collections import Enum, assert_single_element
+from pants.util.collections import assert_single_element
 from pants.util.contextutil import Timer
 from pants.util.dirutil import fast_relpath, fast_relpath_optional, safe_mkdir
+from pants.util.enums import match
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.strutil import safe_shlex_join
 
@@ -159,7 +161,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
   def _compiler_tags(self):
     return {
       f'{self.get_options().force_compiler_tag_prefix}:{workflow.value}': workflow
-      for workflow in self.JvmCompileWorkflowType.all_values()
+      for workflow in self.JvmCompileWorkflowType
     }
 
   @classmethod
@@ -171,12 +173,12 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
            'specified on the cli.')
 
     register('--workflow', type=cls.JvmCompileWorkflowType,
-      choices=cls.JvmCompileWorkflowType.all_values(),
+      choices=list(cls.JvmCompileWorkflowType),
       default=cls.JvmCompileWorkflowType.zinc_only, metavar='<workflow>',
       help='The default workflow to use to compile JVM targets. This is overriden on a per-target basis with the force-compiler-tag-prefix tag.', fingerprint=True)
 
     register('--scala-workflow-override', type=cls.JvmCompileWorkflowType,
-      choices=cls.JvmCompileWorkflowType.all_values(),
+      choices=list(cls.JvmCompileWorkflowType),
       default=None, metavar='<workflow_override>',
       help='Experimental option. The workflow to use to compile Scala targets, overriding the "workflow" option as well as any force-compiler-tag-prefix tags applied to targets. An example use case is to quickly turn off outlining workflows in case of errors.', fingerprint=True)
 
@@ -214,11 +216,11 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         ),
       ],
       custom_rules=[
-        Shader.exclude_package('scala', recursive=True), 
-        Shader.exclude_package('xsbt', recursive=True), 
-        Shader.exclude_package('xsbti', recursive=True), 
-        # Unfortunately, is loaded reflectively by the compiler. 
-        Shader.exclude_package('org.apache.logging.log4j', recursive=True), 
+        Shader.exclude_package('scala', recursive=True),
+        Shader.exclude_package('xsbt', recursive=True),
+        Shader.exclude_package('xsbti', recursive=True),
+        # Unfortunately, is loaded reflectively by the compiler.
+        Shader.exclude_package('org.apache.logging.log4j', recursive=True),
       ]
     )
 
@@ -258,7 +260,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
 
   # Overrides the normal zinc compiler classpath, which only contains zinc.
   def get_zinc_compiler_classpath(self):
-    return self.execution_strategy.match({
+    return match(self.execution_strategy, {
       # NB: We must use the verbose version of super() here, possibly because of the lambda.
       self.ExecutionStrategy.hermetic: lambda: super(RscCompile, self).get_zinc_compiler_classpath(),
       self.ExecutionStrategy.subprocess: lambda: super(RscCompile, self).get_zinc_compiler_classpath(),
@@ -289,7 +291,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         rsc_cc.rsc_jar_file.hydrate_missing_directory_digest(classes_dir_snapshot.directory_digest)
 
       if rsc_cc.workflow is not None:
-        cp_entries = rsc_cc.workflow.match({
+        cp_entries = match(rsc_cc.workflow, {
           self.JvmCompileWorkflowType.zinc_only: lambda: confify([self._classpath_for_context(zinc_cc)]),
           self.JvmCompileWorkflowType.zinc_java: lambda: confify([self._classpath_for_context(zinc_cc)]),
           self.JvmCompileWorkflowType.rsc_and_zinc: lambda: confify([rsc_cc.rsc_jar_file]),
@@ -347,7 +349,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
 
   def _key_for_target_as_dep(self, target, workflow):
     # used for jobs that are either rsc jobs or zinc jobs run against rsc
-    return workflow.match({
+    return match(workflow, {
       self.JvmCompileWorkflowType.zinc_only: lambda: self._zinc_key_for_target(target, workflow),
       self.JvmCompileWorkflowType.zinc_java: lambda: self._zinc_key_for_target(target, workflow),
       self.JvmCompileWorkflowType.rsc_and_zinc: lambda: self._rsc_key_for_target(target),
@@ -361,7 +363,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     return f'outline({target.address.spec})'
 
   def _zinc_key_for_target(self, target, workflow):
-    return workflow.match({
+    return match(workflow, {
       self.JvmCompileWorkflowType.zinc_only: lambda: f'zinc[zinc-only]({target.address.spec})',
       self.JvmCompileWorkflowType.zinc_java: lambda: f'zinc[zinc-java]({target.address.spec})',
       self.JvmCompileWorkflowType.rsc_and_zinc: lambda: f'zinc[rsc-and-zinc]({target.address.spec})',
@@ -452,7 +454,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
             classpath_abs_jdk = classpath_paths + self._jdk_libs_abs(distribution)
             return ((EMPTY_DIRECTORY_DIGEST), classpath_abs_jdk)
 
-          (input_digest, classpath_entry_paths) = self.execution_strategy.match({
+          (input_digest, classpath_entry_paths) = match(self.execution_strategy, {
             self.ExecutionStrategy.hermetic: hermetic_digest_classpath,
             self.ExecutionStrategy.subprocess: nonhermetic_digest_classpath,
             self.ExecutionStrategy.nailgun: nonhermetic_digest_classpath,
@@ -468,7 +470,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
             ]
 
           target_sources = ctx.sources
-          
+
           # TODO: m.jar digests aren't found, so hermetic will fail.
           if use_youtline and not hermetic and self.get_options().zinc_outline:
             self._zinc_outline(ctx, classpath_paths, target_sources, youtline_args)
@@ -584,7 +586,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     record('execution_strategy', self.execution_strategy.value)
 
     # Create the cache doublecheck job.
-    workflow.match({
+    match(workflow, {
       self.JvmCompileWorkflowType.zinc_only: lambda: cache_doublecheck_jobs.append(
         make_cache_doublecheck_job(list(all_zinc_rsc_invalid_dep_keys(invalid_dependencies)))
       ),
@@ -601,7 +603,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
 
     # Create the rsc job.
     # Currently, rsc only supports outlining scala.
-    workflow.match({
+    match(workflow, {
       self.JvmCompileWorkflowType.zinc_only: lambda: None,
       self.JvmCompileWorkflowType.zinc_java: lambda: None,
       self.JvmCompileWorkflowType.rsc_and_zinc: lambda: rsc_jobs.append(make_outline_job(compile_target, invalid_dependencies)),
@@ -612,7 +614,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     # - Scala zinc compile jobs depend on the results of running rsc on the scala target.
     # - Java zinc compile jobs depend on the zinc compiles of their dependencies, because we can't
     #   generate jars that make javac happy at this point.
-    workflow.match({
+    match(workflow, {
       # NB: zinc-only zinc jobs run zinc and depend on rsc and/or zinc compile outputs.
       self.JvmCompileWorkflowType.zinc_only: lambda: zinc_jobs.append(
         make_zinc_job(
@@ -725,7 +727,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
 
   def _runtool_hermetic(self, main, tool_name, distribution, input_digest, ctx):
     use_youtline = tool_name == 'scalac-outliner'
-    
+
     tool_classpath_abs = self._scalac_classpath if use_youtline else self._rsc_classpath
     tool_classpath = fast_relpath_collection(tool_classpath_abs)
 
@@ -897,7 +899,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       nailgun_classpath = self._nailgunnable_combined_classpath
 
     with self.context.new_workunit(tool_name) as wu:
-      return self.execution_strategy.match({
+      return match(self.execution_strategy, {
         self.ExecutionStrategy.hermetic: lambda: self._runtool_hermetic(
           main, tool_name, distribution, input_digest, ctx),
         self.ExecutionStrategy.subprocess: lambda: self._runtool_nonhermetic(

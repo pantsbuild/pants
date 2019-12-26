@@ -4,7 +4,7 @@
 import os
 from pathlib import Path
 from textwrap import dedent
-from typing import Iterable, List, Optional
+from typing import Iterable, List, Optional, Set, cast
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.targets.python_binary import PythonBinary
@@ -138,7 +138,7 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
     else:
       eval_targets = all_targets
 
-    sources = set()
+    sources: Set[str] = set()
     for target in eval_targets:
       sources.update(
         source for source in target.sources_relative_to_buildroot()
@@ -177,7 +177,7 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
         )
       if task_version_configured:
         return f"mypy=={self.get_options().version}"
-      return self._mypy_subsystem.get_options().version
+      return cast(str, self._mypy_subsystem.get_options().version)
 
     mypy_version = get_mypy_version()
     extras_hash = hash_utils.hash_all(hash_utils.hash_dir(Path(extra_pex.path()))
