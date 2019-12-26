@@ -40,8 +40,8 @@ class JavaCompileSettingsPartitioningTest(NailgunTaskTestBase):
     return Revision.lenient(version)
 
   def _task_setup(self, targets, platforms=None, default_platform=None, **options):
-    options['source'] = options.get('source', '1.13')
-    options['target'] = options.get('target', '1.13')
+    options['source'] = options.get('source', '13')
+    options['target'] = options.get('target', '13')
     self.set_options(**options)
     self.set_options_for_scope('jvm-platform', platforms=platforms,
                                default_platform=default_platform)
@@ -90,17 +90,17 @@ class JavaCompileSettingsPartitioningTest(NailgunTaskTestBase):
                                                 self._format_partition(received)))
 
   def test_single_target(self):
-    java11 = self._java('eleven', '1.11')
-    partition = self._partition([java11], platforms=self._platforms('1.11'))
+    java11 = self._java('eleven', '11')
+    partition = self._partition([java11], platforms=self._platforms('11'))
     self.assertEqual(1, len(partition))
-    self.assertEqual({java11}, set(partition[self._version('1.11')]))
+    self.assertEqual({java11}, set(partition[self._version('11')]))
 
   def test_independent_targets(self):
-    java11 = self._java('eleven', '1.11')
-    java12 = self._java('twelve', '1.12')
-    java13 = self._java('thirteen', '1.13')
+    java11 = self._java('eleven', '11')
+    java12 = self._java('twelve', '12')
+    java13 = self._java('thirteen', '13')
     partition = self._partition([java11, java12, java13],
-                                platforms=self._platforms('1.11', '1.12', '1.13'))
+                                platforms=self._platforms('11', '12', '13'))
     expected = {self._version(java.payload.platform): {java}
                 for java in (java11, java12, java13)}
     self.assertEqual(3, len(partition))
@@ -121,42 +121,42 @@ class JavaCompileSettingsPartitioningTest(NailgunTaskTestBase):
     self.assert_partitions_equal(expected, partition)
 
   def test_valid_dependent_targets(self):
-    java11 = self._java('eleven', '1.11')
-    java12 = self._java('twelve', '1.12')
-    java13 = self._java('thirteen', '1.13', deps=[java11])
+    java11 = self._java('eleven', '11')
+    java12 = self._java('twelve', '12')
+    java13 = self._java('thirteen', '13', deps=[java11])
 
     partition = self._partition([java11, java12, java13],
-                                platforms=self._platforms('1.11', '1.12', '1.13'))
+                                platforms=self._platforms('11', '12', '13'))
     self.assert_partitions_equal({
-      self._version('1.11'): {java11},
-      self._version('1.12'): {java12},
-      self._version('1.13'): {java13},
+      self._version('11'): {java11},
+      self._version('12'): {java12},
+      self._version('13'): {java13},
     }, partition)
 
   def test_unspecified_default(self):
     java = self._java('unspecified', None)
-    java11 = self._java('eleven', '1.11', deps=[java])
-    java12 = self._java('twelve', '1.12', deps=[java])
-    partition = self._partition([java12, java, java11], source='1.11', target='1.11',
-                                platforms=self._platforms('1.11', '1.12'),
-                                default_platform='1.11')
+    java11 = self._java('eleven', '11', deps=[java])
+    java12 = self._java('twelve', '12', deps=[java])
+    partition = self._partition([java12, java, java11], source='11', target='11',
+                                platforms=self._platforms('11', '12'),
+                                default_platform='11')
     self.assert_partitions_equal({
-      self._version('1.11'): {java, java11},
-      self._version('1.12'): {java12},
+      self._version('11'): {java, java11},
+      self._version('12'): {java12},
     }, partition)
 
   def test_invalid_source_target_combination_by_jvm_platform(self):
     java_wrong = self._java('source7target6', 'bad')
     with self.assertRaises(JvmPlatformSettings.IllegalSourceTargetCombination):
       self._settings_and_targets([java_wrong], platforms={
-        'bad': {'source': '1.12', 'target': '1.11'}
+        'bad': {'source': '12', 'target': '11'}
       })
 
   def test_valid_source_target_combination(self):
     platforms = {
-      'java9_10': {'source': 9, 'target': 10},
-      'java10_11': {'source': 10, 'target': 11},
-      'java9_11': {'source': 9, 'target': 11},
+      'java9_10': {'source': '9', 'target': '10'},
+      'java10_11': {'source': '10', 'target': '11'},
+      'java9_11': {'source': '9', 'target': '11'},
     }
     self._settings_and_targets([
       self._java('java9_10', 'java9_10'),
@@ -165,18 +165,18 @@ class JavaCompileSettingsPartitioningTest(NailgunTaskTestBase):
     ], platforms=platforms)
 
   def test_compile_setting_equivalence(self):
-    self.assertEqual(JvmPlatformSettings('1.11', '1.11', ['-Xfoo:bar']),
-                     JvmPlatformSettings('1.11', '1.11', ['-Xfoo:bar']))
+    self.assertEqual(JvmPlatformSettings('11', '11', ['-Xfoo:bar']),
+                     JvmPlatformSettings('11', '11', ['-Xfoo:bar']))
 
   def test_compile_setting_inequivalence(self):
-    self.assertNotEqual(JvmPlatformSettings('1.11', '1.11', ['-Xfoo:bar']),
-                        JvmPlatformSettings('1.11', '1.12', ['-Xfoo:bar']))
+    self.assertNotEqual(JvmPlatformSettings('11', '11', ['-Xfoo:bar']),
+                        JvmPlatformSettings('11', '12', ['-Xfoo:bar']))
 
-    self.assertNotEqual(JvmPlatformSettings('1.11', '1.11', ['-Xfoo:bar']),
-                        JvmPlatformSettings('1.11', '1.11', ['-Xbar:foo']))
+    self.assertNotEqual(JvmPlatformSettings('11', '11', ['-Xfoo:bar']),
+                        JvmPlatformSettings('11', '11', ['-Xbar:foo']))
 
-    self.assertNotEqual(JvmPlatformSettings('1.4', '1.11', ['-Xfoo:bar']),
-                        JvmPlatformSettings('1.11', '1.11', ['-Xfoo:bar']))
+    self.assertNotEqual(JvmPlatformSettings('9', '11', ['-Xfoo:bar']),
+                        JvmPlatformSettings('11', '11', ['-Xfoo:bar']))
 
   def _get_zinc_arguments(self, settings):
     distribution = JvmCompile._local_jvm_distribution(settings=settings)

@@ -177,11 +177,11 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
         '--jvm-platform-default-platform=java8',
         '--jvm-platform-platforms={'
         ' "java8": {"source": "1.8", "target": "1.8", "args": [ "-X123" ]},'
-        ' "java9": {"source": "1.9", "target": "1.9", "args": [ "-X456" ]}'
+        ' "java11": {"source": "11", "target": "11", "args": [ "-X456" ]}'
         '}',
         '--jvm-distributions-paths={'
         ' "macos": [ "/Library/JDK" ],'
-        ' "linux": [ "/usr/lib/jdk8", "/usr/lib/jdk9"]'
+        ' "linux": [ "/usr/lib/jdk8", "/usr/lib/jdk11"]'
         '}'
       ])
       self.assertFalse('python_setup' in json_data)
@@ -196,10 +196,10 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
               'source_level': '1.8',
               'args': ['-X123'],
               'target_level': '1.8'},
-            'java9': {
-              'source_level': '1.9',
+            'java11': {
+              'source_level': '11',
               'args': ['-X456'],
-              'target_level': '1.9'},
+              'target_level': '11'},
           }
         },
         json_data['jvm_platforms'])
