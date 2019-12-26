@@ -154,14 +154,14 @@ class JavaCompileSettingsPartitioningTest(NailgunTaskTestBase):
 
   def test_valid_source_target_combination(self):
     platforms = {
-      'java117': {'source': 6, 'target': 7},
-      'java128': {'source': 7, 'target': 8},
-      'java118': {'source': 6, 'target': 8},
+      'java9_10': {'source': 9, 'target': 10},
+      'java10_11': {'source': 10, 'target': 11},
+      'java9_11': {'source': 9, 'target': 11},
     }
     self._settings_and_targets([
-      self._java('java117', 'java117'),
-      self._java('java128', 'java128'),
-      self._java('java118', 'java118'),
+      self._java('java9_10', 'java9_10'),
+      self._java('java10_11', 'java10_11'),
+      self._java('java9_11', 'java9_11'),
     ], platforms=platforms)
 
   def test_compile_setting_equivalence(self):
