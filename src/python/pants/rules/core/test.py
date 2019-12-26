@@ -29,8 +29,9 @@ class TestOptions(GoalSubsystem):
   @classmethod
   def register_options(cls, register) -> None:
     super().register_options(register)
-    register('--debug', type=bool, fingerprint=True, default=False,
-             help='Run a single test target in an interactive process.')
+    register('--debug', type=bool, default=False,
+             help='Run a single test target in an interactive process. This is '
+                  'necessary, for example, when you add breakpoints in your code.')
 
 
 class Test(Goal):

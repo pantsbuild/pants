@@ -14,9 +14,10 @@ from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.base.build_root import BuildRoot
 from pants.build_graph.address import Address
+from pants.engine.addressable import BuildFileAddresses
 from pants.engine.fs import Digest, DirectoriesToMerge, DirectoryToMaterialize, Workspace
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
-from pants.engine.legacy.graph import BuildFileAddresses, HydratedTarget, TransitiveHydratedTargets
+from pants.engine.legacy.graph import HydratedTarget, TransitiveHydratedTargets
 from pants.engine.legacy.structs import PythonTestsAdaptor
 from pants.engine.rules import rule
 from pants.engine.selectors import Get, MultiGet
@@ -78,8 +79,7 @@ async def debug_python_test(
 
   inits_digest = await Get[InjectedInitDigest](Digest, sources_digest)
 
-  merged_input_files = await Get(
-    Digest,
+  merged_input_files = await Get[Digest](
     DirectoriesToMerge(
       directories=(
         sources_digest,
@@ -90,7 +90,7 @@ async def debug_python_test(
   )
 
   with temporary_dir(root_dir=str(Path(build_root.path, ".pants.d")), cleanup=True) as tmpdir:
-    path_relative_to_build_root = Path(tmpdir).relative_to(build_root.path)
+    path_relative_to_build_root = str(Path(tmpdir).relative_to(build_root.path))
     test_target_sources_file_names = sorted(
       f'{path_relative_to_build_root}/{snapshot_file}'
       for snapshot_file
@@ -102,7 +102,7 @@ async def debug_python_test(
       DirectoryToMaterialize(merged_input_files, path_prefix=path_relative_to_build_root)
     )
 
-    request_args = [f'{path_relative_to_build_root}/{output_pytest_requirements_pex}', *pex_args]
+    request_args = (f'{path_relative_to_build_root}/{output_pytest_requirements_pex}', *pex_args)
     run_request = InteractiveProcessRequest(argv=request_args, run_in_workspace=True)
 
     result = runner.run_local_interactive_process(run_request)

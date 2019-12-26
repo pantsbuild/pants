@@ -4,6 +4,7 @@
 import logging
 from textwrap import dedent
 from typing import Dict, Optional
+from unittest.mock import Mock
 
 from pants.base.specs import DescendantAddresses, SingleAddress, Spec
 from pants.build_graph.address import Address, BuildFileAddress
@@ -24,8 +25,13 @@ from pants.rules.core.test import (
   fast_test,
 )
 from pants.source.wrapped_globs import EagerFilesetWithSpec
-from pants.testutil.engine.util import MockConsole, MockGet, MockOptions, run_rule
+from pants.testutil.engine.util import MockConsole, MockGet, run_rule
 from pants.testutil.test_base import TestBase
+
+
+class MockOptions:
+  def __init__(self, **values):
+    self.values = Mock(**values)
 
 
 class TestTest(TestBase):

@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from io import StringIO
 from types import CoroutineType, GeneratorType
 from typing import Any, Callable, Optional, Sequence, Type
-from unittest.mock import Mock
 
 from colors import blue, green, red
 
@@ -202,8 +201,3 @@ class MockConsole:
 
   def red(self, text):
     return self._safe_color(text, red)
-
-
-class MockOptions:
-  def __init__(self, **values):
-    self.values = Mock(**values)
