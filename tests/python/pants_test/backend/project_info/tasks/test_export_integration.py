@@ -209,7 +209,7 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
     with self.temporary_workdir() as workdir:
       test_target = 'testprojects/tests/java/org/pantsbuild/testproject/testjvms:eight-test-platform'
       json_data = self.run_export(test_target, workdir)
-      self.assertEqual('java7', json_data['targets'][test_target]['platform'])
+      self.assertEqual('java9', json_data['targets'][test_target]['platform'])
       self.assertEqual('java8', json_data['targets'][test_target]['test_platform'])
 
   @ensure_resolver

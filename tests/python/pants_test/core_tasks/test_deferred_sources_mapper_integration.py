@@ -77,8 +77,9 @@ class DeferredSourcesMapperIntegration(PantsRunIntegrationTest):
         ],
       )
       """))
-    return [f'{os.path.relpath(workdir, get_buildroot())}:proto-{suffix}'
-            for suffix in (7, 8, 'other')]
+    return [
+      f'{os.path.relpath(workdir, get_buildroot())}:proto-{suffix}' for suffix in (8, 9, 'other')
+    ]
 
   def _configured_pants_run(self, command, workdir):
     pants_run = self.run_pants_with_workdir(
@@ -108,8 +109,8 @@ class DeferredSourcesMapperIntegration(PantsRunIntegrationTest):
 
   def test_deferred_sources_export_successfully(self):
     with self.temporary_workdir() as workdir:
-      proto7, proto8, proto_other = self._emit_targets(workdir)
-      pants_run = self._configured_pants_run(['export', proto7, proto8, proto_other], workdir)
+      proto8, proto9, proto_other = self._emit_targets(workdir)
+      pants_run = self._configured_pants_run(['export', proto8, proto9, proto_other], workdir)
 
       self.assert_success(pants_run)
       export_data = json.loads(pants_run.stdout_data)
@@ -122,7 +123,8 @@ class DeferredSourcesMapperIntegration(PantsRunIntegrationTest):
       self.assertEqual(3, len(synthetic_proto_libraries),
                        'Got unexpected number of synthetic proto libraries.')
 
-      synthetic8, synthetic9, synthetic_other = sorted(
+      # NB: 'java10' < 'java8' and 'java9' per lexicographic sorting.
+      synthetic_other, synthetic8, synthetic9 = sorted(
         synthetic_proto_libraries, key=lambda t: t['platform'])
 
       self.assertIn('proto-8', synthetic8['id'])

@@ -4,6 +4,7 @@
 java_library(
   name='base',
   sources=['TestBase.java'],
+  platform='java7',
   dependencies=['3rdparty:junit'],
 )
 
@@ -19,7 +20,7 @@ junit_tests(
 junit_tests(
   name='eight-test-platform',
   sources=['TestEight.java'],
-  platform='java7',
+  platform='java9',
   test_platform='java8',
   dependencies=[':base'],
   strict_deps=False,
