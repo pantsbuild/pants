@@ -1,7 +1,6 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import io
 import json
 import os
 import shlex
@@ -17,7 +16,6 @@ from packaging.version import Version
 
 from pants.base.deprecated import CodeRemovedError
 from pants.base.hash_utils import CoercingEncoder
-from pants.engine.fs import FileContent
 from pants.option.config import Config
 from pants.option.custom_types import UnsetBool, file_option, target_option
 from pants.option.errors import (
@@ -1530,17 +1528,3 @@ class OptionsTest(TestBase):
     single_warning_dummy1 = assert_single_element(w)
     self.assertEqual(single_warning_dummy1.category, DeprecationWarning)
     self.assertEqual('vv', vals1.foo)
-
-
-# TODO: Figure out why this testing is necessary.
-class OptionsTestStringPayloads(OptionsTest):
-  """Runs the same tests as OptionsTest, but backed with `Config.loads` vs `Config.load`."""
-
-  def _create_config_from_strings(self, config):
-    with io.BytesIO(b'') as fp:
-      self._write_config_to_file(fp, config)
-      fp.seek(0)
-      payload = fp.read()
-      return Config.load_file_contents(
-        config_payloads=[FileContent(path='blah', content=payload)],
-      )
