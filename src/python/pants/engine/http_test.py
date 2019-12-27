@@ -47,6 +47,18 @@ class HttpHandlerForTests(BaseHTTPRequestHandler):
     self.end_headers()
 
 
+class CachingTestHandler(BaseHTTPRequestHandler):
+  count = 0
+
+  def do_GET(self):
+    self.send_response(200)
+    self.end_headers()
+    count = CachingTestHandler.count
+    output = f"Your path: {self.path} count: {count}"
+    CachingTestHandler.count += 1
+    self.wfile.write(output.encode())
+
+
 class HttpIntrinsicTest(TestBase):
   @classmethod
   def rules(cls):
@@ -105,3 +117,19 @@ class HttpIntrinsicTest(TestBase):
         pass
     messages = cm.exception.end_user_messages()
     assert messages == ["Error parsing field 'headers': odd number of parts"]
+
+  def test_caching_semantics(self):
+    with http_server(CachingTestHandler) as port:
+      request1 = MakeHttpRequest(url=f'http://localhost:{port}/one-url', invalidation_token='some-token')
+      request2 = MakeHttpRequest(url=f'http://localhost:{port}/one-url', invalidation_token='some-token')
+      request3 = MakeHttpRequest(url=f'http://localhost:{port}/one-url', invalidation_token='something-else')
+      request4 = MakeHttpRequest(url=f'http://localhost:{port}/another-url', invalidation_token='some-token')
+
+      output1 = self.request_single_product(HttpResponse, request1)
+      output2 = self.request_single_product(HttpResponse, request2)
+      assert CachingTestHandler.count == 1
+      output3 = self.request_single_product(HttpResponse, request3)
+      assert CachingTestHandler.count == 2
+      output4 = self.request_single_product(HttpResponse, request4)
+      assert CachingTestHandler.count == 3
+

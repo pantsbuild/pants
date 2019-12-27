@@ -19,6 +19,7 @@ class HttpResponse:
 class MakeHttpRequest:
   url: str
   headers: Tuple[str, ...] = ()
+  invalidation_token: str = ''
 
 
 def create_http_rules():

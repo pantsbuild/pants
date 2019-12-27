@@ -477,7 +477,6 @@ impl WrappedNode for HttpRequester {
       .send()
       .then(|result: Result<reqwest::r#async::Response, reqwest::Error>| match result {
         Ok(resp) => {
-          println!("RESULT IN RUST: {:?}", resp);
           let response_code = Some(resp.status().as_u16());
           let url = resp.url().as_str().to_string();
           let headers: Vec<(String, String)> = resp
