@@ -12,5 +12,5 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:publish_directory',
   ],
   timeout = 240,
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )

@@ -1,3 +1,6 @@
+# Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 python_tests(
   dependencies = [
     'contrib/googlejavaformat/src/python/pants/contrib/googlejavaformat',
@@ -7,4 +10,5 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/testutil/jvm:nailgun_task_test_base',
   ],
+  tags = {'partially_type_checked'},
 )

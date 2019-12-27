@@ -31,7 +31,7 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'testprojects/src/java/org/pantsbuild/testproject:phrases_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 530,
 )
 
@@ -54,6 +54,7 @@ python_library(
     'src/python/pants/testutil/base:context_utils',
     'tests/python/pants_test:deprecated_testinfra',
   ],
+  tags = {'partially_type_checked'},
 )
 
 python_tests(
@@ -215,7 +216,7 @@ python_tests(
     'src/python/pants/testutil:test_base',
     'src/python/pants/testutil/option',
   ],
-  tags={'platform_specific_behavior'},
+  tags={'platform_specific_behavior', 'partially_type_checked'},
 )
 
 python_tests(
@@ -228,7 +229,7 @@ python_tests(
     'testprojects/src/python:coordinated_runs_directory',
     'testprojects:pants_plugins_directory',
   ],
-  tags = {'platform_specific_behavior', 'integration'},
+  tags = {'platform_specific_behavior', 'integration', 'partially_type_checked'},
   # NB: This frequently times out, but due to hanging. So, we want to fail eagerly. See
   # https://github.com/pantsbuild/pants/issues/8127.
   timeout = 200,
@@ -241,6 +242,6 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'testprojects/src/python:unicode_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 120,
 )

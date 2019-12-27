@@ -76,6 +76,7 @@ python_library(
     'src/python/pants/testutil:process_test_util',
     'src/python/pants/testutil:int-test',
   ],
+  tags = {'partially_type_checked'},
 )
 
 python_tests(
@@ -92,7 +93,7 @@ python_tests(
     'testprojects/src/python:nested_runs_directory',
     'testprojects/src/python:print_env_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 900
 )
 

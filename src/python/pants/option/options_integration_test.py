@@ -245,8 +245,8 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
       'options', '--skip-inherited', '--name=colors',
     ])
     self.assert_success(pants_run)
-    lines = (s.split('(', 1)[0] for s in pants_run.stdout_data.split('\n') if '(' in s)
-    lines = [s.strip() for s in lines]
+    unstripped_lines = (s.split('(', 1)[0] for s in pants_run.stdout_data.split('\n') if '(' in s)
+    lines = [s.strip() for s in unstripped_lines]
     # This should be included because it has no super-scopes.
     self.assertIn('colors = False', lines)
     # These should be included because they differ from the super-scope value.

@@ -22,7 +22,7 @@ python_tests(
     'examples/src/java/org/pantsbuild/example:hello_directory',
     'examples/src/scala/org/pantsbuild/example:several_scala_targets_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 600,
 )
 

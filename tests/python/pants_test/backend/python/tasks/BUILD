@@ -37,7 +37,7 @@ python_tests(
     'testprojects/src/python:python_distribution_directory',
     'testprojects/tests/python:example_test_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 180,
 )
 
@@ -68,7 +68,7 @@ python_tests(
     'tests/python/pants_test:interpreter_selection_utils',
     'testprojects/src/python:interpreter_selection_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout=240,
 )
 
@@ -95,7 +95,7 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'testprojects/tests/java/org/pantsbuild/testproject:dummies_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )
 
 python_tests(
@@ -132,7 +132,7 @@ python_tests(
     'testprojects/tests/python/pants:constants_only_directory',
     'testprojects/tests/python/pants:timeout_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout=240,
 )
 
@@ -157,7 +157,7 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'testprojects/src/python:python_distribution_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout=240
 )
 
@@ -182,7 +182,7 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'testprojects/src/python:interpreter_selection_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout=120,
 )
 
@@ -198,7 +198,7 @@ python_tests(
     'testprojects/src/python:interpreter_selection_directory',
     'testprojects/src/python:print_env_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout=240
 )
 
@@ -281,7 +281,7 @@ python_tests(
     'examples/src/thrift/org/pantsbuild/example:precipitation_directory',
     'testprojects:pants_plugins_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout=240,
 )
 

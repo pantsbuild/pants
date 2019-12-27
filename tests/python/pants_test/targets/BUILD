@@ -16,7 +16,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil:int-test',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )
 
 python_tests(
@@ -48,7 +48,7 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'testprojects/src/java/org/pantsbuild/testproject:bundle_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 300,
 )
 

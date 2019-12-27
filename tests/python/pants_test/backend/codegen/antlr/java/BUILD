@@ -27,6 +27,6 @@ python_tests(
     'examples/src/java/org/pantsbuild/example:antlr3_directory',
     'examples/src/java/org/pantsbuild/example:antlr4_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 240,
 )

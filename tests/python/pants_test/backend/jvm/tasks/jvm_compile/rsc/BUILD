@@ -9,6 +9,7 @@ python_library(
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
     'src/python/pants/testutil:test_base',
   ],
+  tags = {'partially_type_checked'},
 )
 
 python_tests(
@@ -23,7 +24,7 @@ python_tests(
     'testprojects/src/scala/org/pantsbuild/testproject:mutual_directory',
   ],
   timeout = 660,
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )
 
 python_tests(
@@ -36,7 +37,7 @@ python_tests(
     'testprojects/src/scala/org/pantsbuild/testproject:public_inference_directory',
   ],
   timeout = 800,
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )
 
 
@@ -50,4 +51,5 @@ python_tests(
     'src/python/pants/testutil/jvm:nailgun_task_test_base',
     'src/python/pants/testutil/subsystem',
   ],
+  tags = {'partially_type_checked'},
 )

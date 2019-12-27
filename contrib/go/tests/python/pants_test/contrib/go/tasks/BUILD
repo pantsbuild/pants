@@ -15,6 +15,7 @@ python_tests(
     'src/python/pants/testutil/subsystem',
     'src/python/pants/testutil:task_test_base',
   ],
+  tags = {'partially_type_checked'},
   timeout=120,
 )
 
@@ -32,6 +33,6 @@ python_tests(
     'src/python/pants/testutil:file_test_util',
     'src/python/pants/testutil:int-test',
   ],
-  tags={'integration'},
+  tags={'integration', 'partially_type_checked'},
   timeout=360,
 )

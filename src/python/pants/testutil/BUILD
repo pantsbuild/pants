@@ -16,6 +16,7 @@ python_library(
     'src/python/pants/testutil/option',
     'src/python/pants/testutil/subsystem',
   ],
+  tags = {'partially_type_checked'},
   provides=pants_setup_py(
     name='pantsbuild.pants.testutil',
     description='Test support for writing Pants plugins.',
@@ -28,9 +29,7 @@ python_library(
 
 python_library(
   name = 'int-test-for-export',
-  sources = [
-    'pants_run_integration_test.py'
-  ],
+  sources = ['pants_run_integration_test.py'],
   dependencies = [
     '//:build_root',
     '//:pants_pex',
@@ -49,6 +48,7 @@ python_library(
     'src/python/pants/util:strutil',
     'src/python/pants:entry_point',
   ],
+  tags = {'partially_type_checked'},
 )
 
 target(

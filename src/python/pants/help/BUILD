@@ -34,5 +34,5 @@ python_tests(
   dependencies=[
     'src/python/pants/testutil:int-test',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )

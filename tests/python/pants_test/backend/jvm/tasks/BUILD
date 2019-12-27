@@ -50,7 +50,7 @@ python_tests(
   dependencies = [
     'src/python/pants/testutil:int-test',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )
 
 python_tests(
@@ -72,7 +72,7 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'testprojects/src/java/org/pantsbuild/testproject:bench_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 210,
 )
 
@@ -89,7 +89,7 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:manifest_directory',
   ],
   timeout=420,
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )
 
 python_tests(
@@ -149,7 +149,7 @@ python_tests(
     'examples/src/java/org/pantsbuild/example:hello_directory',
     'testprojects/3rdparty:checkstyle_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 240,
 )
 
@@ -246,7 +246,7 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:intransitive_directory',
   ],
   timeout=300,
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )
 
 python_tests(
@@ -270,7 +270,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil:int-test',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )
 
 python_tests(
@@ -324,7 +324,7 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'examples/tests/scala/org/pantsbuild/example:hello_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )
 
 python_tests(
@@ -338,7 +338,7 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:unicode_directory',
   ],
   timeout = 240,
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )
 
 python_tests(
@@ -413,7 +413,7 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:publish_directory',
     'testprojects/src/scala/org/pantsbuild/testproject:publish_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 480,
 )
 
@@ -453,6 +453,7 @@ python_tests(
     'src/python/pants/testutil/subsystem',
     'src/python/pants/testutil:task_test_base',
   ],
+  tags = {'partially_type_checked'},
   timeout = 120,
 )
 
@@ -472,7 +473,7 @@ python_tests(
     'testprojects/tests/java/org/pantsbuild/testproject:timeout_directory',
     'testprojects/tests/java/org/pantsbuild/testproject:unicode_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 600
 )
 
@@ -493,7 +494,7 @@ python_tests(
     'testprojects/tests/java/org/pantsbuild/testproject:fail256_directory',
     'testprojects/tests/java/org/pantsbuild/testproject:workdirs_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 1240,
 )
 
@@ -507,7 +508,7 @@ python_tests(
     'testprojects/tests/java/org/pantsbuild/testproject:parallelclassesandmethods_directory',
     'testprojects/tests/java/org/pantsbuild/testproject:parallelmethods_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 540,
 )
 
@@ -532,7 +533,7 @@ python_tests(
     'testprojects/maven_layout:resource_collision_directory',
     'testprojects/src/java/org/pantsbuild/testproject:unicode_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 320,
 )
 
@@ -558,7 +559,7 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:nocache_directory',
     'testprojects/src/java/org/pantsbuild/testproject:unicode_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 460,
 )
 
@@ -583,7 +584,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil:int-test',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )
 
 python_tests(
@@ -607,7 +608,7 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'testprojects/src/java/org/pantsbuild/testproject:jvmprepcommand_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 250,
 )
 
@@ -646,7 +647,7 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:extra_jvm_options_directory',
     'testprojects/tests/java/org/pantsbuild/testproject:syntheticjar_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 360,
 )
 
@@ -749,7 +750,7 @@ python_tests(
     'testprojects/src/scala/org/pantsbuild/testproject:rsc_compat_directory',
   ],
   timeout=340,
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )
 
 python_tests(
@@ -780,7 +781,7 @@ python_tests(
     'testprojects/src/scala/org/pantsbuild/testproject:unicode_directory',
   ],
   timeout=480,
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )
 
 python_tests(
@@ -792,7 +793,7 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:provided_directory',
   ],
   timeout=720,
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )
 
 python_tests(
@@ -803,7 +804,7 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:runtime_directory',
   ],
   timeout=600,
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )
 
 python_tests(
@@ -817,7 +818,7 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:junit_directory',
   ],
   timeout=300,
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )
 
 python_tests(
@@ -844,7 +845,7 @@ python_tests(
     'examples/src/java/org/pantsbuild/example:hello_directory',
     'testprojects/src/java/org/pantsbuild/testproject:exclude_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 300
 )
 
@@ -873,7 +874,7 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:unicode_directory',
     'testprojects/tests/java/org/pantsbuild/testproject:testjvms_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 360,
 )
 
