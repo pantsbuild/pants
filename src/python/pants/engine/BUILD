@@ -239,6 +239,7 @@ python_library(
   dependencies=[
     ':native_engine_shared_library',
     ':fs',
+    ':http',
     ':interactive_runner',
     ':isolated_process',
     ':selectors',
