@@ -5,3 +5,8 @@ files(
   name = '3rdparty_directory',
   sources = rglobs('3rdparty/*'),
 )
+
+files(
+  name = 'isort_cfg',
+  source = '.isort.cfg',
+)

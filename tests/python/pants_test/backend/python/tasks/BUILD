@@ -85,6 +85,8 @@ python_tests(
   name = 'isort_run_integration',
   sources = ['test_isort_run_integration.py'],
   dependencies = [
+    'contrib:isort_cfg',
+    'examples:isort_cfg',
     'src/python/pants/backend/python/tasks',
     'src/python/pants/testutil:int-test',
     'testprojects/tests/java/org/pantsbuild/testproject:dummies_directory',
