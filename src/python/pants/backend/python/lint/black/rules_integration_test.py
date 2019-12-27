@@ -70,33 +70,32 @@ class BlackIntegrationTest(TestBase):
     if config is not None:
       self.create_file(relpath="pyproject.toml", contents=config)
     input_snapshot = self.request_single_product(Snapshot, InputFilesContent(source_files))
-    target = BlackTarget(
-      TargetAdaptor(
-        sources=EagerFilesetWithSpec('test', {'globs': []}, snapshot=input_snapshot),
-        address=Address.parse("test:target"),
-      ),
-      prior_formatter_result_digest=input_snapshot.directory_digest,
+    target_adaptor = TargetAdaptor(
+      sources=EagerFilesetWithSpec('test', {'globs': []}, snapshot=input_snapshot),
+      address=Address.parse("test:target"),
     )
+    lint_target = BlackTarget(target_adaptor)
+    fmt_target = BlackTarget(target_adaptor, prior_formatter_result_digest=input_snapshot.directory_digest)
     black_subsystem = global_subsystem_instance(
       Black, options={Black.options_scope: {
         "config": "pyproject.toml" if config else None,
         "args": passthrough_args or [],
       }}
     )
+    python_subsystems = [
+      PythonNativeCode.global_instance(),
+      PythonSetup.global_instance(),
+      SubprocessEnvironment.global_instance(),
+    ]
     black_setup = self.request_single_product(
-      BlackSetup,
-      Params(
-        black_subsystem,
-        PythonNativeCode.global_instance(),
-        PythonSetup.global_instance(),
-        SubprocessEnvironment.global_instance(),
-      )
+      BlackSetup, Params(black_subsystem, *python_subsystems)
     )
-    fmt_and_lint_params = Params(
-      target, black_setup, PythonSetup.global_instance(), SubprocessEnvironment.global_instance()
+    lint_result = self.request_single_product(
+      LintResult, Params(lint_target, black_setup, *python_subsystems)
     )
-    lint_result = self.request_single_product(LintResult, fmt_and_lint_params)
-    fmt_result = self.request_single_product(FmtResult, fmt_and_lint_params)
+    fmt_result = self.request_single_product(
+      FmtResult, Params(fmt_target, black_setup, *python_subsystems)
+    )
     return lint_result, fmt_result
 
   def get_digest(self, source_files: List[FileContent]) -> Digest:
