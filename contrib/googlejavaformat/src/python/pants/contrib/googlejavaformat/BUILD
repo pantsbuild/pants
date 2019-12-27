@@ -3,6 +3,7 @@
 
 python_library(
   sources=['googlejavaformat.py'],
+  tags = {'partially_type_checked'},
 )
 
 contrib_plugin(
@@ -11,6 +12,7 @@ contrib_plugin(
     ':googlejavaformat',
     'src/python/pants/goal:task_registrar',
   ],
+  tags = {'partially_type_checked'},
   distribution_name='pantsbuild.pants.contrib.googlejavaformat',
   description='Google Java Format code formatter pants plugins.',
   additional_classifiers=[

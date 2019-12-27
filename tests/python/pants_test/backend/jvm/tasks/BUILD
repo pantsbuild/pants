@@ -7,7 +7,8 @@ python_library(
   dependencies = [
     'src/python/pants/java/distribution',
     'src/python/pants/testutil/subsystem',
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )
 
 python_tests(

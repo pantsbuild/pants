@@ -28,6 +28,7 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants:version',
   ],
+  tags = {'partially_type_checked'},
 )
 
 resources(

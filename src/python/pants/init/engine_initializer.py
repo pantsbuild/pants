@@ -3,7 +3,7 @@
 
 import logging
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Optional, cast
 
 from pants.backend.docgen.targets.doc import Page
 from pants.backend.jvm.targets.jvm_app import JvmApp
@@ -19,6 +19,7 @@ from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.base.specs import Specs
 from pants.build_graph.address import BuildFileAddress
 from pants.build_graph.build_configuration import BuildConfiguration
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.remote_sources import RemoteSources
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.build_files import create_graph_rules
@@ -46,6 +47,7 @@ from pants.engine.legacy.structs import (
 )
 from pants.engine.legacy.structs import rules as structs_rules
 from pants.engine.mapper import AddressMapper, ResolveError
+from pants.engine.native import Native
 from pants.engine.parser import SymbolTable
 from pants.engine.platform import create_platform_rules
 from pants.engine.rules import RootRule, UnionMembership, rule
@@ -57,6 +59,7 @@ from pants.option.global_options import (
   ExecutionOptions,
   GlobMatchErrorBehavior,
 )
+from pants.option.options_bootstrapper import OptionsBootstrapper
 
 
 logger = logging.getLogger(__name__)
@@ -103,14 +106,8 @@ _apply_default_sources_globs(PythonTestsAdaptor, PythonTests)
 _apply_default_sources_globs(RemoteSourcesAdaptor, RemoteSources)
 
 
-def _legacy_symbol_table(build_file_aliases):
-  """Construct a SymbolTable for the given BuildFileAliases.
-
-  :param build_file_aliases: BuildFileAliases to register.
-  :type build_file_aliases: :class:`pants.build_graph.build_file_aliases.BuildFileAliases`
-
-  :returns: A SymbolTable.
-  """
+def _legacy_symbol_table(build_file_aliases: BuildFileAliases) -> SymbolTable:
+  """Construct a SymbolTable for the given BuildFileAliases."""
   table = {
     alias: _make_target_adaptor(TargetAdaptor, target_type)
     for alias, target_type in build_file_aliases.target_types.items()
@@ -271,7 +268,11 @@ class EngineInitializer:
     return goal_map
 
   @staticmethod
-  def setup_legacy_graph(native, options_bootstrapper, build_configuration):
+  def setup_legacy_graph(
+    native: Native,
+    options_bootstrapper: OptionsBootstrapper,
+    build_configuration: BuildConfiguration,
+  ) -> LegacyGraphScheduler:
     """Construct and return the components necessary for LegacyBuildGraph construction."""
     build_root = get_buildroot()
     bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
@@ -296,17 +297,17 @@ class EngineInitializer:
     pants_ignore_patterns,
     local_store_dir,
     build_file_imports_behavior,
-    options_bootstrapper,
-    build_configuration,
-    build_root=None,
-    native=None,
-    glob_match_error_behavior=None,
+    options_bootstrapper: OptionsBootstrapper,
+    build_configuration: BuildConfiguration,
+    build_root: Optional[str] = None,
+    native: Optional[Native] = None,
+    glob_match_error_behavior: Optional[GlobMatchErrorBehavior] = None,
     build_ignore_patterns=None,
     exclude_target_regexps=None,
     subproject_roots=None,
-    include_trace_on_error=True,
-    execution_options=None,
-  ):
+    include_trace_on_error: bool = True,
+    execution_options: Optional[ExecutionOptions] = None,
+  ) -> LegacyGraphScheduler:
     """Construct and return the components necessary for LegacyBuildGraph construction.
 
     :param list pants_ignore_patterns: A list of path ignore patterns for FileSystemProjectTree,
@@ -315,25 +316,20 @@ class EngineInitializer:
     :param build_file_imports_behavior: How to behave if a BUILD file being parsed tries to use
       import statements. Valid values: "allow", "warn", "error".
     :type build_file_imports_behavior: string
-    :param str build_root: A path to be used as the build root. If None, then default is used.
-    :param Native native: An instance of the native-engine subsystem.
+    :param build_root: A path to be used as the build root. If None, then default is used.
+    :param native: An instance of the native-engine subsystem.
     :param options_bootstrapper: A `OptionsBootstrapper` object containing bootstrap options.
-    :type options_bootstrapper: :class:`pants.options.options_bootstrapper.OptionsBootstrapper`
     :param build_configuration: The `BuildConfiguration` object to get build file aliases from.
-    :type build_configuration: :class:`pants.build_graph.build_configuration.BuildConfiguration`
     :param glob_match_error_behavior: How to behave if a glob specified for a target's sources or
                                       bundles does not expand to anything.
-    :type glob_match_error_behavior: :class:`pants.option.global_options.GlobMatchErrorBehavior`
     :param list build_ignore_patterns: A list of paths ignore patterns used when searching for BUILD
                                        files, usually taken from the '--build-ignore' global option.
     :param list exclude_target_regexps: A list of regular expressions for excluding targets.
     :param list subproject_roots: Paths that correspond with embedded build roots
                                   under the current build root.
-    :param bool include_trace_on_error: If True, when an error occurs, the error message will
-                include the graph trace.
+    :param include_trace_on_error: If True, when an error occurs, the error message will include
+                                   the graph trace.
     :param execution_options: Option values for (remote) process execution.
-    :type execution_options: :class:`pants.option.global_options.ExecutionOptions`
-    :returns: A LegacyGraphScheduler.
     """
 
     build_root = build_root or get_buildroot()
@@ -378,15 +374,15 @@ class EngineInitializer:
 
     @rule
     def build_root_singleton() -> BuildRoot:
-      return BuildRoot.instance
+      return cast(BuildRoot, BuildRoot.instance)
 
     @rule
     async def single_build_file_address(specs: Specs) -> BuildFileAddress:
-      build_file_addresses = await Get(BuildFileAddresses, Specs, specs)
+      build_file_addresses = await Get[BuildFileAddresses](Specs, specs)
       if len(build_file_addresses.dependencies) == 0:
         raise ResolveError("No targets were matched")
       if len(build_file_addresses.dependencies) > 1:
-        potential_addresses = await Get(BuildFileAddresses, Specs, specs)
+        potential_addresses = await Get[BuildFileAddresses](Specs, specs)
         targets = [bfa.to_address() for bfa in potential_addresses]
         output = '\n '.join(str(target) for target in targets)
 

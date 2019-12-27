@@ -207,7 +207,9 @@ class ExceptionSink:
 
   @classmethod
   @contextmanager
-  def exiter_as_until_exception(cls, new_exiter_fun: Callable[[Optional[Exiter]], Exiter]) -> Iterator[None]:
+  def exiter_as_until_exception(
+    cls, new_exiter_fun: Callable[[Optional[Exiter]], Exiter]
+  ) -> Iterator[None]:
     """Temporarily override the global exiter, except this will unset it when an exception happens."""
     previous_exiter = cls._exiter
     new_exiter = new_exiter_fun(previous_exiter)
@@ -225,7 +227,6 @@ class ExceptionSink:
     Python state:
     - Overwrites sys.excepthook.
     """
-    assert(isinstance(exiter, Exiter))
     logger.debug(f"overriding the global exiter with {exiter} (from {cls._exiter})")
     # NB: mutate the class variables! This is done before mutating the exception hook, because the
     # uncaught exception handler uses cls._exiter to exit.
@@ -267,7 +268,7 @@ class ExceptionSink:
     if for_pid is None:
       intermediate_filename_component = ''
     else:
-      assert(isinstance(for_pid, Pid))
+      assert isinstance(for_pid, Pid)
       intermediate_filename_component = '.{}'.format(for_pid)
     in_dir = in_dir or cls._log_dir
     return os.path.join(
@@ -329,7 +330,7 @@ class ExceptionSink:
     pid = os.getpid()
     pid_specific_log_path = cls.exceptions_log_path(for_pid=pid, in_dir=new_log_location)
     shared_log_path = cls.exceptions_log_path(in_dir=new_log_location)
-    assert(pid_specific_log_path != shared_log_path)
+    assert pid_specific_log_path != shared_log_path
     try:
       # Truncate the pid-specific error log file.
       pid_specific_error_stream = safe_open(pid_specific_log_path, mode='w')
@@ -355,7 +356,7 @@ class ExceptionSink:
     :returns: The :class:`SignalHandler` that was previously registered, or None if this is
               the first time this method was called.
     """
-    assert(isinstance(signal_handler, SignalHandler))
+    assert isinstance(signal_handler, SignalHandler)
     # NB: Modify process-global state!
     for signum, handler in signal_handler.signal_handler_mapping.items():
       signal.signal(signum, handler)
