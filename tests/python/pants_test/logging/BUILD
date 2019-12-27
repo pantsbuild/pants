@@ -3,9 +3,7 @@
 
 python_tests(
   name='test_native_engine_logging',
-  sources=[
-    'test_native_engine_logging.py'
-  ],
+  sources=['test_native_engine_logging.py'],
   dependencies=[
     'src/python/pants/testutil:int-test',
     'tests/python/pants_test/pantsd:pantsd_integration_test_base',
@@ -15,9 +13,7 @@ python_tests(
 
 python_tests(
   name='test_workunit_label',
-  sources=[
-    'test_workunit_label.py'
-  ],
+  sources=['test_workunit_label.py'],
   dependencies=[
     'src/python/pants/goal:run_tracker',
     'src/python/pants/testutil:int-test',

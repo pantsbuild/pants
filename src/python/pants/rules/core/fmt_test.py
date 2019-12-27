@@ -38,7 +38,7 @@ class FmtTest(TestBase):
       # TODO: this is not robust to set as an empty digest. Add a test util that provides
       #  some premade snapshots and possibly a generalized make_hydrated_target function.
       directory_digest=EMPTY_DIRECTORY_DIGEST,
-      files=("formatted.txt", "fake.txt") if include_sources else (),
+      files=tuple(["formatted.txt", "fake.txt"] if include_sources else []),
       dirs=()
     )
     return HydratedTarget(

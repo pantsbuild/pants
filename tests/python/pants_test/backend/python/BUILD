@@ -10,7 +10,8 @@ python_tests(
     'src/python/pants/backend/python/targets',
     'src/python/pants/base:build_environment',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -22,7 +23,8 @@ python_tests(
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
     'src/python/pants/testutil:test_base'
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -36,6 +38,7 @@ python_tests(
     'tests/python/pants_test:interpreter_selection_utils',
     'src/python/pants/testutil:test_base',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -60,5 +63,5 @@ python_library(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/testutil:int-test',
-  ]
+  ],
 )

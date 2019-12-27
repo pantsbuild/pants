@@ -20,7 +20,8 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -42,7 +43,8 @@ python_tests(
     'src/python/pants/base:cmd_line_spec_parser',
     'src/python/pants/build_graph',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -51,7 +53,7 @@ python_library(
   dependencies = [
     'src/python/pants/testutil/base:context_utils',
     'tests/python/pants_test:deprecated_testinfra',
-  ]
+  ],
 )
 
 python_tests(
@@ -63,6 +65,7 @@ python_tests(
     'src/python/pants:version',
     'src/python/pants/testutil:test_base',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -83,7 +86,8 @@ python_tests(
   dependencies = [
     'src/python/pants/base:fingerprint_strategy',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -92,7 +96,8 @@ python_tests(
   dependencies = [
     'src/python/pants/base:generator',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -133,7 +138,8 @@ python_tests(
     'src/python/pants/base:payload_field',
     'src/python/pants/build_graph',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -144,7 +150,8 @@ python_tests(
     'src/python/pants/backend/python:python_requirement',
     'src/python/pants/base:payload_field',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -162,7 +169,8 @@ python_tests(
   dependencies = [
     'src/python/pants/base:revision',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -172,7 +180,8 @@ python_tests(
     'src/python/pants/base:run_info',
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(

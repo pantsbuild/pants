@@ -13,7 +13,8 @@ python_tests(
     'src/python/pants/util:dirutil',
     'src/python/pants/testutil/engine:util',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -137,7 +138,8 @@ python_tests(
     'src/python/pants/init',
     'src/python/pants/testutil/engine:util',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -177,7 +179,8 @@ python_tests(
     'src/python/pants/init',
     'src/python/pants/testutil:test_base',
     'src/python/pants/testutil/engine:util',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(

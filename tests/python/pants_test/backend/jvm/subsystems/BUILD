@@ -29,6 +29,7 @@ python_tests(
     'src/python/pants/testutil/jvm:nailgun_task_test_base',
     'src/python/pants/testutil/subsystem',
   ],
+  tags = {"partially_type_checked"},
 )
 
 
@@ -45,7 +46,8 @@ python_tests(
     'src/python/pants/backend/jvm/tasks/jvm_compile/zinc',
     'src/python/pants/testutil:test_base',
     'src/python/pants/testutil/subsystem',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -89,7 +91,8 @@ python_tests(
     'src/python/pants/util:dirutil',
     'src/python/pants/testutil:test_base',
     'src/python/pants/testutil/subsystem',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(

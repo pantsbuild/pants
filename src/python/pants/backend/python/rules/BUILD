@@ -37,6 +37,7 @@ python_tests(
     'src/python/pants/util:collections',
     'src/python/pants/util:contextutil',
   ],
+  tags = {"partially_type_checked"},
 )
 
 

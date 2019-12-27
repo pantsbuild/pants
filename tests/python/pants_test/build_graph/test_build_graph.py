@@ -208,7 +208,7 @@ class BuildGraphTest(TestBase):
 
     def empty_gen():
       return
-      yield
+      yield  # type: ignore[misc] # MyPy complains that this is not reachable
     self.assertEqual([], BuildGraph.closure(empty_gen()))
 
   def test_closure_bfs(self):

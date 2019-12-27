@@ -8,7 +8,8 @@ python_tests(
   dependencies = [
     'tests/python/pants_test/pantsd:test_deps',
     'src/python/pants/pantsd/service:pants_service'
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -18,7 +19,8 @@ python_tests(
   dependencies = [
     'tests/python/pants_test/pantsd:test_deps',
     'src/python/pants/pantsd/service:fs_event_service'
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -28,5 +30,6 @@ python_tests(
   dependencies = [
     'tests/python/pants_test/pantsd:test_deps',
     'src/python/pants/pantsd/service:pailgun_service'
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )

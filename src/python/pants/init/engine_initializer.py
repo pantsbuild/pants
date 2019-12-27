@@ -51,7 +51,7 @@ from pants.engine.native import Native
 from pants.engine.parser import SymbolTable
 from pants.engine.platform import create_platform_rules
 from pants.engine.rules import RootRule, UnionMembership, rule
-from pants.engine.scheduler import Scheduler
+from pants.engine.scheduler import Scheduler, SchedulerSession
 from pants.engine.selectors import Get, Params
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
 from pants.option.global_options import (
@@ -170,7 +170,9 @@ class LegacyGraphScheduler:
   build_file_aliases: Any
   goal_map: Any
 
-  def new_session(self, zipkin_trace_v2, build_id, v2_ui=False, should_report_workunits=False):
+  def new_session(
+    self, zipkin_trace_v2, build_id, v2_ui=False, should_report_workunits=False
+  ) -> "LegacyGraphSession":
     session = self.scheduler.new_session(zipkin_trace_v2, build_id, v2_ui, should_report_workunits)
     return LegacyGraphSession(session, self.build_file_aliases, self.goal_map)
 
@@ -178,7 +180,7 @@ class LegacyGraphScheduler:
 @dataclass(frozen=True)
 class LegacyGraphSession:
   """A thin wrapper around a SchedulerSession configured with @rules for a symbol table."""
-  scheduler_session: Any
+  scheduler_session: SchedulerSession
   build_file_aliases: Any
   goal_map: Any
 

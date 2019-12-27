@@ -8,7 +8,8 @@ python_library(
     'src/python/pants/goal',
     'src/python/pants/goal:task_registrar',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 

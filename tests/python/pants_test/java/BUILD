@@ -31,7 +31,8 @@ python_tests(
     '3rdparty/python:psutil',
     'src/python/pants/java:nailgun_executor',
     'src/python/pants/testutil:test_base'
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -83,5 +84,6 @@ python_tests(
     'src/python/pants/java:util',
     'src/python/pants/util:dirutil',
     'src/python/pants/testutil/jvm:nailgun_task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )

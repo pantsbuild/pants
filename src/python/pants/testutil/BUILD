@@ -87,6 +87,7 @@ python_library(
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -98,6 +99,7 @@ python_library(
     'src/python/pants/init',
     'src/python/pants/util:meta',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -113,6 +115,7 @@ python_library(
     'src/python/pants/util:objects',
     ':test_base',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(

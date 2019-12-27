@@ -12,7 +12,8 @@ python_tests(
     'src/python/pants/backend/python/targets',
     'src/python/pants/base:build_environment',
     'src/python/pants/testutil:task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -37,7 +38,8 @@ python_tests(
     'src/python/pants/backend/python/targets',
     'src/python/pants/build_graph',
     'src/python/pants/testutil:task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -49,6 +51,7 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/testutil:task_test_base',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -63,6 +66,7 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/testutil:task_test_base',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -78,6 +82,7 @@ python_tests(
     'src/python/pants/testutil/subsystem',
     'src/python/pants/testutil:console_rule_test_base',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -89,6 +94,7 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/testutil:task_test_base',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -98,7 +104,8 @@ python_tests(
     'src/python/pants/backend/graph_info/tasks',
     'src/python/pants/base:exceptions',
     'src/python/pants/testutil:task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -120,6 +127,7 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/testutil:task_test_base',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -129,5 +137,6 @@ python_tests(
     'src/python/pants/backend/graph_info/tasks',
     'src/python/pants/build_graph',
     'src/python/pants/testutil:task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )

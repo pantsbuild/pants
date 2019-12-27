@@ -33,7 +33,7 @@ def fn_raises(x):
 
 
 @rule
-def nested_raise(x: B) -> A:
+def nested_raise(x: B) -> A:  # type: ignore[return]
   fn_raises(x)
 
 
@@ -59,7 +59,7 @@ class D:
 
 @rule
 async def transitive_coroutine_rule(c: C) -> D:
-  b = await Get(B, C, c)
+  b = await Get[B](C, c)
   return D(b)
 
 
@@ -89,7 +89,7 @@ class UnionA:
 
 @rule
 def select_union_a(union_a: UnionA) -> A:
-  return union_a.a()
+  return union_a.a()  # type: ignore[no-any-return]
 
 
 class UnionB:
@@ -100,13 +100,13 @@ class UnionB:
 
 @rule
 def select_union_b(union_b: UnionB) -> A:
-  return union_b.a()
+  return union_b.a()  # type: ignore[no-any-return]
 
 
 # TODO: add GetMulti testing for unions!
 @rule
 async def a_union_test(union_wrapper: UnionWrapper) -> A:
-  union_a = await Get(A, UnionBase, union_wrapper.inner)
+  union_a = await Get[A](UnionBase, union_wrapper.inner)
   return union_a
 
 
@@ -116,7 +116,7 @@ class UnionX:
 
 @rule
 async def error_msg_test_rule(union_wrapper: UnionWrapper) -> UnionX:
-  union_x = await Get(UnionX, UnionWithNonMemberErrorMsg, union_wrapper.inner)
+  union_x = await Get[UnionX](UnionWithNonMemberErrorMsg, union_wrapper.inner)
   return union_x
 
 
