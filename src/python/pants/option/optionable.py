@@ -64,8 +64,8 @@ class Optionable(OptionableFactory, metaclass=ABCMeta):
   # Option values can be read from the deprecated scope, but a deprecation warning will be issued.
   # The deprecation warning becomes an error at the given Pants version (which must therefore be
   # a valid semver).
-  deprecated_options_scope = None
-  deprecated_options_scope_removal_version = None
+  deprecated_options_scope: Optional[str] = None
+  deprecated_options_scope_removal_version: Optional[str] = None
 
   _scope_name_component_re = re.compile(r'^(?:[a-z0-9])+(?:-(?:[a-z0-9])+)*$')
 
