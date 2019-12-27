@@ -2,20 +2,31 @@ python_library(
   dependencies=[
     '3rdparty/python:dataclasses',
     'src/python/pants/binaries',
-    'src/python/pants/engine:console',
     'src/python/pants/engine:fs',
-    'src/python/pants/engine:goal',
     'src/python/pants/engine:isolated_process',
     'src/python/pants/engine:platform',
     'src/python/pants/engine:rules',
     'src/python/pants/engine:selectors',
-    'src/python/pants/util:pkg_util',
     'src/python/pants/util:strutil',
-    ':move-output-file',
-  ]
+  ],
 )
 
 resources(
-  name='move-output-file',
-  sources=['move_output_file_path.bash'],
+  name='example-bash-script',
+  sources=['example-bash-script.bash'],
+)
+
+python_tests(
+  name='tests',
+  dependencies=[
+    ':example-bash-script',
+    ':shell_scripts',
+    'src/python/pants/engine:fs',
+    'src/python/pants/engine:isolated_process',
+    'src/python/pants/engine:selectors',
+    'src/python/pants/testutil/engine:util',
+    'src/python/pants/testutil:test_base',
+    'src/python/pants/util:collections',
+    'src/python/pants/util:pkg_util',
+  ],
 )

@@ -5,25 +5,20 @@ import dataclasses
 from dataclasses import dataclass
 from pathlib import Path
 
-import pants.rules.shell_scripts
 from pants.binaries.binary_tool import BinaryToolFetchRequest, NativeTool
 from pants.binaries.binary_util import BinaryToolUrlGenerator
-from pants.engine.console import Console
 from pants.engine.fs import (
-  EMPTY_DIRECTORY_DIGEST,
   Digest,
   DirectoriesToMerge,
   FileContent,
   InputFilesContent,
   SingleFileExecutable,
 )
-from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
+from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.engine.platform import Platform
-from pants.engine.rules import RootRule, console_rule, optionable_rule, rule
+from pants.engine.rules import RootRule, optionable_rule, rule
 from pants.engine.selectors import Get
 from pants.util.memo import memoized_classproperty
-from pants.util.pkg_util import get_resource_string
 from pants.util.strutil import ensure_relative_file_name
 
 
@@ -104,34 +99,10 @@ async def create_bash_script_execution_request(req: BashScriptRequest, bash: Bas
     input_files=merged_digest)
 
 
-class RunBashOptions(GoalSubsystem):
-  name = 'do-bash'
-
-
-class RunBash(Goal):
-  subsystem_cls = RunBashOptions
-
-
-@console_rule
-async def run_bash_script(console: Console) -> RunBash:
-  example_script_contents = get_resource_string(pants.rules.shell_scripts, Path('move_output_file_path.bash'))
-  bash_result = await Get[ExecuteProcessResult](BashScriptRequest(
-    script=FileContent('test.bash', bytes(example_script_contents)),
-    base_exe_request=ExecuteProcessRequest(
-      argv=(),
-      input_files=EMPTY_DIRECTORY_DIGEST,
-      description='test bash!!!',
-    ),
-  ))
-  console.print_stdout(f'bash_result: {bash_result}')
-  return RunBash(exit_code=0)
-
-
 def rules():
   return [
     optionable_rule(Bash.Factory),
     get_bash,
     RootRule(BashScriptRequest),
     create_bash_script_execution_request,
-    run_bash_script,
   ]

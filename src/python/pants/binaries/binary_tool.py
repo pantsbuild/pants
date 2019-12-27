@@ -13,7 +13,14 @@ from pants.binaries.binary_util import (
   BinaryUtil,
   HostPlatform,
 )
-from pants.engine.fs import Digest, PathGlobs, PathGlobsAndRoot, SingleFileExecutable, Snapshot, UrlToFetch
+from pants.engine.fs import (
+  Digest,
+  PathGlobs,
+  PathGlobsAndRoot,
+  SingleFileExecutable,
+  Snapshot,
+  UrlToFetch,
+)
 from pants.engine.platform import Platform, PlatformConstraint
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get
