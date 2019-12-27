@@ -15,14 +15,15 @@ class PyTest(Subsystem):
   def register_options(cls, register):
     super().register_options(register)
     register(
-      '--args', type=list, member_type=str,
+      '--args', type=list, member_type=str, fingerprint=True,
       help="Arguments to pass directly to Pytest, e.g. `--pytest-args=\"-k test_foo --quiet\"`",
     )
-    register('--version', default='pytest>=4.6.6,<4.7',
-             help="Requirement string for Pytest.", fingerprint=True)
+    register('--version', default='pytest>=4.6.6,<4.7', fingerprint=True,
+             help="Requirement string for Pytest.")
     register(
       '--pytest-plugins',
       type=list,
+      fingerprint=True,
       default=[
         'pytest-timeout>=1.3.3,<1.4',
         'pytest-cov>=2.8.1,<3',
@@ -30,7 +31,6 @@ class PyTest(Subsystem):
         "more-itertools<6.0.0 ; python_version<'3'",
       ],
       help="Requirement strings for any plugins or additional requirements you'd like to use.",
-      fingerprint=True
     )
     register('--requirements', advanced=True, default='pytest>=4.6.6,<4.7',
              help='Requirements string for the pytest library.',
