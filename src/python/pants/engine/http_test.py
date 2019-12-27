@@ -37,13 +37,17 @@ class HttpHandlerForTests(BaseHTTPRequestHandler):
       code = 500
     elif self.path == "/redirect":
       code = 302
-      self.send_header("Location", "/valid-url")
     else:
       code = 404
     self.send_response(code)
-    self.send_header("Content-Type", "text/utf-8")
+
+    if self.path == "/redirect":
+      self.send_header("Location", "/valid-url")
     if self.path == "/broken-header":
       self.send_header(f"Content-Length", "deliberately-broken-header")
+
+    self.send_header("Content-Type", "text/utf-8")
+
     self.end_headers()
 
 
@@ -83,8 +87,7 @@ class HttpIntrinsicTest(TestBase):
 
   def test_302(self):
     with self.make_request_to_path("redirect") as (response, port):
-      print(response)
-      assert response.response_code == 444
+      assert response.url == f"http://localhost:{port}/valid-url"
 
   def test_404(self):
     with self.make_request_to_path("nothingtheserverknowsabout") as (response, port):
