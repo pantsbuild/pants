@@ -21,7 +21,7 @@ from pants.util.contextutil import temporary_dir
 class PythonRunIntegrationTest(PantsRunIntegrationTest):
   testproject = 'testprojects/src/python/interpreter_selection'
   py2_interpreter_constraint = 'CPython>=2.7,<3'
-  py3_interpreter_constraint = 'CPython>=3.6,<4'
+  py3_interpreter_constraint = 'CPython>=3.6'
 
   @classmethod
   def hermetic(cls):
