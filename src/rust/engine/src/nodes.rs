@@ -475,54 +475,56 @@ impl WrappedNode for HttpRequester {
 
     request
       .send()
-      .then(|result: Result<reqwest::r#async::Response, reqwest::Error>| match result {
-        Ok(resp) => {
-          let response_code = Some(resp.status().as_u16());
-          let url = resp.url().as_str().to_string();
-          let headers: Vec<(String, String)> = resp
-            .headers()
-            .into_iter()
-            .map(|(k, v)| (k.as_str().to_string(), v.to_str().unwrap().to_string()))
-            .collect();
+      .then(
+        |result: Result<reqwest::r#async::Response, reqwest::Error>| match result {
+          Ok(resp) => {
+            let response_code = Some(resp.status().as_u16());
+            let url = resp.url().as_str().to_string();
+            let headers: Vec<(String, String)> = resp
+              .headers()
+              .into_iter()
+              .map(|(k, v)| (k.as_str().to_string(), v.to_str().unwrap().to_string()))
+              .collect();
 
-          let bytes: Vec<u8> = Vec::new();
-          let decoder = resp.into_body();
-          let fold: futures::stream::Fold<
-            _,
-            _,
-            futures::future::FutureResult<_, reqwest::Error>,
-            _,
-          > = decoder.fold(bytes, |mut acc: Vec<u8>, chunk: reqwest::r#async::Chunk| {
-            acc.extend_from_slice(&chunk);
-            future::ok(acc)
-          });
-          fold
-            .map_err(|err: reqwest::Error| throw(&format!("{}", err)))
-            .and_then(move |bytes: Vec<u8>| {
-              future::ok(EngineHttpResponse {
-                response_code,
-                bytes: Some(bytes),
-                url,
-                headers,
+            let bytes: Vec<u8> = Vec::new();
+            let decoder = resp.into_body();
+            let fold: futures::stream::Fold<
+              _,
+              _,
+              futures::future::FutureResult<_, reqwest::Error>,
+              _,
+            > = decoder.fold(bytes, |mut acc: Vec<u8>, chunk: reqwest::r#async::Chunk| {
+              acc.extend_from_slice(&chunk);
+              future::ok(acc)
+            });
+            fold
+              .map_err(|err: reqwest::Error| throw(&format!("{}", err)))
+              .and_then(move |bytes: Vec<u8>| {
+                future::ok(EngineHttpResponse {
+                  response_code,
+                  bytes: Some(bytes),
+                  url,
+                  headers,
+                })
               })
+              .to_boxed()
+          }
+          Err(err) => {
+            let response_code = err.status().map(|s| s.as_u16());
+            let url = match err.url() {
+              None => String::new(),
+              Some(url) => url.as_str().to_string(),
+            };
+            future::ok(EngineHttpResponse {
+              response_code,
+              bytes: None,
+              url,
+              headers: vec![],
             })
             .to_boxed()
-        }
-        Err(err) => {
-          let response_code = err.status().map(|s| s.as_u16());
-          let url = match err.url() {
-            None => String::new(),
-            Some(url) => url.as_str().to_string(),
-          };
-          future::ok(EngineHttpResponse {
-            response_code,
-            bytes: None,
-            url,
-            headers: vec![],
-          })
-          .to_boxed()
-        }
-      })
+          }
+        },
+      )
       .to_boxed()
   }
 }

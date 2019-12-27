@@ -128,11 +128,10 @@ class HttpIntrinsicTest(TestBase):
       request3 = MakeHttpRequest(url=f'http://localhost:{port}/one-url', invalidation_token='something-else')
       request4 = MakeHttpRequest(url=f'http://localhost:{port}/another-url', invalidation_token='some-token')
 
-      output1 = self.request_single_product(HttpResponse, request1)
-      output2 = self.request_single_product(HttpResponse, request2)
+      self.request_single_product(HttpResponse, request1)
+      self.request_single_product(HttpResponse, request2)
       assert CachingTestHandler.count == 1
-      output3 = self.request_single_product(HttpResponse, request3)
+      self.request_single_product(HttpResponse, request3)
       assert CachingTestHandler.count == 2
-      output4 = self.request_single_product(HttpResponse, request4)
+      self.request_single_product(HttpResponse, request4)
       assert CachingTestHandler.count == 3
-
