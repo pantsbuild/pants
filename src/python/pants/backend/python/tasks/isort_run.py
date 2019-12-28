@@ -5,6 +5,7 @@ import functools
 import logging
 import os
 
+from pants.backend.python.lint.isort.subsystem import Isort
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_tests import PythonTests
@@ -50,7 +51,7 @@ class IsortRun(FmtTaskMixin, Task):
         return
 
       isort = self.context.products.get_data(IsortPrep.tool_instance_cls)
-      isort_subsystem = IsortPrep.tool_subsystem_cls.global_instance()
+      isort_subsystem = Isort.global_instance()
       deprecated_conditional(
         lambda: self.get_passthru_args(),
         removal_version='1.26.0.dev3',
@@ -99,3 +100,7 @@ class IsortRun(FmtTaskMixin, Task):
   @classmethod
   def supports_passthru_args(cls):
     return True
+
+  @property
+  def skip_execution(self):
+    return self.get_options().skip or Isort.global_instance().options.skip

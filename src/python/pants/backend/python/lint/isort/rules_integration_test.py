@@ -74,6 +74,7 @@ class IsortIntegrationTest(TestBase):
     *,
     config: Optional[str] = None,
     passthrough_args: Optional[Sequence[str]] = None,
+    skip: bool = False,
   ) -> Tuple[LintResult, FmtResult]:
     if config is not None:
       self.create_file(relpath=".isort.cfg", contents=config)
@@ -89,6 +90,7 @@ class IsortIntegrationTest(TestBase):
       Isort, options={Isort.options_scope: {
         "config": [".isort.cfg"] if config else None,
         "args": passthrough_args or [],
+        "skip": skip,
       }}
     )
     isort_setup = self.request_single_product(
@@ -153,3 +155,8 @@ class IsortIntegrationTest(TestBase):
     assert "Fixing" in fmt_result.stdout
     assert "test/config.py" in fmt_result.stdout
     assert fmt_result.digest == self.get_digest([self.fixed_needs_config_source])
+
+  def test_skip(self) -> None:
+    lint_result, fmt_result = self.run_isort([self.bad_source], skip=True)
+    assert lint_result == LintResult.noop()
+    assert fmt_result == FmtResult.noop()

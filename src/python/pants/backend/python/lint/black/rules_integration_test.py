@@ -66,6 +66,7 @@ class BlackIntegrationTest(TestBase):
     *,
     config: Optional[str] = None,
     passthrough_args: Optional[Sequence[str]] = None,
+    skip: bool = False,
   ) -> Tuple[LintResult, FmtResult]:
     if config is not None:
       self.create_file(relpath="pyproject.toml", contents=config)
@@ -81,6 +82,7 @@ class BlackIntegrationTest(TestBase):
       Black, options={Black.options_scope: {
         "config": "pyproject.toml" if config else None,
         "args": passthrough_args or [],
+        "skip": skip,
       }}
     )
     black_setup = self.request_single_product(
@@ -140,3 +142,8 @@ class BlackIntegrationTest(TestBase):
     assert "1 file would be left unchanged" in lint_result.stderr
     assert "1 file left unchanged" in fmt_result.stderr
     assert fmt_result.digest == self.get_digest([self.needs_config_source])
+
+  def test_skip(self) -> None:
+    lint_result, fmt_result = self.run_black([self.bad_source], skip=True)
+    assert lint_result == LintResult.noop()
+    assert fmt_result == FmtResult.noop()

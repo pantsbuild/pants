@@ -20,6 +20,10 @@ class LintResult:
   stderr: str
 
   @staticmethod
+  def noop() -> "LintResult":
+    return LintResult(exit_code=0, stdout="", stderr="")
+
+  @staticmethod
   def from_fallible_execute_process_result(
     process_result: FallibleExecuteProcessResult
   ) -> "LintResult":

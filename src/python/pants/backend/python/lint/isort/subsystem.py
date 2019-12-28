@@ -18,6 +18,10 @@ class Isort(PythonToolBase):
   def register_options(cls, register):
     super().register_options(register)
     register(
+      '--skip', type=bool, default=False, fingerprint=True,
+      help="Don't use isort when running `./pants fmt` and `./pants lint`"
+    )
+    register(
       '--args', type=list, member_type=str, fingerprint=True,
       help="Arguments to pass directly to isort, e.g. "
            "`--isort-args=\"--case-sensitive --trailing-comma\"`",
