@@ -19,12 +19,15 @@ from pants.base.hash_utils import CoercingEncoder
 from pants.option.config import Config
 from pants.option.custom_types import UnsetBool, file_option, target_option
 from pants.option.errors import (
+  BooleanConversionError,
   BooleanOptionNameWithNo,
+  FromfileError,
   FrozenRegistration,
   ImplicitValIsNone,
   InvalidKwarg,
   InvalidMemberType,
   MemberTypeNotAllowed,
+  MutuallyExclusiveOptionError,
   NoOptionNames,
   OptionAlreadyRegistered,
   OptionNameDash,
@@ -51,15 +54,15 @@ from pants.util.strutil import safe_shlex_join
 _FAKE_CUR_VERSION = '1.0.0.dev0'
 
 
-def task(scope):
+def task(scope: str) -> ScopeInfo:
   return ScopeInfo(scope, ScopeInfo.TASK)
 
 
-def intermediate(scope):
+def intermediate(scope: str) -> ScopeInfo:
   return ScopeInfo(scope, ScopeInfo.INTERMEDIATE)
 
 
-def subsystem(scope):
+def subsystem(scope: str) -> ScopeInfo:
   return ScopeInfo(scope, ScopeInfo.SUBSYSTEM)
 
 
@@ -75,7 +78,7 @@ class OptionsTest(TestBase):
   def _create_config(self, config: Optional[Dict[str, Dict[str, str]]] = None) -> Config:
     with open(os.path.join(safe_mkdtemp(), 'test_config.ini'), 'w') as fp:
       self._write_config_to_file(fp, config or {})
-    return cast(Config, Config.load(config_paths=[fp.name]))
+    return Config.load(config_paths=[fp.name])
 
   def _parse(
     self,
@@ -413,7 +416,7 @@ class OptionsTest(TestBase):
 
   def test_boolean_invalid_value(self) -> None:
     def assert_invalid_value(val) -> None:
-      with self.assertRaises(Parser.BooleanConversionError):
+      with self.assertRaises(BooleanConversionError):
         self._parse('./pants', config={'DEFAULT': {'store_true_flag': val}}).for_global_scope()
 
     assert_invalid_value(11)
@@ -969,7 +972,7 @@ class OptionsTest(TestBase):
       env: Optional[Dict[str, str]] = None,
       config: Optional[Dict[str, Dict[str, str]]] = None,
     ) -> None:
-      with self.assertRaises(Parser.MutuallyExclusiveOptionError):
+      with self.assertRaises(MutuallyExclusiveOptionError):
         options = self._parse(arg_str, env=env, config=config)
         if scope:
           options.for_scope(scope)
@@ -1270,7 +1273,7 @@ class OptionsTest(TestBase):
 
   def test_fromfile_error(self) -> None:
     options = self._parse('./pants fromfile --string=@/does/not/exist')
-    with self.assertRaises(Parser.FromfileError):
+    with self.assertRaises(FromfileError):
       options.for_scope('fromfile')
 
   def test_fromfile_escape(self) -> None:
