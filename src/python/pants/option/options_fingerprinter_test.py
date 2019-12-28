@@ -6,12 +6,12 @@ import os
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 from pants.option.custom_types import (
+  DictValueComponent,
+  ListValueComponent,
   UnsetBool,
-  dict_option,
   dict_with_files_option,
   dir_option,
   file_option,
-  list_option,
   target_option,
 )
 from pants.option.options_fingerprinter import OptionsFingerprinter
@@ -29,20 +29,20 @@ class OptionsFingerprinterTest(TestBase):
     d1 = {'b': 1, 'a': 2}
     d2 = {'a': 2, 'b': 1}
     d3 = {'a': 1, 'b': 2}
-    fp1, fp2, fp3 = (self.options_fingerprinter.fingerprint(dict_option, d)
+    fp1, fp2, fp3 = (self.options_fingerprinter.fingerprint(DictValueComponent.create, d)
                      for d in (d1, d2, d3))
     self.assertEqual(fp1, fp2)
     self.assertNotEqual(fp1, fp3)
 
   def test_fingerprint_dict_with_non_string_keys(self) -> None:
     d = {('a', 2): (3, 4)}
-    fp = self.options_fingerprinter.fingerprint(dict_option, d)
+    fp = self.options_fingerprinter.fingerprint(DictValueComponent.create, d)
     self.assertEqual(fp, '3852a094612ce1c22c08ee2ddcdc03d09e87ad97')
 
   def test_fingerprint_list(self) -> None:
     l1 = [1, 2, 3]
     l2 = [1, 3, 2]
-    fp1, fp2 = (self.options_fingerprinter.fingerprint(list_option, l)
+    fp1, fp2 = (self.options_fingerprinter.fingerprint(ListValueComponent.create, l)
                      for l in (l1, l2))
     self.assertNotEqual(fp1, fp2)
 

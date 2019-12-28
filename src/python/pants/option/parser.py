@@ -564,15 +564,15 @@ class Parser:
   @staticmethod
   def _wrap_type(t):
     if t == list:
-      return list_option
+      return ListValueComponent.create
     if t == dict:
-      return dict_option
+      return DictValueComponent.create
     return t
 
   @staticmethod
   def _convert_member_type(t, x):
     if t == dict:
-      return dict_option(x).val
+      return DictValueComponent.create(x).val
     return t(x)
 
   def _compute_value(self, dest, kwargs, flag_val_strs):

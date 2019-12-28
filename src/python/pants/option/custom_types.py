@@ -6,6 +6,7 @@ import re
 from enum import Enum
 from typing import Dict, Iterable, List, Pattern, Sequence
 
+from pants.base.deprecated import warn_or_error
 from pants.option.errors import ParseError
 from pants.util.eval import parse_expression
 from pants.util.memo import memoized_method
@@ -32,6 +33,11 @@ def dict_option(s: str) -> "DictValueComponent":
 
   :API: public
   """
+  warn_or_error(
+    removal_version="1.27.0.dev0",
+    deprecated_entity_description="pants.option.custom_types.dict_option",
+    hint="Instead of setting an option's type as `type=dict_option`, set `type=dict`."
+  )
   return DictValueComponent.create(s)
 
 
@@ -48,6 +54,11 @@ def list_option(s: str) -> "ListValueComponent":
 
   :API: public
   """
+  warn_or_error(
+    removal_version="1.27.0.dev0",
+    deprecated_entity_description="pants.option.custom_types.list_option",
+    hint="Instead of setting an option's type as `type=list_option`, set `type=list`."
+  )
   return ListValueComponent.create(s)
 
 
@@ -61,8 +72,6 @@ def target_option(s: str) -> str:
   return s
 
 
-# TODO: Replace target_list_option with type=list, member_type=target_option.
-# Then we'll get all the goodies from list_option (e.g., appending) free.
 def target_list_option(s):
   """Same type as 'list_option', but indicates list contents are target specs.
 
@@ -70,6 +79,12 @@ def target_list_option(s):
 
   TODO(stuhood): Eagerly convert these to Addresses: see https://rbcommons.com/s/twitter/r/2937/
   """
+  warn_or_error(
+    removal_version="1.27.0.dev0",
+    deprecated_entity_description="pants.option.custom_types.target_list_option",
+    hint="Instead of setting an option's type as `type=target_list_option`, set "
+         "`type=list, member_type=target_option`."
+  )
   return _convert(s, (list, tuple))
 
 
@@ -110,7 +125,7 @@ def dict_with_files_option(s):
 
   :API: public
   """
-  return dict_option(s)
+  return DictValueComponent.create(s)
 
 
 def _convert(val, acceptable_types):
