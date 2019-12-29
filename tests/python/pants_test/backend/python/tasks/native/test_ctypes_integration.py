@@ -208,6 +208,11 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
     (2) a different platform than the one we are currently running on. The python_binary() target
     below is declared with `platforms="current"`.
     """
+
+    # The implementation abbreviation of 'dne' (does not exist), is ~guaranteed not to match our
+    # current platform while still providing an overall valid platform identifier string.
+    foreign_platform = 'macosx-10.5-x86_64-dne-37-m'
+
     command = [
       'run',
       'testprojects/src/python/python_distribution/ctypes:bin'
@@ -219,7 +224,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
         'toolchain_variant': 'llvm',
       },
       'python-setup': {
-        'platforms': ['current', 'this_platform_does_not_exist']
+        'platforms': ['current', foreign_platform]
       },
     })
     self.assert_success(pants_run)

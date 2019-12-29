@@ -1,14 +1,10 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import re
 from collections import OrderedDict
-
-import pex.resolver
 
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.python_distribution import PythonDistribution
-from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants_test.backend.python.tasks.util.build_local_dists_test_base import (
   BuildLocalPythonDistributionsTestBase,
@@ -85,15 +81,6 @@ setup(
         """,
       },
     }),
-
-    ('src/python/install_requires:conflict', {
-      'key': 'install_requires_conflict',
-      'target_type': PythonLibrary,
-      'dependencies': [
-        '3rdparty/python:pycountry',
-        'src/python/install_requires:install_requires',
-      ],
-    }),
   ])
 
   def test_create_distribution(self):
@@ -123,15 +110,3 @@ setup(
       expected_platform=self.ExpectedPlatformType.any,
       dist_target=install_requires_dist,
     )
-
-  def test_install_requires_conflict(self):
-    install_requires_dist = self.target_dict['install_requires']
-    pycountry_req_lib = self.target_dict['pycountry']
-    conflicting_lib = self.target_dict['install_requires_conflict']
-
-    with self.assertRaisesRegex(
-        pex.resolver.Unsatisfiable,
-        re.escape('Could not satisfy all requirements for pycountry==18.5.20:')):
-      self._create_distribution_synthetic_target(
-        install_requires_dist,
-        extra_targets=[pycountry_req_lib, conflicting_lib])

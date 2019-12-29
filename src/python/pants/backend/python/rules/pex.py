@@ -98,6 +98,8 @@ async def create_pex(
   interpreter constraints."""
 
   argv = ["--output-file", request.output_filename]
+  if python_setup.resolver_jobs:
+    argv.extend(["--jobs", python_setup.resolver_jobs])
   if request.entry_point is not None:
     argv.extend(["--entry-point", request.entry_point])
   argv.extend(request.interpreter_constraints.generate_pex_arg_list())
