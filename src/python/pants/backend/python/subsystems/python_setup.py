@@ -20,6 +20,8 @@ class PythonSetup(Subsystem):
   """A python environment."""
   options_scope = 'python-setup'
 
+  _DEFAULT_MANYLINUX_UPPER_BOUND = 'manylinux2014'
+
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
@@ -56,6 +58,16 @@ class PythonSetup(Subsystem):
                   '"<PATH>" (the contents of the PATH env var), '
                   '"<PEXRC>" (paths in the PEX_PYTHON_PATH variable in a pexrc file), '
                   '"<PYENV>" (all python versions under $(pyenv root)/versions).')
+    register('--resolver-use-manylinux', advanced=True, type=bool, default=False, fingerprint=True,
+             removal_version='1.26.0.dev2',
+             removal_hint='Use --resolver-manylinux=<manylinux spec upper bound> instead.',
+             help='Whether to consider manylinux wheels when resolving requirements for foreign'
+                  'linux platforms.')
+    register('--resolver-manylinux', advanced=True, type=str,
+             default=cls._DEFAULT_MANYLINUX_UPPER_BOUND, fingerprint=True,
+             help='Whether to allow resolution of manylinux wheels when resolving requirements for '
+                  'foreign linux platforms. The value should be a manylinux platform upper bound, '
+                  'e.g.: manylinux2010, or else [Ff]alse, [Nn]o or [Nn]one to disallow.')
     register('--resolver-jobs', type=int, default=None, advanced=True, fingerprint=True,
              help='The maximum number of concurrent jobs to resolve wheels with.')
 
@@ -89,6 +101,22 @@ class PythonSetup(Subsystem):
   @property
   def resolver_allow_prereleases(self):
     return self.get_options().resolver_allow_prereleases
+
+  @property
+  def manylinux(self):
+    if self.get_options().resolver_manylinux:
+      manylinux = self.get_options().resolver_manylinux
+      if manylinux.lower() in ('false', 'no', 'none'):
+        if self.get_options().resolver_use_manylinux:
+          logger.warning('The [{scope}] manylinux option is explicitly set to {manylinux} '
+                         'over-riding the [{scope}] use_manylinux option.'.
+                         format(scope=self.options_scope, manylinux=manylinux))
+        return None
+      return manylinux
+    elif self.get_options().resolver_use_manylinux:
+      return self._DEFAULT_MANYLINUX_UPPER_BOUND
+    else:
+      return None
 
   @property
   def resolver_jobs(self):

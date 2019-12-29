@@ -230,6 +230,7 @@ class PexBuilderWrapper:
       platforms=platforms,
       cache=python_setup.resolver_cache_dir,
       allow_prereleases=python_setup.resolver_allow_prereleases,
+      manylinux=python_setup.manylinux,
       max_parallel_jobs=python_setup.resolver_jobs)
 
   def add_sources_from(self, tgt: Target) -> None:

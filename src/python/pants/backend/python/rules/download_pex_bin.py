@@ -67,8 +67,8 @@ class DownloadedPexBin(HermeticPex):
 @rule
 async def download_pex_bin() -> DownloadedPexBin:
   # TODO: Inject versions and digests here through some option, rather than hard-coding it.
-  url = 'https://github.com/pantsbuild/pex/releases/download/v1.6.12/pex'
-  digest = Digest('ce64cb72cd23d2123dd48126af54ccf2b718d9ecb98c2ed3045ed1802e89e7e1', 1842359)
+  url = 'https://github.com/pantsbuild/pex/releases/download/v2.1.0/pex'
+  digest = Digest('152c15d9516e78fb5917312acb8e7ebc45a43141366388d39a755eaadc3e4dee', 2609214)
   snapshot = await Get[Snapshot](UrlToFetch(url, digest))
   return DownloadedPexBin(SingleFileExecutable(snapshot))
 
