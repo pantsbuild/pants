@@ -91,7 +91,7 @@ def rewrite_record_file(workspace, src_record_file, mutated_file_tuples):
 
 # The wheel METADATA file will contain a line like: `Version: 1.11.0.dev3+7951ec01`.
 # We don't parse the entire file because it's large (it contains the entire release notes history).
-_version_re = re.compile('Version: (?P<version>\S+)')
+_version_re = re.compile(r'Version: (?P<version>\S+)')
 
 
 def reversion(args):
