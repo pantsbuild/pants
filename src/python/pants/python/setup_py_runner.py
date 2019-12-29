@@ -81,7 +81,9 @@ class SetupPyRunner:
 
   def cmdline(self, setup_command: Iterable[str]) -> Iterable[str]:
     """Returns the command line that would be used to execute the given setup.py command."""
-    return self._requirements_pex.cmdline(self._create_python_args(setup_command))
+    args = self._create_python_args(setup_command)
+    cmdline: List[str] = self._requirements_pex.cmdline(args)
+    return cmdline
 
   def run_setup_command(self, *, source_dir: Path, setup_command: Iterable[str], **kwargs) -> None:
     """Runs the given setup.py command against the setup.py project in `source_dir`.
