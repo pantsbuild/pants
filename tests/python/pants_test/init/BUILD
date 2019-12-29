@@ -18,6 +18,7 @@ python_tests(
     'src/python/pants/init',
     'src/python/pants/option',
     'src/python/pants/pantsd:pants_daemon',
+    'src/python/pants/python',
     'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',

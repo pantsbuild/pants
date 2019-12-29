@@ -9,6 +9,13 @@ execution_strategy = "subprocess"
 # overhead.
 worker_count = 4
 
+[python-setup]
+# If we use typical default process parallelism tied to core count, we see too many cores under
+# travis and either get oomkilled from launching too many processes with too much total memory
+# overhead or else just generally thrash the container and slow things down.
+resolver_jobs = 4
+
+
 [test.pytest]
 # NB: We set a maximum timeout of 9.8 minutes to fail before hitting Travis' 10 minute timeout (which
 # doesn't give us useful debug info).
