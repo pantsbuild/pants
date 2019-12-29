@@ -7,8 +7,8 @@ import re
 import shutil
 from pathlib import Path
 
-from pex import pep425tags
 from pex.interpreter import PythonInterpreter
+from wheel import pep425tags
 
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.native.tasks.link_shared_libraries import SharedLibrary

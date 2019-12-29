@@ -6,7 +6,6 @@ import shutil
 import unittest
 from abc import ABCMeta, abstractmethod
 from contextlib import contextmanager
-from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
 
@@ -32,15 +31,15 @@ from pants.util.dirutil import safe_rmtree, touch
 req = Requirement.parse
 
 
-@dataclass(frozen=True)
 class Installer(metaclass=ABCMeta):
-  source_dir: Path
-  install_dir: Path
+  def __init__(self, source_dir: Path, install_dir: Path) -> None:
+    self._source_dir = source_dir
+    self._install_dir = install_dir
 
   def run(self) -> None:
     init_subsystem(SetupPyRunner.Factory)
     dist = self._create_dist(SetupPyRunner.Factory.create())
-    shutil.copy(dist, self.install_dir)
+    shutil.copy(str(dist), str(self._install_dir))
 
   @abstractmethod
   def _create_dist(self, runner: SetupPyRunner) -> Path:
@@ -49,12 +48,12 @@ class Installer(metaclass=ABCMeta):
 
 class SdistInstaller(Installer):
   def _create_dist(self, runner: SetupPyRunner) -> Path:
-    return runner.sdist(source_dir=self.source_dir)
+    return runner.sdist(source_dir=self._source_dir)
 
 
 class WheelInstaller(Installer):
   def _create_dist(self, runner: SetupPyRunner):
-    return runner.bdist(source_dir=self.source_dir)
+    return runner.bdist(source_dir=self._source_dir)
 
 
 INSTALLERS = [('sdist', SdistInstaller), ('whl', WheelInstaller)]

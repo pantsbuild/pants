@@ -9,6 +9,8 @@ import subprocess
 import textwrap
 from abc import ABC, abstractmethod
 from collections import OrderedDict, defaultdict
+from pathlib import Path
+from typing import Dict
 
 from pex.interpreter import PythonInterpreter
 from pex.pex import PEX

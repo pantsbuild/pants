@@ -10,7 +10,7 @@ from pex.pex import PEX
 from pex.pex_info import PexInfo
 
 from pants.backend.python.python_requirement import PythonRequirement
-from pants.binaries.executable_pex_tool import ExecutablePexTool
+from pants.backend.python.subsystems.executable_pex_tool import ExecutablePexTool
 from pants.option.optionable import Optionable
 from pants.util.contextutil import pushd
 from pants.util.dirutil import safe_mkdtemp
@@ -27,12 +27,12 @@ class SetupPyRunner:
   class Factory(ExecutablePexTool):
     options_scope = 'setup-py-runner'
     deprecated_options_scope = 'build-setup-requires-pex'
-    deprecated_options_scope_removal_version = '1.25.0.dev2'
+    deprecated_options_scope_removal_version = '1.27.0.dev2'
 
     @classmethod
     def register_options(cls, register: Callable[..., None]) -> None:
       super().register_options(register)
-      register('--setuptools-version', advanced=True, fingerprint=True, default='41.6.0',
+      register('--setuptools-version', advanced=True, fingerprint=True, default='44.0.0',
                help='The setuptools version to use when executing `setup.py` scripts.')
       register('--wheel-version', advanced=True, fingerprint=True, default='0.33.6',
                help='The wheel version to use when executing `setup.py` scripts.')
@@ -81,7 +81,9 @@ class SetupPyRunner:
 
   def cmdline(self, setup_command: Iterable[str]) -> Iterable[str]:
     """Returns the command line that would be used to execute the given setup.py command."""
-    return self._requirements_pex.cmdline(self._create_python_args(setup_command))
+    args = self._create_python_args(setup_command)
+    cmdline: List[str] = self._requirements_pex.cmdline(args)
+    return cmdline
 
   def run_setup_command(self, *, source_dir: Path, setup_command: Iterable[str], **kwargs) -> None:
     """Runs the given setup.py command against the setup.py project in `source_dir`.
