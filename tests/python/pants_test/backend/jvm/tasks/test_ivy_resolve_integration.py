@@ -178,7 +178,7 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
 
   def _find_html_report(self, ivy_report_dir):
     html_report_file = None
-    pattern = re.compile('internal-.*-default\.html$')
+    pattern = re.compile(r'internal-.*-default\.html$')
     listdir = os.listdir(ivy_report_dir)
     for f in listdir:
       if os.path.isfile(os.path.join(ivy_report_dir, f)):

@@ -160,7 +160,7 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
               "http://www.puppycrawl.com/dtds/suppressions_1_1.dtd">
 
           <suppressions>
-            <suppress files=".*/bad-files/.*\.java" checks=".*"/>
+            <suppress files=".*/bad-files/.*\\.java" checks=".*"/>
           </suppressions>
           """).strip()
 
@@ -191,7 +191,7 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
                 "http://www.puppycrawl.com/dtds/suppressions_1_1.dtd">
 
             <suppressions>
-              <suppress files=".*/bad-files/.*\.java" checks=".*"/>
+              <suppress files=".*/bad-files/.*\\.java" checks=".*"/>
             </suppressions>
           """).strip(),
           dedent("""
@@ -201,8 +201,8 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
                 "http://www.puppycrawl.com/dtds/suppressions_1_1.dtd">
 
             <suppressions>
-              <suppress files=".*/bad-files/.*\.java" checks=".*"/>
-              <suppress files=".*/really-bad-files/.*\.java" checks=".*"/>
+              <suppress files=".*/bad-files/.*\\.java" checks=".*"/>
+              <suppress files=".*/really-bad-files/.*\\.java" checks=".*"/>
             </suppressions>
           """).strip(),
         ]

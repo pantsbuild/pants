@@ -16,12 +16,12 @@ from pants.backend.project_info.rules.source_file_validator import (
 # showcasing common use-cases.
 class MatcherTest(unittest.TestCase):
   def test_match(self):
-    m = Matcher('Here is a two-digit number: \d\d')
+    m = Matcher(r'Here is a two-digit number: \d\d')
     self.assertTrue(m.matches('Here is a two-digit number: 42'))
     self.assertFalse(m.matches('Here is a two-digit number: 4'))
 
   def test_inverse_match(self):
-    m = Matcher('Here is a two-digit number: \d\d', inverted=True)
+    m = Matcher(r'Here is a two-digit number: \d\d', inverted=True)
     self.assertFalse(m.matches('Here is a two-digit number: 42'))
     self.assertTrue(m.matches('Here is a two-digit number: 4'))
 
@@ -53,7 +53,7 @@ class MultiMatcherTest(unittest.TestCase):
           """).lstrip()
         },
         'no_six': {
-          'pattern': "(?m)(^from six(\.\w+)* +import +)|(^import six\s*$)",
+          'pattern': r"(?m)(^from six(\.\w+)* +import +)|(^import six\s*$)",
           'inverted': True
         },
         'jvm_header': {
