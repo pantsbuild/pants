@@ -49,6 +49,10 @@ from pants.rules.core.strip_source_root import SourceRootStrippedSources
 from pants.source.source_root import SourceRootConfig
 
 
+class TargetNotExported(Exception):
+  """Indicates a target that was expected to be exported is not."""
+
+
 class NoOwnerError(Exception):
   """Indicates an exportable target has no owning exported target."""
 
@@ -153,9 +157,80 @@ class SetupPyChroot:
 
 
 @dataclass(frozen=True)
+class RunSetupPyRequest:
+  """A request to run a setup.py command."""
+  exported_target: ExportedTarget
+  chroot: SetupPyChroot
+  args: Tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class RunSetupPyResult:
+  """The result of running a setup.py command."""
+  output: Digest  # The state of the chroot after running setup.py.
+
+
+@dataclass(frozen=True)
 class SetuptoolsSetup:
   """The setuptools tool."""
   requirements_pex: Pex
+
+
+class SetupPyOptions(GoalSubsystem):
+  name = "setup-py2"
+
+  @classmethod
+  def register_options(cls, register):
+    super().register_options(register)
+    register(
+      '--args', type=list, member_type=str,
+      help="Arguments to pass directly to setup.py, e.g. "
+           "`--setup-py2-args=\"bdist_wheel\"`. If unspecified, we just dump the setup.py chroot."
+    )
+
+
+class SetupPy(Goal):
+  """Runs setup.py commands."""
+  subsystem_cls = SetupPyOptions
+
+
+@console_rule
+async def run_setup_pys(addresses: BuildFileAddresses, console: Console, options: SetupPyOptions,
+                        distdir: DistDir, workspace: Workspace) -> SetupPy:
+  """Run setup.py commands on all exported targets addressed."""
+  targets = await Get[HydratedTargets](BuildFileAddresses, addresses)
+
+  exported_targets: List[ExportedTarget] = []
+  nonexported_targets: List[HydratedTarget] = []
+  for target in targets:
+    if _is_exported(target):
+      exported_targets.append(ExportedTarget(target))
+    else:
+      nonexported_targets.append(target)
+  if nonexported_targets:
+    raise TargetNotExported(
+      'Cannot run setup.py on these targets, because they have no `provides=` clause: '
+      f'{", ".join(so.address.reference() for so in nonexported_targets)}')
+
+  for target in exported_targets:
+    addr = target.hydrated_target.address.reference()
+    chroot = await Get[SetupPyChroot](SetupPyChrootRequest(target))
+    provides = target.hydrated_target.adaptor.provides
+    setup_py_dir = distdir.relpath / f'{provides.name}-{provides.version}'
+    if options.values.args:
+      console.print_stderr(f'Running setup.py for {addr}')
+      setup_py_result = await Get[RunSetupPyResult](
+        RunSetupPyRequest(target, chroot, tuple(options.values.args)))
+      result_digest = setup_py_result.output
+    else:
+      # Just dump the chroot.
+      result_digest = chroot.digest
+    workspace.materialize_directory(
+      DirectoryToMaterialize(result_digest, path_prefix=str(setup_py_dir))
+    )
+    console.print_stderr(f'Wrote setup.py chroot for {addr} to {setup_py_dir}')
+
+  return SetupPy(0)
 
 
 # We write .py sources into the chroot under this dir.
@@ -170,6 +245,33 @@ from setuptools import setup
 
 setup(**{setup_kwargs_str})
 """
+
+
+@rule
+async def run_setup_py(
+    req: RunSetupPyRequest,
+    setuptools_setup: SetuptoolsSetup,
+    python_setup: PythonSetup,
+    subprocess_encoding_environment: SubprocessEncodingEnvironment
+) -> RunSetupPyResult:
+  """Run a setup.py command on a single exported target."""
+  merged_input_files = await Get[Digest](
+    DirectoriesToMerge(directories=(
+      req.chroot.digest,
+      setuptools_setup.requirements_pex.directory_digest))
+  )
+  request = setuptools_setup.requirements_pex.create_execute_request(
+    python_setup=python_setup,
+    subprocess_encoding_environment=subprocess_encoding_environment,
+    pex_path="./setuptools.pex",
+    pex_args=('setup.py', *req.args),
+    input_files=merged_input_files,
+    output_files=('**',),
+    description=f'Run setuptools for {req.exported_target.hydrated_target.address.reference()}',
+  )
+  result = await Get[ExecuteProcessResult](ExecuteProcessRequest, request)
+  return RunSetupPyResult(result.output_directory_digest)
+
 
 @rule
 async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
@@ -413,3 +515,18 @@ async def setup_setuptools(setuptools: Setuptools) -> SetuptoolsSetup:
   return SetuptoolsSetup(
     requirements_pex=requirements_pex,
   )
+
+
+def rules():
+  return [
+    run_setup_pys,
+    run_setup_py,
+    generate_chroot,
+    get_sources,
+    get_requirements,
+    get_ancestor_init_py,
+    get_owned_dependencies,
+    get_exporting_owner,
+    setup_setuptools,
+    optionable_rule(Setuptools),
+  ]
