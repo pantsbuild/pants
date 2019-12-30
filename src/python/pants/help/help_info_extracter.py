@@ -3,11 +3,11 @@
 
 import inspect
 from dataclasses import dataclass
+from enum import Enum
 from typing import List, Optional, Type
 
 from pants.base import deprecated
 from pants.option.option_util import is_list_option
-from pants.util.collections import Enum
 
 
 @dataclass(frozen=True)

@@ -2,13 +2,13 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import unittest
+from enum import Enum
 
 from pants.help.help_info_extracter import HelpInfoExtracter
 from pants.option.config import Config
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_tracker import OptionTracker
 from pants.option.parser import Parser
-from pants.util.collections import Enum
 
 
 class HelpInfoExtracterTest(unittest.TestCase):
