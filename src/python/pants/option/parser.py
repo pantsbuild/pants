@@ -10,7 +10,19 @@ import traceback
 from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Dict, Iterable
+from typing import (
+  Any,
+  Callable,
+  DefaultDict,
+  Dict,
+  Iterable,
+  List,
+  Optional,
+  Set,
+  Tuple,
+  Type,
+  Union,
+)
 
 import Levenshtein
 import yaml
@@ -28,22 +40,28 @@ from pants.option.custom_types import (
   target_option,
 )
 from pants.option.errors import (
+  BooleanConversionError,
   BooleanOptionNameWithNo,
+  FromfileError,
   FrozenRegistration,
   ImplicitValIsNone,
   InvalidKwarg,
   InvalidKwargNonGlobalScope,
   InvalidMemberType,
   MemberTypeNotAllowed,
+  MutuallyExclusiveOptionError,
   NoOptionNames,
   OptionAlreadyRegistered,
   OptionNameDash,
   OptionNameDoubleDash,
   ParseError,
   RecursiveSubsystemOption,
+  RegistrationError,
   Shadowing,
 )
+from pants.option.option_tracker import OptionTracker
 from pants.option.option_util import is_dict_option, is_list_option
+from pants.option.option_value_container import OptionValueContainer
 from pants.option.ranked_value import RankedValue
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
 from pants.util.meta import frozen_after_init
@@ -63,43 +81,38 @@ class Parser:
   option from the outer scope.
   """
 
-  class BooleanConversionError(ParseError):
-    """Indicates a value other than 'True' or 'False' when attempting to parse a bool."""
-
-  class FromfileError(ParseError):
-    """Indicates a problem reading a value @fromfile."""
-
-  class MutuallyExclusiveOptionError(ParseError):
-    """Raised when more than one option belonging to the same mutually exclusive group is specified."""
-
   @staticmethod
-  def _ensure_bool(s):
-    if isinstance(s, str):
-      if s.lower() == 'true':
+  def _ensure_bool(val: Union[bool, str]) -> bool:
+    if isinstance(val, bool):
+      return val
+    if isinstance(val, str):
+      s = val.lower()
+      if s == 'true':
         return True
-      elif s.lower() == 'false':
+      if s == 'false':
         return False
-      else:
-        raise Parser.BooleanConversionError(f'Got "{s}". Expected "True" or "False".')
-    if s is True:
-      return True
-    elif s is False:
-      return False
-    else:
-      raise Parser.BooleanConversionError(f'Got {s}. Expected True or False.')
+      raise BooleanConversionError(f'Got "{val}". Expected "True" or "False".')
+    raise BooleanConversionError(f'Got {val}. Expected True or False.')
 
   @classmethod
-  def _invert(cls, s):
+  def _invert(cls, s: Optional[Union[bool, str]]) -> Optional[bool]:
     if s is None:
       return None
     b = cls._ensure_bool(s)
     return not b
 
-  def __init__(self, env, config, scope_info, parent_parser, option_tracker):
+  def __init__(
+    self,
+    env: Dict[str, str],
+    config: Config,
+    scope_info: ScopeInfo,
+    parent_parser: Optional["Parser"],
+    option_tracker: OptionTracker,
+  ) -> None:
     """Create a Parser instance.
 
     :param env: a dict of environment variables.
-    :param :class:`pants.option.config.Config` config: data from a config file.
+    :param config: data from a config file.
     :param scope_info: the scope this parser acts for.
     :param parent_parser: the parser for the scope immediately enclosing this one, or
                           None if this is the global scope.
@@ -115,29 +128,28 @@ class Parser:
     self._frozen = False
 
     # All option args registered with this parser.  Used to prevent shadowing args in inner scopes.
-    self._known_args = set()
+    self._known_args: Set[str] = set()
 
     # List of (args, kwargs) registration pairs, exactly as captured at registration time.
-    self._option_registrations = []
+    OptionNames = Tuple[str, ...]
+    OptionKwargs = Dict[str, Any]
+    self._option_registrations: List[Tuple[OptionNames, OptionKwargs]] = []
 
-    # A Parser instance, or None for the global scope parser.
     self._parent_parser = parent_parser
-
-    # List of Parser instances.
-    self._child_parsers = []
+    self._child_parsers: List["Parser"] = []
 
     if self._parent_parser:
       self._parent_parser._register_child_parser(self)
 
   @property
-  def scope(self):
+  def scope(self) -> str:
     return self._scope
 
   @property
-  def known_args(self):
+  def known_args(self) -> Set[str]:
     return self._known_args
 
-  def walk(self, callback):
+  def walk(self, callback: Callable) -> None:
     """Invoke callback on this parser and its descendants, in depth-first order."""
     callback(self)
     for child in self._child_parsers:
@@ -147,16 +159,16 @@ class Parser:
   @dataclass(unsafe_hash=True)
   class ParseArgsRequest:
     flag_value_map: Dict
-    namespace: Any
-    get_all_scoped_flag_names: Callable[[], Iterable]
+    namespace: OptionValueContainer
+    get_all_scoped_flag_names: Callable[["Parser.ParseArgsRequest"], Iterable]
     levenshtein_max_distance: int
 
     def __init__(
       self,
       flags_in_scope: Iterable[str],
-      namespace,
+      namespace: OptionValueContainer,
       get_all_scoped_flag_names: Callable[[], Iterable],
-      levenshtein_max_distance: int
+      levenshtein_max_distance: int,
     ) -> None:
       """
       :param flags_in_scope: Iterable of arg strings to parse into flag values.
@@ -171,19 +183,20 @@ class Parser:
       """
       self.flag_value_map = self._create_flag_value_map(flags_in_scope)
       self.namespace = namespace
-      self.get_all_scoped_flag_names = get_all_scoped_flag_names  # type: ignore[assignment,misc] # cannot assign a method + MyPy says "does not accept self argument"
+      self.get_all_scoped_flag_names = get_all_scoped_flag_names  # type: ignore[assignment]  # cannot assign a method
       self.levenshtein_max_distance = levenshtein_max_distance
 
     @staticmethod
-    def _create_flag_value_map(flags):
+    def _create_flag_value_map(flags: Iterable[str]) -> DefaultDict[str, List[Optional[str]]]:
       """Returns a map of flag -> list of values, based on the given flag strings.
 
       None signals no value given (e.g., -x, --foo).
       The value is a list because the user may specify the same flag multiple times, and that's
       sometimes OK (e.g., when appending to list-valued options).
       """
-      flag_value_map = defaultdict(list)
+      flag_value_map: DefaultDict[str, List[Optional[str]]] = defaultdict(list)
       for flag in flags:
+        flag_val: Optional[str]
         key, has_equals_sign, flag_val = flag.partition('=')
         if not has_equals_sign:
           if not flag.startswith('--'):  # '-xfoo' style.
@@ -197,13 +210,9 @@ class Parser:
         flag_value_map[key].append(flag_val)
       return flag_value_map
 
-  def parse_args(self, parse_args_request):
+  def parse_args(self, parse_args_request: ParseArgsRequest) -> OptionValueContainer:
     """Set values for this parser's options on the namespace object.
 
-    :param Parser.ParseArgsRequest parse_args_request: parameters for parsing this parser's
-                                                       arguments.
-    :returns: The `parse_args_request.namespace` object that the option values are being registered
-              on.
     :raises: :class:`ParseError` if any flags weren't recognized.
     """
 
@@ -212,7 +221,7 @@ class Parser:
     get_all_scoped_flag_names = parse_args_request.get_all_scoped_flag_names
     levenshtein_max_distance = parse_args_request.levenshtein_max_distance
 
-    mutex_map = defaultdict(list)
+    mutex_map: DefaultDict[str, List[str]] = defaultdict(list)
     for args, kwargs in self._unnormalized_option_registrations_iter():
       self._validate(args, kwargs)
       name, dest = self.parse_name_and_dest(*args, **kwargs)
@@ -230,15 +239,13 @@ class Parser:
       if implicit_value is None and kwargs.get('type') == bool:
         implicit_value = True  # Allows --foo to mean --foo=true.
 
-      flag_vals = []
+      flag_vals: List[Union[int, float, bool, str]] = []
 
-      def add_flag_val(v):
+      def add_flag_val(v: Optional[Union[int, float, bool, str]]) -> None:
         if v is None:
           if implicit_value is None:
-            raise ParseError('Missing value for command line flag {} in {}'.format(
-              arg, self._scope_str()))
-          else:
-            flag_vals.append(implicit_value)
+            raise ParseError(f'Missing value for command line flag {arg} in {self._scope_str()}')
+          flag_vals.append(implicit_value)
         else:
           flag_vals.append(v)
 
@@ -281,8 +288,9 @@ class Parser:
           mutex_map[dest].append(dest)
 
         if len(mutex_map[dest]) > 1:
-          raise self.MutuallyExclusiveOptionError(
-            f"Can only provide one of the mutually exclusive options {mutex_map[dest]}")
+          raise MutuallyExclusiveOptionError(
+            f"Can only provide one of the mutually exclusive options {mutex_map[dest]}"
+          )
 
       setattr(namespace, dest, val)
 
@@ -290,8 +298,9 @@ class Parser:
     if flag_value_map:
       self._raise_error_for_invalid_flag_names(
         flag_value_map,
-        all_scoped_flag_names=list(get_all_scoped_flag_names()),
-        levenshtein_max_distance=levenshtein_max_distance)
+        all_scoped_flag_names=get_all_scoped_flag_names(),
+        levenshtein_max_distance=levenshtein_max_distance,
+      )
 
     return namespace
 
@@ -424,7 +433,7 @@ class Parser:
       if self._scope_info.category == ScopeInfo.SUBSYSTEM or 'recursive' in kwargs:
         yield args, kwargs
 
-  def register(self, *args, **kwargs):
+  def register(self, *args, **kwargs) -> None:
     """Register an option."""
     if self._frozen:
       raise FrozenRegistration(self.scope, args[0])
@@ -461,7 +470,7 @@ class Parser:
         raise OptionAlreadyRegistered(self.scope, arg)
     self._known_args.update(args)
 
-  def _check_deprecated(self, name, kwargs, print_warning=True):
+  def _check_deprecated(self, name: str, kwargs, print_warning: bool = True) -> None:
     """Checks option for deprecation and issues a warning/error if necessary."""
     removal_version = kwargs.get('removal_version', None)
     if removal_version is not None:
@@ -486,9 +495,11 @@ class Parser:
     str, int, float, dict, dir_option, dict_option, file_option, target_option
   }
 
-  def _validate(self, args, kwargs):
+  def _validate(self, args, kwargs) -> None:
     """Validate option registration arguments."""
-    def error(exception_type, arg_name=None, **msg_kwargs):
+    def error(
+      exception_type: Type[RegistrationError], arg_name: Optional[str] = None, **msg_kwargs,
+    ) -> None:
       if arg_name is None:
         arg_name = args[0] if args else '<unknown>'
       raise exception_type(self.scope, arg_name, **msg_kwargs)
@@ -520,14 +531,14 @@ class Parser:
         error(InvalidKwarg, kwarg=kwarg)
 
       # Ensure `daemon=True` can't be passed on non-global scopes (except for `recursive=True`).
-      if (kwarg == 'daemon' and self._scope != GLOBAL_SCOPE and kwargs.get('recursive') is False):
+      if kwarg == 'daemon' and self._scope != GLOBAL_SCOPE and kwargs.get('recursive') is False:
         error(InvalidKwargNonGlobalScope, kwarg=kwarg)
 
     removal_version = kwargs.get('removal_version')
     if removal_version is not None:
       validate_deprecation_semver(removal_version, 'removal version')
 
-  def _existing_scope(self, arg):
+  def _existing_scope(self, arg: str) -> Optional[str]:
     if arg in self._known_args:
       return self._scope
     elif self._parent_parser:
@@ -548,23 +559,21 @@ class Parser:
     name = arg.lstrip('-').replace('-', '_')
 
     dest = kwargs.get('dest')
-    return (name, dest if dest else name)
+    return name, dest if dest else name
 
   @staticmethod
   def _wrap_type(t):
     if t == list:
       return list_option
-    elif t == dict:
+    if t == dict:
       return dict_option
-    else:
-      return t
+    return t
 
   @staticmethod
   def _convert_member_type(t, x):
     if t == dict:
       return dict_option(x).val
-    else:
-      return t(x)
+    return t(x)
 
   def _compute_value(self, dest, kwargs, flag_val_strs):
     """Compute the value to use for an option.
@@ -589,8 +598,7 @@ class Parser:
     # Helper function to expand a fromfile=True value string, if needed.
     # May return a string or a dict/list decoded from a json/yaml file.
     def expand(val_or_str):
-      if (kwargs.get('fromfile', True) and val_or_str and
-          isinstance(val_or_str, str) and val_or_str.startswith('@')):
+      if kwargs.get('fromfile', True) and isinstance(val_or_str, str) and val_or_str.startswith('@'):
         if val_or_str.startswith('@@'):   # Support a literal @ for fromfile values via @@.
           return val_or_str[1:]
         else:
@@ -605,8 +613,9 @@ class Parser:
               else:
                 return s
           except (IOError, ValueError, yaml.YAMLError) as e:
-            raise self.FromfileError('Failed to read {} in {} from file {}: {}'.format(
-                dest, self._scope_str(), fromfile, e))
+            raise FromfileError(
+              f'Failed to read {dest} in {self._scope_str()} from file {fromfile}: {e!r}'
+            )
       else:
         return val_or_str
 
@@ -747,23 +756,22 @@ class Parser:
     # All done!
     return ret
 
-  def _inverse_arg(self, arg):
-    if arg.startswith('--'):
-      if arg.startswith('--no-'):
-        raise BooleanOptionNameWithNo(self.scope, arg)
-      return f'--no-{arg[2:]}'
-    else:
+  def _inverse_arg(self, arg: str) -> Optional[str]:
+    if not arg.startswith('--'):
       return None
+    if arg.startswith('--no-'):
+      raise BooleanOptionNameWithNo(self.scope, arg)
+    return f'--no-{arg[2:]}'
 
-  def _register_child_parser(self, child):
+  def _register_child_parser(self, child: "Parser") -> None:
     self._child_parsers.append(child)
 
-  def _freeze(self):
+  def _freeze(self) -> None:
     self._frozen = True
 
-  def _scope_str(self, scope=None):
+  def _scope_str(self, scope: Optional[str] = None) -> str:
     scope = scope or self.scope
     return 'global scope' if scope == GLOBAL_SCOPE else f"scope '{scope}'"
 
-  def __str__(self):
+  def __str__(self) -> str:
     return f'Parser({self._scope})'

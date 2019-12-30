@@ -5,22 +5,22 @@ import unittest
 from textwrap import dedent
 from typing import Dict, List, Union
 
-from pants.option.custom_types import ListValueComponent, UnsetBool, dict_option, list_option
+from pants.option.custom_types import DictValueComponent, ListValueComponent, UnsetBool
 from pants.option.errors import ParseError
+
+
+ValidPrimitives = Union[int, str]
+ParsedList = List[ValidPrimitives]
+ParsedDict = Dict[str, Union[ValidPrimitives, ParsedList]]
 
 
 class CustomTypesTest(unittest.TestCase):
 
-  ValidPrimitives = Union[int, str]
-  ParsedList = List[ValidPrimitives]
-  ParsedDict = Dict[str, Union[ValidPrimitives, ParsedList]]
+  def assert_list_parsed(self, s: str, *, expected: ParsedList) -> None:
+    assert expected == ListValueComponent.create(s).val
 
-  def assert_parsed(self, s: str, *, expected: Union[ParsedList, ParsedDict]) -> None:
-    custom_type = dict_option(s) if isinstance(expected, dict) else list_option(s)
-    self.assertEqual(expected, custom_type.val)
-
-  def assert_split_list(self, expr: str, *, expected: List[str]) -> None:
-    self.assertEqual(expected, ListValueComponent._split_modifier_expr(expr))
+  def assert_split_list(self, s: str, *, expected: List[str]) -> None:
+    self.assertEqual(expected, ListValueComponent._split_modifier_expr(s))
 
   def test_unset_bool(self):
     # UnsetBool should only be use-able as a singleton value via its type.
@@ -28,36 +28,40 @@ class CustomTypesTest(unittest.TestCase):
       UnsetBool()
 
   def test_dict(self) -> None:
+    def assert_dict_parsed(s: str, *, expected: ParsedDict) -> None:
+      assert expected == DictValueComponent.create(s).val
+
+    assert_dict_parsed('{}', expected={})
+    assert_dict_parsed('{ "a": "b" }', expected={'a': 'b'})
+    assert_dict_parsed("{ 'a': 'b' }", expected={'a': 'b'})
+    assert_dict_parsed('{ "a": [1, 2, 3] }', expected={'a': [1, 2, 3]})
+    assert_dict_parsed('{ "a": [1, 2] + [3, 4] }', expected={'a': [1, 2, 3, 4]})
+
     def assert_dict_error(s: str) -> None:
       with self.assertRaises(ParseError):
-        self.assert_parsed(s, expected={})
+        assert_dict_parsed(s, expected={})
 
-    self.assert_parsed('{}', expected={})
-    self.assert_parsed('{ "a": "b" }', expected={'a': 'b'})
-    self.assert_parsed("{ 'a': 'b' }", expected={'a': 'b'})
-    self.assert_parsed('{ "a": [1, 2, 3] }', expected={'a': [1, 2, 3]})
-    self.assert_parsed('{ "a": [1, 2] + [3, 4] }', expected={'a': [1, 2, 3, 4]})
     assert_dict_error('[]')
     assert_dict_error('[1, 2, 3]')
     assert_dict_error('1')
     assert_dict_error('"a"')
 
   def test_list(self) -> None:
-    self.assert_parsed('[]', expected=[])
-    self.assert_parsed('[1, 2, 3]', expected=[1, 2, 3])
-    self.assert_parsed('(1, 2, 3)', expected=[1, 2, 3])
-    self.assert_parsed('["a", "b", "c"]', expected=['a', 'b', 'c'])
-    self.assert_parsed("['a', 'b', 'c']", expected=['a', 'b', 'c'])
-    self.assert_parsed('[1, 2] + [3, 4]', expected=[1, 2, 3, 4])
-    self.assert_parsed('(1, 2) + (3, 4)', expected=[1, 2, 3, 4])
-    self.assert_parsed('a"', expected=['a"'])
-    self.assert_parsed("a'", expected=["a'"])
-    self.assert_parsed("\"a'", expected=["\"a'"])
-    self.assert_parsed("'a\"", expected=["'a\""])
-    self.assert_parsed('a"""a', expected=['a"""a'])
-    self.assert_parsed('1,2', expected=['1,2'])
-    self.assert_parsed('+[1,2]', expected=[1, 2])
-    self.assert_parsed('\\', expected=['\\'])
+    self.assert_list_parsed('[]', expected=[])
+    self.assert_list_parsed('[1, 2, 3]', expected=[1, 2, 3])
+    self.assert_list_parsed('(1, 2, 3)', expected=[1, 2, 3])
+    self.assert_list_parsed('["a", "b", "c"]', expected=['a', 'b', 'c'])
+    self.assert_list_parsed("['a', 'b', 'c']", expected=['a', 'b', 'c'])
+    self.assert_list_parsed('[1, 2] + [3, 4]', expected=[1, 2, 3, 4])
+    self.assert_list_parsed('(1, 2) + (3, 4)', expected=[1, 2, 3, 4])
+    self.assert_list_parsed('a"', expected=['a"'])
+    self.assert_list_parsed("a'", expected=["a'"])
+    self.assert_list_parsed("\"a'", expected=["\"a'"])
+    self.assert_list_parsed("'a\"", expected=["'a\""])
+    self.assert_list_parsed('a"""a', expected=['a"""a'])
+    self.assert_list_parsed('1,2', expected=['1,2'])
+    self.assert_list_parsed('+[1,2]', expected=[1, 2])
+    self.assert_list_parsed('\\', expected=['\\'])
 
   def test_split_list_modifier_expressions(self) -> None:
     self.assert_split_list('1', expected=['1'])
@@ -114,7 +118,7 @@ class CustomTypesTest(unittest.TestCase):
     UnicodeDecodeError: 'ascii' codec can't decode byte 0xe2 in position 44:
                        ordinal not in range(128)
     """
-    self.assert_parsed(
+    self.assert_list_parsed(
       dedent("""
          [
            'Hi there!',

@@ -18,15 +18,15 @@ from pants.option.scope import ScopeInfo
 from pants.util.contextutil import pushd, temporary_dir
 
 
-def task(scope):
+def task(scope: str) -> ScopeInfo:
   return ScopeInfo(scope, ScopeInfo.TASK)
 
 
-def intermediate(scope):
+def intermediate(scope: str) -> ScopeInfo:
   return ScopeInfo(scope, ScopeInfo.INTERMEDIATE)
 
 
-def subsys(scope):
+def subsys(scope: str) -> ScopeInfo:
   return ScopeInfo(scope, ScopeInfo.SUBSYSTEM)
 
 
@@ -329,9 +329,9 @@ class ArgSplitterTest(unittest.TestCase):
     def assert_unknown_goal(args_str: str, unknown_goals: List[str]) -> None:
       splitter = ArgSplitter(ArgSplitterTest._known_scope_infos)
       result = splitter.split_args(shlex.split(args_str))
-      self.assertTrue(isinstance(splitter.help_request, UnknownGoalHelp))
-      self.assertSetEqual(set(unknown_goals), set(splitter.help_request.unknown_goals))
-      self.assertEqual(result.unknown_scopes, unknown_goals)
+      assert isinstance(splitter.help_request, UnknownGoalHelp)
+      assert set(unknown_goals) == set(splitter.help_request.unknown_goals)
+      assert result.unknown_scopes == unknown_goals
 
     assert_unknown_goal('./pants foo', ['foo'])
     assert_unknown_goal('./pants compile foo', ['foo'])
