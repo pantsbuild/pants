@@ -108,7 +108,7 @@ class HelpInfoExtracter:
     return metavar
 
   @staticmethod
-  def compute_choices(kwargs):
+  def compute_choices(kwargs) -> Optional[str]:
     """Compute the option choices to display based on an Enum or list type."""
     typ = kwargs.get('type', [])
     if inspect.isclass(typ) and issubclass(typ, Enum):

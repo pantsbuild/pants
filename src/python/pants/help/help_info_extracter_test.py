@@ -97,7 +97,7 @@ class HelpInfoExtracterTest(unittest.TestCase):
     self.assertEqual('do not use this', ohi.removal_hint)
     self.assertIsNotNone(ohi.deprecated_message)
 
-  def test_enum(self):
+  def test_enum(self) -> None:
     class LogLevel(Enum):
       INFO = 'info'
       DEBUG = 'debug'
