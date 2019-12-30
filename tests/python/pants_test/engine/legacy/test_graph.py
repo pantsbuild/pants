@@ -39,7 +39,7 @@ class GraphTest(TestBase):
                        '.*Did you mean one of:\n' \
                        '.*:Markdown\n' \
                        '.*:Pygments\n'
-    with self.assertRaisesRegexp(AddressLookupError, expected_message):
+    with self.assertRaisesRegex(AddressLookupError, expected_message):
       self.targets('3rdparty/python:rutabaga')
 
   def test_with_missing_directory_fails(self):

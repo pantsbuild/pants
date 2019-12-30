@@ -188,7 +188,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
         """
     ))
     task = self.prepare_execute(self.context(target_roots=[self.target('foo:empty')]))
-    with self.assertRaisesRegexp(TargetDefinitionException,
+    with self.assertRaisesRegex(TargetDefinitionException,
                                  r'must include a non-empty set of sources'):
       task.execute()
 

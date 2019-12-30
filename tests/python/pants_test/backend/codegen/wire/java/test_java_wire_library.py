@@ -32,7 +32,7 @@ class JavaWireLibraryTest(TestBase):
     self.assertEqual(['foo', 'bar', 'baz'], target.payload.service_writer_options)
 
   def test_invalid_service_writer_opts(self):
-    with self.assertRaisesRegexp(TargetDefinitionException,
+    with self.assertRaisesRegex(TargetDefinitionException,
                                  r'service_writer_options requires setting service_writer'):
       self.make_target('invalid:service_writer_opts', JavaWireLibrary,
                        service_writer_options=['one', 'two'])

@@ -201,7 +201,7 @@ class SubsystemTest(TestBase):
 
   def test_uninitialized_global(self) -> None:
     Subsystem.reset()
-    with self.assertRaisesRegexp(Subsystem.UninitializedSubsystemError,
+    with self.assertRaisesRegex(Subsystem.UninitializedSubsystemError,
                                  r'UninitializedSubsystem.*uninitialized-scope'):
       UninitializedSubsystem.global_instance()
 
@@ -212,7 +212,7 @@ class SubsystemTest(TestBase):
       options_scope = 'optional'
 
     optional = UninitializedOptional()
-    with self.assertRaisesRegexp(Subsystem.UninitializedSubsystemError,
+    with self.assertRaisesRegex(Subsystem.UninitializedSubsystemError,
                                  r'UninitializedSubsystem.*uninitialized-scope'):
       UninitializedSubsystem.scoped_instance(optional)
 

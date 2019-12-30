@@ -324,7 +324,7 @@ class NodeResolveSourceDepsTest(TaskTestBase):
     dep = self._create_dep()
     app = self._create_app(dep, dep_not_found=True)
     error_msg = 'Local dependency in package.json not found in the build graph.'
-    with self.assertRaisesRegexp(TaskError, error_msg):
+    with self.assertRaisesRegex(TaskError, error_msg):
       self._resolve_target(app)
 
   def test_file_dependency_not_supported_npm(self):

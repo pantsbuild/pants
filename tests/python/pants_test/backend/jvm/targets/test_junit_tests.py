@@ -40,7 +40,7 @@ class JUnitTestsTest(TestBase):
     tc4 = self.make_target('//:testconcurrency4', JUnitTests, sources=['Test.java'],
                            concurrency='PARALLEL_CLASSES_AND_METHODS')
     self.assertEqual(JUnitTests.CONCURRENCY_PARALLEL_CLASSES_AND_METHODS, tc4.concurrency)
-    with self.assertRaisesRegexp(TargetDefinitionException, r'concurrency'):
+    with self.assertRaisesRegex(TargetDefinitionException, r'concurrency'):
       self.make_target('//:testconcurrency5', JUnitTests, sources=['Test.java'],
                        concurrency='nonsense')
 
@@ -49,7 +49,7 @@ class JUnitTestsTest(TestBase):
     self.assertEqual(99, tt1.threads)
     tt2 = self.make_target('//:testthreads2', JUnitTests, sources=['Test.java'], threads="123")
     self.assertEqual(123, tt2.threads)
-    with self.assertRaisesRegexp(TargetDefinitionException, r'threads'):
+    with self.assertRaisesRegex(TargetDefinitionException, r'threads'):
       self.make_target('//:testthreads3', JUnitTests, sources=['Test.java'], threads="abc")
 
     # timeout parameter

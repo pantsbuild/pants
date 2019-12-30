@@ -135,7 +135,7 @@ class TestNodeBuild(TaskTestBase):
       target_type=NodeModule,
       sources=['package.json'],
       build_script=build_script)
-    with self.assertRaisesRegexp(TaskError, build_script):
+    with self.assertRaisesRegex(TaskError, build_script):
       self._run_test_and_get_products([(target, [package_json_file])])
 
   def test_run_no_output_dir(self):
@@ -155,5 +155,5 @@ class TestNodeBuild(TaskTestBase):
       sources=['package.json'],
       build_script='my_build',
       output_dir=output_dir)
-    with self.assertRaisesRegexp(TaskError, output_dir):
+    with self.assertRaisesRegex(TaskError, output_dir):
       self._run_test_and_get_products([(target, [package_json_file])])
