@@ -94,6 +94,17 @@ class OwnedDependencies(Collection[OwnedDependency]):
 
 
 @dataclass(frozen=True)
+class ExportedTargetRequirements:
+  """The requirements of an ExportedTarget.
+
+  Includes:
+  - The "normal" 3rdparty requirements of the ExportedTarget and all targets it owns.
+  - The published versions of any other ExportedTargets it depends on.
+  """
+  requirement_strs: Tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class AncestorInitPyFiles:
   """__init__.py files in enclosing packages of the exported code."""
   digests: Tuple[Digest, ...]  # The files stripped of their source roots.
@@ -150,6 +161,47 @@ async def get_ancestor_init_py(
 
 def _is_exported(target: HydratedTarget) -> bool:
   return getattr(target.adaptor, 'provides', None) is not None
+
+
+@rule(name="Get requirements")
+async def get_requirements(dep_owner: DependencyOwner) -> ExportedTargetRequirements:
+  tht = await Get[TransitiveHydratedTargets](
+    BuildFileAddresses([dep_owner.exported_target.hydrated_target.address]))
+
+  ownable_tgts = [tgt for tgt in tht.closure
+                  if isinstance(tgt.adaptor, (PythonTargetAdaptor, ResourcesAdaptor))]
+  owners = await MultiGet(Get[ExportedTarget](OwnedDependency(ht)) for ht in ownable_tgts)
+  owned_by_us = set()
+  owned_by_others = set()
+  for tgt, owner in zip(ownable_tgts, owners):
+    (owned_by_us if owner == dep_owner.exported_target else owned_by_others).add(tgt)
+
+  # Get all 3rdparty deps of our owned deps.
+  #
+  # Note that we need only consider requirements that are direct dependencies of our owned deps:
+  # If T depends on R indirectly, then it must be via some direct deps U1, U2, ... For each such U,
+  # if U is in the owned deps then we'll pick up R through U. And if U is not in the owned deps
+  # then it's owned by an exported target ET, and so R will be in the requirements for ET, and we
+  # will require ET.
+  #
+  # TODO: Note that this logic doesn't account for indirection via dep aggregator targets, of type
+  #  `target`. But we don't have those in v2 (yet) anyway. Plus, as we move towards buildgen and/or
+  #  stricter build graph hygiene, it makes sense to require that targets directly declare their
+  #  true dependencies. Plus, in the specific realm of setup-py, since we must exclude indirect
+  #  deps across exported target boundaries, it's not a big stretch to just insist that
+  #  requirements must be direct deps.
+  direct_deps_addrs = tuple({dep for ht in owned_by_us for dep in ht.dependencies})
+  direct_deps_tgts = await MultiGet(Get[HydratedTarget](Address, a) for a in direct_deps_addrs)
+  reqs = PexRequirements.create_from_adaptors(tgt.adaptor for tgt in direct_deps_tgts)
+  req_strs = list(reqs.requirements)
+
+  # Add the requirements on any exported targets on which we depend.
+  exported_targets_we_depend_on = await MultiGet(
+    Get[ExportedTarget](OwnedDependency(ht)) for ht in owned_by_others)
+  req_strs.extend(et.hydrated_target.adaptor.provides.key
+                  for et in set(exported_targets_we_depend_on))
+
+  return ExportedTargetRequirements(tuple(sorted(req_strs)))
 
 
 @rule(name="Get owned targets")
@@ -228,4 +280,3 @@ async def setup_setuptools(setuptools: Setuptools) -> SetuptoolsSetup:
   return SetuptoolsSetup(
     requirements_pex=requirements_pex,
   )
-

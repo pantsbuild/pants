@@ -56,6 +56,52 @@ class TestSetupPyBase(TestBase):
     return self.request_single_product(HydratedTarget, Params(Address.parse(addr)))
 
 
+class TestGetRequirements(TestSetupPyBase):
+  @classmethod
+  def rules(cls):
+    return super().rules() + [
+      get_requirements,
+      get_owned_dependencies,
+      get_exporting_owner,
+      RootRule(DependencyOwner),
+    ]
+
+  def assert_requirements(self, expected_req_strs, addr):
+    reqs = self.request_single_product(
+      ExportedTargetRequirements, Params(DependencyOwner(ExportedTarget(self.tgt(addr)))))
+    assert sorted(expected_req_strs) == sorted(reqs.requirement_strs)
+
+  def test_get_requirements(self):
+    self.create_file('3rdparty/BUILD', textwrap.dedent("""
+      python_requirement_library(name='ext1',
+        requirements=[python_requirement('ext1==1.22.333')])
+      python_requirement_library(name='ext2',
+        requirements=[python_requirement('ext2==4.5.6')])
+      python_requirement_library(name='ext3',
+        requirements=[python_requirement('ext3==0.0.1')])
+    """))
+    self.create_file('src/python/foo/bar/baz/BUILD',
+                     "python_library(dependencies=['3rdparty:ext1'])")
+    self.create_file('src/python/foo/bar/qux/BUILD',
+                     "python_library(dependencies=['3rdparty:ext2', 'src/python/foo/bar/baz'])")
+    self.create_file('src/python/foo/bar/BUILD', textwrap.dedent("""
+      python_library(
+        dependencies=['src/python/foo/bar/baz', 'src/python/foo/bar/qux'],
+        provides=setup_py(name='bar', version='9.8.7')
+      )
+    """))
+    self.create_file('src/python/foo/corge/BUILD', textwrap.dedent("""
+      python_library(
+        dependencies=['3rdparty:ext3', 'src/python/foo/bar'],
+        provides=setup_py(name='corge', version='2.2.2')
+      )
+    """))
+
+    self.assert_requirements(['ext1==1.22.333', 'ext2==4.5.6'], 'src/python/foo/bar')
+    self.assert_requirements(['ext3==0.0.1', 'bar==9.8.7'],
+                             'src/python/foo/corge')
+
+
 class TestGetAncestorInitPy(TestSetupPyBase):
   @classmethod
   def rules(cls):
