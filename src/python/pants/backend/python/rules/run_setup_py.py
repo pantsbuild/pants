@@ -48,3 +48,26 @@ from pants.rules.core.distdir import DistDir
 from pants.rules.core.strip_source_root import SourceRootStrippedSources
 from pants.source.source_root import SourceRootConfig
 
+
+@dataclass(frozen=True)
+class SetuptoolsSetup:
+  """The setuptools tool."""
+  requirements_pex: Pex
+
+
+@rule(name="Set up setuptools")
+async def setup_setuptools(setuptools: Setuptools) -> SetuptoolsSetup:
+  requirements_pex = await Get[Pex](
+    CreatePex(
+      output_filename="setuptools.pex",
+      requirements=PexRequirements(requirements=tuple(setuptools.get_requirement_specs())),
+      interpreter_constraints=PexInterpreterConstraints(
+        constraint_set=tuple(setuptools.default_interpreter_constraints)
+      ),
+      entry_point=setuptools.get_entry_point(),
+    )
+  )
+  return SetuptoolsSetup(
+    requirements_pex=requirements_pex,
+  )
+
