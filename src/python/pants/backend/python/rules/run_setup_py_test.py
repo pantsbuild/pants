@@ -56,6 +56,90 @@ class TestSetupPyBase(TestBase):
     return self.request_single_product(HydratedTarget, Params(Address.parse(addr)))
 
 
+class TestGetSources(TestSetupPyBase):
+  @classmethod
+  def rules(cls):
+    return super().rules() + [
+      get_sources,
+      strip_source_root,
+      get_ancestor_init_py,
+      RootRule(SetupPySourcesRequest),
+      RootRule(SourceRootConfig),
+    ]
+
+  def assert_sources(self, expected_files, expected_packages, expected_namespace_packages,
+                     expected_package_data, addrs):
+    srcs = self.request_single_product(
+      SetupPySources,
+      Params(SetupPySourcesRequest(HydratedTargets([self.tgt(addr) for addr in addrs])),
+             SourceRootConfig.global_instance()))
+    chroot_snapshot = self.request_single_product(Snapshot, Params(srcs.digest))
+
+    assert sorted(expected_files) == sorted(chroot_snapshot.files)
+    assert sorted(expected_packages) == sorted(srcs.packages)
+    assert sorted(expected_namespace_packages) == sorted(srcs.namespace_packages)
+    assert expected_package_data == dict(srcs.package_data)
+
+  def test_get_sources(self):
+    init_subsystem(SourceRootConfig)
+    self.create_file('src/python/foo/bar/baz/BUILD', textwrap.dedent("""
+      python_library(name='baz1', sources=['baz1.py'])
+      python_library(name='baz2', sources=['baz2.py'])
+    """))
+    self.create_file('src/python/foo/bar/baz/baz1.py', '')
+    self.create_file('src/python/foo/bar/baz/baz2.py', '')
+    self.create_file('src/python/foo/bar/__init__.py', '')
+    self.create_file('src/python/foo/qux/BUILD', 'python_library()')
+    self.create_file('src/python/foo/qux/__init__.py', '')
+    self.create_file('src/python/foo/qux/qux.py', '')
+    self.create_file('src/python/foo/resources/BUILD', 'resources(sources=["js/code.js"])')
+    self.create_file('src/python/foo/resources/js/code.js', '')
+    self.create_file('resources/BUILD', 'resources(sources=["css/style.css"])')
+    self.create_file('resources/css/style.css', '')
+    self.create_file('src/python/foo/__init__.py', '')
+
+    self.assert_sources(
+      expected_files=['foo/bar/baz/baz1.py', 'foo/bar/__init__.py', 'foo/__init__.py'],
+      expected_packages=['foo.bar.baz'],
+      expected_namespace_packages=['foo.bar.baz'],
+      expected_package_data={},
+      addrs=['src/python/foo/bar/baz:baz1'])
+
+    self.assert_sources(
+      expected_files=['foo/bar/baz/baz2.py', 'foo/bar/__init__.py', 'foo/__init__.py'],
+      expected_packages=['foo.bar.baz'],
+      expected_namespace_packages=['foo.bar.baz'],
+      expected_package_data={},
+      addrs=['src/python/foo/bar/baz:baz2'])
+
+    self.assert_sources(
+      expected_files=['foo/qux/qux.py', 'foo/qux/__init__.py', 'foo/__init__.py'],
+      expected_packages=['foo.qux'],
+      expected_namespace_packages=[],
+      expected_package_data={},
+      addrs=['src/python/foo/qux'])
+
+    self.assert_sources(
+      expected_files= ['foo/bar/baz/baz1.py', 'foo/bar/__init__.py',
+                       'foo/qux/qux.py', 'foo/qux/__init__.py', 'foo/__init__.py',
+                       'foo/resources/js/code.js', 'css/style.css'],
+      expected_packages=['foo.bar.baz', 'foo.qux', 'foo.resources'],
+      expected_namespace_packages=['foo.bar.baz', 'foo.resources'],
+      expected_package_data={'foo.resources': ('js/code.js',), '': ('css/style.css',)},
+      addrs=['src/python/foo/bar/baz:baz1', 'src/python/foo/qux', 'src/python/foo/resources',
+             'resources'])
+
+    self.assert_sources(
+      expected_files=['foo/bar/baz/baz1.py', 'foo/bar/baz/baz2.py',
+                      'foo/bar/__init__.py', 'foo/qux/qux.py', 'foo/qux/__init__.py',
+                      'foo/__init__.py', 'foo/resources/js/code.js', 'css/style.css'],
+      expected_packages=['foo.bar.baz', 'foo.qux', 'foo.resources'],
+      expected_namespace_packages=['foo.bar.baz', 'foo.resources'],
+      expected_package_data={'foo.resources': ('js/code.js',), '': ('css/style.css',)},
+      addrs=['src/python/foo/bar/baz:baz1', 'src/python/foo/bar/baz:baz2', 'src/python/foo/qux',
+             'src/python/foo/resources', 'resources'])
+
+
 class TestGetRequirements(TestSetupPyBase):
   @classmethod
   def rules(cls):

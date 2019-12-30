@@ -111,9 +111,52 @@ class AncestorInitPyFiles:
 
 
 @dataclass(frozen=True)
+class SetupPySourcesRequest:
+  hydrated_targets: HydratedTargets
+
+
+@dataclass(frozen=True)
+class SetupPySources:
+  """The sources required by a setup.py command.
+
+  Includes some information derived from analyzing the source, namely the packages,
+  namespace packages and resource files in the source.
+  """
+  digest: Digest
+  packages: Tuple[str, ...]
+  namespace_packages: Tuple[str, ...]
+  package_data: Tuple[PackageDatum, ...]
+
+
+@dataclass(frozen=True)
 class SetuptoolsSetup:
   """The setuptools tool."""
   requirements_pex: Pex
+
+
+@rule
+async def get_sources(request: SetupPySourcesRequest,
+                      source_root_config: SourceRootConfig) -> SetupPySources:
+  targets = request.hydrated_targets
+  stripped_srcs_list = await MultiGet(
+    Get[SourceRootStrippedSources](HydratedTarget, target) for target in targets)
+
+  # Create a chroot with all the sources, and any ancestor __init__.py files that might be needed
+  # for imports to work.  Note that if a repo has multiple exported targets under a single ancestor
+  # package, then that package must be a namespace package, which in Python 3 means it must not
+  # have an __init__.py. We don't validate this here, because it would require inspecting *all*
+  # targets, whether or not they are in the target set for this run - basically the entire repo.
+  # So it's the repo owners' responsibility to ensure __init__.py hygiene.
+  stripped_srcs_digests = [stripped_sources.snapshot.directory_digest
+                           for stripped_sources in stripped_srcs_list]
+  ancestor_init_pys = await Get[AncestorInitPyFiles](HydratedTargets, targets)
+  sources_digest = await Get[Digest](
+    DirectoriesToMerge(directories=tuple([*stripped_srcs_digests, *ancestor_init_pys.digests])))
+  sources_snapshot = await Get[Snapshot](Digest, sources_digest)
+  packages, namespace_packages, package_data = find_packages(
+    source_root_config.get_source_roots(), zip(targets, stripped_srcs_list), sources_snapshot)
+  return SetupPySources(digest=sources_digest, packages=packages,
+                        namespace_packages=namespace_packages, package_data=package_data)
 
 
 @rule
