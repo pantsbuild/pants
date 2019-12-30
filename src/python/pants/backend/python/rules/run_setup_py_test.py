@@ -56,6 +56,98 @@ class TestSetupPyBase(TestBase):
     return self.request_single_product(HydratedTarget, Params(Address.parse(addr)))
 
 
+class TestGenerateChroot(TestSetupPyBase):
+  @classmethod
+  def rules(cls):
+    return super().rules() + [
+      generate_chroot,
+      get_sources,
+      get_requirements,
+      strip_source_root,
+      get_ancestor_init_py,
+      get_owned_dependencies,
+      get_exporting_owner,
+      RootRule(SetupPyChrootRequest),
+      RootRule(SourceRootConfig)
+    ]
+
+  def assert_chroot(self, expected_files, expected_setup_kwargs, addr):
+    chroot = self.request_single_product(
+      SetupPyChroot,
+      Params(SetupPyChrootRequest(ExportedTarget(self.tgt(addr))),
+             SourceRootConfig.global_instance()))
+    snapshot = self.request_single_product(Snapshot, Params(chroot.digest))
+    assert sorted(expected_files) == sorted(snapshot.files)
+    kwargs = json.loads(chroot.setup_keywords_json)
+    assert expected_setup_kwargs == kwargs
+
+  def assert_error(self, addr: str, exc_cls: Type[Exception]):
+    with pytest.raises(ExecutionError) as excinfo:
+      self.request_single_product(
+        SetupPyChroot,
+        Params(SetupPyChrootRequest(ExportedTarget(self.tgt(addr))),
+               SourceRootConfig.global_instance()))
+    ex = excinfo.value
+    assert len(ex.wrapped_exceptions) == 1
+    assert type(ex.wrapped_exceptions[0]) == exc_cls
+
+  def test_generate_chroot(self):
+    init_subsystem(SourceRootConfig)
+    self.create_file('src/python/foo/bar/baz/BUILD',
+                     "python_library(provides=setup_py(name='baz', version='1.1.1'))")
+    self.create_file('src/python/foo/bar/baz/baz.py', '')
+    self.create_file('src/python/foo/qux/BUILD', textwrap.dedent("""
+      python_library()
+      python_binary(name="bin", entry_point="foo.qux.bin")
+    """))
+    self.create_file('src/python/foo/qux/__init__.py', '')
+    self.create_file('src/python/foo/qux/qux.py', '')
+    self.create_file('src/python/foo/resources/BUILD', 'resources(sources=["js/code.js"])')
+    self.create_file('src/python/foo/resources/js/code.js', '')
+    self.create_file('src/python/foo/BUILD', textwrap.dedent("""
+      python_library(dependencies=['src/python/foo/bar/baz', 'src/python/foo/qux',
+                                   'src/python/foo/resources'],
+                     provides=setup_py(name='foo', version='1.2.3').with_binaries(
+                       foo_main='src/python/foo/qux:bin'))
+    """))
+    self.create_file('src/python/foo/foo.py', '')
+    self.assert_chroot(
+      ['src/foo/qux/__init__.py', 'src/foo/qux/qux.py', 'src/foo/resources/js/code.js',
+       'src/foo/foo.py', 'setup.py'],
+      {
+        'name': 'foo',
+        'version': '1.2.3',
+        'package_dir': {'': 'src'},
+        'packages': ['foo', 'foo.qux', 'foo.resources'],
+        'namespace_packages': ['foo', 'foo.resources'],
+        'package_data': {'foo.resources': ['js/code.js']},
+        'install_requires': ['baz==1.1.1'],
+        'entry_points': {'console_scripts': ['foo_main=foo.qux.bin']}
+      },
+      'src/python/foo')
+
+
+  def test_invalid_binary(self):
+    init_subsystem(SourceRootConfig)
+    self.create_file('src/python/invalid_binary/BUILD', textwrap.dedent("""
+      python_library(name='not_a_binary')
+      python_binary(name='no_entrypoint')
+      python_library(
+        name='invalid_bin1',
+        provides=setup_py(name='invalid_bin1', version='1.1.1').with_binaries(
+        foo=':not_a_binary')
+      )
+      python_library(
+        name='invalid_bin2',
+        provides=setup_py(name='invalid_bin2', version='1.1.1').with_binaries(
+        foo=':no_entrypoint')
+      )
+      """))
+
+    self.assert_error('src/python/invalid_binary:invalid_bin1', InvalidEntryPoint)
+    self.assert_error('src/python/invalid_binary:invalid_bin2', InvalidEntryPoint)
+
+
 class TestGetSources(TestSetupPyBase):
   @classmethod
   def rules(cls):
