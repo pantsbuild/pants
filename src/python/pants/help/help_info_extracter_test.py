@@ -101,9 +101,9 @@ class HelpInfoExtracterTest(unittest.TestCase):
     class LogLevel(Enum):
       INFO = 'info'
       DEBUG = 'debug'
-    kwargs = {'choices': LogLevel}
+    kwargs = {'type': LogLevel, 'default': LogLevel.INFO}
     ohi = HelpInfoExtracter('').get_option_help_info([], kwargs)
-    self.assertEqual(', '.join(e.value for e in LogLevel), ohi.choices)
+    assert ', '.join(e.value for e in LogLevel) == ohi.choices
 
   def test_grouping(self):
     def do_test(kwargs, expected_basic=False, expected_recursive=False, expected_advanced=False):

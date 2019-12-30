@@ -1,8 +1,9 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import inspect
 from dataclasses import dataclass
-from typing import List, Type
+from typing import List, Optional, Type
 
 from pants.base import deprecated
 from pants.option.option_util import is_list_option
@@ -36,10 +37,10 @@ class OptionHelpInfo:
   typ: Type
   default: str
   help: str
-  deprecated_message: str
-  removal_version: str
-  removal_hint: str
-  choices: List[str]
+  deprecated_message: Optional[str]
+  removal_version: Optional[str]
+  removal_hint: Optional[str]
+  choices: Optional[str]
 
   def comma_separated_display_args(self):
     return ', '.join(self.display_args)
@@ -109,13 +110,11 @@ class HelpInfoExtracter:
   @staticmethod
   def compute_choices(kwargs):
     """Compute the option choices to display based on an Enum or list type."""
-    choices = kwargs.get('choices', [])
-    if isinstance(choices, list):
-      values = (str(choice) for choice in choices)
-    elif issubclass(choices, Enum):
-      values = (choice.value for choice in choices)
+    typ = kwargs.get('type', [])
+    if inspect.isclass(typ) and issubclass(typ, Enum):
+      values = (choice.value for choice in typ)
     else:
-      raise ValueError(f'Type {type(choices)} not supported for option choices')
+      values = (str(choice) for choice in kwargs.get('choices', []))
     return ', '.join(values) or None
 
   def __init__(self, scope):
