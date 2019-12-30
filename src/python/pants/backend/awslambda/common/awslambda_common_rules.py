@@ -31,7 +31,6 @@ class AWSLambdaTarget:
 
 
 class AWSLambdaOptions(LineOriented, GoalSubsystem):
-  """Runs tests."""
   name = "awslambda"
 
 

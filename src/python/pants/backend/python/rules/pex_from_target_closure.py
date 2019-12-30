@@ -42,9 +42,7 @@ async def create_pex_from_target_closure(request: CreatePexFromTargetClosure,
   )
 
   source_root_stripped_sources = await MultiGet(
-    Get[SourceRootStrippedSources](HydratedTarget, target_adaptor)
-    for target_adaptor in all_targets
-  )
+    Get[SourceRootStrippedSources](HydratedTarget, target) for target in all_targets)
 
   stripped_sources_digests = [stripped_sources.snapshot.directory_digest
                               for stripped_sources in source_root_stripped_sources]
