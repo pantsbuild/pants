@@ -56,6 +56,64 @@ class TestSetupPyBase(TestBase):
     return self.request_single_product(HydratedTarget, Params(Address.parse(addr)))
 
 
+class TestGetAncestorInitPy(TestSetupPyBase):
+  @classmethod
+  def rules(cls):
+    return super().rules() + [
+      get_ancestor_init_py,
+      RootRule(HydratedTargets),
+      RootRule(SourceRootConfig),
+    ]
+
+  def assert_ancestor_init_py(self, expected_init_pys, addrs):
+    ancestor_init_py_files = self.request_single_product(
+      AncestorInitPyFiles,
+      Params(HydratedTargets([self.tgt(addr) for addr in addrs]),
+             SourceRootConfig.global_instance()))
+    snapshots = [self.request_single_product(Snapshot, Params(digest))
+                 for digest in ancestor_init_py_files.digests]
+    init_py_files_found = set([file for snapshot in snapshots for file in snapshot.files])
+    # NB: Doesn't include the root __init__.py or the missing src/python/foo/bar/__init__.py.
+    assert sorted(expected_init_pys) == sorted(init_py_files_found)
+
+  def test_get_ancestor_init_py(self):
+    init_subsystem(SourceRootConfig)
+    # NB: src/python/foo/bar/baz/qux/__init__.py is a target's source.
+    self.create_file('src/python/foo/bar/baz/qux/BUILD', 'python_library()')
+    self.create_file('src/python/foo/bar/baz/qux/qux.py', '')
+    self.create_file('src/python/foo/bar/baz/qux/__init__.py', '')
+    self.create_file('src/python/foo/bar/baz/__init__.py', '')
+    # NB: No src/python/foo/bar/__init__.py.
+    # NB: src/python/foo/corge/__init__.py is not any target's source.
+    self.create_file('src/python/foo/corge/BUILD', 'python_library(sources=["corge.py"])')
+    self.create_file('src/python/foo/corge/corge.py', '')
+    self.create_file('src/python/foo/corge/__init__.py', '')
+    self.create_file('src/python/foo/__init__.py', '')
+    self.create_file('src/python/__init__.py', '')
+    self.create_file('src/python/foo/resources/BUILD', 'resources(sources=["style.css"])')
+    self.create_file('src/python/foo/resources/style.css', '')
+    # NB: A stray __init__.py in a resources-only dir.
+    self.create_file('src/python/foo/resources/__init__.py', '')
+
+    # NB: None of these should include the root src/python/__init__.py, the missing
+    # src/python/foo/bar/__init__.py, or the stray src/python/foo/resources/__init__.py.
+    self.assert_ancestor_init_py(['foo/bar/baz/qux/__init__.py',
+                                  'foo/bar/baz/__init__.py',
+                                  'foo/__init__.py'],
+                                 ['src/python/foo/bar/baz/qux'])
+    self.assert_ancestor_init_py([],
+                                 ['src/python/foo/resources'])
+    self.assert_ancestor_init_py(['foo/corge/__init__.py',
+                                  'foo/__init__.py'],
+                                 ['src/python/foo/corge', 'src/python/foo/resources'])
+
+    self.assert_ancestor_init_py(['foo/bar/baz/qux/__init__.py',
+                                  'foo/bar/baz/__init__.py',
+                                  'foo/corge/__init__.py',
+                                  'foo/__init__.py'],
+                                 ['src/python/foo/bar/baz/qux', 'src/python/foo/corge'])
+
+
 class TestGetOwnedDependencies(TestSetupPyBase):
   @classmethod
   def rules(cls):

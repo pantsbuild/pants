@@ -94,9 +94,58 @@ class OwnedDependencies(Collection[OwnedDependency]):
 
 
 @dataclass(frozen=True)
+class AncestorInitPyFiles:
+  """__init__.py files in enclosing packages of the exported code."""
+  digests: Tuple[Digest, ...]  # The files stripped of their source roots.
+
+
+@dataclass(frozen=True)
 class SetuptoolsSetup:
   """The setuptools tool."""
   requirements_pex: Pex
+
+
+@rule
+async def get_ancestor_init_py(
+    targets: HydratedTargets,
+    source_root_config: SourceRootConfig
+) -> AncestorInitPyFiles:
+  """Find any ancestor __init__.py files for the given targets.
+
+  Includes sibling __init__.py files. Returns the files stripped of their source roots.
+  """
+  source_roots = source_root_config.get_source_roots()
+  # Find the ancestors of all dirs containing .py files, including those dirs themselves.
+  source_dir_ancestors: Set[Tuple[str, str]] = set()  # Items are (src_root, path incl. src_root).
+  sources_snapshots = await MultiGet(
+    Get[Snapshot](Digest, target.adaptor.sources.snapshot.directory_digest)
+    for target in targets if isinstance(target.adaptor, PythonTargetAdaptor)
+  )
+  for sources_snapshot in sources_snapshots:
+    for file in sources_snapshot.files:
+      source_dir_ancestor = os.path.dirname(file)
+      source_root = source_root_or_raise(source_roots, file)
+      # Do not allow the repository root to leak (i.e., '.' should not be a package in setup.py).
+      while source_dir_ancestor != source_root:
+        source_dir_ancestors.add((source_root, source_dir_ancestor))
+        source_dir_ancestor = os.path.dirname(source_dir_ancestor)
+
+  source_dir_ancestors_list = list(source_dir_ancestors)  # To force a consistent order.
+
+  # Note that we must MultiGet single globs instead of a a single Get for all the globs, because
+  # we match each result to its originating glob (see use of zip below).
+  ancestor_init_py_snapshots = await MultiGet[Snapshot](
+    Get[Snapshot](PathGlobs,
+                  PathGlobs(include=(os.path.join(source_dir_ancestor[1], '__init__.py'),)))
+    for source_dir_ancestor in source_dir_ancestors_list
+  )
+
+  source_root_stripped_ancestor_init_pys = await MultiGet[Digest](
+    Get[Digest](DirectoryWithPrefixToStrip(
+      directory_digest=snapshot.directory_digest, prefix=source_dir_ancestor[0])
+  ) for snapshot, source_dir_ancestor in zip(ancestor_init_py_snapshots, source_dir_ancestors_list))
+
+  return AncestorInitPyFiles(source_root_stripped_ancestor_init_pys)
 
 
 def _is_exported(target: HydratedTarget) -> bool:
