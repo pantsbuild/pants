@@ -126,7 +126,6 @@ class TestGenerateChroot(TestSetupPyBase):
       },
       'src/python/foo')
 
-
   def test_invalid_binary(self):
     init_subsystem(SourceRootConfig)
     self.create_file('src/python/invalid_binary/BUILD', textwrap.dedent("""

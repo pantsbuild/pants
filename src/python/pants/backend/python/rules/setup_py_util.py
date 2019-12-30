@@ -24,6 +24,7 @@ class NoSourceRootError(Exception):
   This future-proofs us against switching --source-unmatched from 'create' to 'fail'.
   """
 
+
 def source_root_or_raise(source_roots: SourceRoots, path: str) -> str:
   source_root = source_roots.find_by_path(path)
   if not source_root:
