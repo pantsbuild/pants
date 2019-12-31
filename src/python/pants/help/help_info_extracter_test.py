@@ -81,9 +81,9 @@ class HelpInfoExtracterTest(unittest.TestCase):
                       parent_parser=None, option_tracker=OptionTracker())
       parser.register(*args, **kwargs)
       oshi = HelpInfoExtracter.get_option_scope_help_info_from_parser(parser).basic
-      assert 1 == len(oshi)
+      assert len(oshi) == 1
       ohi = oshi[0]
-      assert expected_default == ohi.default
+      assert ohi.default == expected_default
 
     do_test(['--foo'], {'type': bool }, 'False')
     do_test(['--foo'], {'type': bool, 'default': True}, 'True')
@@ -105,7 +105,7 @@ class HelpInfoExtracterTest(unittest.TestCase):
     self.assertIsNotNone(ohi.deprecated_message)
 
   def test_choices(self) -> None:
-    kwargs={'choices' : ['info', 'debug']}
+    kwargs={'choices': ['info', 'debug']}
     ohi = HelpInfoExtracter('').get_option_help_info([], kwargs)
     assert ohi.choices == 'info, debug'
 
