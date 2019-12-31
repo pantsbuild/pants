@@ -6,11 +6,7 @@ from dataclasses import replace
 from enum import Enum
 
 from pants.help.help_formatter import HelpFormatter
-from pants.help.help_info_extracter import HelpInfoExtracter, OptionHelpInfo
-from pants.option.config import Config
-from pants.option.global_options import GlobalOptionsRegistrar
-from pants.option.option_tracker import OptionTracker
-from pants.option.parser import Parser
+from pants.help.help_info_extracter import OptionHelpInfo
 
 
 class OptionHelpFormatterTest(unittest.TestCase):
@@ -53,22 +49,8 @@ class OptionHelpFormatterTest(unittest.TestCase):
     class LogLevel(Enum):
       INFO = 'info'
       DEBUG = 'debug'
-    def do_test(args, kwargs, expected_help_message):
-      parser = Parser(env={}, config=Config.load([]),
-                      scope_info=GlobalOptionsRegistrar.get_scope_info(),
-                      parent_parser=None, option_tracker=OptionTracker())
-      parser.register(*args, **kwargs)
-      oshi = HelpInfoExtracter.get_option_scope_help_info_from_parser(parser).basic
-      self.assertEqual(1, len(oshi))
-      ohi = oshi[0]
-      lines = HelpFormatter(
-        scope='', show_recursive=False, show_advanced=False, color=False
-      ).format_option(ohi)
-      assert len(lines) == 2
-      line = lines[0]
-      assert line.lstrip() == expected_help_message
+    no_default = self.format_help_for_foo(typ=LogLevel, choices='info, debug')
+    assert no_default.lstrip() == '--foo (one of: [info, debug] default: None)'
 
-    do_test(['--foo'], {'type': LogLevel, 'default': LogLevel.DEBUG},
-            '--foo=<LogLevel> (one of: [info, debug] default: debug)')
-    do_test(['--foo'], {'type': LogLevel},
-            '--foo=<LogLevel> (one of: [info, debug] default: None)')
+    default = self.format_help_for_foo(typ=LogLevel, choices='info, debug', default='info')
+    assert default.lstrip() == '--foo (one of: [info, debug] default: info)'
