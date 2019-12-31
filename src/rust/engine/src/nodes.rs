@@ -1436,6 +1436,7 @@ impl Node for NodeKey {
       &NodeKey::Task(ref s) => s.task.cacheable,
       // TODO Select nodes are made uncacheable as a workaround to #6146. Will be worked on in #6598
       &NodeKey::Select(_) => false,
+      &NodeKey::HttpRequester(..) => false,
       _ => true,
     }
   }
