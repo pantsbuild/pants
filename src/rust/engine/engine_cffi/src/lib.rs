@@ -983,7 +983,7 @@ pub extern "C" fn run_local_interactive_process(
               session.workunit_store().clone(),
             );
 
-            let _ = scheduler.core.executor.spawn_on_io_pool(write_operation).wait()?;
+            scheduler.core.executor.spawn_on_io_pool(write_operation).wait()?;
           }
         }
 
