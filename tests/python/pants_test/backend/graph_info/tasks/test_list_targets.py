@@ -58,7 +58,7 @@ class ListTargetsTest(ConsoleRuleTestBase):
             """).strip() if provides else 'None'
 
     def create_library(path: str, *libs: Lib) -> None:
-      libs = libs or [Lib(os.path.basename(os.path.dirname(self.build_path(path))))]
+      libs = libs or (Lib(os.path.basename(os.path.dirname(self.build_path(path)))),)
       for lib in libs:
         target = f"java_library(name='{lib.name}', provides={lib.provides}, sources=[])\n"
         self.add_to_build_file(path, target)

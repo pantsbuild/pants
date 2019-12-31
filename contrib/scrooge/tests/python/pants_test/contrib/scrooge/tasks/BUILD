@@ -8,7 +8,8 @@ python_tests(
     'contrib/scrooge/src/python/pants/contrib/scrooge/tasks:java_thrift_library_fingerprint_strategy',
     'src/python/pants/backend/codegen/thrift/java',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )
 
 python_tests(
@@ -25,6 +26,7 @@ python_tests(
     'src/python/pants/util:dirutil',
     'src/python/pants/testutil/jvm:nailgun_task_test_base'
   ],
+  tags = {'partially_type_checked'},
 )
 
 python_tests(
@@ -35,7 +37,7 @@ python_tests(
     'contrib/scrooge:scala_tests_directory',
     'contrib/scrooge:thrift_tests_directory',
   ],
-  tags={'integration'},
+  tags={'integration', 'partially_type_checked'},
   timeout=270,
 )
 
@@ -46,7 +48,7 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'contrib/scrooge:thrift_tests_directory',
   ],
-  tags={'integration'},
+  tags={'integration', 'partially_type_checked'},
   timeout=240,
 )
 
@@ -61,6 +63,7 @@ python_tests(
     'src/python/pants/testutil:task_test_base',
     'src/python/pants/testutil:mock_logger',
   ],
+  tags = {'partially_type_checked'},
 )
 
 python_tests(
@@ -71,5 +74,6 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )

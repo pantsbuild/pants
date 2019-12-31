@@ -4,7 +4,7 @@
 import json
 import os.path
 import zipfile
-from typing import Dict, List
+from typing import Dict, Optional, cast
 
 from pants.backend.python.rules.download_pex_bin import download_pex_bin
 from pants.backend.python.rules.pex import (
@@ -54,7 +54,7 @@ class TestResolveRequirements(TestBase):
   def create_pex_and_get_all_data(self, *, requirements=PexRequirements(),
       entry_point=None,
       interpreter_constraints=PexInterpreterConstraints(),
-      input_files: Digest = None) -> (Dict, List[str]):
+      input_files: Optional[Digest] = None) -> Dict:
     request = CreatePex(
       output_filename="test.pex",
       requirements=requirements,
@@ -83,9 +83,13 @@ class TestResolveRequirements(TestBase):
   def create_pex_and_get_pex_info(
     self, *, requirements=PexRequirements(), entry_point=None,
     interpreter_constraints=PexInterpreterConstraints(),
-    input_files: Digest = None) -> Dict:
-    return self.create_pex_and_get_all_data(requirements=requirements, entry_point=entry_point, interpreter_constraints=interpreter_constraints,
-        input_files=input_files)['info']
+    input_files: Optional[Digest] = None) -> Dict:
+    return cast(Dict, self.create_pex_and_get_all_data(
+      requirements=requirements,
+      entry_point=entry_point,
+      interpreter_constraints=interpreter_constraints,
+      input_files=input_files
+    )['info'])
 
   def test_generic_pex_creation(self) -> None:
     input_files_content = InputFilesContent((
@@ -124,7 +128,7 @@ class TestResolveRequirements(TestBase):
 
   def test_interpreter_constraints(self) -> None:
     constraints = PexInterpreterConstraints(
-        constraint_set=("CPython>=2.7,<3", "CPython>=3.6,<4")
+        constraint_set=("CPython>=2.7,<3", "CPython>=3.6")
     )
     pex_info = self.create_pex_and_get_pex_info(interpreter_constraints=constraints)
     self.assertEqual(set(pex_info["interpreter_constraints"]), set(constraints.constraint_set))

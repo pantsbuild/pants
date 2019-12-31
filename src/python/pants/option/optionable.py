@@ -4,7 +4,7 @@
 import functools
 import re
 from abc import ABC, ABCMeta, abstractmethod
-from typing import Optional
+from typing import Optional, Type
 
 from pants.engine.selectors import Get
 from pants.option.errors import OptionsError
@@ -27,7 +27,7 @@ class OptionableFactory(ABC):
 
   @property
   @abstractmethod
-  def optionable_cls(self):
+  def optionable_cls(self) -> Type["Optionable"]:
     """The Optionable class that is constructed by this OptionableFactory."""
 
   @property
@@ -64,8 +64,8 @@ class Optionable(OptionableFactory, metaclass=ABCMeta):
   # Option values can be read from the deprecated scope, but a deprecation warning will be issued.
   # The deprecation warning becomes an error at the given Pants version (which must therefore be
   # a valid semver).
-  deprecated_options_scope = None
-  deprecated_options_scope_removal_version = None
+  deprecated_options_scope: Optional[str] = None
+  deprecated_options_scope_removal_version: Optional[str] = None
 
   _scope_name_component_re = re.compile(r'^(?:[a-z0-9])+(?:-(?:[a-z0-9])+)*$')
 
@@ -75,15 +75,16 @@ class Optionable(OptionableFactory, metaclass=ABCMeta):
     return cls
 
   @classmethod
-  def is_valid_scope_name_component(cls, s):
+  def is_valid_scope_name_component(cls, s: str) -> bool:
     return cls._scope_name_component_re.match(s) is not None
 
   @classmethod
-  def validate_scope_name_component(cls, s):
+  def validate_scope_name_component(cls, s: str) -> None:
     if not cls.is_valid_scope_name_component(s):
-      raise OptionsError('Options scope "{}" is not valid:\n'
-                         'Replace in code with a new scope name consisting of dash-separated-words, '
-                         'with words consisting only of lower-case letters and digits.'.format(s))
+      raise OptionsError(
+        f'Options scope "{s}" is not valid:\nReplace in code with a new scope name consisting of '
+        f'dash-separated-words, with words consisting only of lower-case letters and digits.'
+      )
 
   @classmethod
   def get_scope_info(cls):
@@ -136,7 +137,7 @@ class Optionable(OptionableFactory, metaclass=ABCMeta):
     """
     cls.register_options(options.registration_function_for_optionable(cls))
 
-  def __init__(self):
+  def __init__(self) -> None:
     # Check that the instance's class defines options_scope.
     # Note: It is a bit odd to validate a class when instantiating an object of it. but checking
     # the class itself (e.g., via metaclass magic) turns out to be complicated, because

@@ -26,6 +26,6 @@ python_tests(
     'src/python/pants/testutil/subsystem',
     'testprojects/src/java/org/pantsbuild/testproject:printversion_directory'
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 300,
 )

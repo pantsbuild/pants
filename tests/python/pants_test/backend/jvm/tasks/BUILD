@@ -7,7 +7,8 @@ python_library(
   dependencies = [
     'src/python/pants/java/distribution',
     'src/python/pants/testutil/subsystem',
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )
 
 python_tests(
@@ -20,7 +21,8 @@ python_tests(
     'src/python/pants/java/jar',
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil/jvm:jvm_tool_task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -38,7 +40,8 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil/jvm:jvm_tool_task_test_base',
     'src/python/pants/testutil/subsystem',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -47,7 +50,7 @@ python_tests(
   dependencies = [
     'src/python/pants/testutil:int-test',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )
 
 python_tests(
@@ -58,7 +61,8 @@ python_tests(
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
     'src/python/pants/testutil/jvm:jvm_tool_task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -68,7 +72,7 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'testprojects/src/java/org/pantsbuild/testproject:bench_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 210,
 )
 
@@ -85,7 +89,7 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:manifest_directory',
   ],
   timeout=420,
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )
 
 python_tests(
@@ -101,7 +105,8 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -117,7 +122,8 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -130,7 +136,8 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/testutil/jvm:nailgun_task_test_base',
     'src/python/pants/testutil:task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -142,7 +149,7 @@ python_tests(
     'examples/src/java/org/pantsbuild/example:hello_directory',
     'testprojects/3rdparty:checkstyle_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 240,
 )
 
@@ -158,7 +165,8 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:check_published_deps',
     'src/python/pants/build_graph',
     'src/python/pants/testutil:task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -178,7 +186,8 @@ python_tests(
     'src/python/pants/testutil:test_base',
     'src/python/pants/testutil/subsystem',
     'src/python/pants/testutil:file_test_util',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -191,7 +200,8 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:classpath_util',
     'src/python/pants/goal:products',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -209,6 +219,7 @@ python_tests(
     'src/python/pants/testutil/jvm:jvm_task_test_base',
     'src/python/pants/testutil/subsystem',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -224,6 +235,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -234,7 +246,7 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:intransitive_directory',
   ],
   timeout=300,
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )
 
 python_tests(
@@ -247,7 +259,8 @@ python_tests(
     'src/python/pants/java/jar',
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil/jvm:nailgun_task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -257,7 +270,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil:int-test',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )
 
 python_tests(
@@ -278,14 +291,13 @@ python_tests(
     'src/python/pants/testutil/jvm:nailgun_task_test_base',
     'src/python/pants/testutil/subsystem',
     'src/python/pants/testutil:task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
   name = 'coursier_resolve',
-  sources = [
-    'test_coursier_resolve.py',
-  ],
+  sources = ['test_coursier_resolve.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/jvm/subsystems:jar_dependency_management',
@@ -300,7 +312,8 @@ python_tests(
     'src/python/pants/testutil/jvm:nailgun_task_test_base',
     'src/python/pants/testutil/subsystem',
     'src/python/pants/testutil:task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -311,7 +324,7 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'examples/tests/scala/org/pantsbuild/example:hello_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )
 
 python_tests(
@@ -325,7 +338,7 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:unicode_directory',
   ],
   timeout = 240,
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )
 
 python_tests(
@@ -343,7 +356,8 @@ python_tests(
     'tests/python/pants_test/backend/jvm/tasks/ivy_utils_resources',
     'src/python/pants/testutil:test_base',
     'src/python/pants/testutil/subsystem',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -365,6 +379,7 @@ python_tests(
     'src/python/pants/testutil:task_test_base',
     'src/python/pants/testutil/subsystem',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -382,6 +397,7 @@ python_tests(
     'src/python/pants/testutil/jvm:nailgun_task_test_base',
     'src/python/pants/testutil:mock_logger',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -397,7 +413,7 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:publish_directory',
     'testprojects/src/scala/org/pantsbuild/testproject:publish_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 480,
 )
 
@@ -414,7 +430,8 @@ python_tests(
     'src/python/pants/util:dirutil',
     'src/python/pants/testutil/jvm:jar_task_test_base',
     'src/python/pants/testutil/jvm:jvm_tool_task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -436,6 +453,7 @@ python_tests(
     'src/python/pants/testutil/subsystem',
     'src/python/pants/testutil:task_test_base',
   ],
+  tags = {'partially_type_checked'},
   timeout = 120,
 )
 
@@ -455,7 +473,7 @@ python_tests(
     'testprojects/tests/java/org/pantsbuild/testproject:timeout_directory',
     'testprojects/tests/java/org/pantsbuild/testproject:unicode_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 600
 )
 
@@ -476,7 +494,7 @@ python_tests(
     'testprojects/tests/java/org/pantsbuild/testproject:fail256_directory',
     'testprojects/tests/java/org/pantsbuild/testproject:workdirs_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 1240,
 )
 
@@ -490,7 +508,7 @@ python_tests(
     'testprojects/tests/java/org/pantsbuild/testproject:parallelclassesandmethods_directory',
     'testprojects/tests/java/org/pantsbuild/testproject:parallelmethods_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 540,
 )
 
@@ -501,7 +519,8 @@ python_library(
     'src/python/pants/backend/jvm/tasks:classpath_products',
     'src/python/pants/java/jar',
     'src/python/pants/testutil/jvm:nailgun_task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -514,7 +533,7 @@ python_tests(
     'testprojects/maven_layout:resource_collision_directory',
     'testprojects/src/java/org/pantsbuild/testproject:unicode_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 320,
 )
 
@@ -527,7 +546,8 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:jvm_dependency_usage',
     'src/python/pants/util:dirutil',
     'src/python/pants/testutil:task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -539,7 +559,7 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:nocache_directory',
     'testprojects/src/java/org/pantsbuild/testproject:unicode_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 460,
 )
 
@@ -551,7 +571,8 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:jvm_platform_analysis',
     'src/python/pants/build_graph',
     'src/python/pants/testutil:task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -563,7 +584,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil:int-test',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )
 
 python_tests(
@@ -574,7 +595,8 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:run_jvm_prep_command',
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil:task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -586,7 +608,7 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'testprojects/src/java/org/pantsbuild/testproject:jvmprepcommand_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 250,
 )
 
@@ -598,7 +620,8 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:jvm_task',
     'src/python/pants/testutil/jvm:jvm_task_test_base',
     'src/python/pants/testutil:task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -610,7 +633,8 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:jvm_run',
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil/jvm:jvm_task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -623,7 +647,7 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:extra_jvm_options_directory',
     'testprojects/tests/java/org/pantsbuild/testproject:syntheticjar_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 360,
 )
 
@@ -635,7 +659,8 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:jvmdoc_gen',
     'src/python/pants/base:exceptions',
     'src/python/pants/testutil/jvm:jvm_task_test_base'
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 resources(
@@ -656,7 +681,8 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/util:dirutil',
     'src/python/pants/testutil:task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -669,7 +695,8 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil:task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -682,7 +709,8 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:prepare_services',
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil:task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -709,6 +737,7 @@ python_tests(
     'src/python/pants/testutil/jvm:nailgun_task_test_base',
     'src/python/pants/testutil/subsystem'
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -721,7 +750,7 @@ python_tests(
     'testprojects/src/scala/org/pantsbuild/testproject:rsc_compat_directory',
   ],
   timeout=340,
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )
 
 python_tests(
@@ -739,7 +768,8 @@ python_tests(
     'src/python/pants/testutil/jvm:nailgun_task_test_base',
     'src/python/pants/testutil/subsystem',
     'src/python/pants/testutil:task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -751,7 +781,7 @@ python_tests(
     'testprojects/src/scala/org/pantsbuild/testproject:unicode_directory',
   ],
   timeout=480,
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )
 
 python_tests(
@@ -763,7 +793,7 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:provided_directory',
   ],
   timeout=720,
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )
 
 python_tests(
@@ -774,7 +804,7 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:runtime_directory',
   ],
   timeout=600,
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )
 
 python_tests(
@@ -788,7 +818,7 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:junit_directory',
   ],
   timeout=300,
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )
 
 python_tests(
@@ -802,7 +832,8 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/testutil:task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -814,7 +845,7 @@ python_tests(
     'examples/src/java/org/pantsbuild/example:hello_directory',
     'testprojects/src/java/org/pantsbuild/testproject:exclude_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 300
 )
 
@@ -831,6 +862,7 @@ python_tests(
     'src/python/pants/testutil/subsystem',
     'src/python/pants/testutil:task_test_base',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -842,7 +874,7 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:unicode_directory',
     'testprojects/tests/java/org/pantsbuild/testproject:testjvms_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 360,
 )
 
@@ -858,4 +890,5 @@ python_tests(
     'src/python/pants/util:dirutil',
     'src/python/pants/testutil/jvm:jvm_tool_task_test_base',
   ],
+  tags = {"partially_type_checked"},
 )

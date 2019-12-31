@@ -169,7 +169,7 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
     with temporary_dir() as interpreters_cache:
       pants_ini_config = {
         'python-setup': {
-          'interpreter_constraints': ['CPython>=2.7,<4'],
+          'interpreter_constraints': ['CPython>=2.7'],
           'interpreter_cache_dir': interpreters_cache,
         },
         # NB: we pin Pytest to 4.6 to ensure Pytest still works with Python 2.
@@ -196,7 +196,7 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
     with temporary_dir() as interpreters_cache:
       pants_ini_config = {
         'python-setup': {
-          'interpreter_constraints': ['CPython>=2.7,<4'],
+          'interpreter_constraints': ['CPython>=2.7'],
           'interpreter_cache_dir': interpreters_cache,
         }
       }

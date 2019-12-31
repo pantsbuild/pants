@@ -12,6 +12,7 @@ python_tests(
     'src/python/pants/util:dirutil',
     'src/python/pants/testutil:task_test_base',
   ],
+  tags = {'partially_type_checked'},
   timeout=30,
 )
 
@@ -25,6 +26,7 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/testutil:task_test_base',
   ],
+  tags = {'partially_type_checked'},
   timeout=30
 )
 
@@ -38,7 +40,7 @@ python_tests(
     'src/python/pants/util:contextutil',
   ],
   timeout=480,
-  tags={'integration'},
+  tags={'integration', 'partially_type_checked'},
 )
 
 python_tests(
@@ -48,7 +50,7 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'contrib/node:examples_directory',
   ],
-  tags={'integration'},
+  tags={'integration', 'partially_type_checked'},
 )
 
 python_tests(
@@ -60,7 +62,7 @@ python_tests(
     'contrib/node:testprojects_directory',
   ],
   timeout=180,
-  tags={'integration'},
+  tags={'integration', 'partially_type_checked'},
 )
 
 python_tests(
@@ -71,7 +73,7 @@ python_tests(
     'contrib/node:examples_directory',
   ],
   timeout=180,
-  tags={'integration'},
+  tags={'integration', 'partially_type_checked'},
 )
 
 python_tests(
@@ -82,7 +84,7 @@ python_tests(
     'contrib/node:examples_directory',
   ],
   timeout=240,
-  tags={'integration'},
+  tags={'integration', 'partially_type_checked'},
 )
 
 python_tests(
@@ -97,7 +99,8 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil:task_test_base',
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )
 
 python_tests(
@@ -114,7 +117,8 @@ python_tests(
     'contrib/node/src/python/pants/contrib/node/subsystems/resolvers:node_preinstalled_module_resolver',
     'src/python/pants/build_graph',
     'src/python/pants/testutil:task_test_base',
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )
 
 python_tests(
@@ -125,7 +129,7 @@ python_tests(
     'contrib/node:examples_directory',
   ],
   timeout=180,
-  tags={'integration'},
+  tags={'integration', 'partially_type_checked'},
 )
 
 python_tests(
@@ -136,7 +140,7 @@ python_tests(
     'contrib/node:examples_directory',
   ],
   timeout=180,
-  tags={'integration'},
+  tags={'integration', 'partially_type_checked'},
 )
 
 python_tests(
@@ -153,5 +157,6 @@ python_tests(
     'contrib/node/src/python/pants/contrib/node/subsystems/resolvers:node_preinstalled_module_resolver',
     'src/python/pants/build_graph',
     'src/python/pants/testutil:task_test_base',
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )

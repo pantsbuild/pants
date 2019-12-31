@@ -120,13 +120,13 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
     expected_rx_str = re.escape(
       """"b" was not found in namespace "root". Did you mean one of:
   :a""")
-    with self.assertRaisesRegexp(ResolveError, expected_rx_str):
+    with self.assertRaisesRegex(ResolveError, expected_rx_str):
       self._resolve_build_file_addresses(
         specs, address_family, self._snapshot(), self._address_mapper())
 
     # Ensure that we still catch nonexistent targets later on in the list of command-line specs.
     specs = Specs([SingleAddress('root', 'a'), SingleAddress('root', 'b')])
-    with self.assertRaisesRegexp(ResolveError, expected_rx_str):
+    with self.assertRaisesRegex(ResolveError, expected_rx_str):
       self._resolve_build_file_addresses(
         specs, address_family, self._snapshot(), self._address_mapper())
 

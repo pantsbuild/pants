@@ -99,6 +99,7 @@ python_tests(
     'src/python/pants/util:meta',
     'src/python/pants/testutil:test_base',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -118,6 +119,7 @@ python_tests(
     'src/python/pants/util:objects',
     'src/python/pants/testutil:test_base',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -127,6 +129,7 @@ python_tests(
     'src/python/pants/util:osutil',
     'src/python/pants/testutil:test_base',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(

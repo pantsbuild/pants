@@ -94,7 +94,7 @@ class DistributionIntegrationTest(PantsRunIntegrationTest):
 
   def test_impossible_distribution_requirements(self):
     with _distribution_locator() as locator:
-      with self.assertRaisesRegexp(Distribution.Error, "impossible constraints"):
+      with self.assertRaisesRegex(Distribution.Error, "impossible constraints"):
         locator.cached('2', '1', jdk=False)
 
   def _test_jvm_does_not_meet_distribution_requirements(self,

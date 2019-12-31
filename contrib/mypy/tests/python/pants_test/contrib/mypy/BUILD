@@ -8,6 +8,7 @@ python_tests(
     'src/python/pants/testutil:task_test_base',
     'contrib/mypy/src/python/pants/contrib/mypy/tasks',
   ],
+  tags = {'partially_type_checked'},
 )
 
 python_tests(
@@ -17,6 +18,6 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'contrib/mypy:examples_directory',
   ],
-  tags={'integration'},
+  tags={'integration', 'partially_type_checked'},
   timeout = 120,
 )

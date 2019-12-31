@@ -24,7 +24,7 @@ class PythonSetup(Subsystem):
   def register_options(cls, register):
     super().register_options(register)
     register('--interpreter-constraints', advanced=True, fingerprint=True, type=list,
-             default=['CPython>=2.7,<3', 'CPython>=3.6,<4'],
+             default=['CPython>=2.7,<3', 'CPython>=3.6'],
              metavar='<requirement>',
              help="Constrain the selected Python interpreter.  Specify with requirement syntax, "
                   "e.g. 'CPython>=2.7,<3' (A CPython interpreter with version >=2.7 AND version <3)"
@@ -75,8 +75,8 @@ class PythonSetup(Subsystem):
                    "Python 3.6+. In preparation for this change, you should explicitly mark what "
                    "Python version(s) your project uses in your `pants.ini` under the section "
                    "`python-setup`.\n\nFor example, if you need to still support Python 2, set "
-                   "`interpreter_constraints` to `['CPython>=2.7,<3', 'CPython>=3.6<4']`. "
-                   "Otherwise, set the value to something like `['CPython>=3.6<4']`. See "
+                   "`interpreter_constraints` to `['CPython>=2.7,<3', 'CPython>=3.6']`. "
+                   "Otherwise, set the value to something like `['CPython>=3.6']`. See "
                    "https://www.pantsbuild.org/python_readme.html#configure-the-python-version "
                    "for more information on setting interpreter constraints."
     )

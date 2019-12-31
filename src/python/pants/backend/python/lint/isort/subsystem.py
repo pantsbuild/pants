@@ -18,12 +18,12 @@ class Isort(PythonToolBase):
   def register_options(cls, register):
     super().register_options(register)
     register(
-      '--args', type=list, member_type=str,
+      '--args', type=list, member_type=str, fingerprint=True,
       help="Arguments to pass directly to isort, e.g. "
            "`--isort-args=\"--case-sensitive --trailing-comma\"`",
     )
     register(
-      '--config', type=list, member_type=file_option,
+      '--config', type=list, member_type=file_option, fingerprint=True,
       help="Path to `isort.cfg` or alternative isort config file(s)"
     )
 

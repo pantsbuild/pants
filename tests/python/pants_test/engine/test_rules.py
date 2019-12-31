@@ -81,7 +81,7 @@ class Example(Goal):
 
 @console_rule
 async def a_console_rule_generator(console: Console) -> Example:
-  a = await Get(A, str('a str!'))
+  a = await Get[A](str('a str!'))
   console.print_stdout(str(a))
   return Example(exit_code=0)
 
@@ -309,8 +309,8 @@ class RuleGraphTest(TestBase):
       pass
 
     @rule
-    async def d_from_a_and_suba(a: A, suba: SubA) -> D:
-      _ = await Get(A, C, C())  # noqa: F841
+    async def d_from_a_and_suba(a: A, suba: SubA) -> D:  # type: ignore[return]
+      _ = await Get[A](C, C())  # noqa: F841
 
     @rule
     def a_from_c(c: C) -> A:
@@ -510,8 +510,8 @@ class RuleGraphTest(TestBase):
     # they intend for the Get's parameter to be consumed in the subgraph. Anything else would
     # be surprising.
     @rule
-    async def a(sub_a: SubA) -> A:
-      _ = await Get(B, C())  # noqa: F841
+    async def a(sub_a: SubA) -> A:  # type: ignore[return]
+      _ = await Get[B](C())  # noqa: F841
 
     @rule
     def b_from_suba(suba: SubA) -> B:
@@ -799,8 +799,8 @@ class RuleGraphTest(TestBase):
 
   def test_get_simple(self):
     @rule
-    async def a() -> A:
-      _ = await Get(B, D, D())  # noqa: F841
+    async def a() -> A:  # type: ignore[return]
+      _ = await Get[B](D, D())  # noqa: F841
 
     @rule
     async def b_from_d(d: D) -> B:

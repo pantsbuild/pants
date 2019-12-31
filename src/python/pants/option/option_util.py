@@ -2,17 +2,16 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import shlex
-from typing import Sequence, Tuple
+from typing import Sequence, Tuple, cast
 
 from pants.option.custom_types import dict_with_files_option, list_option
 
 
-def is_list_option(kwargs):
-  return (kwargs.get('action') == 'append' or kwargs.get('type') == list or
-          kwargs.get('type') == list_option)
+def is_list_option(kwargs) -> bool:
+  return cast(bool, kwargs.get('action') == 'append' or kwargs.get('type') in [list, list_option])
 
 
-def is_dict_option(kwargs):
+def is_dict_option(kwargs) -> bool:
   return kwargs.get('type') in (dict, dict_with_files_option)
 
 

@@ -3,7 +3,7 @@
 
 from enum import Enum
 from textwrap import dedent
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import yaml
 
@@ -13,6 +13,18 @@ HEADER = dedent("""\
   # To change, edit `build-support/bin/generate_travis_yml.py` and run:
   # ./pants --quiet run build-support/bin:generate_travis_yml > .travis.yml
   """)
+
+# ----------------------------------------------------------------------
+# Utils
+# ----------------------------------------------------------------------
+
+def safe_append(d: Dict, key: str, value: Any) -> None:
+  safe_extend(d, key, [value])
+
+
+def safe_extend(d: Dict, key: str, values: List[Any]) -> None:
+  prior = d.get(key, [])
+  d[key] = [*prior, *values]
 
 # ----------------------------------------------------------------------
 # Stages
@@ -36,7 +48,7 @@ class Stage(Enum):
       self.test_cron: is_cron,
       self.build_stable: r"tag IS present AND tag =~ ^release_.*$",
       self.build_unstable: r"tag IS NOT present AND type NOT IN (pull_request, cron)"
-    }[self]
+    }[self]  # type: ignore[index]
 
   @classmethod
   def all_entries(cls) -> List[Dict[str, str]]:
@@ -86,11 +98,11 @@ class PythonVersion(Enum):
 
   @property
   def number(self) -> int:
-    return {self.py36: 36, self.py37: 37}[self]
+    return {self.py36: 36, self.py37: 37}[self]  # type: ignore[index]
 
   @property
   def decimal(self) -> float:
-    return {self.py36: 3.6, self.py37: 3.7}[self]
+    return {self.py36: 3.6, self.py37: 3.7}[self]  # type: ignore[index]
 
   @property
   def is_py36(self) -> bool:
@@ -102,8 +114,8 @@ class PythonVersion(Enum):
 
   def default_stage(self, *, is_bootstrap: bool = False) -> Stage:
     if is_bootstrap:
-      return {self.py36: Stage.bootstrap, self.py37: Stage.bootstrap_cron}[self]
-    return {self.py36: Stage.test, self.py37: Stage.test_cron}[self]
+      return {self.py36: Stage.bootstrap, self.py37: Stage.bootstrap_cron}[self]  # type: ignore[index]
+    return {self.py36: Stage.test, self.py37: Stage.test_cron}[self]  # type: ignore[index]
 
 
 # ----------------------------------------------------------------------
@@ -295,7 +307,7 @@ def linux_shard(
       setup["env"].append('PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"')
   if use_docker:
     setup["services"] = ["docker"]
-    setup["before_script"] = setup.get("before_script", []) + ["ulimit -c unlimited"]
+    safe_append(setup, "before_script", "ulimit -c unlimited")
   return setup
 
 
@@ -396,7 +408,7 @@ def bootstrap_linux(python_version: PythonVersion) -> Dict:
       AWS_DEPLOY_PANTS_PEX_COMMAND,
     ]
   }
-  shard["env"] = shard.get("env", []) + _bootstrap_env(python_version=python_version, platform=Platform.linux)
+  safe_extend(shard, "env", _bootstrap_env(python_version=python_version, platform=Platform.linux))
   return shard
 
 
@@ -412,7 +424,7 @@ def bootstrap_osx(python_version: PythonVersion) -> Dict:
     "stage": python_version.default_stage(is_bootstrap=True).value,
     "script": _bootstrap_command(python_version=python_version) + [AWS_DEPLOY_PANTS_PEX_COMMAND]
   }
-  shard["env"] = shard.get("env", []) + _bootstrap_env(python_version=python_version, platform=Platform.osx)
+  safe_extend(shard, "env", _bootstrap_env(python_version=python_version, platform=Platform.osx))
   return shard
 
 # ----------------------------------------------------------------------
@@ -427,7 +439,7 @@ def lint(python_version: PythonVersion) -> Dict:
       f"./build-support/bin/ci.py --githooks --sanity-checks --doc-gen --lint --python-version {python_version.decimal}"
     ]
   }
-  shard["env"] = shard.get("env", []) + [f"CACHE_NAME=lint.py{python_version.number}"]
+  safe_append(shard, "env", f"CACHE_NAME=lint.py{python_version.number}")
   return shard
 
 # -------------------------------------------------------------------------
@@ -471,7 +483,7 @@ def unit_tests(python_version: PythonVersion) -> Dict:
       f"--remote-execution-enabled --python-version {python_version.decimal}"
     ],
   }
-  shard["env"] = shard.get("env", []) + [f"CACHE_NAME=unit_tests.py{python_version.number}"]
+  safe_append(shard, "env", f"CACHE_NAME=unit_tests.py{python_version.number}")
   return shard
 
 # ----------------------------------------------------------------------
@@ -502,7 +514,7 @@ def build_wheels_linux() -> Dict:
       docker_run_travis_ci_image(command)
     ]
   }
-  shard["env"] = shard.get("env", []) + (_build_wheels_env(platform=Platform.linux))
+  safe_extend(shard, "env", _build_wheels_env(platform=Platform.linux))
   return shard
 
 
@@ -512,12 +524,17 @@ def build_wheels_osx() -> Dict:
     "name": "Build OSX wheels (Python 3.6)",
     "script": _build_wheels_command(),
   }
-  shard["env"] = shard.get("env", []) + _build_wheels_env(platform=Platform.osx) + [
-    # We ensure selection of the pyenv interpreter by PY aware scripts and pants.pex with these
-    # env vars.
-    'PY=${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin/python',
-    """PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython==${PYENV_PY36_VERSION}']\""""
-  ]
+  safe_extend(
+    shard,
+    "env",
+    [
+      *_build_wheels_env(platform=Platform.osx),
+      # We ensure selection of the pyenv interpreter by PY aware scripts and pants.pex with these
+      # env vars.
+      'PY=${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin/python',
+      """PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython==${PYENV_PY36_VERSION}']\""""
+    ],
+  )
   return shard
 
 # -------------------------------------------------------------------------
@@ -538,12 +555,14 @@ def integration_tests_v1(python_version: PythonVersion, *, use_pantsd: bool = Fa
         ),
       ]
     }
-    shard["env"] = shard.get("env", []) + [
+    safe_append(
+      shard,
+      "env",
       f"CACHE_NAME=integration.v1.shard_{shard_num}.py{python_version.number}{'.pantsd' if use_pantsd else ''}"
-    ]
+    )
     if use_pantsd:
       shard["stage"] = Stage.test_cron.value
-      shard["env"].append('USE_PANTSD_FOR_INTEGRATION_TESTS="true"')
+      safe_append(shard, "env", 'USE_PANTSD_FOR_INTEGRATION_TESTS="true"')
     return shard
   return [make_shard(shard_num=i) for i in range(num_integration_shards)]
 
@@ -559,16 +578,14 @@ def integration_tests_v2(python_version: PythonVersion) -> Dict:
       ),
     ]
   }
-  shard["env"] = shard.get("env", []) + [
-    f"CACHE_NAME=integration.v2.py{python_version.number}"
-  ]
+  safe_append(shard, "env", f"CACHE_NAME=integration.v2.py{python_version.number}")
   return shard
 
 # -------------------------------------------------------------------------
 # Rust tests
 # -------------------------------------------------------------------------
 
-_RUST_TESTS_BASE = {
+_RUST_TESTS_BASE: Dict = {
   **CACHE_NATIVE_ENGINE,
   "stage": Stage.test.value,
   "before_script": ["ulimit -c unlimited", "ulimit -n 8192"],
@@ -624,7 +641,7 @@ def osx_platform_tests(python_version: PythonVersion) -> Dict:
       f"./build-support/bin/ci.py --platform-specific-tests --python-version {python_version.decimal}"
     ],
   }
-  shard["env"] = shard.get("env", []) + [f"CACHE_NAME=osx_platform_tests.py{python_version.number}"]
+  safe_append(shard, "env", f"CACHE_NAME=osx_platform_tests.py{python_version.number}")
   return shard
 
 # -------------------------------------------------------------------------
@@ -641,7 +658,9 @@ def _osx_sanity_check(
       f"MODE=debug ./build-support/bin/ci.py --sanity-checks --python-version {python_version.decimal}"
     ],
   }
-  shard["env"] = shard.get("env", []) + [f"CACHE_NAME=osx_sanity.10_{os_version_number}.py{python_version.number}"]
+  safe_append(
+    shard, "env", f"CACHE_NAME=osx_sanity.10_{os_version_number}.py{python_version.number}"
+  )
   return shard
 
 
@@ -665,7 +684,7 @@ def jvm_tests(python_version: PythonVersion) -> Dict:
     "name": f"JVM tests (Python {python_version.decimal})",
     "script": [f"./build-support/bin/ci.py --jvm-tests --python-version {python_version.decimal}"]
   }
-  shard["env"] = shard.get("env", []) + [f"CACHE_NAME=jvm_tests.py{python_version.number}"]
+  safe_append(shard, "env", f"CACHE_NAME=jvm_tests.py{python_version.number}")
   return shard
 
 # -------------------------------------------------------------------------
@@ -727,7 +746,7 @@ def deploy_stable() -> Dict:
       }
     }
   }
-  shard["env"] = shard.get("env", []) + ["PANTS_PEX_RELEASE=stable", "CACHE_NAME=deploy.stable"]
+  safe_extend(shard, "env", ["PANTS_PEX_RELEASE=stable", "CACHE_NAME=deploy.stable"])
   return shard
 
 
@@ -737,11 +756,10 @@ def deploy_unstable() -> Dict:
     "name": "Deploy unstable pants.pex (Python 3.6)",
     "stage": Stage.build_unstable.value,
   }
-  shard["script"] = shard.get("script", []) + [
-    "mkdir -p dist/deploy/pex/",
-    "mv dist/pants*.pex dist/deploy/pex/",
-  ]
-  shard["env"] = shard.get("env", []) + ["PREPARE_DEPLOY=1", "CACHE_NAME=deploy.unstable"]
+  safe_extend(
+    shard, "script", ["mkdir -p dist/deploy/pex/", "mv dist/pants*.pex dist/deploy/pex/"]
+  )
+  safe_extend(shard, "env", ["PREPARE_DEPLOY=1", "CACHE_NAME=deploy.unstable"])
   return shard
 
 # ----------------------------------------------------------------------

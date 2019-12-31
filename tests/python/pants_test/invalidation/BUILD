@@ -20,7 +20,8 @@ python_tests(
     'src/python/pants/invalidation',
     'src/python/pants/util:dirutil',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -31,6 +32,6 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'testprojects/tests/java/org/pantsbuild/testproject:strictdeps_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 480,
 )

@@ -7,5 +7,6 @@ python_tests(
     'src/python/pants/backend/python:python_requirement',
     'src/python/pants/util:collections',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )

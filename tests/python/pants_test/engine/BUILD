@@ -8,6 +8,7 @@ python_library(
     'src/python/pants/testutil/engine:util',
     'tests/python/pants_test:deprecated_testinfra',
   ],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -16,7 +17,8 @@ python_library(
   dependencies = [
     'src/python/pants/testutil/engine:engine_test_base',
     'tests/python/pants_test:deprecated_testinfra',
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )
 
 python_tests(
@@ -28,6 +30,7 @@ python_tests(
     'src/python/pants/engine:legacy_engine',
     'src/python/pants/testutil/base:context_utils',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -39,6 +42,7 @@ python_tests(
     'src/python/pants/task',
     'src/python/pants/testutil:test_base',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -60,7 +64,8 @@ python_tests(
     'src/python/pants/engine:nodes',
     'src/python/pants/testutil:test_base',
     'tests/python/pants_test/engine/examples:fs_test',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -77,6 +82,7 @@ python_tests(
     'tests/python/pants_test/engine/examples:fs_test',
     'tests/python/pants_test/engine/examples:scheduler_inputs',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -180,6 +186,7 @@ python_tests(
     'src/python/pants/testutil/subsystem',
     'src/python/pants/testutil:test_base',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -195,6 +202,7 @@ python_tests(
     'tests/python/pants_test/engine/examples:scheduler_inputs',
     'src/python/pants/testutil:test_base',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -205,7 +213,7 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'examples/src/scala/org/pantsbuild/example:hello_directory',
   ],
-  tags={'integration'},
+  tags={'integration', 'partially_type_checked'},
 )
 
 python_library(

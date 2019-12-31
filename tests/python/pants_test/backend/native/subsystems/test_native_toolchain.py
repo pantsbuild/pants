@@ -6,7 +6,6 @@ import re
 import subprocess
 from contextlib import contextmanager
 
-from pants.backend.native.config.environment import Platform
 from pants.backend.native.register import rules as native_backend_rules
 from pants.backend.native.subsystems.binaries.gcc import GCC
 from pants.backend.native.subsystems.binaries.llvm import LLVM
@@ -18,7 +17,7 @@ from pants.backend.native.subsystems.native_toolchain import (
   LLVMCToolchain,
   NativeToolchain,
 )
-from pants.engine.platform import create_platform_rules
+from pants.engine.platform import Platform, create_platform_rules
 from pants.testutil.subsystem.util import global_subsystem_instance, init_subsystems
 from pants.testutil.test_base import TestBase
 from pants.util.contextutil import environment_as, pushd, temporary_dir

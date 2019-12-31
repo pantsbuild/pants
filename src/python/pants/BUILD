@@ -7,7 +7,8 @@ python_library(
   sources=['__main__.py'],
   dependencies=[
     'src/python/pants/bin',
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -21,6 +22,7 @@ python_library(
     ':entry_point',
     ':version',
   ],
+  tags = {'partially_type_checked'},
   provides=pants_setup_py(
     name='pantsbuild.pants',
     description='A scalable build tool for large, complex, heterogeneous repos.',

@@ -1,7 +1,6 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import unittest
 from pathlib import Path
 
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
@@ -24,7 +23,6 @@ class WorkUnitLabelTest(PantsRunIntegrationTest):
     self.assert_failure(pants_run)
     self.assertIn("[non-existent-main-class]", pants_run.stdout_data)
 
-  @unittest.skip
   def test_workunit_label_ignore(self):
     pants_run = self.run_pants(
       [*self.load_plugin_cmdline, 'run-workunit-label-test', '--ignore-label']

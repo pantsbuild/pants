@@ -82,6 +82,6 @@ class UnpackWheelsTest(TaskTestBase):
     self._assert_unpacking(module_name='pex')
 
   def test_unpack_missing_module_name(self):
-    with self.assertRaisesRegexp(UnpackWheels.WheelUnpackingError, re.escape(
+    with self.assertRaisesRegex(UnpackWheels.WheelUnpackingError, re.escape(
         'Error extracting wheel for target UnpackedWheels(unpack:foo): Exactly one dist was expected to match name not-a-real-module')):
       self._assert_unpacking(module_name='not-a-real-module')

@@ -16,12 +16,12 @@ from pants.backend.project_info.rules.source_file_validator import (
 # showcasing common use-cases.
 class MatcherTest(unittest.TestCase):
   def test_match(self):
-    m = Matcher('Here is a two-digit number: \d\d')
+    m = Matcher(r'Here is a two-digit number: \d\d')
     self.assertTrue(m.matches('Here is a two-digit number: 42'))
     self.assertFalse(m.matches('Here is a two-digit number: 4'))
 
   def test_inverse_match(self):
-    m = Matcher('Here is a two-digit number: \d\d', inverted=True)
+    m = Matcher(r'Here is a two-digit number: \d\d', inverted=True)
     self.assertFalse(m.matches('Here is a two-digit number: 42'))
     self.assertTrue(m.matches('Here is a two-digit number: 4'))
 
@@ -53,7 +53,7 @@ class MultiMatcherTest(unittest.TestCase):
           """).lstrip()
         },
         'no_six': {
-          'pattern': "(?m)(^from six(\.\w+)* +import +)|(^import six\s*$)",
+          'pattern': r"(?m)(^from six(\.\w+)* +import +)|(^import six\s*$)",
           'inverted': True
         },
         'jvm_header': {
@@ -110,7 +110,7 @@ class MultiMatcherTest(unittest.TestCase):
                       self._rm.check_source_file('foo/bar/baz.py', py_file_content))
 
   def test_multiple_encodings_error(self):
-    with self.assertRaisesRegexp(ValueError, r'Path matched patterns with multiple content '
+    with self.assertRaisesRegex(ValueError, r'Path matched patterns with multiple content '
                                              r'encodings \(ascii, utf8\): hello\/world.foo'):
       self._rm.get_applicable_content_pattern_names('hello/world.foo')
 
@@ -121,7 +121,7 @@ class MultiMatcherTest(unittest.TestCase):
         'unknown_path_pattern2': (),
       }
     }
-    with self.assertRaisesRegexp(ValueError, 'required_matches uses unknown path pattern names: '
+    with self.assertRaisesRegex(ValueError, 'required_matches uses unknown path pattern names: '
                                              'unknown_path_pattern1, unknown_path_pattern2'):
       MultiMatcher(bad_config1)
 
@@ -131,6 +131,6 @@ class MultiMatcherTest(unittest.TestCase):
         'dummy': ('unknown_content_pattern1',)
       }
     }
-    with self.assertRaisesRegexp(ValueError, 'required_matches uses unknown content '
+    with self.assertRaisesRegex(ValueError, 'required_matches uses unknown content '
                                              'pattern names: unknown_content_pattern1'):
       MultiMatcher(bad_config2)

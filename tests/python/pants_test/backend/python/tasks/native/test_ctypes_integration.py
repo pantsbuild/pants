@@ -9,8 +9,8 @@ from functools import wraps
 from unittest import skip
 from zipfile import ZipFile
 
-from pants.backend.native.config.environment import Platform
 from pants.backend.native.subsystems.native_build_step import ToolchainVariant
+from pants.engine.platform import Platform
 from pants.option.scope import GLOBAL_SCOPE_CONFIG_SECTION
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.collections import assert_single_element

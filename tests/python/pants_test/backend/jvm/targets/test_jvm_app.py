@@ -45,7 +45,7 @@ class JvmAppTest(TestBase):
     self.assertEqual('zip', app_target.payload.archive)
 
   def test_bad_basename(self):
-    with self.assertRaisesRegexp(TargetDefinitionException,
+    with self.assertRaisesRegex(TargetDefinitionException,
                                  r'Invalid target JvmApp.* basename must not equal name.'):
       self.make_target(':foo', JvmApp, basename='foo')
 
@@ -73,7 +73,7 @@ class JvmAppTest(TestBase):
 
   def test_no_binary(self):
     app = self.create_app('src/java/org/archimedes/buoyancy')
-    with self.assertRaisesRegexp(TargetDefinitionException,
+    with self.assertRaisesRegex(TargetDefinitionException,
                                  r'Invalid target JvmApp.*src/java/org/archimedes/buoyancy:app\).*'
                                  r' An app must define exactly one'):
       app.binary
@@ -82,7 +82,7 @@ class JvmAppTest(TestBase):
     self.make_target('src/java/org/archimedes/buoyancy:bin', JvmBinary)
     bin2 = self.make_target('src/java/org/archimedes/buoyancy:bin2', JvmBinary)
     app = self.create_app('src/java/org/archimedes/buoyancy', binary=':bin', dependencies=[bin2])
-    with self.assertRaisesRegexp(TargetDefinitionException,
+    with self.assertRaisesRegex(TargetDefinitionException,
                                  r'Invalid target JvmApp.*src/java/org/archimedes/buoyancy:app\).*'
                                  r' An app must define exactly one'):
       app.binary
@@ -91,7 +91,7 @@ class JvmAppTest(TestBase):
     bin = self.make_target('src/java/org/archimedes/buoyancy:bin', JvmBinary)
     bin2 = self.make_target('src/java/org/archimedes/buoyancy:bin2', JvmBinary)
     app = self.create_app('src/java/org/archimedes/buoyancy', dependencies=[bin, bin2])
-    with self.assertRaisesRegexp(TargetDefinitionException,
+    with self.assertRaisesRegex(TargetDefinitionException,
                                  r'Invalid target JvmApp.*src/java/org/archimedes/buoyancy:app\).*'
                                  r' An app must define exactly one'):
       app.binary
@@ -100,7 +100,7 @@ class JvmAppTest(TestBase):
     self.make_target('src/java/org/archimedes/buoyancy:bin', JvmBinary)
     self.create_app('src/java/org/archimedes/buoyancy', name='app', binary=':bin')
     app = self.create_app('src/java/org/archimedes/buoyancy', name='app2', binary=':app')
-    with self.assertRaisesRegexp(TargetDefinitionException,
+    with self.assertRaisesRegex(TargetDefinitionException,
                                  r'Invalid target JvmApp.*src/java/org/archimedes/buoyancy:app2\).*'
                                  r' Expected binary dependency'):
       app.binary

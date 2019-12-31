@@ -104,12 +104,12 @@ class RunPrepCommandTest(TaskTestBase):
     self.assertEqual(frozenset({'binary', 'test'}), prep_command.goals)
 
   def test_invalid_target_no_executable(self):
-    with self.assertRaisesRegexp(TargetDefinitionException,
+    with self.assertRaisesRegex(TargetDefinitionException,
                                  r'prep_executable must be specified'):
       self.make_target('foo', PrepCommand,)
 
   def test_invalid_target_unrecognized_goals(self):
-    with self.assertRaisesRegexp(TargetDefinitionException,
+    with self.assertRaisesRegex(TargetDefinitionException,
                                  r'.*Got unrecognized goals baloney, malarkey. '
                                  r'Goal must be one of.*'):
       self.make_target('foo', PrepCommand, prep_executable='foo.sh',

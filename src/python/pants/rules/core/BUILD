@@ -40,6 +40,7 @@ python_tests(
     'src/python/pants/testutil/engine:util',
     'src/python/pants/testutil/subsystem',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -51,5 +52,5 @@ python_tests(
     'examples/src/scala/org/pantsbuild/example:hello_directory',
     'examples/src/resources/org/pantsbuild/example:hello_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )

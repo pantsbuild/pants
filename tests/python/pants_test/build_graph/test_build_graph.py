@@ -208,7 +208,7 @@ class BuildGraphTest(TestBase):
 
     def empty_gen():
       return
-      yield
+      yield  # type: ignore[misc] # MyPy complains that this is not reachable
     self.assertEqual([], BuildGraph.closure(empty_gen()))
 
   def test_closure_bfs(self):
@@ -283,14 +283,14 @@ class BuildGraphTest(TestBase):
 
   @unittest.skip(reason='TODO: #4515')
   def test_invalid_address(self):
-    with self.assertRaisesRegexp(AddressLookupError, '.* does not contain any BUILD files.'):
+    with self.assertRaisesRegex(AddressLookupError, '.* does not contain any BUILD files.'):
       self.inject_address_closure('//:a')
 
     self.add_to_build_file('BUILD',
                            'target(name="a", '
                            '  dependencies=["non-existent-path:b"],'
                            ')')
-    with self.assertRaisesRegexp(AddressLookupError,
+    with self.assertRaisesRegex(AddressLookupError,
                                  '^.*/non-existent-path does not contain any BUILD files.'
                                  '\s+when translating spec non-existent-path:b'
                                  '\s+referenced from //:a$'):
@@ -306,7 +306,7 @@ class BuildGraphTest(TestBase):
                            'target(name="b", '
                            '  dependencies=["non-existent-path:c"],'
                            ')')
-    with self.assertRaisesRegexp(BuildGraph.TransitiveLookupError,
+    with self.assertRaisesRegex(BuildGraph.TransitiveLookupError,
                                  '^.*/non-existent-path does not contain any BUILD files.'
                                  '\s+when translating spec non-existent-path:c'
                                  '\s+referenced from goodpath:b'
@@ -337,7 +337,7 @@ class BuildGraphTest(TestBase):
                            'target(name="c", '
                            '  dependencies=["non-existent-path:d"],'
                            ')')
-    with self.assertRaisesRegexp(BuildGraph.TransitiveLookupError,
+    with self.assertRaisesRegex(BuildGraph.TransitiveLookupError,
                                  '^.*/non-existent-path does not contain any BUILD files.'
                                  '\s+when translating spec non-existent-path:d'
                                  '\s+referenced from goodpath:c'
@@ -355,7 +355,7 @@ class BuildGraphTest(TestBase):
     self.add_to_build_file('other/BUILD',
                            'target(name="b")')
 
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         AddressLookupError,
         '''^Addresses in dependencies must be unique. 'other:b' is '''
         '''referenced more than once by target '//:a'.'''):

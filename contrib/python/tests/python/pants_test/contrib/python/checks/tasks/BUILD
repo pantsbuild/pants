@@ -8,5 +8,6 @@ python_tests(
     'src/python/pants/backend/python/subsystems',
     'contrib/python/src/python/pants/contrib/python/checks/tasks',
     'tests/python/pants_test/backend/python/tasks:python_task_test_base',
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )

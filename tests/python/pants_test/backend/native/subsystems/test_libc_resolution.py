@@ -1,9 +1,9 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.native.config.environment import Platform
 from pants.backend.native.subsystems.libc_dev import LibcDev
 from pants.backend.native.subsystems.utils.parse_search_dirs import ParseSearchDirs
+from pants.engine.platform import Platform
 from pants.testutil.subsystem.util import global_subsystem_instance, init_subsystems
 from pants.testutil.test_base import TestBase
 from pants_test.backend.native.util.platform_utils import platform_specific

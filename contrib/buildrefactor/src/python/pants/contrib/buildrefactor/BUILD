@@ -6,6 +6,7 @@ contrib_plugin(
   dependencies=[
     ':buildrefactor'
   ],
+  tags = {'partially_type_checked'},
   distribution_name='pantsbuild.pants.contrib.buildrefactor',
   description='Plugin to manipulate and refactor BUILD files and targets',
   register_goals=True,

@@ -79,9 +79,9 @@ class TestNodeBundle(TaskTestBase):
         self.assertRaises(TargetDefinitionException, task.execute)
 
   def test_no_zip_for_archive(self):
-    with self.assertRaisesRegexp(TargetDefinitionException, 'zip'):
+    with self.assertRaisesRegex(TargetDefinitionException, 'zip'):
       NodeBundle(node_module=self.node_module_target_name_full, archive='zip')
 
   def test_require_node_module_for_bundle(self):
-    with self.assertRaisesRegexp(TargetDefinitionException, 'node_module'):
+    with self.assertRaisesRegex(TargetDefinitionException, 'node_module'):
       NodeBundle()

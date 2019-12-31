@@ -5,7 +5,7 @@ import os
 import sys
 from abc import ABC
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Dict, Iterable, List, Optional, Tuple
 
 from twitter.common.collections import OrderedSet
 
@@ -54,7 +54,7 @@ class VersionHelp(HelpRequest):
 class UnknownGoalHelp(HelpRequest):
   """The user specified an unknown goal (or task)."""
 
-  def __init__(self, unknown_goals):
+  def __init__(self, unknown_goals: List[str]) -> None:
     super().__init__()
     self.unknown_goals = unknown_goals
 
@@ -83,16 +83,16 @@ class ArgSplitter:
   _HELP_ARGS = (_HELP_BASIC_ARGS + _HELP_ADVANCED_ARGS + _HELP_ALL_SCOPES_ARGS +
                 _HELP_VERSION_ARGS + _HELP_GOALS_ARGS)
 
-  def __init__(self, known_scope_infos):
+  def __init__(self, known_scope_infos: Iterable[ScopeInfo]) -> None:
     self._known_scope_infos = known_scope_infos
     # TODO: Get rid of our reliance on known scopes here. We don't really need it now
     # that we heuristically identify target specs based on it containing /, : or being
     # a top-level directory.
     self._known_scopes = ({si.scope for si in known_scope_infos} |
                           {'goals', 'help', 'help-advanced', 'help-all'})
-    self._unknown_scopes = []
-    self._unconsumed_args = []  # In reverse order, for efficient popping off the end.
-    self._help_request = None  # Will be set if we encounter any help flags.
+    self._unknown_scopes: List[str] = []
+    self._unconsumed_args: List[str] = []  # In reverse order, for efficient popping off the end.
+    self._help_request: Optional[HelpRequest] = None  # Will be set if we encounter any help flags.
 
     # For convenience, and for historical reasons, we allow --scope-flag-name anywhere on the
     # cmd line, as an alternative to ... scope --flag-name.
@@ -106,11 +106,11 @@ class ArgSplitter:
                                     for si in sorted_scope_infos]
 
   @property
-  def help_request(self):
+  def help_request(self) -> Optional[HelpRequest]:
     return self._help_request
 
-  def _check_for_help_request(self, arg):
-    if not arg in self._HELP_ARGS:
+  def _check_for_help_request(self, arg: str) -> bool:
+    if arg not in self._HELP_ARGS:
       return False
     if arg in self._HELP_VERSION_ARGS:
       self._help_request = VersionHelp()
@@ -127,7 +127,7 @@ class ArgSplitter:
         self._help_request = OptionsHelp(advanced=advanced, all_scopes=all_scopes)
     return True
 
-  def split_args(self, args=None):
+  def split_args(self, args: Optional[List[str]] = None) -> SplitArgs:
     """Split the specified arg list (or sys.argv if unspecified).
 
     args[0] is ignored.
@@ -135,9 +135,9 @@ class ArgSplitter:
     Returns a SplitArgs tuple.
     """
     goals = OrderedSet()
-    scope_to_flags = {}
+    scope_to_flags: Dict[str, List[str]] = {}
 
-    def add_scope(s):
+    def add_scope(s: str) -> None:
       # Force the scope to appear, even if empty.
       if s not in scope_to_flags:
         scope_to_flags[s] = []
@@ -152,7 +152,7 @@ class ArgSplitter:
     if not self._at_flag() and self._unconsumed_args:
       self._unconsumed_args.pop()
 
-    def assign_flag_to_scope(flg, default_scope):
+    def assign_flag_to_scope(flg: str, default_scope: str) -> None:
       flag_scope, descoped_flag = self._descope_flag(flg, default_scope=default_scope)
       if flag_scope not in scope_to_flags:
         scope_to_flags[flag_scope] = []
@@ -206,7 +206,7 @@ class ArgSplitter:
     """
     return os.path.sep in arg or ':' in arg or os.path.isdir(arg)
 
-  def _consume_scope(self):
+  def _consume_scope(self) -> Tuple[Optional[str], List[str]]:
     """Returns a pair (scope, list of flags encountered in that scope).
 
     Note that the flag may be explicitly scoped, and therefore not actually belong to this scope.
@@ -224,7 +224,7 @@ class ArgSplitter:
     flags = self._consume_flags()
     return scope, flags
 
-  def _consume_flags(self):
+  def _consume_flags(self) -> List[str]:
     """Read flags until we encounter the first token that isn't a flag."""
     flags = []
     while self._at_flag():
@@ -233,7 +233,7 @@ class ArgSplitter:
         flags.append(flag)
     return flags
 
-  def _descope_flag(self, flag, default_scope):
+  def _descope_flag(self, flag: str, default_scope: str) -> Tuple[str, str]:
     """If the flag is prefixed by its scope, in the old style, extract the scope.
 
     Otherwise assume it belongs to default_scope.
@@ -257,13 +257,15 @@ class ArgSplitter:
           return scope, flag_prefix + flag[len(prefix):]
     return default_scope, flag
 
-  def _at_flag(self):
-    return (self._unconsumed_args and
-            self._unconsumed_args[-1].startswith('-') and
-            not self._at_double_dash())
+  def _at_flag(self) -> bool:
+    return (
+      bool(self._unconsumed_args)
+      and self._unconsumed_args[-1].startswith('-')
+      and not self._at_double_dash()
+    )
 
-  def _at_scope(self):
-    return self._unconsumed_args and self._unconsumed_args[-1] in self._known_scopes
+  def _at_scope(self) -> bool:
+    return bool(self._unconsumed_args) and self._unconsumed_args[-1] in self._known_scopes
 
-  def _at_double_dash(self):
-    return self._unconsumed_args and self._unconsumed_args[-1] == '--'
+  def _at_double_dash(self) -> bool:
+    return bool(self._unconsumed_args) and self._unconsumed_args[-1] == '--'

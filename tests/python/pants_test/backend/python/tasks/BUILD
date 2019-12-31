@@ -11,7 +11,8 @@ python_library(
     'src/python/pants/subsystem',
     'src/python/pants/testutil/subsystem',
     'src/python/pants/testutil:task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -23,6 +24,7 @@ python_tests(
     'src/python/pants/backend/python/targets',
     'tests/python/pants_test/backend/python/tasks/util',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -35,7 +37,7 @@ python_tests(
     'testprojects/src/python:python_distribution_directory',
     'testprojects/tests/python:example_test_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 180,
 )
 
@@ -53,6 +55,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil:task_test_base',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -65,7 +68,7 @@ python_tests(
     'tests/python/pants_test:interpreter_selection_utils',
     'testprojects/src/python:interpreter_selection_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout=240,
 )
 
@@ -79,17 +82,20 @@ python_tests(
     'tests/python/pants_test:interpreter_selection_utils',
     ':python_task_test_base',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
   name = 'isort_run_integration',
   sources = ['test_isort_run_integration.py'],
   dependencies = [
+    'contrib:isort_cfg',
+    'examples:isort_cfg',
     'src/python/pants/backend/python/tasks',
     'src/python/pants/testutil:int-test',
     'testprojects/tests/java/org/pantsbuild/testproject:dummies_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )
 
 python_tests(
@@ -108,6 +114,7 @@ python_tests(
     'src/python/pants/testutil/subsystem',
     ':python_task_test_base',
   ],
+  tags = {"partially_type_checked"},
   timeout=480,
 )
 
@@ -125,7 +132,7 @@ python_tests(
     'testprojects/tests/python/pants:constants_only_directory',
     'testprojects/tests/python/pants:timeout_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout=240,
 )
 
@@ -138,6 +145,7 @@ python_tests(
     'src/python/pants/build_graph',
     ':python_task_test_base',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -149,7 +157,7 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'testprojects/src/python:python_distribution_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout=240
 )
 
@@ -164,6 +172,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     ':python_task_test_base',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -173,7 +182,7 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'testprojects/src/python:interpreter_selection_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout=120,
 )
 
@@ -189,7 +198,7 @@ python_tests(
     'testprojects/src/python:interpreter_selection_directory',
     'testprojects/src/python:print_env_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout=240
 )
 
@@ -203,6 +212,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     ':python_task_test_base',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -220,6 +230,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil:task_test_base',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -235,6 +246,7 @@ python_tests(
     'src/python/pants/util:dirutil',
     'src/python/pants/testutil:task_test_base',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -256,6 +268,7 @@ python_tests(
     'src/python/pants/testutil/subsystem',
     'tests/python/pants_test:interpreter_selection_utils',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -268,7 +281,7 @@ python_tests(
     'examples/src/thrift/org/pantsbuild/example:precipitation_directory',
     'testprojects:pants_plugins_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout=240,
 )
 
@@ -284,4 +297,5 @@ python_tests(
     'src/python/pants/util:collections',
     'src/python/pants/testutil:task_test_base',
   ],
+  tags = {"partially_type_checked"},
 )

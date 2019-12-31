@@ -9,4 +9,5 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil/jvm:nailgun_task_test_base'
   ],
+  tags = {"partially_type_checked"},
 )

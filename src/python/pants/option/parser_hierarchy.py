@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import re
+from typing import Iterator
 
 from pants.option.config import Config
 from pants.option.parser import Parser
@@ -14,34 +15,33 @@ class InvalidScopeError(Exception):
 _empty_scope_component_re = re.compile(r'\.\.')
 
 
-def _validate_full_scope(scope):
+def _validate_full_scope(scope: str) -> None:
   if _empty_scope_component_re.search(scope):
-    raise InvalidScopeError(
-      f"full scope '{scope}' has at least one empty component")
+    raise InvalidScopeError(f"full scope '{scope}' has at least one empty component")
 
 
-def enclosing_scope(scope):
+def enclosing_scope(scope: str) -> str:
   """Utility function to return the scope immediately enclosing a given scope."""
   _validate_full_scope(scope)
   return scope.rpartition('.')[0]
 
 
-def all_enclosing_scopes(scope, allow_global=True):
+def all_enclosing_scopes(scope: str, *, allow_global: bool = True) -> Iterator[str]:
   """Utility function to return all scopes up to the global scope enclosing a
   given scope."""
 
   _validate_full_scope(scope)
 
-  def scope_within_range(tentative_scope):
-    if tentative_scope is None:
-      return False
+  def scope_within_range(tentative_scope: str) -> bool:
     if not allow_global and tentative_scope == GLOBAL_SCOPE:
       return False
     return True
 
   while scope_within_range(scope):
     yield scope
-    scope = (None if scope == GLOBAL_SCOPE else enclosing_scope(scope))
+    if scope == GLOBAL_SCOPE:
+      return
+    scope = enclosing_scope(scope)
 
 
 class ParserHierarchy:
