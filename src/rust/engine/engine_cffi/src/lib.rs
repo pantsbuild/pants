@@ -46,7 +46,7 @@ use engine::{
 };
 use futures::Future;
 use hashing::{Digest, EMPTY_DIGEST};
-use log::{error, Log};
+use log::{error, warn, Log};
 use logging::logger::LOGGER;
 use logging::{Destination, Logger};
 use rule_graph::{GraphMaker, RuleGraph};
@@ -970,7 +970,7 @@ pub extern "C" fn run_local_interactive_process(
         let digest: Digest = nodes::lift_digest(&input_files_value)?;
         if digest != EMPTY_DIGEST {
           if run_in_workspace {
-            return Err("When running an interactive process in the workspace, use the Workspace type to materialize files.".to_string());
+            warn!("Local interactive process should not attempt to materialize files when run in workspace");
           } else {
             let destination = match maybe_tempdir {
               Some(ref dir) => dir.path().to_path_buf(),
