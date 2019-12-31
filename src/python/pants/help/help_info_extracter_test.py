@@ -104,7 +104,12 @@ class HelpInfoExtracterTest(unittest.TestCase):
     self.assertEqual('do not use this', ohi.removal_hint)
     self.assertIsNotNone(ohi.deprecated_message)
 
-  def test_enum_choices(self) -> None:
+  def test_choices(self) -> None:
+    kwargs={'choices' : ['info', 'debug']}
+    ohi = HelpInfoExtracter('').get_option_help_info([], kwargs)
+    assert ohi.choices == 'info, debug'
+
+  def test_choices_enum(self) -> None:
     kwargs = {'type': LogLevel}
     ohi = HelpInfoExtracter('').get_option_help_info([], kwargs)
     assert ohi.choices == 'info, debug'

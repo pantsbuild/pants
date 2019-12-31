@@ -3,7 +3,6 @@
 
 import unittest
 from dataclasses import replace
-from enum import Enum
 
 from pants.help.help_formatter import HelpFormatter
 from pants.help.help_info_extracter import OptionHelpInfo
@@ -44,13 +43,3 @@ class OptionHelpFormatterTest(unittest.TestCase):
   def test_format_help_choices(self):
     line = self.format_help_for_foo(typ=str, default='kiwi', choices='apple, banana, kiwi')
     assert line.lstrip() == '--foo (one of: [apple, banana, kiwi] default: kiwi)'
-
-  def test_format_help_choices_enum(self) -> None:
-    # We assume that help_info_extractor.py correctly parsed the Enum into this OptionHelpInfo
-    class LogLevel(Enum):
-      INFO = 'info'
-      DEBUG = 'debug'
-    no_default = self.format_help_for_foo(typ=LogLevel, choices='info, debug')
-    assert no_default.lstrip() == '--foo (one of: [info, debug] default: None)'
-    default = self.format_help_for_foo(typ=LogLevel, choices='info, debug', default='info')
-    assert default.lstrip() == '--foo (one of: [info, debug] default: info)'
