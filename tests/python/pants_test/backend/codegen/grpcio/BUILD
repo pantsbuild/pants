@@ -8,5 +8,6 @@ python_tests(
     'src/python/pants/base:build_environment',
     'src/python/pants/testutil:task_test_base',
   ],
-  sources=globs('*.py')
+  sources=globs('*.py'),
+  tags = {"partially_type_checked"},
 )

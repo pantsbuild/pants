@@ -62,15 +62,6 @@ class ProjectsTestBase(PantsRunIntegrationTest):
       'testprojects/src/python/unicode/compilation_failure',
     ]
 
-    # May not succeed without java8 installed
-    need_java_8 = [
-      'testprojects/src/java/org/pantsbuild/testproject/targetlevels/java8',
-      'testprojects/tests/java/org/pantsbuild/testproject/testjvms',
-      'testprojects/tests/java/org/pantsbuild/testproject/testjvms:eight',
-      'testprojects/tests/java/org/pantsbuild/testproject/testjvms:eight-test-platform',
-      'examples/src/java/org/pantsbuild/example/plugin',
-    ]
-
     # Interpreter will not resolve correctly when Pants is constrained to Python 3
     python2_only = [
       # tested in test_antlr_py_gen_integration.py
@@ -114,7 +105,6 @@ class ProjectsTestBase(PantsRunIntegrationTest):
     return [
       *known_failing_targets,
       *negative_test_targets,
-      *need_java_8,
       *python2_only,
       *timeout_targets,
       *deliberately_conflicting_targets,
@@ -150,11 +140,5 @@ class ProjectsTestBase(PantsRunIntegrationTest):
     return list(sorted(pants_run.stdout_data.split()))
 
   def assert_valid_projects(self, *globs: str) -> None:
-    pants_run = self.run_pants([
-      'compile',
-      'lint',
-      'test',
-      *self.targets_for_globs(*globs),
-      '--jvm-platform-default-platform=java7'
-    ])
+    pants_run = self.run_pants(['compile', 'lint', 'test', *self.targets_for_globs(*globs)])
     self.assert_success(pants_run)

@@ -17,6 +17,6 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'examples/tests/java/org/pantsbuild/example:hello_directory',
   ],
-  tags={'integration'},
+  tags={'integration', 'partially_type_checked'},
   timeout=300
 )

@@ -81,7 +81,7 @@ class TestInterpreterCache(TestBase):
       with self._setup_cache(constraints=['CPython>=2.7,<3'],
                              search_paths=['<PEXRC>']) as (cache, _):
         self.assertIn(py27_path, {pi.binary for pi in cache.setup()})
-      with self._setup_cache(constraints=['CPython>=3.6,<4'],
+      with self._setup_cache(constraints=['CPython>=3.6'],
                              search_paths=['<PEXRC>']) as (cache, _):
         self.assertIn(py36_path, {pi.binary for pi in cache.setup()})
 

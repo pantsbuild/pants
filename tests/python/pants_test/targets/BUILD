@@ -6,6 +6,7 @@ python_library(
   dependencies = [
     'src/python/pants/testutil:test_base',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -15,7 +16,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil:int-test',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )
 
 python_tests(
@@ -24,7 +25,8 @@ python_tests(
   dependencies = [
     ':base',
     'src/python/pants/build_graph',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -35,7 +37,8 @@ python_tests(
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -45,7 +48,7 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'testprojects/src/java/org/pantsbuild/testproject:bundle_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 300,
 )
 
@@ -56,7 +59,8 @@ python_tests(
     ':base',
     'src/python/pants/backend/python/targets',
     'src/python/pants/build_graph',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -69,7 +73,8 @@ python_tests(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/build_graph',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -83,5 +88,6 @@ python_tests(
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
     'src/python/pants/testutil:test_base'
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )

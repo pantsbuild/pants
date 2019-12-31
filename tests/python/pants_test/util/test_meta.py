@@ -57,7 +57,7 @@ class WithProp:
     return cls._value
 
   @staticproperty
-  def static_property():
+  def static_property():  # type: ignore[misc]  # MyPy expects methods to have `self` or `cls`
     "static_property docs"
     return 'static_property'
 
@@ -289,7 +289,7 @@ class FrozenAfterInitTest(unittest.TestCase):
 
     test = Test()
     with self.assertRaises(FrozenInstanceError):
-      test.x = 1
+      test.x = 1  # type: ignore[attr-defined]
 
   def test_init_still_works(self):
     @frozen_after_init
@@ -319,18 +319,18 @@ class FrozenAfterInitTest(unittest.TestCase):
     class Test:
 
       def __init__(self, x: int) -> None:
-        self.x: x
+        self.x = x
 
     test = Test(x=0)
     with self.assertRaises(FrozenInstanceError):
-      test.y = "abc"
+      test.y = "abc"  # type: ignore[attr-defined]
 
   def test_explicitly_call_setattr_after_init(self) -> None:
     @frozen_after_init
     class Test:
 
       def __init__(self, x: int) -> None:
-        self.x: x
+        self.x = x
 
     test = Test(x=0)
     with self.assertRaises(FrozenInstanceError):

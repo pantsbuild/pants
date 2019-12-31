@@ -77,5 +77,6 @@ python_library(
     'src/python/pants/util:memo',
     ':process_manager',
     ':watchman_launcher'
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )

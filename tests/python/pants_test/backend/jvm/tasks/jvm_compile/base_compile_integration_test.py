@@ -4,6 +4,7 @@
 import os
 from collections import defaultdict
 from contextlib import contextmanager
+from typing import List
 
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import temporary_dir
@@ -14,7 +15,7 @@ class BaseCompileIT(PantsRunIntegrationTest):
   :API: public
   """
 
-  _EXTRA_TASK_ARGS=[]
+  _EXTRA_TASK_ARGS: List[str] = []
 
   @contextmanager
   def do_test_compile(self, target, expected_files=None, iterations=2, expect_failure=False,

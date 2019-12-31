@@ -142,7 +142,7 @@ class BootstrapJvmToolsNonOptionalNoDefaultTest(BootstrapJvmToolsTestBase):
     return cls.JvmToolTask
 
   def test_unsupplied(self):
-    with self.assertRaisesRegexp(BootstrapJvmTools.ToolResolveError,
+    with self.assertRaisesRegex(BootstrapJvmTools.ToolResolveError,
                                  r'\s*Failed to resolve target for tool: test:checkstyle\..*'):
       self.execute(context=self.context())
 

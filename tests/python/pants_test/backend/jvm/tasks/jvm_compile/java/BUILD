@@ -12,7 +12,7 @@ python_tests(
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout=720,
 )
 
@@ -33,7 +33,7 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:printversion_directory',
     'testprojects/src/scala/org/pantsbuild/testproject:unicode_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout=600,
 )
 
@@ -55,7 +55,7 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:unicode_directory',
     'testprojects/tests/java/org/pantsbuild/testproject:matcher_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout=600,
 )
 
@@ -68,7 +68,7 @@ python_tests(
     'examples/src/java/org/pantsbuild/example:javac_directory',
   ],
   timeout = 530,
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )
 
 python_tests(
@@ -84,15 +84,5 @@ python_tests(
     'src/python/pants/testutil/jvm:nailgun_task_test_base',
     'src/python/pants/testutil/subsystem',
   ],
-)
-
-python_library(
-  name = 'jvm_platform_integration_mixin',
-  sources = ['jvm_platform_integration_mixin.py'],
-  dependencies = [
-    'src/python/pants/fs',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:dirutil',
-    'src/python/pants/testutil:int-test',
-  ],
+  tags = {"partially_type_checked"},
 )

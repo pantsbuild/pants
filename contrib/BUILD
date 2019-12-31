@@ -24,3 +24,8 @@ target(
     'contrib/thrifty/src/python/pants/contrib/thrifty:plugin',
   ]
 )
+
+files(
+  name = 'isort_cfg',
+  source = '.isort.cfg',
+)

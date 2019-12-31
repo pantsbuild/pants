@@ -15,7 +15,8 @@ python_tests(
   dependencies = [
     ':test_deps',
     'src/python/pants/pantsd:process_manager',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -25,7 +26,8 @@ python_tests(
   dependencies = [
     ':test_deps',
     'src/python/pants/pantsd:watchman'
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -35,7 +37,8 @@ python_tests(
   dependencies = [
     ':test_deps',
     'src/python/pants/pantsd:watchman_client'
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -45,7 +48,8 @@ python_tests(
   dependencies = [
     ':test_deps',
     'src/python/pants/pantsd:pailgun_server'
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -58,7 +62,8 @@ python_tests(
     'src/python/pants/pantsd:pants_daemon',
     'src/python/pants/pantsd/service:pants_service',
     'src/python/pants/util:contextutil',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -71,6 +76,7 @@ python_library(
     'src/python/pants/testutil:process_test_util',
     'src/python/pants/testutil:int-test',
   ],
+  tags = {'partially_type_checked'},
 )
 
 python_tests(
@@ -87,7 +93,7 @@ python_tests(
     'testprojects/src/python:nested_runs_directory',
     'testprojects/src/python:print_env_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 900
 )
 
@@ -99,5 +105,6 @@ python_tests(
     'tests/python/pants_test/pantsd:test_deps',
     'src/python/pants/testutil/subsystem',
     'src/python/pants/pantsd:watchman_launcher'
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )

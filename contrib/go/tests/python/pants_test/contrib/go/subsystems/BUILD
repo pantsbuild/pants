@@ -8,7 +8,8 @@ python_tests(
     'contrib/go/src/python/pants/contrib/go/subsystems',
     'src/python/pants/testutil/subsystem',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )
 
 python_tests(
@@ -39,6 +40,6 @@ python_tests(
     'contrib/go:examples_directory',
     'src/python/pants/testutil:int-test',
   ],
-  tags={'integration'},
+  tags={'integration', 'partially_type_checked'},
   timeout=180,
 )

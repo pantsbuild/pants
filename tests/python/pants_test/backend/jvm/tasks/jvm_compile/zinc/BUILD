@@ -32,7 +32,7 @@ python_tests(
     'examples/src/java/org/pantsbuild/example:hello_directory',
   ],
   timeout = 900,
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )
 
 python_tests(
@@ -43,5 +43,5 @@ python_tests(
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
   ],
   timeout = 900,
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )

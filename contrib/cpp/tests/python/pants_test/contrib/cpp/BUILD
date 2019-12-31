@@ -12,7 +12,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil:int-test',
   ],
-  tags={'integration'},
+  tags={'integration', 'partially_type_checked'},
 )
 
 python_tests(

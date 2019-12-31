@@ -16,6 +16,7 @@ python_library(
     'tests/python/pants_test/option/util',
     'tests/python/pants_test/testutils:file_test_util',
   ],
+  tags = {'partially_type_checked'},
   provides=pants_setup_py(
     name='pantsbuild.pants.testinfra',
     description='Test support for writing Pants plugins.',
@@ -31,7 +32,8 @@ python_library(
   sources=['deprecated_testinfra.py'],
   dependencies = [
     'src/python/pants/base:deprecated',
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -40,7 +42,8 @@ python_library(
   dependencies = [
     ':deprecated_testinfra',
     'src/python/pants/testutil:int-test-for-export',
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )
 
 target(
@@ -57,7 +60,8 @@ python_library(
   dependencies = [
     'src/python/pants/base:deprecated',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -66,7 +70,8 @@ python_library(
   dependencies = [
     ':deprecated_testinfra',
     'src/python/pants/testutil:console_rule_test_base',
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )
 
 
@@ -76,7 +81,8 @@ python_library(
   dependencies = [
     ':deprecated_testinfra',
     'src/python/pants/testutil:task_test_base',
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -85,7 +91,8 @@ python_library(
   dependencies = [
     ':deprecated_testinfra',
     'src/python/pants/testutil:interpreter_selection_utils',
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )
 
 python_tests(
@@ -97,5 +104,6 @@ python_tests(
     'src/python/pants/source',
     'src/python/pants/testutil:test_base',
     'src/python/pants/testutil/subsystem',
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )

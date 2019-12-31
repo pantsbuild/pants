@@ -7,5 +7,6 @@ python_tests(
   dependencies=[
     'src/python/pants/backend/jvm/subsystems:jvm',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )

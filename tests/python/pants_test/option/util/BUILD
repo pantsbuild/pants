@@ -6,4 +6,5 @@ python_library(
     'src/python/pants/testutil/option',
     'tests/python/pants_test:deprecated_testinfra',
   ],
+  tags = {'partially_type_checked'},
 )

@@ -12,7 +12,8 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/testutil:test_base',
     'src/python/pants/testutil/jvm:nailgun_task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 
@@ -26,6 +27,6 @@ python_tests(
     'examples/src/java/org/pantsbuild/example:antlr3_directory',
     'examples/src/java/org/pantsbuild/example:antlr4_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 240,
 )

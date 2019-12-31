@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+from typing import List, Tuple
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
@@ -57,7 +58,7 @@ class DummyTask(Task):
 
 
 class FakeTask(Task):
-  _impls = []
+  _impls: List[Tuple[str, int]] = []
 
   @classmethod
   def implementation_version(cls):
@@ -79,7 +80,7 @@ class FakeTask(Task):
 
 
 class OtherFakeTask(FakeTask):
-  _other_impls = []
+  _other_impls: List[Tuple[str, int]] = []
 
   @classmethod
   def supports_passthru_args(cls):
@@ -146,7 +147,9 @@ class TaskWithTransitiveSubsystemDependencies(Task):
 
 class TaskWithTargetFiltering(DummyTask):
   options_scope = 'task-with-target-filtering'
-  target_filtering_enabled = True
+  # TODO: MyPy doesn't understand when a class property was defined via a method with
+  # @classproperty and then is treated as a normal class var in a subclass.
+  target_filtering_enabled = True  # type: ignore[assignment]
 
 
 class TaskTest(TaskTestBase):

@@ -10,7 +10,7 @@ from pants.option.ranked_value import RankedValue
 
 class OptionValueContainerTest(unittest.TestCase):
 
-  def test_unknown_values(self):
+  def test_unknown_values(self) -> None:
     o = OptionValueContainer()
     o.foo = RankedValue(RankedValue.HARDCODED, 1)
     self.assertEqual(1, o.foo)
@@ -18,7 +18,7 @@ class OptionValueContainerTest(unittest.TestCase):
     with self.assertRaises(AttributeError):
       o.bar
 
-  def test_value_ranking(self):
+  def test_value_ranking(self) -> None:
     o = OptionValueContainer()
     o.foo = RankedValue(RankedValue.CONFIG, 11)
     self.assertEqual(11, o.foo)
@@ -33,7 +33,7 @@ class OptionValueContainerTest(unittest.TestCase):
     self.assertEqual(44, o.foo)
     self.assertEqual(RankedValue.FLAG, o.get_rank('foo'))
 
-  def test_is_flagged(self):
+  def test_is_flagged(self) -> None:
     o = OptionValueContainer()
 
     o.foo = RankedValue(RankedValue.NONE, 11)
@@ -48,7 +48,7 @@ class OptionValueContainerTest(unittest.TestCase):
     o.foo = RankedValue(RankedValue.FLAG, 11)
     self.assertTrue(o.is_flagged('foo'))
 
-  def test_indexing(self):
+  def test_indexing(self) -> None:
     o = OptionValueContainer()
     o.foo = RankedValue(RankedValue.CONFIG, 1)
     self.assertEqual(1, o['foo'])
@@ -61,7 +61,7 @@ class OptionValueContainerTest(unittest.TestCase):
     with self.assertRaises(AttributeError):
       o['bar']
 
-  def test_iterator(self):
+  def test_iterator(self) -> None:
     o = OptionValueContainer()
     o.a = RankedValue(RankedValue.FLAG, 3)
     o.b = RankedValue(RankedValue.FLAG, 2)
@@ -69,7 +69,7 @@ class OptionValueContainerTest(unittest.TestCase):
     names = list(iter(o))
     self.assertListEqual(['a', 'b', 'c'], names)
 
-  def test_copy(self):
+  def test_copy(self) -> None:
     # copy semantics can get hairy when overriding __setattr__/__getattr__, so we test them.
     o = OptionValueContainer()
     o.foo = RankedValue(RankedValue.FLAG, 1)
@@ -83,10 +83,11 @@ class OptionValueContainerTest(unittest.TestCase):
     self.assertFalse(hasattr(p, 'baz'))  # Does not have attribute added after the copy.
 
     # Verify that it's a shallow copy by modifying a referent in o and reading it in p.
-    o.bar['b'] = 222
+    # TODO: add type hints to ranked_value.py and option_value_container.py so that this works.
+    o.bar['b'] = 222  # type: ignore[index]
     self.assertEqual({'a': 111, 'b': 222}, p.bar)
 
-  def test_deepcopy(self):
+  def test_deepcopy(self) -> None:
     # copy semantics can get hairy when overriding __setattr__/__getattr__, so we test them.
     o = OptionValueContainer()
     o.foo = RankedValue(RankedValue.FLAG, 1)
@@ -100,5 +101,6 @@ class OptionValueContainerTest(unittest.TestCase):
     self.assertFalse(hasattr(p, 'baz'))  # Does not have attribute added after the copy.
 
     # Verify that it's a deep copy by modifying a referent in o and reading it in p.
-    o.bar['b'] = 222
+    # TODO: add type hints to ranked_value.py and option_value_container.py so that this works.
+    o.bar['b'] = 222  # type: ignore[index]
     self.assertEqual({'a': 111}, p.bar)

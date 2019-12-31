@@ -19,6 +19,7 @@ python_library(
     'src/python/pants/java/jar',
     'src/python/pants/util:dirutil',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -28,6 +29,7 @@ python_library(
     ':jvm_tool_task_test_base',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -36,6 +38,7 @@ python_library(
   dependencies=[
     ':nailgun_task_test_base',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -47,4 +50,5 @@ python_library(
     'src/python/pants/testutil:task_test_base',
     'src/python/pants/util:dirutil',
   ],
+  tags = {"partially_type_checked"},
 )

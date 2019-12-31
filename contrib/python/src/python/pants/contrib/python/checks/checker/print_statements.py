@@ -26,7 +26,8 @@ class PrintStatements(CheckstylePlugin):
       # Python 3 interpreter will raise SyntaxError upon reading a print statement.
       # So, this module cannot be meaningfully used when ran with a Python 3 interpreter.
       return
-    for print_stmt in self.iter_ast_types(ast.Print):
+    # MyPy says this is unreachable when run with Python 3
+    for print_stmt in self.iter_ast_types(ast.Print):  # type: ignore[misc]
       # In Python 3.x and in 2.x with __future__ print_function, prints show up as plain old
       # function expressions.  ast.Print does not exist in Python 3.x.  However, allow use
       # syntactically as a function, i.e. ast.Print but with ws "(" .* ")" ws

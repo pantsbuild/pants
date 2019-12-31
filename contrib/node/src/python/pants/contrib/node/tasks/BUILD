@@ -128,6 +128,7 @@ python_library(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:process_handler',
   ],
+  tags = {'partially_type_checked'},
 )
 
 python_library(

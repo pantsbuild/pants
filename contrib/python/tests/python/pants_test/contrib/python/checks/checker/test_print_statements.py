@@ -28,8 +28,7 @@ class PrintStatementsTest(CheckstylePluginTestBase):
     """
     self.assertNoNits(statement)
 
-  # TODO(#7979): Rework tests so that we can run this with Python 2.
-  @unittest.skip
+  @unittest.skip(reason="#7979: Rework tests so that we can run this with Python 2.")
   def test_print_statement(self):
     statement = """
       print["I do what I want"]

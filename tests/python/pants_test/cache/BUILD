@@ -9,7 +9,8 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -22,7 +23,8 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -37,7 +39,8 @@ python_tests(
     'src/python/pants/testutil:test_base',
     'src/python/pants/testutil/option',
     'src/python/pants/testutil:mock_logger',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -51,6 +54,7 @@ python_tests(
     'src/python/pants/cache:cache',
     'src/python/pants/testutil:task_test_base',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -62,6 +66,7 @@ python_tests(
     'src/python/pants/util:dirutil',
     'src/python/pants/testutil:task_test_base',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -83,6 +88,7 @@ python_tests(
     'src/python/pants/cache',
     'src/python/pants/testutil:test_base',
   ],
+  tags = {'partially_type_checked'},
   timeout = 90
 )
 
@@ -106,6 +112,6 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'testprojects/src/java/org/pantsbuild/testproject:unicode_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 600,
 )

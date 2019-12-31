@@ -13,7 +13,8 @@ python_tests(
     'src/python/pants/util:dirutil',
     'src/python/pants/testutil/engine:util',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -24,7 +25,7 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:phrases_directory',
     'testprojects/tests/python/pants:constants_only_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )
 
 python_tests(
@@ -35,7 +36,7 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'testprojects/src/java/org/pantsbuild/testproject:bundle_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 480,
 )
 
@@ -55,7 +56,7 @@ python_tests(
     'testprojects/src/python:sources_directory',
     'testprojects/tests/scala/org/pantsbuild/testproject:cp-directories_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 600,
 )
 
@@ -66,7 +67,7 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'testprojects/tests/python:owners_integration_target',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )
 
 python_tests(
@@ -76,7 +77,7 @@ python_tests(
     'tests/python/pants_test/pantsd:pantsd_integration_test_base',
     'examples/src/scala/org/pantsbuild/example:hello_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 270,
 )
 
@@ -89,7 +90,7 @@ python_tests(
     'examples/src/scala/org/pantsbuild/example:jvm_run_directory',
     'examples/tests/scala/org/pantsbuild/example:hello_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )
 
 python_tests(
@@ -99,7 +100,7 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'examples/src/scala/org/pantsbuild/example:hello_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 40,
 )
 
@@ -112,7 +113,7 @@ python_tests(
     'testprojects/src/python:sources_directory',
     'testprojects/tests/python/pants:file_sets_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )
 
 python_tests(
@@ -123,7 +124,7 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'examples/src/scala/org/pantsbuild/example:hello_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 180,
 )
 
@@ -137,7 +138,8 @@ python_tests(
     'src/python/pants/init',
     'src/python/pants/testutil/engine:util',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -152,7 +154,7 @@ python_tests(
     'testprojects/src/python:no_build_file_directory',
     'testprojects/src/python:sources_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 180,
 )
 
@@ -164,7 +166,7 @@ python_tests(
     'testprojects/tests/python/pants:build_parsing_directory',
     'testprojects/tests/java/org/pantsbuild:build_parsing_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 180,
 )
 
@@ -177,7 +179,8 @@ python_tests(
     'src/python/pants/init',
     'src/python/pants/testutil:test_base',
     'src/python/pants/testutil/engine:util',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(

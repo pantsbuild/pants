@@ -18,12 +18,12 @@ class MyPy(PythonToolBase):
   def register_options(cls, register):
     super().register_options(register)
     register(
-      '--args', type=list, member_type=str,
+      '--args', type=list, member_type=str, fingerprint=True,
       help="Arguments to pass directly to mypy, e.g. "
            "`--mypy-args=\"--python-version 3.7 --disallow-any-expr\"`",
     )
     register(
-      '--config', type=file_option,
+      '--config', type=file_option, fingerprint=True,
       help="Path to `mypy.ini` or alternative MyPy config file"
     )
 

@@ -8,6 +8,6 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'contrib/scalajs:examples_directory',
   ],
-  tags={'integration'},
+  tags={'integration', 'partially_type_checked'},
   timeout=270,
 )

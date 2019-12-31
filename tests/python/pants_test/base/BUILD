@@ -20,7 +20,8 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -30,7 +31,7 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'testprojects/src/java/org/pantsbuild/testproject:phrases_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 530,
 )
 
@@ -42,7 +43,8 @@ python_tests(
     'src/python/pants/base:cmd_line_spec_parser',
     'src/python/pants/build_graph',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -51,7 +53,8 @@ python_library(
   dependencies = [
     'src/python/pants/testutil/base:context_utils',
     'tests/python/pants_test:deprecated_testinfra',
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )
 
 python_tests(
@@ -63,6 +66,7 @@ python_tests(
     'src/python/pants:version',
     'src/python/pants/testutil:test_base',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -83,7 +87,8 @@ python_tests(
   dependencies = [
     'src/python/pants/base:fingerprint_strategy',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -92,7 +97,8 @@ python_tests(
   dependencies = [
     'src/python/pants/base:generator',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -133,7 +139,8 @@ python_tests(
     'src/python/pants/base:payload_field',
     'src/python/pants/build_graph',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -144,7 +151,8 @@ python_tests(
     'src/python/pants/backend/python:python_requirement',
     'src/python/pants/base:payload_field',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -162,7 +170,8 @@ python_tests(
   dependencies = [
     'src/python/pants/base:revision',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -172,7 +181,8 @@ python_tests(
     'src/python/pants/base:run_info',
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -206,7 +216,7 @@ python_tests(
     'src/python/pants/testutil:test_base',
     'src/python/pants/testutil/option',
   ],
-  tags={'platform_specific_behavior'},
+  tags={'platform_specific_behavior', 'partially_type_checked'},
 )
 
 python_tests(
@@ -219,7 +229,7 @@ python_tests(
     'testprojects/src/python:coordinated_runs_directory',
     'testprojects:pants_plugins_directory',
   ],
-  tags = {'platform_specific_behavior', 'integration'},
+  tags = {'platform_specific_behavior', 'integration', 'partially_type_checked'},
   # NB: This frequently times out, but due to hanging. So, we want to fail eagerly. See
   # https://github.com/pantsbuild/pants/issues/8127.
   timeout = 200,
@@ -232,6 +242,6 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'testprojects/src/python:unicode_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 120,
 )

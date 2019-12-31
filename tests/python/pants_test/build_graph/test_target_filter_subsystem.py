@@ -11,7 +11,9 @@ class TestTargetFilter(TaskTestBase):
 
   class DummyTask(Task):
     options_scope = 'dummy'
-    target_filtering_enabled = True
+    # TODO: MyPy doesn't understand when a class property was defined via a method with
+    # @classproperty and then is treated as a normal class var in a subclass.
+    target_filtering_enabled = True  # type: ignore[assignment]
 
     def execute(self):
       self.context.products.safe_create_data('task_targets', self.get_targets)

@@ -10,5 +10,5 @@ python_tests(
     'examples/src/scala/org/pantsbuild/example:scalac_directory',
   ],
   timeout = 640,
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )

@@ -6,5 +6,5 @@ python_tests(
     'contrib/thrifty/src/python/pants/contrib/thrifty',
     'src/python/pants/testutil:task_test_base',
   ],
-  sources=globs('*.py'),
+  tags = {'partially_type_checked'},
 )
