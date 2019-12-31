@@ -6,19 +6,17 @@ from textwrap import dedent
 from typing import Dict, Optional
 from unittest.mock import Mock
 
-from pants.base.specs import DescendantAddresses, SingleAddress, Spec
+from pants.base.specs import DescendantAddresses, SingleAddress, Spec, Specs
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.build_files import AddressProvenanceMap
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, Snapshot
 from pants.engine.legacy.graph import HydratedTarget
 from pants.engine.legacy.structs import PythonBinaryAdaptor, PythonTestsAdaptor
 from pants.engine.rules import UnionMembership
-from pants.rules.core.core_test_model import Status, TestResult, TestTarget
+from pants.rules.core.core_test_model import Status, TestDebugResult, TestResult, TestTarget
 from pants.rules.core.test import (
   AddressAndDebugResult,
   AddressAndTestResult,
-  Specs,
-  TestDebugResult,
   coordinator_of_tests,
   fast_test,
 )
