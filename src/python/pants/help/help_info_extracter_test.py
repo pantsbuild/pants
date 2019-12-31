@@ -2,12 +2,18 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import unittest
+from enum import Enum
 
 from pants.help.help_info_extracter import HelpInfoExtracter
 from pants.option.config import Config
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_tracker import OptionTracker
 from pants.option.parser import Parser
+
+
+class LogLevel(Enum):
+  INFO = 'info'
+  DEBUG = 'debug'
 
 
 class HelpInfoExtracterTest(unittest.TestCase):
@@ -66,7 +72,7 @@ class HelpInfoExtracterTest(unittest.TestCase):
     do_test(['--foo'], {'type': bool, 'implicit_value': False }, ['--[no-]bar-baz-foo'],
             ['--bar-baz-foo', '--no-bar-baz-foo'], ['--foo', '--no-foo'])
 
-  def test_default(self):
+  def test_default(self) -> None:
     def do_test(args, kwargs, expected_default):
       # Defaults are computed in the parser and added into the kwargs, so we
       # must jump through this hoop in this test.
@@ -75,9 +81,9 @@ class HelpInfoExtracterTest(unittest.TestCase):
                       parent_parser=None, option_tracker=OptionTracker())
       parser.register(*args, **kwargs)
       oshi = HelpInfoExtracter.get_option_scope_help_info_from_parser(parser).basic
-      self.assertEqual(1, len(oshi))
+      assert len(oshi) == 1
       ohi = oshi[0]
-      self.assertEqual(expected_default, ohi.default)
+      assert ohi.default == expected_default
 
     do_test(['--foo'], {'type': bool }, 'False')
     do_test(['--foo'], {'type': bool, 'default': True}, 'True')
@@ -88,6 +94,8 @@ class HelpInfoExtracterTest(unittest.TestCase):
     do_test(['--foo'], {'type': int, 'default': 42}, '42')
     do_test(['--foo'], {'type': list}, '[]')
     do_test(['--foo'], {'type': dict}, '{}')
+    do_test(['--foo'], {'type': LogLevel}, 'None')
+    do_test(['--foo'], {'type': LogLevel, 'default': LogLevel.DEBUG}, 'debug')
 
   def test_deprecated(self):
     kwargs = {'removal_version': '999.99.9', 'removal_hint': 'do not use this'}
@@ -95,6 +103,16 @@ class HelpInfoExtracterTest(unittest.TestCase):
     self.assertEqual('999.99.9', ohi.removal_version)
     self.assertEqual('do not use this', ohi.removal_hint)
     self.assertIsNotNone(ohi.deprecated_message)
+
+  def test_choices(self) -> None:
+    kwargs={'choices': ['info', 'debug']}
+    ohi = HelpInfoExtracter('').get_option_help_info([], kwargs)
+    assert ohi.choices == 'info, debug'
+
+  def test_choices_enum(self) -> None:
+    kwargs = {'type': LogLevel}
+    ohi = HelpInfoExtracter('').get_option_help_info([], kwargs)
+    assert ohi.choices == 'info, debug'
 
   def test_grouping(self):
     def do_test(kwargs, expected_basic=False, expected_recursive=False, expected_advanced=False):

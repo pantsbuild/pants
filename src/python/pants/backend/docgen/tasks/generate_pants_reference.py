@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+from dataclasses import asdict
 
 from pants.base.mustache import MustacheRenderer
 from pants.goal.goal import Goal
@@ -54,7 +55,7 @@ class GeneratePantsReference(Task):
           # We don't use _asdict(), because then .description wouldn't be available.
           'scope_info': si,
           # We do use _asdict() here, so our mustache library can do property expansion.
-          'help_info': help_info._asdict(),
+          'help_info': asdict(help_info),
         })
       return ret
 
