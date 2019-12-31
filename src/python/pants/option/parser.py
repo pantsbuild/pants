@@ -131,9 +131,7 @@ class Parser:
     self._known_args: Set[str] = set()
 
     # List of (args, kwargs) registration pairs, exactly as captured at registration time.
-    OptionNames = Tuple[str, ...]
-    OptionKwargs = Dict[str, Any]
-    self._option_registrations: List[Tuple[OptionNames, OptionKwargs]] = []
+    self._option_registrations: List[Tuple[Tuple[str, ...], Dict[str, Any]]] = []
 
     self._parent_parser = parent_parser
     self._child_parsers: List["Parser"] = []
