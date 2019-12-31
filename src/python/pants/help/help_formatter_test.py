@@ -46,6 +46,7 @@ class OptionHelpFormatterTest(unittest.TestCase):
     assert line.lstrip() == '--foo (one of: [apple, banana, kiwi] default: kiwi)'
 
   def test_format_help_choices_enum(self) -> None:
+    # We assume that help_info_extractor.py correctly parsed the Enum into this OptionHelpInfo
     class LogLevel(Enum):
       INFO = 'info'
       DEBUG = 'debug'
