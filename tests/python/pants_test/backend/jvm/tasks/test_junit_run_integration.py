@@ -6,11 +6,9 @@ import os
 import time
 import xml.etree.ElementTree as ET
 from contextlib import contextmanager
-from unittest import skipIf
 
 from pants.base.build_environment import get_buildroot
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
-from pants_test.backend.jvm.tasks.missing_jvm_check import is_missing_jvm
 
 
 class JunitRunIntegrationTest(PantsRunIntegrationTest):
@@ -19,11 +17,9 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
     spec = f'testprojects/tests/java/org/pantsbuild/testproject/testjvms:{spec_name}'
     self.assert_success(self.run_pants(['clean-all', 'test.junit', '--strict-jvm-version', spec]))
 
-  @skipIf(is_missing_jvm('1.8'), 'no java 1.8 installation on testing machine')
   def test_java_eight(self):
     self._testjvms('eight')
 
-  @skipIf(is_missing_jvm('1.8'), 'no java 1.8 installation on testing machine')
   def test_with_test_platform(self):
     self._testjvms('eight-test-platform')
 

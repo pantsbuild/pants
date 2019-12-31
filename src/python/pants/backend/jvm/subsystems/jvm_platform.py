@@ -17,12 +17,10 @@ logger = logging.getLogger(__name__)
 class JvmPlatform(Subsystem):
   """Used to keep track of repo compile settings."""
 
-  # NB(gmalmquist): These assume a java version number N can be specified as either 'N' or '1.N'
-  # (eg, '7' is equivalent to '1.7'). New versions should only be added to this list
-  # if they follow this convention. If this convention is ever not followed for future
-  # java releases, they can simply be omitted from this list and they will be parsed
-  # strictly (eg, if Java 10 != 1.10, simply leave it out).
-  SUPPORTED_CONVERSION_VERSIONS = (6, 7, 8,)
+  # NB: These assume a java version number N can be specified as either 'N' or '1.N'
+  # (eg, '7' is equivalent to '1.7'). Java stopped following this convention starting with Java 9,
+  # so this list does not go past it.
+  SUPPORTED_CONVERSION_VERSIONS = (6, 7, 8)
 
   _COMPILER_CHOICES = ['zinc', 'javac', 'rsc']
 

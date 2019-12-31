@@ -6,9 +6,9 @@ from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 
 class ClassmapTaskIntegrationTest(PantsRunIntegrationTest):
   # A test target with both transitive internal dependency as well as external dependency
-  TEST_JVM_TARGET = 'testprojects/tests/java/org/pantsbuild/testproject/testjvms:seven'
-  INTERNAL_MAPPING = ('org.pantsbuild.testproject.testjvms.TestSeven '
-                      'testprojects/tests/java/org/pantsbuild/testproject/testjvms:seven')
+  TEST_JVM_TARGET = 'testprojects/tests/java/org/pantsbuild/testproject/testjvms:eight'
+  INTERNAL_MAPPING = ('org.pantsbuild.testproject.testjvms.TestEight '
+                      'testprojects/tests/java/org/pantsbuild/testproject/testjvms:eight')
   INTERNAL_TRANSITIVE_MAPPING = ('org.pantsbuild.testproject.testjvms.TestBase '
                                  'testprojects/tests/java/org/pantsbuild/testproject/testjvms:base')
   EXTERNAL_MAPPING = ('org.junit.ClassRule 3rdparty:junit')
