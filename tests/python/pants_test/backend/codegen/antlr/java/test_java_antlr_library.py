@@ -16,7 +16,7 @@ class JavaAntlrLibraryTest(TestBase):
     return BuildFileAliases(targets={'java_antlr_library': JavaAntlrLibrary})
 
   def test_empty(self):
-    with self.assertRaisesRegexp(TargetDefinitionException,
+    with self.assertRaisesRegex(TargetDefinitionException,
                                  "the sources parameter.*contains an empty snapshot."):
       self.add_to_build_file('BUILD', dedent('''
         java_antlr_library(name='foo',
@@ -34,7 +34,7 @@ class JavaAntlrLibraryTest(TestBase):
     self.assertIsInstance(self.foo, JavaAntlrLibrary)
 
   def test_invalid_compiler(self):
-    with self.assertRaisesRegexp(TargetDefinitionException, "Illegal value for 'compiler'"):
+    with self.assertRaisesRegex(TargetDefinitionException, "Illegal value for 'compiler'"):
       self.add_to_build_file('BUILD', dedent('''
         java_antlr_library(name='foo',
           sources=['foo'],

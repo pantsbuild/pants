@@ -27,9 +27,9 @@ class ParseValidation(unittest.TestCase):
       assert_list(["file.txt"], allowable=(set,))  # Incorrect type
 
   def test_invalid_inputs_with_key_arg(self):
-    with self.assertRaisesRegexp(ValueError, "In key 'resources':"):
+    with self.assertRaisesRegex(ValueError, "In key 'resources':"):
       assert_list({"file3.txt": "source"}, key_arg='resources')  # Can't pass a dict
-    with self.assertRaisesRegexp(ValueError, "In key 'artifacts':"):
+    with self.assertRaisesRegex(ValueError, "In key 'artifacts':"):
       assert_list([["file3.txt"]], key_arg='artifacts')  # All values most be strings
-    with self.assertRaisesRegexp(ValueError, "In key 'jars':"):
+    with self.assertRaisesRegex(ValueError, "In key 'jars':"):
       assert_list(None, can_be_none=False, key_arg='jars')  # The default is ok as None only when can_be_none is true

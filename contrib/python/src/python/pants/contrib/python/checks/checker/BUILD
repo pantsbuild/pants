@@ -20,6 +20,7 @@ python_library(
     'contrib/python/src/python/pants/contrib/python/checks/checker/3rdparty:pyflakes',
     'contrib/python/src/python/pants/contrib/python/checks/checker/3rdparty:six',
   ],
+  tags = {'partially_type_checked'},
 )
 
 python_binary(
@@ -28,4 +29,5 @@ python_binary(
   dependencies=[
     ':checker',
   ],
+  tags = {'partially_type_checked'},
 )

@@ -8,6 +8,7 @@ python_library(
     'src/python/pants/backend/jvm/tasks:nailgun_task',
     'src/python/pants/base:workunit',
     'src/python/pants/goal:task_registrar',
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )
 

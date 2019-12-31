@@ -121,8 +121,8 @@ class CheckstyleTest(NailgunTaskTestBase):
 
     suppression_file = self._create_suppression_file(
       [
-        '<suppress files=".*with_tab_1\.java" checks=".*" />',
-        '<suppress files=".*with_tab_2\.java" checks=".*" />',
+        '<suppress files=".*with_tab_1\\.java" checks=".*" />',
+        '<suppress files=".*with_tab_2\\.java" checks=".*" />',
       ])
 
     no_tab = self._create_target('no_tab', self._TEST_JAVA_SOURCE_WITH_NO_TAB)

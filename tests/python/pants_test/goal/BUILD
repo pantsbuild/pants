@@ -9,7 +9,8 @@ python_tests(
     'src/python/pants/goal:artifact_cache_stats',
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -29,7 +30,8 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -44,6 +46,6 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:extra_jvm_options_directory',
     'testprojects/src/java/org/pantsbuild/testproject:unicode_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 180,
 )

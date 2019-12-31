@@ -2,7 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.backend.jvm.targets.import_jars_mixin import ImportJarsMixin
-from pants.backend.jvm.tasks.classpath_products import ArtifactClasspathEntry, ClasspathProducts
+from pants.backend.jvm.tasks.classpath_entry import ArtifactClasspathEntry
+from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
 from pants.backend.jvm.tasks.jar_import_products import JarImportProducts
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask

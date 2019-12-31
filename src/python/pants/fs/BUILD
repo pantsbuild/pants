@@ -18,4 +18,5 @@ python_tests(
     'src/python/pants/testutil:console_rule_test_base',
     'src/python/pants/testutil/engine:util',
   ],
+  tags = {"partially_type_checked"},
 )

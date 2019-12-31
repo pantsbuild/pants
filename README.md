@@ -28,5 +28,5 @@ At a minimum, Pants requires the following to run properly:
 
 Additionally, if you use the JVM backend to work with Java or Scala code (installed by default):
 
-* OpenJDK or Oracle JDK version 7 or greater.
+* OpenJDK or Oracle JDK version 8 or greater.
 

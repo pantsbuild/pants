@@ -1,6 +1,13 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from enum import Enum
+from typing import Any, Dict, Iterator, List, Optional, Union, cast
+
+
+Rank = int
+Value = Union[str, int, float, None, Dict, Enum, List]
+
 
 class RankedValue:
   """An option value, together with a rank inferred from its source.
@@ -53,39 +60,43 @@ class RankedValue:
   }
 
   @classmethod
-  def get_rank_name(cls, rank):
+  def get_rank_name(cls, rank: Rank) -> str:
     """Returns the string name for the given rank integer.
 
-    :param int rank: the integer rank constant (E.g., RankedValue.HARDCODED).
+    :param rank: the integer rank constant (E.g., RankedValue.HARDCODED).
     :returns: the string name of the rank.
-    :rtype: string
     """
     return cls._RANK_NAMES.get(rank, 'UNKNOWN')
 
   @classmethod
-  def get_rank_value(cls, name):
+  def get_rank_value(cls, name: str) -> Optional[Rank]:
     """Returns the integer constant value for the given rank name.
 
-    :param string rank: the string rank name (E.g., 'HARDCODED').
+    :param name: the string rank name (E.g., 'HARDCODED').
     :returns: the integer constant value of the rank.
-    :rtype: int
     """
     if name in cls._RANK_NAMES.values():
-      return getattr(cls, name, None)
+      return cast(Optional[Rank], getattr(cls, name, None))
     return None
 
   @classmethod
-  def get_names(cls):
+  def get_names(cls) -> List[str]:
     """Returns the list of rank names.
 
     :returns: the rank names as a list (I.e., ['NONE', 'HARDCODED', 'CONFIG', ...])
-    :rtype: list
     """
     return sorted(cls._RANK_NAMES.values(), key=cls.get_rank_value)
 
   @classmethod
-  def prioritized_iter(cls, flag_val, env_val, config_val, config_default_val,
-                       hardcoded_val, default):
+  def prioritized_iter(
+    cls,
+    flag_val: Value,
+    env_val: Value,
+    config_val: Value,
+    config_default_val: Value,
+    hardcoded_val: Value,
+    default: Value,
+  ) -> Iterator["RankedValue"]:
     """Yield the non-None values from highest-ranked to lowest, wrapped in RankedValue instances."""
     if flag_val is not None:
       yield RankedValue(cls.FLAG, flag_val)
@@ -99,20 +110,22 @@ class RankedValue:
       yield RankedValue(cls.HARDCODED, hardcoded_val)
     yield RankedValue(cls.NONE, default)
 
-  def __init__(self, rank, value):
+  def __init__(self, rank: Rank, value: Value) -> None:
     self._rank = rank
     self._value = value
 
   @property
-  def rank(self):
+  def rank(self) -> Rank:
     return self._rank
 
   @property
-  def value(self):
+  def value(self) -> Value:
     return self._value
 
-  def __eq__(self, other):
+  def __eq__(self, other: Any) -> bool:
+    if not isinstance(other, RankedValue):
+      return NotImplemented
     return self._rank == other._rank and self._value == other._value
 
-  def __repr__(self):
+  def __repr__(self) -> str:
     return f'({self.get_rank_name(self._rank)}, {self._value})'

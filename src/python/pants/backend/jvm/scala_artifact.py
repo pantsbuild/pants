@@ -14,3 +14,7 @@ class ScalaArtifact(Artifact):
   @property
   def name(self):
     return ScalaPlatform.global_instance().suffix_version(self._base_name)
+
+  @name.setter
+  def name(self, value):
+    self._base_name = ScalaPlatform.global_instance().suffix_version(value)

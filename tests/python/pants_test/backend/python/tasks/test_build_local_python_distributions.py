@@ -129,7 +129,7 @@ setup(
     pycountry_req_lib = self.target_dict['pycountry']
     conflicting_lib = self.target_dict['install_requires_conflict']
 
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         pex.resolver.Unsatisfiable,
         re.escape('Could not satisfy all requirements for pycountry==18.5.20:')):
       self._create_distribution_synthetic_target(

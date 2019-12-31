@@ -8,7 +8,8 @@ python_tests(
     'src/python/pants/backend/jvm:artifact',
     'src/python/pants/backend/jvm:repository',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -26,7 +27,8 @@ python_library(
   dependencies=[
     'src/python/pants/testutil/jvm:jvm_tool_task_test_base',
     'tests/python/pants_test:deprecated_testinfra',
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -35,7 +37,8 @@ python_library(
   dependencies=[
     'src/python/pants/testutil/jvm:nailgun_task_test_base',
     'tests/python/pants_test:deprecated_testinfra',
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -44,7 +47,8 @@ python_library(
   dependencies=[
     'src/python/pants/testutil/jvm:jar_task_test_base',
     'tests/python/pants_test:deprecated_testinfra',
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -53,5 +57,6 @@ python_library(
   dependencies=[
     'src/python/pants/testutil/jvm:jvm_task_test_base',
     'tests/python/pants_test:deprecated_testinfra',
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )

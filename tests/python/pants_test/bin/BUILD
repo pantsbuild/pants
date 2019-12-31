@@ -12,5 +12,5 @@ python_tests(
     'testprojects:pants_plugins_directory',
     'testprojects/src/python:nested_runs_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )

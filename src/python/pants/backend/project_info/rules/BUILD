@@ -21,5 +21,6 @@ python_tests(
   dependencies=[
     ':rules',
     'src/python/pants/testutil:console_rule_test_base',
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )

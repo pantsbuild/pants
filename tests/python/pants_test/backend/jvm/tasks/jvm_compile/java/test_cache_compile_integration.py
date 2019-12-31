@@ -336,8 +336,16 @@ class CacheCompileIntegrationTest(BaseCompileIT):
         Compile({srcfile: "public final class A {}"}, config, 3),
     )
   
-  def _compile_spec(self, compiles: List[Compile], target_defs: List[str], target_names: List[str], target_to_compile: str, callback: Callable[[Compile, Dict[str, str]], None] = lambda cache_test_subdirs: None) -> None:
-    """Compiles a spec within the same workspace under multiple compilation configs, with a callback function."""
+  def _compile_spec(
+    self,
+    compiles: List[Compile],
+    target_defs: List[str],
+    target_names: List[str],
+    target_to_compile: str,
+    callback: Callable[[Compile, Dict[str, str]], None] = lambda _compile, _cache_test_subdirs: None,
+  ) -> None:
+    """Compiles a spec within the same workspace under multiple compilation configs, with a
+    callback function."""
 
     with temporary_dir() as cache_dir, \
         self.temporary_workdir() as workdir, \

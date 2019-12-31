@@ -356,21 +356,21 @@ class DirutilTest(unittest.TestCase):
   def test_relative_symlink_same_paths(self) -> None:
     with temporary_dir() as tmpdir_1:  # source is link
       source = os.path.join(tmpdir_1, 'source')
-      with self.assertRaisesRegexp(ValueError, r'Path for link is identical to source'):
+      with self.assertRaisesRegex(ValueError, r'Path for link is identical to source'):
         relative_symlink(source, source)
 
   def test_relative_symlink_bad_source(self) -> None:
     with temporary_dir() as tmpdir_1:  # source is not absolute
       source = os.path.join('foo', 'bar')
       link = os.path.join(tmpdir_1, 'link')
-      with self.assertRaisesRegexp(ValueError, r'Path for source.*absolute'):
+      with self.assertRaisesRegex(ValueError, r'Path for source.*absolute'):
         relative_symlink(source, link)
 
   def test_relative_symlink_bad_link(self) -> None:
     with temporary_dir() as tmpdir_1:  # link is not absolute
       source = os.path.join(tmpdir_1, 'source')
       link = os.path.join('foo', 'bar')
-      with self.assertRaisesRegexp(ValueError, r'Path for link.*absolute'):
+      with self.assertRaisesRegex(ValueError, r'Path for link.*absolute'):
         relative_symlink(source, link)
 
   def test_relative_symlink_overwrite_existing_file(self) -> None:
@@ -388,7 +388,7 @@ class DirutilTest(unittest.TestCase):
       link_path = os.path.join(tmpdir_1, 'link')
 
       safe_mkdir(link_path)
-      with self.assertRaisesRegexp(ValueError, r'Path for link.*overwrite an existing directory*'):
+      with self.assertRaisesRegex(ValueError, r'Path for link.*overwrite an existing directory*'):
         relative_symlink(source, link_path)
 
   def test_get_basedir(self) -> None:

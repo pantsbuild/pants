@@ -6,6 +6,7 @@ import inspect
 import logging
 from typing import Callable, Dict, Iterable, List, Optional, Tuple, Type, TypeVar, Union, cast
 
+from pants.option.option_value_container import OptionValueContainer
 from pants.option.optionable import Optionable
 from pants.option.options import Options
 from pants.option.scope import ScopeInfo
@@ -138,7 +139,7 @@ class Subsystem(SubsystemClientMixin, Optionable):
       cls._options = None
     cls._scoped_instances = {}
 
-  def __init__(self, scope: str, scoped_options) -> None:
+  def __init__(self, scope: str, scoped_options: OptionValueContainer) -> None:
     """Note: A subsystem has no access to options in scopes other than its own.
 
     TODO: We'd like that to be true of Tasks some day. Subsystems will help with that.
@@ -161,14 +162,14 @@ class Subsystem(SubsystemClientMixin, Optionable):
     return self._scope
 
   @property
-  def options(self):
+  def options(self) -> OptionValueContainer:
     """Returns the option values for this subsystem's scope.
 
     :API: public
     """
     return self._scoped_options
 
-  def get_options(self):
+  def get_options(self) -> OptionValueContainer:
     """Returns the option values for this subsystem's scope.
 
     :API: public

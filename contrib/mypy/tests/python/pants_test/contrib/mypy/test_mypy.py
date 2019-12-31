@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
-from typing import List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.build_graph.target import Target
@@ -18,14 +18,14 @@ class MyPyWhitelistMechanismTest(TaskTestBase):
     return MypyTask
 
   def make_python_target(
-    self, spec: str, *, typed: bool = False, dependencies: Optional[List[Target]] = None
+    self, spec: str, *, typed: bool = False, dependencies: Optional[List[Target]] = None,
   ) -> Target:
-    kwargs = {}
+    kwargs: Dict[str, Any] = {}
     if typed:
       kwargs['tags'] = ['type_checked']
     if dependencies:
       kwargs['dependencies'] = dependencies
-    return self.make_target(spec, PythonLibrary, **kwargs)
+    return cast(Target, self.make_target(spec, PythonLibrary, **kwargs))
 
   def run_task_and_capture_warnings(
     self, *, target_roots: List[Target], enable_whitelist: bool = True
@@ -37,7 +37,7 @@ class MyPyWhitelistMechanismTest(TaskTestBase):
     task = self.create_task(context)
     with self.captured_logging(level=logging.WARNING) as captured:
       task.execute()
-    return captured.warnings()
+    return cast(List[str], captured.warnings())
 
   def assert_no_warning(self, captured_warnings: List[str]) -> None:
     self.assertFalse(captured_warnings)

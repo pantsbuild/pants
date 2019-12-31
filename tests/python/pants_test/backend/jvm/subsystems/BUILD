@@ -29,6 +29,7 @@ python_tests(
     'src/python/pants/testutil/jvm:nailgun_task_test_base',
     'src/python/pants/testutil/subsystem',
   ],
+  tags = {"partially_type_checked"},
 )
 
 
@@ -45,7 +46,8 @@ python_tests(
     'src/python/pants/backend/jvm/tasks/jvm_compile/zinc',
     'src/python/pants/testutil:test_base',
     'src/python/pants/testutil/subsystem',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -57,7 +59,7 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'testprojects/src/scala/org/pantsbuild/testproject:custom_scala_platform_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout=500,
 )
 
@@ -73,7 +75,7 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:shading_directory',
     'testprojects/3rdparty:managed_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 370,
 )
 
@@ -89,7 +91,8 @@ python_tests(
     'src/python/pants/util:dirutil',
     'src/python/pants/testutil:test_base',
     'src/python/pants/testutil/subsystem',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -106,6 +109,6 @@ python_tests(
     'testprojects/tests/java/org/pantsbuild/testproject:depman_directory',
     'testprojects/3rdparty:managed_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout=800,
 )

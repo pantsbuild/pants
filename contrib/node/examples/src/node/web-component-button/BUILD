@@ -24,7 +24,7 @@ node_test(
   dependencies=[
     ':web-component-button'
   ],
-  tags={'integration'},
+  tags={'integration', 'partially_type_checked'},
 )
 
 # Contains non-transpiled codes including all subdirectories under node_modules dirctory.

@@ -8,5 +8,6 @@ python_tests(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:xml_parser',
     'src/python/pants/testutil:test_base'
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )

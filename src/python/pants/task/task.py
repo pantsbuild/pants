@@ -7,6 +7,7 @@ from abc import ABCMeta, abstractmethod
 from contextlib import contextmanager
 from hashlib import sha1
 from itertools import repeat
+from typing import Optional
 
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work
@@ -58,7 +59,7 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
 
   # We set this explicitly on the synthetic subclass, so that it shares a stable name with
   # its superclass, which is not necessary for regular use, but can be convenient in tests.
-  _stable_name = None
+  _stable_name: Optional[str] = None
 
   @classmethod
   def implementation_version(cls):

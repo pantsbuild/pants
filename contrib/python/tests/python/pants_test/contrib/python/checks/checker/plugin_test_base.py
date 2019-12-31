@@ -4,17 +4,18 @@
 import copy
 import os
 import unittest
+from typing import Optional, Type
 
 from pants.testutil.option.fakes import create_options
 from pants.util.dirutil import safe_mkdtemp
 
-from pants.contrib.python.checks.checker.common import Nit, PythonFile
+from pants.contrib.python.checks.checker.common import CheckstylePlugin, Nit, PythonFile
 
 
 # TODO: Refactor this test suite to leverage the ConsoleTaskTestBase class
 # for proper integration testing (i.e. any test that runs task.execute()).
 class CheckstylePluginTestBase(unittest.TestCase):
-  plugin_type = None   # Subclasses must override.
+  plugin_type: Optional[Type[CheckstylePlugin]] = None   # Subclasses must override.
 
   @property
   def file_required(self):

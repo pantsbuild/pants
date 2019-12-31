@@ -1,13 +1,15 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import unittest
+
 from pants.option.parser_hierarchy import InvalidScopeError, all_enclosing_scopes, enclosing_scope
 from pants.option.scope import GLOBAL_SCOPE
-from pants.testutil.test_base import TestBase
 
 
-class TestEnclosingScopeTraversal(TestBase):
-  def test_enclosing_scope(self):
+class TestEnclosingScopeTraversal(unittest.TestCase):
+
+  def test_enclosing_scope(self) -> None:
     """The enclosing scope of any non-nested scope should be the global scope,
     and the enclosing scope of a nested scope should be the scope without its
     final component."""
@@ -15,7 +17,7 @@ class TestEnclosingScopeTraversal(TestBase):
     self.assertEqual(GLOBAL_SCOPE, enclosing_scope('scope'))
     self.assertEqual('base', enclosing_scope('base.subscope'))
 
-  def test_all_enclosing_scopes(self):
+  def test_all_enclosing_scopes(self) -> None:
     """`all_enclosing_scopes` should repeatedly apply `enclosing_scope` to any
     valid single- or multiple- component scope. `all_enclosing_scopes` should
     not yield the global scope if `allow_global=False`."""
@@ -37,7 +39,7 @@ class TestEnclosingScopeTraversal(TestBase):
     compound_scope_closure_no_global = list(all_enclosing_scopes(compound_scope, allow_global=False))
     self.assertEqual(compound_scope_closure_no_global, [compound_scope, base_scope])
 
-  def test_valid_invalid_scope(self):
+  def test_valid_invalid_scope(self) -> None:
     """Scopes with dashes or underscores are treated as a single component, and
     scopes with empty components raise an InvalidScopeError."""
     base_dashed_scope = 'base-scope'

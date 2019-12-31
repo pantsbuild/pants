@@ -11,7 +11,7 @@ from collections import defaultdict
 from contextlib import contextmanager
 from tempfile import mkdtemp
 from textwrap import dedent
-from typing import Any, Type, TypeVar, Union, cast
+from typing import Any, Optional, Type, TypeVar, Union, cast
 
 from pants.base.build_root import BuildRoot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
@@ -90,7 +90,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
   :API: public
   """
 
-  _scheduler = None
+  _scheduler: Optional[SchedulerSession] = None
   _local_store_dir = None
   _build_graph = None
   _address_mapper = None
@@ -408,7 +408,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     if self._scheduler is None:
       self._init_engine()
       self.post_scheduler_init()
-    return self._scheduler
+    return cast(SchedulerSession, self._scheduler)
 
   def post_scheduler_init(self):
     """Run after initializing the Scheduler, it will have the same lifetime"""

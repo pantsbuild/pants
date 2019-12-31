@@ -13,7 +13,8 @@ python_tests(
     'src/python/pants/testutil:test_base',
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil:task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 
@@ -26,6 +27,6 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:proto-ordering_directory',
     'testprojects/src/protobuf/org/pantsbuild/testproject:import_from_buildroot_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
   timeout = 330,
 )

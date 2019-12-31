@@ -7,5 +7,6 @@ python_tests(
     'src/python/pants/backend/jvm/tasks/coverage',
     'src/python/pants/java/jar',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )

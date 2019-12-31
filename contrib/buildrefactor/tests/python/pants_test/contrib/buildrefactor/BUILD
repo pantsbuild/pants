@@ -19,7 +19,8 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil/subsystem',
     'src/python/pants/testutil:task_test_base',
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )
 
 
@@ -33,7 +34,8 @@ python_tests(
     'src/python/pants/base:build_environment',
     'src/python/pants/testutil/subsystem',
     'src/python/pants/testutil:task_test_base',
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )
 
 
@@ -44,7 +46,7 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'testprojects/tests/java/org/pantsbuild/testproject:buildrefactor_directory',
   ],
-  tags={'integration'},
+  tags={'integration', 'partially_type_checked'},
 )
 
 
@@ -55,5 +57,5 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'testprojects/tests/java/org/pantsbuild/testproject:buildrefactor_directory',
   ],
-  tags={'integration'},
+  tags={'integration', 'partially_type_checked'},
 )

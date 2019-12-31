@@ -8,6 +8,7 @@ python_library(
     'src/python/pants/testutil:mock_logger',
     'tests/python/pants_test:deprecated_testinfra',
   ],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -19,6 +20,7 @@ python_library(
     'src/python/pants/testutil:file_test_util',
     'tests/python/pants_test:deprecated_testinfra',
   ],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -30,6 +32,7 @@ python_library(
     'src/python/pants/testutil:git_util',
     'tests/python/pants_test:deprecated_testinfra',
   ],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -41,6 +44,7 @@ python_library(
     'src/python/pants/testutil:process_test_util',
     'tests/python/pants_test:deprecated_testinfra',
   ],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -52,4 +56,5 @@ python_library(
     'src/python/pants/testutil:pexrc_util',
     'tests/python/pants_test:deprecated_testinfra',
   ],
+  tags = {'partially_type_checked'},
 )

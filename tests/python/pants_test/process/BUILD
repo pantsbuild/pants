@@ -6,5 +6,6 @@ python_tests(
     'src/python/pants/process',
     'src/python/pants/testutil:test_base',
     'src/python/pants/testutil/subsystem',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )

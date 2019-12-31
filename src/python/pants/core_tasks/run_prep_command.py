@@ -4,6 +4,7 @@
 import os
 import subprocess
 from collections import namedtuple
+from typing import Optional
 
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
@@ -22,7 +23,7 @@ class RunPrepCommandBase(Task):
 
   :API: public
   """
-  goal = None
+  goal: Optional[str] = None
 
   @classmethod
   def register_options(cls, register):

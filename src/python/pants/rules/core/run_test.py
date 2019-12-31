@@ -33,10 +33,10 @@ class RunTest(ConsoleRuleTestBase):
       target_name=address.target_name,
       rel_path=f'{address.spec_path}/BUILD'
     )
-    BuildRoot.path = self.build_root
+    BuildRoot().path = self.build_root
     res = run_rule(
       run.run,
-      rule_args=[console, workspace, interactive_runner, BuildRoot, bfa],
+      rule_args=[console, workspace, interactive_runner, BuildRoot(), bfa],
       mock_gets=[
         MockGet(
           product_type=CreatedBinary,

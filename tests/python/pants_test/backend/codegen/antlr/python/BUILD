@@ -11,7 +11,8 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/testutil:test_base',
     'src/python/pants/testutil/jvm:nailgun_task_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 
@@ -24,5 +25,5 @@ python_tests(
     'testprojects/src/python:antlr_directory',
     'testprojects/src/antlr/python:test_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )

@@ -108,7 +108,7 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
               ],
               sources=['w.java'],
             )
-        """.format(org=self.b_org, name=self.b_name)))
+        """))
 
     self.add_to_build_file('src/java/targets',
         dedent("""
@@ -121,7 +121,7 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
               excludes=[exclude(org='commons-lang', name='commons-lang')],
               sources=['w.java'],
             )
-        """.format(org=self.b_org, name=self.b_name)))
+        """))
 
     self.a = self.target('src/java/targets:a')
     self.b = self.target('src/java/targets:b')

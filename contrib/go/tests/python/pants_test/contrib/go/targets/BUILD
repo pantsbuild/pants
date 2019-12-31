@@ -7,7 +7,8 @@ python_library(
     'contrib/go/src/python/pants/contrib/go:plugin',
     'src/python/pants/build_graph',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )
 
 python_tests(
@@ -17,5 +18,6 @@ python_tests(
     'contrib/go/src/python/pants/contrib/go/targets',
     'src/python/pants/build_graph',
     'src/python/pants/testutil:test_base',
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )

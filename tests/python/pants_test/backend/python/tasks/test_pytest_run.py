@@ -313,7 +313,7 @@ python_tests(
 python_tests(
   name = "py23-tests",
   sources = ["py23_test_source.py"],
-  compatibility = ['CPython>=2.7,<4'],
+  compatibility = ['CPython>=2.7'],
 )
 
 python_tests(

@@ -5,7 +5,8 @@ import os
 from collections import OrderedDict
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
-from pants.backend.jvm.tasks.classpath_products import ClasspathEntry, ClasspathProducts
+from pants.backend.jvm.tasks.classpath_entry import ClasspathEntry
+from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar

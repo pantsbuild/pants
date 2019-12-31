@@ -139,7 +139,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
       relative_symlink(dest_path, link_path)
 
     exc_reg = f'.*While expanding link.*{link}.*may not traverse outside of the buildroot.*{dest}.*'
-    with self.assertRaisesRegexp(Exception, exc_reg):
+    with self.assertRaisesRegex(Exception, exc_reg):
       self.assert_walk_files([link], [], prepare=prepare)
 
   def test_walk_recursive_all(self):

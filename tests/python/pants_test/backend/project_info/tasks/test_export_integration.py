@@ -174,32 +174,32 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
     with self.temporary_workdir() as workdir:
       test_target = 'examples/src/java/org/pantsbuild/example/hello/simple'
       json_data = self.run_export(test_target, workdir, load_libs=False, extra_args=[
-        '--jvm-platform-default-platform=java7',
+        '--jvm-platform-default-platform=java8',
         '--jvm-platform-platforms={'
-        ' "java7": {"source": "1.7", "target": "1.7", "args": [ "-X123" ]},'
-        ' "java8": {"source": "1.8", "target": "1.8", "args": [ "-X456" ]}'
+        ' "java8": {"source": "1.8", "target": "1.8", "args": [ "-X123" ]},'
+        ' "java11": {"source": "11", "target": "11", "args": [ "-X456" ]}'
         '}',
         '--jvm-distributions-paths={'
         ' "macos": [ "/Library/JDK" ],'
-        ' "linux": [ "/usr/lib/jdk7", "/usr/lib/jdk8"]'
+        ' "linux": [ "/usr/lib/jdk8", "/usr/lib/jdk11"]'
         '}'
       ])
       self.assertFalse('python_setup' in json_data)
       target_name = 'examples/src/java/org/pantsbuild/example/hello/simple:simple'
       targets = json_data.get('targets')
-      self.assertEqual('java7', targets[target_name]['platform'])
+      self.assertEqual('java8', targets[target_name]['platform'])
       self.assertEqual(
         {
-          'default_platform' : 'java7',
+          'default_platform': 'java8',
           'platforms': {
-            'java7': {
-              'source_level': '1.7',
-              'args': ['-X123'],
-              'target_level': '1.7'},
             'java8': {
               'source_level': '1.8',
-              'args': ['-X456'],
+              'args': ['-X123'],
               'target_level': '1.8'},
+            'java11': {
+              'source_level': '11',
+              'args': ['-X456'],
+              'target_level': '11'},
           }
         },
         json_data['jvm_platforms'])
