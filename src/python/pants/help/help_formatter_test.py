@@ -52,6 +52,5 @@ class OptionHelpFormatterTest(unittest.TestCase):
       DEBUG = 'debug'
     no_default = self.format_help_for_foo(typ=LogLevel, choices='info, debug')
     assert no_default.lstrip() == '--foo (one of: [info, debug] default: None)'
-
     default = self.format_help_for_foo(typ=LogLevel, choices='info, debug', default='info')
     assert default.lstrip() == '--foo (one of: [info, debug] default: info)'
