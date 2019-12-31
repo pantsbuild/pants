@@ -71,7 +71,7 @@ class HelpInfoExtracter:
     return cls(parser.scope).get_option_scope_help_info(parser.option_registrations_iter())
 
   @staticmethod
-  def compute_default(kwargs):
+  def compute_default(kwargs) -> str:
     """Compute the default value to display in help for an option registered with these kwargs."""
     ranked_default = kwargs.get('default')
     typ = kwargs.get('type', str)
@@ -90,6 +90,8 @@ class HelpInfoExtracter:
         default_str = '{}'
     elif typ == str:
       default_str = "'{}'".format(default).replace('\n', ' ')
+    elif inspect.isclass(typ) and issubclass(typ, Enum):
+      default_str = default.value
     else:
       default_str = str(default)
     return default_str

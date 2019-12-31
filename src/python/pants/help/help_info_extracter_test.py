@@ -11,6 +11,11 @@ from pants.option.option_tracker import OptionTracker
 from pants.option.parser import Parser
 
 
+class LogLevel(Enum):
+  INFO = 'info'
+  DEBUG = 'debug'
+
+
 class HelpInfoExtracterTest(unittest.TestCase):
   def test_global_scope(self):
     def do_test(args, kwargs, expected_display_args, expected_scoped_cmd_line_args):
@@ -67,7 +72,7 @@ class HelpInfoExtracterTest(unittest.TestCase):
     do_test(['--foo'], {'type': bool, 'implicit_value': False }, ['--[no-]bar-baz-foo'],
             ['--bar-baz-foo', '--no-bar-baz-foo'], ['--foo', '--no-foo'])
 
-  def test_default(self):
+  def test_default(self) -> None:
     def do_test(args, kwargs, expected_default):
       # Defaults are computed in the parser and added into the kwargs, so we
       # must jump through this hoop in this test.
@@ -76,9 +81,9 @@ class HelpInfoExtracterTest(unittest.TestCase):
                       parent_parser=None, option_tracker=OptionTracker())
       parser.register(*args, **kwargs)
       oshi = HelpInfoExtracter.get_option_scope_help_info_from_parser(parser).basic
-      self.assertEqual(1, len(oshi))
+      assert 1 == len(oshi)
       ohi = oshi[0]
-      self.assertEqual(expected_default, ohi.default)
+      assert expected_default == ohi.default
 
     do_test(['--foo'], {'type': bool }, 'False')
     do_test(['--foo'], {'type': bool, 'default': True}, 'True')
@@ -89,6 +94,8 @@ class HelpInfoExtracterTest(unittest.TestCase):
     do_test(['--foo'], {'type': int, 'default': 42}, '42')
     do_test(['--foo'], {'type': list}, '[]')
     do_test(['--foo'], {'type': dict}, '{}')
+    do_test(['--foo'], {'type': LogLevel}, 'None')
+    do_test(['--foo'], {'type': LogLevel, 'default': LogLevel.DEBUG}, 'debug')
 
   def test_deprecated(self):
     kwargs = {'removal_version': '999.99.9', 'removal_hint': 'do not use this'}
@@ -97,11 +104,8 @@ class HelpInfoExtracterTest(unittest.TestCase):
     self.assertEqual('do not use this', ohi.removal_hint)
     self.assertIsNotNone(ohi.deprecated_message)
 
-  def test_enum(self) -> None:
-    class LogLevel(Enum):
-      INFO = 'info'
-      DEBUG = 'debug'
-    kwargs = {'type': LogLevel, 'default': LogLevel.INFO}
+  def test_enum_choices(self) -> None:
+    kwargs = {'type': LogLevel}
     ohi = HelpInfoExtracter('').get_option_help_info([], kwargs)
     assert ', '.join(e.value for e in LogLevel) == ohi.choices
 
