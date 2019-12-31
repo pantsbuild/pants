@@ -32,6 +32,7 @@ fn setup() -> (
       .prefix("lmdb_store")
       .tempdir()
       .unwrap(),
+    None,
   )
   .unwrap();
   let dir = tempfile::Builder::new().prefix("root").tempdir().unwrap();

@@ -1,6 +1,6 @@
 use crate::{
-  DirectoryMaterializeMetadata, EntryType, FileContent, LoadMetadata, Store, UploadSummary,
-  MEGABYTES,
+  DirectoryMaterializeMetadata, EntryType, FileContent, FileMaterializationBehavior, LoadMetadata,
+  Store, UploadSummary, MEGABYTES,
 };
 
 use bazel_protos;
@@ -90,7 +90,7 @@ pub fn new_cas(chunk_size_bytes: usize) -> StubCAS {
 /// Create a new local store with whatever was already serialized in dir.
 ///
 fn new_local_store<P: AsRef<Path>>(dir: P) -> Store {
-  Store::local_only(task_executor::Executor::new(), dir).expect("Error creating local store")
+  Store::local_only(task_executor::Executor::new(), dir, None).expect("Error creating local store")
 }
 
 ///
@@ -110,6 +110,7 @@ fn new_store<P: AsRef<Path>>(dir: P, cas_address: String) -> Store {
     BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
     1,
     1,
+    None,
   )
   .unwrap()
 }
@@ -831,6 +832,7 @@ fn instance_name_upload() {
     BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
     1,
     1,
+    None,
   )
   .unwrap();
 
@@ -861,6 +863,7 @@ fn instance_name_download() {
     BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
     1,
     1,
+    None,
   )
   .unwrap();
 
@@ -907,6 +910,7 @@ fn auth_upload() {
     BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
     1,
     1,
+    None,
   )
   .unwrap();
 
@@ -937,6 +941,7 @@ fn auth_download() {
     BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
     1,
     1,
+    None,
   )
   .unwrap();
 
@@ -964,6 +969,7 @@ fn materialize_missing_file() {
     file.clone(),
     TestData::roland().digest(),
     false,
+    FileMaterializationBehavior::RequireRealFiles,
     WorkUnitStore::new(),
   ))
   .expect_err("Want unknown digest error");
@@ -979,8 +985,14 @@ fn materialize_file() {
   let store_dir = TempDir::new().unwrap();
   let store = new_local_store(store_dir.path());
   block_on(store.store_file_bytes(testdata.bytes(), false)).expect("Error saving bytes");
-  block_on(store.materialize_file(file.clone(), testdata.digest(), false, WorkUnitStore::new()))
-    .expect("Error materializing file");
+  block_on(store.materialize_file(
+    file.clone(),
+    testdata.digest(),
+    false,
+    FileMaterializationBehavior::RequireRealFiles,
+    WorkUnitStore::new(),
+  ))
+  .expect("Error materializing file");
   assert_eq!(file_contents(&file), testdata.bytes());
   assert!(!is_executable(&file));
 }
@@ -995,8 +1007,14 @@ fn materialize_file_executable() {
   let store_dir = TempDir::new().unwrap();
   let store = new_local_store(store_dir.path());
   block_on(store.store_file_bytes(testdata.bytes(), false)).expect("Error saving bytes");
-  block_on(store.materialize_file(file.clone(), testdata.digest(), true, WorkUnitStore::new()))
-    .expect("Error materializing file");
+  block_on(store.materialize_file(
+    file.clone(),
+    testdata.digest(),
+    true,
+    FileMaterializationBehavior::RequireRealFiles,
+    WorkUnitStore::new(),
+  ))
+  .expect("Error materializing file");
   assert_eq!(file_contents(&file), testdata.bytes());
   assert!(is_executable(&file));
 }
@@ -1010,6 +1028,7 @@ fn materialize_missing_directory() {
   block_on(store.materialize_directory(
     materialize_dir.path().to_owned(),
     TestDirectory::recursive().digest(),
+    FileMaterializationBehavior::RequireRealFiles,
     WorkUnitStore::new(),
   ))
   .expect_err("Want unknown digest error");
@@ -1035,6 +1054,7 @@ fn materialize_directory() {
   block_on(store.materialize_directory(
     materialize_dir.path().to_owned(),
     recursive_testdir.digest(),
+    FileMaterializationBehavior::RequireRealFiles,
     WorkUnitStore::new(),
   ))
   .expect("Error materializing");
@@ -1069,6 +1089,7 @@ fn materialize_directory_executable() {
   block_on(store.materialize_directory(
     materialize_dir.path().to_owned(),
     testdir.digest(),
+    FileMaterializationBehavior::RequireRealFiles,
     WorkUnitStore::new(),
   ))
   .expect("Error materializing");
@@ -1197,7 +1218,7 @@ fn file_contents(path: &Path) -> Bytes {
   Bytes::from(contents)
 }
 
-fn is_executable(path: &Path) -> bool {
+pub fn is_executable(path: &Path) -> bool {
   std::fs::metadata(path)
     .expect("Getting metadata")
     .permissions()
@@ -1348,6 +1369,7 @@ fn materialize_directory_metadata_all_local() {
     .block_on(store.materialize_directory(
       mat_dir.path().to_owned(),
       outer_dir.digest(),
+      FileMaterializationBehavior::RequireRealFiles,
       WorkUnitStore::new(),
     ))
     .unwrap();
@@ -1404,6 +1426,7 @@ fn materialize_directory_metadata_mixed() {
     .block_on(store.materialize_directory(
       mat_dir.path().to_owned(),
       outer_dir.digest(),
+      FileMaterializationBehavior::RequireRealFiles,
       WorkUnitStore::new(),
     ))
     .unwrap();
@@ -1468,6 +1491,7 @@ fn explicitly_overwrites_already_existing_file() {
     .block_on(store.materialize_directory(
       dir_to_write_to.path().to_owned(),
       contents_dir.digest(),
+      FileMaterializationBehavior::RequireRealFiles,
       WorkUnitStore::new(),
     ))
     .unwrap();

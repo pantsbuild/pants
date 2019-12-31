@@ -61,6 +61,8 @@ class ExecutionOptions:
   remote_execution_extra_platform_properties: Any
   remote_execution_headers: Any
   process_execution_local_enable_nailgun: bool
+  process_execution_local_symlink_optimization_threshold: int
+  process_execution_local_symlink_ttl: float
 
   @classmethod
   def from_bootstrap_options(cls, bootstrap_options):
@@ -86,6 +88,8 @@ class ExecutionOptions:
       remote_execution_extra_platform_properties=bootstrap_options.remote_execution_extra_platform_properties,
       remote_execution_headers=bootstrap_options.remote_execution_headers,
       process_execution_local_enable_nailgun=bootstrap_options.process_execution_local_enable_nailgun,
+      process_execution_local_symlink_optimization_threshold=bootstrap_options.process_execution_local_symlink_optimization_threshold,
+      process_execution_local_symlink_ttl=bootstrap_options.process_execution_local_symlink_ttl,
     )
 
 
@@ -111,6 +115,10 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_execution_extra_platform_properties=[],
     remote_execution_headers={},
     process_execution_local_enable_nailgun=False,
+    process_execution_local_symlink_optimization_threshold=100,
+    # The default is set to clean up cached materializations if they have not been accessed for 2
+    # days.
+    process_execution_local_symlink_ttl=172800.0,
   )
 
 
@@ -471,6 +479,13 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--process-execution-local-enable-nailgun', type=bool, default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_enable_nailgun,
              help='Whether or not to use nailgun to run the requests that are marked as nailgunnable.',
              advanced=True)
+    register('--process-execution-local-symlink-optimization-threshold', type=int, default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_symlink_optimization_threshold,
+             help='The number of times to materialize a file before using a symlink instead '
+                  'for applicable local process executions. A value of 0 disables this feature.')
+    register('--process-execution-local-symlink-ttl', type=float, default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_symlink_ttl,
+             help='The time (in seconds) to retain symlink file materialization cache entries. '
+                  'All entries older than this will be deleted when Pants exits. '
+                  'The default is 2 days.')
 
   @classmethod
   def register_options(cls, register):

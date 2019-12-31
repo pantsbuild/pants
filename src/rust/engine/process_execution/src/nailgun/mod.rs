@@ -65,6 +65,7 @@ fn construct_nailgun_server_request(
     jdk_home: Some(jdk),
     target_platform: platform,
     is_nailgunnable: true,
+    require_real_files: true,
   }
 }
 
@@ -86,6 +87,7 @@ fn construct_nailgun_client_request(
     jdk_home: _jdk_home,
     target_platform,
     is_nailgunnable,
+    require_real_files,
   } = original_req;
   client_args.insert(0, client_main_class);
   ExecuteProcessRequest {
@@ -101,6 +103,7 @@ fn construct_nailgun_client_request(
     jdk_home: None,
     target_platform,
     is_nailgunnable,
+    require_real_files,
   }
 }
 

@@ -16,7 +16,7 @@ fn missing_digest() {
   let runtime = task_executor::Executor::new();
 
   let store =
-    Store::local_only(runtime.clone(), store_dir.path()).expect("Error creating local store");
+    Store::local_only(runtime.clone(), store_dir.path(), None).expect("Error creating local store");
 
   let _fs = mount(mount_dir.path(), store, runtime).expect("Mounting");
   assert!(!&mount_dir
@@ -32,7 +32,7 @@ fn read_file_by_digest() {
   let runtime = task_executor::Executor::new();
 
   let store =
-    Store::local_only(runtime.clone(), store_dir.path()).expect("Error creating local store");
+    Store::local_only(runtime.clone(), store_dir.path(), None).expect("Error creating local store");
 
   let test_bytes = TestData::roland();
 
@@ -55,7 +55,7 @@ fn list_directory() {
   let runtime = task_executor::Executor::new();
 
   let store =
-    Store::local_only(runtime.clone(), store_dir.path()).expect("Error creating local store");
+    Store::local_only(runtime.clone(), store_dir.path(), None).expect("Error creating local store");
 
   let test_bytes = TestData::roland();
   let test_directory = TestDirectory::containing_roland();
@@ -81,7 +81,7 @@ fn read_file_from_directory() {
   let runtime = task_executor::Executor::new();
 
   let store =
-    Store::local_only(runtime.clone(), store_dir.path()).expect("Error creating local store");
+    Store::local_only(runtime.clone(), store_dir.path(), None).expect("Error creating local store");
 
   let test_bytes = TestData::roland();
   let test_directory = TestDirectory::containing_roland();
@@ -109,7 +109,7 @@ fn list_recursive_directory() {
   let runtime = task_executor::Executor::new();
 
   let store =
-    Store::local_only(runtime.clone(), store_dir.path()).expect("Error creating local store");
+    Store::local_only(runtime.clone(), store_dir.path(), None).expect("Error creating local store");
 
   let test_bytes = TestData::roland();
   let treat_bytes = TestData::catnip();
@@ -144,7 +144,7 @@ fn read_file_from_recursive_directory() {
   let runtime = task_executor::Executor::new();
 
   let store =
-    Store::local_only(runtime.clone(), store_dir.path()).expect("Error creating local store");
+    Store::local_only(runtime.clone(), store_dir.path(), None).expect("Error creating local store");
 
   let test_bytes = TestData::roland();
   let treat_bytes = TestData::catnip();
@@ -184,7 +184,7 @@ fn files_are_correctly_executable() {
   let runtime = task_executor::Executor::new();
 
   let store =
-    Store::local_only(runtime.clone(), store_dir.path()).expect("Error creating local store");
+    Store::local_only(runtime.clone(), store_dir.path(), None).expect("Error creating local store");
 
   let treat_bytes = TestData::catnip();
   let directory = TestDirectory::with_mixed_executable_files();

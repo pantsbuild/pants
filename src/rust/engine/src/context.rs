@@ -28,7 +28,7 @@ use reqwest;
 use rule_graph::RuleGraph;
 use sharded_lmdb::ShardedLmdb;
 use std::collections::BTreeMap;
-use store::Store;
+use store::{LocalFileMaterializationCache, Store};
 
 const GIGABYTES: usize = 1024 * 1024 * 1024;
 
@@ -82,6 +82,8 @@ impl Core {
     process_execution_use_local_cache: bool,
     remote_execution_headers: BTreeMap<String, String>,
     process_execution_local_enable_nailgun: bool,
+    process_execution_local_symlink_optimization_threshold: u64,
+    process_execution_local_symlink_ttl: Duration,
   ) -> Result<Core, String> {
     // Randomize CAS address order to avoid thundering herds from common config.
     let mut remote_store_servers = remote_store_servers;
@@ -108,12 +110,25 @@ impl Core {
       None
     };
 
+    let file_materialization_cache_dir = local_store_dir.join("file_materialization_cache");
     let local_store_dir2 = local_store_dir.clone();
     let store = safe_create_dir_all_ioerror(&local_store_dir)
+      .and_then(|()| safe_create_dir_all_ioerror(&file_materialization_cache_dir))
       .map_err(|e| format!("Error making directory {:?}: {:?}", local_store_dir, e))
-      .and_then(|()| {
+      .and_then(move |()| {
+        LocalFileMaterializationCache::new(
+          file_materialization_cache_dir,
+          process_execution_local_symlink_optimization_threshold,
+          process_execution_local_symlink_ttl.into(),
+        )
+      })
+      .and_then(|local_file_materialization_cache| {
         if !remote_execution || remote_store_servers.is_empty() {
-          Store::local_only(executor.clone(), local_store_dir)
+          Store::local_only(
+            executor.clone(),
+            local_store_dir,
+            Some(local_file_materialization_cache),
+          )
         } else {
           Store::with_remote(
             executor.clone(),
@@ -130,6 +145,7 @@ impl Core {
               .unwrap(),
             remote_store_rpc_retries,
             remote_store_connection_limit,
+            Some(local_file_materialization_cache),
           )
         }
       })
@@ -146,6 +162,8 @@ impl Core {
       executor.clone(),
       std::env::temp_dir(),
       process_execution_cleanup_local_dirs,
+      // If the symlink threshold is 0, disable file materialization caching.
+      process_execution_local_symlink_optimization_threshold != 0,
     );
 
     let maybe_nailgunnable_local_command_runner: Box<dyn process_execution::CommandRunner> =

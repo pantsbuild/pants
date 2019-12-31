@@ -15,7 +15,7 @@ use std::os::unix::{fs::symlink, process::ExitStatusExt};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::Arc;
-use store::{OneOffStoreFileByDigest, Snapshot, Store};
+use store::{FileMaterializationBehavior, OneOffStoreFileByDigest, Snapshot, Store};
 
 use tokio::timer::Timeout;
 use tokio_codec::{BytesCodec, FramedRead};
@@ -35,6 +35,7 @@ pub struct CommandRunner {
   executor: task_executor::Executor,
   work_dir_base: PathBuf,
   cleanup_local_dirs: bool,
+  allow_symlink_optimization: bool,
   platform: Platform,
 }
 
@@ -44,12 +45,14 @@ impl CommandRunner {
     executor: task_executor::Executor,
     work_dir_base: PathBuf,
     cleanup_local_dirs: bool,
+    allow_symlink_optimization: bool,
   ) -> CommandRunner {
     CommandRunner {
       store,
       executor,
       work_dir_base,
       cleanup_local_dirs,
+      allow_symlink_optimization,
       platform: Platform::current_platform().unwrap(),
     }
   }
@@ -222,7 +225,11 @@ impl super::CommandRunner for CommandRunner {
     .iter()
     {
       if let Some(compatible_req) = req.0.get(compatible_constraint) {
-        return Some(compatible_req.clone());
+        let mut compatible_req = compatible_req.clone();
+        if !self.allow_symlink_optimization {
+          compatible_req.require_real_files = true;
+        }
+        return Some(compatible_req);
       }
     }
     None
@@ -313,11 +320,17 @@ pub trait CapturedWorkdir {
     let maybe_jdk_home = req.jdk_home;
     let unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule =
       req.unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule;
+    let file_materialization_behavior = if req.require_real_files {
+      FileMaterializationBehavior::RequireRealFiles
+    } else {
+      FileMaterializationBehavior::AllowSymlinkOptimization
+    };
 
     store
       .materialize_directory(
         workdir_path.clone(),
         req.input_files,
+        file_materialization_behavior,
         context.workunit_store.clone(),
       )
       .and_then({
@@ -326,6 +339,7 @@ pub trait CapturedWorkdir {
           store2.materialize_directory(
             workdir_path4,
             unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule,
+            file_materialization_behavior,
             workunit_store,
           )
         }

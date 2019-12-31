@@ -22,7 +22,7 @@ fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {
   let runtime = task_executor::Executor::new();
   let work_dir = TempDir::new().unwrap();
   let store_dir = TempDir::new().unwrap();
-  let store = Store::local_only(runtime.clone(), store_dir.path()).unwrap();
+  let store = Store::local_only(runtime.clone(), store_dir.path(), None).unwrap();
   let local = crate::local::CommandRunner::new(
     store.clone(),
     runtime.clone(),

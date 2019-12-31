@@ -16,7 +16,7 @@ fn read_file_by_digest_exact_bytes() {
   let runtime = task_executor::Executor::new();
 
   let store =
-    Store::local_only(runtime.clone(), store_dir.path()).expect("Error creating local store");
+    Store::local_only(runtime.clone(), store_dir.path(), None).expect("Error creating local store");
 
   let test_bytes = TestData::roland();
 

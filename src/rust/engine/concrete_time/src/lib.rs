@@ -26,7 +26,9 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-use serde_derive::Serialize;
+use serde_derive::{Deserialize, Serialize};
+
+use std::default::Default;
 
 /// A concrete data representation of a duration.
 /// Unlike std::time::Duration, it doesn't hide how the time is stored as the purpose of this
@@ -39,12 +41,18 @@ use serde_derive::Serialize;
 ///
 /// It can be used to represent a timestamp (as a duration since the unix epoch) or simply a
 /// duration between two arbitrary timestamps.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct Duration {
   /// How many seconds did this `Duration` last?
   pub secs: u64,
   /// How many sub-second nanoseconds did this `Duration` last?
   pub nanos: u32,
+}
+
+impl Default for Duration {
+  fn default() -> Self {
+    Duration { secs: 0, nanos: 0 }
+  }
 }
 
 impl Duration {
@@ -70,7 +78,7 @@ impl Into<std::time::Duration> for Duration {
 }
 
 /// A timespan
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct TimeSpan {
   /// Duration since the UNIX_EPOCH
   pub start: Duration,
@@ -79,6 +87,13 @@ pub struct TimeSpan {
 }
 
 impl TimeSpan {
+  pub fn now() -> Self {
+    TimeSpan {
+      start: Self::since_epoch(&std::time::SystemTime::now()).into(),
+      duration: Duration::default(),
+    }
+  }
+
   fn since_epoch(time: &std::time::SystemTime) -> std::time::Duration {
     time
       .duration_since(std::time::UNIX_EPOCH)

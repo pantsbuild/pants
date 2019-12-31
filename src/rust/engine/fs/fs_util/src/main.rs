@@ -50,7 +50,7 @@ use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::sync::Arc;
 use std::time::Duration;
-use store::{Snapshot, Store, StoreFileByDigest, UploadSummary};
+use store::{FileMaterializationBehavior, Snapshot, Store, StoreFileByDigest, UploadSummary};
 
 #[derive(Debug)]
 enum ExitCode {
@@ -329,11 +329,12 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
             value_t!(top_match.value_of("rpc-attempts"), usize).expect("Bad rpc-attempts flag"),
             value_t!(top_match.value_of("connection-limit"), usize)
               .expect("Bad connection-limit flag"),
+            None,
           ),
           true,
         )
       }
-      None => (Store::local_only(runtime.clone(), &store_dir), false),
+      None => (Store::local_only(runtime.clone(), &store_dir, None), false),
     };
     let store = store_result.map_err(|e| {
       format!(
@@ -425,6 +426,7 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           .block_on(store.materialize_directory(
             destination,
             digest,
+            FileMaterializationBehavior::RequireRealFiles,
             workunit_store::WorkUnitStore::new(),
           ))
           .map(|metadata| {

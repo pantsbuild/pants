@@ -3,6 +3,7 @@ use crate::tests::block_on;
 use crate::{EntryType, ShrinkBehavior};
 use bytes::{BufMut, Bytes, BytesMut};
 use hashing::{Digest, Fingerprint};
+use std::convert::From;
 use std::path::Path;
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory};
@@ -426,7 +427,7 @@ pub fn all_digests() {
 }
 
 pub fn new_store<P: AsRef<Path>>(dir: P) -> ByteStore {
-  ByteStore::new(task_executor::Executor::new(), dir).unwrap()
+  ByteStore::new(task_executor::Executor::new(), dir, None).unwrap()
 }
 
 pub fn load_file_bytes(store: &ByteStore, digest: Digest) -> Result<Option<Bytes>, String> {

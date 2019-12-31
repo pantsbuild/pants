@@ -627,7 +627,7 @@ fn output_empty_dir() {
 fn local_only_scratch_files_materialized() {
   let store_dir = TempDir::new().unwrap();
   let executor = task_executor::Executor::new();
-  let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
+  let store = Store::local_only(executor.clone(), store_dir.path(), None).unwrap();
 
   // Prepare the store to contain roland, because the EPR needs to materialize it
   let roland_directory_digest = TestDirectory::containing_roland().digest();
@@ -705,7 +705,7 @@ fn timeout() {
 fn working_directory() {
   let store_dir = TempDir::new().unwrap();
   let executor = task_executor::Executor::new();
-  let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
+  let store = Store::local_only(executor.clone(), store_dir.path(), None).unwrap();
 
   // Prepare the store to contain /cats/roland, because the EPR needs to materialize it and then run
   // from the ./cats directory.
@@ -775,7 +775,7 @@ fn run_command_locally_in_dir(
   let store_dir = TempDir::new().unwrap();
   let executor = executor.unwrap_or_else(task_executor::Executor::new);
   let store =
-    store.unwrap_or_else(|| Store::local_only(executor.clone(), store_dir.path()).unwrap());
+    store.unwrap_or_else(|| Store::local_only(executor.clone(), store_dir.path(), None).unwrap());
   let runner = crate::local::CommandRunner::new(store, executor.clone(), dir, cleanup);
   executor.block_on(runner.run(req.into(), Context::default()))
 }

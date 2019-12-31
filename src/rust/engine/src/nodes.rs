@@ -454,6 +454,7 @@ impl MultiPlatformExecuteProcess {
     };
 
     let is_nailgunnable = externs::project_bool(&value, "is_nailgunnable");
+    let require_real_files = externs::project_bool(&value, "require_real_files");
 
     let unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule =
       lift_digest(&externs::project_ignoring_type(
@@ -475,6 +476,7 @@ impl MultiPlatformExecuteProcess {
       jdk_home,
       target_platform,
       is_nailgunnable,
+      require_real_files,
     })
   }
 

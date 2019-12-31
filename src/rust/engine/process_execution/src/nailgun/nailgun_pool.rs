@@ -22,7 +22,7 @@ use lazy_static::lazy_static;
 use crate::ExecuteProcessRequest;
 use digest::Digest as DigestTrait;
 use sha2::Sha256;
-use store::Store;
+use store::{FileMaterializationBehavior, Store};
 use workunit_store::WorkUnitStore;
 
 lazy_static! {
@@ -57,7 +57,7 @@ impl NailgunPool {
     let workdir_for_server2 = workdir_for_server.clone();
 
     // TODO(#8481) This materializes the input files in the client req, which is a superset of the files we need (we only need the classpath, not the input files)
-    store.materialize_directory(workdir_for_server.clone(), input_files, workunit_store)
+    store.materialize_directory(workdir_for_server.clone(), input_files, FileMaterializationBehavior::RequireRealFiles, workunit_store)
     .and_then(move |_metadata| {
       let jdk_home_in_workdir = &workdir_for_server.clone().join(".jdk");
       let jdk_home_in_workdir2 = jdk_home_in_workdir.clone();

@@ -11,7 +11,7 @@ use workunit_store::WorkUnitStore;
 fn mock_nailgun_runner(workdir_base: Option<PathBuf>) -> CommandRunner {
   let store_dir = TempDir::new().unwrap();
   let executor = task_executor::Executor::new();
-  let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
+  let store = Store::local_only(executor.clone(), store_dir.path(), None).unwrap();
   let local_runner =
     crate::local::CommandRunner::new(store, executor.clone(), std::env::temp_dir(), true);
   let metadata = ExecuteProcessRequestMetadata {

@@ -211,6 +211,8 @@ pub struct ExecuteProcessRequest {
   pub target_platform: Platform,
 
   pub is_nailgunnable: bool,
+
+  pub require_real_files: bool,
 }
 
 impl TryFrom<MultiPlatformExecuteProcessRequest> for ExecuteProcessRequest {

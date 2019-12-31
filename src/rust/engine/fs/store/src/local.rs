@@ -1,4 +1,5 @@
 use super::{EntryType, ShrinkBehavior, GIGABYTES};
+use crate::materialization_cache::LocalFileMaterializationCache;
 
 use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::Bytes;
@@ -7,10 +8,11 @@ use futures::future::{self, Future};
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
 use lmdb::Error::NotFound;
 use lmdb::{self, Cursor, Database, RwTransaction, Transaction, WriteFlags};
+use parking_lot::Mutex;
 use sha2::Sha256;
 use sharded_lmdb::ShardedLmdb;
-use std;
 use std::collections::BinaryHeap;
+use std::default::Default;
 use std::path::Path;
 use std::sync::Arc;
 use std::time;
@@ -27,12 +29,14 @@ struct InnerStore {
   file_dbs: Result<Arc<ShardedLmdb>, String>,
   directory_dbs: Result<Arc<ShardedLmdb>, String>,
   executor: task_executor::Executor,
+  file_materialization_cache: Option<Arc<Mutex<LocalFileMaterializationCache>>>,
 }
 
 impl ByteStore {
   pub fn new<P: AsRef<Path>>(
     executor: task_executor::Executor,
     path: P,
+    file_materialization_cache: Option<LocalFileMaterializationCache>,
   ) -> Result<ByteStore, String> {
     let root = path.as_ref();
     let files_root = root.join("files");
@@ -53,8 +57,20 @@ impl ByteStore {
         directory_dbs: ShardedLmdb::new(directories_root.clone(), 5 * GIGABYTES, executor.clone())
           .map(Arc::new),
         executor: executor,
+        file_materialization_cache: file_materialization_cache
+          .map(|cache| Arc::new(Mutex::new(cache))),
       }),
     })
+  }
+
+  pub fn get_file_materialization_cache(
+    &self,
+  ) -> Option<Arc<Mutex<LocalFileMaterializationCache>>> {
+    self
+      .inner
+      .file_materialization_cache
+      .as_ref()
+      .map(|cache| Arc::clone(&cache))
   }
 
   // Note: This performs IO on the calling thread. Hopefully the IO is small enough not to matter.

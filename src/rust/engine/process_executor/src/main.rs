@@ -40,7 +40,7 @@ use std::iter::{FromIterator, Iterator};
 use std::path::PathBuf;
 use std::process::exit;
 use std::time::Duration;
-use store::{BackoffConfig, Store};
+use store::{BackoffConfig, FileMaterializationBehavior, Store};
 use tokio::runtime::Runtime;
 use workunit_store::WorkUnitStore;
 
@@ -303,9 +303,10 @@ fn main() {
         3,
         value_t!(args.value_of("store-connection-limit"), usize)
           .expect("Bad store-connection-limit flag"),
+        None,
       )
     }
-    (None, None) => Store::local_only(executor.clone(), local_store_path),
+    (None, None) => Store::local_only(executor.clone(), local_store_path, None),
     _ => panic!("Must specify either both --server and --cas-server or neither."),
   }
   .expect("Error making store");
@@ -341,6 +342,7 @@ fn main() {
     target_platform: Platform::try_from(&args.value_of("target-platform").unwrap().to_string())
       .expect("invalid value for `target-platform"),
     is_nailgunnable,
+    require_real_files: true,
   };
 
   let runner: Box<dyn process_execution::CommandRunner> = match server_arg {
@@ -384,6 +386,7 @@ fn main() {
       executor,
       work_dir_base,
       true,
+      false,
     )) as Box<dyn process_execution::CommandRunner>,
   };
 
@@ -395,7 +398,12 @@ fn main() {
 
   if let Some(output) = args.value_of("materialize-output-to").map(PathBuf::from) {
     runtime
-      .block_on(store.materialize_directory(output, result.output_directory, WorkUnitStore::new()))
+      .block_on(store.materialize_directory(
+        output,
+        result.output_directory,
+        FileMaterializationBehavior::RequireRealFiles,
+        WorkUnitStore::new(),
+      ))
       .unwrap();
   }
 

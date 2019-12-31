@@ -60,6 +60,7 @@ use std::os::raw;
 use std::panic;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
+use store::FileMaterializationBehavior;
 use tempfile::TempDir;
 use workunit_store::WorkUnit;
 
@@ -207,6 +208,8 @@ pub extern "C" fn scheduler_create(
   process_execution_use_local_cache: bool,
   remote_execution_headers_buf: BufferBuffer,
   process_execution_local_enable_nailgun: bool,
+  process_execution_local_symlink_optimization_threshold: u64,
+  process_execution_local_symlink_ttl: f64,
 ) -> RawResult {
   match make_core(
     tasks_ptr,
@@ -236,6 +239,8 @@ pub extern "C" fn scheduler_create(
     process_execution_use_local_cache,
     remote_execution_headers_buf,
     process_execution_local_enable_nailgun,
+    process_execution_local_symlink_optimization_threshold,
+    process_execution_local_symlink_ttl,
   ) {
     Ok(core) => RawResult {
       is_throw: false,
@@ -278,6 +283,8 @@ fn make_core(
   process_execution_use_local_cache: bool,
   remote_execution_headers_buf: BufferBuffer,
   process_execution_local_enable_nailgun: bool,
+  process_execution_local_symlink_optimization_threshold: u64,
+  process_execution_local_symlink_ttl: f64,
 ) -> Result<Core, String> {
   let root_type_ids = root_type_ids.to_vec();
   let ignore_patterns = ignore_patterns_buf
@@ -386,6 +393,10 @@ fn make_core(
     process_execution_use_local_cache,
     remote_execution_headers,
     process_execution_local_enable_nailgun,
+    process_execution_local_symlink_optimization_threshold,
+    // convert delay from float to millisecond resolution. use from_secs_f64 when it is
+    // off nightly. https://github.com/rust-lang/rust/issues/54361
+    Duration::from_millis((process_execution_local_symlink_ttl * 1000.0).round() as u64),
   )
 }
 
@@ -970,6 +981,7 @@ pub extern "C" fn run_local_interactive_process(
             let write_operation = scheduler.core.store().materialize_directory(
               destination,
               digest,
+              FileMaterializationBehavior::RequireRealFiles,
               session.workunit_store().clone(),
             );
 
@@ -1062,6 +1074,7 @@ pub extern "C" fn materialize_directories(
           let metadata = scheduler.core.store().materialize_directory(
             destination.clone(),
             digest,
+            FileMaterializationBehavior::RequireRealFiles,
             workunit_store.clone(),
           );
           metadata.map(|m| (destination, m))

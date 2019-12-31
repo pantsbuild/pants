@@ -763,6 +763,7 @@ pub fn sends_headers() {
     store::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
     1,
     1,
+    None,
   )
   .expect("Failed to make store");
 
@@ -929,6 +930,7 @@ fn ensure_inline_stdio_is_stored() {
     store::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
     1,
     1,
+    None,
   )
   .expect("Failed to make store");
 
@@ -961,7 +963,7 @@ fn ensure_inline_stdio_is_stored() {
   );
 
   let local_store =
-    Store::local_only(runtime.clone(), &store_dir_path).expect("Error creating local store");
+    Store::local_only(runtime.clone(), &store_dir_path, None).expect("Error creating local store");
   {
     assert_eq!(
       runtime
@@ -1462,6 +1464,7 @@ fn execute_missing_file_uploads_if_known() {
     store::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
     1,
     1,
+    None,
   )
   .expect("Failed to make store");
   runtime
@@ -1570,6 +1573,7 @@ fn execute_missing_file_uploads_if_known_status() {
     store::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
     1,
     1,
+    None,
   )
   .expect("Failed to make store");
   store
@@ -1654,6 +1658,7 @@ fn execute_missing_file_errors_if_unknown() {
     store::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
     1,
     1,
+    None,
   )
   .expect("Failed to make store");
 
@@ -2515,6 +2520,7 @@ fn make_store(store_dir: &Path, cas: &mock::StubCAS, executor: task_executor::Ex
     store::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
     1,
     1,
+    None,
   )
   .expect("Failed to make store")
 }

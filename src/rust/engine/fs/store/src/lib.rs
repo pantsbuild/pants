@@ -45,7 +45,7 @@ pub use serverset::BackoffConfig;
 use std::collections::{BTreeMap, HashMap};
 use std::fs::OpenOptions;
 use std::io::Write;
-use std::os::unix::fs::OpenOptionsExt;
+use std::os::unix::fs::{symlink, OpenOptionsExt};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
@@ -67,6 +67,15 @@ pub mod local_tests;
 mod remote;
 #[cfg(test)]
 mod remote_tests;
+
+mod materialization_cache;
+pub use materialization_cache::LocalFileMaterializationCache;
+use materialization_cache::{
+  CachedFileMaterializationState, CachedFileToMaterialize, CanonicalFileMaterializationRequest,
+  FileMaterializationInput,
+};
+#[cfg(test)]
+mod materialization_cache_tests;
 
 // Summary of the files and directories uploaded with an operation
 // ingested_file_{count, bytes}: Number and combined size of processed files
@@ -181,6 +190,12 @@ pub struct Store {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum FileMaterializationBehavior {
+  AllowSymlinkOptimization,
+  RequireRealFiles,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ShrinkBehavior {
   ///
   /// Free up space in the store for future writes (marking pages as dirty), but don't proactively
@@ -209,9 +224,10 @@ impl Store {
   pub fn local_only<P: AsRef<Path>>(
     executor: task_executor::Executor,
     path: P,
+    file_materialization_cache: Option<LocalFileMaterializationCache>,
   ) -> Result<Store, String> {
     Ok(Store {
-      local: local::ByteStore::new(executor, path)?,
+      local: local::ByteStore::new(executor, path, file_materialization_cache)?,
       remote: None,
     })
   }
@@ -233,9 +249,10 @@ impl Store {
     backoff_config: BackoffConfig,
     rpc_retries: usize,
     connection_limit: usize,
+    file_materialization_cache: Option<LocalFileMaterializationCache>,
   ) -> Result<Store, String> {
     Ok(Store {
-      local: local::ByteStore::new(executor, path)?,
+      local: local::ByteStore::new(executor, path, file_materialization_cache)?,
       remote: Some(remote::ByteStore::new(
         cas_addresses,
         instance_name,
@@ -360,6 +377,7 @@ impl Store {
   /// Guarantees that if an Ok Some value is returned, it is valid, and canonical, and its
   /// fingerprint exactly matches that which is requested. Will return an Err if it would return a
   /// non-canonical Directory.
+  /// TODO: Describe what "canonical" means here somewhere in this file!!
   ///
   pub fn load_directory(
     &self,
@@ -687,6 +705,7 @@ impl Store {
     &self,
     destination: PathBuf,
     digest: Digest,
+    behavior: FileMaterializationBehavior,
     workunit_store: WorkUnitStore,
   ) -> BoxFuture<DirectoryMaterializeMetadata, String> {
     let root = Arc::new(Mutex::new(None));
@@ -695,6 +714,7 @@ impl Store {
         destination,
         RootOrParentMetadataBuilder::Root(root.clone()),
         digest,
+        behavior,
         workunit_store,
       )
       .map(|()| Arc::try_unwrap(root).unwrap().into_inner().unwrap().build())
@@ -706,6 +726,7 @@ impl Store {
     destination: PathBuf,
     root_or_parent_metadata: RootOrParentMetadataBuilder,
     digest: Digest,
+    behavior: FileMaterializationBehavior,
     workunit_store: WorkUnitStore,
   ) -> BoxFuture<(), String> {
     if let RootOrParentMetadataBuilder::Root(..) = root_or_parent_metadata {
@@ -757,6 +778,7 @@ impl Store {
                 path,
                 digest,
                 file_node.is_executable,
+                behavior,
                 workunit_store.clone(),
               )
               .map(move |metadata| child_files.lock().insert(name, metadata))
@@ -777,7 +799,13 @@ impl Store {
               child_files.clone(),
             ));
 
-            store.materialize_directory_helper(path, builder, digest, workunit_store.clone())
+            store.materialize_directory_helper(
+              path,
+              builder,
+              digest,
+              behavior,
+              workunit_store.clone(),
+            )
           })
           .collect::<Vec<_>>();
         future::join_all(file_futures)
@@ -787,17 +815,24 @@ impl Store {
       .to_boxed()
   }
 
-  fn materialize_file(
+  fn uncached_materialize_file(
     &self,
     destination: PathBuf,
-    digest: Digest,
-    is_executable: bool,
+    input: FileMaterializationInput,
     workunit_store: WorkUnitStore,
   ) -> BoxFuture<LoadMetadata, String> {
+    let FileMaterializationInput {
+      digest,
+      is_executable,
+    } = input;
+
     self
       .load_file_bytes_with(
         digest,
         move |bytes| {
+          // TODO: Determine when this situation happens! If we materialize files into a
+          // newly-constructed temp dir (as we do with local hermetic process executions), we do
+          // *not* expect this file to exist. Should we error in that case?
           if destination.exists() {
             std::fs::remove_file(&destination)
           } else {
@@ -827,6 +862,101 @@ impl Store {
         None => Err(format!("File with digest {:?} not found", digest)),
       })
       .to_boxed()
+  }
+
+  fn generate_canonical_file_materialization(
+    &self,
+    destination: PathBuf,
+    request: CanonicalFileMaterializationRequest,
+    workunit_store: WorkUnitStore,
+  ) -> BoxFuture<LoadMetadata, String> {
+    let CanonicalFileMaterializationRequest {
+      input,
+      materialize_into_dir,
+    } = request;
+    let canonical_materialized_location = {
+      let FileMaterializationInput {
+        digest,
+        is_executable,
+      } = input;
+      let Digest(fingerprint, size_bytes) = digest;
+      let canonical_file_name = format!("{}-{}-{}", fingerprint, size_bytes, is_executable);
+      materialize_into_dir.join(canonical_file_name)
+    };
+
+    let store = self.clone();
+    self
+      .uncached_materialize_file(
+        canonical_materialized_location.clone(),
+        input,
+        workunit_store,
+      )
+      .map(move |_| CachedFileToMaterialize {
+        input,
+        canonical_materialized_location,
+      })
+      .and_then(move |to_materialize| {
+        let symlinked_result = store
+          .local
+          .get_file_materialization_cache()
+          .unwrap()
+          .lock()
+          .register_newly_materialized_file(to_materialize.clone())
+          .and_then(|()| store.materialize_symlink_to_canonical_file(destination, to_materialize));
+        future::result(symlinked_result)
+      })
+      .to_boxed()
+  }
+
+  fn materialize_symlink_to_canonical_file(
+    &self,
+    destination: PathBuf,
+    to_materialize: CachedFileToMaterialize,
+  ) -> Result<LoadMetadata, String> {
+    let CachedFileToMaterialize {
+      canonical_materialized_location,
+      ..
+    } = to_materialize;
+    symlink(canonical_materialized_location, destination).map_err(|e| format!("{}", e))?;
+    Ok(LoadMetadata::Local)
+  }
+
+  fn materialize_file(
+    &self,
+    destination: PathBuf,
+    digest: Digest,
+    is_executable: bool,
+    behavior: FileMaterializationBehavior,
+    workunit_store: WorkUnitStore,
+  ) -> BoxFuture<LoadMetadata, String> {
+    let file_materialization_key = FileMaterializationInput {
+      digest,
+      is_executable,
+    };
+    let maybe_file_materialization_cache = self.local.get_file_materialization_cache();
+
+    match (behavior, maybe_file_materialization_cache) {
+      (_, None) | (FileMaterializationBehavior::RequireRealFiles, _) => {
+        self.uncached_materialize_file(destination, file_materialization_key, workunit_store)
+      }
+      (FileMaterializationBehavior::AllowSymlinkOptimization, Some(cache)) => {
+        match cache
+          .lock()
+          .determine_materialization_state_for_file(file_materialization_key)
+        {
+          CachedFileMaterializationState::HasNoCanonicalMaterialization => {
+            self.uncached_materialize_file(destination, file_materialization_key, workunit_store)
+          }
+          CachedFileMaterializationState::RequiresCanonicalMaterialization(request) => self
+            .generate_canonical_file_materialization(destination, request, workunit_store)
+            .to_boxed(),
+          CachedFileMaterializationState::AlreadyCanonicallyMaterialized(to_materialize) => {
+            future::result(self.materialize_symlink_to_canonical_file(destination, to_materialize))
+              .to_boxed()
+          }
+        }
+      }
+    }
   }
 
   // Returns files sorted by their path.

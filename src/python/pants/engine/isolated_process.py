@@ -40,6 +40,7 @@ class ExecuteProcessRequest:
   unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: Digest
   jdk_home: Optional[str]
   is_nailgunnable: bool
+  require_real_files: bool
 
   def __init__(
     self,
@@ -55,6 +56,7 @@ class ExecuteProcessRequest:
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: Digest = EMPTY_DIRECTORY_DIGEST,
     jdk_home: Optional[str] = None,
     is_nailgunnable: bool = False,
+    require_real_files: bool = False,
   ) -> None:
     self.argv = argv
     self.input_files = input_files
@@ -67,6 +69,7 @@ class ExecuteProcessRequest:
     self.unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule = unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule
     self.jdk_home = jdk_home
     self.is_nailgunnable = is_nailgunnable
+    self.require_real_files = require_real_files
 
 
 @frozen_after_init

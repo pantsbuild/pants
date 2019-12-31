@@ -720,8 +720,9 @@ fn main() {
       .expect("Error making BackoffConfig"),
       1,
       1,
+      None,
     ),
-    None => Store::local_only(runtime.clone(), &store_path),
+    None => Store::local_only(runtime.clone(), &store_path, None),
   }
   .expect("Error making store");
 
