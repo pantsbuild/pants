@@ -4,7 +4,7 @@
 from pants.base.build_root import BuildRoot
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.fs import Digest, FileContent, InputFilesContent, Workspace
-from pants.engine.interactive_runner import InteractiveRunner
+from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
 from pants.rules.core import run
 from pants.rules.core.binary import CreatedBinary
 from pants.testutil.console_rule_test_base import ConsoleRuleTestBase
@@ -58,6 +58,28 @@ class RunTest(ConsoleRuleTestBase):
     self.assertEqual(res.exit_code, 0)
     self.assertEquals(console.stdout.getvalue(), "Running target: some/addr:addr\nsome/addr:addr ran successfully.\n")
     self.assertEquals(console.stderr.getvalue(), "")
+
+  def test_materialize_input_files(self) -> None:
+    program_text = b'#!/usr/bin/python\nprint("hello")'
+    binary = self.create_mock_binary(program_text)
+    interactive_runner = InteractiveRunner(self.scheduler)
+    request = InteractiveProcessRequest(
+      argv=("./program.py",),
+      run_in_workspace=False,
+      input_files=binary.digest,
+    )
+    result = interactive_runner.run_local_interactive_process(request)
+    self.assertEqual(result.process_exit_code, 0)
+
+  def test_no_input_files_in_workspace(self) -> None:
+    program_text = b'#!/usr/bin/python\nprint("hello")'
+    binary = self.create_mock_binary(program_text)
+    with self.assertRaises(ValueError):
+      _ = InteractiveProcessRequest(
+          argv=("/usr/bin/python",),
+          run_in_workspace=True,
+          input_files=binary.digest
+      )
 
   def test_failed_run(self) -> None:
     console = MockConsole(use_colors=False)
