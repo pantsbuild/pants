@@ -13,6 +13,7 @@ from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks.resolve_requirements_task_base import ResolveRequirementsTaskBase
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
 from pants.base.workunit import WorkUnit, WorkUnitLabel
@@ -31,7 +32,7 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
     def __init__(self, *args, **kwargs):
       compiled = kwargs.pop('compiled')
       failed = kwargs.pop('failed')
-      super(PythonEval.Error, self).__init__(*args, **kwargs)
+      super().__init__(*args, **kwargs)
       self.compiled = compiled
       self.failed = failed
 
@@ -44,6 +45,25 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
       PexBuilderWrapper.Factory,
       PythonInterpreterCache
     )
+
+  @property
+  def skip_execution(self):
+    deprecated_conditional(
+      lambda: self.get_options().is_default("skip"),
+      entity_description="`python-eval` defaulting to being used",
+      removal_version="1.27.0.dev0",
+      hint_message="`python-eval` is scheduled to be removed in Pants 1.29.0.dev0. The Python "
+                   "linter landscape has changed since we first created this tool - there are now "
+                   "popular linters that dramatically improve upon this one, such as MyPy and "
+                   "Pylint. Pants currently provides a wrapper around MyPy and will soon add "
+                   "Pylint. (To install MyPy, add "
+                   "`pantsbuild.pants.contrib.mypy==%(pants_version)s` to your `plugins` list.)"
+                   "\n\nTo prepare, set `skip: True` in your `pants.ini` under the section "
+                   "`python-eval`. If you still need to use this tool, set `skip: False`. In "
+                   "Pants 1.27.0.dev0, the default will change from `skip: False` to `skip: True`, "
+                   "and in Pants 1.29.0.dev0, the module will be removed."
+    )
+    return self.get_options().skip
 
   @classmethod
   def prepare(cls, options, round_manager):
