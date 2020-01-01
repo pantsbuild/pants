@@ -70,9 +70,9 @@ from pants.backend.jvm.tasks.run_jvm_prep_command import (
 )
 from pants.backend.jvm.tasks.scala_repl import ScalaRepl
 from pants.backend.jvm.tasks.scaladoc_gen import ScaladocGen
-from pants.backend.jvm.tasks.scalafix import ScalaFixCheck, ScalaFixFix
-from pants.backend.jvm.tasks.scalafmt import ScalaFmtCheckFormat, ScalaFmtFormat
-from pants.backend.jvm.tasks.scalastyle import Scalastyle
+from pants.backend.jvm.tasks.scalafix_task import ScalaFixCheck, ScalaFixFix
+from pants.backend.jvm.tasks.scalafmt_task import ScalaFmtCheckFormat, ScalaFmtFormat
+from pants.backend.jvm.tasks.scalastyle_task import ScalastyleTask
 from pants.backend.jvm.tasks.unpack_jars import UnpackJars
 from pants.backend.project_info.tasks.export_dep_as_jar import ExportDepAsJar
 from pants.build_graph.app_base import Bundle, DirectoryReMapper
@@ -210,7 +210,7 @@ def register_goals():
   # Linting.
   task(name='scalafix', action=ScalaFixCheck).install('lint')
   task(name='scalafmt', action=ScalaFmtCheckFormat, serialize=False).install('lint')
-  task(name='scalastyle', action=Scalastyle, serialize=False).install('lint')
+  task(name='scalastyle', action=ScalastyleTask, serialize=False).install('lint')
   task(name='checkstyle', action=Checkstyle, serialize=False).install('lint')
   task(name='jvm-dep-check', action=JvmDependencyCheck, serialize=False).install('lint')
 

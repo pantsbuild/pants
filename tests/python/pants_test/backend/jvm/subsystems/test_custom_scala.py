@@ -4,9 +4,10 @@
 from textwrap import dedent
 
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
+from pants.backend.jvm.subsystems.scalastyle import Scalastyle
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
-from pants.backend.jvm.tasks.scalastyle import Scalastyle
+from pants.backend.jvm.tasks.scalastyle_task import ScalastyleTask
 from pants.java.jar.jar_dependency import JarDependency
 from pants.testutil.jvm.nailgun_task_test_base import NailgunTaskTestBase
 from pants.testutil.subsystem.util import init_subsystem
@@ -15,7 +16,7 @@ from pants.testutil.subsystem.util import init_subsystem
 class CustomScalaTest(NailgunTaskTestBase):
   @classmethod
   def task_type(cls):
-    return Scalastyle
+    return ScalastyleTask
 
   def setUp(self):
     super().setUp()
@@ -35,7 +36,8 @@ class CustomScalaTest(NailgunTaskTestBase):
   def _create_context(self, scalastyle_config=None, excludes=None, target_roots=None):
     # If config is not specified, then we override pants.ini scalastyle such that
     # we have a default scalastyle config xml but with empty excludes.
-    self.set_options(skip=False, config=scalastyle_config, excludes=excludes)
+    self.set_options_for_scope(Scalastyle.options_scope, config=scalastyle_config)
+    self.set_options(skip=False, excludes=excludes)
     return self.context(target_roots=target_roots)
 
   def _create_scalastyle_config_file(self, rules=None):
