@@ -63,7 +63,8 @@ async def run_python_test(
       build_file_addresses=BuildFileAddresses((test_target.address,)),
       output_filename=output_pytest_requirements_pex_filename,
       entry_point="pytest:main",
-      additional_requirements=pytest.get_requirement_strings()
+      additional_requirements=pytest.get_requirement_strings(),
+      include_source_files=False
     )
   )
 
