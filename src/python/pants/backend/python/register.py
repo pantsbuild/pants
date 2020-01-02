@@ -11,7 +11,6 @@ from pants.backend.python.rules import (
   pex,
   pex_from_target_closure,
   python_create_binary,
-  python_test_debugger,
   python_test_runner,
 )
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
@@ -99,7 +98,6 @@ def rules():
     *pex.rules(),
     *pex_from_target_closure.rules(),
     *python_test_runner.rules(),
-    *python_test_debugger.rules(),
     *python_create_binary.rules(),
     *python_native_code.rules(),
     *subprocess_environment.rules(),
