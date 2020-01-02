@@ -4,12 +4,8 @@
 from typing import Optional
 
 from pants.backend.python.rules.inject_init import InjectedInitDigest
-from pants.backend.python.rules.pex import (
-  CreatePex,
-  Pex,
-  PexInterpreterConstraints,
-  PexRequirements,
-)
+from pants.backend.python.rules.pex import Pex
+from pants.backend.python.rules.pex_from_target_closure import CreatePexFromTargetClosure
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
@@ -56,30 +52,19 @@ async def run_python_test(
 ) -> TestResult:
   """Runs pytest for one target."""
 
-  # TODO(7726): replace this with a proper API to get the `closure` for a
-  # TransitiveHydratedTarget.
   transitive_hydrated_targets = await Get[TransitiveHydratedTargets](
     BuildFileAddresses((test_target.address,))
   )
   all_targets = transitive_hydrated_targets.closure
-  all_target_adaptors = tuple(t.adaptor for t in all_targets)
-
-  interpreter_constraints = PexInterpreterConstraints.create_from_adaptors(
-    adaptors=tuple(all_target_adaptors),
-    python_setup=python_setup
-  )
 
   output_pytest_requirements_pex_filename = 'pytest-with-requirements.pex'
-  requirements = PexRequirements.create_from_adaptors(
-    adaptors=all_target_adaptors,
-    additional_requirements=pytest.get_requirement_strings()
-  )
   resolved_requirements_pex = await Get[Pex](
-    CreatePex(
+    CreatePexFromTargetClosure(
+      build_file_addresses=BuildFileAddresses((test_target.address,)),
       output_filename=output_pytest_requirements_pex_filename,
-      requirements=requirements,
-      interpreter_constraints=interpreter_constraints,
       entry_point="pytest:main",
+      additional_requirements=pytest.get_requirement_strings(),
+      include_source_files=False
     )
   )
 
@@ -101,7 +86,6 @@ async def run_python_test(
     stripped_sources.snapshot.directory_digest for stripped_sources in source_root_stripped_sources
   )
   sources_digest = await Get[Digest](DirectoriesToMerge(directories=stripped_sources_digests))
-
   inits_digest = await Get[InjectedInitDigest](Digest, sources_digest)
 
   merged_input_files = await Get[Digest](
