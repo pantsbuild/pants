@@ -4,12 +4,8 @@
 from pathlib import Path
 
 from pants.backend.python.rules.inject_init import InjectedInitDigest
-from pants.backend.python.rules.pex import (
-  CreatePex,
-  Pex,
-  PexInterpreterConstraints,
-  PexRequirements,
-)
+from pants.backend.python.rules.pex import Pex
+from pants.backend.python.rules.pex_from_target_closure import CreatePexFromTargetClosure
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.base.build_root import BuildRoot
@@ -40,16 +36,16 @@ async def debug_python_test(
     BuildFileAddresses((test_target.address,))
   )
   all_targets = transitive_hydrated_targets.closure
-  all_target_adaptors = [t.adaptor for t in all_targets]
 
-  interpreter_constraints = PexInterpreterConstraints.create_from_adaptors(
-    adaptors=tuple(all_target_adaptors),
-    python_setup=python_setup
-  )
-
-  requirements = PexRequirements.create_from_adaptors(
-    adaptors=all_target_adaptors,
-    additional_requirements=pytest.get_requirement_strings()
+  output_pytest_requirements_pex_filename = 'pytest-with-requirements.pex'
+  resolved_requirements_pex = await Get[Pex](
+    CreatePexFromTargetClosure(
+      build_file_addresses=BuildFileAddresses((test_target.address,)),
+      output_filename=output_pytest_requirements_pex_filename,
+      entry_point="pytest:main",
+      additional_requirements=pytest.get_requirement_strings(),
+      include_source_files=False
+    )
   )
 
   source_root_stripped_test_target_sources = await Get[SourceRootStrippedSources](
@@ -65,18 +61,6 @@ async def debug_python_test(
     stripped_sources.snapshot.directory_digest for stripped_sources in source_root_stripped_sources
   )
   sources_digest = await Get[Digest](DirectoriesToMerge(directories=stripped_sources_digests))
-
-  output_pytest_requirements_pex = 'pytest-with-requirements.pex'
-
-  resolved_requirements_pex = await Get[Pex](
-    CreatePex(
-      output_filename=f'./{output_pytest_requirements_pex}',
-      requirements=requirements,
-      interpreter_constraints=interpreter_constraints,
-      entry_point="pytest:main",
-    )
-  )
-
   inits_digest = await Get[InjectedInitDigest](Digest, sources_digest)
 
   merged_input_files = await Get[Digest](
@@ -102,8 +86,10 @@ async def debug_python_test(
       DirectoryToMaterialize(merged_input_files, path_prefix=path_relative_to_build_root)
     )
 
-    request_args = (f'{path_relative_to_build_root}/{output_pytest_requirements_pex}', *pex_args)
-    run_request = InteractiveProcessRequest(argv=request_args, run_in_workspace=True)
+    run_request = InteractiveProcessRequest(
+      argv=(f'{path_relative_to_build_root}/{output_pytest_requirements_pex_filename}', *pex_args),
+      run_in_workspace=True,
+    )
 
     result = runner.run_local_interactive_process(run_request)
 
