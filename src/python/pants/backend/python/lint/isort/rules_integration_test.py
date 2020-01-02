@@ -78,33 +78,32 @@ class IsortIntegrationTest(TestBase):
     if config is not None:
       self.create_file(relpath=".isort.cfg", contents=config)
     input_snapshot = self.request_single_product(Snapshot, InputFilesContent(source_files))
-    target = IsortTarget(
-      TargetAdaptor(
-        sources=EagerFilesetWithSpec('test', {'globs': []}, snapshot=input_snapshot),
-        address=Address.parse("test:target"),
-      ),
-      prior_formatter_result_digest=input_snapshot.directory_digest,
+    target_adaptor = TargetAdaptor(
+      sources=EagerFilesetWithSpec('test', {'globs': []}, snapshot=input_snapshot),
+      address=Address.parse("test:target"),
     )
+    lint_target = IsortTarget(target_adaptor)
+    fmt_target = IsortTarget(target_adaptor, prior_formatter_result_digest=input_snapshot.directory_digest)
     isort_subsystem = global_subsystem_instance(
       Isort, options={Isort.options_scope: {
         "config": [".isort.cfg"] if config else None,
         "args": passthrough_args or [],
       }}
     )
+    python_subsystems = [
+      PythonNativeCode.global_instance(),
+      PythonSetup.global_instance(),
+      SubprocessEnvironment.global_instance(),
+    ]
     isort_setup = self.request_single_product(
-      IsortSetup,
-      Params(
-        isort_subsystem,
-        PythonNativeCode.global_instance(),
-        PythonSetup.global_instance(),
-        SubprocessEnvironment.global_instance(),
-      )
+      IsortSetup, Params(isort_subsystem, *python_subsystems)
     )
-    fmt_and_lint_params = Params(
-      target, isort_setup, PythonSetup.global_instance(), SubprocessEnvironment.global_instance()
+    lint_result = self.request_single_product(
+      LintResult, Params(lint_target, isort_setup, *python_subsystems)
     )
-    lint_result = self.request_single_product(LintResult, fmt_and_lint_params)
-    fmt_result = self.request_single_product(FmtResult, fmt_and_lint_params)
+    fmt_result = self.request_single_product(
+      FmtResult, Params(fmt_target, isort_setup, *python_subsystems)
+    )
     return lint_result, fmt_result
 
   def get_digest(self, source_files: List[FileContent]) -> Digest:
