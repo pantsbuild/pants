@@ -5,11 +5,12 @@ import logging
 from textwrap import dedent
 
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
+from pants.backend.jvm.subsystems.scalastyle import Scalastyle
 from pants.backend.jvm.subsystems.scoverage_platform import ScoveragePlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
-from pants.backend.jvm.tasks.scalastyle import FileExcluder, Scalastyle
+from pants.backend.jvm.tasks.scalastyle_task import FileExcluder, ScalastyleTask
 from pants.base.exceptions import TaskError
 from pants.java.jar.jar_dependency import JarDependency
 from pants.testutil.jvm.nailgun_task_test_base import NailgunTaskTestBase
@@ -25,7 +26,7 @@ class ScalastyleTest(NailgunTaskTestBase):
 
   @classmethod
   def task_type(cls):
-    return Scalastyle
+    return ScalastyleTask
 
   #
   # Internal test helper section
@@ -55,7 +56,8 @@ class ScalastyleTest(NailgunTaskTestBase):
   def _create_context(self, scalastyle_config=None, excludes=None, target_roots=None):
     # If config is not specified, then we override pants.ini scalastyle such that
     # we have a default scalastyle config xml but with empty excludes.
-    self.set_options(skip=False, config=scalastyle_config, excludes=excludes)
+    self.set_options_for_scope(Scalastyle.options_scope, config=scalastyle_config)
+    self.set_options(skip=False, excludes=excludes)
     return self.context(target_roots=target_roots)
 
   def _create_scalastyle_task(self, scalastyle_config):
@@ -72,11 +74,11 @@ class ScalastyleTest(NailgunTaskTestBase):
     init_subsystem(ScoveragePlatform)
 
   def test_initialize_config_no_config_settings(self):
-    with self.assertRaises(Scalastyle.UnspecifiedConfig):
+    with self.assertRaises(ScalastyleTask.UnspecifiedConfig):
       self._create_scalastyle_task(scalastyle_config=None).validate_scalastyle_config()
 
   def test_initialize_config_config_setting_exist_but_invalid(self):
-    with self.assertRaises(Scalastyle.MissingConfig):
+    with self.assertRaises(ScalastyleTask.MissingConfig):
       self._create_scalastyle_task(
         scalastyle_config='file_does_not_exist.xml').validate_scalastyle_config()
 
@@ -132,10 +134,9 @@ class ScalastyleTest(NailgunTaskTestBase):
                                               sources=['SourceGenerated.scala'],
                                               derived_from=scala_target)
 
-    result_targets = Scalastyle.get_non_synthetic_scala_targets([java_target,
-                                                                 scala_target,
-                                                                 scala_target_with_java_source,
-                                                                 synthetic_scala_target])
+    result_targets = ScalastyleTask.get_non_synthetic_scala_targets(
+      [java_target, scala_target, scala_target_with_java_source, synthetic_scala_target],
+    )
 
     # Only the scala target should remain
     self.assertEqual(1, len(result_targets))
@@ -177,7 +178,7 @@ class ScalastyleTest(NailgunTaskTestBase):
     self.assertEqual(1, len(result_sources))
     self.assertEqual('a/scala_1/Source1.scala', result_sources[0])
 
-  @ensure_cached(Scalastyle, expected_num_artifacts=1)
+  @ensure_cached(ScalastyleTask, expected_num_artifacts=1)
   def test_end_to_end_pass(self):
     # Create a scala source that would PASS ImportGroupingChecker rule.
     self.create_file(

@@ -106,6 +106,16 @@ python_library(
 )
 
 python_library(
+  name = 'scala_linters',
+  sources = ['scalafix.py', 'scalafmt.py', 'scalastyle.py'],
+  dependencies = [
+    'src/python/pants/option',
+    'src/python/pants/subsystem',
+  ],
+  tags = {"partially_type_checked"},
+)
+
+python_library(
   name = 'scala_platform',
   sources = ['scala_platform.py'],
   dependencies = [
