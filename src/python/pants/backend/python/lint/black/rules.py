@@ -33,7 +33,7 @@ from pants.rules.core.lint import LintResult
 @dataclass(frozen=True)
 class BlackTarget:
   target: TargetAdaptor
-  prior_formatter_result_digest: Digest
+  prior_formatter_result_digest: Optional[Digest] = None  # unused by `lint`
 
 
 @dataclass(frozen=True)
@@ -101,7 +101,7 @@ async def create_black_request(
   subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> ExecuteProcessRequest:
   target = wrapped_target.target
-  sources_digest = wrapped_target.prior_formatter_result_digest
+  sources_digest = wrapped_target.prior_formatter_result_digest or target.sources.snapshot.directory_digest
   merged_input_files = await Get[Digest](
     DirectoriesToMerge(
       directories=(
