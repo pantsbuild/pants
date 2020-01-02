@@ -13,7 +13,7 @@ from pants.engine.fs import Digest, FilesContent
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.legacy.graph import HydratedTarget, HydratedTargets
 from pants.engine.objects import Collection
-from pants.engine.rules import console_rule, optionable_rule, rule
+from pants.engine.rules import console_rule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method
@@ -274,5 +274,5 @@ def rules():
   return [
     validate,
     match_regexes_for_one_target,
-    optionable_rule(SourceFileValidation),
+    subsystem_rule(SourceFileValidation),
   ]

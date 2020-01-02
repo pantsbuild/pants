@@ -18,7 +18,7 @@ from pants.engine.addressable import BuildFileAddresses
 from pants.engine.fs import Digest, DirectoriesToMerge
 from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
 from pants.engine.legacy.structs import PythonAWSLambdaAdaptor
-from pants.engine.rules import UnionRule, optionable_rule, rule
+from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
 
 
@@ -83,4 +83,4 @@ async def setup_lambdex(lambdex: Lambdex) -> LambdexSetup:
 def rules():
   return [create_python_awslambda,
           UnionRule(AWSLambdaTarget, PythonAWSLambdaAdaptor),
-          setup_lambdex, optionable_rule(Lambdex)]
+          setup_lambdex, subsystem_rule(Lambdex)]
