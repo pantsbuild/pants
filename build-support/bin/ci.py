@@ -372,7 +372,7 @@ def run_sanity_checks() -> None:
 def run_lint() -> None:
   targets = ["contrib::", "examples::", "src::", "tests::", "zinc::"]
   _run_command(
-    ["./pants.pex", "--tag=-nolint", "lint", "lint-v2", *targets],
+    ["./pants.pex", "--tag=-nolint", "lint", "lint2", *targets],
     slug="Lint",
     start_message="Running lint checks",
     die_message="Lint check failure.",
