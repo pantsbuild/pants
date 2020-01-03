@@ -949,16 +949,6 @@ pub extern "C" fn run_local_interactive_process(
           return Err("Empty argv list not permitted".to_string());
         }
 
-        let mut command = process::Command::new(argv[0].clone());
-        for arg in argv[1..].iter() {
-          command.arg(arg);
-        }
-
-        let env = externs::project_tuple_encoded_map(&value, "env")?;
-        for (key, value) in env.iter() {
-          command.env(key, value);
-        }
-
         let run_in_workspace = externs::project_bool(&value, "run_in_workspace");
         let maybe_tempdir = if run_in_workspace {
           None
@@ -987,8 +977,29 @@ pub extern "C" fn run_local_interactive_process(
           }
         }
 
+        let p = Path::new(&argv[0]);
+        let program_name = match maybe_tempdir {
+          Some(ref tempdir) if p.is_relative() =>  {
+            let mut buf = PathBuf::new();
+            buf.push(tempdir);
+            buf.push(p);
+            buf
+          },
+          _ => p.to_path_buf()
+        };
+
+        let mut command = process::Command::new(program_name);
+        for arg in argv[1..].iter() {
+          command.arg(arg);
+        }
+
         if let Some(ref tempdir) = maybe_tempdir {
           command.current_dir(tempdir.path());
+        }
+
+        let env = externs::project_tuple_encoded_map(&value, "env")?;
+        for (key, value) in env.iter() {
+          command.env(key, value);
         }
 
         let mut subprocess = command.spawn().map_err(|e| format!("Error executing interactive process: {}", e.to_string()))?;
