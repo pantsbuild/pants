@@ -21,11 +21,12 @@ class ThriftLintError(Exception):
 class ThriftLinterTask(LintTaskMixin, NailgunTask):
   """Print lint warnings for thrift files."""
 
-  deprecation_template = (
-    "Conflicting options used. You used the new, preferred `--scrooge-linter-{option}`, but also "
-    "used the deprecated `--lint-thrift-{option}`\nPlease use only one of these "
-    "(preferably `--scrooge-linter-{option}`)."
-  )
+  def raise_conflicting_option(self, option: str) -> None:
+    raise ValueError(
+      f"Conflicting options used. You used the new, preferred `--scrooge-linter-{option}`, but also "
+      f"used the deprecated `--lint-thrift-{option}`\nPlease use only one of these "
+      f"(preferably `--scrooge-linter-{option}`)."
+    )
 
   @staticmethod
   def _is_thrift(target):
@@ -84,7 +85,7 @@ class ThriftLinterTask(LintTaskMixin, NailgunTask):
     task_strict_configured = not task_options.is_default('strict')
     subsystem_strict_configured = not subsystem_options.is_default('strict')
     if task_strict_configured and subsystem_strict_configured:
-      raise ValueError(self.deprecation_template.format(option="strict"))
+      self.raise_conflicting_option("strict")
     if subsystem_strict_configured:
       return self._to_bool(subsystem_options.strict)
     if task_strict_configured:
@@ -96,7 +97,7 @@ class ThriftLinterTask(LintTaskMixin, NailgunTask):
     task_strict_default_configured = not task_options.is_default('strict_default')
     subsystem_strict_default_configured = not subsystem_options.is_default('strict_default')
     if task_strict_default_configured and subsystem_strict_default_configured:
-      raise ValueError(self.deprecation_template.format(option="strict_default"))
+      self.raise_conflicting_option("strict_default")
     if task_strict_configured:
       return self._to_bool(task_options.strict_default)
     return self._to_bool(subsystem_options.strict_default)
@@ -144,7 +145,7 @@ class ThriftLinterTask(LintTaskMixin, NailgunTask):
     task_worker_count_configured = not self.get_options().is_default("worker_count")
     subsystem_worker_count_configured = not ScroogeLinter.global_instance().options.is_default("worker_count")
     if task_worker_count_configured and subsystem_worker_count_configured:
-      raise ValueError(self.deprecation_template.format(option="worker_count"))
+      self.raise_conflicting_option("worker_count")
     worker_count = (
       self.get_options().worker_count
       if task_worker_count_configured
