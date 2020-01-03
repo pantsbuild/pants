@@ -26,6 +26,10 @@ class MyPy(PythonToolBase):
       '--config', type=file_option, fingerprint=True,
       help="Path to `mypy.ini` or alternative MyPy config file"
     )
+    register(
+      '--skip', type=bool, default=False,
+      help="Don't use MyPy when running `./pants lint`."
+    )
 
   def get_args(self) -> Tuple[str, ...]:
     return flatten_shlexed_list(self.get_options().args)

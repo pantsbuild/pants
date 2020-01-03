@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  sources=['googlejavaformat.py'],
+  sources=['googlejavaformat.py', 'subsystem.py'],
   tags = {'partially_type_checked'},
 )
 

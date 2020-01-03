@@ -147,6 +147,10 @@ class ScalaFixFix(FmtTaskMixin, ScalafixTask):
   sideeffecting = True
   additional_args: List[str] = []
 
+  @property
+  def skip_execution(self):
+    return self.get_options().skip or Scalafix.global_instance().options.skip
+
   def process_result(self, result):
     if result != 0:
       raise TaskError(
@@ -158,6 +162,10 @@ class ScalaFixCheck(LintTaskMixin, ScalafixTask):
 
   sideeffecting = False
   additional_args = ['--test']
+
+  @property
+  def skip_execution(self):
+    return self.get_options().skip or Scalafix.global_instance().options.skip
 
   def process_result(self, result):
     if result != 0:

@@ -208,6 +208,10 @@ class JavascriptStyleLint(LintTaskMixin, JavascriptStyleBase):
   """
   fix = False
 
+  @property
+  def skip_execution(self):
+    return self.get_options().skip or ESLint.global_instance().options.skip
+
 
 class JavascriptStyleFmt(FmtTaskMixin, JavascriptStyleBase):
   """Check and fix source files to ensure they follow the style guidelines.
@@ -215,3 +219,7 @@ class JavascriptStyleFmt(FmtTaskMixin, JavascriptStyleBase):
   :API: public
   """
   fix = True
+
+  @property
+  def skip_execution(self):
+    return self.get_options().skip or ESLint.global_instance().options.skip

@@ -98,6 +98,10 @@ class ScalastyleTask(LintTaskMixin, NailgunTask):
 
     return scala_sources
 
+  @property
+  def skip_execution(self):
+    return self.get_options().skip or Scalastyle.global_instance().options.skip
+
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
 

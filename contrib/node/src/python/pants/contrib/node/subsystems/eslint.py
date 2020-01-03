@@ -29,6 +29,10 @@ class ESLint(Subsystem):
       help="Path to `.eslintrc` or alternative ESLint config file",
     )
     register(
+      '--skip', type=bool, default=False,
+      help="Don't use ESLint when running `./pants fmt` and `./pants lint`"
+    )
+    register(
       '--setupdir', type=dir_option, fingerprint=True,
       help='Find the package.json and yarn.lock under this dir for installing eslint and plugins.',
     )
@@ -45,7 +49,6 @@ class ESLint(Subsystem):
     shutil.copytree(self.options.setupdir, bootstrapped_support_path)
 
   def supportdir(self, *, task_workdir: str) -> Tuple[str, bool]:
-
     """Returns the path where the ESLint is bootstrapped.
 
     :param task_workdir: The task's working directory

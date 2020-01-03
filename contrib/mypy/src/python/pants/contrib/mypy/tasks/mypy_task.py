@@ -85,6 +85,10 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
   def subsystem_dependencies(cls):
     return super().subsystem_dependencies() + (PythonInterpreterCache, MyPy)
 
+  @property
+  def skip_execution(self):
+    return self.get_options().skip or MyPy.global_instance().options.skip
+
   def find_mypy_interpreter(self):
     interpreters = self._interpreter_cache.setup(
       filters=[self._MYPY_COMPATIBLE_INTERPETER_CONSTRAINT]

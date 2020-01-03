@@ -95,6 +95,10 @@ class ScalaFmtCheckFormat(LintTaskMixin, ScalafmtTask):
   sideeffecting = False
   additional_args = ['--test']
 
+  @property
+  def skip_execution(self):
+    return self.get_options().skip or Scalafmt.global_instance().options.skip
+
   def process_result(self, result):
     if result != 0:
       raise TaskError('Scalafmt failed with exit code {}; to fix run: '
@@ -113,6 +117,10 @@ class ScalaFmtFormat(FmtTaskMixin, ScalafmtTask):
 
   sideeffecting = True
   additional_args = ['-i']
+
+  @property
+  def skip_execution(self):
+    return self.get_options().skip or Scalafmt.global_instance().options.skip
 
   def process_result(self, result):
     # Processes the results of running the scalafmt command.
