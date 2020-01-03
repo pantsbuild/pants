@@ -13,19 +13,19 @@ its own copy of `mypy`.
 
 ## Usage
 
-Just invoke the `mypy` task against any Python target(s). For example, if you had `python_library`
+Invoke the `lint` task against any Python target(s). For example, if you had `python_library`
 target identified by `src/python/foo/bar:baz`, run this command:
 
 ```
-./pants mypy src/python/foo/bar:baz
+./pants lint src/python/foo/bar:baz
 ```
 
-The `mypy` task will pass through any extra command-line arguments directly to `mypy`. For example,
+To pass through any extra command-line arguments directly to `mypy`, use `--mypy-args`. For example,
 if you want to pass `--follow-imports=silent` to `mypy` for the same python_library target, run
 this command:
 
 ```
-./pants mypy src/python/foo/bar:baz -- --follow-imports=silent
+./pants lint src/python/foo/bar:baz --mypy-args='--follow-imports=silent'
 ```
 
 See `mypy`'s usage screen for more information.

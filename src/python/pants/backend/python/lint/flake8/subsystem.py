@@ -19,6 +19,10 @@ class Flake8(PythonToolBase):
   def register_options(cls, register):
     super().register_options(register)
     register(
+      '--skip', type=bool, default=False,
+      help="Don't use Flake8 when running `./pants lint`"
+    )
+    register(
       '--args', type=list, member_type=str,
       help="Arguments to pass directly to Flake8, e.g. "
            "`--flake8-args=\"--ignore E123,W456 --enable-extensions H111\"`",

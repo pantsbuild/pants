@@ -19,6 +19,10 @@ class Black(PythonToolBase):
   def register_options(cls, register):
     super().register_options(register)
     register(
+      '--skip', type=bool, default=False,
+      help="Don't use Black when running `./pants fmt` and `./pants lint`"
+    )
+    register(
       '--args', type=list, member_type=str,
       help="Arguments to pass directly to Black, e.g. "
            "`--black-args=\"--target-version=py37 --quiet\"`",

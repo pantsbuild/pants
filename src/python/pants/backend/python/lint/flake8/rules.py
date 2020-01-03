@@ -29,8 +29,8 @@ class Flake8Target:
 
 def generate_args(wrapped_target: Flake8Target, flake8: Flake8) -> Tuple[str, ...]:
   args = []
-  if flake8.get_options().config is not None:
-    args.append(f"--config={flake8.get_options().config}")
+  if flake8.options.config is not None:
+    args.append(f"--config={flake8.options.config}")
   args.extend(flake8.get_args())
   args.extend(sorted(wrapped_target.target.sources.snapshot.files))
   return tuple(args)
@@ -43,6 +43,9 @@ async def lint(
   python_setup: PythonSetup,
   subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> LintResult:
+  if flake8.options.skip:
+    return LintResult.noop()
+
   target = wrapped_target.target
 
   # NB: Flake8 output depends upon which Python interpreter version it's run with. We ensure that
@@ -53,7 +56,7 @@ async def lint(
     python_setup=python_setup
   )
 
-  config_path: Optional[str] = flake8.get_options().config
+  config_path: Optional[str] = flake8.options.config
   config_snapshot = await Get[Snapshot](
     PathGlobs(include=tuple([config_path] if config_path else []))
   )
