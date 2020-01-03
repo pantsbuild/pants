@@ -3,9 +3,9 @@
 
 from typing import Optional
 
-from pants.backend.python.rules.inject_init import InjectedInitDigest
 from pants.backend.python.rules.pex import Pex
 from pants.backend.python.rules.pex_from_target_closure import CreatePexFromTargetClosure
+from pants.backend.python.rules.prepare_chrooted_python_sources import ChrootedPythonSourcesRequest
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
@@ -13,10 +13,10 @@ from pants.build_graph.address import Address
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.fs import Digest, DirectoriesToMerge
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
-from pants.engine.legacy.graph import HydratedTarget, TransitiveHydratedTargets
+from pants.engine.legacy.graph import TransitiveHydratedTargets
 from pants.engine.legacy.structs import PythonTestsAdaptor
 from pants.engine.rules import UnionRule, optionable_rule, rule
-from pants.engine.selectors import Get, MultiGet
+from pants.engine.selectors import Get
 from pants.rules.core.core_test_model import TestResult, TestTarget
 from pants.rules.core.strip_source_root import SourceRootStrippedSources
 
@@ -77,24 +77,11 @@ async def run_python_test(
     Address, test_target.address.to_address()
   )
 
-  source_root_stripped_sources = await MultiGet(
-    Get[SourceRootStrippedSources](HydratedTarget, hydrated_target)
-    for hydrated_target in all_targets
-  )
-
-  stripped_sources_digests = tuple(
-    stripped_sources.snapshot.directory_digest for stripped_sources in source_root_stripped_sources
-  )
-  sources_digest = await Get[Digest](DirectoriesToMerge(directories=stripped_sources_digests))
-  inits_digest = await Get[InjectedInitDigest](Digest, sources_digest)
+  sources_digest = await Get[Digest](ChrootedPythonSourcesRequest(hydrated_targets=all_targets))
 
   merged_input_files = await Get[Digest](
     DirectoriesToMerge(
-      directories=(
-        sources_digest,
-        inits_digest.directory_digest,
-        resolved_requirements_pex.directory_digest,
-      )
+      directories=(sources_digest, resolved_requirements_pex.directory_digest)
     ),
   )
 
