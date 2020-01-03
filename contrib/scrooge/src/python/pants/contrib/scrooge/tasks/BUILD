@@ -34,9 +34,10 @@ python_library(
 
 python_library(
   name='thrift_linter',
-  sources=['thrift_linter.py'],
+  sources=['thrift_linter_task.py'],
   dependencies=[
     ':thrift_util',
+    'contrib/scrooge/src/python/pants/contrib/scrooge/subsystems',
     'src/python/pants/backend/codegen/thrift/java',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
     'src/python/pants/base:exceptions',
