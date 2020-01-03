@@ -4,6 +4,7 @@
 import os
 from textwrap import dedent
 
+from pants.backend.jvm.subsystems.checkstyle import Checkstyle as CheckstyleSubsystem
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.checkstyle import Checkstyle
 from pants.base.exceptions import TaskError
@@ -50,9 +51,11 @@ class CheckstyleTest(NailgunTaskTestBase):
       options={
         self.options_scope: {
           'bootstrap_tools': ['//:checkstyle'],
-          'configuration': self._create_config_file(rules_xml),
           'properties': properties or {},
-        }
+        },
+        CheckstyleSubsystem.options_scope: {
+          'config': self._create_config_file(rules_xml),
+        },
       },
       target_roots=target_roots)
 

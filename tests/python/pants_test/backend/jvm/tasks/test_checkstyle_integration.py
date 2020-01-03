@@ -49,10 +49,10 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
           self._create_config_file(config_file, config)
           args = [
             'clean-all',
+            f'--checkstyle-config={config_file}',
             'lint.checkstyle',
             cache_args,
             'examples/src/java/org/pantsbuild/example/hello/simple',
-            f'--lint-checkstyle-configuration={config_file}'
           ]
           pants_run = self.run_pants_with_workdir(args, workdir)
           self.assert_success(pants_run)
@@ -73,10 +73,10 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
           config_file = os.path.join(tmp, config_name)
           self._create_config_file(config_file, config)
           args = [
+            f'--checkstyle-config={config_file}',
             'lint.checkstyle',
             cache_args,
             'examples/src/java/org/pantsbuild/example/hello/simple',
-            f'--lint-checkstyle-configuration={config_file}'
           ]
           pants_run = self.run_pants_with_workdir(args, workdir)
           self.assert_success(pants_run)
@@ -140,10 +140,10 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
         previous_names.add(config_file)
         self._create_config_file(config_file, config)
         args = [
+          f'--checkstyle-config={config_file}',
           'lint.checkstyle',
           cache_args,
           'examples/src/java/org/pantsbuild/example/hello/simple',
-          f'--lint-checkstyle-configuration={config_file}',
         ]
         pants_run = self.run_pants_with_workdir(args, workdir)
         self.assert_success(pants_run)

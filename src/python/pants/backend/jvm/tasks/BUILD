@@ -160,6 +160,7 @@ python_library(
     ':nailgun_task',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/java/jar',
+    'src/python/pants/backend/jvm/subsystems:checkstyle',
     'src/python/pants/backend/jvm/subsystems:shader',
     'src/python/pants/base:exceptions',
     'src/python/pants/option',
