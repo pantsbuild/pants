@@ -10,11 +10,10 @@ from pants.backend.python.rules.pex import (
   PexInterpreterConstraints,
   PexRequirements,
 )
-from pants.backend.python.rules.prepare_chrooted_python_sources import ChrootedPythonSourcesRequest
+from pants.backend.python.rules.prepare_chrooted_python_sources import ChrootedPythonSources
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.engine.addressable import BuildFileAddresses
-from pants.engine.fs import Digest
-from pants.engine.legacy.graph import TransitiveHydratedTargets
+from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
 from pants.engine.rules import rule
 from pants.engine.selectors import Get
 
@@ -42,9 +41,8 @@ async def create_pex_from_target_closure(request: CreatePexFromTargetClosure,
     python_setup=python_setup
   )
 
-  sources_digest: Optional[Digest] = None
   if request.include_source_files:
-    sources_digest = await Get[Digest](ChrootedPythonSourcesRequest(hydrated_targets=all_targets))
+    chrooted_sources = await Get[ChrootedPythonSources](HydratedTargets, all_targets)
 
   requirements = PexRequirements.create_from_adaptors(
     adaptors=all_target_adaptors,
@@ -56,7 +54,7 @@ async def create_pex_from_target_closure(request: CreatePexFromTargetClosure,
     requirements=requirements,
     interpreter_constraints=interpreter_constraints,
     entry_point=request.entry_point,
-    input_files_digest=sources_digest,
+    input_files_digest=chrooted_sources.digest if request.include_source_files else None,
   )
 
   pex = await Get[Pex](CreatePex, create_pex_request)

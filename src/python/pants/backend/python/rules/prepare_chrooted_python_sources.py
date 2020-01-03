@@ -12,12 +12,12 @@ from pants.rules.core.strip_source_root import SourceRootStrippedSources
 
 
 @dataclass(frozen=True)
-class ChrootedPythonSourcesRequest:
-  hydrated_targets: HydratedTargets
+class ChrootedPythonSources:
+  digest: Digest
 
 
 @rule
-async def prepare_chrooted_python_sources(request: ChrootedPythonSourcesRequest) -> Digest:
+async def prepare_chrooted_python_sources(hydrated_targets: HydratedTargets) -> ChrootedPythonSources:
   """Prepares Python sources by stripping the source root and injecting missing init.py files.
 
   NB: This is useful for Pytest or ./pants run, but not every Python rule will need this.
@@ -28,7 +28,7 @@ async def prepare_chrooted_python_sources(request: ChrootedPythonSourcesRequest)
 
   source_root_stripped_sources = await MultiGet(
     Get[SourceRootStrippedSources](HydratedTarget, hydrated_target)
-    for hydrated_target in request.hydrated_targets
+    for hydrated_target in hydrated_targets
   )
 
   sources_digest = await Get[Digest](DirectoriesToMerge(
@@ -37,9 +37,10 @@ async def prepare_chrooted_python_sources(request: ChrootedPythonSourcesRequest)
     )
   ))
   inits_digest = await Get[InjectedInitDigest](Digest, sources_digest)
-  return await Get[Digest](DirectoriesToMerge(
+  sources_digest = await Get[Digest](DirectoriesToMerge(
     directories=(sources_digest, inits_digest.directory_digest)
   ))
+  return ChrootedPythonSources(digest=sources_digest)
 
 
 def rules():

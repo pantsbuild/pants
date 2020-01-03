@@ -5,7 +5,7 @@ from typing import Optional
 
 from pants.backend.python.rules.pex import Pex
 from pants.backend.python.rules.pex_from_target_closure import CreatePexFromTargetClosure
-from pants.backend.python.rules.prepare_chrooted_python_sources import ChrootedPythonSourcesRequest
+from pants.backend.python.rules.prepare_chrooted_python_sources import ChrootedPythonSources
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
@@ -13,7 +13,7 @@ from pants.build_graph.address import Address
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.fs import Digest, DirectoriesToMerge
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
-from pants.engine.legacy.graph import TransitiveHydratedTargets
+from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
 from pants.engine.legacy.structs import PythonTestsAdaptor
 from pants.engine.rules import UnionRule, optionable_rule, rule
 from pants.engine.selectors import Get
@@ -77,11 +77,11 @@ async def run_python_test(
     Address, test_target.address.to_address()
   )
 
-  sources_digest = await Get[Digest](ChrootedPythonSourcesRequest(hydrated_targets=all_targets))
+  chrooted_sources = await Get[ChrootedPythonSources](HydratedTargets, all_targets)
 
   merged_input_files = await Get[Digest](
     DirectoriesToMerge(
-      directories=(sources_digest, resolved_requirements_pex.directory_digest)
+      directories=(chrooted_sources.digest, resolved_requirements_pex.directory_digest)
     ),
   )
 
