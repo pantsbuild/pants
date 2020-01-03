@@ -55,10 +55,6 @@ class ScalafixTask(RewriteBase):
   def source_extension(cls):
     return '.scala'
 
-  @property
-  def skip_execution(self):
-    return self.get_options().skip or Scalafix.global_instance().options.skip
-
   @classmethod
   def prepare(cls, options, round_manager):
     super().prepare(options, round_manager)
@@ -151,6 +147,10 @@ class ScalaFixFix(FmtTaskMixin, ScalafixTask):
   sideeffecting = True
   additional_args: List[str] = []
 
+  @property
+  def skip_execution(self):
+    return self.get_options().skip or Scalafix.global_instance().options.skip
+
   def process_result(self, result):
     if result != 0:
       raise TaskError(
@@ -162,6 +162,10 @@ class ScalaFixCheck(LintTaskMixin, ScalafixTask):
 
   sideeffecting = False
   additional_args = ['--test']
+
+  @property
+  def skip_execution(self):
+    return self.get_options().skip or Scalafix.global_instance().options.skip
 
   def process_result(self, result):
     if result != 0:

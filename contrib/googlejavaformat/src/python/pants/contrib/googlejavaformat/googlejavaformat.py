@@ -41,10 +41,6 @@ class GoogleJavaFormatBase(RewriteBase):
   def source_extension(cls):
     return '.java'
 
-  @property
-  def skip_execution(self):
-    return self.get_options().skip or GoogleJavaFormat.global_instance().options.skip
-
   def invoke_tool(self, _, target_sources):
     args = list(self.additional_args)
     args.extend([source for target, source in target_sources])
@@ -70,6 +66,10 @@ class GoogleJavaFormatLintTask(LintTaskMixin, GoogleJavaFormatBase):
   sideeffecting = False
   additional_args = ['--set-exit-if-changed']
 
+  @property
+  def skip_execution(self):
+    return self.get_options().skip or GoogleJavaFormat.global_instance().options.skip
+
   def process_result(self, result):
     if result != 0:
       raise TaskError('google-java-format failed with exit code {}; to fix run: '
@@ -81,6 +81,10 @@ class GoogleJavaFormatTask(FmtTaskMixin, GoogleJavaFormatBase):
 
   sideeffecting = True
   additional_args = ['-i']
+
+  @property
+  def skip_execution(self):
+    return self.get_options().skip or GoogleJavaFormat.global_instance().options.skip
 
   def process_result(self, result):
     if result != 0:

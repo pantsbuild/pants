@@ -39,10 +39,6 @@ class JavascriptStyleBase(NodeTask):
   def subsystem_dependencies(cls):
     return super().subsystem_dependencies() + (ESLint,)
 
-  @property
-  def skip_execution(self):
-    return self.get_options().skip or ESLint.global_instance().options.skip
-
   def _get_eslint_option(self, option: str, *, default_provided: bool = False):
     """Temporary utility to help with the migration from node-distribution -> eslint."""
     old_option = f"eslint_{option}"
@@ -212,6 +208,10 @@ class JavascriptStyleLint(LintTaskMixin, JavascriptStyleBase):
   """
   fix = False
 
+  @property
+  def skip_execution(self):
+    return self.get_options().skip or ESLint.global_instance().options.skip
+
 
 class JavascriptStyleFmt(FmtTaskMixin, JavascriptStyleBase):
   """Check and fix source files to ensure they follow the style guidelines.
@@ -219,3 +219,7 @@ class JavascriptStyleFmt(FmtTaskMixin, JavascriptStyleBase):
   :API: public
   """
   fix = True
+
+  @property
+  def skip_execution(self):
+    return self.get_options().skip or ESLint.global_instance().options.skip

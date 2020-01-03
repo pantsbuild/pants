@@ -31,10 +31,6 @@ class GoFmtTaskBase(GoWorkspaceTask):
   def subsystem_dependencies(cls):
     return super().subsystem_dependencies() + (Gofmt,)
 
-  @property
-  def skip_execution(self):
-    return self.get_options().skip or Gofmt.global_instance().options.skip
-
   @contextmanager
   def go_fmt_invalid_targets(self, flags):
     targets = self.get_targets(self.is_checked)
