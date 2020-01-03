@@ -8,7 +8,7 @@ from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.testutil.task_test_base import TaskTestBase
 
-from pants.contrib.scrooge.tasks.thrift_linter import ThriftLinter
+from pants.contrib.scrooge.tasks.thrift_linter_task import ThriftLinterTask
 
 
 class ThriftLinterTest(TaskTestBase):
@@ -27,7 +27,7 @@ class ThriftLinterTest(TaskTestBase):
 
   @classmethod
   def task_type(cls):
-    return ThriftLinter
+    return ThriftLinterTask
 
   @patch('pants.contrib.scrooge.tasks.thrift_linter.calculate_include_paths')
   def test_lint(self, mock_calculate_include_paths):
