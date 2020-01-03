@@ -4,20 +4,19 @@
 from dataclasses import dataclass
 from typing import Optional
 
-from pants.backend.python.rules.inject_init import InjectedInitDigest
 from pants.backend.python.rules.pex import (
   CreatePex,
   Pex,
   PexInterpreterConstraints,
   PexRequirements,
 )
+from pants.backend.python.rules.prepare_chrooted_python_sources import ChrootedPythonSourcesRequest
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.engine.addressable import BuildFileAddresses
-from pants.engine.fs import Digest, DirectoriesToMerge
-from pants.engine.legacy.graph import HydratedTarget, TransitiveHydratedTargets
+from pants.engine.fs import Digest
+from pants.engine.legacy.graph import TransitiveHydratedTargets
 from pants.engine.rules import rule
-from pants.engine.selectors import Get, MultiGet
-from pants.rules.core.strip_source_root import SourceRootStrippedSources
+from pants.engine.selectors import Get
 
 
 @dataclass(frozen=True)
@@ -43,20 +42,9 @@ async def create_pex_from_target_closure(request: CreatePexFromTargetClosure,
     python_setup=python_setup
   )
 
-  merged_input_files: Optional[Digest] = None
+  sources_digest: Optional[Digest] = None
   if request.include_source_files:
-    source_root_stripped_sources = await MultiGet(
-      Get[SourceRootStrippedSources](HydratedTarget, target_adaptor)
-      for target_adaptor in all_targets
-    )
-
-    stripped_sources_digests = [stripped_sources.snapshot.directory_digest
-                                for stripped_sources in source_root_stripped_sources]
-    sources_digest = await Get[Digest](DirectoriesToMerge(directories=tuple(stripped_sources_digests)))
-    inits_digest = await Get[InjectedInitDigest](Digest, sources_digest)
-    all_input_digests = [sources_digest, inits_digest.directory_digest]
-    merged_input_files = await Get[Digest](DirectoriesToMerge,
-                                          DirectoriesToMerge(directories=tuple(all_input_digests)))
+    sources_digest = await Get[Digest](ChrootedPythonSourcesRequest(hydrated_targets=all_targets))
 
   requirements = PexRequirements.create_from_adaptors(
     adaptors=all_target_adaptors,
@@ -68,7 +56,7 @@ async def create_pex_from_target_closure(request: CreatePexFromTargetClosure,
     requirements=requirements,
     interpreter_constraints=interpreter_constraints,
     entry_point=request.entry_point,
-    input_files_digest=merged_input_files,
+    input_files_digest=sources_digest,
   )
 
   pex = await Get[Pex](CreatePex, create_pex_request)
