@@ -991,7 +991,7 @@ pub extern "C" fn run_local_interactive_process(
           command.current_dir(tempdir.path());
         }
 
-        let mut subprocess = command.spawn().map_err(|e| e.to_string())?;
+        let mut subprocess = command.spawn().map_err(|e| format!("Error executing interactive process: {}", e.to_string()))?;
         let exit_status = subprocess.wait().map_err(|e| e.to_string())?;
         let code = exit_status.code().unwrap_or(-1);
 
