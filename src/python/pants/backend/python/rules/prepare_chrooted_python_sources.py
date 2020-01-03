@@ -18,18 +18,28 @@ class ChrootedPythonSourcesRequest:
 
 @rule
 async def prepare_chrooted_python_sources(request: ChrootedPythonSourcesRequest) -> Digest:
+  """Prepares Python sources by stripping the source root and injecting missing init.py files.
+
+  NB: This is useful for Pytest or ./pants run, but not every Python rule will need this.
+  For example, autoformatters like Black do not need to understand relative imports or
+  execute the code, so they can safely operate on the original source files without
+  stripping source roots.
+  """
+
   source_root_stripped_sources = await MultiGet(
-    Get[SourceRootStrippedSources](HydratedTarget, target_adaptor)
-    for target_adaptor in request.hydrated_targets
+    Get[SourceRootStrippedSources](HydratedTarget, hydrated_target)
+    for hydrated_target in request.hydrated_targets
   )
 
-  stripped_sources_digests = [stripped_sources.snapshot.directory_digest
-                              for stripped_sources in source_root_stripped_sources]
-  sources_digest = await Get[Digest](DirectoriesToMerge(directories=tuple(stripped_sources_digests)))
+  sources_digest = await Get[Digest](DirectoriesToMerge(
+    directories=tuple(
+      stripped_sources.snapshot.directory_digest for stripped_sources in source_root_stripped_sources
+    )
+  ))
   inits_digest = await Get[InjectedInitDigest](Digest, sources_digest)
-  all_input_digests = (sources_digest, inits_digest.directory_digest)
-  merged_input_files = await Get[Digest](DirectoriesToMerge(directories=all_input_digests))
-  return merged_input_files
+  return await Get[Digest](DirectoriesToMerge(
+    directories=(sources_digest, inits_digest.directory_digest)
+  ))
 
 
 def rules():
