@@ -24,6 +24,8 @@ from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 from pex.pex_info import PexInfo
 
+from pants.contrib.python.checks.tasks.python_eval_subsystem import PythonEval as PythonEvalSubystem
+
 
 class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
   class Error(TaskError):
@@ -42,6 +44,7 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
   @classmethod
   def subsystem_dependencies(cls):
     return super().subsystem_dependencies() + (
+      PythonEvalSubystem,
       PexBuilderWrapper.Factory,
       PythonInterpreterCache
     )
@@ -49,7 +52,7 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
   @property
   def skip_execution(self):
     deprecated_conditional(
-      lambda: self.get_options().is_default("skip"),
+      lambda: self.get_options().is_default("skip") and PythonEvalSubystem.global_instance().options.is_default("skip"),
       entity_description="`python-eval` defaulting to being used",
       removal_version="1.27.0.dev0",
       hint_message="`python-eval` is scheduled to be removed in Pants 1.29.0.dev0. The Python "
@@ -63,7 +66,7 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
                    "Pants 1.27.0.dev0, the default will change from `skip: False` to `skip: True`, "
                    "and in Pants 1.29.0.dev0, the module will be removed."
     )
-    return self.get_options().skip
+    return self.get_options().skip or PythonEvalSubystem.global_instance().options.skip
 
   @classmethod
   def prepare(cls, options, round_manager):

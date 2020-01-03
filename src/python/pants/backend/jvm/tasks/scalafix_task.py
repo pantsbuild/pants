@@ -55,6 +55,10 @@ class ScalafixTask(RewriteBase):
   def source_extension(cls):
     return '.scala'
 
+  @property
+  def skip_execution(self):
+    return self.get_options().skip or Scalafix.global_instance().options.skip
+
   @classmethod
   def prepare(cls, options, round_manager):
     super().prepare(options, round_manager)

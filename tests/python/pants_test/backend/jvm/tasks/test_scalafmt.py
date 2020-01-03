@@ -94,25 +94,22 @@ class ScalaFmtCheckFormatTest(ScalaFmtTestBase):
     return ScalaFmtCheckFormat
 
   def test_scalafmt_fail_default_config(self):
-    self.set_options(skip=False)
     context = self.context(target_roots=self.library)
     with self.assertRaises(TaskError):
       self.execute(context)
 
   def test_scalafmt_fail(self):
     self.set_options_for_scope(Scalafmt.options_scope, config=self.config)
-    self.set_options(skip=False)
     context = self.context(target_roots=self.library)
     with self.assertRaises(TaskError):
       self.execute(context)
 
   def test_scalafmt_disabled(self):
-    self.set_options(skip=True)
+    self.set_options_for_scope(Scalafmt.options_scope, skip=True)
     self.execute(self.context(target_roots=self.library))
 
   def test_scalafmt_ignore_resources(self):
     self.set_options_for_scope(Scalafmt.options_scope, config=self.config)
-    self.set_options(skip=False)
     context = self.context(target_roots=self.as_resources)
     self.execute(context)
 
@@ -124,11 +121,11 @@ class ScalaFmtFormatTest(ScalaFmtTestBase):
     return ScalaFmtFormat
 
   def test_scalafmt_format_default_config(self):
-    self.format_file_and_verify_fmt(skip=False)
+    self.format_file_and_verify_fmt()
 
   def test_scalafmt_format(self):
     self.set_options_for_scope(Scalafmt.options_scope, config=self.config)
-    self.format_file_and_verify_fmt(skip=False)
+    self.format_file_and_verify_fmt()
 
   def format_file_and_verify_fmt(self, **options):
     self.set_options(**options)
@@ -151,7 +148,7 @@ class ScalaFmtFormatTest(ScalaFmtTestBase):
 
   def test_output_dir(self):
     with temporary_dir() as output_dir:
-      self.set_options(skip=False, output_dir=output_dir)
+      self.set_options(output_dir=output_dir)
 
       lint_options_scope = 'sfcf'
       check_fmt_task_type = self.synthesize_task_subtype(ScalaFmtCheckFormat, lint_options_scope)

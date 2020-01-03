@@ -37,7 +37,7 @@ class CustomScalaTest(NailgunTaskTestBase):
     # If config is not specified, then we override pants.ini scalastyle such that
     # we have a default scalastyle config xml but with empty excludes.
     self.set_options_for_scope(Scalastyle.options_scope, config=scalastyle_config)
-    self.set_options(skip=False, excludes=excludes)
+    self.set_options(excludes=excludes)
     return self.context(target_roots=target_roots)
 
   def _create_scalastyle_config_file(self, rules=None):

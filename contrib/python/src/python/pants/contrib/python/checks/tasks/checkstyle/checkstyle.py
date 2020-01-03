@@ -31,6 +31,7 @@ from pkg_resources import DistributionNotFound, Environment, Requirement, Workin
 from pants.contrib.python.checks.checker import checker
 from pants.contrib.python.checks.tasks.checkstyle.plugin_subsystem_base import \
   default_subsystem_for_plugin
+from pants.contrib.python.checks.tasks.checkstyle.pycheck_subsystem import Pycheck
 from pants.contrib.python.checks.tasks.checkstyle.pycodestyle_subsystem import PyCodeStyleSubsystem
 from pants.contrib.python.checks.tasks.checkstyle.pyflakes_subsystem import FlakeCheckSubsystem
 
@@ -53,6 +54,7 @@ class Checkstyle(LintTaskMixin, Task):
   @classmethod
   def subsystem_dependencies(cls):
     return super().subsystem_dependencies() + cls.plugin_subsystems + (
+      Pycheck,
       PexBuilderWrapper.Factory,
       PythonInterpreterCache,
       PythonSetup,
@@ -80,6 +82,10 @@ class Checkstyle(LintTaskMixin, Task):
                   '(either from defaults or pants.ini). If the user supplies an empty list, '
                   'Pants will lint all targets in the target set, irrespective of the working '
                   'set of compatibility constraints.')
+
+  @property
+  def skip_execution(self):
+    return self.get_options().skip or Pycheck.global_instance().options.skip
 
   def _is_checked(self, target):
     return (not target.is_synthetic and isinstance(target, PythonTarget) and

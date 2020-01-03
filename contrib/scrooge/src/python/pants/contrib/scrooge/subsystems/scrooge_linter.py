@@ -18,7 +18,11 @@ class ScroogeLinter(Subsystem):
     register(
       '--args', type=list, member_type=str, fingerprint=True,
       help="Arguments to pass directly to the Scrooge Thrift linter, e.g. "
-           "`--scrooge-linter-args=\"--disable-rule Namespaces\"`",
+           "`--scrooge-linter-args=\"--disable-rule Namespaces\"`.",
+    )
+    register(
+      '--skip', type=bool, default=False,
+      help="Don't use the Scrooge Thrift linter when running `./pants lint`."
     )
     register(
       '--strict', type=bool, fingerprint=True,

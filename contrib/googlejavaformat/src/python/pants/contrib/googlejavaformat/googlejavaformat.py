@@ -9,6 +9,8 @@ from pants.java.jar.jar_dependency import JarDependency
 from pants.task.fmt_task_mixin import FmtTaskMixin
 from pants.task.lint_task_mixin import LintTaskMixin
 
+from pants.contrib.googlejavaformat.subsystem import GoogleJavaFormat
+
 
 class GoogleJavaFormatBase(RewriteBase):
 
@@ -28,12 +30,20 @@ class GoogleJavaFormatBase(RewriteBase):
     return super().implementation_version() + [('GoogleJavaFormatBase', 1)]
 
   @classmethod
+  def subsystem_dependencies(cls):
+    return super().subsystem_dependencies() + (GoogleJavaFormat,)
+
+  @classmethod
   def target_types(cls):
     return ['java_library', 'junit_tests']
 
   @classmethod
   def source_extension(cls):
     return '.java'
+
+  @property
+  def skip_execution(self):
+    return self.get_options().skip or GoogleJavaFormat.global_instance().options.skip
 
   def invoke_tool(self, _, target_sources):
     args = list(self.additional_args)
@@ -50,7 +60,7 @@ class GoogleJavaFormatBase(RewriteBase):
     """List of additional args to supply on the tool command-line."""
 
 
-class GoogleJavaFormatCheckFormat(LintTaskMixin, GoogleJavaFormatBase):
+class GoogleJavaFormatLintTask(LintTaskMixin, GoogleJavaFormatBase):
   """Check if Java source code complies with Google Java Style.
 
   If the files are not formatted correctly an error is raised
@@ -66,7 +76,7 @@ class GoogleJavaFormatCheckFormat(LintTaskMixin, GoogleJavaFormatBase):
                       '`./pants fmt <targets>`'.format(result), exit_code=result)
 
 
-class GoogleJavaFormat(FmtTaskMixin, GoogleJavaFormatBase):
+class GoogleJavaFormatTask(FmtTaskMixin, GoogleJavaFormatBase):
   """Reformat Java source code to comply with Google Java Style."""
 
   sideeffecting = True

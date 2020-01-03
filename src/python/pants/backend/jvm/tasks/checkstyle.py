@@ -67,6 +67,10 @@ class Checkstyle(LintTaskMixin, NailgunTask):
   def subsystem_dependencies(cls):
     return super().subsystem_dependencies() + (CheckstyleSubsystem,)
 
+  @property
+  def skip_execution(self):
+    return self.get_options().skip or CheckstyleSubsystem.global_instance().options.skip
+
   @classmethod
   def prepare(cls, options, round_manager):
     super().prepare(options, round_manager)

@@ -50,6 +50,10 @@ class ScalafmtTask(RewriteBase):
   def implementation_version(cls):
     return super().implementation_version() + [('ScalaFmt', 5)]
 
+  @property
+  def skip_execution(self):
+    return self.get_options().skip or Scalafmt.global_instance().options.skip
+
   def invoke_tool(self, absolute_root, target_sources):
     task_config = self.get_options().configuration
     subsystem_config = Scalafmt.global_instance().get_options().config

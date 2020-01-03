@@ -13,6 +13,7 @@ python_library(
     'src/python/pants/base:generator',
     'src/python/pants/base:workunit',
     'src/python/pants/task',
+    'src/python/pants/subsystem',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
   ],
