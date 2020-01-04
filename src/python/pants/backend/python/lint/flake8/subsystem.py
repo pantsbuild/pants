@@ -1,11 +1,8 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Tuple
-
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
-from pants.option.custom_types import file_option
-from pants.option.option_util import flatten_shlexed_list
+from pants.option.custom_types import file_option, shell_str
 
 
 class Flake8(PythonToolBase):
@@ -23,7 +20,7 @@ class Flake8(PythonToolBase):
       help="Don't use Flake8 when running `./pants lint`"
     )
     register(
-      '--args', type=list, member_type=str,
+      '--args', type=list, member_type=shell_str,
       help="Arguments to pass directly to Flake8, e.g. "
            "`--flake8-args=\"--ignore E123,W456 --enable-extensions H111\"`",
     )
@@ -31,6 +28,3 @@ class Flake8(PythonToolBase):
       '--config', type=file_option, default=None, advanced=True,
       help="Path to `.flake8` or alternative Flake8 config file"
     )
-
-  def get_args(self) -> Tuple[str, ...]:
-    return flatten_shlexed_list(self.get_options().args)

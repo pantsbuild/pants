@@ -290,7 +290,7 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
                      "V2 implementation, which only supports `--mypy-args`.",
       )
       cmd.extend(self.get_passthru_args())
-      cmd.extend(self._mypy_subsystem.get_args())
+      cmd.extend(self._mypy_subsystem.options.args)
       cmd.append(f'@{sources_list_path}')
 
       with self.context.new_workunit(name='create_mypy_pex', labels=[WorkUnitLabel.PREP]):

@@ -31,7 +31,7 @@ def generate_args(wrapped_target: Flake8Target, flake8: Flake8) -> Tuple[str, ..
   args = []
   if flake8.options.config is not None:
     args.append(f"--config={flake8.options.config}")
-  args.extend(flake8.get_args())
+  args.extend(flake8.options.args)
   args.extend(sorted(wrapped_target.target.sources.snapshot.files))
   return tuple(args)
 

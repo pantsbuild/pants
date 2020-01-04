@@ -112,7 +112,7 @@ class ThriftLinterTask(LintTaskMixin, NailgunTask):
     config_args = []
 
     config_args.extend(self.get_options().linter_args)
-    config_args.extend(ScroogeLinter.global_instance().get_args())
+    config_args.extend(ScroogeLinter.global_instance().options.args)
 
     # N.B. We always set --fatal-warnings to make sure errors like missing-namespace are at least printed.
     # If --no-strict is turned on, the return code will be 0 instead of 1, but the errors/warnings

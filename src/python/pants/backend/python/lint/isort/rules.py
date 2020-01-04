@@ -59,7 +59,7 @@ async def setup_isort(isort: Isort) -> IsortSetup:
   return IsortSetup(
     requirements_pex=requirements_pex,
     config_snapshot=config_snapshot,
-    passthrough_args=isort.get_args(),
+    passthrough_args=tuple(isort.options.args),
     skip=isort.options.skip,
   )
 

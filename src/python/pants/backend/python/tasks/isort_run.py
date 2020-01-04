@@ -66,7 +66,7 @@ class IsortRun(FmtTaskMixin, Task):
                      "V2 implementation, which only supports `--isort-args`.",
       )
       args = [
-        *self.get_passthru_args(), *isort_subsystem.get_args(), '--filter-files', *sources
+        *self.get_passthru_args(), *isort_subsystem.options.args, '--filter-files', *sources,
       ]
 
       # NB: We execute isort out of process to avoid unwanted side-effects from importing it:
