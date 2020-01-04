@@ -4,6 +4,131 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.25.0.dev0 (01/03/2020)
+------------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Deprecate `--fmt-skip` and `--lint-skip` (#8900)
+  `Issue #8346 <https://github.com/pantsbuild/pants/issues/8346>`_
+  `PR #8900 <https://github.com/pantsbuild/pants/pull/8900>`_
+
+* Add `--skip` option to every linter/formatter subsystem (#8898)
+  `PR #8898 <https://github.com/pantsbuild/pants/pull/8898>`_
+
+* Add ESLint subsystem and deprecate `node-distribution` ESLint options (#8891)
+  `PR #8891 <https://github.com/pantsbuild/pants/pull/8891>`_
+
+* Add `--black-skip`, `--isort-skip`, and `--flake8-skip` (#8888)
+  `PR #8888 <https://github.com/pantsbuild/pants/pull/8888>`_
+
+* Deprecate running `python-eval` by default (#8889)
+  `PR #8889 <https://github.com/pantsbuild/pants/pull/8889>`_
+
+* Add `scrooge-linter` subsystem and deprecate `lint-thrift` options (#8894)
+  `PR #8894 <https://github.com/pantsbuild/pants/pull/8894>`_
+
+* Add `checkstyle` subsystem and deprecate `--lint-checkstyle-configuration` (#8896)
+  `PR #8896 <https://github.com/pantsbuild/pants/pull/8896>`_
+
+* Deprecate `option.custom_types.dict_option` and `list_option` (#8885)
+  `PR #8885 <https://github.com/pantsbuild/pants/pull/8885>`_
+
+* Add `scalafix`, `scalafmt`, and `scalastyle` subsystems and deprecate task-level config options (#8886)
+  `PR #8886 <https://github.com/pantsbuild/pants/pull/8886>`_
+
+* Stop using Java 6 and 7 internally (#8657)
+  `PR #8657 <https://github.com/pantsbuild/pants/pull/8657>`_
+
+* Bump default MyPy from 0.740 to 0.761 (#8866)
+  `PR #8866 <https://github.com/pantsbuild/pants/pull/8866>`_
+
+Bugfixes
+~~~~~~~~
+
+* Use absolute path when running interactive process in tempdir (#8895)
+  `PR #8895 <https://github.com/pantsbuild/pants/pull/8895>`_
+
+* Fix `./pants lint2` for Black and isort (#8877)
+  `PR #8877 <https://github.com/pantsbuild/pants/pull/8877>`_
+  `PR #8823 <https://github.com/pantsbuild/pants/pull/8823>`_
+
+* Provide input_files Digest to InteractiveRunner (#8855)
+  `PR #8855 <https://github.com/pantsbuild/pants/pull/8855>`_
+
+* Support enums when displaying option help choices (#8853)
+  `PR #8853 <https://github.com/pantsbuild/pants/pull/8853>`_
+
+* Hotfix MyPy not working on macOS due to type alias (#8887)
+  `PR #8887 <https://github.com/pantsbuild/pants/pull/8887>`_
+
+* Use raw strings to fix regex deprecation warnings (#8880)
+  `PR #8880 <https://github.com/pantsbuild/pants/pull/8880>`_
+
+* Fix isort, Pytest, and MyPy options to be fingerprinted (#8871)
+  `PR #8871 <https://github.com/pantsbuild/pants/pull/8871>`_
+
+* Report a deprecation for the option name rather than for the dest. (#8856)
+  `PR #8856 <https://github.com/pantsbuild/pants/pull/8856>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Use V2 isort internally (#8756)
+  `PR #8756 <https://github.com/pantsbuild/pants/pull/8756>`_
+
+* Refactor `python_test_runner` to use the new pex creation rule  (#8852)
+  `PR #8852 <https://github.com/pantsbuild/pants/pull/8852>`_
+
+* Add type hints to `option/` and `subsystem/` (#8878)
+  `PR #8878 <https://github.com/pantsbuild/pants/pull/8878>`_
+
+* Replace deprecated `assertRaisesRegexp` with `assertRaisesRegex` (#8879)
+  `PR #8879 <https://github.com/pantsbuild/pants/pull/8879>`_
+
+* Remove deprecated `--pytest-requirements`, `--pytest-timeout-requirements`, `--pytest-cov-requirements`, and `--pytest-unittest2-requirements` (#8876)
+  `PR #8876 <https://github.com/pantsbuild/pants/pull/8876>`_
+
+* Partially type check remaining 250 files (#8875)
+  `PR #8875 <https://github.com/pantsbuild/pants/pull/8875>`_
+
+* Stop referencing Python 4 in Python interpreter constraints (#8867)
+  `PR #8867 <https://github.com/pantsbuild/pants/pull/8867>`_
+
+* Partially type check `TestBase` and 235 test files (#8874)
+  `PR #8874 <https://github.com/pantsbuild/pants/pull/8874>`_
+
+* Finish partially type checking all `src` code (#8865)
+  `PR #8865 <https://github.com/pantsbuild/pants/pull/8865>`_
+
+* Refactor `option` and `subsystem` tests (#8872)
+  `PR #8872 <https://github.com/pantsbuild/pants/pull/8872>`_
+
+* Type check `build-support/bin/generate_travis_yml.py` (#8868)
+  `PR #8868 <https://github.com/pantsbuild/pants/pull/8868>`_
+
+* Move `option` and `subsystem` tests from `tests/python` to `src/python` (#8870)
+  `PR #8870 <https://github.com/pantsbuild/pants/pull/8870>`_
+
+* make match() on Enum into a top-level function in meta.py (#8504)
+  `PR #8504 <https://github.com/pantsbuild/pants/pull/8504>`_
+
+* add SingleFileExecutable to make it easier to consume Snapshots of executables (#8860)
+  `PR #8860 <https://github.com/pantsbuild/pants/pull/8860>`_
+
+* improve ergonomics of checking for @union types with new @decorated_type_checkable decorator (#8496)
+  `PR #8496 <https://github.com/pantsbuild/pants/pull/8496>`_
+
+* Partially type check `backend/native` and 100 more files (#8864)
+  `PR #8864 <https://github.com/pantsbuild/pants/pull/8864>`_
+
+* Fix type hints for decorators in `memo.py` and `meta.py` (#8863)
+  `PR #8863 <https://github.com/pantsbuild/pants/pull/8863>`_
+
+* [IntelliJ] Export only modulizable targets when in `export-dep-as-jar` (#8812)
+  `PR #8812 <https://github.com/pantsbuild/pants/pull/8812>`_
+
 1.24.0rc0 (12/19/2019)
 ----------------------
 
