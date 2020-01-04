@@ -63,9 +63,6 @@ Bugfixes
 * Hotfix MyPy not working on macOS due to type alias (#8887)
   `PR #8887 <https://github.com/pantsbuild/pants/pull/8887>`_
 
-* Use raw strings to fix regex deprecation warnings (#8880)
-  `PR #8880 <https://github.com/pantsbuild/pants/pull/8880>`_
-
 * Fix isort, Pytest, and MyPy options to be fingerprinted (#8871)
   `PR #8871 <https://github.com/pantsbuild/pants/pull/8871>`_
 
@@ -128,6 +125,9 @@ Refactoring, Improvements, and Tooling
 
 * [IntelliJ] Export only modulizable targets when in `export-dep-as-jar` (#8812)
   `PR #8812 <https://github.com/pantsbuild/pants/pull/8812>`_
+
+* Use raw strings to fix regex deprecation warnings (#8880)
+  `PR #8880 <https://github.com/pantsbuild/pants/pull/8880>`_
 
 1.24.0rc0 (12/19/2019)
 ----------------------

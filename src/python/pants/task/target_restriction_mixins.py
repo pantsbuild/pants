@@ -125,6 +125,7 @@ class DeprecatedSkipAndDeprecatedTransitiveGoalOptionsRegistrar(GoalOptionsRegis
       'lint-google-java-format': 'google-java-format',
       'fmt-isort': 'isort',
       'lint-mypy': 'mypy',
+      'lint-pythonstyle': 'pycheck',
       'lint-python-eval': 'python-eval',
       'fmt-scalafix': 'scalafix',
       'lint-scalafix': 'scalafix',
