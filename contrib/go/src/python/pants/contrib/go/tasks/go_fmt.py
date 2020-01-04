@@ -3,7 +3,6 @@
 
 from pants.task.fmt_task_mixin import FmtTaskMixin
 
-from pants.contrib.go.subsystems.gofmt import Gofmt
 from pants.contrib.go.tasks.go_fmt_task_base import GoFmtTaskBase
 
 
@@ -12,7 +11,7 @@ class GoFmt(FmtTaskMixin, GoFmtTaskBase):
 
   @property
   def skip_execution(self):
-    return self.get_options().skip or Gofmt.global_instance().options.skip
+    return super()._resolve_conflicting_skip(old_scope="fmt-go")
 
   def execute(self):
     with self.go_fmt_invalid_targets(['-w']) as output:

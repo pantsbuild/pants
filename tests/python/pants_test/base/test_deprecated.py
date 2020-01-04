@@ -4,7 +4,9 @@
 import unittest.mock
 import warnings
 from contextlib import contextmanager
+from functools import partial
 
+import pytest
 from packaging.version import Version
 
 from pants.base.deprecated import (
@@ -17,8 +19,11 @@ from pants.base.deprecated import (
   deprecated,
   deprecated_conditional,
   deprecated_module,
+  resolve_conflicting_options,
   warn_or_error,
 )
+from pants.option.option_value_container import OptionValueContainer
+from pants.option.ranked_value import RankedValue
 from pants.testutil.test_base import TestBase
 from pants.util.collections import assert_single_element
 
@@ -218,3 +223,39 @@ class DeprecatedTest(TestBase):
       warn_or_error(removal_version='999.999.999.dev999',
                     deprecated_entity_description='dummy',
                     deprecation_start_version='500.0.0.dev0'))
+
+  def test_resolve_conflicting_options(self) -> None:
+    resolve_options = partial(
+      resolve_conflicting_options,
+      old_option="my_opt",
+      new_option="my_opt",
+      old_scope="old-scope",
+      new_scope="new-scope",
+    )
+    old_val = "ancient"
+    new_val = "modern"
+    old_default_rv = RankedValue(RankedValue.HARDCODED, old_val)
+    new_default_rv = RankedValue(RankedValue.HARDCODED, new_val)
+    old_configured_rv = RankedValue(RankedValue.FLAG, old_val)
+    new_configured_rv = RankedValue(RankedValue.FLAG, new_val)
+
+    def assert_option_resolved(
+      *, old_configured: bool = False, new_configured: bool = False, expected: str,
+    ) -> None:
+      old_container, new_container = OptionValueContainer(), OptionValueContainer()
+      old_container.my_opt = old_configured_rv if old_configured else old_default_rv
+      new_container.my_opt = new_configured_rv if new_configured else new_default_rv
+      assert resolve_options(old_container=old_container, new_container=new_container) == expected
+
+    assert_option_resolved(expected=new_val)
+    assert_option_resolved(old_configured=True, expected=old_val)
+    assert_option_resolved(new_configured=True, expected=new_val)
+
+    # both configured -> raise an error
+    old_container, new_container = OptionValueContainer(), OptionValueContainer()
+    old_container.my_opt = old_configured_rv
+    new_container.my_opt = new_configured_rv
+    with pytest.raises(ValueError) as e:
+      resolve_options(old_container=old_container, new_container=new_container)
+    assert "--old-scope-my-opt" in str(e.value)
+    assert "--new-scope-my-opt" in str(e.value)

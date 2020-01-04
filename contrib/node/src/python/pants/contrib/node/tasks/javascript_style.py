@@ -4,6 +4,7 @@
 import os
 
 from pants.base.build_environment import get_buildroot
+from pants.base.deprecated import resolve_conflicting_options
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.task.fmt_task_mixin import FmtTaskMixin
@@ -28,6 +29,26 @@ class JavascriptStyleBase(NodeTask):
   _JSX_SOURCE_EXTENSION = '.jsx'
   INSTALL_JAVASCRIPTSTYLE_TARGET_NAME = 'synthetic-install-javascriptstyle-module'
 
+  def _resolve_conflicting_options(self, *, old_option: str, new_option: str):
+    return resolve_conflicting_options(
+      old_option=old_option,
+      new_option=new_option,
+      old_scope="node-distribution",
+      new_scope='eslint',
+      old_container=self.node_distribution.options,
+      new_container=ESLint.global_instance().options,
+    )
+
+  def _resolve_conflicting_skip(self, *, old_scope: str):
+    return resolve_conflicting_options(
+      old_option="skip",
+      new_option="skip",
+      old_scope=old_scope,
+      new_scope='eslint',
+      old_container=self.get_options(),
+      new_container=ESLint.global_instance().options,
+    )
+
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
@@ -38,27 +59,6 @@ class JavascriptStyleBase(NodeTask):
   @classmethod
   def subsystem_dependencies(cls):
     return super().subsystem_dependencies() + (ESLint,)
-
-  def _get_eslint_option(self, option: str, *, default_provided: bool = False):
-    """Temporary utility to help with the migration from node-distribution -> eslint."""
-    old_option = f"eslint_{option}"
-    node_distribution_val = getattr(self.node_distribution.get_options(), old_option)
-    eslint_val = getattr(ESLint.global_instance().options, option)
-
-    both_defined = node_distribution_val and eslint_val
-    both_not_default = (
-      not self.node_distribution.get_options().is_default(old_option) and
-      not ESLint.global_instance().options.is_default(option)
-    )
-    both_configured = both_not_default if default_provided else both_defined
-    if both_configured:
-      raise ValueError(
-        f"Conflicting options used. You used the new, preferred `--eslint-{option}`, but also "
-        f"used the deprecated `--node-distribution-eslint-{option}`.\n"
-        f"Please use only one of these (preferably `--eslint-{option}`)."
-      )
-
-    return eslint_val or node_distribution_val
 
   @property
   def fix(self):
@@ -97,7 +97,9 @@ class JavascriptStyleBase(NodeTask):
   @memoized_method
   def _bootstrap_eslinter(self, bootstrap_dir):
     with pushd(bootstrap_dir):
-      eslint_version = self._get_eslint_option("version", default_provided=True)
+      eslint_version = self._resolve_conflicting_options(
+        old_option="eslint_version", new_option="version",
+      )
       eslint = f'eslint@{eslint_version}'
       self.context.log.debug(f'Installing {eslint}...')
       result, add_command = self.add_package(
@@ -183,8 +185,8 @@ class JavascriptStyleBase(NodeTask):
           target,
           bootstrap_dir,
           files,
-          config=self._get_eslint_option("config"),
-          ignore_path=self._get_eslint_option("ignore"),
+          config=self._resolve_conflicting_options(old_option="eslint_config", new_option="config"),
+          ignore_path=self._resolve_conflicting_options(old_option="eslint_ignore", new_option="ignore"),
         )
         if result_code != 0:
           if self.get_options().fail_slow:
@@ -210,7 +212,7 @@ class JavascriptStyleLint(LintTaskMixin, JavascriptStyleBase):
 
   @property
   def skip_execution(self):
-    return self.get_options().skip or ESLint.global_instance().options.skip
+    return super()._resolve_conflicting_skip(old_scope="lint-javascriptstyle")
 
 
 class JavascriptStyleFmt(FmtTaskMixin, JavascriptStyleBase):
@@ -222,4 +224,4 @@ class JavascriptStyleFmt(FmtTaskMixin, JavascriptStyleBase):
 
   @property
   def skip_execution(self):
-    return self.get_options().skip or ESLint.global_instance().options.skip
+    return super()._resolve_conflicting_skip(old_scope="fmt-javascriptstyle")
