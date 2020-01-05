@@ -423,153 +423,211 @@ class OptionsTest(TestBase):
     assert_invalid_value('AlmostTrue')
 
   def test_list_option(self) -> None:
-    def check(expected: List[int], args_str: str, env=None, config=None) -> None:
-      global_options = self._parse(args_str=args_str, env=env, config=config).for_global_scope()
-      self.assertEqual(expected, global_options.listy)
+    def check(
+      *,
+      expected: List[int],
+      flags: str = "",
+      env_val: Optional[str] = None,
+      config_val: Optional[str] = None,
+    ) -> None:
+      env = {"PANTS_GLOBAL_LISTY": env_val} if env_val else None
+      config = {"GLOBAL": {"listy": config_val}} if config_val else None
+      global_options = self._parse(
+        args_str=f"./pants {flags}", env=env, config=config
+      ).for_global_scope()
+      assert global_options.listy == expected
+
+    default = [1, 2, 3]
+    check(expected=default)
 
     # Appending to the default.
-    check([1, 2, 3, 4], './pants --listy=4')
-    check([1, 2, 3, 4, 5], './pants --listy=4 --listy=5')
-    check([1, 2, 3, 4, 5], './pants --listy=+[4,5]')
+    check(flags='--listy=4', expected=[*default, 4])
+    check(flags='--listy=4 --listy=5', expected=[*default, 4, 5])
+    check(flags='--listy=+[4,5]', expected=[*default, 4, 5])
 
     # Filtering from the default.
-    check([1, 3], './pants --listy=-[2]')
+    check(flags='--listy=-[2]', expected=[1, 3])
 
     # Replacing the default.
-    check([4, 5], './pants --listy=[4,5]')
+    check(flags='--listy=[4,5]', expected=[4, 5])
 
     # Appending across env, config and flags (in the right order).
-    check([1, 2, 3, 4, 5, 6, 7, 8, 9], './pants --listy=+[8,9]',
-          env={'PANTS_GLOBAL_LISTY': '+[6,7]'},
-          config={'GLOBAL': {'listy': '+[4,5]'}})
+    check(
+      flags='--listy=+[8,9]',
+      env_val='+[6,7]',
+      config_val='+[4,5]',
+      expected=[*default, 4, 5, 6, 7, 8, 9],
+    )
 
     # Appending and filtering across env, config and flags (in the right order).
-    check([2, 3, 4, 7], './pants --listy=-[1,5,6]',
-          env={'PANTS_GLOBAL_LISTY': '+[6,7]'},
-          config={'GLOBAL': {'listy': '+[4,5]'}})
-
-    check([1, 2, 8, 9], './pants --listy=+[8,9]',
-          env={'PANTS_GLOBAL_LISTY': '-[4,5]'},
-          config={'GLOBAL': {'listy': '+[4,5],-[3]'}})
+    check(
+      flags='--listy=-[1,5,6]',
+      env_val='+[6,7]',
+      config_val='+[4,5]',
+      expected=[2, 3, 4, 7],
+    )
+    check(
+      flags='--listy=+[8,9]',
+      env_val='-[4,5]',
+      config_val='+[4,5],-[3]',
+      expected=[1, 2, 8, 9],
+    )
 
     # Overwriting from env, then appending and filtering.
-    check([7, 8, 9], './pants --listy=+[8,9],-[6]',
-          env={'PANTS_GLOBAL_LISTY': '[6,7]'},
-          config={'GLOBAL': {'listy': '+[4,5]'}})
+    check(
+      flags='--listy=+[8,9],-[6]',
+      env_val='[6,7]',
+      config_val='+[4,5]',
+      expected=[7, 8, 9],
+    )
 
     # Overwriting from config, then appending.
-    check([4, 5, 6, 7, 8, 9], './pants --listy=+[8,9]',
-          env={'PANTS_GLOBAL_LISTY': '+[6,7]'},
-          config={'GLOBAL': {'listy': '[4,5]'}})
+    check(
+      flags='--listy=+[8,9]',
+      env_val='+[6,7]',
+      config_val='[4,5]',
+      expected=[4, 5, 6, 7, 8, 9],
+    )
 
     # Overwriting from flags.
-    check([8, 9], './pants --listy=[8,9]',
-          env={'PANTS_GLOBAL_LISTY': '+[6,7]'},
-          config={'GLOBAL': {'listy': '+[4,5],-[8]'}})
+    check(
+      flags='--listy=[8,9]',
+      env_val='+[6,7]',
+      config_val='+[4,5],-[8]',
+      expected=[8, 9],
+    )
 
     # Filtering all instances of repeated values.
-    check([1, 2, 3, 4, 6], './pants --listy=-[5]',
-          config={'GLOBAL': {'listy': '[1, 2, 5, 3, 4, 5, 6, 5, 5]'}})
+    check(
+      flags='--listy=-[5]',
+      config_val='[1, 2, 5, 3, 4, 5, 6, 5, 5]',
+      expected=[1, 2, 3, 4, 6],
+    )
 
     # Filtering a value even though it was appended again at a higher rank.
-    check([1, 2, 3, 5], './pants --listy=+[4]',
-          env={'PANTS_GLOBAL_LISTY': '-[4]'},
-          config={'GLOBAL': {'listy': '+[4, 5]'}})
+    check(
+      flags='--listy=+[4]',
+      env_val='-[4]',
+      config_val='+[4,5]',
+      expected=[*default, 5],
+    )
 
     # Filtering a value even though it was appended again at the same rank.
-    check([1, 2, 3, 5], './pants',
-          env={'PANTS_GLOBAL_LISTY': '-[4],+[4]'},
-          config={'GLOBAL': {'listy': '+[4, 5]'}})
+    check(
+      env_val='-[4],+[4]',
+      config_val='+[4,5]',
+      expected=[*default, 5],
+    )
 
     # Overwriting cancels filters.
-    check([4], './pants',
-          env={'PANTS_GLOBAL_LISTY': '[4]'},
-          config={'GLOBAL': {'listy': '-[4]'}})
+    check(env_val='[4]', config_val='-[4]', expected=[4])
 
   def test_dict_list_option(self) -> None:
-    def check(expected, args_str: str, *, env=None, config=None) -> None:
-      global_options = self._parse(args_str=args_str, env=env, config=config).for_global_scope()
-      self.assertEqual(expected, global_options.dict_listy)
+    def check(
+      *,
+      expected: List[Dict[str, int]],
+      flags: str = "",
+      env_val: Optional[str] = None,
+      config_val: Optional[str] = None,
+    ) -> None:
+      env = {"PANTS_GLOBAL_DICT_LISTY": env_val} if env_val else None
+      config = {"GLOBAL": {"dict_listy": config_val}} if config_val else None
+      global_options = self._parse(
+        args_str=f"./pants {flags}", env=env, config=config
+      ).for_global_scope()
+      assert global_options.dict_listy == expected
 
-    # Appending to the default.
-    check([{'a': 1, 'b': 2}, {'c': 3}], './pants')
-    check([{'a': 1, 'b': 2}, {'c': 3}, {'d': 4, 'e': 5}],
-          './pants --dict-listy=\'{"d": 4, "e": 5}\'')
-    check([{'a': 1, 'b': 2}, {'c': 3}, {'d': 4, 'e': 5}, {'f': 6}],
-          './pants --dict-listy=\'{"d": 4, "e": 5}\' --dict-listy=\'{"f": 6}\'')
-    check([{'a': 1, 'b': 2}, {'c': 3}, {'d': 4, 'e': 5}, {'f': 6}],
-          './pants --dict-listy=\'+[{"d": 4, "e": 5}, {"f": 6}]\'')
+    default = [{'a': 1, 'b': 2}, {'c': 3}]
+    one_element_appended = [*default, {'d': 4, 'e': 5}]
+    two_elements_appended = [*one_element_appended, {'f': 6}]
+    replaced = [{'d': 4, 'e': 5}, {'f': 6}]
 
-    # Replacing the default.
-    check([{'d': 4, 'e': 5}, {'f': 6}],
-          './pants --dict-listy=\'[{"d": 4, "e": 5}, {"f": 6}]\'')
+    check(expected=default)
 
-    # Parsing env var correctly.
-    check([{'a': 1, 'b': 2}, {'c': 3}, {'d': 4, 'e': 5}],
-          './pants', env={'PANTS_GLOBAL_DICT_LISTY': '{"d": 4, "e": 5}'})
-    check([{'a': 1, 'b': 2}, {'c': 3}, {'d': 4, 'e': 5}, {'f': 6}],
-          './pants', env={'PANTS_GLOBAL_DICT_LISTY': '+[{"d": 4, "e": 5}, {"f": 6}]'})
-    check([{'d': 4, 'e': 5}, {'f': 6}],
-          './pants', env={'PANTS_GLOBAL_DICT_LISTY': '[{"d": 4, "e": 5}, {"f": 6}]'})
+    check(flags="--dict-listy='{\"d\": 4, \"e\": 5}'", expected=one_element_appended)
+    check(
+      flags="--dict-listy='{\"d\": 4, \"e\": 5}' --dict-listy='{\"f\": 6}'",
+      expected=two_elements_appended,
+    )
+    check(
+      flags="--dict-listy='+[{\"d\": 4, \"e\": 5}, {\"f\": 6}]'", expected=two_elements_appended,
+    )
+    check(flags="--dict-listy='[{\"d\": 4, \"e\": 5}, {\"f\": 6}]'", expected=replaced)
 
-    # Parsing config value correctly.
-    check([{'a': 1, 'b': 2}, {'c': 3}, {'d': 4, 'e': 5}],
-          './pants', config={'GLOBAL': { 'dict_listy': '{"d": 4, "e": 5}'} })
-    check([{'a': 1, 'b': 2}, {'c': 3}, {'d': 4, 'e': 5}, {'f': 6}],
-          './pants', config={'GLOBAL': { 'dict_listy': '+[{"d": 4, "e": 5}, {"f": 6}]'} })
-    check([{'d': 4, 'e': 5}, {'f': 6}],
-          './pants', config={'GLOBAL': { 'dict_listy': '[{"d": 4, "e": 5}, {"f": 6}]'} })
+    check(env_val='{"d": 4, "e": 5}', expected=one_element_appended)
+    check(env_val='+[{"d": 4, "e": 5}, {"f": 6}]', expected=two_elements_appended)
+    check(env_val='[{"d": 4, "e": 5}, {"f": 6}]', expected=replaced)
+
+    check(config_val='{"d": 4, "e": 5}', expected=one_element_appended)
+    check(config_val='+[{"d": 4, "e": 5}, {"f": 6}]', expected=two_elements_appended)
+    check(config_val='[{"d": 4, "e": 5}, {"f": 6}]', expected=replaced)
 
   def test_target_list_option(self) -> None:
-    def check(expected, args_str: str, *, env=None, config=None) -> None:
-      global_options = self._parse(args_str=args_str, env=env, config=config).for_global_scope()
-      self.assertEqual(expected, global_options.target_listy)
+    def check(
+      *,
+      expected: List[str],
+      flags: str = "",
+      env_val: Optional[str] = None,
+      config_val: Optional[str] = None,
+    ) -> None:
+      env = {"PANTS_GLOBAL_TARGET_LISTY": env_val} if env_val else None
+      config = {"GLOBAL": {"target_listy": config_val}} if config_val else None
+      global_options = self._parse(
+        args_str=f"./pants {flags}", env=env, config=config
+      ).for_global_scope()
+      assert global_options.target_listy == expected
 
-    # Appending to the default.
-    check(['//:a', '//:b'], './pants')
-    check(['//:a', '//:b', '//:c', '//:d'],
-          './pants --target-listy=//:c --target-listy=//:d')
-    check(['//:a', '//:b', '//:c', '//:d'],
-          './pants --target-listy=\'+["//:c", "//:d"]\'')
+    default = ['//:a', '//:b']
+    specified_args = ['//:c', '//:d']
+    all_args = [*default, *specified_args]
 
-    # Replacing the default.
-    check(['//:c', '//:d'],
-          './pants --target-listy=\'["//:c", "//:d"]\'')
+    check(expected=default)
 
-    # Parsing env var correctly.
-    check(['//:a', '//:b', '//:c'],
-          './pants', env={'PANTS_GLOBAL_TARGET_LISTY': '//:c'})
-    check(['//:a', '//:b', '//:c', '//:d'],
-          './pants', env={'PANTS_GLOBAL_TARGET_LISTY': '+["//:c", "//:d"]'})
-    check(['//:c', '//:d'],
-          './pants', env={'PANTS_GLOBAL_TARGET_LISTY': '["//:c", "//:d"]'})
+    check(flags="--target-listy=//:c --target-listy=//:d", expected=all_args)
+    check(flags="--target-listy='+[\"//:c\", \"//:d\"]'", expected=all_args)
+    check(flags="--target-listy='[\"//:c\", \"//:d\"]'", expected=specified_args)
 
-    # Parsing config value correctly.
-    check(['//:a', '//:b', '//:c'],
-          './pants', config={'GLOBAL': {'target_listy': '//:c'} })
-    check(['//:a', '//:b', '//:c', '//:d'],
-          './pants', config={'GLOBAL': {'target_listy': '+["//:c", "//:d"]'} })
-    check(['//:c', '//:d'],
-          './pants', config={'GLOBAL': {'target_listy': '["//:c", "//:d"]'} })
+    check(env_val='//:c', expected=[*default, '//:c'])
+    check(env_val='+["//:c", "//:d"]', expected=all_args)
+    check(env_val='["//:c", "//:d"]', expected=specified_args)
+
+    check(config_val='//:c', expected=[*default, '//:c'])
+    check(config_val='+["//:c", "//:d"]', expected=all_args)
+    check(config_val='["//:c", "//:d"]', expected=specified_args)
 
   def test_dict_option(self) -> None:
-    def check(expected, args_str, env=None, config=None):
-      options = self._parse(args_str=args_str, env=env, config=config)
-      self.assertEqual(expected, options.for_global_scope().dicty)
+    def check(
+      *,
+      expected: Dict[str, str],
+      flags: str = "",
+      config_val: Optional[str] = None,
+    ) -> None:
+      config = {"GLOBAL": {"dicty": config_val}} if config_val else None
+      global_options = self._parse(args_str=f"./pants {flags}", config=config).for_global_scope()
+      assert global_options.dicty == expected
 
-    check({'a': 'b'}, './pants')
-    check({'c': 'd'}, './pants --dicty=\'{"c": "d"}\'')
-    check({'a': 'b', 'c': 'd'}, './pants --dicty=\'+{"c": "d"}\'')
+    default = {'a': 'b'}
+    specified_args = {'c': 'd'}
+    all_args = {**default, **specified_args}
 
-    check({'c': 'd'}, './pants', config={'GLOBAL': {'dicty': '{"c": "d"}'}})
-    check({'a': 'b', 'c': 'd'}, './pants', config={'GLOBAL': {'dicty': '+{"c": "d"}'}})
-    check({'a': 'b', 'c': 'd', 'e': 'f'}, './pants --dicty=\'+{"e": "f"}\'',
-          config={'GLOBAL': {'dicty': '+{"c": "d"}'}})
+    check(expected=default)
+
+    check(flags='--dicty=\'{"c": "d"}\'', expected=specified_args)
+    check(flags='--dicty=\'+{"c": "d"}\'', expected=all_args)
+
+    check(config_val='{"c": "d"}', expected=specified_args)
+    check(config_val='+{"c": "d"}', expected=all_args)
+    check(
+      config_val='+{"c": "d"}', flags='--dicty=\'+{"e": "f"}\'', expected={**all_args, 'e': 'f'},
+    )
 
     # Check that highest rank wins if we have multiple values for the same key.
-    check({'a': 'b+', 'c': 'd'}, './pants', config={'GLOBAL': {'dicty': '+{"a": "b+", "c": "d"}'}})
-    check({'a': 'b++', 'c': 'd'}, './pants --dicty=\'+{"a": "b++"}\'',
-          config={'GLOBAL': {'dicty': '+{"a": "b+", "c": "d"}'}})
+    check(config_val='+{"a": "b+", "c": "d"}', expected={'a': 'b+', 'c': 'd'})
+    check(
+      config_val='+{"a": "b+", "c": "d"}',
+      flags='--dicty=\'+{"a": "b++"}\'',
+      expected={'a': 'b++', 'c': 'd'},
+    )
 
   def test_defaults(self) -> None:
     # Hard-coded defaults.
