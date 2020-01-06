@@ -127,7 +127,7 @@ class PexBuilderWrapper:
     @classmethod
     def register_options(cls, register):
       super(PexBuilderWrapper.Factory, cls).register_options(register)
-      register('--setuptools-version', advanced=True, default='40.6.3',
+      register('--setuptools-version', advanced=True, default='44.0.0',
                help='The setuptools version to include in the pex if namespace packages need to be '
                     'injected.')
 

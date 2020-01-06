@@ -97,7 +97,7 @@ async def create_pex(
   """Returns a PEX with the given requirements, optional entry point, and optional
   interpreter constraints."""
 
-  argv = ["--output-file", request.output_filename]
+  argv = ["-vvvvvvvvv", "--output-file", request.output_filename]
   if python_setup.resolver_jobs:
     argv.extend(["--jobs", python_setup.resolver_jobs])
   if request.entry_point is not None:

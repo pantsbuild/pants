@@ -17,7 +17,7 @@ from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import is_executable, read_file, safe_file_dump
 from pants.util.enums import match
-from pants_test.backend.python.tasks.python_task_test_base import name_and_platform
+from pants_test.backend.python.tasks.util.wheel import name_and_platform
 
 
 def invoke_pex_for_output(pex_file_to_run):
