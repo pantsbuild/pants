@@ -42,7 +42,7 @@ async def create_pex_from_target_closure(request: CreatePexFromTargetClosure,
   )
 
   if request.include_source_files:
-    chrooted_sources = await Get[ChrootedPythonSources](HydratedTargets, all_targets)
+    chrooted_sources = await Get[ChrootedPythonSources](HydratedTargets(all_targets))
 
   requirements = PexRequirements.create_from_adaptors(
     adaptors=all_target_adaptors,

@@ -77,7 +77,7 @@ async def run_python_test(
     Address, test_target.address.to_address()
   )
 
-  chrooted_sources = await Get[ChrootedPythonSources](HydratedTargets, all_targets)
+  chrooted_sources = await Get[ChrootedPythonSources](HydratedTargets(all_targets))
 
   merged_input_files = await Get[Digest](
     DirectoriesToMerge(

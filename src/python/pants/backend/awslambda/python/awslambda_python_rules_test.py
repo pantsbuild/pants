@@ -17,6 +17,9 @@ from pants.backend.python.rules.download_pex_bin import download_pex_bin
 from pants.backend.python.rules.inject_init import inject_init
 from pants.backend.python.rules.pex import create_pex
 from pants.backend.python.rules.pex_from_target_closure import create_pex_from_target_closure
+from pants.backend.python.rules.prepare_chrooted_python_sources import (
+  prepare_chrooted_python_sources,
+)
 from pants.backend.python.subsystems.python_native_code import (
   PythonNativeCode,
   create_pex_native_build_environment,
@@ -53,6 +56,7 @@ class TestPythonAWSLambdaCreation(TestBase):
       strip_source_root,
       download_pex_bin,
       inject_init,
+      prepare_chrooted_python_sources,
       create_pex_from_target_closure,
       RootRule(Digest),
       RootRule(SourceRootConfig),
