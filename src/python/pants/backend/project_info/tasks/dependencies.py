@@ -30,7 +30,7 @@ class Dependencies(ConsoleTask):
       '--external-only',
       type=bool,
       help='Specifies that only external dependencies should be included in the graph output (only external jars).',
-      removal_version="1.26.0.dev1",
+      removal_version="1.26.0.dev0",
       removal_hint="This feature is being removed. If you depend on this functionality, please let us know in the "
                    "#general channel on Slack at https://pantsbuild.slack.com/. \nYou can join the pants slack here: "
                    "https://pantsslack.herokuapp.com/ ",
@@ -47,7 +47,7 @@ class Dependencies(ConsoleTask):
   def console_output(self, unused_method_argument):
     deprecated_conditional(
       lambda: not self.is_external_only and not self.is_internal_only,
-      removal_version="1.26.0.dev1",
+      removal_version="1.26.0.dev0",
       entity_description="The default dependencies output including external dependencies",
       hint_message="Pants will soon default to `--internal-only`, and remove the `--external-only` option. "
                     "Currently, Pants defaults to include both internal and external dependencies, which means this "

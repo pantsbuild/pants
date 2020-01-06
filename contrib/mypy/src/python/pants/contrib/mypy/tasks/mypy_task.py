@@ -263,7 +263,7 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
         cmd.append(f'--config-file={os.path.join(get_buildroot(), config)}')
       deprecated_conditional(
         lambda: self.get_passthru_args(),
-        removal_version='1.26.0.dev3',
+        removal_version='1.26.0.dev1',
         entity_description='Using the old style of passthrough args for MyPy',
         hint_message="You passed arguments to MyPy through either the "
                      "`--lint-mypy-passthrough-args` option or the style "
