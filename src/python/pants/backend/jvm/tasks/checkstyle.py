@@ -5,6 +5,7 @@ import os
 
 from twitter.common.collections import OrderedSet
 
+from pants.backend.jvm.subsystems.checkstyle import Checkstyle as CheckstyleSubsystem
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
@@ -31,6 +32,8 @@ class Checkstyle(LintTaskMixin, NailgunTask):
   def register_options(cls, register):
     super().register_options(register)
     register('--configuration', advanced=True, type=file_option, fingerprint=True,
+             removal_version='1.27.0.dev0',
+             removal_hint='Use `--checkstyle-config` instead of `--lint-checkstyle-configuration`.',
              help='Path to the checkstyle configuration file.')
     register('--properties', advanced=True, type=dict_with_files_option, default={},
              fingerprint=True,
@@ -59,6 +62,14 @@ class Checkstyle(LintTaskMixin, NailgunTask):
                               Shader.exclude_package('com.puppycrawl.tools.checkstyle',
                                                      recursive=True),
                           ])
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super().subsystem_dependencies() + (CheckstyleSubsystem,)
+
+  @property
+  def skip_execution(self):
+    return self.get_options().skip or CheckstyleSubsystem.global_instance().options.skip
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -100,12 +111,22 @@ class Checkstyle(LintTaskMixin, NailgunTask):
         union_classpath.update(jar for conf, jar in runtime_classpath
                                if conf in self.get_options().confs)
 
-    configuration_file = self.get_options().configuration
-    if not configuration_file:
-      raise TaskError('No checkstyle configuration file provided.')
+    task_config = self.get_options().configuration
+    subsystem_config = CheckstyleSubsystem.global_instance().options.config
+    if task_config and subsystem_config:
+      raise ValueError(
+        "Conflicting options for the config file used. You used the new, preferred "
+        "`--checkstyle-config`, but also used the deprecated `--lint-checkstyle-configuration`.\n"
+        "Please use only one of these (preferably `--checkstyle-config`)."
+      )
+    config = task_config or subsystem_config
+    if not config:
+      raise TaskError(
+        'No checkstyle configuration file configured. Configure with `--checkstyle-config`.'
+      )
 
     args = [
-      '-c', configuration_file,
+      '-c', config,
       '-f', 'plain'
     ]
 

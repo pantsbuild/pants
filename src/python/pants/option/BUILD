@@ -8,6 +8,7 @@ python_library(
     '3rdparty/python:python-Levenshtein',
     '3rdparty/python:PyYAML',
     '3rdparty/python:setuptools',
+    '3rdparty/python:typing-extensions',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:deprecated',

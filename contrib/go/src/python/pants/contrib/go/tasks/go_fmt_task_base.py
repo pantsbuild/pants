@@ -7,6 +7,7 @@ from contextlib import contextmanager
 
 from pants.base.exceptions import TaskError
 
+from pants.contrib.go.subsystems.gofmt import Gofmt
 from pants.contrib.go.targets.go_local_source import GoLocalSource
 from pants.contrib.go.tasks.go_workspace_task import GoWorkspaceTask
 
@@ -25,6 +26,10 @@ class GoFmtTaskBase(GoWorkspaceTask):
       sources.update(source for source in target.sources_relative_to_buildroot()
                      if GoLocalSource.is_go_source(source))
     return sources
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super().subsystem_dependencies() + (Gofmt,)
 
   @contextmanager
   def go_fmt_invalid_targets(self, flags):

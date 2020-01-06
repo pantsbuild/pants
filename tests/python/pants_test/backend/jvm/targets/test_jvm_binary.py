@@ -23,21 +23,21 @@ class JarRulesTest(unittest.TestCase):
     self.assertEqual('Skip(apply_pattern=foo)', repr(skip_rule))
 
   def test_invalid_apply_pattern(self):
-    with self.assertRaisesRegexp(ValueError, r'The supplied apply_pattern is not a str'):
+    with self.assertRaisesRegex(ValueError, r'The supplied apply_pattern is not a str'):
       Skip(None)
-    with self.assertRaisesRegexp(ValueError, r'The supplied apply_pattern is not a str'):
+    with self.assertRaisesRegex(ValueError, r'The supplied apply_pattern is not a str'):
       Duplicate(None, Duplicate.SKIP)
-    with self.assertRaisesRegexp(ValueError, r'The supplied apply_pattern: \) is not a valid'):
+    with self.assertRaisesRegex(ValueError, r'The supplied apply_pattern: \) is not a valid'):
       Skip(r')')
-    with self.assertRaisesRegexp(ValueError, r'The supplied apply_pattern: \) is not a valid'):
+    with self.assertRaisesRegex(ValueError, r'The supplied apply_pattern: \) is not a valid'):
       Duplicate(r')', Duplicate.SKIP)
 
   def test_bad_action(self):
-    with self.assertRaisesRegexp(ValueError, r'The supplied action must be one of'):
+    with self.assertRaisesRegex(ValueError, r'The supplied action must be one of'):
       Duplicate('foo', None)
 
   def test_duplicate_error(self):
-    with self.assertRaisesRegexp(Duplicate.Error, r'Duplicate entry encountered for path foo'):
+    with self.assertRaisesRegex(Duplicate.Error, r'Duplicate entry encountered for path foo'):
       raise Duplicate.Error('foo')
 
   def test_default(self):
@@ -47,7 +47,7 @@ class JarRulesTest(unittest.TestCase):
       self.assertTrue(rule.apply_pattern.pattern.startswith(r'^META-INF'))
 
   def test_set_bad_default(self):
-    with self.assertRaisesRegexp(ValueError, r'The default rules must be a JarRules'):
+    with self.assertRaisesRegex(ValueError, r'The default rules must be a JarRules'):
       JarRules.set_default(None)
 
 
@@ -121,7 +121,7 @@ class JvmBinaryTest(TestBase):
       '',
       'jvm_binary(name = "foo", main = "com.example.Foo", source = ["foo.py"])',
     )
-    with self.assertRaisesRegexp(AddressLookupError,
+    with self.assertRaisesRegex(AddressLookupError,
                                  r'Invalid target.*foo.*source must be a str'):
       self.target(':foo')
 
@@ -132,7 +132,7 @@ class JvmBinaryTest(TestBase):
       'foo',
       'jvm_binary(name = "foo", main = "com.example.Foo", sources = ["foo.py", "bar.py"])',
     )
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
       AddressLookupError,
       r'Invalid target.*foo.*jvm_binary must have exactly 0 or 1 sources'
     ):
@@ -140,7 +140,7 @@ class JvmBinaryTest(TestBase):
 
   def test_bad_main_declaration(self):
     self.add_to_build_file('', 'jvm_binary(name = "bar", main = ["com.example.Bar"])')
-    with self.assertRaisesRegexp(TargetDefinitionException,
+    with self.assertRaisesRegex(TargetDefinitionException,
                                  r'Invalid target JvmBinary.*bar.*main must be a fully'):
       self.target(':bar')
 
@@ -149,7 +149,7 @@ class JvmBinaryTest(TestBase):
       '',
       'jvm_binary(name = "foo", main = "com.example.Foo", deploy_jar_rules="invalid")',
     )
-    with self.assertRaisesRegexp(TargetDefinitionException,
+    with self.assertRaisesRegex(TargetDefinitionException,
                                  r'Invalid target JvmBinary.*foo.*'
                                  r'deploy_jar_rules must be a JarRules specification. '
                                  r'got (str|unicode)'):
@@ -204,7 +204,7 @@ class JvmBinaryTest(TestBase):
   main = "com.example.Foo",
   manifest_entries = "foo",
 )''')
-    with self.assertRaisesRegexp(TargetDefinitionException,
+    with self.assertRaisesRegex(TargetDefinitionException,
                                  r'Invalid target JvmBinary.*foo.*: manifest_entries must be a '
                                  r'dict. got (str|unicode)'):
       self.target(':foo')
@@ -217,7 +217,7 @@ class JvmBinaryTest(TestBase):
   main = "com.example.Foo",
   manifest_entries = {jar("bad", "bad", "bad"): "foo"},
 )''')
-    with self.assertRaisesRegexp(TargetDefinitionException,
+    with self.assertRaisesRegex(TargetDefinitionException,
                                  r'entries must be dictionary of strings, got key .* '
                                  r'type JarDependency'):
       self.target(':foo')

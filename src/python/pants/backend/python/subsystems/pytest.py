@@ -1,7 +1,7 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Tuple, cast
+from typing import Tuple
 
 from pants.base.deprecated import deprecated_conditional
 from pants.option.option_util import flatten_shlexed_list
@@ -61,7 +61,7 @@ class PyTest(Subsystem):
     opts = self.get_options()
 
     deprecated_conditional(
-      lambda: cast(bool, opts.is_default("version")),
+      lambda: opts.is_default("version"),
       removal_version="1.25.0.dev2",
       entity_description="Pants defaulting to a Python 2-compatible Pytest version",
       hint_message="Pants will soon start defaulting to Pytest 5.x, which no longer supports "

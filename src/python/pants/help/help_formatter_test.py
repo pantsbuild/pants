@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import unittest
+from dataclasses import replace
 
 from pants.help.help_formatter import HelpFormatter
 from pants.help.help_info_extracter import OptionHelpInfo
@@ -14,7 +15,7 @@ class OptionHelpFormatterTest(unittest.TestCase):
                          typ=bool, default=None, help='help for foo',
                          deprecated_message=None, removal_version=None, removal_hint=None,
                          choices=None)
-    ohi = ohi._replace(**kwargs)
+    ohi = replace(ohi, **kwargs)
     lines = HelpFormatter(
       scope='', show_recursive=False, show_advanced=False, color=False
     ).format_option(ohi)

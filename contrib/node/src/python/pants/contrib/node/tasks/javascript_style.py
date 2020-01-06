@@ -11,6 +11,7 @@ from pants.task.lint_task_mixin import LintTaskMixin
 from pants.util.contextutil import pushd
 from pants.util.memo import memoized_method
 
+from pants.contrib.node.subsystems.eslint import ESLint
 from pants.contrib.node.subsystems.package_managers import (PACKAGE_MANAGER_YARNPKG,
                                                             PackageInstallationVersionOption)
 from pants.contrib.node.targets.node_module import NodeModule
@@ -33,6 +34,31 @@ class JavascriptStyleBase(NodeTask):
     register('--fail-slow', type=bool,
              help='Check all targets and present the full list of errors.')
     register('--color', type=bool, default=True, help='Enable or disable color.')
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super().subsystem_dependencies() + (ESLint,)
+
+  def _get_eslint_option(self, option: str, *, default_provided: bool = False):
+    """Temporary utility to help with the migration from node-distribution -> eslint."""
+    old_option = f"eslint_{option}"
+    node_distribution_val = getattr(self.node_distribution.get_options(), old_option)
+    eslint_val = getattr(ESLint.global_instance().options, option)
+
+    both_defined = node_distribution_val and eslint_val
+    both_not_default = (
+      not self.node_distribution.get_options().is_default(old_option) and
+      not ESLint.global_instance().options.is_default(option)
+    )
+    both_configured = both_not_default if default_provided else both_defined
+    if both_configured:
+      raise ValueError(
+        f"Conflicting options used. You used the new, preferred `--eslint-{option}`, but also "
+        f"used the deprecated `--node-distribution-eslint-{option}`.\n"
+        f"Please use only one of these (preferably `--eslint-{option}`)."
+      )
+
+    return eslint_val or node_distribution_val
 
   @property
   def fix(self):
@@ -71,7 +97,7 @@ class JavascriptStyleBase(NodeTask):
   @memoized_method
   def _bootstrap_eslinter(self, bootstrap_dir):
     with pushd(bootstrap_dir):
-      eslint_version = self.node_distribution.eslint_version
+      eslint_version = self._get_eslint_option("version", default_provided=True)
       eslint = f'eslint@{eslint_version}'
       self.context.log.debug(f'Installing {eslint}...')
       result, add_command = self.add_package(
@@ -140,7 +166,11 @@ class JavascriptStyleBase(NodeTask):
     if not targets:
       return
     failed_targets = []
-    bootstrap_dir, is_preconfigured = self.node_distribution.eslint_supportdir(self.workdir)
+    bootstrap_dir, is_preconfigured = (
+      ESLint.global_instance().supportdir(task_workdir=self.workdir)
+      if ESLint.global_instance().options.setupdir else
+      self.node_distribution.eslint_supportdir(self.workdir)
+    )
     if not is_preconfigured:
       self.context.log.debug('ESLint is not pre-configured, bootstrapping with defaults.')
       self._bootstrap_eslinter(bootstrap_dir)
@@ -149,11 +179,13 @@ class JavascriptStyleBase(NodeTask):
     for target in targets:
       files = self.get_javascript_sources(target)
       if files:
-        result_code, command = self._run_javascriptstyle(target,
-                                                         bootstrap_dir,
-                                                         files,
-                                                         config=self.node_distribution.eslint_config,
-                                                         ignore_path=self.node_distribution.eslint_ignore)
+        result_code, command = self._run_javascriptstyle(
+          target,
+          bootstrap_dir,
+          files,
+          config=self._get_eslint_option("config"),
+          ignore_path=self._get_eslint_option("ignore"),
+        )
         if result_code != 0:
           if self.get_options().fail_slow:
             raise TaskError('Javascript style failed: \n'
@@ -176,6 +208,10 @@ class JavascriptStyleLint(LintTaskMixin, JavascriptStyleBase):
   """
   fix = False
 
+  @property
+  def skip_execution(self):
+    return self.get_options().skip or ESLint.global_instance().options.skip
+
 
 class JavascriptStyleFmt(FmtTaskMixin, JavascriptStyleBase):
   """Check and fix source files to ensure they follow the style guidelines.
@@ -183,3 +219,7 @@ class JavascriptStyleFmt(FmtTaskMixin, JavascriptStyleBase):
   :API: public
   """
   fix = True
+
+  @property
+  def skip_execution(self):
+    return self.get_options().skip or ESLint.global_instance().options.skip

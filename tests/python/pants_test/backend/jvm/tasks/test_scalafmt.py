@@ -5,10 +5,11 @@ import os
 from textwrap import dedent
 
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
+from pants.backend.jvm.subsystems.scalafmt import Scalafmt
 from pants.backend.jvm.subsystems.scoverage_platform import ScoveragePlatform
 from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
-from pants.backend.jvm.tasks.scalafmt import ScalaFmtCheckFormat, ScalaFmtFormat
+from pants.backend.jvm.tasks.scalafmt_task import ScalaFmtCheckFormat, ScalaFmtFormat
 from pants.base.exceptions import TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.resources import Resources
@@ -29,11 +30,12 @@ class ScalaFmtTestBase(NailgunTaskTestBase):
   def setUp(self):
     super().setUp()
 
+    init_subsystem(Scalafmt)
     init_subsystem(ScalaPlatform)
     init_subsystem(ScoveragePlatform)
     init_subsystem(SourceRootConfig)
 
-    self.configuration = self.create_file(
+    self.config = self.create_file(
       relpath='build-support/scalafmt/config',
       contents=dedent("""
       align.arrowEnumeratorGenerator = true
@@ -92,23 +94,22 @@ class ScalaFmtCheckFormatTest(ScalaFmtTestBase):
     return ScalaFmtCheckFormat
 
   def test_scalafmt_fail_default_config(self):
-    self.set_options(skip=False)
     context = self.context(target_roots=self.library)
     with self.assertRaises(TaskError):
       self.execute(context)
 
   def test_scalafmt_fail(self):
-    self.set_options(skip=False, configuration=self.configuration)
+    self.set_options_for_scope(Scalafmt.options_scope, config=self.config)
     context = self.context(target_roots=self.library)
     with self.assertRaises(TaskError):
       self.execute(context)
 
   def test_scalafmt_disabled(self):
-    self.set_options(skip=True)
+    self.set_options_for_scope(Scalafmt.options_scope, skip=True)
     self.execute(self.context(target_roots=self.library))
 
   def test_scalafmt_ignore_resources(self):
-    self.set_options(skip=False, configuration=self.configuration)
+    self.set_options_for_scope(Scalafmt.options_scope, config=self.config)
     context = self.context(target_roots=self.as_resources)
     self.execute(context)
 
@@ -120,10 +121,11 @@ class ScalaFmtFormatTest(ScalaFmtTestBase):
     return ScalaFmtFormat
 
   def test_scalafmt_format_default_config(self):
-    self.format_file_and_verify_fmt(skip=False)
+    self.format_file_and_verify_fmt()
 
   def test_scalafmt_format(self):
-    self.format_file_and_verify_fmt(skip=False, configuration=self.configuration)
+    self.set_options_for_scope(Scalafmt.options_scope, config=self.config)
+    self.format_file_and_verify_fmt()
 
   def format_file_and_verify_fmt(self, **options):
     self.set_options(**options)
@@ -146,7 +148,7 @@ class ScalaFmtFormatTest(ScalaFmtTestBase):
 
   def test_output_dir(self):
     with temporary_dir() as output_dir:
-      self.set_options(skip=False, output_dir=output_dir)
+      self.set_options(output_dir=output_dir)
 
       lint_options_scope = 'sfcf'
       check_fmt_task_type = self.synthesize_task_subtype(ScalaFmtCheckFormat, lint_options_scope)

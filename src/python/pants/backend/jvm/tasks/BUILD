@@ -160,6 +160,7 @@ python_library(
     ':nailgun_task',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/java/jar',
+    'src/python/pants/backend/jvm/subsystems:checkstyle',
     'src/python/pants/backend/jvm/subsystems:shader',
     'src/python/pants/base:exceptions',
     'src/python/pants/option',
@@ -691,9 +692,10 @@ python_library(
 
 python_library(
   name = 'scalafix',
-  sources = ['scalafix.py'],
+  sources = ['scalafix_task.py'],
   dependencies = [
     ':rewrite_base',
+    'src/python/pants/backend/jvm/subsystems:scala_linters',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
@@ -706,9 +708,10 @@ python_library(
 
 python_library(
   name = 'scalafmt',
-  sources = ['scalafmt.py'],
+  sources = ['scalafmt_task.py'],
   dependencies = [
     ':rewrite_base',
+    'src/python/pants/backend/jvm/subsystems:scala_linters',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
@@ -736,9 +739,10 @@ python_library(
 
 python_library(
   name = 'scalastyle',
-  sources = ['scalastyle.py'],
+  sources = ['scalastyle_task.py'],
   dependencies = [
     ':nailgun_task',
+    'src/python/pants/backend/jvm/subsystems:scala_linters',
     'src/python/pants/backend/jvm/subsystems:scala_platform',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',

@@ -31,7 +31,7 @@ from pants.rules.core.lint import LintResult
 @dataclass(frozen=True)
 class IsortTarget:
   target: TargetAdaptor
-  prior_formatter_result_digest: Digest
+  prior_formatter_result_digest: Optional[Digest] = None  # unused by `lint`
 
 
 @dataclass(frozen=True)
@@ -39,11 +39,12 @@ class IsortSetup:
   requirements_pex: Pex
   config_snapshot: Snapshot
   passthrough_args: Tuple[str, ...]
+  skip: bool
 
 
 @rule
 async def setup_isort(isort: Isort) -> IsortSetup:
-  config_path: Optional[List[str]] = isort.get_options().config
+  config_path: Optional[List[str]] = isort.options.config
   config_snapshot = await Get[Snapshot](PathGlobs(include=config_path or ()))
   requirements_pex = await Get[Pex](
     CreatePex(
@@ -59,6 +60,7 @@ async def setup_isort(isort: Isort) -> IsortSetup:
     requirements_pex=requirements_pex,
     config_snapshot=config_snapshot,
     passthrough_args=isort.get_args(),
+    skip=isort.options.skip,
   )
 
 
@@ -91,7 +93,7 @@ async def create_isort_request(
   subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> ExecuteProcessRequest:
   target = wrapped_target.target
-  sources_digest = wrapped_target.prior_formatter_result_digest
+  sources_digest = wrapped_target.prior_formatter_result_digest or target.sources.snapshot.directory_digest
   merged_input_files = await Get[Digest](
     DirectoriesToMerge(
       directories=(
@@ -114,6 +116,8 @@ async def create_isort_request(
 
 @rule(name="Format using isort")
 async def fmt(wrapped_target: IsortTarget, isort_setup: IsortSetup) -> FmtResult:
+  if isort_setup.skip:
+    return FmtResult.noop()
   args = IsortArgs.create(wrapped_target=wrapped_target, isort_setup=isort_setup, check_only=False)
   request = await Get[ExecuteProcessRequest](IsortArgs, args)
   result = await Get[ExecuteProcessResult](ExecuteProcessRequest, request)
@@ -122,6 +126,8 @@ async def fmt(wrapped_target: IsortTarget, isort_setup: IsortSetup) -> FmtResult
 
 @rule(name="Lint using isort")
 async def lint(wrapped_target: IsortTarget, isort_setup: IsortSetup) -> LintResult:
+  if isort_setup.skip:
+    return LintResult.noop()
   args = IsortArgs.create(wrapped_target=wrapped_target, isort_setup=isort_setup, check_only=True)
   request = await Get[ExecuteProcessRequest](IsortArgs, args)
   result = await Get[FallibleExecuteProcessResult](ExecuteProcessRequest, request)

@@ -4,11 +4,16 @@
 from pants.base.exceptions import TaskError
 from pants.task.lint_task_mixin import LintTaskMixin
 
+from pants.contrib.go.subsystems.gofmt import Gofmt
 from pants.contrib.go.tasks.go_fmt_task_base import GoFmtTaskBase
 
 
 class GoCheckstyle(LintTaskMixin, GoFmtTaskBase):
   """Checks Go code matches gofmt style."""
+
+  @property
+  def skip_execution(self):
+    return self.get_options().skip or Gofmt.global_instance().options.skip
 
   def execute(self):
     with self.go_fmt_invalid_targets(['-d']) as output:

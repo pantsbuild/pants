@@ -33,7 +33,7 @@ from pants.rules.core.lint import LintResult
 @dataclass(frozen=True)
 class BlackTarget:
   target: TargetAdaptor
-  prior_formatter_result_digest: Digest
+  prior_formatter_result_digest: Optional[Digest] = None  # unused by `lint`
 
 
 @dataclass(frozen=True)
@@ -41,11 +41,12 @@ class BlackSetup:
   requirements_pex: Pex
   config_snapshot: Snapshot
   passthrough_args: Optional[Tuple[str, ...]]
+  skip: bool
 
 
 @rule
 async def setup_black(black: Black) -> BlackSetup:
-  config_path: Optional[str] = black.get_options().config
+  config_path: Optional[str] = black.options.config
   config_snapshot = await Get[Snapshot](
     PathGlobs(include=tuple([config_path] if config_path else []))
   )
@@ -63,6 +64,7 @@ async def setup_black(black: Black) -> BlackSetup:
     requirements_pex=requirements_pex,
     config_snapshot=config_snapshot,
     passthrough_args=black.get_args(),
+    skip=black.options.skip,
   )
 
 
@@ -101,7 +103,7 @@ async def create_black_request(
   subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> ExecuteProcessRequest:
   target = wrapped_target.target
-  sources_digest = wrapped_target.prior_formatter_result_digest
+  sources_digest = wrapped_target.prior_formatter_result_digest or target.sources.snapshot.directory_digest
   merged_input_files = await Get[Digest](
     DirectoriesToMerge(
       directories=(
@@ -124,6 +126,8 @@ async def create_black_request(
 
 @rule(name="Format using Black")
 async def fmt(wrapped_target: BlackTarget, black_setup: BlackSetup) -> FmtResult:
+  if black_setup.skip:
+    return FmtResult.noop()
   args = BlackArgs.create(black_setup=black_setup, wrapped_target=wrapped_target, check_only=False)
   request = await Get[ExecuteProcessRequest](BlackArgs, args)
   result = await Get[ExecuteProcessResult](ExecuteProcessRequest, request)
@@ -132,6 +136,8 @@ async def fmt(wrapped_target: BlackTarget, black_setup: BlackSetup) -> FmtResult
 
 @rule(name="Lint using Black")
 async def lint(wrapped_target: BlackTarget, black_setup: BlackSetup) -> LintResult:
+  if black_setup.skip:
+    return LintResult.noop()
   args = BlackArgs.create(black_setup=black_setup, wrapped_target=wrapped_target, check_only=True)
   request = await Get[ExecuteProcessRequest](BlackArgs, args)
   result = await Get[FallibleExecuteProcessResult](ExecuteProcessRequest, request)

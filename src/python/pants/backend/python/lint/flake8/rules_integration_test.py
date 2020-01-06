@@ -63,6 +63,7 @@ class Flake8IntegrationTest(TestBase):
     config: Optional[str] = None,
     passthrough_args: Optional[Sequence[str]] = None,
     interpreter_constraints: Optional[Sequence[str]] = None,
+    skip: bool = False,
   ) -> LintResult:
     if config is not None:
       self.create_file(relpath=".flake8", contents=config)
@@ -78,6 +79,7 @@ class Flake8IntegrationTest(TestBase):
       Flake8, options={Flake8.options_scope: {
         "config": ".flake8" if config else None,
         "args": passthrough_args or [],
+        "skip": skip,
       }}
     )
     return self.request_single_product(
@@ -125,3 +127,7 @@ class Flake8IntegrationTest(TestBase):
     result = self.run_flake8([self.bad_source], passthrough_args=["--ignore=F401"])
     assert result.exit_code == 0
     assert result.stdout.strip() == ""
+
+  def test_skip(self) -> None:
+    result = self.run_flake8([self.bad_source], skip=True)
+    assert result == LintResult.noop()

@@ -5,7 +5,13 @@ from dataclasses import dataclass
 from typing import Tuple
 
 from pants.engine.console import Console
-from pants.engine.fs import Digest, DirectoriesToMerge, DirectoryToMaterialize, Workspace
+from pants.engine.fs import (
+  EMPTY_DIRECTORY_DIGEST,
+  Digest,
+  DirectoriesToMerge,
+  DirectoryToMaterialize,
+  Workspace,
+)
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.isolated_process import ExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTargets
@@ -20,6 +26,10 @@ class FmtResult:
   digest: Digest
   stdout: str
   stderr: str
+
+  @staticmethod
+  def noop() -> "FmtResult":
+    return FmtResult(digest=EMPTY_DIRECTORY_DIGEST, stdout="", stderr="")
 
   @staticmethod
   def from_execute_process_result(process_result: ExecuteProcessResult) -> "FmtResult":

@@ -204,7 +204,7 @@ class SchedulerTest(TestBase):
     # But not a subset.
     expected_msg = ("No installed @rules can compute {} for input Params(A), but"
                     .format(str.__name__))
-    with self.assertRaisesRegexp(Exception, re.escape(expected_msg)):
+    with self.assertRaisesRegex(Exception, re.escape(expected_msg)):
       self.request_single_product(str, Params(a))
 
   def test_transitive_params(self):

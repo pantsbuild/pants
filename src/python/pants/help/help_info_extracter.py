@@ -1,16 +1,17 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from collections import namedtuple
+import inspect
+from dataclasses import dataclass
+from enum import Enum
+from typing import List, Optional, Type
 
 from pants.base import deprecated
 from pants.option.option_util import is_list_option
 
 
-class OptionHelpInfo(namedtuple('_OptionHelpInfo',
-    ['registering_class', 'display_args', 'scoped_cmd_line_args', 'unscoped_cmd_line_args',
-     'typ', 'default', 'help', 'deprecated_message', 'removal_version',
-     'removal_hint', 'choices'])):
+@dataclass(frozen=True)
+class OptionHelpInfo:
   """A container for help information for a single option.
 
   registering_class: The type that registered the option.
@@ -29,19 +30,33 @@ class OptionHelpInfo(namedtuple('_OptionHelpInfo',
   removal_hint: If deprecated: The removal hint message registered for this option.
   choices: If this option has a constrained list of choices, a csv list of the choices.
   """
+  registering_class: Type
+  display_args: List[str]
+  scoped_cmd_line_args: List[str]
+  unscoped_cmd_line_args: List[str]
+  typ: Type
+  default: str
+  help: str
+  deprecated_message: Optional[str]
+  removal_version: Optional[str]
+  removal_hint: Optional[str]
+  choices: Optional[str]
 
   def comma_separated_display_args(self):
     return ', '.join(self.display_args)
 
 
-class OptionScopeHelpInfo(namedtuple('_OptionScopeHelpInfo',
-                                     ['scope', 'basic', 'recursive', 'advanced'])):
+@dataclass(frozen=True)
+class OptionScopeHelpInfo:
   """A container for help information for a scope of options.
 
   scope: The scope of the described options.
   basic|recursive|advanced: A list of OptionHelpInfo for the options in that group.
   """
-  pass
+  scope: str
+  basic: List[OptionHelpInfo]
+  recursive: List[OptionHelpInfo]
+  advanced: List[OptionHelpInfo]
 
 
 class HelpInfoExtracter:
@@ -56,7 +71,7 @@ class HelpInfoExtracter:
     return cls(parser.scope).get_option_scope_help_info(parser.option_registrations_iter())
 
   @staticmethod
-  def compute_default(kwargs):
+  def compute_default(kwargs) -> str:
     """Compute the default value to display in help for an option registered with these kwargs."""
     ranked_default = kwargs.get('default')
     typ = kwargs.get('type', str)
@@ -75,6 +90,8 @@ class HelpInfoExtracter:
         default_str = '{}'
     elif typ == str:
       default_str = "'{}'".format(default).replace('\n', ' ')
+    elif inspect.isclass(typ) and issubclass(typ, Enum):
+      default_str = default.value
     else:
       default_str = str(default)
     return default_str
@@ -91,6 +108,16 @@ class HelpInfoExtracter:
       metavar = f'<{typ.__name__}>' if typ != dict else '"{\'key1\':val1,\'key2\':val2,...}"'
 
     return metavar
+
+  @staticmethod
+  def compute_choices(kwargs) -> Optional[str]:
+    """Compute the option choices to display based on an Enum or list type."""
+    typ = kwargs.get('type', [])
+    if inspect.isclass(typ) and issubclass(typ, Enum):
+      values = (choice.value for choice in typ)
+    else:
+      values = (str(choice) for choice in kwargs.get('choices', []))
+    return ', '.join(values) or None
 
   def __init__(self, scope):
     self._scope = scope
@@ -165,7 +192,7 @@ class HelpInfoExtracter:
       deprecated_message = 'DEPRECATED. {} removed in version: {}'.format(deprecated_tense,
                                                                           removal_version)
     removal_hint = kwargs.get('removal_hint')
-    choices = ', '.join(str(choice) for choice in kwargs.get('choices', [])) or None
+    choices = self.compute_choices(kwargs)
 
     ret = OptionHelpInfo(registering_class=kwargs.get('registering_class', type(None)),
                          display_args=display_args,

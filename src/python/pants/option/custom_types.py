@@ -4,7 +4,9 @@
 import os
 import re
 from enum import Enum
+from typing import Dict, Iterable, List, Pattern, Sequence
 
+from pants.base.deprecated import warn_or_error
 from pants.option.errors import ParseError
 from pants.util.eval import parse_expression
 from pants.util.memo import memoized_method
@@ -19,22 +21,27 @@ class UnsetBool:
   :API: public
   """
 
-  def __init__(self):
+  def __init__(self) -> None:
     raise NotImplementedError('UnsetBool cannot be instantiated. It should only be used as a '
                               'sentinel type.')
 
 
-def dict_option(s):
+def dict_option(s: str) -> "DictValueComponent":
   """An option of type 'dict'.
 
   The value (on the command-line, in an env var or in the config file) must be eval'able to a dict.
 
   :API: public
   """
+  warn_or_error(
+    removal_version="1.27.0.dev0",
+    deprecated_entity_description="pants.option.custom_types.dict_option",
+    hint="Instead of setting an option's type as `type=dict_option`, set `type=dict`."
+  )
   return DictValueComponent.create(s)
 
 
-def list_option(s):
+def list_option(s: str) -> "ListValueComponent":
   """An option of type 'list'.
 
   The value (on the command-line, in an env var or in the config file) must be one of:
@@ -47,10 +54,15 @@ def list_option(s):
 
   :API: public
   """
+  warn_or_error(
+    removal_version="1.27.0.dev0",
+    deprecated_entity_description="pants.option.custom_types.list_option",
+    hint="Instead of setting an option's type as `type=list_option`, set `type=list`."
+  )
   return ListValueComponent.create(s)
 
 
-def target_option(s):
+def target_option(s: str) -> str:
   """Same type as 'str', but indicates a single target spec.
 
   :API: public
@@ -60,8 +72,6 @@ def target_option(s):
   return s
 
 
-# TODO: Replace target_list_option with type=list, member_type=target_option.
-# Then we'll get all the goodies from list_option (e.g., appending) free.
 def target_list_option(s):
   """Same type as 'list_option', but indicates list contents are target specs.
 
@@ -69,10 +79,16 @@ def target_list_option(s):
 
   TODO(stuhood): Eagerly convert these to Addresses: see https://rbcommons.com/s/twitter/r/2937/
   """
+  warn_or_error(
+    removal_version="1.27.0.dev0",
+    deprecated_entity_description="pants.option.custom_types.target_list_option",
+    hint="Instead of setting an option's type as `type=target_list_option`, set "
+         "`type=list, member_type=target_option`."
+  )
   return _convert(s, (list, tuple))
 
 
-def _normalize_directory_separators(s):
+def _normalize_directory_separators(s: str) -> str:
   """Coalesce runs of consecutive instances of `os.sep` in `s`, e.g. '//' -> '/' on POSIX.
 
   The engine will use paths or target addresses either to form globs or to string-match against, and
@@ -85,7 +101,7 @@ def _normalize_directory_separators(s):
   return os.path.normpath(s)
 
 
-def dir_option(s):
+def dir_option(s: str) -> str:
   """Same type as 'str', but indicates string represents a directory path.
 
   :API: public
@@ -93,7 +109,7 @@ def dir_option(s):
   return _normalize_directory_separators(s)
 
 
-def file_option(s):
+def file_option(s: str) -> str:
   """Same type as 'str', but indicates string represents a filepath.
 
   :API: public
@@ -109,7 +125,7 @@ def dict_with_files_option(s):
 
   :API: public
   """
-  return dict_option(s)
+  return DictValueComponent.create(s)
 
 
 def _convert(val, acceptable_types):
@@ -147,7 +163,7 @@ class ListValueComponent:
   # If we do ever encounter them, we'll have to replace this with a real parser.
   @classmethod
   @memoized_method
-  def _get_modifier_expr_re(cls):
+  def _get_modifier_expr_re(cls) -> Pattern[str]:
     # Note that the regex consists of a positive lookbehind assertion for a ] or a ),
     # followed by a comma (possibly surrounded by whitespace), followed by a
     # positive lookahead assertion for [ or (.  The lookahead/lookbehind assertions mean that
@@ -155,23 +171,17 @@ class ListValueComponent:
     return re.compile(r'(?<=\]|\))\s*,\s*(?=[+-](?:\[|\())')
 
   @classmethod
-  def _split_modifier_expr(cls, s):
+  def _split_modifier_expr(cls, s: str) -> List[str]:
     # This check ensures that the first expression (before the first split point) is a modification.
     if s.startswith('+') or s.startswith('-'):
       return cls._get_modifier_expr_re().split(s)
-    else:
-      return [s]
+    return [s]
 
   @classmethod
-  def merge(cls, components):
+  def merge(cls, components: Iterable["ListValueComponent"]) -> "ListValueComponent":
     """Merges components into a single component, applying their actions appropriately.
 
-    This operation is associative:  M(M(a, b), c) == M(a, M(b, c)) == M(a, b, c).
-
-    :param list components: an iterable of instances of ListValueComponent.
-    :return: An instance representing the result of merging the components.
-    :rtype: `ListValueComponent`
-    """
+    This operation is associative:  M(M(a, b), c) == M(a, M(b, c)) == M(a, b, c)."""
     # Note that action of the merged component is MODIFY until the first REPLACE is encountered.
     # This guarantees associativity.
     action = cls.MODIFY
@@ -186,16 +196,16 @@ class ListValueComponent:
         appends.extend(component._appends)
         filters.extend(component._filters)
       else:
-        raise ParseError(f'Unknown action for list value: {component.action}')
+        raise ParseError(f'Unknown action for list value: {component._action}')
     return cls(action, appends, filters)
 
-  def __init__(self, action, appends, filters):
+  def __init__(self, action: str, appends: List, filters: List) -> None:
     self._action = action
     self._appends = appends
     self._filters = filters
 
   @property
-  def val(self):
+  def val(self) -> List:
     ret = list(self._appends)
     for x in self._filters:
       # Note: can't do ret.remove(x) because that only removes the first instance of x.
@@ -203,7 +213,7 @@ class ListValueComponent:
     return ret
 
   @classmethod
-  def create(cls, value):
+  def create(cls, value) -> "ListValueComponent":
     """Interpret value as either a list or something to extend another list with.
 
     Note that we accept tuple literals, but the internal value is always a list.
@@ -212,7 +222,6 @@ class ListValueComponent:
                   a string representation of a list or tuple (possibly prefixed by + or -
                   indicating modification instead of replacement), or any allowed member_type.
                   May also be a comma-separated sequence of modifications.
-    :rtype: `ListValueComponent`
     """
     if isinstance(value, bytes):
       value = value.decode()
@@ -223,8 +232,8 @@ class ListValueComponent:
         return cls.merge([cls.create(x) for x in comma_separated_exprs])
 
     action = cls.MODIFY
-    appends = []
-    filters = []
+    appends: Sequence[str] = []
+    filters: Sequence[str] = []
     if isinstance(value, cls):  # Ensure idempotency.
       action = value._action
       appends = value._appends
@@ -245,7 +254,7 @@ class ListValueComponent:
       appends = _convert(f'[{value}]', list)
     return cls(action, list(appends), list(filters))
 
-  def __repr__(self):
+  def __repr__(self) -> str:
     return f'{self._action} +{self._appends} -{self._filters}'
 
 
@@ -261,15 +270,10 @@ class DictValueComponent:
   EXTEND = 'EXTEND'
 
   @classmethod
-  def merge(cls, components):
+  def merge(cls, components: Iterable["DictValueComponent"]) -> "DictValueComponent":
     """Merges components into a single component, applying their actions appropriately.
 
-    This operation is associative:  M(M(a, b), c) == M(a, M(b, c)) == M(a, b, c).
-
-    :param list components: an iterable of instances of DictValueComponent.
-    :return: An instance representing the result of merging the components.
-    :rtype: `DictValueComponent`
-    """
+    This operation is associative:  M(M(a, b), c) == M(a, M(b, c)) == M(a, b, c)."""
     # Note that action of the merged component is EXTEND until the first REPLACE is encountered.
     # This guarantees associativity.
     action = cls.EXTEND
@@ -284,17 +288,16 @@ class DictValueComponent:
         raise ParseError(f'Unknown action for dict value: {component.action}')
     return cls(action, val)
 
-  def __init__(self, action, val):
+  def __init__(self, action: str, val: Dict) -> None:
     self.action = action
     self.val = val
 
   @classmethod
-  def create(cls, value):
+  def create(cls, value) -> "DictValueComponent":
     """Interpret value as either a dict or something to extend another dict with.
 
     :param value: The value to convert.  Can be an instance of DictValueComponent, a dict,
                   or a string representation (possibly prefixed by +) of a dict.
-    :rtype: `DictValueComponent`
     """
     if isinstance(value, bytes):
       value = value.decode()
@@ -314,7 +317,7 @@ class DictValueComponent:
       raise ParseError(f'Invalid dict value: {value}')
     return cls(action, dict(val))
 
-  def __repr__(self):
+  def __repr__(self) -> str:
     return f'{self.action} {self.val}'
 
 

@@ -2,6 +2,16 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
+  name = 'checkstyle',
+  sources = ['checkstyle.py'],
+  dependencies = [
+    'src/python/pants/option',
+    'src/python/pants/subsystem',
+  ],
+  tags = {"partially_type_checked"},
+)
+
+python_library(
   name = 'dependency_context',
   sources = ['dependency_context.py'],
   dependencies = [
@@ -101,6 +111,16 @@ python_library(
     'src/python/pants/option',
     'src/python/pants/subsystem',
     'src/python/pants/task',
+  ],
+  tags = {"partially_type_checked"},
+)
+
+python_library(
+  name = 'scala_linters',
+  sources = ['scalafix.py', 'scalafmt.py', 'scalastyle.py'],
+  dependencies = [
+    'src/python/pants/option',
+    'src/python/pants/subsystem',
   ],
   tags = {"partially_type_checked"},
 )

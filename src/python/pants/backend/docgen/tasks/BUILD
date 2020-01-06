@@ -4,6 +4,7 @@
 python_library(
   dependencies = [
     ':resources',
+    '3rdparty/python:dataclasses',
     '3rdparty/python:docutils',
     '3rdparty/python:Markdown',
     '3rdparty/python:Pygments',

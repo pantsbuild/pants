@@ -86,15 +86,3 @@ python_tests(
   ],
   tags = {"partially_type_checked"},
 )
-
-python_library(
-  name = 'jvm_platform_integration_mixin',
-  sources = ['jvm_platform_integration_mixin.py'],
-  dependencies = [
-    'src/python/pants/fs',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:dirutil',
-    'src/python/pants/testutil:int-test',
-  ],
-  tags = {'partially_type_checked'},
-)

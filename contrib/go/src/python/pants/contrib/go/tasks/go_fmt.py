@@ -3,11 +3,16 @@
 
 from pants.task.fmt_task_mixin import FmtTaskMixin
 
+from pants.contrib.go.subsystems.gofmt import Gofmt
 from pants.contrib.go.tasks.go_fmt_task_base import GoFmtTaskBase
 
 
 class GoFmt(FmtTaskMixin, GoFmtTaskBase):
   """Format Go code using gofmt."""
+
+  @property
+  def skip_execution(self):
+    return self.get_options().skip or Gofmt.global_instance().options.skip
 
   def execute(self):
     with self.go_fmt_invalid_targets(['-w']) as output:

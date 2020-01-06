@@ -87,7 +87,7 @@ class ThriftLinterTest(PantsRunIntegrationTest):
   @rename_build_file
   def test_bad_default_override(self):
     # thrift-linter fails with command line flag overriding the BUILD section.
-    cmd = ['lint.thrift', '--strict', self.thrift_test_target('bad-thrift-default')]
+    cmd = ['--scrooge-linter-strict', 'lint.thrift', self.thrift_test_target('bad-thrift-default')]
     pants_run = self.run_pants(cmd)
     self.assert_failure(pants_run)
     self.assertIn(self.lint_error_token, pants_run.stdout_data)
@@ -98,8 +98,8 @@ class ThriftLinterTest(PantsRunIntegrationTest):
     target_a = self.thrift_test_target('bad-thrift-strict')
     target_b = self.thrift_test_target('bad-thrift-strict2')
     cmd = ['-q',
+           '--scrooge-linter-strict',
            'lint.thrift',
-           '--strict',
            target_a,
            target_b,
            ]
@@ -113,7 +113,7 @@ class ThriftLinterTest(PantsRunIntegrationTest):
   @rename_build_file
   def test_bad_strict_override(self):
     # thrift-linter passes with non-strict command line flag overriding the BUILD section.
-    cmd = ['lint.thrift', '--no-strict', self.thrift_test_target('bad-thrift-strict')]
+    cmd = ['--no-scrooge-linter-strict', 'lint.thrift', self.thrift_test_target('bad-thrift-strict')]
     pants_run = self.run_pants(cmd)
     self.assert_success(pants_run)
     self.assertIn(self.lint_error_token, pants_run.stdout_data)
@@ -121,7 +121,7 @@ class ThriftLinterTest(PantsRunIntegrationTest):
   @rename_build_file
   def test_bad_non_strict_override(self):
     # thrift-linter fails with command line flag overriding the BUILD section.
-    cmd = ['lint.thrift', '--strict', self.thrift_test_target('bad-thrift-non-strict')]
+    cmd = ['--scrooge-linter-strict', 'lint.thrift', self.thrift_test_target('bad-thrift-non-strict')]
     pants_run = self.run_pants(cmd)
     self.assert_failure(pants_run)
     self.assertIn(self.lint_error_token, pants_run.stdout_data)
@@ -130,7 +130,7 @@ class ThriftLinterTest(PantsRunIntegrationTest):
   def test_bad_pants_ini_strict(self):
     # thrift-linter fails if pants.ini has a thrift-linter:strict=True setting.
     cmd = ['lint.thrift', self.thrift_test_target('bad-thrift-default')]
-    pants_ini_config = {'lint.thrift': {'strict': True}}
+    pants_ini_config = {'scrooge-linter': {'strict': True}}
     pants_run = self.run_pants(cmd, config=pants_ini_config)
     self.assert_failure(pants_run)
     self.assertIn(self.lint_error_token, pants_run.stdout_data)
@@ -139,8 +139,8 @@ class ThriftLinterTest(PantsRunIntegrationTest):
   def test_bad_pants_ini_strict_overridden(self):
     # thrift-linter passes if pants.ini has a thrift-linter:strict=True setting and
     # a command line non-strict flag is passed.
-    cmd = ['lint.thrift', '--no-strict', self.thrift_test_target('bad-thrift-default')]
-    pants_ini_config = {'lint.thrift': {'strict': True}}
+    cmd = ['--no-scrooge-linter-strict', 'lint.thrift', self.thrift_test_target('bad-thrift-default')]
+    pants_ini_config = {'scrooge-linter': {'strict': True}}
     pants_run = self.run_pants(cmd, config=pants_ini_config)
     self.assert_success(pants_run)
     self.assertIn(self.lint_error_token, pants_run.stdout_data)

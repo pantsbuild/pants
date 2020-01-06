@@ -115,13 +115,13 @@ This is the second readme file! Isn't it exciting?
 
   def test_no_sources(self):
     self.add_to_build_file('', "page(name='page', sources=['does-not-exist.md'])")
-    with self.assertRaisesRegexp(AddressLookupError, r'//:page.*exactly 1 source, but found 0'):
+    with self.assertRaisesRegex(AddressLookupError, r'//:page.*exactly 1 source, but found 0'):
       self.target(':page')
 
   def test_multiple_sources(self):
     self.create_files('', ['exists.md', 'also-exists.md'])
     self.add_to_build_file('', "page(name='page', sources=['exists.md', 'also-exists.md'])")
-    with self.assertRaisesRegexp(AddressLookupError, r'//:page.*exactly 1 source, but found 2'):
+    with self.assertRaisesRegex(AddressLookupError, r'//:page.*exactly 1 source, but found 2'):
       self.target(':page')
 
   def test_source_and_sources(self):
@@ -130,7 +130,7 @@ This is the second readme file! Isn't it exciting?
       '',
       "page(name='page', source=['exists.md'], sources=['also-exists.md'])",
     )
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
       AddressLookupError,
       r'//:page: Cannot specify both source and sources attribute'
     ):

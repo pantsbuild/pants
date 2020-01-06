@@ -22,7 +22,7 @@ class ScalaFixIntegrationTest(PantsRunIntegrationTest):
     options = {
       'lint.scalafix': rules,
       'fmt.scalafix': rules,
-      'lint.scalastyle': {'skip': True}
+      'scalastyle': {'skip': True}
     }
 
     target = f'{TEST_DIR}/procedure_syntax'
@@ -36,7 +36,7 @@ class ScalaFixIntegrationTest(PantsRunIntegrationTest):
     options = {
       'lint.scalafix': rules,
       'fmt.scalafix': rules,
-      'lint.scalastyle': {'skip': True}
+      'scalastyle': {'skip': True}
     }
 
     # take a snapshot of the file which we can write out
@@ -67,7 +67,7 @@ class ScalaFixIntegrationTest(PantsRunIntegrationTest):
       'compile.rsc': {'args': '+["-S-Ywarn-unused"]'},
       'lint.scalafix': rules,
       'fmt.scalafix': rules,
-      'lint.scalastyle': {'skip': True}
+      'scalastyle': {'skip': True}
     }
 
     test_file_name = f'{TEST_DIR}/rsc_compat/RscCompat.scala'
@@ -83,7 +83,7 @@ class ScalaFixIntegrationTest(PantsRunIntegrationTest):
       self.assert_success(test_fix)
 
   def test_rsccompat_fmt(self):
-    options =  {
+    options = {
       'scala': {
         'scalac_plugin_dep': f'{TEST_DIR}/rsc_compat:semanticdb-scalac',
         'scalac_plugins': '+["semanticdb"]'
@@ -94,8 +94,6 @@ class ScalaFixIntegrationTest(PantsRunIntegrationTest):
         'transitive': True,
         'scalafix_tool_classpath': f'{TEST_DIR}/rsc_compat:rsc-compat',
       },
-      'lint.scalafix': {'skip': True},
-      'lint.scalastyle': {'skip': True},
     }
     
     test_file_name = f'{TEST_DIR}/rsc_compat/RscCompat.scala'

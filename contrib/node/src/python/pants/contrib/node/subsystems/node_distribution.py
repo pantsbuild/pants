@@ -5,6 +5,7 @@ import filecmp
 import logging
 import os
 import shutil
+from typing import Tuple
 
 from pants.base.exceptions import TaskError
 from pants.binaries.binary_tool import NativeTool
@@ -65,14 +66,24 @@ class NodeDistribution(NativeTool):
              choices=VALID_PACKAGE_MANAGERS,
              help='Default package manager config for repo. Should be one of {}'.format(
                VALID_PACKAGE_MANAGERS))
+    # TODO: remove _configure_eslinter(), eslint_supportdir(), and _eslint_required_files when
+    # removing this option!
     register('--eslint-setupdir', advanced=True, type=dir_option, fingerprint=True,
+             removal_version="1.27.0.dev0",
+             removal_hint="Use `--eslint-setupdir` instead of `--node-distribution-eslint-setupdir`",
              help='Find the package.json and yarn.lock under this dir '
                   'for installing eslint and plugins.')
     register('--eslint-config', advanced=True, type=file_option, fingerprint=True,
+             removal_version="1.27.0.dev0",
+             removal_hint="Use `--eslint-config` instead of `--node-distribution-eslint-config`",
              help='The path to the global eslint configuration file specifying all the rules')
     register('--eslint-ignore', advanced=True, type=file_option, fingerprint=True,
+             removal_version="1.27.0.dev0",
+             removal_hint="Use `--eslint-ignore` instead of `--node-distribution-eslint-ignore`",
              help='The path to the global eslint ignore path')
     register('--eslint-version', default='4.15.0', fingerprint=True,
+             removal_version="1.27.0.dev0",
+             removal_hint="Use `--eslint-version` instead of `--node-distribution-eslint-version`",
              help='Use this ESLint version.')
     register('--node-scope', advanced=True, fingerprint=True,
              help='Default node scope for repo. Scope groups related packages together.')
@@ -162,22 +173,20 @@ class NodeDistribution(NativeTool):
     # `node` with no arguments is useful, it launches a REPL.
     return command_gen([self._install_node], 'node', args=args, node_paths=node_paths)
 
-  def _configure_eslinter(self, bootstrapped_support_path):
+  def _configure_eslinter(self, bootstrapped_support_path: str) -> None:
     logger.debug('Copying {setupdir} to bootstrapped dir: {support_path}'
                            .format(setupdir=self.eslint_setupdir,
                                    support_path=bootstrapped_support_path))
     safe_rmtree(bootstrapped_support_path)
     shutil.copytree(self.eslint_setupdir, bootstrapped_support_path)
-    return True
 
   _eslint_required_files = ['yarn.lock', 'package.json']
 
-  def eslint_supportdir(self, task_workdir):
-    """ Returns the path where the ESLint is bootstrapped.
+  def eslint_supportdir(self, task_workdir: str) -> Tuple[str, bool]:
+    """Returns the path where the ESLint is bootstrapped.
 
-    :param string task_workdir: The task's working directory
+    :param task_workdir: The task's working directory
     :returns: The path where ESLint is bootstrapped and whether or not it is configured
-    :rtype: (string, bool)
     """
     bootstrapped_support_path = os.path.join(task_workdir, 'eslint')
 

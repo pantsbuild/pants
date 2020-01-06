@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Tuple
 
 from pants.base.exception_sink import ExceptionSink
+from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, Digest
 from pants.engine.rules import RootRule
 
 
@@ -21,7 +22,12 @@ class InteractiveProcessResult:
 class InteractiveProcessRequest:
   argv: Tuple[str, ...]
   env: Tuple[str, ...] = ()
+  input_files: Digest = EMPTY_DIRECTORY_DIGEST
   run_in_workspace: bool = False
+
+  def __post_init__(self):
+    if self.input_files != EMPTY_DIRECTORY_DIGEST and self.run_in_workspace:
+      raise ValueError("InteractiveProessRequest should use the Workspace API to materialize any needed files when it runs in the workspace")
 
 
 @dataclass(frozen=True)

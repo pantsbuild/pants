@@ -1,7 +1,9 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from collections import defaultdict, namedtuple
+from collections import defaultdict
+from dataclasses import dataclass
+from typing import DefaultDict, Iterator, List, Optional
 
 from pants.option.ranked_value import RankedValue
 
@@ -10,27 +12,36 @@ from pants.option.ranked_value import RankedValue
 class OptionTracker:
   """Records a history of what options are set and where they came from."""
 
-  OptionHistoryRecord = namedtuple('OptionHistoryRecord',
-                                   ['value', 'rank', 'deprecation_version', 'details'])
+  @dataclass(frozen=True)
+  class OptionHistoryRecord:
+    value: str
+    rank: int
+    deprecation_version: Optional[str]
+    details: Optional[str]
 
   class OptionHistory:
     """Tracks the history of an individual option."""
 
-    def __init__(self):
-      self.values = []
+    def __init__(self) -> None:
+      self.values: List["OptionTracker.OptionHistoryRecord"] = []
 
-    def record_value(self, value, rank, deprecation_version, details=None):
+    def record_value(
+      self, value: str,
+      rank: int,
+      deprecation_version: Optional[str],
+      details: Optional[str] = None,
+    ) -> None:
       """Record that the option was set to the given value at the given rank.
 
       :param value: the value the option was set to.
-      :param int rank: the rank of the option when it was set to this value.
+      :param rank: the rank of the option when it was set to this value.
       :param deprecation_version: Deprecation version for this option.
-      :param string details: optional elaboration of where the option came from (eg, a particular
+      :param details: optional elaboration of where the option came from (eg, a particular
         config file).
       """
       deprecation_version_to_write = deprecation_version
 
-      if self.values:
+      if self.latest is not None:
         if self.latest.rank > rank:
           return
         if self.latest.value == value:
@@ -44,37 +55,45 @@ class OptionTracker:
                                                            deprecation_version_to_write, details))
 
     @property
-    def was_overridden(self):
+    def was_overridden(self) -> bool:
       """A value was overridden if it has rank greater than 'HARDCODED'."""
-      if len(self.values) < 2:
+      if self.latest is None or len(self.values) < 2:
         return False
       return self.latest.rank > RankedValue.HARDCODED and self.values[-2].rank > RankedValue.NONE
 
     @property
-    def latest(self):
+    def latest(self) -> Optional["OptionTracker.OptionHistoryRecord"]:
       """The most recent value this option was set to, or None if it was never set."""
       return self.values[-1] if self.values else None
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator["OptionTracker.OptionHistoryRecord"]:
       for record in self.values:
         yield record
 
-    def __len__(self):
+    def __len__(self) -> int:
       return len(self.values)
 
-  def __init__(self):
-    self.option_history_by_scope = defaultdict(dict)
+  def __init__(self) -> None:
+    self.option_history_by_scope: DefaultDict = defaultdict(dict)
 
-  def record_option(self, scope, option, value, rank, deprecation_version=None, details=None):
+  def record_option(
+    self,
+    scope: str,
+    option: str,
+    value: str,
+    rank: int,
+    deprecation_version: Optional[str] = None,
+    details: Optional[str] = None,
+  ) -> None:
     """Records that the given option was set to the given value.
 
-    :param string scope: scope of the option.
-    :param string option: name of the option.
-    :param string value: value the option was set to.
-    :param int rank: the rank of the option (Eg, RankedValue.HARDCODED), to keep track of where the
+    :param scope: scope of the option.
+    :param option: name of the option.
+    :param value: value the option was set to.
+    :param rank: the rank of the option (Eg, RankedValue.HARDCODED), to keep track of where the
       option came from.
     :param deprecation_version: Deprecation version for this option.
-    :param string details: optional additional details about how the option was set (eg, the name
+    :param details: optional additional details about how the option was set (eg, the name
            of a particular config file, if the rank is RankedValue.CONFIG).
     """
     scoped_options = self.option_history_by_scope[scope]

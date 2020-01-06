@@ -5,6 +5,7 @@ import os
 import re
 
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
+from pants.backend.jvm.subsystems.scalastyle import Scalastyle
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.build_graph.target import Target
@@ -37,7 +38,7 @@ class FileExcluder:
     return True
 
 
-class Scalastyle(LintTaskMixin, NailgunTask):
+class ScalastyleTask(LintTaskMixin, NailgunTask):
   """Checks scala source files to ensure they're stylish.
 
   Scalastyle only checks scala sources in non-synthetic targets.
@@ -47,13 +48,11 @@ class Scalastyle(LintTaskMixin, NailgunTask):
 
   class UnspecifiedConfig(TaskError):
     def __init__(self):
-      super(Scalastyle.UnspecifiedConfig, self).__init__(
-        'Path to scalastyle config file must be specified.')
+      super().__init__('Path to scalastyle config file must be specified.')
 
   class MissingConfig(TaskError):
     def __init__(self, path):
-      super(Scalastyle.MissingConfig, self).__init__(
-        f'Scalastyle config file does not exist: {path}.')
+      super().__init__(f'Scalastyle config file does not exist: {path}.')
 
   _SCALA_SOURCE_EXTENSION = '.scala'
 
@@ -61,12 +60,13 @@ class Scalastyle(LintTaskMixin, NailgunTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super().subsystem_dependencies() + (ScalaPlatform, )
+    return super().subsystem_dependencies() + (ScalaPlatform, Scalastyle)
 
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
     register('--config', type=file_option, advanced=True, fingerprint=True,
+             removal_version='1.27.0.dev0', removal_hint='Use `--scalastyle-config` instead.',
              help='Path to scalastyle config file.')
     register('--excludes', type=file_option, advanced=True, fingerprint=True,
              help='Path to optional scalastyle excludes file. Each line is a regex. (Blank lines '
@@ -97,6 +97,10 @@ class Scalastyle(LintTaskMixin, NailgunTask):
     scala_sources = [source for source in scala_sources if scalastyle_excluder.should_include(source)]
 
     return scala_sources
+
+  @property
+  def skip_execution(self):
+    return self.get_options().skip or Scalastyle.global_instance().options.skip
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
@@ -154,15 +158,23 @@ class Scalastyle(LintTaskMixin, NailgunTask):
 
         result = Xargs(call).execute(scala_sources)
         if result != 0:
-          raise TaskError(f'java {Scalastyle._MAIN} ... exited non-zero ({result})')
+          raise TaskError(f'java {ScalastyleTask._MAIN} ... exited non-zero ({result})')
 
   def validate_scalastyle_config(self):
-    scalastyle_config = self.get_options().config
-    if not scalastyle_config:
-      raise Scalastyle.UnspecifiedConfig()
-    if not os.path.exists(scalastyle_config):
-      raise Scalastyle.MissingConfig(scalastyle_config)
-    return scalastyle_config
+    task_config = self.get_options().config
+    subsystem_config = Scalastyle.global_instance().get_options().config
+    if task_config and subsystem_config:
+      raise ValueError(
+        "Conflicting options for the config file used. You used the new, preferred "
+        "`--scalastyle-config`, but also used the deprecated `--lint-scalastyle-config`.\n"
+        "Please use only one of these (preferably `--scalastyle-config`)."
+      )
+    config = task_config or subsystem_config or None
+    if not config:
+      raise ScalastyleTask.UnspecifiedConfig()
+    if not os.path.exists(config):
+      raise ScalastyleTask.MissingConfig(config)
+    return config
 
   def create_file_excluder(self):
     return FileExcluder(self.get_options().excludes, self.context.log)
