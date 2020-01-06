@@ -67,7 +67,7 @@ class HasSkipOptionMixin:
     if hasattr(self.get_options(), "only"):
       only = self.get_options().only
       if only is None:
-        return False
+        return skip
       elif only == "scalafix":
         only_resolved_as_skip = not self.__class__.__name__.startswith("ScalaFix")
         if skip and not only_resolved_as_skip:
