@@ -1,8 +1,11 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import os
+
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from textwrap import dedent
+from typing import List, Optional, Set, Tuple
 
 from pants.backend.python.rules.pex import Pex
 from pants.backend.python.rules.pex_from_target_closure import CreatePexFromTargetClosure
@@ -12,7 +15,7 @@ from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.build_graph.address import Address
 from pants.engine.addressable import BuildFileAddresses
-from pants.engine.fs import Digest, DirectoriesToMerge
+from pants.engine.fs import Digest, DirectoriesToMerge, FileContent, InputFilesContent
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
@@ -22,6 +25,26 @@ from pants.engine.selectors import Get
 from pants.option.global_options import GlobalOptions
 from pants.rules.core.strip_source_root import SourceRootStrippedSources
 from pants.rules.core.test import TestDebugResult, TestResult, TestTarget
+
+
+DEFAULT_COVERAGE_CONFIG = dedent(f"""
+  [run]
+  branch = True
+  timid = False
+  relative_files = True
+  """)
+
+
+def get_coveragerc_input(coveragerc_content: bytes):
+  return InputFilesContent(
+    [
+      FileContent(
+        path='.coveragerc',
+        content=coveragerc_content,
+        is_executable=False,
+      ),
+    ]
+  )
 
 
 def calculate_timeout_seconds(
@@ -53,6 +76,20 @@ class TestTargetSetup:
   input_files_digest: Digest
 
 
+def get_packages_to_cover(
+  coverage: str,
+  source_root_stripped_file_paths: List[str],
+) -> Set[str]:
+  if coverage == 'auto':
+    return set(
+      os.path.dirname(source_root_stripped_source_file_path).replace(os.sep, '.')
+      for source_root_stripped_source_file_path in source_root_stripped_file_paths
+    )
+  return {
+    os.path.dirname(path).replace(os.sep, '.') for path in coverage.split(',')
+  }
+
+
 @rule
 async def setup_pytest_for_target(test_target: PythonTestsAdaptor, pytest: PyTest) -> TestTargetSetup:
   transitive_hydrated_targets = await Get[TransitiveHydratedTargets](
@@ -80,16 +117,42 @@ async def setup_pytest_for_target(test_target: PythonTestsAdaptor, pytest: PyTes
   )
 
   chrooted_sources = await Get[ChrootedPythonSources](HydratedTargets(all_targets))
+  source_root_stripped_sources = await MultiGet(
+    Get[SourceRootStrippedSources](HydratedTarget, hydrated_target)
+    for hydrated_target in all_targets
+  )
 
-  merged_input_files = await Get[Digest](
+  stripped_sources_digests = tuple(
+    stripped_sources.snapshot.directory_digest for stripped_sources in source_root_stripped_sources
+  )
+  coveragerc_digest = await Get[Digest](InputFilesContent, get_coveragerc_input(DEFAULT_COVERAGE_CONFIG.encode()))
+
+  merged_input_files: Digest = await Get(
+    Digest,
     DirectoriesToMerge(
-      directories=(chrooted_sources.digest, resolved_requirements_pex.directory_digest)
+      directories=(
+        chrooted_sources.digest,
+        resolved_requirements_pex.directory_digest,
+        coveragerc_digest,
+      )
     ),
   )
+  test_target_sources_file_names = source_root_stripped_test_target_sources.snapshot.files
+  coverage_args = []
+  if pytest.options.coverage:
+    packages_to_cover = get_packages_to_cover(
+      coverage=pytest.options.coverage,
+      source_root_stripped_file_paths=test_target_sources_file_names,
+    )
+    coverage_args = [
+      '--cov-report=', # To not generate any output. https://pytest-cov.readthedocs.io/en/latest/config.html
+    ]
+    for package in packages_to_cover:
+      coverage_args.extend(['--cov', package])
 
   return TestTargetSetup(
     requirements_pex=resolved_requirements_pex,
-    args=(*pytest.options.args, *sorted(source_root_stripped_test_target_sources.snapshot.files)),
+    args=(*pytest.options.args, *coverage_args, *sorted(test_target_sources_file_names)),
     input_files_digest=merged_input_files
   )
 
@@ -121,6 +184,7 @@ async def run_python_test(
     pex_path=f'./{test_setup.requirements_pex.output_filename}',
     pex_args=test_setup.args,
     input_files=test_setup.input_files_digest,
+    output_directories=('.coverage',),
     description=f'Run Pytest for {test_target.address.reference()}',
     timeout_seconds=timeout_seconds if timeout_seconds is not None else 9999,
     env=env
