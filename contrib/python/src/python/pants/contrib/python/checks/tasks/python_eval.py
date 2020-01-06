@@ -13,7 +13,7 @@ from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks.resolve_requirements_task_base import ResolveRequirementsTaskBase
-from pants.base.deprecated import deprecated_conditional
+from pants.base.deprecated import deprecated_conditional, resolve_conflicting_options
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
 from pants.base.workunit import WorkUnit, WorkUnitLabel
@@ -51,8 +51,10 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
 
   @property
   def skip_execution(self):
+    task_options = self.get_options()
+    subsystem_options = PythonEvalSubystem.global_instance().options
     deprecated_conditional(
-      lambda: self.get_options().is_default("skip") and PythonEvalSubystem.global_instance().options.is_default("skip"),
+      lambda: task_options.is_default("skip") and subsystem_options.is_default("skip"),
       entity_description="`python-eval` defaulting to being used",
       removal_version="1.27.0.dev0",
       hint_message="`python-eval` is scheduled to be removed in Pants 1.29.0.dev0. The Python "
@@ -66,7 +68,14 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
                    "Pants 1.27.0.dev0, the default will change from `skip: False` to `skip: True`, "
                    "and in Pants 1.29.0.dev0, the module will be removed."
     )
-    return self.get_options().skip or PythonEvalSubystem.global_instance().options.skip
+    return resolve_conflicting_options(
+      old_option="skip",
+      new_option="skip",
+      old_scope="lint-python-eval",
+      new_scope="python-eval",
+      old_container=task_options,
+      new_container=subsystem_options,
+    )
 
   @classmethod
   def prepare(cls, options, round_manager):

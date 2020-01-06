@@ -4,7 +4,7 @@
 from typing import Tuple
 
 from pants.base.deprecated import deprecated_conditional
-from pants.option.option_util import flatten_shlexed_list
+from pants.option.custom_types import shell_str
 from pants.subsystem.subsystem import Subsystem
 
 
@@ -15,7 +15,7 @@ class PyTest(Subsystem):
   def register_options(cls, register):
     super().register_options(register)
     register(
-      '--args', type=list, member_type=str, fingerprint=True,
+      '--args', type=list, member_type=shell_str, fingerprint=True,
       help="Arguments to pass directly to Pytest, e.g. `--pytest-args=\"-k test_foo --quiet\"`",
     )
     register(
@@ -58,10 +58,8 @@ class PyTest(Subsystem):
 
   def get_requirement_strings(self) -> Tuple[str, ...]:
     """Returns a tuple of requirements-style strings for Pytest and Pytest plugins."""
-    opts = self.get_options()
-
     deprecated_conditional(
-      lambda: opts.is_default("version"),
+      lambda: self.options.is_default("version"),
       removal_version="1.25.0.dev2",
       entity_description="Pants defaulting to a Python 2-compatible Pytest version",
       hint_message="Pants will soon start defaulting to Pytest 5.x, which no longer supports "
@@ -72,8 +70,4 @@ class PyTest(Subsystem):
                    "tests with Python 2 and want the newest Pytest, set `version` to "
                    "`pytest>=5.2.4`."
     )
-
-    return (opts.version, *opts.pytest_plugins)
-
-  def get_args(self) -> Tuple[str, ...]:
-    return flatten_shlexed_list(self.get_options().args)
+    return (self.options.version, *self.options.pytest_plugins)

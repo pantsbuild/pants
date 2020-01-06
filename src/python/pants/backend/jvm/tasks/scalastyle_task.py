@@ -7,6 +7,7 @@ import re
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.subsystems.scalastyle import Scalastyle
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
+from pants.base.deprecated import resolve_conflicting_options
 from pants.base.exceptions import TaskError
 from pants.build_graph.target import Target
 from pants.option.custom_types import file_option
@@ -58,6 +59,16 @@ class ScalastyleTask(LintTaskMixin, NailgunTask):
 
   _MAIN = 'org.scalastyle.Main'
 
+  def _resolve_conflicting_options(self, *, old_option: str, new_option: str):
+    return resolve_conflicting_options(
+      old_option=old_option,
+      new_option=new_option,
+      old_scope='lint-scalastyle',
+      new_scope='scalastyle',
+      old_container=self.get_options(),
+      new_container=Scalastyle.global_instance().options,
+    )
+
   @classmethod
   def subsystem_dependencies(cls):
     return super().subsystem_dependencies() + (ScalaPlatform, Scalastyle)
@@ -100,11 +111,10 @@ class ScalastyleTask(LintTaskMixin, NailgunTask):
 
   @property
   def skip_execution(self):
-    return self.get_options().skip or Scalastyle.global_instance().options.skip
+    return self._resolve_conflicting_options(old_option="skip", new_option="skip")
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
-
     self._results_dir = os.path.join(self.workdir, 'results')
 
   def _create_result_file(self, target):
@@ -161,15 +171,7 @@ class ScalastyleTask(LintTaskMixin, NailgunTask):
           raise TaskError(f'java {ScalastyleTask._MAIN} ... exited non-zero ({result})')
 
   def validate_scalastyle_config(self):
-    task_config = self.get_options().config
-    subsystem_config = Scalastyle.global_instance().get_options().config
-    if task_config and subsystem_config:
-      raise ValueError(
-        "Conflicting options for the config file used. You used the new, preferred "
-        "`--scalastyle-config`, but also used the deprecated `--lint-scalastyle-config`.\n"
-        "Please use only one of these (preferably `--scalastyle-config`)."
-      )
-    config = task_config or subsystem_config or None
+    config = self._resolve_conflicting_options(old_option="config", new_option="config")
     if not config:
       raise ScalastyleTask.UnspecifiedConfig()
     if not os.path.exists(config):

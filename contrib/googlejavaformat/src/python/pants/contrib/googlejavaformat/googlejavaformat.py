@@ -4,6 +4,7 @@
 from abc import abstractmethod
 
 from pants.backend.jvm.tasks.rewrite_base import RewriteBase
+from pants.base.deprecated import resolve_conflicting_options
 from pants.base.exceptions import TaskError
 from pants.java.jar.jar_dependency import JarDependency
 from pants.task.fmt_task_mixin import FmtTaskMixin
@@ -13,6 +14,16 @@ from pants.contrib.googlejavaformat.subsystem import GoogleJavaFormat
 
 
 class GoogleJavaFormatBase(RewriteBase):
+
+  def _resolve_conflicting_skip(self, *, old_scope: str):
+    return resolve_conflicting_options(
+      old_option="skip",
+      new_option="skip",
+      old_scope=old_scope,
+      new_scope="google-java-format",
+      old_container=self.get_options(),
+      new_container=GoogleJavaFormat.global_instance().options,
+    )
 
   @classmethod
   def register_options(cls, register):
@@ -68,7 +79,7 @@ class GoogleJavaFormatLintTask(LintTaskMixin, GoogleJavaFormatBase):
 
   @property
   def skip_execution(self):
-    return self.get_options().skip or GoogleJavaFormat.global_instance().options.skip
+    return super()._resolve_conflicting_skip(old_scope="fmt-google-java-format")
 
   def process_result(self, result):
     if result != 0:
@@ -84,7 +95,7 @@ class GoogleJavaFormatTask(FmtTaskMixin, GoogleJavaFormatBase):
 
   @property
   def skip_execution(self):
-    return self.get_options().skip or GoogleJavaFormat.global_instance().options.skip
+    return super()._resolve_conflicting_skip(old_scope="lint-google-java-format")
 
   def process_result(self, result):
     if result != 0:
