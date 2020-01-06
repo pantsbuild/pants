@@ -1,7 +1,7 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.base.deprecated import deprecated_conditional
+from pants.base.deprecated import deprecated_conditional, resolve_conflicting_options
 from pants.task.goal_options_mixin import GoalOptionsMixin, GoalOptionsRegistrar
 
 
@@ -49,7 +49,40 @@ class HasSkipOptionMixin:
 
   @property
   def skip_execution(self):
-    return self.get_options().skip
+    return self.get_options().skip or self.resolve_only()
+
+  def resolve_only(self):
+    # This flag is defined only on fmt, which is done in FmtTaskMixin.
+    # In v2, we expect to have a --only flag on both fmt and lint which will allow individual
+    # formatters to be selected.
+    #
+    # This is a hacky one-off implementation to help Twitter deal with the fact that they have a
+    # custom Goal called scalafix, which does the equivalent of `fmt --fmt-only=scalafix`, as it
+    # provides them with a forward-compatible way of migrating people off of their scalafix goal.
+    #
+    # When the v2 goal is renamed from fmt2 to fmt, this option should be moved to that Goal, and
+    # its implementation broadened to support all v2 formatters, as well as any v1 formatters we
+    # fancy while we keep them around.
+    if hasattr(self.get_options(), "only"):
+      only = self.get_options().only
+      if only is None:
+        return False
+      elif only == "scalafix":
+        return not self.__class__.__name__.startswith("ScalaFix")
+      else:
+        raise ValueError("Invalid value for flag --only - must be scalafix or not set at all")
+    return False
+
+  def resolve_conflicting_skip_options(self, old_scope, new_scope, subsystem):
+    skip = resolve_conflicting_options(
+      old_option="skip",
+      new_option="skip",
+      old_scope=old_scope,
+      new_scope=new_scope,
+      old_container=self.get_options(),
+      new_container=subsystem.options,
+    )
+    return skip or self.resolve_only()
 
 
 class SkipOptionRegistrar:

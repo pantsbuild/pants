@@ -86,13 +86,10 @@ class Checkstyle(LintTaskMixin, Task):
 
   @property
   def skip_execution(self):
-    return resolve_conflicting_options(
-      old_option="skip",
-      new_option="skip",
+    return self.resolve_conflicting_skip_options(
       old_scope="lint-pythonstyle",
       new_scope="pycheck",
-      old_container=self.get_options(),
-      new_container=Pycheck.global_instance().options,
+      subsystem=Pycheck.global_instance(),
     )
 
   def _is_checked(self, target):

@@ -7,7 +7,16 @@ from pants.task.target_restriction_mixins import (
 )
 
 
+class FmtGoalRegistrar(DeprecatedSkipAndDeprecatedTransitiveGoalOptionsRegistrar):
+  @classmethod
+  def register_options(cls, register):
+    super().register_options(register)
+    register("--only", type=str, default=None, fingerprint=True,
+             help="Only run the specified formatter. Currently the only accepted values are "
+                  "scalafix, or not setting any value.")
+
+
 class FmtTaskMixin(HasSkipAndDeprecatedTransitiveGoalOptionsMixin):
   """A mixin to combine with code formatting tasks."""
-  goal_options_registrar_cls = DeprecatedSkipAndDeprecatedTransitiveGoalOptionsRegistrar
+  goal_options_registrar_cls = FmtGoalRegistrar
   target_filtering_enabled = True

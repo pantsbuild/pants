@@ -17,13 +17,10 @@ class GoFmtTaskBase(GoWorkspaceTask):
   """Base class for tasks that run gofmt."""
 
   def _resolve_conflicting_skip(self, *, old_scope: str):
-    return resolve_conflicting_options(
-      old_option="skip",
-      new_option="skip",
+    return self.resolve_conflicting_skip_options(
       old_scope=old_scope,
       new_scope="gofmt",
-      old_container=self.get_options(),
-      new_container=Gofmt.global_instance().options,
+      subsystem=Gofmt.global_instance(),
     )
 
   @classmethod
