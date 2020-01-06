@@ -5,7 +5,6 @@ import os
 import subprocess
 from contextlib import contextmanager
 
-from pants.base.deprecated import resolve_conflicting_options
 from pants.base.exceptions import TaskError
 
 from pants.contrib.go.subsystems.gofmt import Gofmt
