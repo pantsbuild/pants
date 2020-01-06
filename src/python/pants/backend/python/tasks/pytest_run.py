@@ -637,7 +637,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
                                                                     pytest_rootdir):
       # Validate that the user didn't provide any passthru args that conflict
       # with those we must set ourselves.
-      for arg in (*self.get_passthru_args(), *PyTest.global_instance().get_args()):
+      for arg in (*self.get_passthru_args(), *PyTest.global_instance().options.args):
         if arg.startswith('--junitxml') or arg.startswith('--confcutdir'):
           raise TaskError(f'Cannot pass this arg through to pytest: {arg}')
 
@@ -670,7 +670,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
                      "passthrough args and to prepare for Pytest eventually exclusively using the "
                      "V2 implementation, which only supports `--pytest-args`.",
       )
-      args.extend([*self.get_passthru_args(), *PyTest.global_instance().get_args()])
+      args.extend([*self.get_passthru_args(), *PyTest.global_instance().options.args])
 
       args.extend(test_args)
       args.extend(sources_map.keys())
