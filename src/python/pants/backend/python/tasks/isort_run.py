@@ -11,7 +11,7 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.isort_prep import IsortPrep
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import deprecated_conditional
+from pants.base.deprecated import deprecated_conditional, resolve_conflicting_options
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.task.fmt_task_mixin import FmtTaskMixin
@@ -103,4 +103,11 @@ class IsortRun(FmtTaskMixin, Task):
 
   @property
   def skip_execution(self):
-    return self.get_options().skip or Isort.global_instance().options.skip
+    return resolve_conflicting_options(
+      old_option="skip",
+      new_option="skip",
+      old_scope="fmt-isort",
+      new_scope="isort",
+      old_container=self.get_options(),
+      new_container=Isort.global_instance().options,
+    )

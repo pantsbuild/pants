@@ -8,6 +8,7 @@ from twitter.common.collections import OrderedSet
 from pants.backend.jvm.subsystems.checkstyle import Checkstyle as CheckstyleSubsystem
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
+from pants.base.deprecated import resolve_conflicting_options
 from pants.base.exceptions import TaskError
 from pants.java.jar.jar_dependency import JarDependency
 from pants.option.custom_types import dict_with_files_option, file_option
@@ -27,6 +28,16 @@ class Checkstyle(LintTaskMixin, NailgunTask):
   _JAVA_SOURCE_EXTENSION = '.java'
 
   _CHECKSTYLE_BOOTSTRAP_KEY = "checkstyle"
+
+  def _resolve_conflicting_options(self, *, old_option: str, new_option: str):
+    return resolve_conflicting_options(
+      old_option=old_option,
+      new_option=new_option,
+      old_scope='lint-checkstyle',
+      new_scope='checkstyle',
+      old_container=self.get_options(),
+      new_container=CheckstyleSubsystem.global_instance().options,
+    )
 
   @classmethod
   def register_options(cls, register):
@@ -69,7 +80,7 @@ class Checkstyle(LintTaskMixin, NailgunTask):
 
   @property
   def skip_execution(self):
-    return self.get_options().skip or CheckstyleSubsystem.global_instance().options.skip
+    return self._resolve_conflicting_options(old_option="skip", new_option="skip")
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -111,15 +122,7 @@ class Checkstyle(LintTaskMixin, NailgunTask):
         union_classpath.update(jar for conf, jar in runtime_classpath
                                if conf in self.get_options().confs)
 
-    task_config = self.get_options().configuration
-    subsystem_config = CheckstyleSubsystem.global_instance().options.config
-    if task_config and subsystem_config:
-      raise ValueError(
-        "Conflicting options for the config file used. You used the new, preferred "
-        "`--checkstyle-config`, but also used the deprecated `--lint-checkstyle-configuration`.\n"
-        "Please use only one of these (preferably `--checkstyle-config`)."
-      )
-    config = task_config or subsystem_config
+    config = self._resolve_conflicting_options(old_option="configuration", new_option="config")
     if not config:
       raise TaskError(
         'No checkstyle configuration file configured. Configure with `--checkstyle-config`.'
