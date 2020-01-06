@@ -46,7 +46,7 @@ from pants.testutil.test_base import TestBase
 class TestSetupPyBase(TestBase):
 
   @classmethod
-  def alias_groups(cls):
+  def alias_groups(cls) -> BuildFileAliases:
     return BuildFileAliases(objects={
       'python_requirement': PythonRequirement,
       'setup_py': PythonArtifact,
@@ -91,7 +91,7 @@ class TestGenerateChroot(TestSetupPyBase):
     assert len(ex.wrapped_exceptions) == 1
     assert type(ex.wrapped_exceptions[0]) == exc_cls
 
-  def test_generate_chroot(self):
+  def test_generate_chroot(self) -> None:
     init_subsystem(SourceRootConfig)
     self.create_file('src/python/foo/bar/baz/BUILD',
                      "python_library(provides=setup_py(name='baz', version='1.1.1'))")
@@ -126,7 +126,7 @@ class TestGenerateChroot(TestSetupPyBase):
       },
       'src/python/foo')
 
-  def test_invalid_binary(self):
+  def test_invalid_binary(self) -> None:
     init_subsystem(SourceRootConfig)
     self.create_file('src/python/invalid_binary/BUILD', textwrap.dedent("""
       python_library(name='not_a_binary')
@@ -171,7 +171,7 @@ class TestGetSources(TestSetupPyBase):
     assert sorted(expected_namespace_packages) == sorted(srcs.namespace_packages)
     assert expected_package_data == dict(srcs.package_data)
 
-  def test_get_sources(self):
+  def test_get_sources(self) -> None:
     init_subsystem(SourceRootConfig)
     self.create_file('src/python/foo/bar/baz/BUILD', textwrap.dedent("""
       python_library(name='baz1', sources=['baz1.py'])
@@ -246,7 +246,7 @@ class TestGetRequirements(TestSetupPyBase):
       ExportedTargetRequirements, Params(DependencyOwner(ExportedTarget(self.tgt(addr)))))
     assert sorted(expected_req_strs) == sorted(reqs.requirement_strs)
 
-  def test_get_requirements(self):
+  def test_get_requirements(self) -> None:
     self.create_file('3rdparty/BUILD', textwrap.dedent("""
       python_requirement_library(name='ext1',
         requirements=[python_requirement('ext1==1.22.333')])
@@ -286,7 +286,7 @@ class TestGetAncestorInitPy(TestSetupPyBase):
       RootRule(SourceRootConfig),
     ]
 
-  def assert_ancestor_init_py(self, expected_init_pys, addrs):
+  def assert_ancestor_init_py(self, expected_init_pys: Iterable[str], addrs: Iterable[str]) -> None:
     ancestor_init_py_files = self.request_single_product(
       AncestorInitPyFiles,
       Params(HydratedTargets([self.tgt(addr) for addr in addrs]),
@@ -297,7 +297,7 @@ class TestGetAncestorInitPy(TestSetupPyBase):
     # NB: Doesn't include the root __init__.py or the missing src/python/foo/bar/__init__.py.
     assert sorted(expected_init_pys) == sorted(init_py_files_found)
 
-  def test_get_ancestor_init_py(self):
+  def test_get_ancestor_init_py(self) -> None:
     init_subsystem(SourceRootConfig)
     # NB: src/python/foo/bar/baz/qux/__init__.py is a target's source.
     self.create_file('src/python/foo/bar/baz/qux/BUILD', 'python_library()')
@@ -350,7 +350,7 @@ class TestGetOwnedDependencies(TestSetupPyBase):
       OwnedDependencies, Params(DependencyOwner(ExportedTarget(self.tgt(exported))))
     ))
 
-  def test_owned_dependencies(self):
+  def test_owned_dependencies(self) -> None:
     self.create_file('src/python/foo/bar/baz/BUILD', textwrap.dedent("""
       python_library(name='baz1')
       python_library(name='baz2')
@@ -403,7 +403,7 @@ class TestGetExportingOwner(TestSetupPyBase):
   def assert_ambiguous_owner(self, owned: str):
     self.assert_error(owned, AmbiguousOwnerError)
 
-  def test_get_owner_simple(self):
+  def test_get_owner_simple(self) -> None:
     self.create_file('src/python/foo/bar/baz/BUILD', textwrap.dedent("""
       python_library(name='baz1')
       python_library(name='baz2')
@@ -438,7 +438,7 @@ class TestGetExportingOwner(TestSetupPyBase):
     self.assert_no_owner('src/python/foo:foo2')
     self.assert_ambiguous_owner('src/python/foo/bar/baz:baz2')
 
-  def test_get_owner_siblings(self):
+  def test_get_owner_siblings(self) -> None:
     self.create_file('src/python/siblings/BUILD', textwrap.dedent("""
         python_library(name='sibling1')
         python_library(name='sibling2',
@@ -449,7 +449,7 @@ class TestGetExportingOwner(TestSetupPyBase):
     self.assert_is_owner('src/python/siblings:sibling2', 'src/python/siblings:sibling1')
     self.assert_is_owner('src/python/siblings:sibling2', 'src/python/siblings:sibling2')
 
-  def test_get_owner_not_an_ancestor(self):
+  def test_get_owner_not_an_ancestor(self) -> None:
     self.create_file('src/python/notanancestor/aaa/BUILD', textwrap.dedent("""
         python_library(name='aaa')
       """))
@@ -462,7 +462,7 @@ class TestGetExportingOwner(TestSetupPyBase):
     self.assert_no_owner('src/python/notanancestor/aaa')
     self.assert_is_owner('src/python/notanancestor/bbb', 'src/python/notanancestor/bbb')
 
-  def test_get_owner_multiple_ancestor_generations(self):
+  def test_get_owner_multiple_ancestor_generations(self) -> None:
     self.create_file('src/python/aaa/bbb/ccc/BUILD', textwrap.dedent("""
         python_library(name='ccc')
       """))

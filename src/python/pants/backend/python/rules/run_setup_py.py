@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import json
+import logging
 import os
 from dataclasses import dataclass
 from typing import List, Set, Tuple
@@ -44,9 +45,13 @@ from pants.engine.legacy.structs import PythonBinaryAdaptor, PythonTargetAdaptor
 from pants.engine.objects import Collection
 from pants.engine.rules import console_rule, optionable_rule, rule
 from pants.engine.selectors import Get, MultiGet
+from pants.option.option_util import flatten_shlexed_list
 from pants.rules.core.distdir import DistDir
 from pants.rules.core.strip_source_root import SourceRootStrippedSources
 from pants.source.source_root import SourceRootConfig
+
+
+logger = logging.getLogger(__name__)
 
 
 class TargetNotExported(Exception):
@@ -185,8 +190,12 @@ class SetupPyOptions(GoalSubsystem):
     register(
       '--args', type=list, member_type=str,
       help="Arguments to pass directly to setup.py, e.g. "
-           "`--setup-py2-args=\"bdist_wheel\"`. If unspecified, we just dump the setup.py chroot."
+           "`--setup-py2-args=\"bdist_wheel --python-tag py36.py37\"`. If unspecified, we just "
+           "dump the setup.py chroot."
     )
+
+  def get_args(self) -> Tuple[str, ...]:
+    return flatten_shlexed_list(self.values.args)
 
 
 class SetupPy(Goal):
@@ -195,7 +204,7 @@ class SetupPy(Goal):
 
 
 @console_rule
-async def run_setup_pys(addresses: BuildFileAddresses, console: Console, options: SetupPyOptions,
+async def run_setup_pys(addresses: BuildFileAddresses, options: SetupPyOptions, console: Console,
                         distdir: DistDir, workspace: Workspace) -> SetupPy:
   """Run setup.py commands on all exported targets addressed."""
   targets = await Get[HydratedTargets](BuildFileAddresses, addresses)
@@ -217,18 +226,20 @@ async def run_setup_pys(addresses: BuildFileAddresses, console: Console, options
     chroot = await Get[SetupPyChroot](SetupPyChrootRequest(target))
     provides = target.hydrated_target.adaptor.provides
     setup_py_dir = distdir.relpath / f'{provides.name}-{provides.version}'
-    if options.values.args:
-      console.print_stderr(f'Running setup.py for {addr}')
+    args = options.get_args()
+    if args:
       setup_py_result = await Get[RunSetupPyResult](
-        RunSetupPyRequest(target, chroot, tuple(options.values.args)))
+        RunSetupPyRequest(target, chroot, args))
+      console.print_stderr(f'Writing results of running setup.py for {addr} to {setup_py_dir}')
       result_digest = setup_py_result.output
     else:
       # Just dump the chroot.
+      console.print_stderr(f'Writing setup.py chroot for {addr} to {setup_py_dir}')
       result_digest = chroot.digest
+
     workspace.materialize_directory(
       DirectoryToMaterialize(result_digest, path_prefix=str(setup_py_dir))
     )
-    console.print_stderr(f'Wrote setup.py chroot for {addr} to {setup_py_dir}')
 
   return SetupPy(0)
 
@@ -266,7 +277,9 @@ async def run_setup_py(
     pex_path="./setuptools.pex",
     pex_args=('setup.py', *req.args),
     input_files=merged_input_files,
-    output_files=('**',),
+    # setuptools commands that create dists write them to dist/.
+    # TODO: Could there be other useful files to capture?
+    output_directories=('dist/',),
     description=f'Run setuptools for {req.exported_target.hydrated_target.address.reference()}',
   )
   result = await Get[ExecuteProcessResult](ExecuteProcessRequest, request)
@@ -363,18 +376,15 @@ async def get_ancestor_init_py(
   source_roots = source_root_config.get_source_roots()
   # Find the ancestors of all dirs containing .py files, including those dirs themselves.
   source_dir_ancestors: Set[Tuple[str, str]] = set()  # Items are (src_root, path incl. src_root).
-  sources_snapshots = await MultiGet(
-    Get[Snapshot](Digest, target.adaptor.sources.snapshot.directory_digest)
-    for target in targets if isinstance(target.adaptor, PythonTargetAdaptor)
-  )
-  for sources_snapshot in sources_snapshots:
-    for file in sources_snapshot.files:
-      source_dir_ancestor = os.path.dirname(file)
-      source_root = source_root_or_raise(source_roots, file)
-      # Do not allow the repository root to leak (i.e., '.' should not be a package in setup.py).
-      while source_dir_ancestor != source_root:
-        source_dir_ancestors.add((source_root, source_dir_ancestor))
-        source_dir_ancestor = os.path.dirname(source_dir_ancestor)
+  for target in targets:
+    if isinstance(target.adaptor, PythonTargetAdaptor):
+      for file in target.adaptor.sources.snapshot.files:
+        source_dir_ancestor = os.path.dirname(file)
+        source_root = source_root_or_raise(source_roots, file)
+        # Do not allow the repository root to leak (i.e., '.' should not be a package in setup.py).
+        while source_dir_ancestor != source_root:
+          source_dir_ancestors.add((source_root, source_dir_ancestor))
+          source_dir_ancestor = os.path.dirname(source_dir_ancestor)
 
   source_dir_ancestors_list = list(source_dir_ancestors)  # To force a consistent order.
 
@@ -398,7 +408,7 @@ def _is_exported(target: HydratedTarget) -> bool:
   return getattr(target.adaptor, 'provides', None) is not None
 
 
-@rule(name="Get requirements")
+@rule(name="Compute distribution's 3rd party requirements")
 async def get_requirements(dep_owner: DependencyOwner) -> ExportedTargetRequirements:
   tht = await Get[TransitiveHydratedTargets](
     BuildFileAddresses([dep_owner.exported_target.hydrated_target.address]))
@@ -439,7 +449,7 @@ async def get_requirements(dep_owner: DependencyOwner) -> ExportedTargetRequirem
   return ExportedTargetRequirements(tuple(sorted(req_strs)))
 
 
-@rule(name="Get owned targets")
+@rule(name="Find all code to be published in the distribution")
 async def get_owned_dependencies(dependency_owner: DependencyOwner) -> OwnedDependencies:
   """Find the dependencies of dependency_owner that are owned by it.
 
@@ -447,8 +457,7 @@ async def get_owned_dependencies(dependency_owner: DependencyOwner) -> OwnedDepe
   """
   tht = await Get[TransitiveHydratedTargets](
     BuildFileAddresses([dependency_owner.exported_target.hydrated_target.address]))
-  all_tgts = list(tht.closure)
-  ownable_targets = [tgt for tgt in all_tgts
+  ownable_targets = [tgt for tgt in tht.closure
                      if isinstance(tgt.adaptor, (PythonTargetAdaptor, ResourcesAdaptor))]
   owners = await MultiGet(Get[ExportedTarget](OwnedDependency(ht)) for ht in ownable_targets)
   owned_dependencies = [tgt for owner, tgt in zip(owners, ownable_targets)
@@ -502,14 +511,15 @@ async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarg
 
 @rule(name="Set up setuptools")
 async def setup_setuptools(setuptools: Setuptools) -> SetuptoolsSetup:
+  # Note that this pex has no entrypoint. We use it to run our generated setup.py, which
+  # in turn imports from and invokes setuptools.
   requirements_pex = await Get[Pex](
     CreatePex(
       output_filename="setuptools.pex",
       requirements=PexRequirements(requirements=tuple(setuptools.get_requirement_specs())),
       interpreter_constraints=PexInterpreterConstraints(
         constraint_set=tuple(setuptools.default_interpreter_constraints)
-      ),
-      entry_point=setuptools.get_entry_point(),
+      )
     )
   )
   return SetuptoolsSetup(
