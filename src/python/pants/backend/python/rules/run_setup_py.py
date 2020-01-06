@@ -332,10 +332,17 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
     target_address_spec=ht.address.reference(),
     setup_kwargs_str=distutils_repr(setup_kwargs)
   ).encode()
-  setup_py_digest = await Get[Digest](
-    InputFilesContent([FileContent('setup.py', setup_py_content)]))
+  extra_files_digest = await Get[Digest](
+    InputFilesContent([
+      FileContent('setup.py', setup_py_content),
+      FileContent('MANIFEST.in', 'include *.py'.encode())  # Make sure setup.py is included.
+    ]))
 
-  chroot_digest = await Get[Digest](DirectoriesToMerge((src_digest, setup_py_digest)))
+  manifest_in_digest = await Get[Digest](
+    InputFilesContent([])
+  )
+
+  chroot_digest = await Get[Digest](DirectoriesToMerge((src_digest, extra_files_digest)))
   return SetupPyChroot(chroot_digest, json.dumps(setup_kwargs, sort_keys=True))
 
 

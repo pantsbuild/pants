@@ -113,7 +113,7 @@ class TestGenerateChroot(TestSetupPyBase):
     self.create_file('src/python/foo/foo.py', '')
     self.assert_chroot(
       ['src/foo/qux/__init__.py', 'src/foo/qux/qux.py', 'src/foo/resources/js/code.js',
-       'src/foo/foo.py', 'setup.py'],
+       'src/foo/foo.py', 'setup.py', 'MANIFEST.in'],
       {
         'name': 'foo',
         'version': '1.2.3',
