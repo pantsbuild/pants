@@ -91,8 +91,11 @@ struct B {}
   def _target_dict(self):
     return self.populate_target_dict(self._target_specs)
 
-  def _run_tasks(self, target_roots):
-    self.set_options(strict=True)
+  def _run_tasks(self, target_roots, strict_missing_py_namespace=False, strict_clashing_py_namespace=False):
+    self.set_options(
+        strict_missing_py_namespace=strict_missing_py_namespace,
+        strict_clashing_py_namespace=strict_clashing_py_namespace,
+      )
     return self.invoke_tasks(target_roots=target_roots)
 
   _exception_prelude = """\
@@ -105,7 +108,7 @@ Errors:"""
   def test_no_py_namespace(self):
     no_py_namespace_target = self._target_dict()['no-py-namespace']
     with self.assertRaises(PyThriftNamespaceClashCheck.NamespaceExtractionError) as cm:
-      self._run_tasks(target_roots=[no_py_namespace_target])
+      self._run_tasks(target_roots=[no_py_namespace_target], strict_missing_py_namespace=True)
     self.assertEqual(str(cm.exception), """\
 Python namespaces could not be extracted from some thrift sources. Declaring a `namespace py` in
 thrift sources for python thrift library targets will soon become required.
@@ -123,7 +126,8 @@ and/or files which need to be edited will be dumped to: {}
     with self.assertRaisesWithMessage(PyThriftNamespaceClashCheck.ClashingNamespaceError, """{}
 org.pantsbuild.namespace: [(src/py-thrift:clashing-namespace, src/py-thrift/a.thrift), (src/py-thrift:clashing-namespace, src/py-thrift/b.thrift)]
 """.format(self._exception_prelude)):
-      self._run_tasks(target_roots=[clashing_same_target])
+      self._run_tasks(target_roots=[clashing_same_target], strict_clashing_py_namespace=True)
+    self._run_tasks(target_roots=[clashing_same_target], strict_clashing_py_namespace=False)
 
   def test_clashing_namespace_multiple_targets(self):
     target_dict = self._target_dict()
@@ -131,11 +135,16 @@ org.pantsbuild.namespace: [(src/py-thrift:clashing-namespace, src/py-thrift/a.th
     with self.assertRaisesWithMessage(PyThriftNamespaceClashCheck.ClashingNamespaceError, """{}
 org.pantsbuild.namespace: [(src/py-thrift-clashing:clashingA, src/py-thrift-clashing/a.thrift), (src/py-thrift-clashing:clashingB, src/py-thrift-clashing/b.thrift)]
 """.format(self._exception_prelude)):
-      self._run_tasks(target_roots=clashing_targets)
+      self._run_tasks(target_roots=clashing_targets, strict_clashing_py_namespace=True)
+    self._run_tasks(target_roots=clashing_targets, strict_clashing_py_namespace=False)
 
   def test_accepts_py_namespace_with_comments_above(self):
     commented_thrift_source_target = self._target_dict()['with-comments-and-other-namespaces']
-    result = self._run_tasks(target_roots=[commented_thrift_source_target])
+    result = self._run_tasks(
+        target_roots=[commented_thrift_source_target],
+        strict_missing_py_namespace=True,
+        strict_clashing_py_namespace=True,
+      )
     # Check that the file was correctly mapped to the namespace parsed out of its file content.
     namespaces_by_files = result.context.products.get_data('_py_thrift_namespaces_by_files')
     self.assertEqual(
