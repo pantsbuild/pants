@@ -95,7 +95,7 @@ def find_packages(
     source_roots: SourceRoots,
     tgts_and_stripped_srcs: Iterator[Tuple[HydratedTarget, SourceRootStrippedSources]],
     all_sources: Snapshot
-) -> Tuple[Tuple[str], Tuple[str], Tuple[PackageDatum, ...]]:
+) -> Tuple[Tuple[str, ...], Tuple[str, ...], Tuple[PackageDatum, ...]]:
   """Analyze the package structure for the given sources.
 
   Returns a tuple (packages, namespace_packages, package_data).

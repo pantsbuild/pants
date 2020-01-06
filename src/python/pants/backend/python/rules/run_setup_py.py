@@ -195,7 +195,7 @@ class SetupPyOptions(GoalSubsystem):
     )
 
   def get_args(self) -> Tuple[str, ...]:
-    return flatten_shlexed_list(self.values.args)
+    return tuple(flatten_shlexed_list(self.values.args))
 
 
 class SetupPy(Goal):
@@ -211,11 +211,11 @@ async def run_setup_pys(addresses: BuildFileAddresses, options: SetupPyOptions, 
 
   exported_targets: List[ExportedTarget] = []
   nonexported_targets: List[HydratedTarget] = []
-  for target in targets:
-    if _is_exported(target):
-      exported_targets.append(ExportedTarget(target))
+  for hydrated_target in targets:
+    if _is_exported(hydrated_target):
+      exported_targets.append(ExportedTarget(hydrated_target))
     else:
-      nonexported_targets.append(target)
+      nonexported_targets.append(hydrated_target)
   if nonexported_targets:
     raise TargetNotExported(
       'Cannot run setup.py on these targets, because they have no `provides=` clause: '
@@ -224,9 +224,9 @@ async def run_setup_pys(addresses: BuildFileAddresses, options: SetupPyOptions, 
   chroots = await MultiGet(Get[SetupPyChroot](SetupPyChrootRequest(target))
                            for target in exported_targets)
 
-  for target, chroot in zip(exported_targets, chroots):
-    addr = target.hydrated_target.address.reference()
-    provides = target.hydrated_target.adaptor.provides
+  for exported_target, chroot in zip(exported_targets, chroots):
+    addr = exported_target.hydrated_target.address.reference()
+    provides = exported_target.hydrated_target.adaptor.provides
     args = options.get_args()
     # TODO: We should run these in exported target dependency order, in case the
     #  command publishes a dist, in which case we must publish its dependencies first.
@@ -234,7 +234,7 @@ async def run_setup_pys(addresses: BuildFileAddresses, options: SetupPyOptions, 
     #  run these concurrently.
     if args:
       setup_py_result = await Get[RunSetupPyResult](
-        RunSetupPyRequest(target, chroot, args))
+        RunSetupPyRequest(exported_target, chroot, args))
       console.print_stderr(f'Writing dist for {addr} to {distdir.relpath}')
       workspace.materialize_directory(
         DirectoryToMaterialize(setup_py_result.output, path_prefix=str(distdir.relpath))
@@ -426,8 +426,8 @@ async def get_requirements(dep_owner: DependencyOwner) -> ExportedTargetRequirem
   ownable_tgts = [tgt for tgt in tht.closure
                   if isinstance(tgt.adaptor, (PythonTargetAdaptor, ResourcesAdaptor))]
   owners = await MultiGet(Get[ExportedTarget](OwnedDependency(ht)) for ht in ownable_tgts)
-  owned_by_us = set()
-  owned_by_others = set()
+  owned_by_us: Set[HydratedTarget] = set()
+  owned_by_others: Set[HydratedTarget] = set()
   for tgt, owner in zip(ownable_tgts, owners):
     (owned_by_us if owner == dep_owner.exported_target else owned_by_others).add(tgt)
 
