@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.base.deprecated import deprecated_conditional, resolve_conflicting_options
+from pants.subsystem.subsystem import Subsystem
 from pants.task.goal_options_mixin import GoalOptionsMixin, GoalOptionsRegistrar
 
 
@@ -49,9 +50,9 @@ class HasSkipOptionMixin:
 
   @property
   def skip_execution(self):
-    return self.get_options().skip or self.resolve_only()
+    return self.resolve_only_as_skip(self.get_options().skip)
 
-  def resolve_only(self):
+  def resolve_only_as_skip(self, skip: bool):
     # This flag is defined only on fmt, which is done in FmtTaskMixin.
     # In v2, we expect to have a --only flag on both fmt and lint which will allow individual
     # formatters to be selected.
@@ -68,12 +69,17 @@ class HasSkipOptionMixin:
       if only is None:
         return False
       elif only == "scalafix":
-        return not self.__class__.__name__.startswith("ScalaFix")
+        only_resolved_as_skip = not self.__class__.__name__.startswith("ScalaFix")
+        if skip and not only_resolved_as_skip:
+          raise ValueError(
+            f"Invalid flag combination; cannot specify --only={only} if --skip=True",
+          )
+        return only_resolved_as_skip
       else:
         raise ValueError("Invalid value for flag --only - must be scalafix or not set at all")
     return False
 
-  def resolve_conflicting_skip_options(self, old_scope, new_scope, subsystem):
+  def resolve_conflicting_skip_options(self, old_scope: str, new_scope: str, subsystem: Subsystem):
     skip = resolve_conflicting_options(
       old_option="skip",
       new_option="skip",
@@ -82,7 +88,7 @@ class HasSkipOptionMixin:
       old_container=self.get_options(),
       new_container=subsystem.options,
     )
-    return skip or self.resolve_only()
+    return self.resolve_only_as_skip(skip)
 
 
 class SkipOptionRegistrar:
