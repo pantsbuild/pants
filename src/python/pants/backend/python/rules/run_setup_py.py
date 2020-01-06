@@ -221,25 +221,31 @@ async def run_setup_pys(addresses: BuildFileAddresses, options: SetupPyOptions, 
       'Cannot run setup.py on these targets, because they have no `provides=` clause: '
       f'{", ".join(so.address.reference() for so in nonexported_targets)}')
 
-  for target in exported_targets:
+  chroots = await MultiGet(Get[SetupPyChroot](SetupPyChrootRequest(target))
+                           for target in exported_targets)
+
+  for target, chroot in zip(exported_targets, chroots):
     addr = target.hydrated_target.address.reference()
-    chroot = await Get[SetupPyChroot](SetupPyChrootRequest(target))
     provides = target.hydrated_target.adaptor.provides
-    setup_py_dir = distdir.relpath / f'{provides.name}-{provides.version}'
     args = options.get_args()
+    # TODO: We should run these in exported target dependency order, in case the
+    #  command publishes a dist, in which case we must publish its dependencies first.
+    #  Or, we can do so based on an option, and if the user doesn't require it we can
+    #  run these concurrently.
     if args:
       setup_py_result = await Get[RunSetupPyResult](
         RunSetupPyRequest(target, chroot, args))
-      console.print_stderr(f'Writing results of running setup.py for {addr} to {setup_py_dir}')
-      result_digest = setup_py_result.output
+      console.print_stderr(f'Writing dist for {addr} to {distdir.relpath}')
+      workspace.materialize_directory(
+        DirectoryToMaterialize(setup_py_result.output, path_prefix=str(distdir.relpath))
+      )
     else:
       # Just dump the chroot.
+      setup_py_dir = distdir.relpath / f'{provides.name}-{provides.version}'
       console.print_stderr(f'Writing setup.py chroot for {addr} to {setup_py_dir}')
-      result_digest = chroot.digest
-
-    workspace.materialize_directory(
-      DirectoryToMaterialize(result_digest, path_prefix=str(setup_py_dir))
-    )
+      workspace.materialize_directory(
+        DirectoryToMaterialize(chroot.digest, path_prefix=str(setup_py_dir))
+      )
 
   return SetupPy(0)
 
@@ -283,7 +289,9 @@ async def run_setup_py(
     description=f'Run setuptools for {req.exported_target.hydrated_target.address.reference()}',
   )
   result = await Get[ExecuteProcessResult](ExecuteProcessRequest, request)
-  return RunSetupPyResult(result.output_directory_digest)
+  output_digest = await Get[Digest](
+    DirectoryWithPrefixToStrip(result.output_directory_digest, 'dist/'))
+  return RunSetupPyResult(output_digest)
 
 
 @rule
@@ -300,8 +308,7 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
   requirements = await Get[ExportedTargetRequirements](DependencyOwner(request.exported_target))
 
   # Nest the sources under the src/ prefix.
-  src_digest = await Get[Digest](
-    DirectoryWithPrefixToAdd, DirectoryWithPrefixToAdd(sources.digest, CHROOT_SOURCE_ROOT))
+  src_digest = await Get[Digest](DirectoryWithPrefixToAdd(sources.digest, CHROOT_SOURCE_ROOT))
 
   # Generate the kwargs to the setup() call.
   setup_kwargs = request.exported_target.hydrated_target.adaptor.provides.setup_py_keywords.copy()
