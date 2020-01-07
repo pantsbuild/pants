@@ -3,7 +3,7 @@
 
 import os
 from os import PathLike
-from typing import Union, Tuple
+from typing import Tuple, Union
 
 from wheel import pep425tags
 
