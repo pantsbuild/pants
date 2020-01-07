@@ -110,7 +110,7 @@ class SubsystemClientMixin:
       message = 'Cycle detected:\n\t{}'.format(' ->\n\t'.join(
         '{} scope: {}'.format(optionable_cls, optionable_cls.options_scope)
         for optionable_cls in cycle))
-      super(SubsystemClientMixin.CycleException, self).__init__(message)
+      super().__init__(message)
 
   @classmethod
   def known_scope_infos(cls):

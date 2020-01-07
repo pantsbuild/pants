@@ -3,7 +3,7 @@
 
 import os
 
-from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
+from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress, Spec
 
 
 class CmdLineSpecParser:
@@ -28,10 +28,10 @@ class CmdLineSpecParser:
   class BadSpecError(Exception):
     """Indicates an unparseable command line address selector."""
 
-  def __init__(self, root_dir):
+  def __init__(self, root_dir: str) -> None:
     self._root_dir = os.path.realpath(root_dir)
 
-  def _normalize_spec_path(self, path):
+  def _normalize_spec_path(self, path: str) -> str:
     is_abs = not path.startswith('//') and os.path.isabs(path)
     if is_abs:
       path = os.path.realpath(path)
@@ -48,11 +48,9 @@ class CmdLineSpecParser:
       normalized = ''
     return normalized
 
-  def parse_spec(self, spec):
-    """Parse the given spec into a `specs.Spec` object.
+  def parse_spec(self, spec: str) -> Spec:
+    """Parse the given spec into a `Spec` object.
 
-    :param spec: a single spec string.
-    :return: a single specs.Specs object.
     :raises: CmdLineSpecParser.BadSpecError if the address selector could not be parsed.
     """
 
