@@ -77,7 +77,7 @@ class HasSkipOptionMixin:
         return only_resolved_as_skip
       else:
         raise ValueError("Invalid value for flag --only - must be scalafix or not set at all")
-    return False
+    return skip
 
   def resolve_conflicting_skip_options(self, old_scope: str, new_scope: str, subsystem: Subsystem):
     skip = resolve_conflicting_options(
