@@ -136,7 +136,7 @@ def find_packages(
       # TODO: detect old-style, explicit namespace packages? That would require heuristics for
       #  detecting calls to pkg_resources.declare_namespace, or to pkgutil.extend_path.
       #  Or, allow exported targets to explicitly enumerate their namespace packages in the
-      #  BUILD file.
+      #  BUILD file. See https://github.com/pantsbuild/pants/issues/8912.
       namespace_packages.add(package)
 
   return (tuple(sorted(packages)),

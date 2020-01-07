@@ -273,20 +273,25 @@ async def run_setup_py(
       req.chroot.digest,
       setuptools_setup.requirements_pex.directory_digest))
   )
+  # The setuptools dist dir, created by it under the chroot (not to be confused with
+  # pants's own dist dir, at the buildroot).
+  # TODO: The user can change this with the --dist-dir flag to the sdist and bdist_wheel commands.
+  #  See https://github.com/pantsbuild/pants/issues/8912.
+  dist_dir = 'dist/'
   request = setuptools_setup.requirements_pex.create_execute_request(
     python_setup=python_setup,
     subprocess_encoding_environment=subprocess_encoding_environment,
     pex_path="./setuptools.pex",
     pex_args=('setup.py', *req.args),
     input_files=merged_input_files,
-    # setuptools commands that create dists write them to dist/.
+    # setuptools commands that create dists write them to the distdir.
     # TODO: Could there be other useful files to capture?
-    output_directories=('dist/',),
+    output_directories=(dist_dir,),
     description=f'Run setuptools for {req.exported_target.hydrated_target.address.reference()}',
   )
   result = await Get[ExecuteProcessResult](ExecuteProcessRequest, request)
   output_digest = await Get[Digest](
-    DirectoryWithPrefixToStrip(result.output_directory_digest, 'dist/'))
+    DirectoryWithPrefixToStrip(result.output_directory_digest, dist_dir))
   return RunSetupPyResult(output_digest)
 
 
@@ -313,7 +318,7 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
     'packages': sources.packages,
     'namespace_packages': sources.namespace_packages,
     'package_data': dict(sources.package_data),
-    'install_requires': sorted(requirements.requirement_strs)
+    'install_requires': requirements.requirement_strs
   })
   ht = request.exported_target.hydrated_target
   key_to_binary_spec = getattr(ht.adaptor.provides, 'binaries', {})
@@ -449,10 +454,10 @@ async def get_requirements(dep_owner: DependencyOwner) -> ExportedTargetRequirem
   # Add the requirements on any exported targets on which we depend.
   exported_targets_we_depend_on = await MultiGet(
     Get[ExportedTarget](OwnedDependency(ht)) for ht in owned_by_others)
-  req_strs.extend(et.hydrated_target.adaptor.provides.key
-                  for et in set(exported_targets_we_depend_on))
+  req_strs.extend(sorted(et.hydrated_target.adaptor.provides.key
+                  for et in set(exported_targets_we_depend_on)))
 
-  return ExportedTargetRequirements(tuple(sorted(req_strs)))
+  return ExportedTargetRequirements(tuple(req_strs))
 
 
 @rule(name="Find all code to be published in the distribution")
