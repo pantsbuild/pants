@@ -81,6 +81,9 @@ def get_packages_to_cover(
   coverage: str,
   source_root_stripped_file_paths: List[str],
 ) -> Set[str]:
+  """Coverage may be a comma separated string of source root stripped files or packages or the special value 'auto'
+    for which we will attempt to figure out which packages we should produce coverage reports for.
+  """
   if coverage == 'auto':
     if hasattr(test_target, 'coverage'):
       return set(test_target.coverage)
