@@ -47,7 +47,7 @@ class ExportDepAsJar(ConsoleTask):
   @classmethod
   def prepare(cls, options, round_manager):
     super().prepare(options, round_manager)
-    round_manager.require_data('runtime_classpath')
+    round_manager.require_data('export_dep_as_jar_classpath')
 
   @property
   def _output_folder(self):
@@ -354,7 +354,7 @@ class ExportDepAsJar(ConsoleTask):
     return graph_info
 
   def console_output(self, targets):
-    runtime_classpath = self.context.products.get_data('runtime_classpath')
+    runtime_classpath = self.context.products.get_data('export_dep_as_jar_classpath')
     if runtime_classpath is None:
       raise TaskError("There was an error compiling the targets - There is no runtime classpath")
     graph_info = self.generate_targets_map(targets, runtime_classpath=runtime_classpath)
