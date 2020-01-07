@@ -18,7 +18,7 @@ from pants.engine.fs import (
 from pants.engine.isolated_process import ExecuteProcessResult, MultiPlatformExecuteProcessRequest
 from pants.engine.legacy.structs import PythonTargetAdaptor, TargetAdaptor
 from pants.engine.platform import Platform, PlatformConstraint
-from pants.engine.rules import optionable_rule, rule
+from pants.engine.rules import rule, subsystem_rule
 from pants.engine.selectors import Get
 
 
@@ -144,5 +144,5 @@ async def create_pex(
 def rules():
   return [
     create_pex,
-    optionable_rule(PythonSetup),
+    subsystem_rule(PythonSetup),
   ]

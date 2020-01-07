@@ -24,7 +24,7 @@ from pants.engine.isolated_process import (
   FallibleExecuteProcessResult,
 )
 from pants.engine.legacy.structs import TargetAdaptor
-from pants.engine.rules import UnionRule, optionable_rule, rule
+from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.rules.core.fmt import FmtResult
 from pants.rules.core.lint import LintResult
@@ -150,7 +150,7 @@ def rules():
     create_black_request,
     fmt,
     lint,
-    optionable_rule(Black),
+    subsystem_rule(Black),
     UnionRule(PythonFormatTarget, BlackTarget),
     UnionRule(PythonLintTarget, BlackTarget),
   ]

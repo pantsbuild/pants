@@ -15,7 +15,7 @@ from pants.engine.fs import Digest, DirectoriesToMerge
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
 from pants.engine.legacy.structs import PythonTestsAdaptor
-from pants.engine.rules import UnionRule, optionable_rule, rule
+from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.rules.core.core_test_model import TestResult, TestTarget
 from pants.rules.core.strip_source_root import SourceRootStrippedSources
@@ -109,6 +109,6 @@ def rules():
   return [
     run_python_test,
     UnionRule(TestTarget, PythonTestsAdaptor),
-    optionable_rule(PyTest),
-    optionable_rule(PythonSetup),
+    subsystem_rule(PyTest),
+    subsystem_rule(PythonSetup),
   ]
