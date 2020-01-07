@@ -62,7 +62,7 @@ async def parse_address_family(address_mapper: AddressMapper, directory: Dir) ->
   return AddressFamily.create(directory.path, address_maps)
 
 
-def _raise_did_you_mean(address_family, name, source=None):
+def _raise_did_you_mean(address_family: AddressFamily, name: str, source=None) -> None:
   names = [a.target_name for a in address_family.addressables]
   possibilities = "\n  ".join(":{}".format(target_name) for target_name in sorted(names))
 
@@ -73,8 +73,7 @@ def _raise_did_you_mean(address_family, name, source=None):
 
   if source:
     raise resolve_error from source
-  else:
-    raise resolve_error
+  raise resolve_error
 
 
 @rule
@@ -199,7 +198,7 @@ def _hydrate(item_type, spec_path, **kwargs):
 
 @rule
 async def provenanced_addresses_from_address_families(
-    address_mapper: AddressMapper, specs: Specs
+  address_mapper: AddressMapper, specs: Specs,
 ) -> ProvenancedBuildFileAddresses:
   """Given an AddressMapper and list of Specs, return matching ProvenancedBuildFileAddresses.
 
@@ -275,7 +274,7 @@ def address_provenance_map(pbfas: ProvenancedBuildFileAddresses) -> AddressProve
   )
 
 
-def _spec_to_globs(address_mapper, specs):
+def _spec_to_globs(address_mapper: AddressMapper, specs: Specs) -> PathGlobs:
   """Given a Specs object, return a PathGlobs object for the build files that it matches."""
   patterns = set()
   for spec in specs:
@@ -284,11 +283,7 @@ def _spec_to_globs(address_mapper, specs):
 
 
 def create_graph_rules(address_mapper: AddressMapper):
-  """Creates tasks used to parse Structs from BUILD files.
-
-:param address_mapper_key: The subject key for an AddressMapper instance.
-:param symbol_table: A SymbolTable instance to provide symbols for Address lookups.
-"""
+  """Creates tasks used to parse Structs from BUILD files."""
 
   @rule
   def address_mapper_singleton() -> AddressMapper:

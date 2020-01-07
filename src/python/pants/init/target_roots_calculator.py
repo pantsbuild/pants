@@ -9,7 +9,7 @@ from twitter.common.collections import OrderedSet
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.specs import SingleAddress, Specs
-from pants.base.target_roots import TargetRoots
+from pants.base.target_roots import InvalidSpecConstraint, TargetRoots
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.legacy.graph import OwnersRequest
 from pants.engine.scheduler import SchedulerSession
@@ -19,10 +19,6 @@ from pants.scm.subsystems.changed import ChangedRequest
 
 
 logger = logging.getLogger(__name__)
-
-
-class InvalidSpecConstraint(Exception):
-  """Raised when invalid constraints are given via target specs and arguments like --changed*."""
 
 
 class TargetRootsCalculator:

@@ -529,7 +529,7 @@ def _eager_fileset_with_spec(spec_path, filespec, snapshot, include_dirs=False):
 
 @rule
 async def hydrate_sources(
-  sources_field: SourcesField, glob_match_error_behavior: GlobMatchErrorBehavior
+  sources_field: SourcesField, glob_match_error_behavior: GlobMatchErrorBehavior,
 ) -> HydratedField:
   """Given a SourcesField, request a Snapshot for its path_globs and create an EagerFilesetWithSpec.
   """
@@ -549,7 +549,7 @@ async def hydrate_sources(
 
 @rule
 async def hydrate_bundles(
-  bundles_field: BundlesField, glob_match_error_behavior: GlobMatchErrorBehavior
+  bundles_field: BundlesField, glob_match_error_behavior: GlobMatchErrorBehavior,
 ) -> HydratedField:
   """Given a BundlesField, request Snapshots for each of its filesets and create BundleAdaptors."""
   path_globs_with_match_errors = [

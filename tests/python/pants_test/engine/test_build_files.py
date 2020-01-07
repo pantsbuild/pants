@@ -9,7 +9,7 @@ from typing import Type, cast
 from pants.base.project_tree import Dir
 from pants.base.specs import SiblingAddresses, SingleAddress, Specs
 from pants.build_graph.address import Address
-from pants.engine.addressable import addressable, addressable_dict
+from pants.engine.addressable import BuildFileAddresses, addressable, addressable_dict
 from pants.engine.build_files import (
   ResolvedTypeMismatchError,
   create_graph_rules,
@@ -66,7 +66,13 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
   def _snapshot(self) -> Snapshot:
     return Snapshot(Digest('xx', 2), ('root/BUILD',), ())
 
-  def _resolve_build_file_addresses(self, specs, address_family, snapshot, address_mapper):
+  def _resolve_build_file_addresses(
+    self,
+    specs: Specs,
+    address_family: AddressFamily,
+    snapshot: Snapshot,
+    address_mapper: AddressMapper,
+  ) -> BuildFileAddresses:
     pbfas = run_rule(
       provenanced_addresses_from_address_families,
       rule_args=[address_mapper, specs],
@@ -83,7 +89,7 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
         ),
       ],
     )
-    return run_rule(remove_provenance, rule_args=[pbfas])
+    return cast(BuildFileAddresses, run_rule(remove_provenance, rule_args=[pbfas]))
 
   def test_duplicated(self) -> None:
     """Test that matching the same Spec twice succeeds."""
