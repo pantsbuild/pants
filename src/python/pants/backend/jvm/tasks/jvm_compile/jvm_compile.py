@@ -488,11 +488,9 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
 
     if self.context.products.is_required_data("export_dep_as_jar_classpath"):
       # filter modulized targets from invalid targets list.
-      print(f"filtering target root dependees from compile {invalid_targets}")
       target_root_addresses = [t.address for t in set(self.context.target_roots)]
       dependees_of_target_roots = self.context.build_graph.transitive_dependees_of_addresses(target_root_addresses)
       invalid_targets = list(set(invalid_targets) - dependees_of_target_roots)
-      print(f"invalid targets list is now {invalid_targets}")
 
     if self.execution_strategy == self.ExecutionStrategy.hermetic:
       self._set_directory_digests_for_valid_target_classpath_directories(valid_targets, compile_contexts)
