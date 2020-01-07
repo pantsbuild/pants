@@ -71,7 +71,11 @@ class ThriftLinterTask(LintTaskMixin, NailgunTask):
 
   @property
   def skip_execution(self):
-    return self._resolve_conflicting_options(old_option="skip", new_option="skip")
+    return self.resolve_conflicting_skip_options(
+      old_scope="thrift-linter",
+      new_scope="scrooge-linter",
+      subsystem=ScroogeLinter.global_instance(),
+    )
 
   @property
   def cache_target_dirs(self):

@@ -4,7 +4,6 @@
 from abc import abstractmethod
 
 from pants.backend.jvm.tasks.rewrite_base import RewriteBase
-from pants.base.deprecated import resolve_conflicting_options
 from pants.base.exceptions import TaskError
 from pants.java.jar.jar_dependency import JarDependency
 from pants.task.fmt_task_mixin import FmtTaskMixin
@@ -16,13 +15,12 @@ from pants.contrib.googlejavaformat.subsystem import GoogleJavaFormat
 class GoogleJavaFormatBase(RewriteBase):
 
   def _resolve_conflicting_skip(self, *, old_scope: str):
-    return resolve_conflicting_options(
-      old_option="skip",
-      new_option="skip",
+    # Skip mypy because this is a temporary hack, and mypy doesn't follow the inheritance chain
+    # properly.
+    return self.resolve_conflicting_skip_options( # type: ignore
       old_scope=old_scope,
       new_scope="google-java-format",
-      old_container=self.get_options(),
-      new_container=GoogleJavaFormat.global_instance().options,
+      subsystem=GoogleJavaFormat.global_instance(),
     )
 
   @classmethod

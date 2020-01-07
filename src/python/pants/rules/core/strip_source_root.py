@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pants.build_graph.files import Files
 from pants.engine.fs import EMPTY_SNAPSHOT, Digest, DirectoryWithPrefixToStrip, Snapshot
 from pants.engine.legacy.graph import HydratedTarget
-from pants.engine.rules import optionable_rule, rule
+from pants.engine.rules import rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.source.source_root import SourceRootConfig
 
@@ -51,4 +51,4 @@ async def strip_source_root(
 
 
 def rules():
-  return [strip_source_root, optionable_rule(SourceRootConfig)]
+  return [strip_source_root, subsystem_rule(SourceRootConfig)]

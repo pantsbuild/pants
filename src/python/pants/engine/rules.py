@@ -16,6 +16,7 @@ from twitter.common.collections import OrderedSet
 from pants.engine.goal import Goal
 from pants.engine.objects import union
 from pants.engine.selectors import Get
+from pants.option.optionable import OptionableFactory
 from pants.util.collections import assert_single_element
 from pants.util.memo import memoized
 from pants.util.meta import frozen_after_init
@@ -54,8 +55,8 @@ class _RuleVisitor(ast.NodeVisitor):
 
 
 @memoized
-def optionable_rule(optionable_factory):
-  """Returns a TaskRule that constructs an instance of the Optionable for the given OptionableFactory.
+def subsystem_rule(optionable_factory: Type[OptionableFactory]) -> "TaskRule":
+  """Returns a TaskRule that constructs an instance of the subsystem.
 
   TODO: This API is slightly awkward for two reasons:
     1) We should consider whether Subsystems/Optionables should be constructed explicitly using
@@ -137,7 +138,7 @@ def _make_rule(
       for p, s in rule_visitor.gets)
 
     # Register dependencies for @console_rule/Goal.
-    dependency_rules = (optionable_rule(return_type.subsystem_cls),) if is_goal_cls else None
+    dependency_rules = (subsystem_rule(return_type.subsystem_cls),) if is_goal_cls else None
 
     # Set a default name for Goal classes if one is not explicitly provided
     if is_goal_cls and name is None:
