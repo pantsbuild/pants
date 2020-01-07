@@ -18,7 +18,7 @@ from pants.rules.core.test import (
   AddressAndDebugResult,
   AddressAndTestResult,
   coordinator_of_tests,
-  fast_test,
+  run_tests,
 )
 from pants.source.wrapped_globs import EagerFilesetWithSpec
 from pants.testutil.engine.util import MockConsole, MockGet, run_rule
@@ -36,7 +36,7 @@ class TestTest(TestBase):
     options = MockOptions(debug=debug)
     addr = self.make_build_target_address("some/target")
     res = run_rule(
-      fast_test,
+      run_tests,
       rule_args=[console, options, (addr,)],
       mock_gets=[
         MockGet(
@@ -115,7 +115,7 @@ class TestTest(TestBase):
       return AddressAndDebugResult(target, result)
 
     res = run_rule(
-      fast_test,
+      run_tests,
       rule_args=[console, options, (target1, target2)],
       mock_gets=[
         MockGet(product_type=AddressAndTestResult, subject_type=Address, mock=make_result),

@@ -65,7 +65,7 @@ class AddressAndDebugResult:
 
 
 @console_rule
-async def fast_test(console: Console, options: TestOptions, addresses: BuildFileAddresses) -> Test:
+async def run_tests(console: Console, options: TestOptions, addresses: BuildFileAddresses) -> Test:
   if options.values.debug:
     dependencies = tuple(SingleAddress(addr.spec_path, addr.target_name) for addr in addresses)
     address = await Get[BuildFileAddress](Specs(dependencies=dependencies))
@@ -151,5 +151,5 @@ def rules():
   return [
       coordinator_of_tests,
       coordinator_of_debug_tests,
-      fast_test,
+      run_tests,
     ]
