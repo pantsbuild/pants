@@ -5,7 +5,6 @@ import os
 import subprocess
 from contextlib import contextmanager
 
-from pants.base.deprecated import resolve_conflicting_options
 from pants.base.exceptions import TaskError
 
 from pants.contrib.go.subsystems.gofmt import Gofmt
@@ -17,13 +16,12 @@ class GoFmtTaskBase(GoWorkspaceTask):
   """Base class for tasks that run gofmt."""
 
   def _resolve_conflicting_skip(self, *, old_scope: str):
-    return resolve_conflicting_options(
-      old_option="skip",
-      new_option="skip",
+    # Skip mypy because this is a temporary hack, and mypy doesn't follow the inheritance chain
+    # properly.
+    return self.resolve_conflicting_skip_options( # type: ignore
       old_scope=old_scope,
       new_scope="gofmt",
-      old_container=self.get_options(),
-      new_container=Gofmt.global_instance().options,
+      subsystem=Gofmt.global_instance(),
     )
 
   @classmethod

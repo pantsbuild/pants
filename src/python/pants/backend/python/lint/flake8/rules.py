@@ -17,7 +17,7 @@ from pants.backend.python.subsystems.subprocess_environment import SubprocessEnc
 from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.legacy.structs import PythonTargetAdaptor, TargetAdaptor
-from pants.engine.rules import UnionRule, optionable_rule, rule
+from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.rules.core.lint import LintResult
 
@@ -91,4 +91,4 @@ async def lint(
 
 
 def rules():
-  return [lint, optionable_rule(Flake8), UnionRule(PythonLintTarget, Flake8Target)]
+  return [lint, subsystem_rule(Flake8), UnionRule(PythonLintTarget, Flake8Target)]

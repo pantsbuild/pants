@@ -40,13 +40,12 @@ class JavascriptStyleBase(NodeTask):
     )
 
   def _resolve_conflicting_skip(self, *, old_scope: str):
-    return resolve_conflicting_options(
-      old_option="skip",
-      new_option="skip",
+    # Skip mypy because this is a temporary hack, and mypy doesn't follow the inheritance chain
+    # properly.
+    return self.resolve_conflicting_skip_options( # type: ignore
       old_scope=old_scope,
       new_scope='eslint',
-      old_container=self.get_options(),
-      new_container=ESLint.global_instance().options,
+      subsystem=ESLint.global_instance(),
     )
 
   @classmethod

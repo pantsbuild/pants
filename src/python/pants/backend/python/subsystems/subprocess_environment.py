@@ -5,7 +5,7 @@ import os
 from dataclasses import dataclass
 from typing import Optional
 
-from pants.engine.rules import optionable_rule, rule
+from pants.engine.rules import rule, subsystem_rule
 from pants.subsystem.subsystem import Subsystem
 
 
@@ -52,6 +52,6 @@ def create_subprocess_encoding_environment(
 
 def rules():
   return [
-    optionable_rule(SubprocessEnvironment),
+    subsystem_rule(SubprocessEnvironment),
     create_subprocess_encoding_environment,
   ]

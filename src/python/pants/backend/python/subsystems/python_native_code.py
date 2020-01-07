@@ -15,7 +15,7 @@ from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.base.exceptions import IncompatiblePlatformsError
 from pants.binaries.executable_pex_tool import ExecutablePexTool
-from pants.engine.rules import optionable_rule, rule
+from pants.engine.rules import rule, subsystem_rule
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
 from pants.util.objects import SubclassesOf
@@ -167,6 +167,6 @@ def create_pex_native_build_environment(python_native_code: PythonNativeCode) ->
 
 def rules():
   return [
-    optionable_rule(PythonNativeCode),
+    subsystem_rule(PythonNativeCode),
     create_pex_native_build_environment,
   ]
