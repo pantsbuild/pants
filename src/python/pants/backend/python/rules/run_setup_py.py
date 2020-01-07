@@ -43,7 +43,7 @@ from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessR
 from pants.engine.legacy.graph import HydratedTarget, HydratedTargets, TransitiveHydratedTargets
 from pants.engine.legacy.structs import PythonBinaryAdaptor, PythonTargetAdaptor, ResourcesAdaptor
 from pants.engine.objects import Collection
-from pants.engine.rules import console_rule, optionable_rule, rule
+from pants.engine.rules import console_rule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.option.custom_types import shell_str
 from pants.rules.core.distdir import DistDir
@@ -549,5 +549,5 @@ def rules():
     get_owned_dependencies,
     get_exporting_owner,
     setup_setuptools,
-    optionable_rule(Setuptools),
+    subsystem_rule(Setuptools),
   ]
