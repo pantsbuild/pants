@@ -12,7 +12,6 @@ from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.build_environment import get_buildroot, pants_version
-from pants.base.deprecated import resolve_conflicting_options
 from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_all
 from pants.base.workunit import WorkUnitLabel
@@ -86,13 +85,10 @@ class Checkstyle(LintTaskMixin, Task):
 
   @property
   def skip_execution(self):
-    return resolve_conflicting_options(
-      old_option="skip",
-      new_option="skip",
+    return self.resolve_conflicting_skip_options(
       old_scope="lint-pythonstyle",
       new_scope="pycheck",
-      old_container=self.get_options(),
-      new_container=Pycheck.global_instance().options,
+      subsystem=Pycheck.global_instance(),
     )
 
   def _is_checked(self, target):
