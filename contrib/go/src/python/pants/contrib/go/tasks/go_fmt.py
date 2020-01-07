@@ -9,6 +9,10 @@ from pants.contrib.go.tasks.go_fmt_task_base import GoFmtTaskBase
 class GoFmt(FmtTaskMixin, GoFmtTaskBase):
   """Format Go code using gofmt."""
 
+  @property
+  def skip_execution(self):
+    return super()._resolve_conflicting_skip(old_scope="fmt-go")
+
   def execute(self):
     with self.go_fmt_invalid_targets(['-w']) as output:
       if output:

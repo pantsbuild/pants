@@ -128,6 +128,17 @@ def dict_with_files_option(s):
   return DictValueComponent.create(s)
 
 
+def shell_str(s: str) -> str:
+  """A member_type for strings that should be split upon parsing through `shlex.split()`.
+
+  For example, the option value `--foo --bar=val` would be split into `['--foo', '--bar=val']`,
+  and then the parser will safely merge this expanded list with any other values defined for the
+  option.
+
+  :API: public"""
+  return s
+
+
 def _convert(val, acceptable_types):
   """Ensure that val is one of the acceptable types, converting it if needed.
 

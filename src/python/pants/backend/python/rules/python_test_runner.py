@@ -6,6 +6,7 @@ from typing import Optional
 from pants.backend.python.rules.inject_init import InjectedInitDigest
 from pants.backend.python.rules.pex import Pex
 from pants.backend.python.rules.pex_from_target_closure import CreatePexFromTargetClosure
+from pants.backend.python.rules.prepare_chrooted_python_sources import ChrootedPythonSources
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
@@ -14,7 +15,7 @@ from pants.engine.addressable import BuildFileAddresses
 from pants.engine.fs import Digest, DirectoriesToMerge
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
-from pants.engine.legacy.graph import HydratedTarget, TransitiveHydratedTargets
+from pants.engine.legacy.graph import HydratedTarget, HydratedTargets, TransitiveHydratedTargets
 from pants.engine.legacy.structs import PythonTestsAdaptor
 from pants.engine.rules import UnionRule, optionable_rule, rule
 from pants.engine.selectors import Get, MultiGet
@@ -78,24 +79,11 @@ async def run_python_test(
     Address, test_target.address.to_address()
   )
 
-  source_root_stripped_sources = await MultiGet(
-    Get[SourceRootStrippedSources](HydratedTarget, hydrated_target)
-    for hydrated_target in all_targets
-  )
-
-  stripped_sources_digests = tuple(
-    stripped_sources.snapshot.directory_digest for stripped_sources in source_root_stripped_sources
-  )
-  sources_digest = await Get[Digest](DirectoriesToMerge(directories=stripped_sources_digests))
-  inits_digest = await Get[InjectedInitDigest](Digest, sources_digest)
+  chrooted_sources = await Get[ChrootedPythonSources](HydratedTargets(all_targets))
 
   merged_input_files = await Get[Digest](
     DirectoriesToMerge(
-      directories=(
-        sources_digest,
-        inits_digest.directory_digest,
-        resolved_requirements_pex.directory_digest,
-      )
+      directories=(chrooted_sources.digest, resolved_requirements_pex.directory_digest)
     ),
   )
 
@@ -110,7 +98,7 @@ async def run_python_test(
     python_setup=python_setup,
     subprocess_encoding_environment=subprocess_encoding_environment,
     pex_path=f'./{output_pytest_requirements_pex_filename}',
-    pex_args=(*pytest.get_args(), *test_target_sources_file_names),
+    pex_args=(*pytest.options.args, *test_target_sources_file_names),
     input_files=merged_input_files,
     description=f'Run Pytest for {test_target.address.reference()}',
     timeout_seconds=timeout_seconds if timeout_seconds is not None else 9999
@@ -169,7 +157,7 @@ async def debug_python_test(
   )
 
   test_target_sources_file_names = sorted(source_root_stripped_test_target_sources.snapshot.files)
-  pex_args = (*pytest.get_args(), *test_target_sources_file_names)
+  pex_args = (*pytest.options.args, *test_target_sources_file_names)
 
   run_request = InteractiveProcessRequest(
     argv=(output_pytest_requirements_pex_filename, *pex_args),

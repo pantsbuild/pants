@@ -17,7 +17,7 @@ from packaging.version import Version
 from pants.base.deprecated import CodeRemovedError
 from pants.base.hash_utils import CoercingEncoder
 from pants.option.config import Config
-from pants.option.custom_types import UnsetBool, file_option, target_option
+from pants.option.custom_types import UnsetBool, file_option, shell_str, target_option
 from pants.option.errors import (
   BooleanConversionError,
   BooleanOptionNameWithNo,
@@ -154,6 +154,9 @@ class OptionsTest(TestBase):
                     default=['//:a', '//:b'])
     register_global('--filey', type=file_option, default=None)
     register_global('--file-listy', type=list, member_type=file_option)
+    register_global(
+      '--shell-str-listy', type=list, member_type=shell_str, default='--default1 --default2=test',
+    )
 
     # Implicit value.
     register_global('--implicit-valuey', default='default', implicit_value='implicit')
@@ -551,6 +554,39 @@ class OptionsTest(TestBase):
           './pants', config={'GLOBAL': {'target_listy': '+["//:c", "//:d"]'} })
     check(['//:c', '//:d'],
           './pants', config={'GLOBAL': {'target_listy': '["//:c", "//:d"]'} })
+
+  def test_shell_str_list(self) -> None:
+    def check(
+      *,
+      expected: List[str],
+      flags: str = "",
+      env_val: Optional[str] = None,
+      config_val: Optional[str] = None,
+    ) -> None:
+      env = {"PANTS_GLOBAL_SHELL_STR_LISTY": env_val} if env_val else None
+      config = {"GLOBAL": {"shell_str_listy": config_val}} if config_val else None
+      global_options = self._parse(
+        args_str=f"./pants {flags}", env=env, config=config
+      ).for_global_scope()
+      assert global_options.shell_str_listy == expected
+
+    default = ['--default1', '--default2=test']
+    specified_args = ['arg1', 'arg2=foo', '--arg3']
+    all_args = [*default, *specified_args]
+
+    check(expected=default)
+
+    check(flags="--shell-str-listy='arg1 arg2=foo' --shell-str-listy='--arg3'", expected=all_args)
+    check(flags="""--shell-str-listy='+["arg1 arg2=foo", "--arg3"]'""", expected=all_args)
+    check(flags="""--shell-str-listy='["arg1 arg2=foo", "--arg3"]'""", expected=specified_args)
+
+    check(env_val='arg1 arg2=foo --arg3', expected=all_args)
+    check(env_val='+["arg1 arg2=foo", "--arg3"]', expected=all_args)
+    check(env_val='["arg1 arg2=foo", "--arg3"]', expected=specified_args)
+
+    check(config_val='arg1 arg2=foo --arg3', expected=all_args)
+    check(config_val='+["arg1 arg2=foo", "--arg3"]', expected=all_args)
+    check(config_val='["arg1 arg2=foo", "--arg3"]', expected=specified_args)
 
   def test_dict_option(self) -> None:
     def check(expected, args_str, env=None, config=None):

@@ -5,6 +5,7 @@ import multiprocessing
 
 from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
+from pants.base.deprecated import resolve_conflicting_options
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work, WorkerPool
 from pants.base.workunit import WorkUnitLabel
@@ -21,11 +22,14 @@ class ThriftLintError(Exception):
 class ThriftLinterTask(LintTaskMixin, NailgunTask):
   """Print lint warnings for thrift files."""
 
-  def raise_conflicting_option(self, option: str) -> None:
-    raise ValueError(
-      f"Conflicting options used. You used the new, preferred `--scrooge-linter-{option}`, but also "
-      f"used the deprecated `--lint-thrift-{option}`\nPlease use only one of these "
-      f"(preferably `--scrooge-linter-{option}`)."
+  def _resolve_conflicting_options(self, *, old_option: str, new_option: str):
+    return resolve_conflicting_options(
+      old_option=old_option,
+      new_option=new_option,
+      old_scope='lint-thrift',
+      new_scope='scrooge-linter',
+      old_container=self.get_options(),
+      new_container=ScroogeLinter.global_instance().options,
     )
 
   @staticmethod
@@ -66,6 +70,10 @@ class ThriftLinterTask(LintTaskMixin, NailgunTask):
     return ['thrift-linter']
 
   @property
+  def skip_execution(self):
+    return self._resolve_conflicting_options(old_option="skip", new_option="skip")
+
+  @property
   def cache_target_dirs(self):
     return True
 
@@ -82,25 +90,19 @@ class ThriftLinterTask(LintTaskMixin, NailgunTask):
     task_options = self.get_options()
     subsystem_options = ScroogeLinter.global_instance().options
 
-    task_strict_configured = not task_options.is_default('strict')
-    subsystem_strict_configured = not subsystem_options.is_default('strict')
-    if task_strict_configured and subsystem_strict_configured:
-      self.raise_conflicting_option("strict")
-    if subsystem_strict_configured:
+    # NB: _resolve_conflicting_options() used to assert that both options aren't configured.
+    self._resolve_conflicting_options(old_option="strict", new_option="strict")
+    if not subsystem_options.is_default("strict"):
       return self._to_bool(subsystem_options.strict)
-    if task_strict_configured:
+    if not task_options.is_default("strict"):
       return self._to_bool(task_options.strict)
 
     if target.thrift_linter_strict is not None:
       return self._to_bool(target.thrift_linter_strict)
 
-    task_strict_default_configured = not task_options.is_default('strict_default')
-    subsystem_strict_default_configured = not subsystem_options.is_default('strict_default')
-    if task_strict_default_configured and subsystem_strict_default_configured:
-      self.raise_conflicting_option("strict_default")
-    if task_strict_configured:
-      return self._to_bool(task_options.strict_default)
-    return self._to_bool(subsystem_options.strict_default)
+    return self._to_bool(
+      self._resolve_conflicting_options(old_option="strict_default", new_option="strict_default"),
+    )
 
   def _lint(self, target, classpath):
     self.context.log.debug(f'Linting {target.address.spec}')
@@ -108,7 +110,7 @@ class ThriftLinterTask(LintTaskMixin, NailgunTask):
     config_args = []
 
     config_args.extend(self.get_options().linter_args)
-    config_args.extend(ScroogeLinter.global_instance().get_args())
+    config_args.extend(ScroogeLinter.global_instance().options.args)
 
     # N.B. We always set --fatal-warnings to make sure errors like missing-namespace are at least printed.
     # If --no-strict is turned on, the return code will be 0 instead of 1, but the errors/warnings
@@ -141,26 +143,17 @@ class ThriftLinterTask(LintTaskMixin, NailgunTask):
 
   def execute(self):
     thrift_targets = self.get_targets(self._is_thrift)
-
-    task_worker_count_configured = not self.get_options().is_default("worker_count")
-    subsystem_worker_count_configured = not ScroogeLinter.global_instance().options.is_default("worker_count")
-    if task_worker_count_configured and subsystem_worker_count_configured:
-      self.raise_conflicting_option("worker_count")
-    worker_count = (
-      self.get_options().worker_count
-      if task_worker_count_configured
-      else ScroogeLinter.global_instance().options.worker_count
-    )
-
     with self.invalidated(thrift_targets) as invalidation_check:
       if not invalidation_check.invalid_vts:
         return
 
       with self.context.new_workunit('parallel-thrift-linter') as workunit:
-        worker_pool = WorkerPool(workunit.parent,
-                                 self.context.run_tracker,
-                                 worker_count,
-                                 workunit.name)
+        worker_pool = WorkerPool(
+          workunit.parent,
+          self.context.run_tracker,
+          self._resolve_conflicting_options(old_option="worker_count", new_option="worker_count"),
+          workunit.name,
+        )
 
         scrooge_linter_classpath = self.tool_classpath('scrooge-linter')
         results = []

@@ -5,6 +5,7 @@ from abc import abstractmethod
 
 from pants.backend.jvm.subsystems.scalafmt import Scalafmt
 from pants.backend.jvm.tasks.rewrite_base import RewriteBase
+from pants.base.deprecated import resolve_conflicting_options
 from pants.base.exceptions import TaskError
 from pants.java.jar.jar_dependency import JarDependency
 from pants.option.custom_types import file_option
@@ -18,6 +19,26 @@ class ScalafmtTask(RewriteBase):
   Classes that inherit from this should override additional_args and
   process_result to run different scalafmt commands.
   """
+
+  def _resolve_conflicting_options(self, *, old_option: str, new_option: str):
+    return resolve_conflicting_options(
+      old_option=old_option,
+      new_option=new_option,
+      old_scope='fmt-scalafmt',
+      new_scope='scalafmt',
+      old_container=self.get_options(),
+      new_container=Scalafmt.global_instance().options,
+    )
+
+  def _resolve_conflicting_skip(self, *, old_scope: str):
+    return resolve_conflicting_options(
+      old_option="skip",
+      new_option="skip",
+      old_scope=old_scope,
+      new_scope='scalafmt',
+      old_container=self.get_options(),
+      new_container=Scalafmt.global_instance().options,
+    )
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -51,16 +72,8 @@ class ScalafmtTask(RewriteBase):
     return super().implementation_version() + [('ScalaFmt', 5)]
 
   def invoke_tool(self, absolute_root, target_sources):
-    task_config = self.get_options().configuration
-    subsystem_config = Scalafmt.global_instance().get_options().config
-    if task_config and subsystem_config:
-      raise ValueError(
-        "Conflicting options for the config file used. You used the new, preferred "
-        "`--scalafmt-config`, but also used the deprecated `--fmt-scalafmt-configuration`.\n"
-        "Please use only one of these (preferably `--scalafmt-config`)."
-      )
-    config = task_config or subsystem_config or None
     args = list(self.additional_args)
+    config = self._resolve_conflicting_options(old_option="configuration", new_option="config")
     if config is not None:
       args.extend(['--config', config])
     args.extend([source for _target, source in target_sources])
@@ -95,6 +108,10 @@ class ScalaFmtCheckFormat(LintTaskMixin, ScalafmtTask):
   sideeffecting = False
   additional_args = ['--test']
 
+  @property
+  def skip_execution(self):
+    return super()._resolve_conflicting_skip(old_scope="lint-scalafmt")
+
   def process_result(self, result):
     if result != 0:
       raise TaskError('Scalafmt failed with exit code {}; to fix run: '
@@ -113,6 +130,10 @@ class ScalaFmtFormat(FmtTaskMixin, ScalafmtTask):
 
   sideeffecting = True
   additional_args = ['-i']
+
+  @property
+  def skip_execution(self):
+    return super()._resolve_conflicting_skip(old_scope="fmt-scalafmt")
 
   def process_result(self, result):
     # Processes the results of running the scalafmt command.

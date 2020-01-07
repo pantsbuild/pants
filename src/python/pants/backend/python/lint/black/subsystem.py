@@ -1,11 +1,8 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Tuple
-
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
-from pants.option.custom_types import file_option
-from pants.option.option_util import flatten_shlexed_list
+from pants.option.custom_types import file_option, shell_str
 
 
 class Black(PythonToolBase):
@@ -23,7 +20,7 @@ class Black(PythonToolBase):
       help="Don't use Black when running `./pants fmt` and `./pants lint`"
     )
     register(
-      '--args', type=list, member_type=str,
+      '--args', type=list, member_type=shell_str,
       help="Arguments to pass directly to Black, e.g. "
            "`--black-args=\"--target-version=py37 --quiet\"`",
     )
@@ -31,6 +28,3 @@ class Black(PythonToolBase):
       '--config', type=file_option, default=None, advanced=True,
       help="Path to Black's pyproject.toml config file"
     )
-
-  def get_args(self) -> Tuple[str, ...]:
-    return flatten_shlexed_list(self.get_options().args)

@@ -4,7 +4,7 @@
 import os
 from pathlib import Path
 from textwrap import dedent
-from typing import Iterable, List, Optional, Set, cast
+from typing import Iterable, List, Set
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.targets.python_binary import PythonBinary
@@ -15,7 +15,7 @@ from pants.backend.python.tasks.resolve_requirements import ResolveRequirements
 from pants.backend.python.tasks.resolve_requirements_task_base import ResolveRequirementsTaskBase
 from pants.base import hash_utils
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import deprecated_conditional
+from pants.base.deprecated import deprecated_conditional, resolve_conflicting_options
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.target import Target
@@ -47,6 +47,16 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
 
   _MYPY_COMPATIBLE_INTERPETER_CONSTRAINT = '>=3.5'
   _PYTHON_SOURCE_EXTENSION = '.py'
+
+  def _resolve_conflicting_options(self, *, old_option: str, new_option: str):
+    return resolve_conflicting_options(
+      old_option=old_option,
+      new_option=new_option,
+      old_scope='lint-mypy',
+      new_scope='mypy',
+      old_container=self.get_options(),
+      new_container=self._mypy_subsystem.options,
+    )
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -84,6 +94,10 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
   @classmethod
   def subsystem_dependencies(cls):
     return super().subsystem_dependencies() + (PythonInterpreterCache, MyPy)
+
+  @property
+  def skip_execution(self):
+    return self._resolve_conflicting_options(old_option="skip", new_option="skip")
 
   def find_mypy_interpreter(self):
     interpreters = self._interpreter_cache.setup(
@@ -165,21 +179,7 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
     return MyPy.global_instance()
 
   def _get_mypy_pex(self, py3_interpreter: PythonInterpreter, *extra_pexes: PEX) -> PEX:
-
-    def get_mypy_version() -> str:
-      task_version_configured = not self.get_options().is_default('version')
-      subsystem_version_configured = not self._mypy_subsystem.get_options().is_default('version')
-      if task_version_configured and subsystem_version_configured:
-        raise ValueError(
-          "Conflicting options for the MyPy version used. You used the new, preferred "
-          "`--mypy-version`, but also used the deprecated `--lint-mypy-version`.\nPlease use "
-          "only one of these (preferably `--mypy-version`)."
-        )
-      if task_version_configured:
-        return f"mypy=={self.get_options().version}"
-      return cast(str, self._mypy_subsystem.get_options().version)
-
-    mypy_version = get_mypy_version()
+    mypy_version = self._resolve_conflicting_options(old_option='version', new_option='version')
     extras_hash = hash_utils.hash_all(hash_utils.hash_dir(Path(extra_pex.path()))
                                       for extra_pex in extra_pexes)
 
@@ -258,18 +258,7 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
       # Construct the mypy command line.
       cmd = [f'--python-version={interpreter_for_targets.identity.python}']
 
-      def get_config() -> Optional[str]:
-        task_config = self.get_options().config_file
-        subsystem_config = self._mypy_subsystem.get_options().config
-        if task_config and subsystem_config:
-          raise ValueError(
-            "Conflicting options for the config file used. You used the new, preferred "
-            "`--mypy-config`, but also used the deprecated `--lint-mypy-config-file`.\nPlease use "
-            "only one of these (preferably `--mypy-config`)."
-          )
-        return subsystem_config or task_config or None
-
-      config = get_config()
+      config = self._resolve_conflicting_options(old_option='config_file', new_option='config')
       if config:
         cmd.append(f'--config-file={os.path.join(get_buildroot(), config)}')
       deprecated_conditional(
@@ -286,7 +275,7 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
                      "V2 implementation, which only supports `--mypy-args`.",
       )
       cmd.extend(self.get_passthru_args())
-      cmd.extend(self._mypy_subsystem.get_args())
+      cmd.extend(self._mypy_subsystem.options.args)
       cmd.append(f'@{sources_list_path}')
 
       with self.context.new_workunit(name='create_mypy_pex', labels=[WorkUnitLabel.PREP]):

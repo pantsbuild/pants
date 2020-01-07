@@ -37,6 +37,7 @@ from pants.option.custom_types import (
   dir_option,
   file_option,
   list_option,
+  shell_str,
   target_option,
 )
 from pants.option.errors import (
@@ -60,7 +61,7 @@ from pants.option.errors import (
   Shadowing,
 )
 from pants.option.option_tracker import OptionTracker
-from pants.option.option_util import is_dict_option, is_list_option
+from pants.option.option_util import flatten_shlexed_list, is_dict_option, is_list_option
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.ranked_value import RankedValue
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
@@ -490,7 +491,7 @@ class Parser:
 
   # TODO: Remove dict_option from here after deprecation is complete.
   _allowed_member_types = {
-    str, int, float, dict, dir_option, dict_option, file_option, target_option
+    str, int, float, dict, dir_option, dict_option, file_option, target_option, shell_str
   }
 
   def _validate(self, args, kwargs) -> None:
@@ -732,6 +733,8 @@ class Parser:
       # TODO: run `check()` for all elements of a list option too!!!
       merged_val = [self._convert_member_type(kwargs.get('member_type', str), x)
                     for x in merged_val]
+      if kwargs.get('member_type') == shell_str:
+        merged_val = flatten_shlexed_list(merged_val)
       for val in merged_val:
         check(val)
       ret = RankedValue(merged_rank, merged_val)

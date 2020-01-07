@@ -63,7 +63,7 @@ async def setup_black(black: Black) -> BlackSetup:
   return BlackSetup(
     requirements_pex=requirements_pex,
     config_snapshot=config_snapshot,
-    passthrough_args=black.get_args(),
+    passthrough_args=tuple(black.options.args),
     skip=black.options.skip,
   )
 

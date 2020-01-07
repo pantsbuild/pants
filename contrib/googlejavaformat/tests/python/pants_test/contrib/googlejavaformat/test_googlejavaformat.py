@@ -9,8 +9,8 @@ from pants.base.exceptions import TaskError
 from pants.build_graph.register import build_file_aliases as register_core
 from pants.testutil.jvm.nailgun_task_test_base import NailgunTaskTestBase
 
-from pants.contrib.googlejavaformat.googlejavaformat import (GoogleJavaFormat,
-                                                             GoogleJavaFormatCheckFormat)
+from pants.contrib.googlejavaformat.googlejavaformat import (GoogleJavaFormatLintTask,
+                                                             GoogleJavaFormatTask)
 
 
 class TestBase(NailgunTaskTestBase):
@@ -45,7 +45,7 @@ class GoogleJavaFormatTests(TestBase):
 
   @classmethod
   def task_type(cls):
-    return GoogleJavaFormat
+    return GoogleJavaFormatTask
 
   def test_googlejavaformat(self):
     javafile = self.create_file(
@@ -67,7 +67,7 @@ class GoogleJavaFormatCheckFormatTests(TestBase):
 
   @classmethod
   def task_type(cls):
-    return GoogleJavaFormatCheckFormat
+    return GoogleJavaFormatLintTask
 
   def test_lint_badformat(self):
     self.create_file(

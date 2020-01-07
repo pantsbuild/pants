@@ -5,14 +5,26 @@ import os
 import subprocess
 from contextlib import contextmanager
 
+from pants.base.deprecated import resolve_conflicting_options
 from pants.base.exceptions import TaskError
 
+from pants.contrib.go.subsystems.gofmt import Gofmt
 from pants.contrib.go.targets.go_local_source import GoLocalSource
 from pants.contrib.go.tasks.go_workspace_task import GoWorkspaceTask
 
 
 class GoFmtTaskBase(GoWorkspaceTask):
   """Base class for tasks that run gofmt."""
+
+  def _resolve_conflicting_skip(self, *, old_scope: str):
+    return resolve_conflicting_options(
+      old_option="skip",
+      new_option="skip",
+      old_scope=old_scope,
+      new_scope="gofmt",
+      old_container=self.get_options(),
+      new_container=Gofmt.global_instance().options,
+    )
 
   @classmethod
   def is_checked(cls, target):
@@ -25,6 +37,10 @@ class GoFmtTaskBase(GoWorkspaceTask):
       sources.update(source for source in target.sources_relative_to_buildroot()
                      if GoLocalSource.is_go_source(source))
     return sources
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super().subsystem_dependencies() + (Gofmt,)
 
   @contextmanager
   def go_fmt_invalid_targets(self, flags):

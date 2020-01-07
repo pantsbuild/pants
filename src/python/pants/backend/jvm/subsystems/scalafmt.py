@@ -16,3 +16,7 @@ class Scalafmt(Subsystem):
       '--config', type=file_option, default=None, fingerprint=True,
       help="Path to `.scalafmt.conf` or an alternative Scalafmt config file."
     )
+    register(
+      '--skip', type=bool, default=False,
+      help="Don't use Scalafmt when running `./pants fmt` and `./pants lint`."
+    )

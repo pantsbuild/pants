@@ -6,12 +6,16 @@ import sys
 import warnings
 from contextlib import contextmanager
 from functools import wraps
-from typing import Callable, Iterator, Optional
+from typing import TYPE_CHECKING, Callable, Iterator, Optional
 
 from packaging.version import InvalidVersion, Version
 
 from pants.util.memo import memoized_method
 from pants.version import PANTS_SEMVER
+
+
+if TYPE_CHECKING:
+  from pants.option.option_value_container import OptionValueContainer
 
 
 class DeprecationApplicationError(Exception):
@@ -294,3 +298,33 @@ def deprecated_module(
   :param stacklevel: The stacklevel to pass to warnings.warn.
   """
   warn_or_error(removal_version, 'module', hint_message, stacklevel=stacklevel)
+
+
+def resolve_conflicting_options(
+  *,
+  old_option: str,
+  new_option: str,
+  old_scope: str,
+  new_scope: str,
+  old_container: "OptionValueContainer",
+  new_container: "OptionValueContainer"
+):
+  """Utility for resolving an option that's been migrated to a new location.
+
+  This ensures that the user does not try to specify both options."""
+  old_configured = not old_container.is_default(old_option)
+  new_configured = not new_container.is_default(new_option)
+  if old_configured and new_configured:
+    def format_option(*, scope: str, option: str) -> str:
+      return f"`--{scope}-{option}`".replace('_', '-')
+
+    old_display = format_option(scope=old_scope, option=old_option)
+    new_display = format_option(scope=new_scope, option=new_option)
+    raise ValueError(
+      f"Conflicting options used. You used the new, preferred {new_display}, but also "
+      f"used the deprecated {old_display}.\n\nPlease use only one of these "
+      f"(preferably {new_display})."
+    )
+  if old_configured:
+    return old_container.get(old_option)
+  return new_container.get(new_option)

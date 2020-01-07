@@ -2,9 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import multiprocessing
-from typing import Tuple
 
-from pants.option.option_util import flatten_shlexed_list
+from pants.option.custom_types import shell_str
 from pants.subsystem.subsystem import Subsystem
 
 
@@ -16,9 +15,13 @@ class ScroogeLinter(Subsystem):
   def register_options(cls, register):
     super().register_options(register)
     register(
-      '--args', type=list, member_type=str, fingerprint=True,
+      '--args', type=list, member_type=shell_str, fingerprint=True,
       help="Arguments to pass directly to the Scrooge Thrift linter, e.g. "
-           "`--scrooge-linter-args=\"--disable-rule Namespaces\"`",
+           "`--scrooge-linter-args=\"--disable-rule Namespaces\"`.",
+    )
+    register(
+      '--skip', type=bool, default=False,
+      help="Don't use the Scrooge Thrift linter when running `./pants lint`."
     )
     register(
       '--strict', type=bool, fingerprint=True,
@@ -33,6 +36,3 @@ class ScroogeLinter(Subsystem):
       '--worker-count', default=multiprocessing.cpu_count(), advanced=True, type=int,
       help='Maximum number of workers to use for linter parallelization.',
     )
-
-  def get_args(self) -> Tuple[str, ...]:
-    return flatten_shlexed_list(self.get_options().args)

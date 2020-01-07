@@ -16,3 +16,7 @@ class Scalafix(Subsystem):
       '--config', type=file_option, default=None, fingerprint=True,
       help="Path to `.scalafix.conf` or an alternative Scalafix config file."
     )
+    register(
+      '--skip', type=bool, default=False,
+      help="Don't use Scalafix when running `./pants fmt` and `./pants lint`."
+    )
