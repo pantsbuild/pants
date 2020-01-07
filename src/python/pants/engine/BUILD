@@ -75,6 +75,16 @@ python_library(
 )
 
 python_library(
+  name='http',
+  sources=['http.py'],
+  dependencies=[
+    '3rdparty/python:dataclasses',
+    '3rdparty/python:requests',
+  ],
+  tags = {'partially_type_checked'},
+)
+
+python_library(
   name='build_files',
   sources=['build_files.py'],
   dependencies=[
@@ -253,4 +263,15 @@ python_library(
 resources(
   name='native_engine_shared_library',
   sources=['native_engine.so']
+)
+
+python_tests(
+  name = "tests",
+  sources = ["http_test.py"],
+  dependencies = [
+    ':http',
+    'src/python/pants/testutil:test_base',
+    'tests/python/pants_test:console_rule_test_base',
+    'tests/python/pants_test/engine:util'
+  ]
 )
