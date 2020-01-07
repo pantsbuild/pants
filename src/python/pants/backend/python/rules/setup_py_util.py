@@ -133,6 +133,10 @@ def find_packages(
     if init_py_path not in actual_init_pys:
       # PEP 420: "Regular packages will ... have an __init__.py and will reside in a single
       # directory. Namespace packages cannot contain an __init__.py."
+      # TODO: detect old-style, explicit namespace packages? That would require heuristics for
+      #  detecting calls to pkg_resources.declare_namespace, or to pkgutil.extend_path.
+      #  Or, allow exported targets to explicitly enumerate their namespace packages in the
+      #  BUILD file.
       namespace_packages.add(package)
 
   return (tuple(sorted(packages)),

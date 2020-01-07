@@ -45,7 +45,7 @@ from pants.engine.legacy.structs import PythonBinaryAdaptor, PythonTargetAdaptor
 from pants.engine.objects import Collection
 from pants.engine.rules import console_rule, optionable_rule, rule
 from pants.engine.selectors import Get, MultiGet
-from pants.option.option_util import flatten_shlexed_list
+from pants.option.custom_types import shell_str
 from pants.rules.core.distdir import DistDir
 from pants.rules.core.strip_source_root import SourceRootStrippedSources
 from pants.source.source_root import SourceRootConfig
@@ -182,32 +182,28 @@ class SetuptoolsSetup:
 
 
 class SetupPyOptions(GoalSubsystem):
+  """Run setup.py commands."""
   name = "setup-py2"
 
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
     register(
-      '--args', type=list, member_type=str,
+      '--args', type=list, member_type=shell_str,
       help="Arguments to pass directly to setup.py, e.g. "
            "`--setup-py2-args=\"bdist_wheel --python-tag py36.py37\"`. If unspecified, we just "
            "dump the setup.py chroot."
     )
 
-  def get_args(self) -> Tuple[str, ...]:
-    return tuple(flatten_shlexed_list(self.values.args))
-
 
 class SetupPy(Goal):
-  """Runs setup.py commands."""
   subsystem_cls = SetupPyOptions
 
 
 @console_rule
-async def run_setup_pys(addresses: BuildFileAddresses, options: SetupPyOptions, console: Console,
+async def run_setup_pys(targets: HydratedTargets, options: SetupPyOptions, console: Console,
                         distdir: DistDir, workspace: Workspace) -> SetupPy:
   """Run setup.py commands on all exported targets addressed."""
-  targets = await Get[HydratedTargets](BuildFileAddresses, addresses)
 
   exported_targets: List[ExportedTarget] = []
   nonexported_targets: List[HydratedTarget] = []
@@ -227,7 +223,7 @@ async def run_setup_pys(addresses: BuildFileAddresses, options: SetupPyOptions, 
   for exported_target, chroot in zip(exported_targets, chroots):
     addr = exported_target.hydrated_target.address.reference()
     provides = exported_target.hydrated_target.adaptor.provides
-    args = options.get_args()
+    args = options.values.args
     # TODO: We should run these in exported target dependency order, in case the
     #  command publishes a dist, in which case we must publish its dependencies first.
     #  Or, we can do so based on an option, and if the user doesn't require it we can
