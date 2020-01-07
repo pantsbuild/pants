@@ -7,13 +7,14 @@ from collections import defaultdict, deque
 from contextlib import contextmanager
 from dataclasses import dataclass
 from os.path import dirname
-from typing import Any, Tuple
+from typing import Any, Iterable, Tuple
 
 from twitter.common.collections import OrderedSet
 
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.parse_context import ParseContext
-from pants.base.specs import AscendantAddresses, DescendantAddresses, SingleAddress, Specs
+from pants.base.specs import AscendantAddresses, DescendantAddresses, SingleAddress, Spec, Specs
+from pants.base.target_roots import TargetRoots
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.app_base import AppBase, Bundle
@@ -186,17 +187,17 @@ class LegacyBuildGraph(BuildGraph):
     addresses = set(addresses) - set(self._target_by_address.keys())
     if not addresses:
       return
-    dependencies = tuple(SingleAddress(a.spec_path, a.target_name) for a in addresses)
-    for _ in self._inject_specs(Specs(dependencies=tuple(dependencies))):
+    dependencies = (SingleAddress(directory=a.spec_path, name=a.target_name) for a in addresses)
+    for _ in self._inject_specs(Specs(dependencies)):
       pass
 
-  def inject_roots_closure(self, target_roots, fail_fast=None):
+  def inject_roots_closure(self, target_roots: TargetRoots, fail_fast=None):
     for address in self._inject_specs(target_roots.specs):
       yield address
 
-  def inject_specs_closure(self, specs, fail_fast=None):
+  def inject_specs_closure(self, specs: Iterable[Spec], fail_fast=None):
     # Request loading of these specs.
-    for address in self._inject_specs(Specs(dependencies=tuple(specs))):
+    for address in self._inject_specs(Specs(specs)):
       yield address
 
   def resolve_address(self, address):
@@ -232,7 +233,7 @@ class LegacyBuildGraph(BuildGraph):
         yielded_addresses.add(address)
         yield address
 
-  def _inject_specs(self, specs):
+  def _inject_specs(self, specs: Specs):
     """Injects targets into the graph for the given `Specs` object.
 
     Yields the resulting addresses.
@@ -251,7 +252,7 @@ class LegacyBuildGraph(BuildGraph):
       yield hydrated_target.address
 
 
-class _DependentGraph(object):
+class _DependentGraph:
   """A graph for walking dependent addresses of TargetAdaptor objects.
 
   This avoids/imitates constructing a v1 BuildGraph object, because that codepath results
@@ -528,7 +529,7 @@ def _eager_fileset_with_spec(spec_path, filespec, snapshot, include_dirs=False):
 
 @rule
 async def hydrate_sources(
-  sources_field: SourcesField, glob_match_error_behavior: GlobMatchErrorBehavior
+  sources_field: SourcesField, glob_match_error_behavior: GlobMatchErrorBehavior,
 ) -> HydratedField:
   """Given a SourcesField, request a Snapshot for its path_globs and create an EagerFilesetWithSpec.
   """
@@ -548,7 +549,7 @@ async def hydrate_sources(
 
 @rule
 async def hydrate_bundles(
-  bundles_field: BundlesField, glob_match_error_behavior: GlobMatchErrorBehavior
+  bundles_field: BundlesField, glob_match_error_behavior: GlobMatchErrorBehavior,
 ) -> HydratedField:
   """Given a BundlesField, request Snapshots for each of its filesets and create BundleAdaptors."""
   path_globs_with_match_errors = [
