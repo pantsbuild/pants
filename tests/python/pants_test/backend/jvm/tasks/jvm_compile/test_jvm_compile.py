@@ -42,7 +42,7 @@ class JvmCompileTest(NailgunTaskTestBase):
     runtime_classpath.add_for_targets([target], [('default', pre_init_runtime_entry)])
 
     task = self.create_task(context)
-    resulting_classpath = task.create_runtime_classpath()
+    resulting_classpath = task.create_classpath_product()
     self.assertEqual([('default', pre_init_runtime_entry), ('default', compile_entry)],
       resulting_classpath.get_for_target(target))
 
