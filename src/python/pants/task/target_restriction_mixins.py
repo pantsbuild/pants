@@ -64,8 +64,12 @@ class HasSkipOptionMixin:
     # When the v2 goal is renamed from fmt2 to fmt, this option should be moved to that Goal, and
     # its implementation broadened to support all v2 formatters, as well as any v1 formatters we
     # fancy while we keep them around.
-    if hasattr(self.get_options(), "only"):
-      only = self.get_options().only
+    #
+    # Skip mypy because this is a temporary hack, and mypy doesn't follow the inheritance chain
+    # properly.
+    options = self.get_options() # type: ignore
+    if hasattr(options, "only"):
+      only = options.only
       if only is None:
         return skip
       elif only == "scalafix":
@@ -85,7 +89,9 @@ class HasSkipOptionMixin:
       new_option="skip",
       old_scope=old_scope,
       new_scope=new_scope,
-      old_container=self.get_options(),
+      # Skip mypy because this is a temporary hack, and mypy doesn't follow the inheritance chain
+      # properly.
+      old_container=self.get_options(), # type: ignore
       new_container=subsystem.options,
     )
     return self.resolve_only_as_skip(skip)
