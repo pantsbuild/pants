@@ -13,7 +13,7 @@ from pants.testutil.test_base import TestBase
 class WorkunitSubscriptableSubsystem(Subsystem):
   options_scope = "dummy scope"
 
-  def handle_workunits(self, workunits):
+  def handle_workunits(self, **kwargs):
     pass
 
 

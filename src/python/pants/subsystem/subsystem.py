@@ -183,9 +183,8 @@ class Subsystem(SubsystemClientMixin, Optionable):
     intended to be passed to StreamingWorkunitHandler. The caller provides a
     collection of strings representing a Python import path to a class that
     implements the `Subsystem` class. It will then inspect these classes for
-    the presence of a special method called `handle_workunits`, which expects a
-    single non-self argument - namely, a tuple of Python dictionaries
-    representing workunits.
+    the presence of a special method called `handle_workunits`, which will
+    be called with a set of kwargs - see the docstring for StreamingWorkunitHandler. 
 
     For instance, you might invoke this method with something like:
 
