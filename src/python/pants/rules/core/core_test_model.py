@@ -3,6 +3,7 @@
 
 from dataclasses import dataclass
 from enum import Enum
+from typing import Optional
 
 from pants.engine.fs import Digest
 from pants.engine.isolated_process import FallibleExecuteProcessResult
@@ -19,7 +20,7 @@ class TestResult:
   status: Status
   stdout: str
   stderr: str
-  coverage_digest: Digest
+  coverage_digest: Optional[Digest] = None
 
   # Prevent this class from being detected by pytest as a test class.
   __test__ = False
