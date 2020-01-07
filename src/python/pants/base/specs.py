@@ -232,7 +232,7 @@ def more_specific(spec1: Optional[Spec], spec2: Optional[Spec]) -> Spec:
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class SpecsMatcher:
+class AddressSpecsMatcher:
   """Contains filters for the output of a Specs match.
 
   This class is separated out from `Specs` to allow for both stuctural equality of the `tags` and
@@ -275,9 +275,10 @@ class SpecsMatcher:
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class Specs:
-  """A collection of Specs representing Spec subclasses, and a SpecsMatcher to filter results."""
+  """A collection of `AddressSpec`s representing AddressSpec subclasses, and a AddressSpecsMatcher
+  to filter results."""
   dependencies: Tuple[Spec, ...]
-  matcher: SpecsMatcher
+  matcher: AddressSpecsMatcher
 
   def __init__(
     self,
@@ -286,7 +287,7 @@ class Specs:
     exclude_patterns: Optional[Iterable[str]] = None,
   ) -> None:
     self.dependencies = tuple(dependencies)
-    self.matcher = SpecsMatcher(tags=tags, exclude_patterns=exclude_patterns)
+    self.matcher = AddressSpecsMatcher(tags=tags, exclude_patterns=exclude_patterns)
 
   def __iter__(self) -> Iterator[Spec]:
     return iter(self.dependencies)
