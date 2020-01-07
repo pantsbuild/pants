@@ -48,7 +48,7 @@ def calculate_timeout_seconds(
 @dataclass(frozen=True)
 class TestTargetSetup:
   requirements_pex: Pex
-  sources_file_names: Tuple[str, ...]
+  args: Tuple[str, ...]
   input_files_digest: Digest
 
 
@@ -88,7 +88,7 @@ async def setup_pytest_for_target(test_target: PythonTestsAdaptor, pytest: PyTes
 
   return TestTargetSetup(
     requirements_pex=resolved_requirements_pex,
-    sources_file_names=tuple(sorted(source_root_stripped_test_target_sources.snapshot.files)),
+    args=(*pytest.options.args, *sorted(source_root_stripped_test_target_sources.snapshot.files)),
     input_files_digest=merged_input_files
   )
 
@@ -96,13 +96,12 @@ async def setup_pytest_for_target(test_target: PythonTestsAdaptor, pytest: PyTes
 @rule(name="Run pytest")
 async def run_python_test(
   test_target: PythonTestsAdaptor,
+  test_setup: TestTargetSetup,
   pytest: PyTest,
   python_setup: PythonSetup,
   subprocess_encoding_environment: SubprocessEncodingEnvironment
 ) -> TestResult:
   """Runs pytest for one target."""
-
-  test_setup = await Get[TestTargetSetup](PythonTestsAdaptor, test_target)
 
   timeout_seconds = calculate_timeout_seconds(
     timeouts_enabled=pytest.options.timeouts,
@@ -114,7 +113,7 @@ async def run_python_test(
     python_setup=python_setup,
     subprocess_encoding_environment=subprocess_encoding_environment,
     pex_path=f'./{test_setup.requirements_pex.output_filename}',
-    pex_args=(*pytest.options.args, *test_setup.sources_file_names),
+    pex_args=test_setup.args,
     input_files=test_setup.input_files_digest,
     description=f'Run Pytest for {test_target.address.reference()}',
     timeout_seconds=timeout_seconds if timeout_seconds is not None else 9999
@@ -126,16 +125,12 @@ async def run_python_test(
 @rule(name="Run pytest in an interactive process")
 async def debug_python_test(
   test_target: PythonTestsAdaptor,
-  pytest: PyTest,
-  python_setup: PythonSetup,
+  test_setup: TestTargetSetup,
   runner: InteractiveRunner
 ) -> TestDebugResult:
 
-  test_setup = await Get[TestTargetSetup](PythonTestsAdaptor, test_target)
-  pex_args = (*pytest.options.args, *test_setup.sources_file_names)
-
   run_request = InteractiveProcessRequest(
-    argv=(test_setup.requirements_pex.output_filename, *pex_args),
+    argv=(test_setup.requirements_pex.output_filename, *test_setup.args),
     run_in_workspace=False,
     input_files=test_setup.input_files_digest
   )
