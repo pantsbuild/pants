@@ -235,7 +235,15 @@ def rule_decorator(*args, **kwargs) -> Callable:
     )
     for name, parameter in signature.parameters.items()
   )
+  validate_parameter_types(func_id, parameter_types, cacheable)
   return _make_rule(return_type, parameter_types, cacheable=cacheable, name=name)(func)
+
+
+def validate_parameter_types(func_id: str, parameter_types: Tuple[Type, ...], cacheable: bool):
+  if cacheable:
+    for ty in parameter_types:
+      if getattr(ty, "side_effecting", False):
+        raise ValueError(f"Non-console `@rule` {func_id} has a side-effecting parameter: {ty}")
 
 
 def inner_rule(*args, **kwargs) -> Callable:
