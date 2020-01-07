@@ -54,7 +54,7 @@ class GoalRunnerFactory:
     spec_parser = CmdLineSpecParser(self._root_dir)
 
     for goal in requested_goals:
-      if address_mapper.is_valid_single_address(spec_parser.parse_spec(goal)):
+      if address_mapper.is_valid_single_address(spec_parser.parse_address_spec(goal)):
         logger.warning("Command-line argument '{0}' is ambiguous and was assumed to be "
                        "a goal. If this is incorrect, disambiguate it with ./{0}.".format(goal))
 

@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from functools import update_wrapper
 from typing import Any, Set, Tuple, Type
 
-from pants.base.specs import Spec
+from pants.base.specs import AddressSpec
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.objects import Collection, Resolvable, Serializable
 from pants.util.objects import TypeConstraintError
@@ -21,7 +21,7 @@ class Addresses(Collection[Address]):
 class ProvenancedBuildFileAddress:
   """A BuildFileAddress along with the cmd-line spec it was generated from."""
   build_file_address: BuildFileAddress
-  provenance: Spec
+  provenance: AddressSpec
 
 
 class BuildFileAddresses(Collection[BuildFileAddress]):

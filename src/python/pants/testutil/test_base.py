@@ -16,7 +16,7 @@ from typing import Any, Optional, Type, TypeVar, Union, cast
 from pants.base.build_root import BuildRoot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.exceptions import TaskError
-from pants.base.specs import Specs
+from pants.base.specs import AddressSpecs
 from pants.base.target_roots import TargetRoots
 from pants.build_graph.address import Address
 from pants.build_graph.build_configuration import BuildConfiguration
@@ -401,7 +401,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     ).new_session(zipkin_trace_v2=False, build_id="buildid_for_test")
     self._scheduler = graph_session.scheduler_session
     self._build_graph, self._address_mapper = graph_session.create_build_graph(
-        TargetRoots(Specs([])), self._build_root()
+        TargetRoots(AddressSpecs([])), self._build_root()
       )
 
   @property
@@ -565,7 +565,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     Returns the set of all Targets found.
     """
 
-    spec = CmdLineSpecParser(self.build_root).parse_spec(spec)
+    spec = CmdLineSpecParser(self.build_root).parse_address_spec(spec)
     targets = []
     for address in self.build_graph.inject_specs_closure([spec]):
       targets.append(self.build_graph.get_target(address))

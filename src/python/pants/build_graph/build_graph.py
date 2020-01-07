@@ -6,9 +6,11 @@ import logging
 import weakref
 from abc import ABC, abstractmethod
 from collections import OrderedDict, defaultdict, deque
+from typing import Iterable
 
 from twitter.common.collections import OrderedSet
 
+from pants.base.specs import AddressSpec
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.injectables_mixin import InjectablesMixin
@@ -602,12 +604,12 @@ class BuildGraph(ABC):
     """
 
   @abstractmethod
-  def inject_specs_closure(self, specs, fail_fast=None):
+  def inject_specs_closure(self, specs: Iterable[AddressSpec], fail_fast=None):
     """Resolves, constructs and injects Targets and their transitive closures of dependencies.
 
     :API: public
 
-    :param specs: A list of base.specs.Spec objects to resolve and inject.
+    :param specs: An iterable of AddressSpec objects to resolve and inject.
     :param fail_fast: Whether to fail quickly for the first error, or to complete all
       possible injections before failing.
     :returns: Yields a sequence of resolved Address objects.

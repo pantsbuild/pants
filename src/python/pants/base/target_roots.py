@@ -3,7 +3,7 @@
 
 from dataclasses import dataclass
 
-from pants.base.specs import Specs
+from pants.base.specs import AddressSpecs
 
 
 class InvalidSpecConstraint(Exception):
@@ -13,4 +13,4 @@ class InvalidSpecConstraint(Exception):
 @dataclass(frozen=True)
 class TargetRoots:
   """Determines the target roots for a given pants run."""
-  specs: Specs
+  specs: AddressSpecs

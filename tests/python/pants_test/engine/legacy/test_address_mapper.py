@@ -116,18 +116,18 @@ class LegacyAddressMapperTest(TestBase):
       mapper.addresses_in_spec_path('foo')
     self.assertIn('does not match any targets.', str(cm.exception))
 
-  def test_scan_specs(self):
+  def test_scan_address_specs(self):
     self.create_build_files()
     mapper = self.address_mapper
-    addresses = mapper.scan_specs([SingleAddress('dir_a', 'a'), SiblingAddresses('')])
+    addresses = mapper.scan_address_specs([SingleAddress('dir_a', 'a'), SiblingAddresses('')])
     self.assertEqual(addresses,
                       {Address('', 'a'), Address('', 'b'), Address('', 'c'), Address('dir_a', 'a')})
 
-  def test_scan_specs_bad_spec(self):
+  def test_scan_address_specs_bad_spec(self):
     self.create_build_files()
     mapper = self.address_mapper
     with self.assertRaises(AddressMapper.BuildFileScanError) as cm:
-      mapper.scan_specs([SingleAddress('dir_a', 'd')])
+      mapper.scan_address_specs([SingleAddress('dir_a', 'd')])
     self.assertIn('does not match any targets.', str(cm.exception))
 
   def test_scan_addresses(self):

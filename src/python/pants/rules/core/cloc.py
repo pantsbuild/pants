@@ -4,7 +4,7 @@
 from dataclasses import dataclass
 from typing import Set
 
-from pants.base.specs import Specs
+from pants.base.specs import AddressSpecs
 from pants.engine.console import Console
 from pants.engine.fs import (
   Digest,
@@ -67,7 +67,10 @@ class CountLinesOfCode(Goal):
 
 @console_rule
 async def run_cloc(
-  console: Console, options: CountLinesOfCodeOptions, cloc_script: DownloadedClocScript, specs: Specs
+  console: Console,
+  options: CountLinesOfCodeOptions,
+  cloc_script: DownloadedClocScript,
+  address_specs: AddressSpecs,
 ) -> CountLinesOfCode:
   """Runs the cloc perl script in an isolated process"""
 
@@ -75,10 +78,10 @@ async def run_cloc(
   ignored = options.values.ignored
 
   if transitive:
-    transitive_hydrated_targets = await Get[TransitiveHydratedTargets](Specs, specs)
+    transitive_hydrated_targets = await Get[TransitiveHydratedTargets](AddressSpecs, address_specs)
     all_target_adaptors = {ht.adaptor for ht in transitive_hydrated_targets.closure}
   else:
-    hydrated_targets = await Get[HydratedTargets](Specs, specs)
+    hydrated_targets = await Get[HydratedTargets](AddressSpecs, address_specs)
     all_target_adaptors = {ht.adaptor for ht in hydrated_targets}
 
   digests_to_merge = []

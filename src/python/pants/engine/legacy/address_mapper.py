@@ -5,7 +5,7 @@ import logging
 import os
 
 from pants.base.build_file import BuildFile
-from pants.base.specs import DescendantAddresses, SiblingAddresses, Specs
+from pants.base.specs import AddressSpecs, DescendantAddresses, SiblingAddresses
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.address_mapper import AddressMapper
 from pants.engine.addressable import BuildFileAddresses
@@ -50,9 +50,9 @@ class LegacyAddressMapper(AddressMapper):
     return LegacyAddressMapper.any_is_declaring_file(address, [file_path])
 
   def addresses_in_spec_path(self, spec_path):
-    return self.scan_specs([SiblingAddresses(spec_path)])
+    return self.scan_address_specs([SiblingAddresses(spec_path)])
 
-  def scan_specs(self, specs, fail_fast=True):
+  def scan_address_specs(self, specs, fail_fast=True):
     return self._internal_scan_specs(specs, fail_fast=fail_fast, missing_is_fatal=True)
 
   def _specs_string(self, specs):
@@ -61,7 +61,7 @@ class LegacyAddressMapper(AddressMapper):
   def _internal_scan_specs(self, specs, fail_fast=True, missing_is_fatal=True):
     # TODO: This should really use `product_request`, but on the other hand, we need to
     # deprecate the entire `AddressMapper` interface anyway. See #4769.
-    request = self._scheduler.execution_request([BuildFileAddresses], [Specs(tuple(specs))])
+    request = self._scheduler.execution_request([BuildFileAddresses], [AddressSpecs(tuple(specs))])
     returns, throws = self._scheduler.execute(request)
 
     if throws:
@@ -69,7 +69,7 @@ class LegacyAddressMapper(AddressMapper):
       if isinstance(state.exc, (AddressLookupError, ResolveError)):
         if missing_is_fatal:
           raise self.BuildFileScanError(
-            'Spec `{}` does not match any targets.\n{}'.format(
+            'AddressSpec `{}` does not match any targets.\n{}'.format(
               self._specs_string(specs), str(state.exc)))
         else:
           # NB: ignore Throws containing ResolveErrors because they are due to missing targets / files
@@ -80,7 +80,7 @@ class LegacyAddressMapper(AddressMapper):
     _, state = returns[0]
     if missing_is_fatal and not state.value.dependencies:
       raise self.BuildFileScanError(
-        'Spec `{}` does not match any targets.'.format(self._specs_string(specs)))
+        'AddressSpec `{}` does not match any targets.'.format(self._specs_string(specs)))
 
     return set(state.value.dependencies)
 

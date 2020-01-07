@@ -13,7 +13,13 @@ from twitter.common.collections import OrderedSet
 
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.parse_context import ParseContext
-from pants.base.specs import AscendantAddresses, DescendantAddresses, SingleAddress, Spec, Specs
+from pants.base.specs import (
+  AddressSpec,
+  AddressSpecs,
+  AscendantAddresses,
+  DescendantAddresses,
+  SingleAddress,
+)
 from pants.base.target_roots import TargetRoots
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
@@ -188,16 +194,16 @@ class LegacyBuildGraph(BuildGraph):
     if not addresses:
       return
     dependencies = (SingleAddress(directory=a.spec_path, name=a.target_name) for a in addresses)
-    for _ in self._inject_specs(Specs(dependencies)):
+    for _ in self._inject_address_specs(AddressSpecs(dependencies)):
       pass
 
   def inject_roots_closure(self, target_roots: TargetRoots, fail_fast=None):
-    for address in self._inject_specs(target_roots.specs):
+    for address in self._inject_address_specs(target_roots.specs):
       yield address
 
-  def inject_specs_closure(self, specs: Iterable[Spec], fail_fast=None):
+  def inject_specs_closure(self, specs: Iterable[AddressSpec], fail_fast=None):
     # Request loading of these specs.
-    for address in self._inject_specs(Specs(specs)):
+    for address in self._inject_address_specs(AddressSpecs(specs)):
       yield address
 
   def resolve_address(self, address):
@@ -217,7 +223,7 @@ class LegacyBuildGraph(BuildGraph):
   def _inject_addresses(self, subjects):
     """Injects targets into the graph for each of the given `Address` objects, and then yields them.
 
-    TODO: See #5606 about undoing the split between `_inject_addresses` and `_inject_specs`.
+    TODO: See #5606 about undoing the split between `_inject_addresses` and `_inject_address_specs`.
     """
     logger.debug('Injecting addresses to %s: %s', self, subjects)
     with self._resolve_context():
@@ -233,8 +239,8 @@ class LegacyBuildGraph(BuildGraph):
         yielded_addresses.add(address)
         yield address
 
-  def _inject_specs(self, specs: Specs):
-    """Injects targets into the graph for the given `Specs` object.
+  def _inject_address_specs(self, specs: AddressSpecs):
+    """Injects targets into the graph for the given `AddressSpecs` object.
 
     Yields the resulting addresses.
     """
@@ -403,7 +409,7 @@ async def find_owners(
 
   # Walk up the buildroot looking for targets that would conceivably claim changed sources.
   candidate_specs = tuple(AscendantAddresses(directory=d) for d in dirs_set)
-  candidate_targets = await Get[HydratedTargets](Specs(candidate_specs))
+  candidate_targets = await Get[HydratedTargets](AddressSpecs(candidate_specs))
 
   # Match the source globs against the expanded candidate targets.
   def owns_any_source(legacy_target):
@@ -432,7 +438,7 @@ async def find_owners(
     return BuildFileAddresses(direct_owners)
   else:
     # Otherwise: find dependees.
-    all_addresses = await Get[BuildFileAddresses](Specs((DescendantAddresses(''),)))
+    all_addresses = await Get[BuildFileAddresses](AddressSpecs((DescendantAddresses(''),)))
     all_structs = [
       s.value for s in
       await MultiGet(Get[HydratedStruct](Address, a.to_address()) for a in all_addresses)

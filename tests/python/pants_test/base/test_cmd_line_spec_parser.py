@@ -2,22 +2,23 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+from typing import Optional
 
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
-from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
+from pants.base.specs import AddressSpec, DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.testutil.test_base import TestBase
 
 
-def single(directory, name=None):
+def single(directory: str, name: Optional[str] = None) -> SingleAddress:
   name = name if name is not None else os.path.basename(directory)
   return SingleAddress(directory, name)
 
 
-def desc(directory):
+def desc(directory: str) -> DescendantAddresses:
   return DescendantAddresses(directory)
 
 
-def sib(directory):
+def sib(directory: str) -> SiblingAddresses:
   return SiblingAddresses(directory)
 
 
@@ -89,5 +90,5 @@ class CmdLineSpecParserTest(TestBase):
     self.assert_parsed('./a/b/:b', single('a/b', 'b'))
     self.assert_parsed(os.path.join(self.build_root, './a/b/:b'), single('a/b', 'b'))
 
-  def assert_parsed(self, spec_str, expected_spec):
-    self.assertEqual(self._spec_parser.parse_spec(spec_str), expected_spec)
+  def assert_parsed(self, spec_str: str, expected_address_spec: AddressSpec) -> None:
+    self.assertEqual(self._spec_parser.parse_address_spec(spec_str), expected_address_spec)

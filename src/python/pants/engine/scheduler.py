@@ -376,8 +376,8 @@ class SchedulerSession:
 
     :param products: A list of product types to request for the roots.
     :type products: list of types
-    :param subjects: A list of Spec and/or PathGlobs objects.
-    :type subject: list of :class:`pants.base.specs.Spec`, `pants.build_graph.Address`, and/or
+    :param subjects: A list of AddressSpec and/or PathGlobs objects.
+    :type subject: list of :class:`pants.base.specs.AddressSpec`, `pants.build_graph.Address`, and/or
       :class:`pants.engine.fs.PathGlobs` objects.
     :returns: An ExecutionRequest for the given products and subjects.
     """
