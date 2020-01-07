@@ -1,7 +1,8 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Optional
+from dataclasses import dataclass
+from typing import Optional, Tuple
 
 from pants.backend.python.rules.pex import Pex
 from pants.backend.python.rules.pex_from_target_closure import CreatePexFromTargetClosure
@@ -44,25 +45,24 @@ def calculate_timeout_seconds(
   return target_timeout
 
 
-@rule(name="Run pytest")
-async def run_python_test(
-  test_target: PythonTestsAdaptor,
-  pytest: PyTest,
-  python_setup: PythonSetup,
-  subprocess_encoding_environment: SubprocessEncodingEnvironment
-) -> TestResult:
-  """Runs pytest for one target."""
+@dataclass(frozen=True)
+class TestTargetSetup:
+  requirements_pex: Pex
+  sources_file_names: Tuple[str, ...]
+  input_files_digest: Digest
 
+
+@rule
+async def setup_pytest_for_target(test_target: PythonTestsAdaptor, pytest: PyTest) -> TestTargetSetup:
   transitive_hydrated_targets = await Get[TransitiveHydratedTargets](
     BuildFileAddresses((test_target.address,))
   )
   all_targets = transitive_hydrated_targets.closure
 
-  output_pytest_requirements_pex_filename = 'pytest-with-requirements.pex'
   resolved_requirements_pex = await Get[Pex](
     CreatePexFromTargetClosure(
       build_file_addresses=BuildFileAddresses((test_target.address,)),
-      output_filename=output_pytest_requirements_pex_filename,
+      output_filename='pytest-with-requirements.pex',
       entry_point="pytest:main",
       additional_requirements=pytest.get_requirement_strings(),
       include_source_files=False
@@ -86,19 +86,36 @@ async def run_python_test(
     ),
   )
 
-  test_target_sources_file_names = sorted(source_root_stripped_test_target_sources.snapshot.files)
+  return TestTargetSetup(
+    requirements_pex=resolved_requirements_pex,
+    sources_file_names=tuple(sorted(source_root_stripped_test_target_sources.snapshot.files)),
+    input_files_digest=merged_input_files
+  )
+
+
+@rule(name="Run pytest")
+async def run_python_test(
+  test_target: PythonTestsAdaptor,
+  pytest: PyTest,
+  python_setup: PythonSetup,
+  subprocess_encoding_environment: SubprocessEncodingEnvironment
+) -> TestResult:
+  """Runs pytest for one target."""
+
+  test_setup = await Get[TestTargetSetup](PythonTestsAdaptor, test_target)
+
   timeout_seconds = calculate_timeout_seconds(
     timeouts_enabled=pytest.options.timeouts,
     target_timeout=getattr(test_target, 'timeout', None),
     timeout_default=pytest.options.timeout_default,
     timeout_maximum=pytest.options.timeout_maximum,
   )
-  request = resolved_requirements_pex.create_execute_request(
+  request = test_setup.requirements_pex.create_execute_request(
     python_setup=python_setup,
     subprocess_encoding_environment=subprocess_encoding_environment,
-    pex_path=f'./{output_pytest_requirements_pex_filename}',
-    pex_args=(*pytest.options.args, *test_target_sources_file_names),
-    input_files=merged_input_files,
+    pex_path=f'./{test_setup.requirements_pex.output_filename}',
+    pex_args=(*pytest.options.args, *test_setup.sources_file_names),
+    input_files=test_setup.input_files_digest,
     description=f'Run Pytest for {test_target.address.reference()}',
     timeout_seconds=timeout_seconds if timeout_seconds is not None else 9999
   )
@@ -114,45 +131,16 @@ async def debug_python_test(
   runner: InteractiveRunner
 ) -> TestDebugResult:
 
-  transitive_hydrated_targets = await Get[TransitiveHydratedTargets](
-    BuildFileAddresses((test_target.address,))
-  )
-  all_targets = transitive_hydrated_targets.closure
-
-  output_pytest_requirements_pex_filename = 'pytest-with-requirements.pex'
-  resolved_requirements_pex = await Get[Pex](
-    CreatePexFromTargetClosure(
-      build_file_addresses=BuildFileAddresses((test_target.address,)),
-      output_filename=output_pytest_requirements_pex_filename,
-      entry_point="pytest:main",
-      additional_requirements=pytest.get_requirement_strings(),
-      include_source_files=False
-    )
-  )
-
-  source_root_stripped_test_target_sources = await Get[SourceRootStrippedSources](
-    Address, test_target.address.to_address()
-  )
-
-  chrooted_sources = await Get[ChrootedPythonSources](HydratedTargets(all_targets))
-
-  merged_input_files = await Get[Digest](
-    DirectoriesToMerge(
-      directories=(chrooted_sources.digest, resolved_requirements_pex.directory_digest)
-    ),
-  )
-
-  test_target_sources_file_names = sorted(source_root_stripped_test_target_sources.snapshot.files)
-  pex_args = (*pytest.options.args, *test_target_sources_file_names)
+  test_setup = await Get[TestTargetSetup](PythonTestsAdaptor, test_target)
+  pex_args = (*pytest.options.args, *test_setup.sources_file_names)
 
   run_request = InteractiveProcessRequest(
-    argv=(output_pytest_requirements_pex_filename, *pex_args),
+    argv=(test_setup.requirements_pex.output_filename, *pex_args),
     run_in_workspace=False,
-    input_files=merged_input_files
+    input_files=test_setup.input_files_digest
   )
 
   result = runner.run_local_interactive_process(run_request)
-
   return TestDebugResult(result.process_exit_code)
 
 
@@ -160,6 +148,7 @@ def rules():
   return [
     run_python_test,
     debug_python_test,
+    setup_pytest_for_target,
     UnionRule(TestTarget, PythonTestsAdaptor),
     optionable_rule(PyTest),
     optionable_rule(PythonSetup),
