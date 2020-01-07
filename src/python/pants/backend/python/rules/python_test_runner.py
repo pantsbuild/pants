@@ -77,10 +77,13 @@ class TestTargetSetup:
 
 
 def get_packages_to_cover(
+  test_target: PythonTestsAdaptor,
   coverage: str,
   source_root_stripped_file_paths: List[str],
 ) -> Set[str]:
   if coverage == 'auto':
+    if hasattr(test_target, 'coverage'):
+      return set(test_target.coverage)
     return set(
       os.path.dirname(source_root_stripped_source_file_path).replace(os.sep, '.')
       for source_root_stripped_source_file_path in source_root_stripped_file_paths
@@ -117,18 +120,10 @@ async def setup_pytest_for_target(test_target: PythonTestsAdaptor, pytest: PyTes
   )
 
   chrooted_sources = await Get[ChrootedPythonSources](HydratedTargets(all_targets))
-  source_root_stripped_sources = await MultiGet(
-    Get[SourceRootStrippedSources](HydratedTarget, hydrated_target)
-    for hydrated_target in all_targets
-  )
 
-  stripped_sources_digests = tuple(
-    stripped_sources.snapshot.directory_digest for stripped_sources in source_root_stripped_sources
-  )
   coveragerc_digest = await Get[Digest](InputFilesContent, get_coveragerc_input(DEFAULT_COVERAGE_CONFIG.encode()))
 
-  merged_input_files: Digest = await Get(
-    Digest,
+  merged_input_files: Digest = await Get[Digest](
     DirectoriesToMerge(
       directories=(
         chrooted_sources.digest,
@@ -141,6 +136,7 @@ async def setup_pytest_for_target(test_target: PythonTestsAdaptor, pytest: PyTes
   coverage_args = []
   if pytest.options.coverage:
     packages_to_cover = get_packages_to_cover(
+      test_target,
       coverage=pytest.options.coverage,
       source_root_stripped_file_paths=test_target_sources_file_names,
     )
