@@ -57,6 +57,9 @@ class TestResult:
 class TestDebugResult:
   exit_code: int
 
+  # Prevent this class from being detected by pytest as a test class.
+  __test__ = False
+
 
 @union
 class TestTarget:

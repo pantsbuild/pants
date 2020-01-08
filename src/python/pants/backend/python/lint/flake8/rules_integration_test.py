@@ -1,7 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import List, Optional, Sequence
+from typing import List, Optional
 
 from pants.backend.python.lint.flake8.rules import Flake8Target
 from pants.backend.python.lint.flake8.rules import rules as flake8_rules
@@ -61,8 +61,8 @@ class Flake8IntegrationTest(TestBase):
     source_files: List[FileContent],
     *,
     config: Optional[str] = None,
-    passthrough_args: Optional[Sequence[str]] = None,
-    interpreter_constraints: Optional[Sequence[str]] = None,
+    passthrough_args: Optional[str] = None,
+    interpreter_constraints: Optional[str] = None,
     skip: bool = False,
   ) -> LintResult:
     if config is not None:
@@ -72,13 +72,13 @@ class Flake8IntegrationTest(TestBase):
       PythonTargetAdaptor(
         sources=EagerFilesetWithSpec('test', {'globs': []}, snapshot=input_snapshot),
         address=Address.parse("test:target"),
-        compatibility=interpreter_constraints,
+        compatibility=[interpreter_constraints] if interpreter_constraints else None,
       )
     )
     flake8_subsystem = global_subsystem_instance(
       Flake8, options={Flake8.options_scope: {
         "config": ".flake8" if config else None,
-        "args": passthrough_args or [],
+        "args": [passthrough_args] if passthrough_args else [],
         "skip": skip,
       }}
     )
@@ -111,10 +111,10 @@ class Flake8IntegrationTest(TestBase):
 
   @skip_unless_python27_and_python3_present
   def test_uses_correct_python_version(self) -> None:
-    py2_result = self.run_flake8([self.py3_only_source], interpreter_constraints=['CPython==2.7.*'])
+    py2_result = self.run_flake8([self.py3_only_source], interpreter_constraints='CPython==2.7.*')
     assert py2_result.exit_code == 1
     assert "test/py3.py:1:8: E999 SyntaxError" in py2_result.stdout
-    py3_result = self.run_flake8([self.py3_only_source], interpreter_constraints=['CPython>=3.6'])
+    py3_result = self.run_flake8([self.py3_only_source], interpreter_constraints='CPython>=3.6')
     assert py3_result.exit_code == 0
     assert py3_result.stdout.strip() == ""
 
@@ -124,7 +124,7 @@ class Flake8IntegrationTest(TestBase):
     assert result.stdout.strip() == ""
 
   def test_respects_passthrough_args(self) -> None:
-    result = self.run_flake8([self.bad_source], passthrough_args=["--ignore=F401"])
+    result = self.run_flake8([self.bad_source], passthrough_args="--ignore=F401")
     assert result.exit_code == 0
     assert result.stdout.strip() == ""
 

@@ -1,7 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import List, Optional, Sequence, Tuple
+from typing import List, Optional, Tuple
 
 from pants.backend.python.lint.black.rules import BlackSetup, BlackTarget
 from pants.backend.python.lint.black.rules import rules as black_rules
@@ -65,7 +65,7 @@ class BlackIntegrationTest(TestBase):
     source_files: List[FileContent],
     *,
     config: Optional[str] = None,
-    passthrough_args: Optional[Sequence[str]] = None,
+    passthrough_args: Optional[str] = None,
     skip: bool = False,
   ) -> Tuple[LintResult, FmtResult]:
     if config is not None:
@@ -80,7 +80,7 @@ class BlackIntegrationTest(TestBase):
     black_subsystem = global_subsystem_instance(
       Black, options={Black.options_scope: {
         "config": "pyproject.toml" if config else None,
-        "args": passthrough_args or [],
+        "args": [passthrough_args] if passthrough_args else [],
         "skip": skip,
       }}
     )
@@ -135,7 +135,7 @@ class BlackIntegrationTest(TestBase):
 
   def test_respects_passthrough_args(self) -> None:
     lint_result, fmt_result = self.run_black(
-      [self.needs_config_source], passthrough_args=["--skip-string-normalization"]
+      [self.needs_config_source], passthrough_args="--skip-string-normalization"
     )
     assert lint_result.exit_code == 0
     assert "1 file would be left unchanged" in lint_result.stderr

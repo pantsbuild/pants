@@ -1,7 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import List, Optional, Sequence, Tuple
+from typing import List, Optional, Tuple
 
 from pants.backend.python.lint.isort.rules import IsortSetup, IsortTarget
 from pants.backend.python.lint.isort.rules import rules as isort_rules
@@ -73,7 +73,7 @@ class IsortIntegrationTest(TestBase):
     source_files: List[FileContent],
     *,
     config: Optional[str] = None,
-    passthrough_args: Optional[Sequence[str]] = None,
+    passthrough_args: Optional[str] = None,
     skip: bool = False,
   ) -> Tuple[LintResult, FmtResult]:
     if config is not None:
@@ -88,7 +88,7 @@ class IsortIntegrationTest(TestBase):
     isort_subsystem = global_subsystem_instance(
       Isort, options={Isort.options_scope: {
         "config": [".isort.cfg"] if config else None,
-        "args": passthrough_args or [],
+        "args": [passthrough_args] if passthrough_args else [],
         "skip": skip,
       }}
     )
@@ -147,7 +147,7 @@ class IsortIntegrationTest(TestBase):
 
   def test_respects_passthrough_args(self) -> None:
     lint_result, fmt_result = self.run_isort(
-      [self.needs_config_source], passthrough_args=["--combine-as"],
+      [self.needs_config_source], passthrough_args="--combine-as",
     )
     assert lint_result.exit_code == 1
     assert "test/config.py Imports are incorrectly sorted" in lint_result.stdout

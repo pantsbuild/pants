@@ -51,6 +51,10 @@ class TestTargetSetup:
   requirements_pex: Pex
   args: Tuple[str, ...]
   input_files_digest: Digest
+  timeout_seconds: Optional[int]
+
+  # Prevent this class from being detected by pytest as a test class.
+  __test__ = False
 
 
 @rule
@@ -69,6 +73,12 @@ async def setup_pytest_for_target(test_target: PythonTestsAdaptor, pytest: PyTes
       include_source_files=False
     )
   )
+  chrooted_sources = await Get[ChrootedPythonSources](HydratedTargets(all_targets))
+  merged_input_files = await Get[Digest](
+    DirectoriesToMerge(
+      directories=(chrooted_sources.digest, resolved_requirements_pex.directory_digest)
+    ),
+  )
 
   # Get the file names for the test_target, adjusted for the source root. This allows us to
   # specify to Pytest which files to test and thus to avoid the test auto-discovery defined by
@@ -79,32 +89,6 @@ async def setup_pytest_for_target(test_target: PythonTestsAdaptor, pytest: PyTes
     Address, test_target.address.to_address()
   )
 
-  chrooted_sources = await Get[ChrootedPythonSources](HydratedTargets(all_targets))
-
-  merged_input_files = await Get[Digest](
-    DirectoriesToMerge(
-      directories=(chrooted_sources.digest, resolved_requirements_pex.directory_digest)
-    ),
-  )
-
-  return TestTargetSetup(
-    requirements_pex=resolved_requirements_pex,
-    args=(*pytest.options.args, *sorted(source_root_stripped_test_target_sources.snapshot.files)),
-    input_files_digest=merged_input_files
-  )
-
-
-@rule(name="Run pytest")
-async def run_python_test(
-  test_target: PythonTestsAdaptor,
-  test_setup: TestTargetSetup,
-  pytest: PyTest,
-  python_setup: PythonSetup,
-  subprocess_encoding_environment: SubprocessEncodingEnvironment,
-  global_options: GlobalOptions,
-) -> TestResult:
-  """Runs pytest for one target."""
-
   timeout_seconds = calculate_timeout_seconds(
     timeouts_enabled=pytest.options.timeouts,
     target_timeout=getattr(test_target, 'timeout', None),
@@ -112,6 +96,23 @@ async def run_python_test(
     timeout_maximum=pytest.options.timeout_maximum,
   )
 
+  return TestTargetSetup(
+    requirements_pex=resolved_requirements_pex,
+    args=(*pytest.options.args, *sorted(source_root_stripped_test_target_sources.snapshot.files)),
+    input_files_digest=merged_input_files,
+    timeout_seconds=timeout_seconds,
+  )
+
+
+@rule(name="Run pytest")
+async def run_python_test(
+  test_target: PythonTestsAdaptor,
+  test_setup: TestTargetSetup,
+  python_setup: PythonSetup,
+  subprocess_encoding_environment: SubprocessEncodingEnvironment,
+  global_options: GlobalOptions,
+) -> TestResult:
+  """Runs pytest for one target."""
   colors = global_options.colors
   env = {"PYTEST_ADDOPTS": f"--color={'yes' if colors else 'no'}"}
 
@@ -122,8 +123,8 @@ async def run_python_test(
     pex_args=test_setup.args,
     input_files=test_setup.input_files_digest,
     description=f'Run Pytest for {test_target.address.reference()}',
-    timeout_seconds=timeout_seconds if timeout_seconds is not None else 9999,
-    env=env
+    timeout_seconds=test_setup.timeout_seconds if test_setup.timeout_seconds is not None else 9999,
+    env=env,
   )
   result = await Get[FallibleExecuteProcessResult](ExecuteProcessRequest, request)
   return TestResult.from_fallible_execute_process_result(result)
@@ -131,17 +132,13 @@ async def run_python_test(
 
 @rule(name="Run pytest in an interactive process")
 async def debug_python_test(
-  test_target: PythonTestsAdaptor,
-  test_setup: TestTargetSetup,
-  runner: InteractiveRunner
+  test_setup: TestTargetSetup, runner: InteractiveRunner,
 ) -> TestDebugResult:
-
   run_request = InteractiveProcessRequest(
     argv=(test_setup.requirements_pex.output_filename, *test_setup.args),
     run_in_workspace=False,
     input_files=test_setup.input_files_digest
   )
-
   result = runner.run_local_interactive_process(run_request)
   return TestDebugResult(result.process_exit_code)
 
