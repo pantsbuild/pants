@@ -390,7 +390,6 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     self._worker_count = worker_count
 
     self._size_estimator = self.size_estimator_by_name(self.get_options().size_estimator)
-    self._classpath_product_key = "runtime_classpath"
 
   @memoized_property
   def _missing_deps_finder(self):
@@ -429,6 +428,13 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
 
     relevant_targets = list(self.context.targets(predicate=self.select))
 
+    # If we are only exporting jars then we can omit some targets from the runtime_classpath.
+    if self.context.products.is_required_data("export_dep_as_jar_classpath") and not self.context.products.is_required_data("runtime_classpath"):
+      # Filter modulized targets from invalid targets list.
+      target_root_addresses = [t.address for t in set(self.context.target_roots)]
+      dependees_of_target_roots = self.context.build_graph.transitive_dependees_of_addresses(target_root_addresses)
+      relevant_targets = list(set(relevant_targets) - dependees_of_target_roots)
+
     if not relevant_targets:
       return
 
@@ -463,18 +469,19 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
             classpath_product.remove_for_target(cc.target, [(conf, cc.classes_dir)])
             classpath_product.add_for_target(cc.target, [(conf, cc.jar_file)])
 
+      if self.context.products.is_required_data("export_dep_as_jar_classpath"):
+        self.context.products.get_data('export_dep_as_jar_classpath', classpath_product.copy)
+
   def _classpath_for_context(self, context):
     if self.get_options().use_classpath_jars:
       return context.jar_file
     return context.classes_dir
 
   def create_classpath_product(self):
-    if self.context.products.is_required_data("export_dep_as_jar_classpath"):
-      self._classpath_product_key = "export_dep_as_jar_classpath"
     compile_classpath = self.context.products.get_data('compile_classpath')
-    classpath_product = self.context.products.get_data(self._classpath_product_key)
+    classpath_product = self.context.products.get_data("runtime_classpath")
     if not classpath_product:
-      classpath_product = self.context.products.get_data(self._classpath_product_key, compile_classpath.copy)
+      classpath_product = self.context.products.get_data("runtime_classpath", compile_classpath.copy)
     else:
       classpath_product.update(compile_classpath)
 
@@ -485,12 +492,6 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
 
     invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]
     valid_targets = [vt.target for vt in invalidation_check.all_vts if vt.valid]
-
-    if self.context.products.is_required_data("export_dep_as_jar_classpath"):
-      # filter modulized targets from invalid targets list.
-      target_root_addresses = [t.address for t in set(self.context.target_roots)]
-      dependees_of_target_roots = self.context.build_graph.transitive_dependees_of_addresses(target_root_addresses)
-      invalid_targets = list(set(invalid_targets) - dependees_of_target_roots)
 
     if self.execution_strategy == self.ExecutionStrategy.hermetic:
       self._set_directory_digests_for_valid_target_classpath_directories(valid_targets, compile_contexts)

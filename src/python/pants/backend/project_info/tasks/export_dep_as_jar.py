@@ -356,7 +356,7 @@ class ExportDepAsJar(ConsoleTask):
   def console_output(self, targets):
     runtime_classpath = self.context.products.get_data('export_dep_as_jar_classpath')
     if runtime_classpath is None:
-      raise TaskError("There was an error compiling the targets - There is no runtime classpath")
+      raise TaskError("There was an error compiling the targets - There is no export_dep_as_jar classpath")
     graph_info = self.generate_targets_map(targets, runtime_classpath=runtime_classpath)
     if self.get_options().formatted:
       return json.dumps(graph_info, indent=4, separators=(',', ': ')).splitlines()
