@@ -17,7 +17,7 @@ from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
 from pants.engine.legacy.structs import PythonTestsAdaptor
 from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
-from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.option.global_options import GlobalOptionValueContainer
 from pants.rules.core.core_test_model import TestResult, TestTarget
 from pants.rules.core.strip_source_root import SourceRootStrippedSources
 
@@ -50,7 +50,7 @@ async def run_python_test(
   pytest: PyTest,
   python_setup: PythonSetup,
   subprocess_encoding_environment: SubprocessEncodingEnvironment,
-  options_bootstrapper: OptionsBootstrapper
+  global_options_values: GlobalOptionValueContainer,
 ) -> TestResult:
   """Runs pytest for one target."""
 
@@ -95,8 +95,8 @@ async def run_python_test(
     timeout_maximum=pytest.options.timeout_maximum,
   )
 
-  global_options = options_bootstrapper.bootstrap_options.for_global_scope()
-  colors = global_options.colors
+  #global_options = global_options_values.inner
+  colors = global_options_values.colors
   env = {"PYTEST_ADDOPTS": f"--color={'yes' if colors else 'no'}"}
 
   request = resolved_requirements_pex.create_execute_request(

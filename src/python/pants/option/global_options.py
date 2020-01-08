@@ -17,9 +17,18 @@ from pants.base.build_environment import (
 )
 from pants.option.custom_types import dir_option, file_option
 from pants.option.errors import OptionsError
+from pants.option.option_value_container import OptionValueContainer
 from pants.option.optionable import Optionable
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
+
+
+@dataclass(frozen=True)
+class GlobalOptionValueContainer:
+  _inner: OptionValueContainer
+
+  def __getattr__(self, key):
+    return self._inner.__getattr__(key)
 
 
 class GlobMatchErrorBehavior(Enum):
