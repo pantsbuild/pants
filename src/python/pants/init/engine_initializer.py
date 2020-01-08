@@ -59,7 +59,6 @@ from pants.init.options_initializer import BuildConfigInitializer, OptionsInitia
 from pants.option.global_options import (
   DEFAULT_EXECUTION_OPTIONS,
   ExecutionOptions,
-  GlobalOptionValueContainer,
   GlobMatchErrorBehavior,
 )
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -219,11 +218,10 @@ class LegacyGraphSession:
     )
     workspace = Workspace(self.scheduler_session)
     interactive_runner = InteractiveRunner(self.scheduler_session)
-    global_options_values = GlobalOptionValueContainer(_inner=global_options)
 
     for goal in goals:
       goal_product = self.goal_map[goal]
-      params = Params(subject, options_bootstrapper, console, workspace, interactive_runner, global_options_values)
+      params = Params(subject, options_bootstrapper, console, workspace, interactive_runner)
       logger.debug(f'requesting {goal_product} to satisfy execution of `{goal}` goal')
       try:
         exit_code = self.scheduler_session.run_console_rule(goal_product, params)
@@ -405,7 +403,6 @@ class EngineInitializer:
     rules = (
       [
         RootRule(Console),
-        RootRule(GlobalOptionValueContainer),
         glob_match_error_behavior_singleton,
         build_configuration_singleton,
         symbol_table_singleton,

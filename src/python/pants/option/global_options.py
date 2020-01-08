@@ -24,7 +24,7 @@ from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
 
 
 @dataclass(frozen=True)
-class GlobalOptionValueContainer:
+class GlobalOptions:
   _inner: OptionValueContainer
 
   def __getattr__(self, key):
