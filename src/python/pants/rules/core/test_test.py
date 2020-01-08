@@ -13,12 +13,14 @@ from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, Snapshot
 from pants.engine.legacy.graph import HydratedTarget
 from pants.engine.legacy.structs import PythonBinaryAdaptor, PythonTestsAdaptor
 from pants.engine.rules import UnionMembership
-from pants.rules.core.core_test_model import Status, TestDebugResult, TestResult, TestTarget
 from pants.rules.core.test import (
-  AddressAndDebugResult,
   AddressAndTestResult,
+  Status,
+  TestDebugResult,
+  TestResult,
+  TestTarget,
   coordinator_of_tests,
-  run_tests,
+  fast_test,
 )
 from pants.source.wrapped_globs import EagerFilesetWithSpec
 from pants.testutil.engine.util import MockConsole, MockGet, run_rule
