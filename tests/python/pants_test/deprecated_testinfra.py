@@ -19,7 +19,7 @@ def deprecated_testinfra_module(instead=None):
     instead = f'pants.testutil.{caller_module_name.lstrip("pants_test.")}'
 
   deprecated_module(
-    removal_version='1.26.0.dev2',
+    removal_version='1.26.0.dev1',
     hint_message=f'Import {instead} from the pantsbuild.pants.testutil distribution instead.',
     stacklevel=4
   )

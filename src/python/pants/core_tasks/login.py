@@ -43,7 +43,7 @@ class Login(ConsoleTask):
 
     deprecated_conditional(
       lambda: self.get_passthru_args(),
-      removal_version='1.26.0.dev3',
+      removal_version='1.26.0.dev1',
       entity_description='Using passthrough args with `./pants login`',
       hint_message="Instead of passing the provider through `--login-passthrough-args` or the "
                    "style `./pants login -- prod`, use the option `--login-to`, such as "

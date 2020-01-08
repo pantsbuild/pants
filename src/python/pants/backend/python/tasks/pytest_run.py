@@ -660,7 +660,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
 
       deprecated_conditional(
         lambda: self.get_passthru_args(),
-        removal_version='1.26.0.dev3',
+        removal_version='1.26.0.dev1',
         entity_description='Using the old style of passthrough args for Pytest',
         hint_message="You passed arguments to Pytest through either the "
                      "`--test-pytest-passthrough-args` option or the style "

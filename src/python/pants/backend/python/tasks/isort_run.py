@@ -54,7 +54,7 @@ class IsortRun(FmtTaskMixin, Task):
       isort_subsystem = Isort.global_instance()
       deprecated_conditional(
         lambda: self.get_passthru_args(),
-        removal_version='1.26.0.dev3',
+        removal_version='1.26.0.dev1',
         entity_description='Using the old style of passthrough args for isort',
         hint_message="You passed arguments to isort through either the "
                      "`--fmt-isort-passthrough-args` option or the style "

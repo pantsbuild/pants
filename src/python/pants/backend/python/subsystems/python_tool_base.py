@@ -36,7 +36,7 @@ class PythonToolBase(Subsystem):
     register('--requirements', type=list, advanced=True, fingerprint=True,
              default=cls.default_requirements,
              help='Python requirement strings for the tool.',
-             removal_version='1.26.0.dev2',
+             removal_version='1.26.0.dev1',
              removal_hint="Instead of `--requirements`, use `--version` and, optionally, "
                           "`--extra-requirements`.")
     register('--entry-point', type=str, advanced=True, fingerprint=True,
@@ -52,7 +52,7 @@ class PythonToolBase(Subsystem):
 
     deprecated_conditional(
       lambda: defined_default_deprecated_options,
-      removal_version="1.26.0.dev2",
+      removal_version="1.26.0.dev1",
       entity_description="Defining `default_requirements` for a subclass of `PythonToolBase`",
       hint_message="Instead of defining `default_requirements`, define `default_version` and, "
                    "optionally, `default_extra_requirements`."
