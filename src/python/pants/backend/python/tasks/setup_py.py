@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import inspect
-import io
 import itertools
 import os
 import shutil
@@ -10,7 +9,6 @@ import subprocess
 import textwrap
 from abc import ABC, abstractmethod
 from collections import OrderedDict, defaultdict
-from collections.abc import Iterable, Mapping, MutableSequence, Set
 
 from pex.installer import Packager, WheelInstaller
 from pex.interpreter import PythonInterpreter
@@ -20,6 +18,7 @@ from pex.pex_info import PexInfo
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil.chroot import Chroot
 
+from pants.backend.python.rules.setup_py_util import distutils_repr
 from pants.backend.python.subsystems.pex_build_util import is_local_python_dist
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
@@ -46,64 +45,6 @@ from setuptools import setup
 
 setup(**{setup_dict})
 """
-
-
-# Distutils does not support unicode strings in setup.py, so we must explicitly convert to binary
-# strings as pants uses unicode_literals. A natural and prior technique was to use `pprint.pformat`,
-# but that embeds u's in the string itself during conversion. For that reason we roll out own
-# literal pretty-printer here.
-#
-# Note that we must still keep this code, even though Pants only runs with Python 3, because
-# the created product may still be run by Python 2.
-#
-# For more information, see http://bugs.python.org/issue13943.
-def distutils_repr(obj):
-  output = io.StringIO()
-  linesep = os.linesep
-
-  def _write(data):
-    output.write(ensure_text(data))
-
-  def _write_repr(o, indent=False, level=0):
-    pad = ' ' * 4 * level
-    if indent:
-      _write(pad)
-    level += 1
-
-    if isinstance(o, (bytes, str)):
-      # The py2 repr of str (unicode) is `u'...'` and we don't want the `u` prefix; likewise,
-      # the py3 repr of bytes is `b'...'` and we don't want the `b` prefix so we hand-roll a
-      # repr here.
-      if linesep in o:
-        _write('"""{}"""'.format(ensure_text(o.replace('"""', r'\"\"\"'))))
-      else:
-        _write("'{}'".format(ensure_text(o.replace("'", r"\'"))))
-    elif isinstance(o, Mapping):
-      _write('{' + linesep)
-      for k, v in o.items():
-        _write_repr(k, indent=True, level=level)
-        _write(': ')
-        _write_repr(v, indent=False, level=level)
-        _write(',' + linesep)
-      _write(pad + '}')
-    elif isinstance(o, Iterable):
-      if isinstance(o, MutableSequence):
-        open_collection, close_collection = '[]'
-      elif isinstance(o, Set):
-        open_collection, close_collection = '{}'
-      else:
-        open_collection, close_collection = '()'
-
-      _write(open_collection + linesep)
-      for i in o:
-        _write_repr(i, indent=True, level=level)
-        _write(',' + linesep)
-      _write(pad + close_collection)
-    else:
-      _write(repr(o))  # Numbers and bools.
-
-  _write_repr(obj)
-  return output.getvalue()
 
 
 class SetupPyRunner(WheelInstaller):

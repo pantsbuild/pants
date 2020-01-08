@@ -145,19 +145,19 @@ class Address:
     normpath = os.path.normpath(path)
     components = normpath.split(os.sep)
     if components[0] in ('.', '..') or normpath != path:
-      raise InvalidSpecPath("Spec has un-normalized path part '{path}'".format(path=path))
+      raise InvalidSpecPath("Address spec has un-normalized path part '{path}'".format(path=path))
     if components[-1].startswith('BUILD'):
-      raise InvalidSpecPath('Spec path {path} has {trailing} as the last path part and BUILD is '
+      raise InvalidSpecPath('Address spec path {path} has {trailing} as the last path part and BUILD is '
                             'reserved files'.format(path=path, trailing=components[-1]))
     if os.path.isabs(path):
-      raise InvalidSpecPath('Spec has absolute path {path}; expected a path relative '
+      raise InvalidSpecPath('Address spec has absolute path {path}; expected a path relative '
                             'to the build root.'.format(path=path))
     return normpath if normpath != '.' else ''
 
   @classmethod
   def check_target_name(cls, spec_path, name):
     if not name:
-      raise InvalidTargetName('Spec {spec}:{name} has no name part'
+      raise InvalidTargetName('Address spec {spec}:{name} has no name part'
                                  .format(spec=spec_path, name=name))
 
     banned_chars = BANNED_CHARS_IN_TARGET_NAME & set(name)

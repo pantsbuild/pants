@@ -6,7 +6,7 @@ from textwrap import dedent
 from typing import Dict, Optional
 from unittest.mock import Mock
 
-from pants.base.specs import DescendantAddresses, SingleAddress, Spec, Specs
+from pants.base.specs import AddressSpec, AddressSpecs, DescendantAddresses, SingleAddress
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.build_files import AddressProvenanceMap
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, Snapshot
@@ -51,7 +51,7 @@ class TestTest(TestBase):
         ),
         MockGet(
           product_type=BuildFileAddress,
-          subject_type=Specs,
+          subject_type=AddressSpecs,
           mock=lambda _: BuildFileAddress(
             build_file=None,
             target_name=addr.target_name,
@@ -122,7 +122,7 @@ class TestTest(TestBase):
         MockGet(product_type=AddressAndDebugResult, subject_type=Address, mock=make_debug_result),
         MockGet(
           product_type=BuildFileAddress,
-          subject_type=Specs,
+          subject_type=AddressSpecs,
           mock=lambda tgt: BuildFileAddress(
             build_file=None,
             target_name=tgt.target_name,
@@ -169,7 +169,7 @@ class TestTest(TestBase):
     self,
     *,
     address: Address,
-    bfaddr_to_spec: Optional[Dict[BuildFileAddress, Spec]] = None,
+    bfaddr_to_address_spec: Optional[Dict[BuildFileAddress, AddressSpec]] = None,
     test_target_type: bool = True,
     include_sources: bool = True,
   ) -> AddressAndTestResult:
@@ -195,7 +195,7 @@ class TestTest(TestBase):
         rule_args=[
           HydratedTarget(address, target_adaptor, ()),
           UnionMembership(union_rules={TestTarget: [PythonTestsAdaptor]}),
-          AddressProvenanceMap(bfaddr_to_spec=bfaddr_to_spec or {}),
+          AddressProvenanceMap(bfaddr_to_address_spec=bfaddr_to_address_spec or {}),
         ],
         mock_gets=[
           MockGet(
@@ -222,7 +222,7 @@ class TestTest(TestBase):
     with self.assertRaisesRegex(AssertionError, r'Rule requested: .* which cannot be satisfied.'):
       self.run_coordinator_of_tests(
         address=bfaddr.to_address(),
-        bfaddr_to_spec={bfaddr: SingleAddress(directory='some/dir', name='bin')},
+        bfaddr_to_address_spec={bfaddr: SingleAddress(directory='some/dir', name='bin')},
         test_target_type=False,
       )
 
@@ -235,7 +235,7 @@ class TestTest(TestBase):
     bfaddr = BuildFileAddress(None, 'tests', 'some/dir')
     result = self.run_coordinator_of_tests(
       address=bfaddr.to_address(),
-      bfaddr_to_spec={bfaddr: DescendantAddresses(directory='some/dir')}
+      bfaddr_to_address_spec={bfaddr: DescendantAddresses(directory='some/dir')}
     )
     assert result == AddressAndTestResult(
       bfaddr.to_address(), TestResult(status=Status.SUCCESS, stdout='foo', stderr='')
@@ -245,7 +245,7 @@ class TestTest(TestBase):
     bfaddr = BuildFileAddress(None, 'bin', 'some/dir')
     result = self.run_coordinator_of_tests(
       address=bfaddr.to_address(),
-      bfaddr_to_spec={bfaddr: DescendantAddresses(directory='some/dir')},
+      bfaddr_to_address_spec={bfaddr: DescendantAddresses(directory='some/dir')},
       test_target_type=False,
     )
     assert result == AddressAndTestResult(bfaddr.to_address(), None)

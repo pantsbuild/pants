@@ -77,7 +77,7 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
     spec_parser = CmdLineSpecParser(get_buildroot())
     # project_path is always the directory of the first target,
     # which is where intellij is going to zoom in under project view.
-    project_path = spec_parser.parse_spec(target_specs[0]).directory
+    project_path = spec_parser.parse_address_spec(target_specs[0]).directory
 
     with self.temporary_workdir() as workdir:
       with temporary_file(root_dir=workdir, cleanup=True) as output_file:

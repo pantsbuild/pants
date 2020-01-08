@@ -506,7 +506,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              help=f'The maximum number of times to loop when `{loop_flag}` is specified.')
 
     register('-t', '--timeout', advanced=True, type=int, metavar='<seconds>',
-            removal_version="1.26.0.dev2",
+            removal_version="1.26.0.dev1",
             removal_hint="This option is not used and may be removed with no change in behavior. ",
             help='Number of seconds to wait for http connections.')
     # TODO: After moving to the new options system these abstraction leaks can go away.

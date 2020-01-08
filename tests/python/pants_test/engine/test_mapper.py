@@ -6,7 +6,7 @@ import unittest
 from contextlib import contextmanager
 from textwrap import dedent
 
-from pants.base.specs import SingleAddress, Specs
+from pants.base.specs import AddressSpec, AddressSpecs, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.build_files import create_graph_rules
@@ -54,7 +54,7 @@ class AddressMapTest(unittest.TestCase):
     self.assertEqual(path, address_map.path)
     yield address_map
 
-  def test_parse(self):
+  def test_parse(self) -> None:
     with self.parse_address_map(dedent("""
       {
         "type_alias": "thing",
@@ -71,17 +71,17 @@ class AddressMapTest(unittest.TestCase):
       self.assertEqual({'one': Thing(name='one', age=42), 'two': Thing(name='two', age=37)},
                        address_map.objects_by_name)
 
-  def test_not_serializable(self):
+  def test_not_serializable(self) -> None:
     with self.assertRaises(UnaddressableObjectError):
       with self.parse_address_map('{}'):
         self.fail()
 
-  def test_not_named(self):
+  def test_not_named(self) -> None:
     with self.assertRaises(UnaddressableObjectError):
       with self.parse_address_map('{"type_alias": "thing"}'):
         self.fail()
 
-  def test_duplicate_names(self):
+  def test_duplicate_names(self) -> None:
     with self.assertRaises(DuplicateNameError):
       with self.parse_address_map('{"type_alias": "thing", "name": "one"}'
                                   '{"type_alias": "thing", "name": "one"}'):
@@ -89,7 +89,7 @@ class AddressMapTest(unittest.TestCase):
 
 
 class AddressFamilyTest(unittest.TestCase):
-  def test_create_single(self):
+  def test_create_single(self) -> None:
     address_family = AddressFamily.create('',
                                           [AddressMap('0', {
                                             'one': Thing(name='one', age=42),
@@ -100,7 +100,7 @@ class AddressFamilyTest(unittest.TestCase):
                       Address.parse('//:two'): Thing(name='two', age=37)},
                      address_family.addressables)
 
-  def test_create_multiple(self):
+  def test_create_multiple(self) -> None:
     address_family = AddressFamily.create('name/space',
                                           [AddressMap('name/space/0',
                                                       {'one': Thing(name='one', age=42)}),
@@ -112,18 +112,18 @@ class AddressFamilyTest(unittest.TestCase):
                       Address.parse('name/space:two'): Thing(name='two', age=37)},
                      address_family.addressables)
 
-  def test_create_empty(self):
+  def test_create_empty(self) -> None:
     # Case where directory exists but is empty.
     address_family = AddressFamily.create('name/space', [])
     self.assertEqual(dict(), address_family.addressables)
 
-  def test_mismatching_paths(self):
+  def test_mismatching_paths(self) -> None:
     with self.assertRaises(DifferingFamiliesError):
       AddressFamily.create('one',
                            [AddressMap('/dev/null/one/0', {}),
                             AddressMap('/dev/null/two/0', {})])
 
-  def test_duplicate_names(self):
+  def test_duplicate_names(self) -> None:
     with self.assertRaises(DuplicateNameError):
       AddressFamily.create('name/space',
                            [AddressMap('name/space/0',
@@ -142,7 +142,7 @@ async def unhydrated_structs(build_file_addresses: BuildFileAddresses) -> Hydrat
 
 
 class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
-  def setUp(self):
+  def setUp(self) -> None:
     # Set up a scheduler that supports address mapping.
     address_mapper = AddressMapper(parser=JsonParser(TARGET_TABLE),
                                    build_patterns=('*.BUILD.json',))
@@ -162,11 +162,11 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
                              configurations=['//a/d/e', Struct(embedded='yes')],
                              type_alias='target')
 
-  def resolve(self, spec):
-    tacs, = self.scheduler.product_request(HydratedStructs, [Specs(tuple([spec]))])
+  def resolve(self, address_spec: AddressSpec):
+    tacs, = self.scheduler.product_request(HydratedStructs, [AddressSpecs([address_spec])])
     return [tac.value for tac in tacs]
 
-  def test_no_address_no_family(self):
+  def test_no_address_no_family(self) -> None:
     spec = SingleAddress('a/c', 'c')
 
     # Does not exist.
@@ -188,7 +188,7 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
     self.assertEqual(1, len(resolved))
     self.assertEqual([Struct(address=Address.parse('a/c'), type_alias='struct')], resolved)
 
-  def test_resolve(self):
+  def test_resolve(self) -> None:
     resolved = self.resolve(SingleAddress('a/b', 'b'))
     self.assertEqual(1, len(resolved))
     self.assertEqual(self.a_b, resolved[0].address)

@@ -31,12 +31,11 @@ class AWSLambdaTarget:
 
 
 class AWSLambdaOptions(LineOriented, GoalSubsystem):
-  """Runs tests."""
+  """Generate an AWS Lambda."""
   name = "awslambda"
 
 
 class AWSLambdaGoal(Goal):
-  """Generate an AWS Lambda."""
   subsystem_cls = AWSLambdaOptions
 
 

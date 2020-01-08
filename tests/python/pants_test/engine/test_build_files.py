@@ -4,11 +4,12 @@
 import os
 import re
 import unittest
+from typing import Type, cast
 
 from pants.base.project_tree import Dir
-from pants.base.specs import SiblingAddresses, SingleAddress, Specs
+from pants.base.specs import AddressSpecs, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address
-from pants.engine.addressable import addressable, addressable_dict
+from pants.engine.addressable import BuildFileAddresses, addressable, addressable_dict
 from pants.engine.build_files import (
   ResolvedTypeMismatchError,
   create_graph_rules,
@@ -22,6 +23,7 @@ from pants.engine.mapper import AddressFamily, AddressMapper, ResolveError
 from pants.engine.nodes import Return, Throw
 from pants.engine.parser import HydratedStruct, SymbolTable
 from pants.engine.rules import rule
+from pants.engine.scheduler import SchedulerSession
 from pants.engine.struct import Struct, StructWithDeps
 from pants.testutil.engine.util import MockGet, Target, run_rule
 from pants.util.objects import Exactly
@@ -34,7 +36,7 @@ from pants_test.engine.scheduler_test_base import SchedulerTestBase
 
 
 class ParseAddressFamilyTest(unittest.TestCase):
-  def test_empty(self):
+  def test_empty(self) -> None:
     """Test that parsing an empty BUILD file results in an empty AddressFamily."""
     address_mapper = AddressMapper(JsonParser(TEST_TABLE))
     af = run_rule(
@@ -58,16 +60,22 @@ class ParseAddressFamilyTest(unittest.TestCase):
 
 class AddressesFromAddressFamiliesTest(unittest.TestCase):
 
-  def _address_mapper(self):
+  def _address_mapper(self) -> AddressMapper:
     return AddressMapper(JsonParser(TEST_TABLE))
 
-  def _snapshot(self):
+  def _snapshot(self) -> Snapshot:
     return Snapshot(Digest('xx', 2), ('root/BUILD',), ())
 
-  def _resolve_build_file_addresses(self, specs, address_family, snapshot, address_mapper):
+  def _resolve_build_file_addresses(
+    self,
+    address_specs: AddressSpecs,
+    address_family: AddressFamily,
+    snapshot: Snapshot,
+    address_mapper: AddressMapper,
+  ) -> BuildFileAddresses:
     pbfas = run_rule(
       provenanced_addresses_from_address_families,
-      rule_args=[address_mapper, specs],
+      rule_args=[address_mapper, address_specs],
       mock_gets=[
         MockGet(
           product_type=Snapshot,
@@ -81,24 +89,24 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
         ),
       ],
     )
-    return run_rule(remove_provenance, rule_args=[pbfas])
+    return cast(BuildFileAddresses, run_rule(remove_provenance, rule_args=[pbfas]))
 
-  def test_duplicated(self):
-    """Test that matching the same Spec twice succeeds."""
+  def test_duplicated(self) -> None:
+    """Test that matching the same AddressSpec twice succeeds."""
     address = SingleAddress('a', 'a')
     snapshot = Snapshot(Digest('xx', 2), ('a/BUILD',), ())
     address_family = AddressFamily('a', {'a': ('a/BUILD', 'this is an object!')})
-    specs = Specs([address, address])
+    address_specs = AddressSpecs([address, address])
 
     bfas = self._resolve_build_file_addresses(
-      specs, address_family, snapshot, self._address_mapper())
+      address_specs, address_family, snapshot, self._address_mapper())
 
     self.assertEqual(len(bfas.dependencies), 1)
     self.assertEqual(bfas.dependencies[0].spec, 'a:a')
 
-  def test_tag_filter(self):
+  def test_tag_filter(self) -> None:
     """Test that targets are filtered based on `tags`."""
-    specs = Specs([SiblingAddresses('root')], tags=['+integration'])
+    address_specs = AddressSpecs([SiblingAddresses('root')], tags=['+integration'])
     address_family = AddressFamily('root',
       {'a': ('root/BUILD', TargetAdaptor()),
        'b': ('root/BUILD', TargetAdaptor(tags={'integration'})),
@@ -107,32 +115,33 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
     )
 
     targets = self._resolve_build_file_addresses(
-      specs, address_family, self._snapshot(), self._address_mapper())
+      address_specs, address_family, self._snapshot(), self._address_mapper())
 
     self.assertEqual(len(targets.dependencies), 1)
     self.assertEqual(targets.dependencies[0].spec, 'root:b')
 
-  def test_fails_on_nonexistent_specs(self):
-    """Test that specs referring to nonexistent targets raise a ResolveError."""
+  def test_fails_on_nonexistent_specs(self) -> None:
+    """Test that address specs referring to nonexistent targets raise a ResolveError."""
     address_family = AddressFamily('root', {'a': ('root/BUILD', TargetAdaptor())})
-    specs = Specs([SingleAddress('root', 'b'), SingleAddress('root', 'a')])
+    address_specs = AddressSpecs([SingleAddress('root', 'b'), SingleAddress('root', 'a')])
 
     expected_rx_str = re.escape(
       """"b" was not found in namespace "root". Did you mean one of:
   :a""")
     with self.assertRaisesRegex(ResolveError, expected_rx_str):
       self._resolve_build_file_addresses(
-        specs, address_family, self._snapshot(), self._address_mapper())
+        address_specs, address_family, self._snapshot(), self._address_mapper())
 
-    # Ensure that we still catch nonexistent targets later on in the list of command-line specs.
-    specs = Specs([SingleAddress('root', 'a'), SingleAddress('root', 'b')])
+    # Ensure that we still catch nonexistent targets later on in the list of command-line
+    # address specs.
+    address_specs = AddressSpecs([SingleAddress('root', 'a'), SingleAddress('root', 'b')])
     with self.assertRaisesRegex(ResolveError, expected_rx_str):
       self._resolve_build_file_addresses(
-        specs, address_family, self._snapshot(), self._address_mapper())
+        address_specs, address_family, self._snapshot(), self._address_mapper())
 
-  def test_exclude_pattern(self):
+  def test_exclude_pattern(self) -> None:
     """Test that targets are filtered based on exclude patterns."""
-    specs = Specs([SiblingAddresses('root')], exclude_patterns=tuple(['.exclude*']))
+    address_specs = AddressSpecs([SiblingAddresses('root')], exclude_patterns=tuple(['.exclude*']))
     address_family = AddressFamily('root',
                                    {'exclude_me': ('root/BUILD', TargetAdaptor()),
                                     'not_me': ('root/BUILD', TargetAdaptor()),
@@ -140,14 +149,14 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
     )
 
     targets = self._resolve_build_file_addresses(
-      specs, address_family, self._snapshot(), self._address_mapper())
+      address_specs, address_family, self._snapshot(), self._address_mapper())
 
     self.assertEqual(len(targets.dependencies), 1)
     self.assertEqual(targets.dependencies[0].spec, 'root:not_me')
 
-  def test_exclude_pattern_with_single_address(self):
+  def test_exclude_pattern_with_single_address(self) -> None:
     """Test that single address targets are filtered based on exclude patterns."""
-    specs = Specs([SingleAddress('root', 'not_me')], exclude_patterns=tuple(['root.*']))
+    address_specs = AddressSpecs([SingleAddress('root', 'not_me')], exclude_patterns=tuple(['root.*']))
     address_family = AddressFamily('root',
                                    {
                                      'not_me': ('root/BUILD', TargetAdaptor()),
@@ -155,7 +164,7 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
     )
 
     targets = self._resolve_build_file_addresses(
-      specs, address_family, self._snapshot(), self._address_mapper())
+      address_specs, address_family, self._snapshot(), self._address_mapper())
 
     self.assertEqual(len(targets.dependencies), 0)
 
@@ -208,7 +217,7 @@ TEST_TABLE = SymbolTable({
 
 
 class GraphTestBase(unittest.TestCase, SchedulerTestBase):
-  def create(self, build_patterns=None, parser=None):
+  def create(self, build_patterns=None, parser=None) -> SchedulerSession:
     address_mapper = AddressMapper(build_patterns=build_patterns,
                                    parser=parser)
 
@@ -217,10 +226,9 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
       return TEST_TABLE
     rules = create_fs_rules() + create_graph_rules(address_mapper) + [symbol_table_singleton]
     project_tree = self.mk_fs_tree(os.path.join(os.path.dirname(__file__), 'examples'))
-    scheduler = self.mk_scheduler(rules=rules, project_tree=project_tree)
-    return scheduler
+    return cast(SchedulerSession, self.mk_scheduler(rules=rules, project_tree=project_tree))
 
-  def create_json(self):
+  def create_json(self) -> SchedulerSession:
     return self.create(build_patterns=('*.BUILD.json',), parser=JsonParser(TEST_TABLE))
 
   def _populate(self, scheduler, address):
@@ -285,21 +293,21 @@ class InlinedGraphTest(GraphTestBase):
 
     self.assertEqual(expected_java1.configurations, resolved_java1.configurations)
 
-  def test_json(self):
+  def test_json(self) -> None:
     scheduler = self.create_json()
     self.do_test_codegen_simple(scheduler)
 
-  def test_python(self):
+  def test_python(self) -> None:
     scheduler = self.create(build_patterns=('*.BUILD.python',),
                             parser=PythonAssignmentsParser(TEST_TABLE))
     self.do_test_codegen_simple(scheduler)
 
-  def test_python_classic(self):
+  def test_python_classic(self) -> None:
     scheduler = self.create(build_patterns=('*.BUILD',),
                             parser=PythonCallbacksParser(TEST_TABLE))
     self.do_test_codegen_simple(scheduler)
 
-  def test_resolve_cache(self):
+  def test_resolve_cache(self) -> None:
     scheduler = self.create_json()
 
     nonstrict_address = Address.parse('graph_test:nonstrict')
@@ -313,7 +321,7 @@ class InlinedGraphTest(GraphTestBase):
 
     self.assertEqual(java1, self.resolve(scheduler, java1_address))
 
-  def do_test_trace_message(self, scheduler, parsed_address, expected_regex=None):
+  def do_test_trace_message(self, scheduler, parsed_address, expected_regex=None) -> None:
     # Confirm that the root failed, and that a cycle occurred deeper in the graph.
     request, state = self._populate(scheduler, parsed_address)
     self.assertEqual(type(state), Throw)
@@ -324,7 +332,7 @@ class InlinedGraphTest(GraphTestBase):
       print(trace_message)
       self.assertRegex(trace_message, expected_regex)
 
-  def do_test_cycle(self, address_str, cyclic_address_str):
+  def do_test_cycle(self, address_str, cyclic_address_str) -> None:
     scheduler = self.create_json()
     parsed_address = Address.parse(address_str)
     self.do_test_trace_message(
@@ -333,11 +341,11 @@ class InlinedGraphTest(GraphTestBase):
         f'(?ms)Dep graph contained a cycle:.*{cyclic_address_str}.* <-.*{cyclic_address_str}.* <-'
       )
 
-  def assert_throws_are_leaves(self, error_msg, throw_name):
-    def indent_of(s):
+  def assert_throws_are_leaves(self, error_msg, throw_name) -> None:
+    def indent_of(s: str) -> int:
       return len(s) - len(s.lstrip())
 
-    def assert_equal_or_more_indentation(more_indented_line, less_indented_line):
+    def assert_equal_or_more_indentation(more_indented_line: str, less_indented_line: str) -> None:
       self.assertTrue(indent_of(more_indented_line) >= indent_of(less_indented_line),
                       '\n"{}"\nshould have more equal or more indentation than\n"{}"\n{}'.format(more_indented_line,
                                                                                              less_indented_line, error_msg))
@@ -348,38 +356,38 @@ class InlinedGraphTest(GraphTestBase):
       # Make sure lines with Throw have more or equal indentation than its neighbors.
       current_line = lines[idx]
       line_above = lines[max(0, idx - 1)]
-
       assert_equal_or_more_indentation(current_line, line_above)
 
-  def test_cycle_self(self):
+  def test_cycle_self(self) -> None:
     self.do_test_cycle('graph_test:self_cycle', 'graph_test:self_cycle')
 
-  def test_cycle_direct(self):
+  def test_cycle_direct(self) -> None:
     self.do_test_cycle('graph_test:direct_cycle', 'graph_test:direct_cycle')
 
-  def test_cycle_indirect(self):
+  def test_cycle_indirect(self) -> None:
     self.do_test_cycle('graph_test:indirect_cycle', 'graph_test:one')
 
-  def test_type_mismatch_error(self):
+  def test_type_mismatch_error(self) -> None:
     scheduler = self.create_json()
     mismatch = Address.parse('graph_test:type_mismatch')
     self.assert_resolve_failure_type(ResolvedTypeMismatchError, mismatch, scheduler)
     self.do_test_trace_message(scheduler, mismatch)
 
-  def test_not_found_but_family_exists(self):
+  def test_not_found_but_family_exists(self) -> None:
     scheduler = self.create_json()
     dne = Address.parse('graph_test:this_addressable_does_not_exist')
     self.assert_resolve_failure_type(ResolveError, dne, scheduler)
     self.do_test_trace_message(scheduler, dne)
 
-  def test_not_found_and_family_does_not_exist(self):
+  def test_not_found_and_family_does_not_exist(self) -> None:
     scheduler = self.create_json()
     dne = Address.parse('this/dir/does/not/exist')
     self.assert_resolve_failure_type(ResolveError, dne, scheduler)
     self.do_test_trace_message(scheduler, dne)
 
-  def assert_resolve_failure_type(self, expected_type, mismatch, scheduler):
-
+  def assert_resolve_failure_type(
+    self, expected_type: Type[Exception], mismatch: Address, scheduler: SchedulerSession
+  ) -> None:
     failure = self.resolve_failure(scheduler, mismatch)
     self.assertEqual(type(failure),
                       expected_type,

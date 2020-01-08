@@ -614,7 +614,7 @@ class Target(AbstractTarget):
 
     :param dict kwargs: The pre-Target.__init__() kwargs dict.
     :param Payload payload: The post-Target.__init__() Payload object.
-    :yields: Spec strings representing dependencies of this target.
+    :yields: AddressSpec strings representing dependencies of this target.
     """
     cls._validate_target_representation_args(kwargs, payload)
     # N.B. This pattern turns this method into a non-yielding generator, which is helpful for
@@ -637,7 +637,7 @@ class Target(AbstractTarget):
 
     :param dict kwargs: The pre-Target.__init__() kwargs dict.
     :param Payload payload: The post-Target.__init__() Payload object.
-    :yields: Spec strings representing dependencies of this target.
+    :yields: AddressSpec strings representing dependencies of this target.
     """
     cls._validate_target_representation_args(kwargs, payload)
     # N.B. This pattern turns this method into a non-yielding generator, which is helpful for

@@ -14,6 +14,7 @@ python_library(
     'src/python/pants/backend/python:interpreter_cache',
     'src/python/pants/backend/python:python_requirement',
     'src/python/pants/backend/python/lint/isort',
+    'src/python/pants/backend/python/rules',  # For setup_py_util.py.
     'src/python/pants/backend/python/subsystems',
     'src/python/pants/backend/python/targets',
     'src/python/pants/backend/python/tasks/coverage:plugin',

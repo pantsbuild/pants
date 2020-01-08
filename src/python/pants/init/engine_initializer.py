@@ -16,7 +16,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.file_system_project_tree import FileSystemProjectTree
-from pants.base.specs import Specs
+from pants.base.specs import AddressSpecs
 from pants.build_graph.address import BuildFileAddress
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
@@ -40,9 +40,11 @@ from pants.engine.legacy.structs import (
   PythonAppAdaptor,
   PythonAWSLambdaAdaptor,
   PythonBinaryAdaptor,
+  PythonRequirementLibraryAdaptor,
   PythonTargetAdaptor,
   PythonTestsAdaptor,
   RemoteSourcesAdaptor,
+  ResourcesAdaptor,
   TargetAdaptor,
 )
 from pants.engine.legacy.structs import rules as structs_rules
@@ -136,7 +138,9 @@ def _legacy_symbol_table(build_file_aliases: BuildFileAliases) -> SymbolTable:
   table['python_app'] = PythonAppAdaptor
   table['python_tests'] = PythonTestsAdaptor
   table['python_binary'] = PythonBinaryAdaptor
+  table['python_requirement_library'] = PythonRequirementLibraryAdaptor
   table['remote_sources'] = RemoteSourcesAdaptor
+  table['resources'] = ResourcesAdaptor
   table['page'] = PageAdaptor
   table['python_awslambda'] = PythonAWSLambdaAdaptor
 
@@ -379,12 +383,12 @@ class EngineInitializer:
       return cast(BuildRoot, BuildRoot.instance)
 
     @rule
-    async def single_build_file_address(specs: Specs) -> BuildFileAddress:
-      build_file_addresses = await Get[BuildFileAddresses](Specs, specs)
+    async def single_build_file_address(address_specs: AddressSpecs) -> BuildFileAddress:
+      build_file_addresses = await Get[BuildFileAddresses](AddressSpecs, address_specs)
       if len(build_file_addresses.dependencies) == 0:
         raise ResolveError("No targets were matched")
       if len(build_file_addresses.dependencies) > 1:
-        potential_addresses = await Get[BuildFileAddresses](Specs, specs)
+        potential_addresses = await Get[BuildFileAddresses](AddressSpecs, address_specs)
         targets = [bfa.to_address() for bfa in potential_addresses]
         output = '\n '.join(str(target) for target in targets)
 

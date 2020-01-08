@@ -236,7 +236,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
 
     spec_parser = CmdLineSpecParser(get_buildroot())
     target_specs = [
-      spec_parser.parse_spec(spec).to_spec_string()
+      spec_parser.parse_address_spec(spec).to_spec_string()
       for spec in self._options.positional_args
     ]
     # Note: This will not include values from `--owner-of` or `--changed-*` flags.

@@ -2,7 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Any
+
+from pants.base.specs import AddressSpecs
 
 
 class InvalidSpecConstraint(Exception):
@@ -12,4 +13,4 @@ class InvalidSpecConstraint(Exception):
 @dataclass(frozen=True)
 class TargetRoots:
   """Determines the target roots for a given pants run."""
-  specs: Any
+  specs: AddressSpecs

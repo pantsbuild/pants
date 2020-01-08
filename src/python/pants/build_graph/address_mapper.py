@@ -3,8 +3,9 @@
 
 import logging
 from abc import ABC, abstractmethod
+from typing import Iterable
 
-from pants.base.specs import SingleAddress
+from pants.base.specs import AddressSpec, SingleAddress
 from pants.build_graph.address_lookup_error import AddressLookupError
 
 
@@ -50,8 +51,8 @@ class AddressMapper(ABC):
     """
 
   @abstractmethod
-  def scan_specs(self, specs, fail_fast=True):
-    """Execute a collection of `specs.Spec` objects and return a set of Addresses."""
+  def scan_address_specs(self, address_specs: Iterable[AddressSpec], fail_fast=True):
+    """Execute a collection of `specs.AddressSpec` objects and return a set of Addresses."""
 
   def is_valid_single_address(self, single_address):
     """Check if a potentially ambiguous single address spec really exists.
@@ -65,7 +66,7 @@ class AddressMapper(ABC):
           single_address, type(single_address), SingleAddress))
 
     try:
-      return bool(self.scan_specs([single_address]))
+      return bool(self.scan_address_specs([single_address]))
     except AddressLookupError:
       return False
 
