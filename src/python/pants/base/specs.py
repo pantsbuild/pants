@@ -18,7 +18,7 @@ if TYPE_CHECKING:
   from pants.engine.mapper import AddressFamily, AddressMapper
 
 
-class Spec(ABC):
+class AddressSpec(ABC):
   """Represents address selectors as passed from the command line.
 
   Supports `Single` target addresses as well as `Sibling` (:) and `Descendant` (::) selector forms.
@@ -30,7 +30,7 @@ class Spec(ABC):
 
   @abstractmethod
   def to_spec_string(self) -> str:
-    """Returns the normalized string representation of this spec."""
+    """Returns the normalized string representation of this address spec."""
 
   class AddressFamilyResolutionError(Exception):
     pass
@@ -39,16 +39,18 @@ class Spec(ABC):
   def matching_address_families(
     self, address_families_dict: Dict[str, "AddressFamily"],
   ) -> List["AddressFamily"]:
-    """Given a dict of (namespace path) -> AddressFamily, return the values matching this spec.
+    """Given a dict of (namespace path) -> AddressFamily, return the values matching this address
+    spec.
 
-    :raises: :class:`Spec.AddressFamilyResolutionError` if no address families matched this spec.
+    :raises: :class:`AddressSpec.AddressFamilyResolutionError` if no address families matched this spec.
     """
 
   @classmethod
   def address_families_for_dir(
     cls, address_families_dict: Dict[str, "AddressFamily"], spec_dir_path: str
   ) -> List["AddressFamily"]:
-    """Implementation of `matching_address_families()` for specs matching at most one directory."""
+    """Implementation of `matching_address_families()` for address specs matching at most
+    one directory."""
     maybe_af = address_families_dict.get(spec_dir_path, None)
     if maybe_af is None:
       raise cls.AddressFamilyResolutionError(
@@ -61,12 +63,12 @@ class Spec(ABC):
 
   @abstractmethod
   def address_target_pairs_from_address_families(self, address_families: List["AddressFamily"]):
-    """Given a list of AddressFamily, return (address, target) pairs matching this spec.
+    """Given a list of AddressFamily, return (address, target) pairs matching this address spec.
 
     :raises: :class:`SingleAddress._SingleAddressResolutionError` for resolution errors with a
              :class:`SingleAddress` instance.
-    :raises: :class:`Spec.AddressResolutionError` if no targets could be found otherwise, if the
-             spec type requires a non-empty set of targets.
+    :raises: :class:`AddressSpec.AddressResolutionError` if no targets could be found otherwise, if
+             the address spec type requires a non-empty set of targets.
     :return: list of (Address, Target) pairs.
     """
 
@@ -80,7 +82,7 @@ class Spec(ABC):
 
   @abstractmethod
   def make_glob_patterns(self, address_mapper: "AddressMapper") -> List[str]:
-    """Generate glob patterns matching exactly all the BUILD files this spec covers."""
+    """Generate glob patterns matching exactly all the BUILD files this address spec covers."""
 
   @classmethod
   def globs_in_single_dir(cls, spec_dir_path: str, address_mapper: "AddressMapper") -> List[str]:
@@ -89,8 +91,8 @@ class Spec(ABC):
 
 
 @dataclass(frozen=True)
-class SingleAddress(Spec):
-  """A Spec for a single address."""
+class SingleAddress(AddressSpec):
+  """An AddressSpec for a single address."""
   directory: str
   name: str
 
@@ -137,8 +139,8 @@ class SingleAddress(Spec):
 
 
 @dataclass(frozen=True)
-class SiblingAddresses(Spec):
-  """A Spec representing all addresses located directly within the given directory."""
+class SiblingAddresses(AddressSpec):
+  """An AddressSpec representing all addresses located directly within the given directory."""
   directory: str
 
   def to_spec_string(self) -> str:
@@ -157,8 +159,8 @@ class SiblingAddresses(Spec):
 
 
 @dataclass(frozen=True)
-class DescendantAddresses(Spec):
-  """A Spec representing all addresses located recursively under the given directory."""
+class DescendantAddresses(AddressSpec):
+  """An AddressSpec representing all addresses located recursively under the given directory."""
   directory: str
 
   def to_spec_string(self) -> str:
@@ -175,7 +177,7 @@ class DescendantAddresses(Spec):
   def address_target_pairs_from_address_families(self, address_families: Sequence["AddressFamily"]):
     addr_tgt_pairs = self.all_address_target_pairs(address_families)
     if len(addr_tgt_pairs) == 0:
-      raise self.AddressResolutionError('Spec {} does not match any targets.'.format(self))
+      raise self.AddressResolutionError('AddressSpec {} does not match any targets.'.format(self))
     return addr_tgt_pairs
 
   def make_glob_patterns(self, address_mapper: "AddressMapper") -> List[str]:
@@ -183,8 +185,8 @@ class DescendantAddresses(Spec):
 
 
 @dataclass(frozen=True)
-class AscendantAddresses(Spec):
-  """A Spec representing all addresses located recursively _above_ the given directory."""
+class AscendantAddresses(AddressSpec):
+  """An AddressSpec representing all addresses located recursively _above_ the given directory."""
   directory: str
 
   def to_spec_string(self) -> str:
@@ -218,27 +220,32 @@ _specificity = {
 }
 
 
-def more_specific(spec1: Optional[Spec], spec2: Optional[Spec]) -> Spec:
+def more_specific(
+  address_spec1: Optional[AddressSpec], address_spec2: Optional[AddressSpec]
+) -> AddressSpec:
   """Returns which of the two specs is more specific.
 
   This is useful when a target matches multiple specs, and we want to associate it with
   the "most specific" one, which will make the most intuitive sense to the user.
   """
   # Note that if either of spec1 or spec2 is None, the other will be returned.
-  if spec1 is None and spec2 is None:
+  if address_spec1 is None and address_spec2 is None:
     raise ValueError('internal error: both specs provided to more_specific() were None')
-  return cast(Spec, spec1 if _specificity[type(spec1)] < _specificity[type(spec2)] else spec2)
+  return cast(
+    AddressSpec,
+    address_spec1 if _specificity[type(address_spec1)] < _specificity[type(address_spec2)] else address_spec2
+  )
 
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class SpecsMatcher:
-  """Contains filters for the output of a Specs match.
+class AddressSpecsMatcher:
+  """Contains filters for the output of a AddressSpecs match.
 
-  This class is separated out from `Specs` to allow for both stuctural equality of the `tags` and
+  This class is separated out from `AddressSpecs` to allow for both stuctural equality of the `tags` and
   `exclude_patterns`, and for caching of their compiled forms using `@memoized_property` (which uses
-  the hash of the class instance in its key, and results in a very large key when used with `Specs`
-  directly).
+  the hash of the class instance in its key, and results in a very large key when used with
+  `AddressSpecs` directly).
   """
   tags: Tuple[str, ...]
   exclude_patterns: Tuple[str, ...]
@@ -274,19 +281,20 @@ class SpecsMatcher:
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class Specs:
-  """A collection of Specs representing Spec subclasses, and a SpecsMatcher to filter results."""
-  dependencies: Tuple[Spec, ...]
-  matcher: SpecsMatcher
+class AddressSpecs:
+  """A collection of `AddressSpec`s representing AddressSpec subclasses, and a AddressSpecsMatcher
+  to filter results."""
+  dependencies: Tuple[AddressSpec, ...]
+  matcher: AddressSpecsMatcher
 
   def __init__(
     self,
-    dependencies: Iterable[Spec],
+    dependencies: Iterable[AddressSpec],
     tags: Optional[Iterable[str]] = None,
     exclude_patterns: Optional[Iterable[str]] = None,
   ) -> None:
     self.dependencies = tuple(dependencies)
-    self.matcher = SpecsMatcher(tags=tags, exclude_patterns=exclude_patterns)
+    self.matcher = AddressSpecsMatcher(tags=tags, exclude_patterns=exclude_patterns)
 
-  def __iter__(self) -> Iterator[Spec]:
+  def __iter__(self) -> Iterator[AddressSpec]:
     return iter(self.dependencies)

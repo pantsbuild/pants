@@ -56,8 +56,8 @@ class ConsoleRuleTestBase(TestBase):
     workspace = Workspace(scheduler)
 
     # Run for the target specs parsed from the args.
-    specs = TargetRootsCalculator.parse_specs(full_options.positional_args, self.build_root)
-    params = Params(specs, console, options_bootstrapper, workspace, *additional_params)
+    address_specs = TargetRootsCalculator.parse_address_specs(full_options.positional_args, self.build_root)
+    params = Params(address_specs, console, options_bootstrapper, workspace, *additional_params)
     actual_exit_code = self.scheduler.run_console_rule(self.goal_cls, params)
 
     # Flush and capture console output.

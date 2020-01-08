@@ -8,7 +8,7 @@ from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
-from pants.base.specs import SingleAddress, Specs
+from pants.base.specs import AddressSpecs, SingleAddress
 from pants.base.target_roots import InvalidSpecConstraint, TargetRoots
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.legacy.graph import OwnersRequest
@@ -25,19 +25,19 @@ class TargetRootsCalculator:
   """Determines the target roots for a given pants run."""
 
   @classmethod
-  def parse_specs(
+  def parse_address_specs(
     cls,
     target_specs: Iterable[str],
     build_root: Optional[str] = None,
     exclude_patterns: Optional[Iterable[str]] = None,
     tags: Optional[Iterable[str]] = None,
-  ) -> Specs:
-    """Parse string specs into unique `Spec` objects."""
+  ) -> AddressSpecs:
+    """Parse string specs into unique `AddressSpec` objects."""
     build_root = build_root or get_buildroot()
     spec_parser = CmdLineSpecParser(build_root)
 
-    dependencies = tuple(OrderedSet(spec_parser.parse_spec(spec_str) for spec_str in target_specs))
-    return Specs(
+    dependencies = tuple(OrderedSet(spec_parser.parse_address_spec(spec_str) for spec_str in target_specs))
+    return AddressSpecs(
       dependencies=dependencies,
       exclude_patterns=exclude_patterns if exclude_patterns else tuple(),
       tags=tags)
@@ -62,7 +62,7 @@ class TargetRootsCalculator:
     tags: Optional[Iterable[str]] = None,
   ) -> TargetRoots:
     # Determine the literal target roots.
-    spec_roots = cls.parse_specs(
+    address_spec_roots = cls.parse_address_specs(
       target_specs=options.positional_args,
       build_root=build_root,
       exclude_patterns=exclude_patterns,
@@ -76,11 +76,11 @@ class TargetRootsCalculator:
     # Determine the `--owner-of=` arguments provided from the global options
     owned_files = options.for_global_scope().owner_of
 
-    logger.debug('spec_roots are: %s', spec_roots)
+    logger.debug('address_spec_roots are: %s', address_spec_roots)
     logger.debug('changed_request is: %s', changed_request)
     logger.debug('owned_files are: %s', owned_files)
     targets_specified = sum(1 for item
-                         in (changed_request.is_actionable(), owned_files, spec_roots.dependencies)
+                         in (changed_request.is_actionable(), owned_files, address_spec_roots.dependencies)
                          if item)
 
     if targets_specified > 1:
@@ -107,7 +107,9 @@ class TargetRootsCalculator:
       changed_addresses, = session.product_request(BuildFileAddresses, [request])
       logger.debug('changed addresses: %s', changed_addresses)
       dependencies = tuple(SingleAddress(a.spec_path, a.target_name) for a in changed_addresses)
-      return TargetRoots(Specs(dependencies=dependencies, exclude_patterns=exclude_patterns, tags=tags))
+      return TargetRoots(
+        AddressSpecs(dependencies=dependencies, exclude_patterns=exclude_patterns, tags=tags),
+      )
 
     if owned_files:
       # We've been provided no spec roots (e.g. `./pants list`) AND a owner request. Compute
@@ -116,6 +118,8 @@ class TargetRootsCalculator:
       owner_addresses, = session.product_request(BuildFileAddresses, [request])
       logger.debug('owner addresses: %s', owner_addresses)
       dependencies = tuple(SingleAddress(a.spec_path, a.target_name) for a in owner_addresses)
-      return TargetRoots(Specs(dependencies=dependencies, exclude_patterns=exclude_patterns, tags=tags))
+      return TargetRoots(
+        AddressSpecs(dependencies=dependencies, exclude_patterns=exclude_patterns, tags=tags),
+      )
 
-    return TargetRoots(spec_roots)
+    return TargetRoots(address_spec_roots)

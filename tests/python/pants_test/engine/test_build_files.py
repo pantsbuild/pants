@@ -7,7 +7,7 @@ import unittest
 from typing import Type, cast
 
 from pants.base.project_tree import Dir
-from pants.base.specs import SiblingAddresses, SingleAddress, Specs
+from pants.base.specs import AddressSpecs, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.addressable import BuildFileAddresses, addressable, addressable_dict
 from pants.engine.build_files import (
@@ -68,14 +68,14 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
 
   def _resolve_build_file_addresses(
     self,
-    specs: Specs,
+    address_specs: AddressSpecs,
     address_family: AddressFamily,
     snapshot: Snapshot,
     address_mapper: AddressMapper,
   ) -> BuildFileAddresses:
     pbfas = run_rule(
       provenanced_addresses_from_address_families,
-      rule_args=[address_mapper, specs],
+      rule_args=[address_mapper, address_specs],
       mock_gets=[
         MockGet(
           product_type=Snapshot,
@@ -92,21 +92,21 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
     return cast(BuildFileAddresses, run_rule(remove_provenance, rule_args=[pbfas]))
 
   def test_duplicated(self) -> None:
-    """Test that matching the same Spec twice succeeds."""
+    """Test that matching the same AddressSpec twice succeeds."""
     address = SingleAddress('a', 'a')
     snapshot = Snapshot(Digest('xx', 2), ('a/BUILD',), ())
     address_family = AddressFamily('a', {'a': ('a/BUILD', 'this is an object!')})
-    specs = Specs([address, address])
+    address_specs = AddressSpecs([address, address])
 
     bfas = self._resolve_build_file_addresses(
-      specs, address_family, snapshot, self._address_mapper())
+      address_specs, address_family, snapshot, self._address_mapper())
 
     self.assertEqual(len(bfas.dependencies), 1)
     self.assertEqual(bfas.dependencies[0].spec, 'a:a')
 
   def test_tag_filter(self) -> None:
     """Test that targets are filtered based on `tags`."""
-    specs = Specs([SiblingAddresses('root')], tags=['+integration'])
+    address_specs = AddressSpecs([SiblingAddresses('root')], tags=['+integration'])
     address_family = AddressFamily('root',
       {'a': ('root/BUILD', TargetAdaptor()),
        'b': ('root/BUILD', TargetAdaptor(tags={'integration'})),
@@ -115,32 +115,33 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
     )
 
     targets = self._resolve_build_file_addresses(
-      specs, address_family, self._snapshot(), self._address_mapper())
+      address_specs, address_family, self._snapshot(), self._address_mapper())
 
     self.assertEqual(len(targets.dependencies), 1)
     self.assertEqual(targets.dependencies[0].spec, 'root:b')
 
   def test_fails_on_nonexistent_specs(self) -> None:
-    """Test that specs referring to nonexistent targets raise a ResolveError."""
+    """Test that address specs referring to nonexistent targets raise a ResolveError."""
     address_family = AddressFamily('root', {'a': ('root/BUILD', TargetAdaptor())})
-    specs = Specs([SingleAddress('root', 'b'), SingleAddress('root', 'a')])
+    address_specs = AddressSpecs([SingleAddress('root', 'b'), SingleAddress('root', 'a')])
 
     expected_rx_str = re.escape(
       """"b" was not found in namespace "root". Did you mean one of:
   :a""")
     with self.assertRaisesRegex(ResolveError, expected_rx_str):
       self._resolve_build_file_addresses(
-        specs, address_family, self._snapshot(), self._address_mapper())
+        address_specs, address_family, self._snapshot(), self._address_mapper())
 
-    # Ensure that we still catch nonexistent targets later on in the list of command-line specs.
-    specs = Specs([SingleAddress('root', 'a'), SingleAddress('root', 'b')])
+    # Ensure that we still catch nonexistent targets later on in the list of command-line
+    # address specs.
+    address_specs = AddressSpecs([SingleAddress('root', 'a'), SingleAddress('root', 'b')])
     with self.assertRaisesRegex(ResolveError, expected_rx_str):
       self._resolve_build_file_addresses(
-        specs, address_family, self._snapshot(), self._address_mapper())
+        address_specs, address_family, self._snapshot(), self._address_mapper())
 
   def test_exclude_pattern(self) -> None:
     """Test that targets are filtered based on exclude patterns."""
-    specs = Specs([SiblingAddresses('root')], exclude_patterns=tuple(['.exclude*']))
+    address_specs = AddressSpecs([SiblingAddresses('root')], exclude_patterns=tuple(['.exclude*']))
     address_family = AddressFamily('root',
                                    {'exclude_me': ('root/BUILD', TargetAdaptor()),
                                     'not_me': ('root/BUILD', TargetAdaptor()),
@@ -148,14 +149,14 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
     )
 
     targets = self._resolve_build_file_addresses(
-      specs, address_family, self._snapshot(), self._address_mapper())
+      address_specs, address_family, self._snapshot(), self._address_mapper())
 
     self.assertEqual(len(targets.dependencies), 1)
     self.assertEqual(targets.dependencies[0].spec, 'root:not_me')
 
   def test_exclude_pattern_with_single_address(self) -> None:
     """Test that single address targets are filtered based on exclude patterns."""
-    specs = Specs([SingleAddress('root', 'not_me')], exclude_patterns=tuple(['root.*']))
+    address_specs = AddressSpecs([SingleAddress('root', 'not_me')], exclude_patterns=tuple(['root.*']))
     address_family = AddressFamily('root',
                                    {
                                      'not_me': ('root/BUILD', TargetAdaptor()),
@@ -163,7 +164,7 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
     )
 
     targets = self._resolve_build_file_addresses(
-      specs, address_family, self._snapshot(), self._address_mapper())
+      address_specs, address_family, self._snapshot(), self._address_mapper())
 
     self.assertEqual(len(targets.dependencies), 0)
 

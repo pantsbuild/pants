@@ -6,7 +6,7 @@ import unittest
 from contextlib import contextmanager
 from textwrap import dedent
 
-from pants.base.specs import SingleAddress, Spec, Specs
+from pants.base.specs import AddressSpec, AddressSpecs, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.build_files import create_graph_rules
@@ -162,8 +162,8 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
                              configurations=['//a/d/e', Struct(embedded='yes')],
                              type_alias='target')
 
-  def resolve(self, spec: Spec):
-    tacs, = self.scheduler.product_request(HydratedStructs, [Specs([spec])])
+  def resolve(self, address_spec: AddressSpec):
+    tacs, = self.scheduler.product_request(HydratedStructs, [AddressSpecs([address_spec])])
     return [tac.value for tac in tacs]
 
   def test_no_address_no_family(self) -> None:

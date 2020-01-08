@@ -3,7 +3,7 @@
 
 import os
 
-from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress, Spec
+from pants.base.specs import AddressSpec, DescendantAddresses, SiblingAddresses, SingleAddress
 
 
 class CmdLineSpecParser:
@@ -48,8 +48,8 @@ class CmdLineSpecParser:
       normalized = ''
     return normalized
 
-  def parse_spec(self, spec: str) -> Spec:
-    """Parse the given spec into a `Spec` object.
+  def parse_address_spec(self, spec: str) -> AddressSpec:
+    """Parse the given spec into an `AddressSpec` object.
 
     :raises: CmdLineSpecParser.BadSpecError if the address selector could not be parsed.
     """
