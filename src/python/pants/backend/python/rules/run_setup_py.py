@@ -22,7 +22,7 @@ from pants.backend.python.rules.setup_py_util import (
 from pants.backend.python.rules.setuptools import Setuptools
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
-from pants.base.specs import AscendantAddresses, Specs
+from pants.base.specs import AddressSpecs, AscendantAddresses
 from pants.build_graph.address import Address
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.console import Console
@@ -491,7 +491,7 @@ async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarg
   """
   hydrated_target = owned_dependency.hydrated_target
   ancestor_addrs = AscendantAddresses(hydrated_target.address.spec_path)
-  ancestor_tgts = await Get[HydratedTargets](Specs, Specs((ancestor_addrs,)))
+  ancestor_tgts = await Get[HydratedTargets](AddressSpecs((ancestor_addrs,)))
   # Note that addresses sort by (spec_path, target_name), and all these targets are
   # ancestors of the given target, i.e., their spec_paths are all prefixes. So sorting by
   # address will effectively sort by closeness of ancestry to the given target.
