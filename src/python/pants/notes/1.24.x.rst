@@ -3,6 +3,24 @@
 
 This document describes releases leading up to the ``1.24.x`` ``stable`` series.
 
+1.24.0rc1 (01/08/2020)
+----------------------
+
+Bugfixes
+~~~~~~~~
+
+* Fix `./pants lint2` for Black and isort (#8877)
+  `PR #8877 <https://github.com/pantsbuild/pants/pull/8877>`_
+
+* Report a deprecation for the option name rather than for the dest. (#8856)
+  `PR #8856 <https://github.com/pantsbuild/pants/pull/8856>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* [IntelliJ] Export only modulizable targets when in `export-dep-as-jar` (#8812)
+  `PR #8812 <https://github.com/pantsbuild/pants/pull/8812>`_
+
 1.24.0rc0 (12/19/2019)
 ----------------------
 
