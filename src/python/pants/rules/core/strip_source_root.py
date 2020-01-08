@@ -34,16 +34,24 @@ async def strip_source_root(
 
   digest = target_adaptor.sources.snapshot.directory_digest
   source_root = source_roots.find_by_path(target_adaptor.address.spec_path)
+  if source_root is None:
+    # If we found no source root, use the target's dir.
+    # Note that when --source-unmatched is 'create' (the default) we'll never return None,
+    # but will return the target's dir. This check allows this code to work even if
+    # --source-unmatched is 'fail'.
+    source_root_path = target_adaptor.address.spec_path
+  else:
+    source_root_path = source_root.path
 
   # Loose `Files`, as opposed to `Resources` or `Target`s, have no (implied) package
   # structure and so we do not remove their source root like we normally do, so that filesystem
   # APIs may still access the files. See pex_build_util.py's `_create_source_dumper`.
   if target_adaptor.type_alias == Files.alias():
-    source_root = None
+    source_root_path = ''
 
   resulting_digest = await Get[Digest](
     DirectoryWithPrefixToStrip(
-      directory_digest=digest, prefix=source_root.path if source_root else ""
+      directory_digest=digest, prefix=source_root_path
     )
   )
   resulting_snapshot = await Get[Snapshot](Digest, resulting_digest)

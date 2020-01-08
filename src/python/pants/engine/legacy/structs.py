@@ -255,6 +255,9 @@ class JvmAppAdaptor(AppAdaptor): pass
 class PythonAppAdaptor(AppAdaptor): pass
 
 
+class ResourcesAdaptor(TargetAdaptor): pass
+
+
 class RemoteSourcesAdaptor(TargetAdaptor):
   def __init__(self, dest=None, **kwargs):
     """
@@ -298,6 +301,9 @@ class PythonTestsAdaptor(PythonTargetAdaptor): pass
 
 
 class PythonAWSLambdaAdaptor(TargetAdaptor): pass
+
+
+class PythonRequirementLibraryAdaptor(TargetAdaptor): pass
 
 
 class PantsPluginAdaptor(PythonTargetAdaptor):

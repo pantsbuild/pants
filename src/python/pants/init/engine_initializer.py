@@ -40,9 +40,11 @@ from pants.engine.legacy.structs import (
   PythonAppAdaptor,
   PythonAWSLambdaAdaptor,
   PythonBinaryAdaptor,
+  PythonRequirementLibraryAdaptor,
   PythonTargetAdaptor,
   PythonTestsAdaptor,
   RemoteSourcesAdaptor,
+  ResourcesAdaptor,
   TargetAdaptor,
 )
 from pants.engine.legacy.structs import rules as structs_rules
@@ -136,7 +138,9 @@ def _legacy_symbol_table(build_file_aliases: BuildFileAliases) -> SymbolTable:
   table['python_app'] = PythonAppAdaptor
   table['python_tests'] = PythonTestsAdaptor
   table['python_binary'] = PythonBinaryAdaptor
+  table['python_requirement_library'] = PythonRequirementLibraryAdaptor
   table['remote_sources'] = RemoteSourcesAdaptor
+  table['resources'] = ResourcesAdaptor
   table['page'] = PageAdaptor
   table['python_awslambda'] = PythonAWSLambdaAdaptor
 

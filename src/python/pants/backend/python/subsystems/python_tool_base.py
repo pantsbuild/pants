@@ -41,7 +41,9 @@ class PythonToolBase(Subsystem):
                           "`--extra-requirements`.")
     register('--entry-point', type=str, advanced=True, fingerprint=True,
              default=cls.default_entry_point,
-             help='The main module for the tool.')
+             help='The main module for the tool. If unspecified, the code using this tool '
+                  'must provide it explicitly on invocation, or it can use the tool as a '
+                  'library, invoked by a wrapper script.')
 
   def get_interpreter_constraints(self):
     return self.get_options().interpreter_constraints
