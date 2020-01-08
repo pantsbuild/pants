@@ -7,7 +7,7 @@ from collections import defaultdict, deque
 from contextlib import contextmanager
 from dataclasses import dataclass
 from os.path import dirname
-from typing import Any, Iterable, Tuple
+from typing import Any, Iterable, Tuple, List, Dict
 
 from twitter.common.collections import OrderedSet
 
@@ -390,6 +390,20 @@ class HydratedTargets(Collection[HydratedTarget]):
 
 
 @dataclass(frozen=True)
+class TopologicallyOrderedTargets:
+  """A set of HydratedTargets, ordered topologically from least to most dependent.
+
+  That is if B depends on A then B follows A in the order.
+
+  Note that most rules won't need to consider target dependency order, as those dependencies
+  usually implicitly create corresponding rule graph dependencies and per-target rules will then
+  execute in the right order automatically. However there can be cases where it's still useful for
+  a single rule invocation to know about the order of multiple targets under its consideration.
+  """
+  hydrated_targets: HydratedTargets
+
+
+@dataclass(frozen=True)
 class OwnersRequest:
   """A request for the owners (and optionally, transitive dependees) of a set of file paths."""
   sources: Tuple
@@ -488,6 +502,30 @@ async def transitive_hydrated_targets(
 async def transitive_hydrated_target(root: HydratedTarget) -> TransitiveHydratedTarget:
   dependencies = await MultiGet(Get[TransitiveHydratedTarget](Address, d) for d in root.dependencies)
   return TransitiveHydratedTarget(root, dependencies)
+
+
+@rule
+async def sort_targets(targets: HydratedTargets) -> TopologicallyOrderedTargets:
+  return TopologicallyOrderedTargets(HydratedTargets(topo_sort(tuple(targets))))
+
+
+def topo_sort(targets: Tuple[HydratedTarget, ...]) -> Tuple[HydratedTarget, ...]:
+  """Sort the targets so that if B depends on A, B follows A in the order."""
+  visited: Dict[HydratedTarget, bool] = defaultdict(bool)
+  res: List[HydratedTarget] = []
+
+  def recursive_topo_sort(ht):
+    if visited[ht]:
+      return
+    visited[ht] = True
+    for dep in ht.dependencies:
+      recursive_topo_sort(dep)
+    res.append(ht)
+
+  for target in targets:
+    recursive_topo_sort(target)
+  return tuple(res)
+
 
 
 @rule
@@ -594,5 +632,6 @@ def create_legacy_graph_tasks():
     find_owners,
     hydrate_sources,
     hydrate_bundles,
+    sort_targets,
     RootRule(OwnersRequest),
   ]
