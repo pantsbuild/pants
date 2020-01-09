@@ -8,15 +8,19 @@ from unittest.mock import Mock
 
 from pants.base.specs import AddressSpec, AddressSpecs, DescendantAddresses, SingleAddress
 from pants.build_graph.address import Address, BuildFileAddress
+from pants.engine.addressable import BuildFileAddresses
 from pants.engine.build_files import AddressProvenanceMap
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, Snapshot
 from pants.engine.legacy.graph import HydratedTarget
 from pants.engine.legacy.structs import PythonBinaryAdaptor, PythonTestsAdaptor
 from pants.engine.rules import UnionMembership
-from pants.rules.core.core_test_model import Status, TestDebugResult, TestResult, TestTarget
 from pants.rules.core.test import (
   AddressAndDebugResult,
   AddressAndTestResult,
+  Status,
+  TestDebugResult,
+  TestResult,
+  TestTarget,
   coordinator_of_tests,
   run_tests,
 )
@@ -37,7 +41,7 @@ class TestTest(TestBase):
     addr = self.make_build_target_address("some/target")
     res = run_rule(
       run_tests,
-      rule_args=[console, options, (addr,)],
+      rule_args=[console, options, BuildFileAddresses([addr])],
       mock_gets=[
         MockGet(
           product_type=AddressAndTestResult,
@@ -51,12 +55,8 @@ class TestTest(TestBase):
         ),
         MockGet(
           product_type=BuildFileAddress,
-          subject_type=AddressSpecs,
-          mock=lambda _: BuildFileAddress(
-            build_file=None,
-            target_name=addr.target_name,
-            rel_path=f'{addr.spec_path}/BUILD'
-          )
+          subject_type=BuildFileAddresses,
+          mock=lambda bfas: bfas.dependencies[0],
         ),
       ],
     )

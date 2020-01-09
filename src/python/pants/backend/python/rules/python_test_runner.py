@@ -20,8 +20,8 @@ from pants.engine.legacy.structs import PythonTestsAdaptor
 from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.option.global_options import GlobalOptions
-from pants.rules.core.core_test_model import TestDebugResult, TestResult, TestTarget
 from pants.rules.core.strip_source_root import SourceRootStrippedSources
+from pants.rules.core.test import TestDebugResult, TestResult, TestTarget
 
 
 def calculate_timeout_seconds(
