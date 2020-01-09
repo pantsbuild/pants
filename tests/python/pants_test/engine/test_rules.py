@@ -95,7 +95,7 @@ class RuleTest(TestBase):
     )
     self.assertEquals(res, Example(0))
 
-  def test_side_effecting_inputs(self) -> None:
+  def test_uncacheable_inputs(self) -> None:
     @console_rule
     def valid_rule(console: Console, b: str) -> Example:
       return Example(exit_code=0)
@@ -106,7 +106,7 @@ class RuleTest(TestBase):
         return False
 
     error_str = str(cm.exception)
-    assert "invalid_rule has a side-effecting parameter" in error_str
+    assert "invalid_rule has an uncacheable parameter" in error_str
     assert "pants.engine.console.Console" in error_str
 
 

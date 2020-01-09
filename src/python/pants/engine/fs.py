@@ -212,7 +212,7 @@ class UrlToFetch:
 @dataclass(frozen=True)
 class Workspace:
   """Abstract handle for operations that touch the real local filesystem."""
-  side_effecting = True
+  uncacheable = True
   _scheduler: "SchedulerSession"
 
   def materialize_directory(

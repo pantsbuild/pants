@@ -36,7 +36,7 @@ class NativeStdErr(NativeWriter):
 
 class Console:
   """Class responsible for writing text to the console while Pants is running. """
-  side_effecting = True
+  uncacheable = True
 
   def __init__(self, stdout=None, stderr=None, use_colors: bool = True, session: Optional[Any] = None):
     """`stdout` and `stderr` may be explicitly provided when Console is constructed. 
