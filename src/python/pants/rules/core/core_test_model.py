@@ -33,6 +33,11 @@ class TestResult:
     )
 
 
+@dataclass(frozen=True)
+class TestDebugResult:
+  exit_code: int
+
+
 @union
 class TestTarget:
   """A union for registration of a testable target type."""

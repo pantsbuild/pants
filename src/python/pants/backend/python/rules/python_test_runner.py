@@ -1,7 +1,8 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Optional
+from dataclasses import dataclass
+from typing import Optional, Tuple
 
 from pants.backend.python.rules.pex import Pex
 from pants.backend.python.rules.pex_from_target_closure import CreatePexFromTargetClosure
@@ -12,13 +13,14 @@ from pants.backend.python.subsystems.subprocess_environment import SubprocessEnc
 from pants.build_graph.address import Address
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.fs import Digest, DirectoriesToMerge
+from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
 from pants.engine.legacy.structs import PythonTestsAdaptor
 from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.option.global_options import GlobalOptions
-from pants.rules.core.core_test_model import TestResult, TestTarget
+from pants.rules.core.core_test_model import TestDebugResult, TestResult, TestTarget
 from pants.rules.core.strip_source_root import SourceRootStrippedSources
 
 
@@ -44,26 +46,24 @@ def calculate_timeout_seconds(
   return target_timeout
 
 
-@rule(name="Run pytest")
-async def run_python_test(
-  test_target: PythonTestsAdaptor,
-  pytest: PyTest,
-  python_setup: PythonSetup,
-  subprocess_encoding_environment: SubprocessEncodingEnvironment,
-  global_options: GlobalOptions,
-) -> TestResult:
-  """Runs pytest for one target."""
+@dataclass(frozen=True)
+class TestTargetSetup:
+  requirements_pex: Pex
+  args: Tuple[str, ...]
+  input_files_digest: Digest
 
+
+@rule
+async def setup_pytest_for_target(test_target: PythonTestsAdaptor, pytest: PyTest) -> TestTargetSetup:
   transitive_hydrated_targets = await Get[TransitiveHydratedTargets](
     BuildFileAddresses((test_target.address,))
   )
   all_targets = transitive_hydrated_targets.closure
 
-  output_pytest_requirements_pex_filename = 'pytest-with-requirements.pex'
   resolved_requirements_pex = await Get[Pex](
     CreatePexFromTargetClosure(
       build_file_addresses=BuildFileAddresses((test_target.address,)),
-      output_filename=output_pytest_requirements_pex_filename,
+      output_filename='pytest-with-requirements.pex',
       entry_point="pytest:main",
       additional_requirements=pytest.get_requirement_strings(),
       include_source_files=False
@@ -87,7 +87,24 @@ async def run_python_test(
     ),
   )
 
-  test_target_sources_file_names = sorted(source_root_stripped_test_target_sources.snapshot.files)
+  return TestTargetSetup(
+    requirements_pex=resolved_requirements_pex,
+    args=(*pytest.options.args, *sorted(source_root_stripped_test_target_sources.snapshot.files)),
+    input_files_digest=merged_input_files
+  )
+
+
+@rule(name="Run pytest")
+async def run_python_test(
+  test_target: PythonTestsAdaptor,
+  test_setup: TestTargetSetup,
+  pytest: PyTest,
+  python_setup: PythonSetup,
+  subprocess_encoding_environment: SubprocessEncodingEnvironment,
+  global_options: GlobalOptions,
+) -> TestResult:
+  """Runs pytest for one target."""
+
   timeout_seconds = calculate_timeout_seconds(
     timeouts_enabled=pytest.options.timeouts,
     target_timeout=getattr(test_target, 'timeout', None),
@@ -98,12 +115,12 @@ async def run_python_test(
   colors = global_options.colors
   env = {"PYTEST_ADDOPTS": f"--color={'yes' if colors else 'no'}"}
 
-  request = resolved_requirements_pex.create_execute_request(
+  request = test_setup.requirements_pex.create_execute_request(
     python_setup=python_setup,
     subprocess_encoding_environment=subprocess_encoding_environment,
-    pex_path=f'./{output_pytest_requirements_pex_filename}',
-    pex_args=(*pytest.options.args, *test_target_sources_file_names),
-    input_files=merged_input_files,
+    pex_path=f'./{test_setup.requirements_pex.output_filename}',
+    pex_args=test_setup.args,
+    input_files=test_setup.input_files_digest,
     description=f'Run Pytest for {test_target.address.reference()}',
     timeout_seconds=timeout_seconds if timeout_seconds is not None else 9999,
     env=env
@@ -112,9 +129,28 @@ async def run_python_test(
   return TestResult.from_fallible_execute_process_result(result)
 
 
+@rule(name="Run pytest in an interactive process")
+async def debug_python_test(
+  test_target: PythonTestsAdaptor,
+  test_setup: TestTargetSetup,
+  runner: InteractiveRunner
+) -> TestDebugResult:
+
+  run_request = InteractiveProcessRequest(
+    argv=(test_setup.requirements_pex.output_filename, *test_setup.args),
+    run_in_workspace=False,
+    input_files=test_setup.input_files_digest
+  )
+
+  result = runner.run_local_interactive_process(run_request)
+  return TestDebugResult(result.process_exit_code)
+
+
 def rules():
   return [
     run_python_test,
+    debug_python_test,
+    setup_pytest_for_target,
     UnionRule(TestTarget, PythonTestsAdaptor),
     subsystem_rule(PyTest),
     subsystem_rule(PythonSetup),
