@@ -3,6 +3,7 @@
 
 import logging
 from dataclasses import dataclass
+from enum import Enum
 from typing import Optional
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
@@ -11,15 +12,65 @@ from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.build_files import AddressProvenanceMap
 from pants.engine.console import Console
+from pants.engine.fs import Digest
 from pants.engine.goal import Goal, GoalSubsystem
+from pants.engine.isolated_process import FallibleExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTarget
+from pants.engine.objects import union
 from pants.engine.rules import UnionMembership, console_rule, rule
 from pants.engine.selectors import Get, MultiGet
-from pants.rules.core.core_test_model import Status, TestDebugResult, TestResult, TestTarget
 
 
 # TODO(#6004): use proper Logging singleton, rather than static logger.
 logger = logging.getLogger(__name__)
+
+
+class Status(Enum):
+  SUCCESS = "SUCCESS"
+  FAILURE = "FAILURE"
+
+
+@dataclass(frozen=True)
+class TestResult:
+  status: Status
+  stdout: str
+  stderr: str
+  # TODO: We need a more generic way to handle coverage output across languages.
+  # See #8915 for proposed improvements.
+  _python_sqlite_coverage_file: Optional[Digest] = None
+
+  # Prevent this class from being detected by pytest as a test class.
+  __test__ = False
+
+  @staticmethod
+  def from_fallible_execute_process_result(
+    process_result: FallibleExecuteProcessResult
+  ) -> "TestResult":
+    return TestResult(
+      status=Status.SUCCESS if process_result.exit_code == 0 else Status.FAILURE,
+      stdout=process_result.stdout.decode(),
+      stderr=process_result.stderr.decode(),
+      _python_sqlite_coverage_file=process_result.output_directory_digest,
+    )
+
+
+@dataclass(frozen=True)
+class TestDebugResult:
+  exit_code: int
+
+
+@union
+class TestTarget:
+  """A union for registration of a testable target type."""
+
+  # Prevent this class from being detected by pytest as a test class.
+  __test__ = False
+
+  @staticmethod
+  def non_member_error_message(subject):
+    if hasattr(subject, 'address'):
+      return f'{subject.address.reference()} is not a testable target.'
+    return None
 
 
 class TestOptions(GoalSubsystem):
@@ -71,7 +122,6 @@ async def run_tests(console: Console, options: TestOptions, addresses: BuildFile
     address = await Get[BuildFileAddress](AddressSpecs(dependencies=dependencies))
     result = await Get[AddressAndDebugResult](Address, address.to_address())
     return Test(result.test_result.exit_code)
-
   results = await MultiGet(Get[AddressAndTestResult](Address, addr.to_address()) for addr in addresses)
   did_any_fail = False
   filtered_results = [(x.address, x.test_result) for x in results if x.test_result is not None]
