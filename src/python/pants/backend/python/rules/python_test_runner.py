@@ -2,10 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import List, Optional, Set, Tuple
+from typing import Optional, Set, Tuple
 
 from pants.backend.python.rules.pex import Pex
 from pants.backend.python.rules.pex_from_target_closure import CreatePexFromTargetClosure
@@ -79,7 +78,7 @@ class TestTargetSetup:
 def get_packages_to_cover(
   test_target: PythonTestsAdaptor,
   coverage: str,
-  source_root_stripped_file_paths: List[str],
+  source_root_stripped_file_paths: Tuple[str, ...],
 ) -> Set[str]:
   """Coverage may be a comma separated string of source root stripped files or packages or the special value 'auto'
     for which we will attempt to figure out which packages we should produce coverage reports for.
