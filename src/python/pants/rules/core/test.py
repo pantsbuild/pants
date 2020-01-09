@@ -130,32 +130,19 @@ async def run_tests(console: Console, options: TestOptions, addresses: BuildFile
     if test_result.status == Status.FAILURE:
       did_any_fail = True
     if test_result.stdout:
-      console.write_stdout(
-        "{} stdout:\n{}\n".format(
-          address.reference(),
-          (console.red(test_result.stdout) if test_result.status == Status.FAILURE
-           else test_result.stdout)
-        )
-      )
+      console.write_stdout(f"{address.reference()} stdout:\n{test_result.stdout}\n")
     if test_result.stderr:
       # NB: we write to stdout, rather than to stderr, to avoid potential issues interleaving the
       # two streams.
-      console.write_stdout(
-        "{} stderr:\n{}\n".format(
-          address.reference(),
-          (console.red(test_result.stderr) if test_result.status == Status.FAILURE
-           else test_result.stderr)
-        )
-      )
+      console.write_stdout(f"{address.reference()} stderr:\n{test_result.stderr}\n")
 
   console.write_stdout("\n")
 
   for address, test_result in filtered_results:
-    console.print_stdout('{0:80}.....{1:>10}'.format(
-      address.reference(), test_result.status.value))
+    console.print_stdout(f'{address.reference():80}.....{test_result.status.value:>10}')
 
   if did_any_fail:
-    console.print_stderr(console.red('Tests failed'))
+    console.print_stderr(console.red('\nTests failed'))
     exit_code = PANTS_FAILED_EXIT_CODE
   else:
     exit_code = PANTS_SUCCEEDED_EXIT_CODE
@@ -178,15 +165,15 @@ async def coordinator_of_tests(
   # TODO(#6004): when streaming to live TTY, rely on V2 UI for this information. When not a
   # live TTY, periodically dump heavy hitters to stderr. See
   # https://github.com/pantsbuild/pants/issues/6004#issuecomment-492699898.
-  logger.info("Starting tests: {}".format(target.address.reference()))
+  logger.info(f"Starting tests: {target.address.reference()}")
   # NB: This has the effect of "casting" a TargetAdaptor to a member of the TestTarget union.
   # The adaptor will always be a member because of the union membership check above, but if
   # it were not it would fail at runtime with a useful error message.
   result = await Get[TestResult](TestTarget, target.adaptor)
-  logger.info("Tests {}: {}".format(
-    "succeeded" if result.status == Status.SUCCESS else "failed",
-    target.address.reference(),
-  ))
+  logger.info(
+    f"Tests {'succeeded' if result.status == Status.SUCCESS else 'failed'}: "
+    f"{target.address.reference()}"
+  )
   return AddressAndTestResult(target.address, result)
 
 
