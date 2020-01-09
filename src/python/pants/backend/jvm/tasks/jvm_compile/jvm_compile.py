@@ -815,7 +815,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
         self._default_work_for_vts,
         ivts,
         compile_context,
-        self._classpath_product_key,
+        'runtime_classpath',
         counter,
         all_compile_contexts,
         classpath_product),
