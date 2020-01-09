@@ -128,7 +128,7 @@ async def setup_pytest_for_target(test_target: PythonTestsAdaptor, pytest: PyTes
   )
   test_target_sources_file_names = source_root_stripped_test_target_sources.snapshot.files
   coverage_args = []
-  if test_options.values.coverage:
+  if test_options.values.run_coverage:
     packages_to_cover = get_packages_to_cover(
       test_target,
       source_root_stripped_file_paths=test_target_sources_file_names,
