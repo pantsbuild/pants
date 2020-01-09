@@ -469,6 +469,9 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
             classpath_product.remove_for_target(cc.target, [(conf, cc.classes_dir)])
             classpath_product.add_for_target(cc.target, [(conf, cc.jar_file)])
 
+      # The runtime classpath will always be a superset of the export_dep_as_jar_classpath
+      # so however we compute runtime_classpath it will contain all the nescessary jars for
+      # the export_dep_as_jar_classpath.export_dep_as_jar_classpath.
       if self.context.products.is_required_data("export_dep_as_jar_classpath"):
         self.context.products.get_data('export_dep_as_jar_classpath', classpath_product.copy)
 

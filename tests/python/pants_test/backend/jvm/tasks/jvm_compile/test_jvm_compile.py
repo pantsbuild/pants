@@ -62,38 +62,44 @@ class JvmCompileTest(NailgunTaskTestBase):
     self.assertEqual([('default', pre_init_runtime_entry), ('default', compile_entry)],
       resulting_classpath.get_for_target(target))
 
-  def test_modulized_targets_not_compiled_for_export_classpath(self):
+  def create_and_return_classpath_products(self, required_products):
+    """Executes our mocked out JvmCompile class, with certain required products
+    args:
+      required_products: list of str. The products to declare a dependency on.f
+    rtype: tuple(ClasspathProducts)
+    """
     init_subsystems([JvmPlatform])
     targets = self.make_linear_graph(['a', 'b', 'c', 'd', 'e'], target_type=JavaLibrary)
     context = self.context(target_roots=[targets['a'], targets['c']], options={'jvm-platform': {'compiler': 'dummy'}})
     context.products.get_data('compile_classpath', ClasspathProducts.init_func(self.pants_workdir))
     # This should cause the jvm compile execution to exclude target roots and their
     # dependess from the set of relevant targets.
-    context.products.require_data("export_dep_as_jar_classpath")
+    for rp in required_products:
+      context.products.require_data(rp)
     self.execute(context)
-    export_classpath = context.products.get_data('export_dep_as_jar_classpath')
+    return (context.products.get_data('runtime_classpath'), context.products.get_data('export_dep_as_jar_classpath'))
+
+
+  def test_modulized_targets_not_compiled_for_export_classpath(self):
+    runtime_classpath, export_dep_as_jar_classpath = self.create_and_return_classpath_products(['export_dep_as_jar_classpath'])
     # assert none of the modulized targets have classpaths.
-    self.assertFalse(export_classpath.get_for_target(targets['a']) + export_classpath.get_for_target(targets['b']) + export_classpath.get_for_target(targets['c']))
-    self.assertTrue(export_classpath.get_for_target(targets['d']))
-    self.assertTrue(export_classpath.get_for_target(targets['e']))
+    self.assertEqual(export_classpath.get_for_target(targets['a']) + export_classpath.get_for_target(targets['b']) + export_classpath.get_for_target(targets['c']), 0)
+    self.assertEqual(len(export_dep_as_jar_classpath.get_for_target(targets['d'])), 1)
+    self.assertEqual(len(export_dep_as_jar_classpath.get_for_target(targets['e'])), 1)
 
   def test_modulized_targets_are_compiled_when_runtime_classpath_is_requested(self):
-    init_subsystems([JvmPlatform])
-    targets = self.make_linear_graph(['a', 'b', 'c', 'd', 'e'], target_type=JavaLibrary)
-    context = self.context(target_roots=[targets['a'], targets['c']], options={'jvm-platform': {'compiler': 'dummy'}})
-    context.products.get_data('compile_classpath', ClasspathProducts.init_func(self.pants_workdir))
     # This should cause the jvm compile execution to exclude target roots and their
     # dependess from the set of relevant targets.
-    context.products.require_data("export_dep_as_jar_classpath")
-    context.products.require_data("runtime_classpath")
-    self.execute(context)
-    runtime_classpath = context.products.get_data('runtime_classpath')
-    export_classpath = context.products.get_data('export_dep_as_jar_classpath')
-    self.assertEqual(runtime_classpath, export_classpath)
+    runtime_classpath, export_dep_as_jar_classpath = self.create_and_return_classpath_products(['export_dep_as_jar_classpath', 'runtime_classpath'])
+    self.assertEqual(runtime_classpath, export_dep_as_jar_classpath)
     # assert all of the modulized targets have classpaths.
-    self.assertTrue(export_classpath.get_for_target(targets['a']))
-    self.assertTrue(export_classpath.get_for_target(targets['b']))
-    self.assertTrue(export_classpath.get_for_target(targets['c']))
+    self.assertEqual(len(export_dep_as_jar_classpath.get_for_target(targets['a'])), 0)
+    self.assertEqual(len(export_dep_as_jar_classpath.get_for_target(targets['b'])), 0)
+    self.assertEqual(len(export_dep_as_jar_classpath.get_for_target(targets['c'])), 0)
+
+  def test_export_dep_as_jar_classpath_not_created(self):
+    runtime_classpath, export_dep_as_jar_classpath = self.create_and_return_classpath_products(['runtime_classpath'])
+    self.assertIsNone(export_dep_as_jar_classpath)
 
 
 class BaseZincCompileJDKTest(NailgunTaskTestBase):
