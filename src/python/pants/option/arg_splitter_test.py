@@ -1,10 +1,10 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import os
 import shlex
 import unittest
 from functools import partial
+from pathlib import Path
 from typing import Dict, List, Optional
 
 from pants.option.arg_splitter import (
@@ -54,37 +54,60 @@ class ArgSplitterTest(unittest.TestCase):
     splitter = ArgSplitter(ArgSplitterTest._known_scope_infos)
     args = shlex.split(args_str)
     split_args = splitter.split_args(args)
-    self.assertEqual(expected_goals, split_args.goals)
-    self.assertEqual(expected_scope_to_flags, split_args.scope_to_flags)
-    self.assertEqual(expected_specs, split_args.specs)
-    self.assertEqual(expected_passthru, split_args.passthru)
-    self.assertEqual(expected_passthru_owner, split_args.passthru_owner)
-    self.assertEqual(expected_is_help, splitter.help_request is not None)
-    self.assertEqual(expected_help_advanced,
-                      (isinstance(splitter.help_request, OptionsHelp) and
-                       splitter.help_request.advanced))
-    self.assertEqual(expected_help_all,
-                      (isinstance(splitter.help_request, OptionsHelp) and
-                       splitter.help_request.all_scopes))
-    self.assertEqual(expected_unknown_scopes, split_args.unknown_scopes)
+    assert expected_goals == split_args.goals
+    assert expected_scope_to_flags == split_args.scope_to_flags
+    assert expected_specs == split_args.specs
+    assert expected_passthru == split_args.passthru
+    assert expected_passthru_owner == split_args.passthru_owner
+    assert expected_is_help == (splitter.help_request is not None)
+    assert expected_help_advanced == (
+      isinstance(splitter.help_request, OptionsHelp) and splitter.help_request.advanced
+    )
+    assert expected_help_all == (
+      isinstance(splitter.help_request, OptionsHelp) and splitter.help_request.all_scopes
+    )
+    assert expected_unknown_scopes == split_args.unknown_scopes
+
+  def assert_unknown_goal(self, args_str: str, unknown_goals: List[str]) -> None:
+    splitter = ArgSplitter(ArgSplitterTest._known_scope_infos)
+    result = splitter.split_args(shlex.split(args_str))
+    assert isinstance(splitter.help_request, UnknownGoalHelp)
+    assert set(unknown_goals) == set(splitter.help_request.unknown_goals)
+    assert result.unknown_scopes == unknown_goals
 
   def test_is_spec(self) -> None:
     def assert_spec(arg: str) -> None:
-      self.assertTrue(ArgSplitter.spec(arg))
+      assert ArgSplitter.spec(arg) is True
 
     def assert_not_spec(arg: str) -> None:
-      self.assertFalse(ArgSplitter.spec(arg))
+      assert ArgSplitter.spec(arg) is False
 
-    assert_spec('a/b/c')
-    assert_spec('a/b:c')
-    assert_spec(':c')
-    with temporary_dir() as tmpdir:
-      os.mkdir(os.path.join(tmpdir, 'foo'))
-      with pushd(tmpdir):
-        assert_spec('foo')
+    unambiguous_specs = [
+      'a/b/c',
+      'a/b/c/',
+      'a/b:c',
+      'a/b/c.txt',
+      ':c',
+      '::',
+      'a/',
+      './a.txt',
+      '.',
+    ]
+    for s in unambiguous_specs:
+      assert_spec(s)
 
-    assert_not_spec('foo')
-    assert_not_spec('a_b_c')
+    directories_vs_goals = ['foo', 'a_b_c']
+    files_vs_subscopes = ['cache.java', 'cache.tmp.java']
+    ambiguous_specs = [*directories_vs_goals, *files_vs_subscopes]
+    for spec in ambiguous_specs:
+      assert_not_spec(spec)
+    with temporary_dir() as tmpdir, pushd(tmpdir):
+      for dir in directories_vs_goals:
+        Path(tmpdir, dir).mkdir()
+      for f in files_vs_subscopes:
+        Path(tmpdir, f).touch()
+      for spec in ambiguous_specs:
+        assert_spec(spec)
 
   def test_basic_arg_splitting(self) -> None:
     # Various flag combos.
@@ -132,24 +155,40 @@ class ArgSplitterTest(unittest.TestCase):
       expected_scope_to_flags={'': [], 'compile': []},
       expected_specs=['test:test'],
     )
-    self.assert_valid_split(
-      './pants test test:test',
+
+    assert_test_goal_split = partial(
+      self.assert_valid_split,
       expected_goals=['test'],
       expected_scope_to_flags={'': [], 'test': []},
-      expected_specs=['test:test'],
     )
+    assert_test_goal_split('./pants test test:test', expected_specs=['test:test'])
+    assert_test_goal_split('./pants test ./test', expected_specs=['./test'])
+    assert_test_goal_split('./pants test //test', expected_specs=['//test'])
+    assert_test_goal_split('./pants test ./test.txt', expected_specs=['./test.txt'])
+    assert_test_goal_split('./pants test test/test.txt', expected_specs=['test/test.txt'])
+    assert_test_goal_split('./pants test test/test', expected_specs=['test/test'])
+    assert_test_goal_split('./pants test .', expected_specs=['.'])
+
+    # An argument that looks like a file, but is a known scope, should be interpreted as a goal.
     self.assert_valid_split(
-      './pants test ./test',
-      expected_goals=['test'],
-      expected_scope_to_flags={'': [], 'test': []},
-      expected_specs=['./test'],
+      './pants test compile.java',
+      expected_goals=['test', 'compile'],
+      expected_scope_to_flags={'': [], 'test': [], 'compile.java': []},
+      expected_specs=[],
     )
-    self.assert_valid_split(
-      './pants test //test',
-      expected_goals=['test'],
-      expected_scope_to_flags={'': [], 'test': []},
-      expected_specs=['//test'],
-    )
+    # An argument that looks like a file, and is not a known scope nor exists on the file system,
+    # should be interpreted as an unknown goal.
+    self.assert_unknown_goal('./pants test compile.haskell', ['compile.haskell'])
+    # An argument that looks like a file, and is not a known scope but _does_ exist on the file
+    # system, should be interpreted as a spec.
+    with temporary_dir() as tmpdir, pushd(tmpdir):
+      Path(tmpdir, 'compile.haskell').touch()
+      self.assert_valid_split(
+        './pants test compile.haskell',
+        expected_goals=['test'],
+        expected_scope_to_flags={'': [], 'test': []},
+        expected_specs=['compile.haskell'],
+      )
 
   def test_descoping_qualified_flags(self) -> None:
     self.assert_valid_split(
@@ -326,17 +365,10 @@ class ArgSplitterTest(unittest.TestCase):
     assert_version_request('./pants --version compile --foo --bar path/to/target')
 
   def test_unknown_goal_detection(self) -> None:
-    def assert_unknown_goal(args_str: str, unknown_goals: List[str]) -> None:
-      splitter = ArgSplitter(ArgSplitterTest._known_scope_infos)
-      result = splitter.split_args(shlex.split(args_str))
-      assert isinstance(splitter.help_request, UnknownGoalHelp)
-      assert set(unknown_goals) == set(splitter.help_request.unknown_goals)
-      assert result.unknown_scopes == unknown_goals
-
-    assert_unknown_goal('./pants foo', ['foo'])
-    assert_unknown_goal('./pants compile foo', ['foo'])
-    assert_unknown_goal('./pants foo bar baz:qux', ['foo', 'bar'])
-    assert_unknown_goal('./pants foo compile bar baz:qux', ['foo', 'bar'])
+    self.assert_unknown_goal('./pants foo', ['foo'])
+    self.assert_unknown_goal('./pants compile foo', ['foo'])
+    self.assert_unknown_goal('./pants foo bar baz:qux', ['foo', 'bar'])
+    self.assert_unknown_goal('./pants foo compile bar baz:qux', ['foo', 'bar'])
 
   def test_no_goal_detection(self) -> None:
     splitter = ArgSplitter(ArgSplitterTest._known_scope_infos)
