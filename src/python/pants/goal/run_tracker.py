@@ -12,7 +12,7 @@ import time
 import uuid
 from collections import OrderedDict
 from contextlib import contextmanager
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 import requests
 
@@ -371,7 +371,7 @@ class RunTracker(Subsystem):
             }
 
   @classmethod
-  def post_stats(cls, stats_url: str, stats: dict, timeout: int=2, auth_provider: Optional[str]=None, stats_version: int=1):
+  def post_stats(cls, stats_url: str, stats: Dict[str, Any], timeout: int=2, auth_provider: Optional[str] = None, stats_version: int = 1):
     """POST stats to the given url.
 
     :return: True if upload was successful, False otherwise.
@@ -484,7 +484,7 @@ class RunTracker(Subsystem):
 
   _log_levels = [Report.ERROR, Report.ERROR, Report.WARN, Report.INFO, Report.INFO]
 
-  def has_ended(self):
+  def has_ended(self) -> bool:
     return self._end_memoized_result is not None
 
   def end(self):
@@ -617,7 +617,7 @@ class RunTracker(Subsystem):
     """
     SubprocPool.shutdown(self._aborted)
 
-  def _get_options_to_record(self):
+  def _get_options_to_record(self) -> dict:
     recorded_options = {}
     for scope in self.get_options().stats_option_scopes_to_record:
       scope_and_maybe_option = scope.split("^")
