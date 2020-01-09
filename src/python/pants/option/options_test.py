@@ -257,7 +257,7 @@ class OptionsTest(TestBase):
     options = self._parse(flags='--verbose')
     self.assertEqual(True, options.for_global_scope().verbose)
     options = self._parse(flags='-z compile path/to/tgt')
-    self.assertEqual(['path/to/tgt'], options.positional_args)
+    self.assertEqual(['path/to/tgt'], options.specs)
     self.assertEqual(True, options.for_global_scope().verbose)
 
     with self.assertRaises(ParseError):
@@ -594,9 +594,7 @@ class OptionsTest(TestBase):
     ) -> None:
       env = {"PANTS_GLOBAL_SHELL_STR_LISTY": env_val} if env_val else None
       config = {"GLOBAL": {"shell_str_listy": config_val}} if config_val else None
-      global_options = self._parse(
-        args_str=f"./pants {flags}", env=env, config=config
-      ).for_global_scope()
+      global_options = self._parse(flags=flags, env=env, config=config).for_global_scope()
       assert global_options.shell_str_listy == expected
 
     default = ['--default1', '--default2=test']
@@ -840,7 +838,7 @@ class OptionsTest(TestBase):
       bootstrapper = OptionsBootstrapper.create(args=shlex.split(f"./pants {flags}"))
       bootstrap_options = bootstrapper.bootstrap_options.for_global_scope()
       options = self._parse(flags=flags, bootstrap_option_values=bootstrap_options)
-      sorted_specs = sorted(options.positional_args)
+      sorted_specs = sorted(options.specs)
       self.assertEqual(['bar', 'fleem:tgt', 'foo', 'morx:tgt'], sorted_specs)
 
   def test_passthru_args(self):
@@ -1382,7 +1380,7 @@ class OptionsTest(TestBase):
           # Set the Levenshtein edit distance to search for misspelled options.
         'option_name_check_distance': 2,
           # If bootstrap option values are provided, this option is accessed and must be provided.
-        'positional_arg_files': [],
+        'spec_files': [],
         },
       })
       return self._parse(flags=safe_shlex_join(list(args)),
