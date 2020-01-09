@@ -74,14 +74,9 @@ class JvmTask(Task):
 
   def preferred_jvm_distribution_for_targets(self, targets, jdk=False, strict=False):
     """Find the preferred jvm distribution for running code from the given targets."""
-    return self.preferred_jvm_distribution(self._jvm_platforms_from_targets(targets),
-                                           jdk=jdk, strict=strict)
+    return self.preferred_jvm_distribution(
+      [target.runtime_platform for target in targets if isinstance(target, JvmTarget)],
+      jdk=jdk, strict=strict)
 
   def preferred_jvm_distribution(self, platforms, jdk=False, strict=False):
     return JvmPlatform.preferred_jvm_distribution(platforms, jdk=jdk, strict=strict)
-
-  def _jvm_platforms_from_targets(self, targets):
-    # Override this to change platform lookup.
-    # This overriding will be eliminated in the next change.
-    return [target.platform for target in targets
-            if isinstance(target, JvmTarget)]

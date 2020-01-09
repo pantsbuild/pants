@@ -20,8 +20,8 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
   def test_java_eight(self):
     self._testjvms('eight')
 
-  def test_with_test_platform(self):
-    self._testjvms('eight-test-platform')
+  def test_with_runtime_platform(self):
+    self._testjvms('eight-runtime-platform')
 
   def test_junit_run_against_class_succeeds(self):
     pants_run = self.run_pants(['clean-all',

@@ -112,3 +112,19 @@ python_tests(
   tags = {'integration', 'partially_type_checked'},
   timeout=800,
 )
+
+python_tests(
+  name='jvm_platform',
+  sources=['test_jvm_platform.py'],
+  dependencies=[
+    'src/python/pants/backend/jvm/subsystems:jvm_platform',
+    'src/python/pants/java/distribution',
+    'src/python/pants/java:executor',
+    'src/python/pants/subsystem',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+    'src/python/pants/testutil:test_base',
+    'src/python/pants/testutil/subsystem',
+  ],
+  tags = {"partially_type_checked"},
+)

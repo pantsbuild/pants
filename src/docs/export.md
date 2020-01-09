@@ -177,6 +177,12 @@ The following is an abbreviated export file from a command in the pants repo:
 
 # Export Format Changes
 
+## 1.0.15
+
+Added 'runtime_platform' to target
+
+Deprecated 'test_platform'. (todo figure out what deprecation means)
+
 ## 1.0.14
 
 Export only modulizable targets for `export-dep-as-jar`, and the rest of targets will appear as libraries.
