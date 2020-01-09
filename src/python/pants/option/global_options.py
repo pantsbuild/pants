@@ -253,12 +253,21 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                   'Later files override earlier ones.')
     register('--pythonpath', advanced=True, type=list,
              help='Add these directories to PYTHONPATH to search for plugins.')
-    register('--target-spec-file', type=list, dest='positional_arg_files', daemon=False,
+    register('--target-spec-file', type=list, dest='spec_files', daemon=False,
              removal_version='1.25.0.dev2',
-             removal_hint='Use --positional-arg-file instead',
+             removal_hint='Use `--spec-file` instead. This change is in preparation for Pants '
+                          'eventually allowing you to pass file names as arguments, e.g. '
+                          '`./pants cloc foo.py`.',
              help='Read additional specs from this file, one per line')
-    register('--positional-arg-file', type=list, dest='positional_arg_files', daemon=False,
+    register('--positional-arg-file', type=list, dest='spec_files', daemon=False,
+             removal_version='1.27.0.dev0',
+             removal_hint='Use `--spec-file` instead. This change is in preparation for Pants '
+                          'eventually allowing you to pass file names as arguments, e.g. '
+                          '`./pants cloc foo.py`.',
              help='Read additional positional args from this file, one per line')
+    register('--spec-file', type=list, dest='spec_files', daemon=False,
+             help='Read additional specs from this file (e.g. target addresses or file names). '
+                  'Each spec should be one per line.')
     register('--verify-config', type=bool, default=True, daemon=False,
              advanced=True,
              help='Verify that all config file values correspond to known options.')

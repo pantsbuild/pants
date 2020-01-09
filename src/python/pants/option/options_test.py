@@ -257,7 +257,7 @@ class OptionsTest(TestBase):
     options = self._parse('./pants --verbose')
     self.assertEqual(True, options.for_global_scope().verbose)
     options = self._parse('./pants -z compile path/to/tgt')
-    self.assertEqual(['path/to/tgt'], options.positional_args)
+    self.assertEqual(['path/to/tgt'], options.specs)
     self.assertEqual(True, options.for_global_scope().verbose)
 
     with self.assertRaises(ParseError):
@@ -794,7 +794,7 @@ class OptionsTest(TestBase):
       bootstrapper = OptionsBootstrapper.create(args=shlex.split(cmdline))
       bootstrap_options = bootstrapper.bootstrap_options.for_global_scope()
       options = self._parse(cmdline, bootstrap_option_values=bootstrap_options)
-      sorted_specs = sorted(options.positional_args)
+      sorted_specs = sorted(options.specs)
       self.assertEqual(['bar', 'fleem:tgt', 'foo', 'morx:tgt'], sorted_specs)
 
   def test_passthru_args(self):

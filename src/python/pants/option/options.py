@@ -5,6 +5,7 @@ import copy
 import re
 import sys
 from dataclasses import dataclass
+from typing import List
 
 from pants.base.deprecated import warn_or_error
 from pants.option.arg_splitter import ArgSplitter
@@ -132,32 +133,32 @@ class Options:
     option_tracker = OptionTracker()
 
     if bootstrap_option_values:
-      positional_arg_files = bootstrap_option_values.positional_arg_files
-      if positional_arg_files:
-        for positional_arg_file in positional_arg_files:
-          with open(positional_arg_file, 'r') as f:
-            split_args.positional_args.extend([line for line in [line.strip() for line in f] if line])
+      spec_files = bootstrap_option_values.spec_files
+      if spec_files:
+        for spec_file in spec_files:
+          with open(spec_file, 'r') as f:
+            split_args.specs.extend([line for line in [line.strip() for line in f] if line])
 
     help_request = splitter.help_request
 
     parser_hierarchy = ParserHierarchy(env, config, complete_known_scope_infos, option_tracker)
     bootstrap_option_values = bootstrap_option_values
     known_scope_to_info = {s.scope: s for s in complete_known_scope_infos}
-    return cls(split_args.goals, split_args.scope_to_flags, split_args.positional_args,
+    return cls(split_args.goals, split_args.scope_to_flags, split_args.specs,
                split_args.passthru, split_args.passthru_owner, help_request,
                parser_hierarchy, bootstrap_option_values, known_scope_to_info,
                option_tracker, split_args.unknown_scopes)
 
-  def __init__(self, goals, scope_to_flags, positional_args, passthru, passthru_owner, help_request,
+  def __init__(self, goals, scope_to_flags, specs: List[str], passthru, passthru_owner, help_request,
                parser_hierarchy, bootstrap_option_values, known_scope_to_info,
-               option_tracker, unknown_scopes):
+               option_tracker, unknown_scopes) -> None:
     """The low-level constructor for an Options instance.
 
     Dependees should use `Options.create` instead.
     """
     self._goals = goals
     self._scope_to_flags = scope_to_flags
-    self._positional_args = positional_args
+    self._specs = specs
     self._passthru = passthru
     self._passthru_owner = passthru_owner
     self._help_request = help_request
@@ -186,13 +187,26 @@ class Options:
     return self._help_request
 
   @property
+  def specs(self) -> List[str]:
+    """The specifications to operate on, e.g. the target addresses and the file names.
+
+    :API: public
+    """
+    return self._specs
+
+  @property
   def target_specs(self):
     """The targets to operate on.
 
     :API: public
     """
-    warn_or_error('1.25.0.dev2', '.target_specs', 'Use .positional_args instead')
-    return self._positional_args
+    warn_or_error(
+      removal_version='1.25.0.dev2',
+      deprecated_entity_description='.target_specs',
+      hint='Use .specs instead. This change is in preparation for Pants eventually allowing you to '
+           'pass file names as arguments, e.g. `./pants cloc foo.py`.',
+    )
+    return self._specs
 
   @property
   def positional_args(self):
@@ -200,7 +214,13 @@ class Options:
 
     :API: public
     """
-    return self._positional_args
+    warn_or_error(
+      removal_version='1.25.0.dev2',
+      deprecated_entity_description='.positional_args',
+      hint='Use .specs instead. This change is in preparation for Pants eventually allowing you to '
+           'pass file names as arguments, e.g. `./pants cloc foo.py`.',
+    )
+    return self._specs
 
   @property
   def goals(self):
@@ -256,7 +276,7 @@ class Options:
     no_flags = {}
     return Options(self._goals,
                    no_flags,
-                   self._positional_args,
+                   self._specs,
                    self._passthru,
                    self._passthru_owner,
                    self._help_request,

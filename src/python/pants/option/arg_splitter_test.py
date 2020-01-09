@@ -41,7 +41,7 @@ class ArgSplitterTest(unittest.TestCase):
     *,
     expected_goals: List[str],
     expected_scope_to_flags: Dict[str, List[str]],
-    expected_positional_args: List[str],
+    expected_specs: List[str],
     expected_passthru: Optional[List[str]] = None,
     expected_passthru_owner: Optional[str] = None,
     expected_is_help: bool = False,
@@ -56,7 +56,7 @@ class ArgSplitterTest(unittest.TestCase):
     split_args = splitter.split_args(args)
     self.assertEqual(expected_goals, split_args.goals)
     self.assertEqual(expected_scope_to_flags, split_args.scope_to_flags)
-    self.assertEqual(expected_positional_args, split_args.positional_args)
+    self.assertEqual(expected_specs, split_args.specs)
     self.assertEqual(expected_passthru, split_args.passthru)
     self.assertEqual(expected_passthru_owner, split_args.passthru_owner)
     self.assertEqual(expected_is_help, splitter.help_request is not None)
@@ -68,23 +68,23 @@ class ArgSplitterTest(unittest.TestCase):
                        splitter.help_request.all_scopes))
     self.assertEqual(expected_unknown_scopes, split_args.unknown_scopes)
 
-  def test_is_positional_arg(self) -> None:
-    def assert_positional(arg: str) -> None:
-      self.assertTrue(ArgSplitter.is_positional_arg(arg))
+  def test_is_spec(self) -> None:
+    def assert_spec(arg: str) -> None:
+      self.assertTrue(ArgSplitter.spec(arg))
 
-    def assert_not_positional(arg: str) -> None:
-      self.assertFalse(ArgSplitter.is_positional_arg(arg))
+    def assert_not_spec(arg: str) -> None:
+      self.assertFalse(ArgSplitter.spec(arg))
 
-    assert_positional('a/b/c')
-    assert_positional('a/b:c')
-    assert_positional(':c')
+    assert_spec('a/b/c')
+    assert_spec('a/b:c')
+    assert_spec(':c')
     with temporary_dir() as tmpdir:
       os.mkdir(os.path.join(tmpdir, 'foo'))
       with pushd(tmpdir):
-        assert_positional('foo')
+        assert_spec('foo')
 
-    assert_not_positional('foo')
-    assert_not_positional('a_b_c')
+    assert_not_spec('foo')
+    assert_not_spec('a_b_c')
 
   def test_basic_arg_splitting(self) -> None:
     # Various flag combos.
@@ -98,7 +98,7 @@ class ArgSplitterTest(unittest.TestCase):
         'compile': ['-g'],
         'test.junit': ['-i']
       },
-      expected_positional_args=['src/java/org/pantsbuild/foo', 'src/java/org/pantsbuild/bar:baz'],
+      expected_specs=['src/java/org/pantsbuild/foo', 'src/java/org/pantsbuild/bar:baz'],
     )
     self.assert_valid_split(
       './pants -farg --fff=arg compile --gg-gg=arg-arg -g test.junit --iii '
@@ -110,45 +110,45 @@ class ArgSplitterTest(unittest.TestCase):
         'test.junit': ['--iii'],
         'compile.java': ['--long-flag'],
       },
-      expected_positional_args=['src/java/org/pantsbuild/foo', 'src/java/org/pantsbuild/bar:baz'],
+      expected_specs=['src/java/org/pantsbuild/foo', 'src/java/org/pantsbuild/bar:baz'],
     )
 
-  def test_distinguish_goals_from_positional_args(self) -> None:
+  def test_distinguish_goals_from_specs(self) -> None:
     self.assert_valid_split(
       './pants compile test foo::',
       expected_goals=['compile', 'test'],
       expected_scope_to_flags={'': [], 'compile': [], 'test': []},
-      expected_positional_args=['foo::'],
+      expected_specs=['foo::'],
     )
     self.assert_valid_split(
       './pants compile test foo::',
       expected_goals=['compile', 'test'],
       expected_scope_to_flags={'': [], 'compile': [], 'test': []},
-      expected_positional_args=['foo::'],
+      expected_specs=['foo::'],
     )
     self.assert_valid_split(
       './pants compile test:test',
       expected_goals=['compile'],
       expected_scope_to_flags={'': [], 'compile': []},
-      expected_positional_args=['test:test'],
+      expected_specs=['test:test'],
     )
     self.assert_valid_split(
       './pants test test:test',
       expected_goals=['test'],
       expected_scope_to_flags={'': [], 'test': []},
-      expected_positional_args=['test:test'],
+      expected_specs=['test:test'],
     )
     self.assert_valid_split(
       './pants test ./test',
       expected_goals=['test'],
       expected_scope_to_flags={'': [], 'test': []},
-      expected_positional_args=['./test'],
+      expected_specs=['./test'],
     )
     self.assert_valid_split(
       './pants test //test',
       expected_goals=['test'],
       expected_scope_to_flags={'': [], 'test': []},
-      expected_positional_args=['//test'],
+      expected_specs=['//test'],
     )
 
   def test_descoping_qualified_flags(self) -> None:
@@ -158,14 +158,14 @@ class ArgSplitterTest(unittest.TestCase):
       expected_scope_to_flags={
         '': [], 'compile': [], 'compile.java': ['--bar'], 'test': [], 'test.junit': ['--no-baz']
       },
-      expected_positional_args=['foo/bar'],
+      expected_specs=['foo/bar'],
     )
     # Qualified flags don't count as explicit goals.
     self.assert_valid_split(
       './pants compile --test-junit-bar foo/bar',
       expected_goals=['compile'],
       expected_scope_to_flags={'': [], 'compile': [], 'test.junit': ['--bar']},
-      expected_positional_args=['foo/bar'],
+      expected_specs=['foo/bar'],
     )
 
   def test_passthru_args(self) -> None:
@@ -173,7 +173,7 @@ class ArgSplitterTest(unittest.TestCase):
       './pants test foo/bar -- -t arg',
       expected_goals=['test'],
       expected_scope_to_flags={'': [], 'test': []},
-      expected_positional_args=['foo/bar'],
+      expected_specs=['foo/bar'],
       expected_passthru=['-t', 'arg'],
       expected_passthru_owner='test',
     )
@@ -188,7 +188,7 @@ class ArgSplitterTest(unittest.TestCase):
         'compile.java': ['--long-flag'],
         'test.junit': ['--iii']
       },
-      expected_positional_args=['src/java/org/pantsbuild/foo', 'src/java/org/pantsbuild/bar:baz'],
+      expected_specs=['src/java/org/pantsbuild/foo', 'src/java/org/pantsbuild/bar:baz'],
       expected_passthru=['passthru1', 'passthru2'],
       expected_passthru_owner='test.junit'
     )
@@ -199,14 +199,14 @@ class ArgSplitterTest(unittest.TestCase):
       './pants --jvm-options=-Dbar=baz test foo:bar',
       expected_goals=['test'],
       expected_scope_to_flags={'': [], 'jvm': ['--options=-Dbar=baz'], 'test': []},
-      expected_positional_args=['foo:bar']
+      expected_specs=['foo:bar']
     )
     # Qualified task subsystem flag in global scope.
     self.assert_valid_split(
       './pants --jvm-test-junit-options=-Dbar=baz test foo:bar',
       expected_goals=['test'],
       expected_scope_to_flags={'': [], 'jvm.test.junit': ['--options=-Dbar=baz'], 'test': []},
-      expected_positional_args=['foo:bar']
+      expected_specs=['foo:bar']
     )
     # Unqualified task subsystem flag in task scope.
     # Note that this exposes a small problem: You can't set an option on the cmd-line if that
@@ -217,13 +217,13 @@ class ArgSplitterTest(unittest.TestCase):
       './pants test.junit --jvm-options=-Dbar=baz foo:bar',
       expected_goals=['test'],
       expected_scope_to_flags={'': [], 'jvm.test.junit': ['--options=-Dbar=baz'], 'test.junit': []},
-      expected_positional_args=['foo:bar'])
+      expected_specs=['foo:bar'])
     # Global-only flag in task scope.
     self.assert_valid_split(
       './pants test.junit --reporting-template-dir=path foo:bar',
       expected_goals=['test'],
       expected_scope_to_flags={'': [], 'reporting': ['--template-dir=path'], 'test.junit': []},
-      expected_positional_args=['foo:bar']
+      expected_specs=['foo:bar']
     )
 
   def test_help_detection(self) -> None:
@@ -231,7 +231,7 @@ class ArgSplitterTest(unittest.TestCase):
       self.assert_valid_split, expected_passthru=None, expected_passthru_owner=None, expected_is_help=True,
     )
     assert_help_no_arguments = partial(
-      assert_help, expected_goals=[], expected_scope_to_flags={'': []}, expected_positional_args=[],
+      assert_help, expected_goals=[], expected_scope_to_flags={'': []}, expected_specs=[],
     )
     assert_help_no_arguments('./pants')
     assert_help_no_arguments('./pants help')
@@ -258,58 +258,58 @@ class ArgSplitterTest(unittest.TestCase):
       './pants -f',
       expected_goals=[],
       expected_scope_to_flags={'': ['-f']},
-      expected_positional_args=[],
+      expected_specs=[],
     )
     assert_help(
       './pants help compile -x',
       expected_goals=['compile'],
       expected_scope_to_flags={'': [], 'compile': ['-x']},
-      expected_positional_args=[],
+      expected_specs=[],
     )
     assert_help(
       './pants help compile -x',
       expected_goals=['compile'],
       expected_scope_to_flags={'': [], 'compile': ['-x']},
-      expected_positional_args=[],
+      expected_specs=[],
     )
     assert_help(
       './pants compile -h',
       expected_goals=['compile'],
       expected_scope_to_flags={'': [], 'compile': []},
-      expected_positional_args=[],
+      expected_specs=[],
     )
     assert_help(
       './pants compile --help test',
       expected_goals=['compile', 'test'],
       expected_scope_to_flags={'': [], 'compile': [], 'test': []},
-      expected_positional_args=[],
+      expected_specs=[],
     )
     assert_help(
       './pants test src/foo/bar:baz -h',
       expected_goals=['test'],
       expected_scope_to_flags={'': [], 'test': []},
-      expected_positional_args=['src/foo/bar:baz'],
+      expected_specs=['src/foo/bar:baz'],
     )
 
     assert_help(
       './pants compile --help-advanced test',
       expected_goals=['compile', 'test'],
       expected_scope_to_flags={'': [], 'compile': [], 'test': []},
-      expected_positional_args=[],
+      expected_specs=[],
       expected_help_advanced=True,
     )
     assert_help(
       './pants help-advanced compile',
       expected_goals=['compile'],
       expected_scope_to_flags={'': [], 'compile': []},
-      expected_positional_args=[],
+      expected_specs=[],
       expected_help_advanced=True,
     )
     assert_help(
       './pants compile help-all test --help',
       expected_goals=['compile', 'test'],
       expected_scope_to_flags={'': [], 'compile': [], 'test': []},
-      expected_positional_args=[],
+      expected_specs=[],
       expected_help_all=True,
     )
 
