@@ -12,7 +12,7 @@ import time
 import uuid
 from collections import OrderedDict
 from contextlib import contextmanager
-from typing import Dict
+from typing import Dict, Optional
 
 import requests
 
@@ -371,7 +371,7 @@ class RunTracker(Subsystem):
             }
 
   @classmethod
-  def post_stats(cls, stats_url, stats, timeout=2, auth_provider=None, stats_version=1):
+  def post_stats(cls, stats_url: str, stats: dict, timeout: int=2, auth_provider: Optional[str]=None, stats_version: int=1):
     """POST stats to the given url.
 
     :return: True if upload was successful, False otherwise.
@@ -428,11 +428,11 @@ class RunTracker(Subsystem):
       return error(f'Error: {e!r}')
 
   @classmethod
-  def _json_dump_options(cls, stats):
+  def _json_dump_options(cls, stats: dict) -> str:
     return json.dumps(stats, cls=RunTrackerOptionEncoder)
 
   @classmethod
-  def write_stats_to_json(cls, file_name, stats):
+  def write_stats_to_json(cls, file_name: str, stats: dict) -> None:
     """Write stats to a local json file."""
     params = cls._json_dump_options(stats)
     try:
@@ -441,7 +441,7 @@ class RunTracker(Subsystem):
       print(f'WARNING: Failed to write stats to {file_name} due to Error: {e!r}',
             file=sys.stderr)
 
-  def run_information(self):
+  def run_information(self) -> dict:
     """Basic information about this run."""
     run_information = self.run_info.get_as_dict()
     target_data = run_information.get('target_data', None)
@@ -449,7 +449,7 @@ class RunTracker(Subsystem):
       run_information['target_data'] = ast.literal_eval(target_data)
     return run_information
 
-  def _stats(self):
+  def _stats(self) -> dict:
     stats = {
       'run_info': self.run_information(),
       'artifact_cache_stats': self.artifact_cache_stats.get_all(),
@@ -462,7 +462,7 @@ class RunTracker(Subsystem):
     else:
       stats.update({
         'self_timings': self.self_timings.get_all(),
-        'critical_path_timings': self.get_critical_path_timings().get_all(),        
+        'critical_path_timings': self.get_critical_path_timings().get_all(),
         'outcomes': self.outcomes,
       })
     return stats
