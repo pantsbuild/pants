@@ -200,7 +200,7 @@ class SetupPyOptions(GoalSubsystem):
            "dump the setup.py chroot."
     )
     register(
-      '--recursive', type=bool,
+      '--transitive', type=bool,
       help="If specified, will run the setup.py command recursively on all exported targets that "
            "the specified targets depend on, in dependency order.  This is useful, e.g., when "
            "the command publishes dists, to ensure that any dependencies of a dist are published "
@@ -215,13 +215,16 @@ class SetupPy(Goal):
 def validate_args(args: Tuple[str, ...]):
   # We rely on the dist dir being the default, so we know where to find the created dists.
   if '--dist-dir' in args or '-d' in args:
-    raise InvalidSetupPyArgs('You must not set --dist-dir in your setup.py args')
+    raise InvalidSetupPyArgs('Cannot set --dist-dir/-d in setup.py args')
   # We don't allow publishing via setup.py, as we don't want the setup.py running rule,
   # which is not a @console_rule, to side-effect (plus, we'd need to ensure that publishing
-  # happens in dependency order).
+  # happens in dependency order).  Note that `upload` and `register` were removed in
+  # setuptools 42.0.0, in favor of Twine, but we still check for them in case the user modified
+  # the default version used by our Setuptools subsystem.
   # TODO: A `publish` rule, that can invoke Twine to do the actual uploading.
-  if 'upload' in args:
-    raise InvalidSetupPyArgs('You must not upload dists via a setup.py command')
+  #  See https://github.com/pantsbuild/pants/issues/8935.
+  if 'upload' in args or 'register' in args:
+    raise InvalidSetupPyArgs('Cannot use the `upload` or `register` setup.py commands')
 
 
 @console_rule
@@ -248,25 +251,35 @@ async def run_setup_pys(targets: HydratedTargets, options: SetupPyOptions, conso
       'Cannot run setup.py on these targets, because they have no `provides=` clause: '
       f'{", ".join(so.address.reference() for so in explicit_nonexported_targets)}')
 
+  if options.values.transitive:
+    # Expand out to all owners of the entire dep closure.
+    tht = await Get[TransitiveHydratedTargets](
+      BuildFileAddresses([et.hydrated_target.address for et in exported_targets]))
+    owners = await MultiGet(
+      Get[ExportedTarget](OwnedDependency(ht)) for ht in tht.closure if is_ownable_target(ht)
+    )
+    exported_targets = list(set(owners))
+
   chroots = await MultiGet(Get[SetupPyChroot](SetupPyChrootRequest(target))
                            for target in exported_targets)
 
-  for exported_target, chroot in zip(exported_targets, chroots):
-    addr = exported_target.hydrated_target.address.reference()
-    provides = exported_target.hydrated_target.adaptor.provides
-    # TODO: We should run these in exported target dependency order, in case the
-    #  command publishes a dist, in which case we must publish its dependencies first.
-    #  Or, we can do so based on an option, and if the user doesn't require it we can
-    #  run these concurrently.
-    if args:
-      setup_py_result = await Get[RunSetupPyResult](
-        RunSetupPyRequest(exported_target, chroot, tuple(args)))
+  if args:
+    setup_py_results = await MultiGet(
+      Get[RunSetupPyResult](RunSetupPyRequest(exported_target, chroot, tuple(args)))
+      for exported_target, chroot in zip(exported_targets, chroots)
+    )
+
+    for exported_target, setup_py_result in zip(exported_targets, setup_py_results):
+      addr = exported_target.hydrated_target.address.reference()
       console.print_stderr(f'Writing contents of dist dir for {addr} to {distdir.relpath}')
       workspace.materialize_directory(
         DirectoryToMaterialize(setup_py_result.output, path_prefix=str(distdir.relpath))
       )
-    else:
-      # Just dump the chroot.
+  else:
+    # Just dump the chroot.
+    for exported_target, chroot in zip(exported_targets, chroots):
+      addr = exported_target.hydrated_target.address.reference()
+      provides = exported_target.hydrated_target.adaptor.provides
       setup_py_dir = distdir.relpath / f'{provides.name}-{provides.version}'
       console.print_stderr(f'Writing setup.py chroot for {addr} to {setup_py_dir}')
       workspace.materialize_directory(
@@ -454,8 +467,7 @@ async def get_requirements(dep_owner: DependencyOwner) -> ExportedTargetRequirem
   tht = await Get[TransitiveHydratedTargets](
     BuildFileAddresses([dep_owner.exported_target.hydrated_target.address]))
 
-  ownable_tgts = [tgt for tgt in tht.closure
-                  if isinstance(tgt.adaptor, (PythonTargetAdaptor, ResourcesAdaptor))]
+  ownable_tgts = [tgt for tgt in tht.closure if is_ownable_target(tgt)]
   owners = await MultiGet(Get[ExportedTarget](OwnedDependency(ht)) for ht in ownable_tgts)
   owned_by_us: Set[HydratedTarget] = set()
   owned_by_others: Set[HydratedTarget] = set()
@@ -566,6 +578,10 @@ async def setup_setuptools(setuptools: Setuptools) -> SetuptoolsSetup:
   return SetuptoolsSetup(
     requirements_pex=requirements_pex,
   )
+
+
+def is_ownable_target(tgt: HydratedTarget):
+  return isinstance(tgt.adaptor, (PythonTargetAdaptor, ResourcesAdaptor))
 
 
 def rules():

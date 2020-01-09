@@ -483,7 +483,7 @@ class TestGetExportingOwner(TestSetupPyBase):
     self.assert_is_owner('src/python/aaa', 'src/python/aaa')
 
 
-def test_validate_args():
+def test_validate_args() -> None:
   with pytest.raises(InvalidSetupPyArgs):
     validate_args(('bdist_wheel', 'upload'))
   with pytest.raises(InvalidSetupPyArgs):
