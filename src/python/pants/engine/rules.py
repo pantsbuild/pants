@@ -239,7 +239,7 @@ def rule_decorator(*args, **kwargs) -> Callable:
   return _make_rule(return_type, parameter_types, cacheable=cacheable, name=name)(func)
 
 
-def validate_parameter_types(func_id: str, parameter_types: Tuple[Type, ...], cacheable: bool):
+def validate_parameter_types(func_id: str, parameter_types: Tuple[Type, ...], cacheable: bool) -> None:
   if cacheable:
     for ty in parameter_types:
       if getattr(ty, "uncacheable", False):
