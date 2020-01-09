@@ -75,8 +75,11 @@ def _get_starting_indent(source):
 
 
 def _make_rule(
-  return_type: Type, parameter_types: typing.Iterable[Type], cacheable: bool = True,
-  name: Optional[bool] = None
+  return_type: Type,
+  parameter_types: typing.Iterable[Type],
+  *,
+  cacheable: bool = True,
+  name: Optional[str] = None
 ) -> Callable[[Callable], Callable]:
   """A @decorator that declares that a particular static function may be used as a TaskRule.
 
@@ -90,12 +93,17 @@ def _make_rule(
                     its inputs.
   """
 
-  is_goal_cls = issubclass(return_type, Goal)
-  if is_goal_cls == cacheable:
+  has_goal_return_type = issubclass(return_type, Goal)
+  if cacheable and has_goal_return_type:
     raise TypeError(
-      'An `@rule` that produces a `Goal` must be declared with @console_rule in order to signal '
+      'An `@rule` that returns a `Goal` must be declared with `@console_rule` in order to signal '
       'that it is not cacheable.'
     )
+  if not cacheable and not has_goal_return_type:
+    raise TypeError(
+      'An `@console_rule` must return a subclass of `engine.goal.Goal`.'
+    )
+  is_goal_cls = has_goal_return_type
 
   def wrapper(func):
     if not inspect.isfunction(func):
@@ -213,7 +221,7 @@ def rule_decorator(*args, **kwargs) -> Callable:
   func = args[0]
 
   cacheable: bool = kwargs['cacheable']
-  name = kwargs.get('name')
+  name: Optional[str] = kwargs.get('name')
 
   signature = inspect.signature(func)
   func_id = f'@rule {func.__module__}:{func.__name__}'
