@@ -16,6 +16,7 @@ from pants.backend.python.rules.run_setup_py import (
   ExportedTarget,
   ExportedTargetRequirements,
   InvalidEntryPoint,
+  InvalidSetupPyArgs,
   NoOwnerError,
   OwnedDependencies,
   OwnedDependency,
@@ -29,7 +30,7 @@ from pants.backend.python.rules.run_setup_py import (
   get_owned_dependencies,
   get_requirements,
   get_sources,
-)
+  validate_args)
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.fs import Snapshot
@@ -480,3 +481,15 @@ class TestGetExportingOwner(TestSetupPyBase):
     self.assert_is_owner('src/python/aaa/bbb', 'src/python/aaa/bbb/ccc')
     self.assert_is_owner('src/python/aaa/bbb', 'src/python/aaa/bbb')
     self.assert_is_owner('src/python/aaa', 'src/python/aaa')
+
+
+def test_validate_args():
+  with pytest.raises(InvalidSetupPyArgs):
+    validate_args(('bdist_wheel', 'upload'))
+  with pytest.raises(InvalidSetupPyArgs):
+    validate_args(('sdist', '-d', 'new_distdir/'))
+  with pytest.raises(InvalidSetupPyArgs):
+    validate_args(('--dist-dir', 'new_distdir/', 'sdist'))
+
+  validate_args(('sdist',))
+  validate_args(('bdist_wheel', '--foo'))

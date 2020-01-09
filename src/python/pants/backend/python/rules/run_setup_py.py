@@ -25,6 +25,7 @@ from pants.backend.python.subsystems.subprocess_environment import SubprocessEnc
 from pants.base.specs import AddressSpecs, AscendantAddresses
 from pants.build_graph.address import Address
 from pants.engine.addressable import BuildFileAddresses
+from pants.engine.build_files import AddressProvenanceMap
 from pants.engine.console import Console
 from pants.engine.fs import (
   Digest,
@@ -52,6 +53,10 @@ from pants.source.source_root import SourceRootConfig
 
 
 logger = logging.getLogger(__name__)
+
+
+class InvalidSetupPyArgs(Exception):
+  """Indicates invalid arguments to setup.py."""
 
 
 class TargetNotExported(Exception):
@@ -194,28 +199,54 @@ class SetupPyOptions(GoalSubsystem):
            "`--setup-py2-args=\"bdist_wheel --python-tag py36.py37\"`. If unspecified, we just "
            "dump the setup.py chroot."
     )
+    register(
+      '--recursive', type=bool,
+      help="If specified, will run the setup.py command recursively on all exported targets that "
+           "the specified targets depend on, in dependency order.  This is useful, e.g., when "
+           "the command publishes dists, to ensure that any dependencies of a dist are published "
+           "before it."
+    )
 
 
 class SetupPy(Goal):
   subsystem_cls = SetupPyOptions
 
 
+def validate_args(args: Tuple[str, ...]):
+  # We rely on the dist dir being the default, so we know where to find the created dists.
+  if '--dist-dir' in args or '-d' in args:
+    raise InvalidSetupPyArgs('You must not set --dist-dir in your setup.py args')
+  # We don't allow publishing via setup.py, as we don't want the setup.py running rule,
+  # which is not a @console_rule, to side-effect (plus, we'd need to ensure that publishing
+  # happens in dependency order).
+  # TODO: A `publish` rule, that can invoke Twine to do the actual uploading.
+  if 'upload' in args:
+    raise InvalidSetupPyArgs('You must not upload dists via a setup.py command')
+
+
 @console_rule
 async def run_setup_pys(targets: HydratedTargets, options: SetupPyOptions, console: Console,
+                        provenance_map: AddressProvenanceMap,
                         distdir: DistDir, workspace: Workspace) -> SetupPy:
   """Run setup.py commands on all exported targets addressed."""
+  args = tuple(options.values.args)
+  validate_args(args)
+
+  # Get all exported targets, ignoring any non-exported targets that happened to be
+  # globbed over, but erroring on any explicitly-requested non-exported targets.
 
   exported_targets: List[ExportedTarget] = []
-  nonexported_targets: List[HydratedTarget] = []
+  explicit_nonexported_targets: List[HydratedTarget] = []
+
   for hydrated_target in targets:
     if _is_exported(hydrated_target):
       exported_targets.append(ExportedTarget(hydrated_target))
-    else:
-      nonexported_targets.append(hydrated_target)
-  if nonexported_targets:
+    elif provenance_map.is_single_address(hydrated_target.address):
+      explicit_nonexported_targets.append(hydrated_target)
+  if explicit_nonexported_targets:
     raise TargetNotExported(
       'Cannot run setup.py on these targets, because they have no `provides=` clause: '
-      f'{", ".join(so.address.reference() for so in nonexported_targets)}')
+      f'{", ".join(so.address.reference() for so in explicit_nonexported_targets)}')
 
   chroots = await MultiGet(Get[SetupPyChroot](SetupPyChrootRequest(target))
                            for target in exported_targets)
@@ -223,15 +254,14 @@ async def run_setup_pys(targets: HydratedTargets, options: SetupPyOptions, conso
   for exported_target, chroot in zip(exported_targets, chroots):
     addr = exported_target.hydrated_target.address.reference()
     provides = exported_target.hydrated_target.adaptor.provides
-    args = options.values.args
     # TODO: We should run these in exported target dependency order, in case the
     #  command publishes a dist, in which case we must publish its dependencies first.
     #  Or, we can do so based on an option, and if the user doesn't require it we can
     #  run these concurrently.
     if args:
       setup_py_result = await Get[RunSetupPyResult](
-        RunSetupPyRequest(exported_target, chroot, args))
-      console.print_stderr(f'Writing dist for {addr} to {distdir.relpath}')
+        RunSetupPyRequest(exported_target, chroot, tuple(args)))
+      console.print_stderr(f'Writing contents of dist dir for {addr} to {distdir.relpath}')
       workspace.materialize_directory(
         DirectoryToMaterialize(setup_py_result.output, path_prefix=str(distdir.relpath))
       )
@@ -454,7 +484,7 @@ async def get_requirements(dep_owner: DependencyOwner) -> ExportedTargetRequirem
   # Add the requirements on any exported targets on which we depend.
   exported_targets_we_depend_on = await MultiGet(
     Get[ExportedTarget](OwnedDependency(ht)) for ht in owned_by_others)
-  req_strs.extend(sorted(et.hydrated_target.adaptor.provides.key
+  req_strs.extend(sorted(et.hydrated_target.adaptor.provides.requirement
                   for et in set(exported_targets_we_depend_on)))
 
   return ExportedTargetRequirements(tuple(req_strs))
