@@ -509,7 +509,7 @@ async def sort_targets(targets: HydratedTargets) -> TopologicallyOrderedTargets:
   return TopologicallyOrderedTargets(HydratedTargets(topo_sort(tuple(targets))))
 
 
-def topo_sort(targets: Tuple[HydratedTarget, ...]) -> Tuple[HydratedTarget, ...]:
+def topo_sort(targets: Iterable[HydratedTarget]) -> Tuple[HydratedTarget, ...]:
   """Sort the targets so that if B depends on A, B follows A in the order."""
   visited: Dict[HydratedTarget, bool] = defaultdict(bool)
   res: List[HydratedTarget] = []
@@ -524,7 +524,11 @@ def topo_sort(targets: Tuple[HydratedTarget, ...]) -> Tuple[HydratedTarget, ...]
 
   for target in targets:
     recursive_topo_sort(target)
-  return tuple(res)
+
+  # Note that if the input set is not transitively closed then res may contain targets
+  # that aren't in the input set.  We subtract those out here.
+  input_set = set(targets)
+  return tuple(tgt for tgt in res if tgt in input_set)
 
 
 
