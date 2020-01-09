@@ -472,7 +472,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
       # The runtime classpath will always be a superset of the export_dep_as_jar_classpath
       # so however we compute runtime_classpath it will contain all the nescessary jars for
       # the export_dep_as_jar_classpath.export_dep_as_jar_classpath.
-      if self.context.products.is_required_data("export_dep_as_jar_classpath"):
+      if self.context.products.is_required_data('export_dep_as_jar_classpath'):
         self.context.products.get_data('export_dep_as_jar_classpath', classpath_product.copy)
 
   def _classpath_for_context(self, context):
