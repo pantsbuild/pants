@@ -1,7 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Tuple, List
+from typing import List
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.option.custom_types import file_option

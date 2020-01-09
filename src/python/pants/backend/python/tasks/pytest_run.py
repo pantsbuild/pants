@@ -325,7 +325,6 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
           def package(test_source_path):
             return os.path.dirname(test_source_path).replace(os.sep, '.')
 
-
           def packages():
             for test_source_path in tgt.sources_relative_to_source_root():
               pkg = package(test_source_path)

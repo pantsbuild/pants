@@ -58,12 +58,5 @@ async def strip_source_root(
   return SourceRootStrippedSources(snapshot=resulting_snapshot)
 
 
-@dataclass(frozen=True)
-class SourceRootsAndSourceRootStrippedSources:
-  """Wrapper for a snapshot of source roots and targets whose source roots have been stripped."""
-  source_root: str
-  source_path: str
-
-
 def rules():
   return [strip_source_root, subsystem_rule(SourceRootConfig)]

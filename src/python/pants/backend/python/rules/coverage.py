@@ -3,7 +3,8 @@
 
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import List
+from typing import Tuple
+
 from pants.backend.python.rules.inject_init import InjectedInitDigest
 from pants.backend.python.rules.pex import (
   CreatePex,
@@ -27,12 +28,11 @@ from pants.engine.fs import (
 )
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTarget, TransitiveHydratedTargets
-from pants.engine.rules import console_rule, subsystem_rule
+from pants.engine.rules import rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.rules.core.strip_source_root import SourceRootStrippedSources
 from pants.rules.core.test import AddressAndTestResult
 from pants.source.source_root import SourceRootConfig
-
 
 
 @dataclass
@@ -71,7 +71,7 @@ def get_file_names(all_target_adaptors):
   return list(iter_files())
 
 
-@console_rule(name="Merge coverage reports")
+@rule(name="Merge coverage reports")
 async def merge_coverage_reports(
   addresses: BuildFileAddresses,
   address_specs: AddressSpecs,
@@ -106,7 +106,7 @@ async def merge_coverage_reports(
 
   coveragerc_digest = await Get[Digest](InputFilesContent, get_coveragerc_input(DEFAULT_COVERAGE_CONFIG.encode()))
 
-  coverage_directory_digests: List[Digest] = await MultiGet(
+  coverage_directory_digests: Tuple[Digest, ...] = await MultiGet(
     Get(
       Digest,
       DirectoryWithPrefixToAdd(
@@ -114,7 +114,7 @@ async def merge_coverage_reports(
         prefix=prefix
       )
     )
-    for prefix, coverage_file_digest in test_results
+    for prefix, coverage_file_digest in test_results if coverage_file_digest is not None
   )
   source_root_stripped_sources = await MultiGet(
     Get[SourceRootStrippedSources](HydratedTarget, hydrated_target)
@@ -123,9 +123,10 @@ async def merge_coverage_reports(
   stripped_sources_digests = tuple(
     stripped_sources.snapshot.directory_digest for stripped_sources in source_root_stripped_sources
   )
+
   sources_digest = await Get[Digest](DirectoriesToMerge(directories=stripped_sources_digests))
   inits_digest = await Get[InjectedInitDigest](Digest, sources_digest)
-  merged_input_files = await Get(
+  merged_input_files: Digest = await Get(
     Digest,
     DirectoriesToMerge(directories=(
       *coverage_directory_digests,
@@ -135,7 +136,6 @@ async def merge_coverage_reports(
       inits_digest.directory_digest,
     )),
   )
-  import pdb; pdb.set_trace()
 
   prefixes = [f'{prefix}/.coverage' for prefix, _ in test_results]
   coverage_args = ['combine', *prefixes]

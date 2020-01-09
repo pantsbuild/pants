@@ -4,7 +4,11 @@
 import os
 from dataclasses import dataclass
 from textwrap import dedent
+<<<<<<< HEAD
 from typing import Optional, Tuple
+=======
+from typing import Optional, Set, Tuple
+>>>>>>> Remove dead things.
 
 from pants.backend.python.rules.inject_init import InjectedInitDigest
 from pants.backend.python.rules.pex import Pex
@@ -89,7 +93,7 @@ def calculate_timeout_seconds(
   return target_timeout
 
 
-def get_packages_to_cover(coverage: str, source_root_stripped_file_paths: List[str]) -> Set[str]:
+def get_packages_to_cover(coverage: str, source_root_stripped_file_paths: Tuple[str, ...]) -> Set[str]:
   # TODO: Support values other than 'auto'
   if coverage == 'auto':
     return set(
