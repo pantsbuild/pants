@@ -254,7 +254,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--pythonpath', advanced=True, type=list,
              help='Add these directories to PYTHONPATH to search for plugins.')
     register('--target-spec-file', type=list, dest='spec_files', daemon=False,
-             removal_version='1.25.0.dev2',
+             removal_version='1.27.0.dev0',
              removal_hint='Use `--spec-file` instead. This change is in preparation for Pants '
                           'eventually allowing you to pass file names as arguments, e.g. '
                           '`./pants cloc foo.py`.',

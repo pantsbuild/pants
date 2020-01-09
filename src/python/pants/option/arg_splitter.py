@@ -199,9 +199,9 @@ class ArgSplitter:
 
   @staticmethod
   def spec(arg: str) -> bool:
-    """Does arg 'look like' a spec (rather than a goal name).
+    """Does arg 'look like' a Spec (rather than a goal name).
 
-    An arg is a spec if it looks like a target spec or a file system spec (i.e. a path).
+    An arg is a spec if it looks like an AddressSpec or a FilesystemSpec.
     In the future we can expand this heuristic to support other kinds of specs, such as URLs.
     """
     return os.path.sep in arg or ':' in arg or os.path.isdir(arg)
