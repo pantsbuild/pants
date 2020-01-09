@@ -1,7 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Tuple
+from typing import Tuple, List
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.option.custom_types import file_option
@@ -28,5 +28,5 @@ class CoverageToolBase(PythonToolBase):
       help="Path to Black's pyproject.toml config file"
     )
 
-  def get_args(self) -> Tuple[str, ...]:
+  def get_args(self) -> List[str]:
     return flatten_shlexed_list(self.get_options().args)

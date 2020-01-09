@@ -88,6 +88,7 @@ def calculate_timeout_seconds(
     return min(target_timeout, timeout_maximum)
   return target_timeout
 
+
 def get_packages_to_cover(coverage: str, source_root_stripped_file_paths: List[str]) -> Set[str]:
   # TODO: Support values other than 'auto'
   if coverage == 'auto':
@@ -96,15 +97,6 @@ def get_packages_to_cover(coverage: str, source_root_stripped_file_paths: List[s
       for source_root_stripped_source_file_path in source_root_stripped_file_paths
     )
   return set()
-
-@rule(name="Run pytest")
-async def run_python_test(
-  test_target: PythonTestsAdaptor,
-  pytest: PyTest,
-  python_setup: PythonSetup,
-  subprocess_encoding_environment: SubprocessEncodingEnvironment
-) -> TestResult:
-  """Runs pytest for one target."""
 
 
 @dataclass(frozen=True)
@@ -197,6 +189,19 @@ async def setup_pytest_for_target(
     timeout_default=pytest.options.timeout_default,
     timeout_maximum=pytest.options.timeout_maximum,
   )
+  test_target_sources_file_names = source_root_stripped_test_target_sources.snapshot.files
+  coverage_args = []
+  if pytest.options.coverage:
+    packages_to_cover = get_packages_to_cover(
+      coverage='auto', # TODO: respect the actual option.
+      source_root_stripped_file_paths=test_target_sources_file_names,
+    )
+    coverage_args = [
+      '--cov-report=', # To not generate any output. https://pytest-cov.readthedocs.io/en/latest/config.html
+    ]
+    for package in packages_to_cover:
+      coverage_args.extend(['--cov', package])
+
 
   return TestTargetSetup(
     requirements_pex=resolved_requirements_pex,
@@ -219,20 +224,9 @@ async def run_python_test(
   colors = global_options.colors
   env = {"PYTEST_ADDOPTS": f"--color={'yes' if colors else 'no'}"}
 
-  coverage_args = []
-  if pytest.options.coverage:
-    packages_to_cover = get_packages_to_cover(
-      coverage='auto', # TODO: respect the actual option.
-      source_root_stripped_file_paths=test_target_sources_file_names,
-    )
-    coverage_args = [
-      '--cov-report=', # To not generate any output. https://pytest-cov.readthedocs.io/en/latest/config.html
-    ]
-    for package in packages_to_cover:
-      coverage_args.extend(['--cov', package])
 
 
-  request = resolved_requirements_pex.create_execute_request(
+  request = test_setup.requirements_pex.create_execute_request(
     python_setup=python_setup,
     subprocess_encoding_environment=subprocess_encoding_environment,
     pex_path=f'./{test_setup.requirements_pex.output_filename}',
@@ -243,10 +237,7 @@ async def run_python_test(
     timeout_seconds=test_setup.timeout_seconds if test_setup.timeout_seconds is not None else 9999,
     env=env,
   )
-  result = await Get[FallibleExecuteProcessResult](
-    ExecuteProcessRequest,
-    request
-  )
+  result = await Get[FallibleExecuteProcessResult](ExecuteProcessRequest, request)
   return TestResult.from_fallible_execute_process_result(result)
 
 

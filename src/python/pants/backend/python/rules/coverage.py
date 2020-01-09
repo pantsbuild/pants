@@ -3,7 +3,7 @@
 
 from dataclasses import dataclass
 from textwrap import dedent
-
+from typing import List
 from pants.backend.python.rules.inject_init import InjectedInitDigest
 from pants.backend.python.rules.pex import (
   CreatePex,
@@ -15,7 +15,7 @@ from pants.backend.python.subsystems.coverage import CoverageToolBase
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
-from pants.base.specs import Specs
+from pants.base.specs import AddressSpecs
 from pants.build_graph.address import Address
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.fs import (
@@ -25,32 +25,14 @@ from pants.engine.fs import (
   FileContent,
   InputFilesContent,
 )
-from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTarget, TransitiveHydratedTargets
-from pants.engine.rules import console_rule, optionable_rule
+from pants.engine.rules import console_rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.rules.core.strip_source_root import SourceRootStrippedSources
 from pants.rules.core.test import AddressAndTestResult
 from pants.source.source_root import SourceRootConfig
 
-
-class CoverageOptions(LineOriented, GoalSubsystem):
-  name = 'coverage2'
-
-  @classmethod
-  def register_options(cls, register):
-    super().register_options(register)
-    register(
-      '--transitive',
-      default=True,
-      type=bool,
-      help='Run dependencies against transitive dependencies of targets specified on the command line.',
-    )
-
-
-class Coverage(Goal):
-  subsystem_cls = CoverageOptions
 
 
 @dataclass
@@ -92,14 +74,13 @@ def get_file_names(all_target_adaptors):
 @console_rule(name="Merge coverage reports")
 async def merge_coverage_reports(
   addresses: BuildFileAddresses,
-  specs: Specs,
+  address_specs: AddressSpecs,
   pytest: PyTest,
   python_setup: PythonSetup,
   coverage: CoverageToolBase,
   source_root_config: SourceRootConfig,
   subprocess_encoding_environment: SubprocessEncodingEnvironment,
-
-) -> Coverage:
+) -> MergedCoverageData:
   """Takes all python test results and generates a single coverage report in dist/coverage."""
   output_pex_filename = "coverage.pex"
   requirements_pex = await Get[Pex](
@@ -113,7 +94,7 @@ async def merge_coverage_reports(
     )
   )
 
-  transitive_targets = await Get[TransitiveHydratedTargets](Specs, specs)
+  transitive_targets = await Get[TransitiveHydratedTargets](AddressSpecs, address_specs)
   python_targets = [
     target for target in transitive_targets.closure
     if target.adaptor.type_alias == 'python_library' or target.adaptor.type_alias == 'python_tests'
@@ -121,11 +102,11 @@ async def merge_coverage_reports(
 
   results = await MultiGet(Get[AddressAndTestResult](Address, addr.to_address()) for addr in addresses)
   test_results = [
-    (x.address.to_address().path_safe_spec, x.test_result.coverage_digest) for x in results if x.test_result is not None]
+    (x.address.to_address().path_safe_spec, x.test_result._python_sqlite_coverage_file) for x in results if x.test_result is not None]
 
   coveragerc_digest = await Get[Digest](InputFilesContent, get_coveragerc_input(DEFAULT_COVERAGE_CONFIG.encode()))
 
-  coverage_directory_digests = await MultiGet(
+  coverage_directory_digests: List[Digest] = await MultiGet(
     Get(
       Digest,
       DirectoryWithPrefixToAdd(
@@ -178,6 +159,6 @@ async def merge_coverage_reports(
 
 def rules():
   return [
-    optionable_rule(CoverageToolBase),
+    subsystem_rule(CoverageToolBase),
     merge_coverage_reports,
   ]
