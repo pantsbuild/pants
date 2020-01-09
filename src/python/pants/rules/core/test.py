@@ -7,6 +7,7 @@ from enum import Enum
 from typing import Optional
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
+from pants.base.specs import AddressSpecs, SingleAddress
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.build_files import AddressProvenanceMap
@@ -79,12 +80,10 @@ class TestOptions(GoalSubsystem):
   @classmethod
   def register_options(cls, register) -> None:
     super().register_options(register)
-    register(
-      '--coverage',
-      type=bool,
-      default=False,
-      help='Generate a coverage report for this test run.',
-    )
+    register('--debug', type=bool, default=False,
+             help='Run a single test target in an interactive process. This is '
+                  'necessary, for example, when you add breakpoints in your code.')
+
 
 class Test(Goal):
   subsystem_cls = TestOptions
@@ -110,8 +109,19 @@ class AddressAndTestResult:
     return is_valid_target_type and has_sources
 
 
+@dataclass(frozen=True)
+class AddressAndDebugResult:
+  address: BuildFileAddress
+  test_result: TestDebugResult
+
+
 @console_rule
-async def fast_test(console: Console,  options: TestOptions, addresses: BuildFileAddresses) -> Test:
+async def run_tests(console: Console, options: TestOptions, addresses: BuildFileAddresses) -> Test:
+  if options.values.debug:
+    dependencies = tuple(SingleAddress(addr.spec_path, addr.target_name) for addr in addresses)
+    address = await Get[BuildFileAddress](AddressSpecs(dependencies=dependencies))
+    result = await Get[AddressAndDebugResult](Address, address.to_address())
+    return Test(result.test_result.exit_code)
   results = await MultiGet(Get[AddressAndTestResult](Address, addr.to_address()) for addr in addresses)
   did_any_fail = False
   filtered_results = [(x.address, x.test_result) for x in results if x.test_result is not None]
@@ -180,8 +190,16 @@ async def coordinator_of_tests(
   return AddressAndTestResult(target.address, result)
 
 
+@rule
+async def coordinator_of_debug_tests(target: HydratedTarget) -> AddressAndDebugResult:
+  logger.info(f"Starting tests in debug mode: {target.address.reference()}")
+  result = await Get[TestDebugResult](TestTarget, target.adaptor)
+  return AddressAndDebugResult(target.address, result)
+
+
 def rules():
   return [
       coordinator_of_tests,
-      fast_test,
+      coordinator_of_debug_tests,
+      run_tests,
     ]

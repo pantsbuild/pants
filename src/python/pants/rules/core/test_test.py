@@ -14,13 +14,14 @@ from pants.engine.legacy.graph import HydratedTarget
 from pants.engine.legacy.structs import PythonBinaryAdaptor, PythonTestsAdaptor
 from pants.engine.rules import UnionMembership
 from pants.rules.core.test import (
+  AddressAndDebugResult,
   AddressAndTestResult,
   Status,
   TestDebugResult,
   TestResult,
   TestTarget,
   coordinator_of_tests,
-  fast_test,
+  run_tests,
 )
 from pants.source.wrapped_globs import EagerFilesetWithSpec
 from pants.testutil.engine.util import MockConsole, MockGet, run_rule
