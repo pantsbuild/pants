@@ -7,15 +7,15 @@ from pants.engine.rules import RootRule
 from pants.testutil.test_base import TestBase
 
 
-class TestInjectInit(TestBase):
+class InjectIniTest(TestBase):
 
   @classmethod
   def rules(cls):
     return super().rules() + [inject_init, RootRule(Snapshot)]
 
-  def assert_result(self, input_snapshot, expected_digest):
+  def assert_result(self, *, input_snapshot, expected_digest):
     injected_digest = self.request_single_product(InjectedInitDigest, input_snapshot)
-    self.assertEqual(injected_digest.directory_digest, expected_digest)
+    assert injected_digest.directory_digest == expected_digest
 
   def test_noops_when_empty_snapshot(self):
     self.assert_result(input_snapshot=EMPTY_SNAPSHOT, expected_digest=EMPTY_DIRECTORY_DIGEST)
