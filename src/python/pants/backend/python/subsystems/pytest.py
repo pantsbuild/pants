@@ -55,12 +55,6 @@ class PyTest(Subsystem):
       advanced=True,
       help='The maximum timeout (in seconds) that can be set on a test target.',
     )
-    register(
-      '--coverage',
-      help='Emit coverage information for specified packages or directories (these should be provided as source root '
-          'stripped paths). The special value "auto" indicates that Pants should attempt to deduce which packages to '
-          'emit coverage for.',
-    )
 
   def get_requirement_strings(self) -> Tuple[str, ...]:
     """Returns a tuple of requirements-style strings for Pytest and Pytest plugins."""

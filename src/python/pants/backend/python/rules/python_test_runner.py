@@ -23,7 +23,7 @@ from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.option.global_options import GlobalOptions
 from pants.rules.core.strip_source_root import SourceRootStrippedSources
-from pants.rules.core.test import TestDebugResult, TestResult, TestTarget
+from pants.rules.core.test import TestDebugResult, TestOptions, TestResult, TestTarget
 
 
 DEFAULT_COVERAGE_CONFIG = dedent(f"""
@@ -77,26 +77,18 @@ class TestTargetSetup:
 
 def get_packages_to_cover(
   test_target: PythonTestsAdaptor,
-  coverage: str,
   source_root_stripped_file_paths: Tuple[str, ...],
 ) -> Set[str]:
-  """Coverage may be a comma separated string of source root stripped files or packages or the special value 'auto'
-    for which we will attempt to figure out which packages we should produce coverage reports for.
-  """
-  if coverage == 'auto':
-    if hasattr(test_target, 'coverage'):
-      return set(test_target.coverage)
-    return set(
-      os.path.dirname(source_root_stripped_source_file_path).replace(os.sep, '.')
-      for source_root_stripped_source_file_path in source_root_stripped_file_paths
-    )
-  return {
-    os.path.dirname(path).replace(os.sep, '.') for path in coverage.split(',')
-  }
+  if hasattr(test_target, 'coverage'):
+    return set(test_target.coverage)
+  return set(
+    os.path.dirname(source_root_stripped_source_file_path).replace(os.sep, '.')
+    for source_root_stripped_source_file_path in source_root_stripped_file_paths
+  )
 
 
 @rule
-async def setup_pytest_for_target(test_target: PythonTestsAdaptor, pytest: PyTest) -> TestTargetSetup:
+async def setup_pytest_for_target(test_target: PythonTestsAdaptor, pytest: PyTest, test_options: TestOptions) -> TestTargetSetup:
   transitive_hydrated_targets = await Get[TransitiveHydratedTargets](
     BuildFileAddresses((test_target.address,))
   )
@@ -136,10 +128,9 @@ async def setup_pytest_for_target(test_target: PythonTestsAdaptor, pytest: PyTes
   )
   test_target_sources_file_names = source_root_stripped_test_target_sources.snapshot.files
   coverage_args = []
-  if pytest.options.coverage:
+  if test_options.values.coverage:
     packages_to_cover = get_packages_to_cover(
       test_target,
-      coverage=pytest.options.coverage,
       source_root_stripped_file_paths=test_target_sources_file_names,
     )
     coverage_args = [
