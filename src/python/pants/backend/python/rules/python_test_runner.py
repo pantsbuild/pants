@@ -5,10 +5,14 @@ import os
 from dataclasses import dataclass
 from textwrap import dedent
 <<<<<<< HEAD
+<<<<<<< HEAD
 from typing import Optional, Tuple
 =======
 from typing import Optional, Set, Tuple
 >>>>>>> Remove dead things.
+=======
+from typing import Optional, Tuple
+>>>>>>> cherrypick python_test_runner
 
 from pants.backend.python.rules.inject_init import InjectedInitDigest
 from pants.backend.python.rules.pex import Pex
@@ -28,6 +32,7 @@ from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.option.global_options import GlobalOptions
 from pants.rules.core.strip_source_root import SourceRootStrippedSources
+<<<<<<< HEAD
 from pants.rules.core.test import TestDebugRequest, TestOptions, TestResult, TestTarget
 
 
@@ -49,6 +54,9 @@ def get_coveragerc_input(coveragerc_content: str) -> InputFilesContent:
       ),
     ]
   )
+=======
+from pants.rules.core.test import TestDebugResult, TestOptions, TestResult, TestTarget
+>>>>>>> cherrypick python_test_runner
 
 
 DEFAULT_COVERAGE_CONFIG = dedent(f"""
@@ -59,12 +67,12 @@ DEFAULT_COVERAGE_CONFIG = dedent(f"""
   """)
 
 
-def get_coveragerc_input(coveragerc_content: bytes):
+def get_coveragerc_input(coveragerc_content: str) -> InputFilesContent:
   return InputFilesContent(
     [
       FileContent(
         path='.coveragerc',
-        content=coveragerc_content,
+        content=coveragerc_content.encode(),
         is_executable=False,
       ),
     ]
@@ -93,16 +101,6 @@ def calculate_timeout_seconds(
   return target_timeout
 
 
-def get_packages_to_cover(coverage: str, source_root_stripped_file_paths: Tuple[str, ...]) -> Set[str]:
-  # TODO: Support values other than 'auto'
-  if coverage == 'auto':
-    return set(
-      os.path.dirname(source_root_stripped_source_file_path).replace(os.sep, '.')
-      for source_root_stripped_source_file_path in source_root_stripped_file_paths
-    )
-  return set()
-
-
 @dataclass(frozen=True)
 class TestTargetSetup:
   requirements_pex: Pex
@@ -125,14 +123,29 @@ def get_packages_to_cover(
     for source_root_stripped_source_file_path in source_root_stripped_file_paths
   }))
 
+def get_packages_to_cover(
+  test_target: PythonTestsAdaptor,
+  source_root_stripped_file_paths: Tuple[str, ...],
+) -> Tuple[str, ...]:
+  if hasattr(test_target, 'coverage'):
+    return tuple(sorted(set(test_target.coverage)))
+  return tuple(sorted({
+    os.path.dirname(source_root_stripped_source_file_path).replace(os.sep, '.') # Turn file paths into package names.
+    for source_root_stripped_source_file_path in source_root_stripped_file_paths
+  }))
+
 @rule
 async def setup_pytest_for_target(
   test_target: PythonTestsAdaptor,
   pytest: PyTest,
   test_options: TestOptions,
 ) -> TestTargetSetup:
+<<<<<<< HEAD
   # TODO: Rather than consuming the TestOptions subsystem, the TestRunner should pass on coverage
   # configuration via #7490.
+=======
+  # TODO: Rather than consuming the TestOptions subsystem, the TestRunner should pass on coverage configuration via #7490.
+>>>>>>> cherrypick python_test_runner
   transitive_hydrated_targets = await Get[TransitiveHydratedTargets](
     BuildFileAddresses((test_target.address,))
   )
@@ -195,9 +208,12 @@ async def setup_pytest_for_target(
   )
   test_target_sources_file_names = source_root_stripped_test_target_sources.snapshot.files
   coverage_args = []
-  if pytest.options.coverage:
+  test_target_sources_file_names = source_root_stripped_test_target_sources.snapshot.files
+  if test_options.values.run_coverage:
+    coveragerc_digest = await Get[Digest](InputFilesContent, get_coveragerc_input(DEFAULT_COVERAGE_CONFIG))
+    directories_to_merge.append(coveragerc_digest)
     packages_to_cover = get_packages_to_cover(
-      coverage='auto', # TODO: respect the actual option.
+      test_target,
       source_root_stripped_file_paths=test_target_sources_file_names,
     )
     coverage_args = [
@@ -206,6 +222,7 @@ async def setup_pytest_for_target(
     for package in packages_to_cover:
       coverage_args.extend(['--cov', package])
 
+  merged_input_files: Digest = await Get[Digest](DirectoriesToMerge(directories=tuple(directories_to_merge)))
 
   return TestTargetSetup(
     requirements_pex=resolved_requirements_pex,
@@ -227,8 +244,6 @@ async def run_python_test(
   """Runs pytest for one target."""
   colors = global_options.colors
   env = {"PYTEST_ADDOPTS": f"--color={'yes' if colors else 'no'}"}
-
-
 
   request = test_setup.requirements_pex.create_execute_request(
     python_setup=python_setup,
