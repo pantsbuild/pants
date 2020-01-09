@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from textwrap import dedent
 from typing import Optional, Tuple
 
+from pants.backend.python.rules.inject_init import InjectedInitDigest
 from pants.backend.python.rules.pex import Pex
 from pants.backend.python.rules.pex_from_target_closure import CreatePexFromTargetClosure
 from pants.backend.python.rules.prepare_chrooted_python_sources import ChrootedPythonSources

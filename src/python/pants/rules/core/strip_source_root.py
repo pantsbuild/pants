@@ -65,21 +65,5 @@ class SourceRootsAndSourceRootStrippedSources:
   source_path: str
 
 
-@rule
-async def split_source_root(
-  file_name: str,
-  source_root_config: SourceRootConfig
-) -> SourceRootsAndSourceRootStrippedSources:
-  """Relativize targets to their source root, e.g.
-  `src/python/pants/util/strutil.py` -> `(src/python, pants/util/strutil.py) ."""
-
-  source_roots = source_root_config.get_source_roots()
-  source_root = source_roots.find_by_path(file_name)
-  return SourceRootsAndSourceRootStrippedSources(
-    source_root=source_root.path,
-    source_path=file_name[len(source_root.path) + 1:]
-  )
-
-
 def rules():
   return [strip_source_root, subsystem_rule(SourceRootConfig)]

@@ -1,13 +1,8 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import configparser
-import itertools
-import json
-from io import StringIO
+from dataclasses import dataclass
 from textwrap import dedent
-
-import pkg_resources
 
 from pants.backend.python.rules.inject_init import InjectedInitDigest
 from pants.backend.python.rules.pex import (
@@ -28,7 +23,6 @@ from pants.engine.fs import (
   DirectoriesToMerge,
   DirectoryWithPrefixToAdd,
   FileContent,
-  FilesContent,
   InputFilesContent,
 )
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
@@ -36,10 +30,7 @@ from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecute
 from pants.engine.legacy.graph import HydratedTarget, TransitiveHydratedTargets
 from pants.engine.rules import console_rule, optionable_rule
 from pants.engine.selectors import Get, MultiGet
-from pants.rules.core.strip_source_root import (
-  SourceRootsAndSourceRootStrippedSources,
-  SourceRootStrippedSources,
-)
+from pants.rules.core.strip_source_root import SourceRootStrippedSources
 from pants.rules.core.test import AddressAndTestResult
 from pants.source.source_root import SourceRootConfig
 
@@ -60,6 +51,11 @@ class CoverageOptions(LineOriented, GoalSubsystem):
 
 class Coverage(Goal):
   subsystem_cls = CoverageOptions
+
+
+@dataclass
+class MergedCoverageData:
+  coverage_data: Digest
 
 
 DEFAULT_COVERAGE_CONFIG = dedent(f"""
@@ -105,7 +101,6 @@ async def merge_coverage_reports(
 
 ) -> Coverage:
   """Takes all python test results and generates a single coverage report in dist/coverage."""
-  plugin_file_digest = await Get(Digest, InputFilesContent, get_coverage_plugin_input())
   output_pex_filename = "coverage.pex"
   requirements_pex = await Get[Pex](
     CreatePex(
@@ -115,7 +110,6 @@ async def merge_coverage_reports(
         constraint_set=tuple(coverage.default_interpreter_constraints)
       ),
       entry_point=coverage.get_entry_point(),
-      input_files_digest=plugin_file_digest,
     )
   )
 
@@ -179,8 +173,7 @@ async def merge_coverage_reports(
     ExecuteProcessRequest,
     request
   )
-  # import pdb; pdb.set_trace()
-  return Coverage(exit_code=0)
+  return MergedCoverageData(coverage_data=result.output_directory_digest)
 
 
 def rules():
