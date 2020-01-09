@@ -45,7 +45,6 @@ from pants.util.dirutil import (
   relative_symlink,
   safe_file_dump,
   safe_mkdir,
-  safe_mkdtemp,
   safe_open,
   safe_rmtree,
 )
@@ -92,7 +91,6 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
   """
 
   _scheduler: Optional[SchedulerSession] = None
-  _local_store_dir = None
   _build_graph = None
   _address_mapper = None
 
@@ -352,8 +350,6 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
 
   def aggressively_reset_scheduler(self):
     self._scheduler = None
-    if self._local_store_dir is not None:
-      safe_rmtree(self._local_store_dir)
 
   @contextmanager
   def isolated_local_store(self):
@@ -384,17 +380,16 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     if self._scheduler is not None:
       return
 
-    self._local_store_dir = os.path.realpath(safe_mkdtemp())
-    safe_mkdir(self._local_store_dir)
+    options_bootstrapper = OptionsBootstrapper.create(args=['--pants-config-files=[]'])
 
     # NB: This uses the long form of initialization because it needs to directly specify
     # `cls.alias_groups` rather than having them be provided by bootstrap options.
     graph_session = EngineInitializer.setup_legacy_graph_extended(
       pants_ignore_patterns=None,
-      local_store_dir=self._local_store_dir,
+      local_store_dir=options_bootstrapper.bootstrap_options.for_global_scope().local_store_dir,
       build_file_imports_behavior='allow',
       native=init_native(),
-      options_bootstrapper=OptionsBootstrapper.create(args=['--pants-config-files=[]']),
+      options_bootstrapper=options_bootstrapper,
       build_root=self.build_root,
       build_configuration=self.build_config(),
       build_ignore_patterns=None,
