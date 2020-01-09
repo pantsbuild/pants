@@ -17,6 +17,7 @@ from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
 from pants.engine.legacy.structs import PythonTestsAdaptor
 from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
+from pants.option.global_options import GlobalOptions
 from pants.rules.core.core_test_model import TestResult, TestTarget
 from pants.rules.core.strip_source_root import SourceRootStrippedSources
 
@@ -48,7 +49,8 @@ async def run_python_test(
   test_target: PythonTestsAdaptor,
   pytest: PyTest,
   python_setup: PythonSetup,
-  subprocess_encoding_environment: SubprocessEncodingEnvironment
+  subprocess_encoding_environment: SubprocessEncodingEnvironment,
+  global_options: GlobalOptions,
 ) -> TestResult:
   """Runs pytest for one target."""
 
@@ -92,6 +94,10 @@ async def run_python_test(
     timeout_default=pytest.options.timeout_default,
     timeout_maximum=pytest.options.timeout_maximum,
   )
+
+  colors = global_options.colors
+  env = {"PYTEST_ADDOPTS": f"--color={'yes' if colors else 'no'}"}
+
   request = resolved_requirements_pex.create_execute_request(
     python_setup=python_setup,
     subprocess_encoding_environment=subprocess_encoding_environment,
@@ -99,7 +105,8 @@ async def run_python_test(
     pex_args=(*pytest.options.args, *test_target_sources_file_names),
     input_files=merged_input_files,
     description=f'Run Pytest for {test_target.address.reference()}',
-    timeout_seconds=timeout_seconds if timeout_seconds is not None else 9999
+    timeout_seconds=timeout_seconds if timeout_seconds is not None else 9999,
+    env=env
   )
   result = await Get[FallibleExecuteProcessResult](ExecuteProcessRequest, request)
   return TestResult.from_fallible_execute_process_result(result)
