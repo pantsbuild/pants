@@ -7,7 +7,6 @@ from enum import Enum
 from typing import Optional
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
-from pants.base.specs import AddressSpecs, SingleAddress
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.build_files import AddressProvenanceMap
@@ -118,8 +117,7 @@ class AddressAndDebugResult:
 @console_rule
 async def run_tests(console: Console, options: TestOptions, addresses: BuildFileAddresses) -> Test:
   if options.values.debug:
-    dependencies = tuple(SingleAddress(addr.spec_path, addr.target_name) for addr in addresses)
-    address = await Get[BuildFileAddress](AddressSpecs(dependencies=dependencies))
+    address = await Get[BuildFileAddress](BuildFileAddresses, addresses)
     result = await Get[AddressAndDebugResult](Address, address.to_address())
     return Test(result.test_result.exit_code)
   results = await MultiGet(Get[AddressAndTestResult](Address, addr.to_address()) for addr in addresses)
