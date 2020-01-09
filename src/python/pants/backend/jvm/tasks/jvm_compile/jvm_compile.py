@@ -484,7 +484,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     compile_classpath = self.context.products.get_data('compile_classpath')
     classpath_product = self.context.products.get_data("runtime_classpath")
     if not classpath_product:
-      classpath_product = self.context.products.get_data("runtime_classpath", compile_classpath.copy)
+      classpath_product = self.context.products.get_data('runtime_classpath', compile_classpath.copy)
     else:
       classpath_product.update(compile_classpath)
 
