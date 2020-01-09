@@ -167,6 +167,27 @@ class RuleTypeAnnotationTest(unittest.TestCase):
         return False
 
 
+class ConsoleRuleValidation(TestBase):
+
+  def test_not_properly_marked_console_rule(self) -> None:
+    with self.assertRaisesWithMessage(
+      TypeError,
+      "An `@rule` that returns a `Goal` must be declared with `@console_rule` in order to signal "
+      "that it is not cacheable."
+    ):
+      @rule
+      def normal_rule_trying_to_return_a_goal() -> Example:
+        return Example(0)
+
+  def test_console_rule_not_returning_a_goal(self) -> None:
+    with self.assertRaisesWithMessage(
+      TypeError, "An `@console_rule` must return a subclass of `engine.goal.Goal`."
+    ):
+      @console_rule
+      def console_rule_returning_a_non_goal() -> int:
+        return 0
+
+
 class RuleGraphTest(TestBase):
   def test_ruleset_with_missing_product_type(self):
     @rule
