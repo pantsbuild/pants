@@ -247,21 +247,7 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
       sources=[],
     )
 
-    def _make_linear_graph(names, **additional_target_args):
-      # A build graph where a -(depends on)-> b -> ... -> e
-      graph = {}
-      last_target = None
-      for name in reversed(names):
-        last_target = self.make_target(
-          f'project_info:{name}',
-          target_type=ScalaLibrary,
-          dependencies=[] if last_target is None else [last_target],
-          **additional_target_args,
-        )
-        graph[name] = last_target
-      return graph
-
-    self.linear_build_graph = _make_linear_graph(['a', 'b', 'c', 'd', 'e'])
+    self.linear_build_graph = self.make_linear_graph(['a', 'b', 'c', 'd', 'e'], target_type=ScalaLibrary)
 
   def create_runtime_classpath_for_targets(self, target):
     def path_to_zjar_with_workdir(address: Address):
