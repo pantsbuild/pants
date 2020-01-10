@@ -21,7 +21,7 @@ class SplitArgs:
   """The result of splitting args."""
   goals: List[str]  # Explicitly requested goals.
   scope_to_flags: Dict[str, List[str]]  # Scope name -> list of flags in that scope.
-  positional_args: List[str]  # The positional args for the goals.
+  specs: List[str]  # The specifications for what to run against, e.g. the targets or files
   passthru: List[str]  # Any remaining args specified after a -- separator.
   passthru_owner: Optional[str]  # The scope specified last on the command line, if any.
   unknown_scopes: List[str]
@@ -64,7 +64,7 @@ class NoGoalHelp(HelpRequest):
 
 
 class ArgSplitter:
-  """Splits a command-line into scoped sets of flags, and a set of positional args.
+  """Splits a command-line into scoped sets of flags and a set of specs.
 
   Recognizes, e.g.:
 
@@ -142,7 +142,7 @@ class ArgSplitter:
       if s not in scope_to_flags:
         scope_to_flags[s] = []
 
-    positional_args = []
+    specs = []
     passthru = []
     passthru_owner = None
 
@@ -179,8 +179,8 @@ class ArgSplitter:
         # We assume any args here are in global scope.
         if not self._check_for_help_request(arg):
           assign_flag_to_scope(arg, GLOBAL_SCOPE)
-      elif self.is_positional_arg(arg):
-        positional_args.append(arg)
+      elif self.spec(arg):
+        specs.append(arg)
       elif arg not in self._known_scopes:
         self._unknown_scopes.append(arg)
 
@@ -194,15 +194,15 @@ class ArgSplitter:
     if not goals and not self._help_request:
       self._help_request = NoGoalHelp()
 
-    return SplitArgs(list(goals), scope_to_flags, positional_args, passthru,
+    return SplitArgs(list(goals), scope_to_flags, specs, passthru,
                      passthru_owner if passthru else None, self._unknown_scopes)
 
   @staticmethod
-  def is_positional_arg(arg: str) -> bool:
-    """Does arg 'look like' a positional arg (rather than a goal name).
+  def spec(arg: str) -> bool:
+    """Does arg 'look like' a Spec (rather than a goal name).
 
-    An arg is a positional arg if it looks like a target spec or a path.
-    In the future we can expand this heuristic to support other kinds of positional args.
+    An arg is a spec if it looks like an AddressSpec or a FilesystemSpec.
+    In the future we can expand this heuristic to support other kinds of specs, such as URLs.
     """
     return os.path.sep in arg or ':' in arg or os.path.isdir(arg)
 

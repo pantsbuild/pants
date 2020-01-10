@@ -16,7 +16,6 @@ from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.file_system_project_tree import FileSystemProjectTree
-from pants.base.specs import AddressSpecs
 from pants.build_graph.address import BuildFileAddress
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
@@ -54,7 +53,7 @@ from pants.engine.parser import SymbolTable
 from pants.engine.platform import create_platform_rules
 from pants.engine.rules import RootRule, UnionMembership, rule
 from pants.engine.scheduler import Scheduler, SchedulerSession
-from pants.engine.selectors import Get, Params
+from pants.engine.selectors import Params
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
 from pants.option.global_options import (
   DEFAULT_EXECUTION_OPTIONS,
@@ -383,13 +382,13 @@ class EngineInitializer:
       return cast(BuildRoot, BuildRoot.instance)
 
     @rule
-    async def single_build_file_address(address_specs: AddressSpecs) -> BuildFileAddress:
-      build_file_addresses = await Get[BuildFileAddresses](AddressSpecs, address_specs)
+    async def single_build_file_address(
+      build_file_addresses: BuildFileAddresses,
+    ) -> BuildFileAddress:
       if len(build_file_addresses.dependencies) == 0:
         raise ResolveError("No targets were matched")
       if len(build_file_addresses.dependencies) > 1:
-        potential_addresses = await Get[BuildFileAddresses](AddressSpecs, address_specs)
-        targets = [bfa.to_address() for bfa in potential_addresses]
+        targets = [bfa.to_address() for bfa in build_file_addresses]
         output = '\n '.join(str(target) for target in targets)
 
         raise ResolveError(

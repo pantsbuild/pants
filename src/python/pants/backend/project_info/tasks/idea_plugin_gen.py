@@ -99,7 +99,7 @@ class IdeaPluginGen(ConsoleTask):
     safe_mkdir(output_dir)
 
     with temporary_dir(root_dir=output_dir, cleanup=False) as output_project_dir:
-      project_name = self.get_project_name(self.context.options.positional_args)
+      project_name = self.get_project_name(self.context.options.specs)
 
       self.gen_project_workdir = output_project_dir
       self.project_filename = os.path.join(self.gen_project_workdir,
@@ -135,7 +135,7 @@ class IdeaPluginGen(ConsoleTask):
       debug_port=self.get_options().debug_port,
     )
 
-    abs_target_specs = [os.path.join(get_buildroot(), spec) for spec in self.context.options.positional_args]
+    abs_target_specs = [os.path.join(get_buildroot(), spec) for spec in self.context.options.specs]
     configured_workspace = TemplateData(
       targets=json.dumps(abs_target_specs),
       project_path=os.path.join(get_buildroot(), abs_target_specs[0].split(':')[0]),
@@ -170,7 +170,7 @@ class IdeaPluginGen(ConsoleTask):
       return output.name
 
   def console_output(self, _targets):
-    if not self.context.options.positional_args:
+    if not self.context.options.specs:
       raise TaskError("No targets specified.")
 
     # Heuristics to guess whether user tries to load a python project,
