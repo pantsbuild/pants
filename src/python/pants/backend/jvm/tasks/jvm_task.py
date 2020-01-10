@@ -33,10 +33,6 @@ class JvmTask(Task):
     super().register_options(register)
     register('--confs', type=list, default=['default'],
              help='Use only these Ivy configurations of external deps.')
-    register('--strict-jvm-version', type=bool, advanced=True, fingerprint=True,
-         help='If true, will strictly require running jvms with the same version of Java as '
-              'the platform -target level. Otherwise, the platform -target level will be '
-              'treated as the minimum jvm to run.')
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -49,7 +45,6 @@ class JvmTask(Task):
     self.args = self.jvm.get_program_args()
     self.confs = self.get_options().confs
     self.synthetic_classpath = self.jvm.get_options().synthetic_classpath
-    self._strict_jvm_version = self.get_options().strict_jvm_version
 
   def classpath(self, targets, classpath_prefix=None, classpath_product=None, exclude_scopes=None,
                 include_scopes=None):
@@ -77,13 +72,13 @@ class JvmTask(Task):
     classpath.extend(classpath_for_targets)
     return classpath
 
-  def preferred_jvm_distribution_for_targets(self, targets, jdk=False):
+  def preferred_jvm_distribution_for_targets(self, targets, jdk=False, strict=False):
     """Find the preferred jvm distribution for running code from the given targets."""
     return self.preferred_jvm_distribution(self._jvm_platforms_from_targets(targets),
-                                           jdk=jdk)
+                                           jdk=jdk, strict=strict)
 
-  def preferred_jvm_distribution(self, platforms, jdk=False):
-    return JvmPlatform.preferred_jvm_distribution(platforms, self._strict_jvm_version, jdk=jdk)
+  def preferred_jvm_distribution(self, platforms, jdk=False, strict=False):
+    return JvmPlatform.preferred_jvm_distribution(platforms, jdk=jdk, strict=strict)
 
   def _jvm_platforms_from_targets(self, targets):
     # Override this to change platform lookup.

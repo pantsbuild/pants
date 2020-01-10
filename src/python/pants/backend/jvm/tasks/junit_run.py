@@ -76,6 +76,10 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
              help='Set the working directory. If no argument is passed, use the build root. '
                   'If cwd is set on a target, it will supersede this option. It is an error to '
                   'use this option in combination with `--chroot`')
+    register('--strict-jvm-version', type=bool, advanced=True, fingerprint=True,
+      help='If true, will strictly require running jvms with the same version of Java as '
+           'the platform -target level. Otherwise, the platform -target level will be '
+           'treated as the minimum jvm to run.')
     register('--failure-summary', type=bool, default=True,
              help='If true, includes a summary of which test-cases failed at the end of a failed '
                   'junit run.')
@@ -124,6 +128,7 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     else:
       self._working_dir = options.cwd or get_buildroot()
 
+    self._strict_jvm_version = options.strict_jvm_version
     self._failure_summary = options.failure_summary
     self._open = options.open
     self._html_report = self._open or options.html_report
@@ -215,7 +220,8 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     across test targets. Used for coverage instrumentation.
     """
 
-    distribution = self.preferred_jvm_distribution_for_targets(targets)
+    distribution = self.preferred_jvm_distribution_for_targets(targets,
+      strict=self._strict_jvm_version)
     actual_executor = SubprocessExecutor(distribution)
     return distribution.execute_java(*args, executor=actual_executor, **kwargs)
 
@@ -284,7 +290,7 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       complete_classpath.update(self.classpath(relevant_targets,
                                                classpath_product=classpath_product))
 
-      distribution = self.preferred_jvm_distribution([platform])
+      distribution = self.preferred_jvm_distribution([platform], self._strict_jvm_version)
 
       # Override cmdline args with values from junit_test() target that specify concurrency:
       args = self._args(fail_fast, batch_output_dir) + [u'-xmlreport']
