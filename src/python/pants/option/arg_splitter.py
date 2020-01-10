@@ -1,10 +1,11 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import os
+import os.path
 import sys
 from abc import ABC
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Tuple
 
 from twitter.common.collections import OrderedSet
@@ -194,8 +195,14 @@ class ArgSplitter:
     if not goals and not self._help_request:
       self._help_request = NoGoalHelp()
 
-    return SplitArgs(list(goals), scope_to_flags, specs, passthru,
-                     passthru_owner if passthru else None, self._unknown_scopes)
+    return SplitArgs(
+      goals=list(goals),
+      scope_to_flags=scope_to_flags,
+      specs=specs,
+      passthru=passthru,
+      passthru_owner=passthru_owner if passthru else None,
+      unknown_scopes=self._unknown_scopes,
+    )
 
   @staticmethod
   def spec(arg: str) -> bool:
@@ -204,7 +211,7 @@ class ArgSplitter:
     An arg is a spec if it looks like an AddressSpec or a FilesystemSpec.
     In the future we can expand this heuristic to support other kinds of specs, such as URLs.
     """
-    return os.path.sep in arg or ':' in arg or os.path.isdir(arg)
+    return os.path.sep in arg or ':' in arg or Path(arg).exists()
 
   def _consume_scope(self) -> Tuple[Optional[str], List[str]]:
     """Returns a pair (scope, list of flags encountered in that scope).
