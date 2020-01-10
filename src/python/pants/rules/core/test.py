@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 
+# from pants.backend.python.rules.coverage import MergedCoverageData
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.addressable import BuildFileAddresses
@@ -19,10 +20,16 @@ from pants.engine.legacy.graph import HydratedTarget
 from pants.engine.objects import union
 from pants.engine.rules import UnionMembership, goal_rule, rule
 from pants.engine.selectors import Get, MultiGet
+from pants.engine.objects import Collection
 
 
 # TODO(#6004): use proper Logging singleton, rather than static logger.
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class MergedCoverageData:
+  coverage_data: Digest
 
 
 class Status(Enum):
@@ -127,6 +134,9 @@ class AddressAndTestResult:
     return is_valid_target_type and has_sources
 
 
+class AddressesAndTestResults(Collection[AddressAndTestResult]):
+  pass
+
 @dataclass(frozen=True)
 class AddressAndDebugRequest:
   address: BuildFileAddress
@@ -146,7 +156,9 @@ async def run_tests(
   results = await MultiGet(Get[AddressAndTestResult](Address, addr.to_address()) for addr in addresses)
   did_any_fail = False
   filtered_results = [(x.address, x.test_result) for x in results if x.test_result is not None]
-
+  if options.values.run_coverage:
+    coverage_data = await Get[MergedCoverageData](AddressesAndTestResults, results)
+    import pdb; pdb.set_trace()
   for address, test_result in filtered_results:
     if test_result.status == Status.FAILURE:
       did_any_fail = True
@@ -203,6 +215,8 @@ async def coordinator_of_debug_tests(target: HydratedTarget) -> AddressAndDebugR
   logger.info(f"Starting tests in debug mode: {target.address.reference()}")
   request = await Get[TestDebugRequest](TestTarget, target.adaptor)
   return AddressAndDebugRequest(target.address, request)
+
+
 
 
 def rules():

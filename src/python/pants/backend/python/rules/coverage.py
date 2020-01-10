@@ -3,7 +3,7 @@
 
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import Tuple
+from typing import Tuple, List
 
 from pants.backend.python.rules.inject_init import InjectedInitDigest
 from pants.backend.python.rules.pex import (
@@ -12,9 +12,9 @@ from pants.backend.python.rules.pex import (
   PexInterpreterConstraints,
   PexRequirements,
 )
-from pants.backend.python.subsystems.coverage import CoverageToolBase
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.python_setup import PythonSetup
+from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.base.specs import AddressSpecs
 from pants.build_graph.address import Address
@@ -31,57 +31,30 @@ from pants.engine.legacy.graph import HydratedTarget, TransitiveHydratedTargets
 from pants.engine.rules import rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.rules.core.strip_source_root import SourceRootStrippedSources
-from pants.rules.core.test import AddressAndTestResult
+from pants.rules.core.test import AddressAndTestResult, MergedCoverageData
 from pants.source.source_root import SourceRootConfig
+from pants.backend.python.rules.python_test_runner import DEFAULT_COVERAGE_CONFIG, get_coveragerc_input
 
 
-@dataclass
-class MergedCoverageData:
-  coverage_data: Digest
-
-
-DEFAULT_COVERAGE_CONFIG = dedent(f"""
-  [run]
-  branch = True
-  timid = False
-  relative_files = True
-  """)
-
-
-def get_coveragerc_input(coveragerc_content: bytes):
-  return InputFilesContent(
-    [
-      FileContent(
-        path='.coveragerc',
-        content=coveragerc_content,
-        is_executable=False,
-      ),
-    ]
-  )
-
-
-def get_file_names(all_target_adaptors):
-  def iter_files():
-    for adaptor in all_target_adaptors:
-      if hasattr(adaptor, 'sources'):
-        for file in adaptor.sources.snapshot.files:
-          if file.endswith('.py'):
-            yield file
-
-  return list(iter_files())
+class CoverageToolBase(PythonToolBase):
+  options_scope = 'merge-coverage'
+  default_version = 'coverage==5.0.0'
+  default_entry_point = 'coverage'
+  default_interpreter_constraints = ["CPython>=3.6"]
 
 
 @rule(name="Merge coverage reports")
 async def merge_coverage_reports(
   addresses: BuildFileAddresses,
   address_specs: AddressSpecs,
+  address_and_test_results: AddressAndTestResult,
   pytest: PyTest,
   python_setup: PythonSetup,
   coverage: CoverageToolBase,
   source_root_config: SourceRootConfig,
   subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> MergedCoverageData:
-  """Takes all python test results and generates a single coverage report in dist/coverage."""
+  """Takes all python test results and merges their coverage data into a single sql file."""
   output_pex_filename = "coverage.pex"
   requirements_pex = await Get[Pex](
     CreatePex(
@@ -100,11 +73,11 @@ async def merge_coverage_reports(
     if target.adaptor.type_alias == 'python_library' or target.adaptor.type_alias == 'python_tests'
   ]
 
-  results = await MultiGet(Get[AddressAndTestResult](Address, addr.to_address()) for addr in addresses)
+  # results = await MultiGet(Get[AddressAndTestResult](Address, addr.to_address()) for addr in addresses)
   test_results = [
-    (x.address.to_address().path_safe_spec, x.test_result._python_sqlite_coverage_file) for x in results if x.test_result is not None]
+    (x.address.to_address().path_safe_spec, x.test_result._python_sqlite_coverage_file) for x in address_and_test_results if x.test_result is not None]
 
-  coveragerc_digest = await Get[Digest](InputFilesContent, get_coveragerc_input(DEFAULT_COVERAGE_CONFIG.encode()))
+  coveragerc_digest = await Get[Digest](InputFilesContent, get_coveragerc_input(DEFAULT_COVERAGE_CONFIG))
 
   coverage_directory_digests: Tuple[Digest, ...] = await MultiGet(
     Get(
@@ -126,6 +99,7 @@ async def merge_coverage_reports(
 
   sources_digest = await Get[Digest](DirectoriesToMerge(directories=stripped_sources_digests))
   inits_digest = await Get[InjectedInitDigest](Digest, sources_digest)
+
   merged_input_files: Digest = await Get(
     Digest,
     DirectoriesToMerge(directories=(
@@ -139,7 +113,6 @@ async def merge_coverage_reports(
 
   prefixes = [f'{prefix}/.coverage' for prefix, _ in test_results]
   coverage_args = ['combine', *prefixes]
-  print(coverage_args)
   request = requirements_pex.create_execute_request(
     python_setup=python_setup,
     subprocess_encoding_environment=subprocess_encoding_environment,

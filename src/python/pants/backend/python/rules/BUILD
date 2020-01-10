@@ -14,7 +14,6 @@ python_library(
     'src/python/pants/engine:rules',
     'src/python/pants/engine:selectors',
     'src/python/pants/option',
-    'src/python/pants/rules/core',
     'src/python/pants/source:source',
   ],
   tags = {"partially_type_checked"},
