@@ -136,7 +136,7 @@ def create_options_bootstrapper(
 ) -> OptionsBootstrapper:
   return cast(
     OptionsBootstrapper,
-    OptionsBootstrapper.create(args=("--pants-config-files=[]", *(args or [])), env=env),
+    OptionsBootstrapper.create(args=("--pants-config-files=[]", *(args or [])), env=env or {}),
   )
 
 
