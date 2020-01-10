@@ -92,7 +92,6 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
   """
 
   _scheduler: Optional[SchedulerSession] = None
-  _local_store_dir = None
   _build_graph = None
   _address_mapper = None
 
@@ -350,19 +349,23 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
       self._build_graph.reset()
       self._scheduler.invalidate_all_files()
 
-  def aggressively_reset_scheduler(self):
-    self._scheduler = None
-    if self._local_store_dir is not None:
-      safe_rmtree(self._local_store_dir)
-
   @contextmanager
   def isolated_local_store(self):
-    self.aggressively_reset_scheduler()
-    self._init_engine()
+    """Temporarily use an anonymous, empty Store for the Scheduler.
+
+    In most cases we re-use a Store across all tests, since `file` and `directory` entries are
+    content addressed, and `process` entries are intended to have strong cache keys. But when
+    dealing with non-referentially transparent `process` executions, it can sometimes be necessary
+    to avoid this cache.
+    """
+    self._scheduler = None
+    local_store_dir = os.path.realpath(safe_mkdtemp())
+    self._init_engine(local_store_dir=local_store_dir)
     try:
       yield
     finally:
-      self.aggressively_reset_scheduler()
+      self._scheduler = None
+      safe_rmtree(local_store_dir)
 
   @property
   def build_root(self):
@@ -380,21 +383,21 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
   def _pants_workdir(self):
     return os.path.join(self._build_root(), '.pants.d')
 
-  def _init_engine(self) -> None:
+  def _init_engine(self, local_store_dir: Optional[str] = None) -> None:
     if self._scheduler is not None:
       return
 
-    self._local_store_dir = os.path.realpath(safe_mkdtemp())
-    safe_mkdir(self._local_store_dir)
+    options_bootstrapper = OptionsBootstrapper.create(args=['--pants-config-files=[]'])
+    local_store_dir = local_store_dir or options_bootstrapper.bootstrap_options.for_global_scope().local_store_dir
 
     # NB: This uses the long form of initialization because it needs to directly specify
     # `cls.alias_groups` rather than having them be provided by bootstrap options.
     graph_session = EngineInitializer.setup_legacy_graph_extended(
       pants_ignore_patterns=None,
-      local_store_dir=self._local_store_dir,
+      local_store_dir=local_store_dir,
       build_file_imports_behavior='allow',
       native=init_native(),
-      options_bootstrapper=OptionsBootstrapper.create(args=['--pants-config-files=[]']),
+      options_bootstrapper=options_bootstrapper,
       build_root=self.build_root,
       build_configuration=self.build_config(),
       build_ignore_patterns=None,

@@ -237,7 +237,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     spec_parser = CmdLineSpecParser(get_buildroot())
     target_specs = [
       spec_parser.parse_address_spec(spec).to_spec_string()
-      for spec in self._options.positional_args
+      for spec in self._options.specs
     ]
     # Note: This will not include values from `--owner-of` or `--changed-*` flags.
     self._run_tracker.run_info.add_info("specs_from_command_line", target_specs, stringify=False)
@@ -320,24 +320,24 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
   def _run(self):
     engine_result = PANTS_FAILED_EXIT_CODE
     goal_runner_result = PANTS_FAILED_EXIT_CODE
-    try:
-      self._maybe_handle_help()
 
-      streaming_handlers = self._options.for_global_scope().streaming_workunits_handlers
-      callbacks = Subsystem.get_streaming_workunit_callbacks(streaming_handlers)
-      streaming_reporter = StreamingWorkunitHandler(self._scheduler_session, callbacks=callbacks)
-      with streaming_reporter.session():
-        engine_result = self._maybe_run_v2()
+    streaming_handlers = self._options.for_global_scope().streaming_workunits_handlers
+    callbacks = Subsystem.get_streaming_workunit_callbacks(streaming_handlers)
+    streaming_reporter = StreamingWorkunitHandler(self._scheduler_session, callbacks=callbacks)
 
-      goal_runner_result = self._maybe_run_v1()
-    finally:
+    with streaming_reporter.session():
       try:
-        self._update_stats()
-        run_tracker_result = self._run_tracker.end()
-      except ValueError as e:
-        # Calling .end() sometimes writes to a closed file, so we return a dummy result here.
-        logger.exception(e)
-        run_tracker_result = PANTS_SUCCEEDED_EXIT_CODE
+        self._maybe_handle_help()
+        engine_result = self._maybe_run_v2()
+        goal_runner_result = self._maybe_run_v1()
+      finally:
+        try:
+          self._update_stats()
+          run_tracker_result = self._run_tracker.end()
+        except ValueError as e:
+          # Calling .end() sometimes writes to a closed file, so we return a dummy result here.
+          logger.exception(e)
+          run_tracker_result = PANTS_SUCCEEDED_EXIT_CODE
 
     final_exit_code = self._compute_final_exit_code(
       engine_result,

@@ -10,6 +10,12 @@ DEFAULT_REPORT_INTERVAL_SECONDS = 10
 
 
 class StreamingWorkunitHandler:
+  """StreamingWorkunitHandler's job is to periodically call each registered callback function with the
+  following kwargs:
+    workunits: Tuple[Dict[str, str], ...] - the workunit data itself
+    finished: bool - this will be set to True when the last chunk of workunit data is reported to the callback
+  """
+
   def __init__(self, scheduler: Any, callbacks: Iterable[Callable] = (), report_interval_seconds: float = DEFAULT_REPORT_INTERVAL_SECONDS):
     self.scheduler = scheduler
     self.report_interval = report_interval_seconds
@@ -29,7 +35,7 @@ class StreamingWorkunitHandler:
     # we report any workunits that were added after the last time the thread polled.
     workunits = self.scheduler.poll_workunits()
     for callback in self.callbacks:
-      callback(workunits)
+      callback(workunits=workunits, finished=True)
 
   @contextmanager
   def session(self) -> Iterator[None]:
@@ -55,7 +61,7 @@ class _InnerHandler(threading.Thread):
     while not self.stop_request.isSet():
       workunits = self.scheduler.poll_workunits()
       for callback in self.callbacks:
-        callback(workunits)
+        callback(workunits=workunits, finished=False)
       self.stop_request.wait(timeout=self.report_interval)
 
   def join(self, timeout=None):

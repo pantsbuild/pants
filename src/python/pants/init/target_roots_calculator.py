@@ -63,7 +63,7 @@ class TargetRootsCalculator:
   ) -> TargetRoots:
     # Determine the literal target roots.
     address_spec_roots = cls.parse_address_specs(
-      target_specs=options.positional_args,
+      target_specs=options.specs,
       build_root=build_root,
       exclude_patterns=exclude_patterns,
       tags=tags)
