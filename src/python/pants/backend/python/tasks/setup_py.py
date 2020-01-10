@@ -498,7 +498,7 @@ class SetupPy(Task):
         for req in dep.payload.requirements:
           install_requires.add(str(req.requirement))
       elif cls.has_provides(dep):
-        install_requires.add(dep.provides.key)
+        install_requires.add(dep.provides.requirement)
     return install_requires
 
   def __init__(self, *args, **kwargs):
