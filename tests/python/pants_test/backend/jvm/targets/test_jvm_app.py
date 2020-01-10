@@ -32,7 +32,7 @@ class JvmAppTest(TestBase):
     self.assertEqual('foo-app', app_target.payload.basename)
     self.assertEqual('foo-app', app_target.basename)
     self.assertEqual(binary_target, app_target.binary)
-    self.assertEqual([':foo-binary'], list(app_target.compute_dependency_specs(payload=app_target.payload)))
+    self.assertEqual([':foo-binary'], list(app_target.compute_dependency_address_specs(payload=app_target.payload)))
 
   def test_jvmapp_bundle_payload_fields(self):
     app_target = self.make_target(':foo_payload',

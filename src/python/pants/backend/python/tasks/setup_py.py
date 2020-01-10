@@ -73,7 +73,7 @@ class TargetAncestorIterator:
     def iter_targets_in_spec_path(spec_path):
       try:
         siblings = SiblingAddresses(spec_path)
-        for address in self._build_graph.inject_specs_closure([siblings]):
+        for address in self._build_graph.inject_address_specs_closure([siblings]):
           yield self._build_graph.get_target(address)
       except AddressLookupError:
         # A spec path may not have any addresses registered under it and that's ok.

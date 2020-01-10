@@ -49,7 +49,7 @@ class JUnit(JvmToolMixin, InjectablesMixin, Subsystem):
                           ])
 
   def injectables(self, build_graph):
-    junit_addr = Address.parse(self.injectables_spec_for_key('library'))
+    junit_addr = Address.parse(self.injectables_address_spec_for_key('library'))
     if not build_graph.contains_address(junit_addr):
       build_graph.inject_synthetic_target(junit_addr,
                                           JarLibrary,

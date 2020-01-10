@@ -245,7 +245,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
 
     # TODO(John Sirois): This re-creates a little bit too much work done by the BuildGraph.
     # Fixup the BuildGraph to deal with non BuildFileAddresses better and just leverage it.
-    traversables = [target.compute_dependency_specs(payload=target.payload)]
+    traversables = [target.compute_dependency_address_specs(payload=target.payload)]
 
     for dependency_spec in itertools.chain(*traversables):
       dependency_address = Address.parse(dependency_spec, relative_to=address.spec_path)
@@ -557,7 +557,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     self.build_graph.inject_address_closure(address)
     return self.build_graph.get_target(address)
 
-  def targets(self, spec):
+  def targets(self, address_spec):
     """Resolves a target spec to one or more Target objects.
 
     :API: public
@@ -568,9 +568,9 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     Returns the set of all Targets found.
     """
 
-    spec = CmdLineSpecParser(self.build_root).parse_address_spec(spec)
+    address_spec = CmdLineSpecParser(self.build_root).parse_address_spec(address_spec)
     targets = []
-    for address in self.build_graph.inject_specs_closure([spec]):
+    for address in self.build_graph.inject_address_specs_closure([address_spec]):
       targets.append(self.build_graph.get_target(address))
     return targets
 
@@ -765,10 +765,10 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     target_dict = {}
 
     # Create a target from each specification and insert it into `target_dict`.
-    for target_spec, target_kwargs in target_map.items():
+    for address_spec, target_kwargs in target_map.items():
       unprocessed_kwargs = target_kwargs.copy()
 
-      target_base = Address.parse(target_spec).spec_path
+      target_base = Address.parse(address_spec).spec_path
 
       # Populate the target's owned files from the specification.
       filemap = unprocessed_kwargs.pop('filemap', {})
@@ -779,7 +779,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
       # Ensure any dependencies exist in the target dict (`target_map` must then be an
       # OrderedDict).
       # The 'key' is used to access the target in `target_dict`, and defaults to `target_spec`.
-      target_address = Address.parse(target_spec)
+      target_address = Address.parse(address_spec)
       key = unprocessed_kwargs.pop('key', target_address.target_name)
       dep_targets = []
       for dep_spec in unprocessed_kwargs.pop('dependencies', []):
@@ -788,7 +788,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
 
       # Register the generated target.
       generated_target = self.make_target(
-        spec=target_spec, dependencies=dep_targets, **unprocessed_kwargs)
+        spec=address_spec, dependencies=dep_targets, **unprocessed_kwargs)
       target_dict[key] = generated_target
 
     return target_dict

@@ -40,7 +40,7 @@ class AntlrPyGen(SimpleCodegenTask, NailgunTask):
                           classpath_spec='//:antlr-{}'.format(_ANTLR3_REV))
     # The ANTLR runtime python deps.
     register('--antlr3-deps', advanced=True, type=list, member_type=target_option,
-             help='A list of specs pointing to dependencies of ANTLR3 generated code.')
+             help='A list of address specs pointing to dependencies of ANTLR3 generated code.')
 
   def find_sources(self, target, target_dir):
     # Ignore .tokens files.

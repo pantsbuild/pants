@@ -117,11 +117,11 @@ class LegacyBuildGraph(BuildGraph):
     self.apply_injectables(new_targets)
 
     for target in new_targets:
-      for spec in target.compute_dependency_specs(payload=target.payload):
-        inject(target, spec, is_dependency=True)
+      for address_spec in target.compute_dependency_address_specs(payload=target.payload):
+        inject(target, address_spec, is_dependency=True)
 
-      for spec in target.compute_injectable_specs(payload=target.payload):
-        inject(target, spec, is_dependency=False)
+      for address_spec in target.compute_injectable_address_specs(payload=target.payload):
+        inject(target, address_spec, is_dependency=False)
 
     # Inject all addresses, then declare injected dependencies.
     self.inject_addresses_closure(addresses_to_inject)
@@ -201,9 +201,9 @@ class LegacyBuildGraph(BuildGraph):
     for address in self._inject_address_specs(target_roots.specs):
       yield address
 
-  def inject_specs_closure(self, specs: Iterable[AddressSpec], fail_fast=None):
-    # Request loading of these specs.
-    for address in self._inject_address_specs(AddressSpecs(specs)):
+  def inject_address_specs_closure(self, address_specs: Iterable[AddressSpec], fail_fast=None):
+    # Request loading of these address specs.
+    for address in self._inject_address_specs(AddressSpecs(address_specs)):
       yield address
 
   def resolve_address(self, address):
@@ -239,18 +239,18 @@ class LegacyBuildGraph(BuildGraph):
         yielded_addresses.add(address)
         yield address
 
-  def _inject_address_specs(self, specs: AddressSpecs):
+  def _inject_address_specs(self, address_specs: AddressSpecs):
     """Injects targets into the graph for the given `AddressSpecs` object.
 
     Yields the resulting addresses.
     """
-    if not specs:
+    if not address_specs:
       return
 
-    logger.debug('Injecting specs to %s: %s', self, specs)
+    logger.debug('Injecting address specs to %s: %s', self, address_specs)
     with self._resolve_context():
       thts, = self._scheduler.product_request(TransitiveHydratedTargets,
-                                              [specs])
+                                              [address_specs])
 
     self._index(thts.closure)
 
@@ -317,7 +317,7 @@ class _DependentGraph:
     implicit_deps = (Address.parse(s,
                                    relative_to=target_adaptor.address.spec_path,
                                    subproject_roots=self._address_mapper.subproject_roots)
-                     for s in target_cls.compute_dependency_specs(kwargs=target_adaptor.kwargs()))
+                     for s in target_cls.compute_dependency_address_specs(kwargs=target_adaptor.kwargs()))
     for dep in declared_deps:
       self._dependent_address_map[dep].add(target_adaptor.address)
     for dep in implicit_deps:

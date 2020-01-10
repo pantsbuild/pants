@@ -186,8 +186,8 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, InjectablesMixin, Subsystem
     ]
 
     for spec_key, create_jardep_func in specs_to_create:
-      spec = self.injectables_spec_for_key(spec_key)
-      target_address = Address.parse(spec)
+      address_spec = self.injectables_address_spec_for_key(spec_key)
+      target_address = Address.parse(address_spec)
       if not build_graph.contains_address(target_address):
         jars = [create_jardep_func(self.version)]
         build_graph.inject_synthetic_target(target_address,

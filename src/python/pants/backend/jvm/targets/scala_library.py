@@ -48,7 +48,7 @@ class ScalaLibrary(ExportableJvmLibrary):
       forced by splitting interdependent java and scala into multiple targets,
       don't use this at all.
       Prefer using ``dependencies`` to express non-circular dependencies.
-    :type java_sources: target spec or list of target specs
+    :type java_sources: address spec or list of address specs
     :param resources: An optional list of paths (DEPRECATED) or ``resources``
       targets containing resources that belong on this library's classpath.
     """
@@ -81,9 +81,9 @@ class ScalaLibrary(ExportableJvmLibrary):
       **kwargs)
 
   @classmethod
-  def compute_injectable_specs(cls, kwargs=None, payload=None):
-    for spec in super().compute_injectable_specs(kwargs, payload):
-      yield spec
+  def compute_injectable_address_specs(cls, kwargs=None, payload=None):
+    for address_spec in super().compute_injectable_address_specs(kwargs, payload):
+      yield address_spec
 
     target_representation = kwargs or payload.as_dict()
     java_sources_specs = target_representation.get('java_sources', None) or []
@@ -91,16 +91,16 @@ class ScalaLibrary(ExportableJvmLibrary):
       yield java_source_spec
 
   @classmethod
-  def compute_dependency_specs(cls, kwargs=None, payload=None):
-    for spec in super().compute_dependency_specs(kwargs, payload):
-      yield spec
+  def compute_dependency_address_specs(cls, kwargs=None, payload=None):
+    for address_spec in super().compute_dependency_address_specs(kwargs, payload):
+      yield address_spec
 
-    for spec in ScalaPlatform.global_instance().injectables_specs_for_key('scala-library'):
-      yield spec
+    for address_spec in ScalaPlatform.global_instance().injectables_address_specs_for_key('scala-library'):
+      yield address_spec
 
     if ScoveragePlatform.global_instance().get_options().enable_scoverage:
-      for spec in ScoveragePlatform.global_instance().injectables_specs_for_key('scoverage'):
-        yield spec
+      for address_spec in ScoveragePlatform.global_instance().injectables_address_specs_for_key('scoverage'):
+        yield address_spec
 
   def get_jar_dependencies(self):
     for jar in super().get_jar_dependencies():
