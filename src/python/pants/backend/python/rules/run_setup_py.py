@@ -215,7 +215,8 @@ class SetupPy(Goal):
 def validate_args(args: Tuple[str, ...]):
   # We rely on the dist dir being the default, so we know where to find the created dists.
   if '--dist-dir' in args or '-d' in args:
-    raise InvalidSetupPyArgs('Cannot set --dist-dir/-d in setup.py args')
+    raise InvalidSetupPyArgs('Cannot set --dist-dir/-d in setup.py args. To change where dists '
+                             'are written, use the global --pants-distdir option.')
   # We don't allow publishing via setup.py, as we don't want the setup.py running rule,
   # which is not a @console_rule, to side-effect (plus, we'd need to ensure that publishing
   # happens in dependency order).  Note that `upload` and `register` were removed in
