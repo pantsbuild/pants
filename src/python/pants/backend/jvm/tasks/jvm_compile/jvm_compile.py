@@ -428,11 +428,21 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
 
     relevant_targets = list(self.context.targets(predicate=self.select))
 
+    # If we are only exporting jars then we can omit some targets from the runtime_classpath.
+    if (
+        self.context.products.is_required_data("export_dep_as_jar_classpath") and
+        not self.context.products.is_required_data("runtime_classpath")
+    ):
+      # Filter modulized targets from invalid targets list.
+      target_root_addresses = [t.address for t in set(self.context.target_roots)]
+      dependees_of_target_roots = self.context.build_graph.transitive_dependees_of_addresses(target_root_addresses)
+      relevant_targets = list(set(relevant_targets) - dependees_of_target_roots)
+
     if not relevant_targets:
       return
 
     # Clone the compile_classpath to the runtime_classpath.
-    classpath_product = self.create_runtime_classpath()
+    classpath_product = self.create_classpath_product()
 
     fingerprint_strategy = DependencyContext.global_instance().create_fingerprint_strategy(
         classpath_product)
@@ -462,14 +472,20 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
             classpath_product.remove_for_target(cc.target, [(conf, cc.classes_dir)])
             classpath_product.add_for_target(cc.target, [(conf, cc.jar_file)])
 
+      # The runtime classpath will always be a superset of the export_dep_as_jar_classpath
+      # so however we compute runtime_classpath it will contain all the nescessary jars for
+      # the export_dep_as_jar_classpath.export_dep_as_jar_classpath.
+      if self.context.products.is_required_data('export_dep_as_jar_classpath'):
+        self.context.products.get_data('export_dep_as_jar_classpath', classpath_product.copy)
+
   def _classpath_for_context(self, context):
     if self.get_options().use_classpath_jars:
       return context.jar_file
     return context.classes_dir
 
-  def create_runtime_classpath(self):
+  def create_classpath_product(self):
     compile_classpath = self.context.products.get_data('compile_classpath')
-    classpath_product = self.context.products.get_data('runtime_classpath')
+    classpath_product = self.context.products.get_data("runtime_classpath")
     if not classpath_product:
       classpath_product = self.context.products.get_data('runtime_classpath', compile_classpath.copy)
     else:
