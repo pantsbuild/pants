@@ -165,6 +165,19 @@ class TaskTestBase(TestBase):
       else:
         self.assertEqual(num_artifacts, expected_num_artifacts)
 
+  def make_linear_graph(self, names, **additional_target_args):
+    # A build graph where a -(depends on)-> b -> ... -> e
+    graph = {}
+    last_target = None
+    for name in reversed(names):
+      last_target = self.make_target(
+        f'project_info:{name}',
+        dependencies=[] if last_target is None else [last_target],
+        **additional_target_args,
+      )
+      graph[name] = last_target
+    return graph
+
 
 class ConsoleTaskTestBase(TaskTestBase):
   """A base class useful for testing ConsoleTasks.
