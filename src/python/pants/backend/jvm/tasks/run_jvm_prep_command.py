@@ -3,15 +3,16 @@
 
 from typing import Optional
 
+from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.jvm_prep_command import JvmPrepCommand
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
-from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.java.executor import SubprocessExecutor
+from pants.task.task import Task
 
 
-class RunJvmPrepCommandBase(JvmTask):
+class RunJvmPrepCommandBase(Task):
   """Base class to enable running JVM binaries before executing a goal.
 
   This command will use the 'runtime_classpath' product and compile dependent JVM code
@@ -49,6 +50,7 @@ class RunJvmPrepCommandBase(JvmTask):
     """
     :API: public
     """
+    super().prepare(options, round_manager)
     round_manager.require_data('compile_classpath')
     if not cls.classpath_product_only:
       round_manager.require_data('runtime_classpath')
@@ -69,7 +71,7 @@ class RunJvmPrepCommandBase(JvmTask):
 
     with self.context.new_workunit(name='jvm_prep_command', labels=[WorkUnitLabel.PREP]) as workunit:
       for target in targets:
-        distribution = self.preferred_jvm_distribution_for_targets([target])
+        distribution = JvmPlatform.preferred_jvm_distribution([target.platform])
         executor = SubprocessExecutor(distribution)
 
         mainclass = target.payload.get_field_value('mainclass')
