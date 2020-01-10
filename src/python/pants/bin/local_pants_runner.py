@@ -321,9 +321,12 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     engine_result = PANTS_FAILED_EXIT_CODE
     goal_runner_result = PANTS_FAILED_EXIT_CODE
 
-    streaming_handlers = self._options.for_global_scope().streaming_workunits_handlers
+    global_options = self._options.for_global_scope()
+
+    streaming_handlers = global_options.streaming_workunits_handlers
+    report_interval = global_options.streaming_workunits_report_interval
     callbacks = Subsystem.get_streaming_workunit_callbacks(streaming_handlers)
-    streaming_reporter = StreamingWorkunitHandler(self._scheduler_session, callbacks=callbacks)
+    streaming_reporter = StreamingWorkunitHandler(self._scheduler_session, callbacks=callbacks, report_interval_seconds=report_interval)
 
     with streaming_reporter.session():
       try:

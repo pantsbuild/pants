@@ -6,9 +6,6 @@ from contextlib import contextmanager
 from typing import Any, Callable, Iterable, Iterator, Optional
 
 
-DEFAULT_REPORT_INTERVAL_SECONDS = 10
-
-
 class StreamingWorkunitHandler:
   """StreamingWorkunitHandler's job is to periodically call each registered callback function with the
   following kwargs:
@@ -16,7 +13,7 @@ class StreamingWorkunitHandler:
     finished: bool - this will be set to True when the last chunk of workunit data is reported to the callback
   """
 
-  def __init__(self, scheduler: Any, callbacks: Iterable[Callable] = (), report_interval_seconds: float = DEFAULT_REPORT_INTERVAL_SECONDS):
+  def __init__(self, scheduler: Any, callbacks: Iterable[Callable], report_interval_seconds: float):
     self.scheduler = scheduler
     self.report_interval = report_interval_seconds
     self.callbacks = callbacks
