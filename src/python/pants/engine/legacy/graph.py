@@ -7,7 +7,7 @@ from collections import defaultdict, deque
 from contextlib import contextmanager
 from dataclasses import dataclass
 from os.path import dirname
-from typing import Any, Iterable, Tuple, List, Dict
+from typing import Any, Dict, Iterable, List, Tuple
 
 from twitter.common.collections import OrderedSet
 
