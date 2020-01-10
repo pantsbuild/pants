@@ -4,7 +4,7 @@
 import os
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import Optional, Set, Tuple
+from typing import Optional, Tuple
 
 from pants.backend.python.rules.pex import Pex
 from pants.backend.python.rules.pex_from_target_closure import CreatePexFromTargetClosure
@@ -34,12 +34,12 @@ DEFAULT_COVERAGE_CONFIG = dedent(f"""
   """)
 
 
-def get_coveragerc_input(coveragerc_content: bytes):
+def get_coveragerc_input(coveragerc_content: str) -> InputFilesContent:
   return InputFilesContent(
     [
       FileContent(
         path='.coveragerc',
-        content=coveragerc_content,
+        content=coveragerc_content.encode(),
         is_executable=False,
       ),
     ]
@@ -78,17 +78,21 @@ class TestTargetSetup:
 def get_packages_to_cover(
   test_target: PythonTestsAdaptor,
   source_root_stripped_file_paths: Tuple[str, ...],
-) -> Set[str]:
+) -> Tuple[str, ...]:
   if hasattr(test_target, 'coverage'):
-    return set(test_target.coverage)
-  return set(
-    os.path.dirname(source_root_stripped_source_file_path).replace(os.sep, '.')
+    return tuple(sorted(set(test_target.coverage)))
+  return tuple(sorted({
+    os.path.dirname(source_root_stripped_source_file_path).replace(os.sep, '.') # Turn file paths into package names.
     for source_root_stripped_source_file_path in source_root_stripped_file_paths
-  )
-
+  }))
 
 @rule
-async def setup_pytest_for_target(test_target: PythonTestsAdaptor, pytest: PyTest, test_options: TestOptions) -> TestTargetSetup:
+async def setup_pytest_for_target(
+  test_target: PythonTestsAdaptor,
+  pytest: PyTest,
+  test_options: TestOptions,
+) -> TestTargetSetup:
+  # TODO: Rather than consuming the TestOptions subsystem, the TestRunner should pass on coverage configuration via #7490.
   transitive_hydrated_targets = await Get[TransitiveHydratedTargets](
     BuildFileAddresses((test_target.address,))
   )
@@ -115,20 +119,16 @@ async def setup_pytest_for_target(test_target: PythonTestsAdaptor, pytest: PyTes
 
   chrooted_sources = await Get[ChrootedPythonSources](HydratedTargets(all_targets))
 
-  coveragerc_digest = await Get[Digest](InputFilesContent, get_coveragerc_input(DEFAULT_COVERAGE_CONFIG.encode()))
+  directories_to_merge = [
+    chrooted_sources.digest,
+    resolved_requirements_pex.directory_digest,
+  ]
 
-  merged_input_files: Digest = await Get[Digest](
-    DirectoriesToMerge(
-      directories=(
-        chrooted_sources.digest,
-        resolved_requirements_pex.directory_digest,
-        coveragerc_digest,
-      )
-    ),
-  )
-  test_target_sources_file_names = source_root_stripped_test_target_sources.snapshot.files
   coverage_args = []
+  test_target_sources_file_names = source_root_stripped_test_target_sources.snapshot.files
   if test_options.values.run_coverage:
+    coveragerc_digest = await Get[Digest](InputFilesContent, get_coveragerc_input(DEFAULT_COVERAGE_CONFIG))
+    directories_to_merge.append(coveragerc_digest)
     packages_to_cover = get_packages_to_cover(
       test_target,
       source_root_stripped_file_paths=test_target_sources_file_names,
@@ -138,6 +138,8 @@ async def setup_pytest_for_target(test_target: PythonTestsAdaptor, pytest: PyTes
     ]
     for package in packages_to_cover:
       coverage_args.extend(['--cov', package])
+
+  merged_input_files: Digest = await Get[Digest](DirectoriesToMerge(directories=tuple(directories_to_merge)))
 
   return TestTargetSetup(
     requirements_pex=resolved_requirements_pex,
@@ -154,6 +156,7 @@ async def run_python_test(
   python_setup: PythonSetup,
   subprocess_encoding_environment: SubprocessEncodingEnvironment,
   global_options: GlobalOptions,
+  test_options: TestOptions,
 ) -> TestResult:
   """Runs pytest for one target."""
 
@@ -173,7 +176,7 @@ async def run_python_test(
     pex_path=f'./{test_setup.requirements_pex.output_filename}',
     pex_args=test_setup.args,
     input_files=test_setup.input_files_digest,
-    output_directories=('.coverage',),
+    output_directories=('.coverage',) if test_options.values.run_coverage else None,
     description=f'Run Pytest for {test_target.address.reference()}',
     timeout_seconds=timeout_seconds if timeout_seconds is not None else 9999,
     env=env
