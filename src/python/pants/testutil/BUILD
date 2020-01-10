@@ -95,8 +95,8 @@ python_library(
   sources = ['goal_rule_test_base.py'],
   dependencies = [
     ':test_base',
-    'src/python/pants/bin',
     'src/python/pants/init',
+    'src/python/pants/testutil/option',
     'src/python/pants/util:meta',
   ],
   tags = {"partially_type_checked"},
