@@ -36,7 +36,7 @@ python_tests(
     'src/python/pants/engine/legacy:graph',
     'src/python/pants/engine/legacy:structs',
     'src/python/pants/testutil:test_base',
-    'src/python/pants/testutil:console_rule_test_base',
+    'src/python/pants/testutil:goal_rule_test_base',
     'src/python/pants/testutil/engine:util',
     'src/python/pants/testutil/subsystem',
   ],

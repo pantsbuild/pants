@@ -16,7 +16,7 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.isolated_process import FallibleExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTarget
 from pants.engine.objects import union
-from pants.engine.rules import UnionMembership, console_rule, rule
+from pants.engine.rules import UnionMembership, goal_rule, rule
 from pants.engine.selectors import Get, MultiGet
 
 
@@ -124,7 +124,7 @@ class AddressAndDebugResult:
   test_result: TestDebugResult
 
 
-@console_rule
+@goal_rule
 async def run_tests(console: Console, options: TestOptions, addresses: BuildFileAddresses) -> Test:
   if options.values.debug:
     address = await Get[BuildFileAddress](BuildFileAddresses, addresses)

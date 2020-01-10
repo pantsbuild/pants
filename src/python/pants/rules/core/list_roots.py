@@ -6,7 +6,7 @@ from typing import Set
 from pants.engine.console import Console
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
-from pants.engine.rules import console_rule, rule, subsystem_rule
+from pants.engine.rules import goal_rule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.source.source_root import AllSourceRoots, SourceRoot, SourceRootConfig
 
@@ -48,7 +48,7 @@ async def all_roots(source_root_config: SourceRootConfig) -> AllSourceRoots:
   return AllSourceRoots(all_source_roots)
 
 
-@console_rule
+@goal_rule
 async def list_roots(console: Console, options: RootsOptions, all_roots: AllSourceRoots) -> Roots:
   with options.line_oriented(console) as print_stdout:
     for src_root in sorted(all_roots, key=lambda x: x.path):

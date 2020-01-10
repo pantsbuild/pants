@@ -17,7 +17,7 @@ from pants.engine.isolated_process import ExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTargets
 from pants.engine.legacy.structs import TargetAdaptor
 from pants.engine.objects import union
-from pants.engine.rules import UnionMembership, console_rule
+from pants.engine.rules import UnionMembership, goal_rule
 from pants.engine.selectors import Get, MultiGet
 
 
@@ -81,7 +81,7 @@ class Fmt(Goal):
   subsystem_cls = FmtOptions
 
 
-@console_rule
+@goal_rule
 async def fmt(
   console: Console,
   targets: HydratedTargets,

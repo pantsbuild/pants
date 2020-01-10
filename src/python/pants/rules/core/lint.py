@@ -9,7 +9,7 @@ from pants.engine.isolated_process import FallibleExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTargets
 from pants.engine.legacy.structs import TargetAdaptor
 from pants.engine.objects import Collection, union
-from pants.engine.rules import UnionMembership, console_rule
+from pants.engine.rules import UnionMembership, goal_rule
 from pants.engine.selectors import Get, MultiGet
 
 
@@ -67,7 +67,7 @@ class Lint(Goal):
   subsystem_cls = LintOptions
 
 
-@console_rule
+@goal_rule
 async def lint(console: Console, targets: HydratedTargets, union_membership: UnionMembership) -> Lint:
   nested_results = await MultiGet(
     Get[LintResults](LintTarget, target.adaptor)

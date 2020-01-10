@@ -8,7 +8,7 @@ from pants.base.build_root import BuildRoot
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.legacy.graph import TransitiveHydratedTargets
-from pants.engine.rules import console_rule
+from pants.engine.rules import goal_rule
 
 
 class FiledepsOptions(LineOriented, GoalSubsystem):
@@ -36,7 +36,7 @@ class Filedeps(Goal):
   subsystem_cls = FiledepsOptions
 
 
-@console_rule
+@goal_rule
 def file_deps(
   console: Console,
   filedeps_options: FiledepsOptions,

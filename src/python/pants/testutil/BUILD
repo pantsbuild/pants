@@ -91,8 +91,8 @@ python_library(
 )
 
 python_library(
-  name = 'console_rule_test_base',
-  sources = ['console_rule_test_base.py'],
+  name = 'goal_rule_test_base',
+  sources = ['goal_rule_test_base.py'],
   dependencies = [
     ':test_base',
     'src/python/pants/bin',

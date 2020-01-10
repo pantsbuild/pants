@@ -15,8 +15,8 @@ from pants.testutil.test_base import TestBase
 from pants.util.meta import classproperty
 
 
-class ConsoleRuleTestBase(TestBase):
-  """A baseclass useful for testing a Goal defined as a @console_rule.
+class GoalRuleTestBase(TestBase):
+  """A baseclass useful for testing a Goal defined as a @goal_rule.
 
   :API: public
   """
@@ -38,7 +38,7 @@ class ConsoleRuleTestBase(TestBase):
       raise AssertionError('goal_cls() must return a Goal subclass, got {}'.format(self.goal_cls))
 
   def execute_rule(self, args=tuple(), env=tuple(), exit_code=0, additional_params: Iterable[Any]=tuple()):
-    """Executes the @console_rule for this test class.
+    """Executes the @goal_rule for this test class.
 
     :API: public
 
@@ -58,7 +58,7 @@ class ConsoleRuleTestBase(TestBase):
     # Run for the target specs parsed from the args.
     address_specs = TargetRootsCalculator.parse_address_specs(full_options.specs, self.build_root)
     params = Params(address_specs, console, options_bootstrapper, workspace, *additional_params)
-    actual_exit_code = self.scheduler.run_console_rule(self.goal_cls, params)
+    actual_exit_code = self.scheduler.run_goal_rule(self.goal_cls, params)
 
     # Flush and capture console output.
     console.flush()

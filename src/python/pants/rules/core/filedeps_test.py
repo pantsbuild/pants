@@ -14,10 +14,10 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.rules.core import filedeps
-from pants.testutil.console_rule_test_base import ConsoleRuleTestBase
+from pants.testutil.goal_rule_test_base import GoalRuleTestBase
 
 
-class FileDepsTest(ConsoleRuleTestBase):
+class FileDepsTest(GoalRuleTestBase):
 
   goal_cls = filedeps.Filedeps
 

@@ -6,11 +6,11 @@ from pathlib import Path
 
 from pants.rules.core.generate_pants_ini import GeneratePantsIni
 from pants.rules.core.generate_pants_ini import rules as generate_pants_ini_rules
-from pants.testutil.console_rule_test_base import ConsoleRuleTestBase
+from pants.testutil.goal_rule_test_base import GoalRuleTestBase
 from pants.version import VERSION
 
 
-class GeneratePantsIniTest(ConsoleRuleTestBase):
+class GeneratePantsIniTest(GoalRuleTestBase):
 
   goal_cls = GeneratePantsIni
 

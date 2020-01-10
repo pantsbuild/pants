@@ -19,7 +19,7 @@ from pants.engine.fs import (
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
-from pants.engine.rules import console_rule, rule
+from pants.engine.rules import goal_rule, rule
 from pants.engine.selectors import Get
 
 
@@ -65,7 +65,7 @@ class CountLinesOfCode(Goal):
   subsystem_cls = CountLinesOfCodeOptions
 
 
-@console_rule
+@goal_rule
 async def run_cloc(
   console: Console,
   options: CountLinesOfCodeOptions,

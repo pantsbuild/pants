@@ -6,10 +6,10 @@ from typing import Sequence
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.rules.core import cloc
-from pants.testutil.console_rule_test_base import ConsoleRuleTestBase
+from pants.testutil.goal_rule_test_base import GoalRuleTestBase
 
 
-class ClocTest(ConsoleRuleTestBase):
+class ClocTest(GoalRuleTestBase):
   goal_cls = cloc.CountLinesOfCode
 
   @classmethod
