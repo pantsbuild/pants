@@ -32,7 +32,7 @@ python_tests(
     'src/python/pants/source',
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil:test_base',
-    'src/python/pants/testutil/subsystem',
+    'src/python/pants/testutil/engine:util',
   ],
   tags = {'partially_type_checked'},
 )

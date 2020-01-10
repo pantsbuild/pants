@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass
 from io import StringIO
 from types import CoroutineType, GeneratorType
-from typing import Any, Callable, Optional, Sequence, Type
+from typing import Any, Callable, Dict, Iterable, Optional, Sequence, Type, cast
 
 from colors import blue, green, red
 
@@ -18,6 +18,7 @@ from pants.engine.scheduler import Scheduler
 from pants.engine.selectors import Get
 from pants.engine.struct import Struct
 from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.objects import SubclassesOf
 
 
@@ -127,6 +128,15 @@ def create_scheduler(rules, union_rules=None, validate=True, native=None):
     union_rules,
     execution_options=DEFAULT_EXECUTION_OPTIONS,
     validate=validate,
+  )
+
+
+def create_options_bootstrapper(
+  *, args: Optional[Iterable[str]] = None, env: Optional[Dict[str, str]] = None,
+) -> OptionsBootstrapper:
+  return cast(
+    OptionsBootstrapper,
+    OptionsBootstrapper.create(args=("--pants-config-files=[]", *(args or [])), env=env),
   )
 
 

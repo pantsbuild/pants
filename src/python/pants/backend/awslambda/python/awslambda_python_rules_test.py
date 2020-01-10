@@ -7,37 +7,23 @@ from typing import Tuple
 from zipfile import ZipFile
 
 from pants.backend.awslambda.common.awslambda_common_rules import CreatedAWSLambda
-from pants.backend.awslambda.python.awslambda_python_rules import (
-  LambdexSetup,
-  create_python_awslambda,
-  setup_lambdex,
-)
-from pants.backend.awslambda.python.lambdex import Lambdex
-from pants.backend.python.rules.download_pex_bin import download_pex_bin
-from pants.backend.python.rules.inject_init import inject_init
-from pants.backend.python.rules.pex import create_pex
-from pants.backend.python.rules.pex_from_target_closure import create_pex_from_target_closure
-from pants.backend.python.rules.prepare_chrooted_python_sources import (
+from pants.backend.awslambda.python.awslambda_python_rules import rules as awslambda_python_rules
+from pants.backend.python.rules import (
+  download_pex_bin,
+  inject_init,
+  pex,
+  pex_from_target_closure,
   prepare_chrooted_python_sources,
 )
-from pants.backend.python.subsystems.python_native_code import (
-  PythonNativeCode,
-  create_pex_native_build_environment,
-)
-from pants.backend.python.subsystems.python_setup import PythonSetup
-from pants.backend.python.subsystems.subprocess_environment import (
-  SubprocessEnvironment,
-  create_subprocess_encoding_environment,
-)
+from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.build_graph.address import Address
-from pants.engine.fs import Digest, FilesContent
+from pants.engine.fs import FilesContent
 from pants.engine.legacy.graph import HydratedTarget
 from pants.engine.legacy.structs import PythonAWSLambdaAdaptor
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
-from pants.rules.core.strip_source_root import strip_source_root
-from pants.source.source_root import SourceRootConfig
-from pants.testutil.subsystem.util import init_subsystems
+from pants.rules.core import strip_source_root
+from pants.testutil.engine.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
 
@@ -45,55 +31,28 @@ class TestPythonAWSLambdaCreation(TestBase):
 
   @classmethod
   def rules(cls):
-    # TODO: A convenient way to bring in all the rules needed to build a pex without
-    # having to enumerate them here.
-    return super().rules() + [
-      create_python_awslambda,
-      setup_lambdex,
-      create_pex,
-      create_pex_native_build_environment,
-      create_subprocess_encoding_environment,
-      strip_source_root,
-      download_pex_bin,
-      inject_init,
-      prepare_chrooted_python_sources,
-      create_pex_from_target_closure,
-      RootRule(Digest),
-      RootRule(SourceRootConfig),
-      RootRule(PythonSetup),
-      RootRule(PythonNativeCode),
-      RootRule(SubprocessEnvironment),
-      RootRule(Lambdex),
-      RootRule(LambdexSetup),
+    return (
+      *super().rules(),
+      *awslambda_python_rules(),
+      *download_pex_bin.rules(),
+      *inject_init.rules(),
+      *pex.rules(),
+      *pex_from_target_closure.rules(),
+      *prepare_chrooted_python_sources.rules(),
+      *python_native_code.rules(),
+      *strip_source_root.rules(),
+      *subprocess_environment.rules(),
       RootRule(PythonAWSLambdaAdaptor),
-    ]
-
-  def setUp(self):
-    super().setUp()
-    init_subsystems([SourceRootConfig, PythonSetup, PythonNativeCode,
-                     SubprocessEnvironment, Lambdex])
+    )
 
   def create_python_awslambda(self, addr: str) -> Tuple[str, bytes]:
-    lambdex_setup = self.request_single_product(
-      LambdexSetup,
-      Params(
-        PythonSetup.global_instance(),
-        PythonNativeCode.global_instance(),
-        SubprocessEnvironment.global_instance(),
-        Lambdex.global_instance(),
-      )
-    )
     target = self.request_single_product(HydratedTarget, Address.parse(addr))
     created_awslambda = self.request_single_product(
       CreatedAWSLambda,
       Params(
         target.adaptor,
-        lambdex_setup,
-        SourceRootConfig.global_instance(),
-        PythonSetup.global_instance(),
-        PythonNativeCode.global_instance(),
-        SubprocessEnvironment.global_instance(),
-      )
+        create_options_bootstrapper(args=["--backend-packages2=pants.backend.awslambda.python"]),
+      ),
     )
     files_content = list(self.request_single_product(FilesContent,
                                                      Params(created_awslambda.digest)))

@@ -1,17 +1,12 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import List, Optional, Sequence
+from typing import List, Optional
 
 from pants.backend.python.lint.flake8.rules import Flake8Target
 from pants.backend.python.lint.flake8.rules import rules as flake8_rules
-from pants.backend.python.lint.flake8.subsystem import Flake8
 from pants.backend.python.rules import download_pex_bin, pex
-from pants.backend.python.rules.pex import CreatePex
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
-from pants.backend.python.subsystems.python_native_code import PythonNativeCode
-from pants.backend.python.subsystems.python_setup import PythonSetup
-from pants.backend.python.subsystems.subprocess_environment import SubprocessEnvironment
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
@@ -21,8 +16,8 @@ from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.rules.core.lint import LintResult
 from pants.source.wrapped_globs import EagerFilesetWithSpec
+from pants.testutil.engine.util import create_options_bootstrapper
 from pants.testutil.interpreter_selection_utils import skip_unless_python27_and_python3_present
-from pants.testutil.subsystem.util import global_subsystem_instance, init_subsystems
 from pants.testutil.test_base import TestBase
 
 
@@ -44,53 +39,37 @@ class Flake8IntegrationTest(TestBase):
       *pex.rules(),
       *python_native_code.rules(),
       *subprocess_environment.rules(),
-      RootRule(CreatePex),
-      RootRule(Flake8),
       RootRule(Flake8Target),
-      RootRule(PythonSetup),
-      RootRule(PythonNativeCode),
-      RootRule(SubprocessEnvironment),
     )
-
-  def setUp(self):
-    super().setUp()
-    init_subsystems([Flake8, PythonSetup, PythonNativeCode, SubprocessEnvironment])
 
   def run_flake8(
     self,
     source_files: List[FileContent],
     *,
     config: Optional[str] = None,
-    passthrough_args: Optional[Sequence[str]] = None,
-    interpreter_constraints: Optional[Sequence[str]] = None,
+    passthrough_args: Optional[str] = None,
+    interpreter_constraints: Optional[str] = None,
     skip: bool = False,
   ) -> LintResult:
-    if config is not None:
+    args = ["--backend-packages2=pants.backend.python.lint.flake8"]
+    if config:
+      # TODO: figure out how to get this file to exist...
       self.create_file(relpath=".flake8", contents=config)
+      args.append("--flake8-config=.flake8")
+    if passthrough_args:
+      args.append(f"--flake8-args='{passthrough_args}'")
+    if skip:
+      args.append(f"--flake8-skip")
     input_snapshot = self.request_single_product(Snapshot, InputFilesContent(source_files))
     target = Flake8Target(
       PythonTargetAdaptor(
         sources=EagerFilesetWithSpec('test', {'globs': []}, snapshot=input_snapshot),
         address=Address.parse("test:target"),
-        compatibility=interpreter_constraints,
+        compatibility=[interpreter_constraints] if interpreter_constraints else None,
       )
-    )
-    flake8_subsystem = global_subsystem_instance(
-      Flake8, options={Flake8.options_scope: {
-        "config": ".flake8" if config else None,
-        "args": passthrough_args or [],
-        "skip": skip,
-      }}
     )
     return self.request_single_product(
-      LintResult,
-      Params(
-        target,
-        flake8_subsystem,
-        PythonNativeCode.global_instance(),
-        PythonSetup.global_instance(),
-        SubprocessEnvironment.global_instance()
-      )
+      LintResult, Params(target, create_options_bootstrapper(args=args)),
     )
 
   def test_single_passing_source(self) -> None:
@@ -111,10 +90,10 @@ class Flake8IntegrationTest(TestBase):
 
   @skip_unless_python27_and_python3_present
   def test_uses_correct_python_version(self) -> None:
-    py2_result = self.run_flake8([self.py3_only_source], interpreter_constraints=['CPython==2.7.*'])
+    py2_result = self.run_flake8([self.py3_only_source], interpreter_constraints='CPython==2.7.*')
     assert py2_result.exit_code == 1
     assert "test/py3.py:1:8: E999 SyntaxError" in py2_result.stdout
-    py3_result = self.run_flake8([self.py3_only_source], interpreter_constraints=['CPython>=3.6'])
+    py3_result = self.run_flake8([self.py3_only_source], interpreter_constraints='CPython>=3.6')
     assert py3_result.exit_code == 0
     assert py3_result.stdout.strip() == ""
 
@@ -124,7 +103,7 @@ class Flake8IntegrationTest(TestBase):
     assert result.stdout.strip() == ""
 
   def test_respects_passthrough_args(self) -> None:
-    result = self.run_flake8([self.bad_source], passthrough_args=["--ignore=F401"])
+    result = self.run_flake8([self.bad_source], passthrough_args="--ignore=F401")
     assert result.exit_code == 0
     assert result.stdout.strip() == ""
 
