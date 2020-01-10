@@ -21,7 +21,6 @@ python_library(
     '3rdparty/python:dataclasses',
     'src/python/pants/base:project_tree',
     'src/python/pants/binaries',
-    'src/python/pants/bin',  # NB: not explicitly used, but necessary for OptionsBootstrapper to be set up properly.
     'src/python/pants/engine:addressable',
     'src/python/pants/engine:native',
     'src/python/pants/engine:parser',

@@ -23,7 +23,7 @@ from pants.engine.legacy.structs import PythonAWSLambdaAdaptor
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.rules.core import strip_source_root
-from pants.testutil.engine.util import create_options_bootstrapper
+from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
 

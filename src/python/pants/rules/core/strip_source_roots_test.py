@@ -10,7 +10,7 @@ from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.rules.core.strip_source_root import SourceRootStrippedSources
 from pants.rules.core.strip_source_root import rules as strip_source_root_rules
-from pants.testutil.engine.util import create_options_bootstrapper
+from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
 

@@ -10,7 +10,7 @@ from pants.engine.goal import Goal
 from pants.engine.selectors import Params
 from pants.init.options_initializer import BuildConfigInitializer
 from pants.init.target_roots_calculator import TargetRootsCalculator
-from pants.testutil.engine.util import create_options_bootstrapper
+from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 from pants.util.meta import classproperty
 

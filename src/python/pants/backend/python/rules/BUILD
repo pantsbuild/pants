@@ -35,6 +35,7 @@ python_tests(
     'src/python/pants/rules/core',
     'src/python/pants/testutil:test_base',
     'src/python/pants/testutil/engine:util',
+    'src/python/pants/testutil/option',
     'src/python/pants/testutil/subsystem',
     'src/python/pants/util:collections',
     'src/python/pants/util:contextutil',

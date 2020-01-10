@@ -15,7 +15,7 @@ from pants.engine.selectors import Params
 from pants.rules.core.fmt import FmtResult
 from pants.rules.core.lint import LintResult
 from pants.source.wrapped_globs import EagerFilesetWithSpec
-from pants.testutil.engine.util import create_options_bootstrapper
+from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
 

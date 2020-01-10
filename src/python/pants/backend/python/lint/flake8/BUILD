@@ -32,7 +32,7 @@ python_tests(
     'src/python/pants/source',
     'src/python/pants/testutil:interpreter_selection_utils',
     'src/python/pants/testutil:test_base',
-    'src/python/pants/testutil/engine:util',
+    'src/python/pants/testutil/option',
   ],
   tags = {'integration', 'partially_type_checked'},
   timeout = 210,
