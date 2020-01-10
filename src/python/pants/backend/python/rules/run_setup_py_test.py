@@ -30,7 +30,8 @@ from pants.backend.python.rules.run_setup_py import (
   get_owned_dependencies,
   get_requirements,
   get_sources,
-  validate_args)
+  validate_args,
+)
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.fs import Snapshot
