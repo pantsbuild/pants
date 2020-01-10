@@ -12,7 +12,6 @@ from pants.backend.python.rules.pex import (
   PexInterpreterConstraints,
   PexRequirements,
 )
-from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
@@ -47,8 +46,7 @@ class CoverageToolBase(PythonToolBase):
 async def merge_coverage_reports(
   addresses: BuildFileAddresses,
   address_specs: AddressSpecs,
-  address_and_test_results: AddressAndTestResult,
-  pytest: PyTest,
+  # address_and_test_results: AddressAndTestResult,
   python_setup: PythonSetup,
   coverage: CoverageToolBase,
   source_root_config: SourceRootConfig,
@@ -73,9 +71,9 @@ async def merge_coverage_reports(
     if target.adaptor.type_alias == 'python_library' or target.adaptor.type_alias == 'python_tests'
   ]
 
-  # results = await MultiGet(Get[AddressAndTestResult](Address, addr.to_address()) for addr in addresses)
+  results = await MultiGet(Get[AddressAndTestResult](Address, addr.to_address()) for addr in addresses)
   test_results = [
-    (x.address.to_address().path_safe_spec, x.test_result._python_sqlite_coverage_file) for x in address_and_test_results if x.test_result is not None]
+    (x.address.to_address().path_safe_spec, x.test_result._python_sqlite_coverage_file) for x in results if x.test_result is not None]
 
   coveragerc_digest = await Get[Digest](InputFilesContent, get_coveragerc_input(DEFAULT_COVERAGE_CONFIG))
 

@@ -157,7 +157,7 @@ async def run_tests(
   did_any_fail = False
   filtered_results = [(x.address, x.test_result) for x in results if x.test_result is not None]
   if options.values.run_coverage:
-    coverage_data = await Get[MergedCoverageData](AddressesAndTestResults, results)
+    coverage_data = await Get[MergedCoverageData](BuildFileAddress, addresses)
     import pdb; pdb.set_trace()
   for address, test_result in filtered_results:
     if test_result.status == Status.FAILURE:
