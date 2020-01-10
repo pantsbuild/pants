@@ -54,7 +54,7 @@ def test_topo_sort(name_to_deps: Dict[str, Tuple[str, ...]],
 
 def test_topo_sort_filtered() -> None:
   # Test that we don't return targets not in the input set.
-  name_to_deps = {'A': (), 'B': ('A',), 'C': ('B',), 'D': ('A',), 'E': ('C', 'D')}
+  name_to_deps: Dict[str, Tuple[str, ...]] = {'A': (), 'B': ('A',), 'C': ('B',), 'D': ('A',), 'E': ('C', 'D')}
   name_to_ht: Dict[str, HydratedTarget] = make_graph(name_to_deps)
   filtered_hts = [name_to_ht['E'], name_to_ht['A'], name_to_ht['B']]
   assert ('A', 'B', 'E') == tuple(ht.address for ht in topo_sort(filtered_hts))
