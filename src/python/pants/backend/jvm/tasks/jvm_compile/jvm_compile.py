@@ -429,7 +429,10 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     relevant_targets = list(self.context.targets(predicate=self.select))
 
     # If we are only exporting jars then we can omit some targets from the runtime_classpath.
-    if self.context.products.is_required_data("export_dep_as_jar_classpath") and not self.context.products.is_required_data("runtime_classpath"):
+    if (
+        self.context.products.is_required_data("export_dep_as_jar_classpath") and
+        not self.context.products.is_required_data("runtime_classpath")
+    ):
       # Filter modulized targets from invalid targets list.
       target_root_addresses = [t.address for t in set(self.context.target_roots)]
       dependees_of_target_roots = self.context.build_graph.transitive_dependees_of_addresses(target_root_addresses)
