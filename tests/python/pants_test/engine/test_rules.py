@@ -15,7 +15,7 @@ from pants.engine.rules import (
   RootRule,
   RuleIndex,
   UnrecognizedRuleArgument,
-  console_rule,
+  goal_rule,
   rule,
 )
 from pants.engine.selectors import Get
@@ -79,17 +79,17 @@ class Example(Goal):
   subsystem_cls = ExampleOptions
 
 
-@console_rule
-async def a_console_rule_generator(console: Console) -> Example:
+@goal_rule
+async def a_goal_rule_generator(console: Console) -> Example:
   a = await Get[A](str('a str!'))
   console.print_stdout(str(a))
   return Example(exit_code=0)
 
 
 class RuleTest(unittest.TestCase):
-  def test_run_rule_console_rule_generator(self):
+  def test_run_rule_goal_rule_generator(self):
     res = run_rule(
-      a_console_rule_generator,
+      a_goal_rule_generator,
       rule_args=[Console()],
       mock_gets=[MockGet(product_type=A, subject_type=str, mock=lambda _: A())],
     )
@@ -120,19 +120,19 @@ class RuleArgumentAnnotationTest(unittest.TestCase):
       def named_rule(a: int, b: str) -> bool:
         return False
 
-  def test_console_rule_automatically_gets_name_from_goal(self):
-    @console_rule
-    def some_console_rule(console: Console) -> Example:
+  def test_goal_rule_automatically_gets_name_from_goal(self):
+    @goal_rule
+    def some_goal_rule() -> Example:
       return Example(exit_code=0)
 
-    self.assertEqual(some_console_rule.rule.name, "example")
+    self.assertEqual(some_goal_rule.rule.name, "example")
 
-  def test_can_override_console_rule_name(self):
-    @console_rule(name='example but **COOLER**')
-    def some_console_rule(console: Console) -> Example:
+  def test_can_override_goal_rule_name(self):
+    @goal_rule(name='example but **COOLER**')
+    def some_goal_rule() -> Example:
       return Example(exit_code=0)
 
-    self.assertEqual(some_console_rule.rule.name, "example but **COOLER**")
+    self.assertEqual(some_goal_rule.rule.name, "example but **COOLER**")
 
 
 class RuleTypeAnnotationTest(unittest.TestCase):
@@ -167,24 +167,23 @@ class RuleTypeAnnotationTest(unittest.TestCase):
         return False
 
 
-class ConsoleRuleValidation(TestBase):
+class GoalRuleValidation(TestBase):
 
-  def test_not_properly_marked_console_rule(self) -> None:
+  def test_not_properly_marked_goal_rule(self) -> None:
     with self.assertRaisesWithMessage(
       TypeError,
-      "An `@rule` that returns a `Goal` must be declared with `@console_rule` in order to signal "
-      "that it is not cacheable."
+      "An `@rule` that returns a `Goal` must instead be declared with `@goal_rule`."
     ):
       @rule
       def normal_rule_trying_to_return_a_goal() -> Example:
         return Example(0)
 
-  def test_console_rule_not_returning_a_goal(self) -> None:
+  def test_goal_rule_not_returning_a_goal(self) -> None:
     with self.assertRaisesWithMessage(
-      TypeError, "An `@console_rule` must return a subclass of `engine.goal.Goal`."
+      TypeError, "An `@goal_rule` must return a subclass of `engine.goal.Goal`."
     ):
-      @console_rule
-      def console_rule_returning_a_non_goal() -> int:
+      @goal_rule
+      def goal_rule_returning_a_non_goal() -> int:
         return 0
 
 

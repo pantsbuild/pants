@@ -86,7 +86,7 @@ class GoalSubsystem(SubsystemClientMixin, Optionable):
 
 @dataclass(frozen=True)
 class Goal:
-  """The named product of a `@console_rule`.
+  """The named product of a `@goal_rule`.
 
   This class should be subclassed and linked to a corresponding `GoalSubsystem`:
 
@@ -99,8 +99,8 @@ class Goal:
     subsystem_cls = ListOptions
   ```
 
-  Since `@console_rules` always run in order to produce side effects (generally: console output),
-  they are not cacheable, and the `Goal` product of a `@console_rule` contains only a exit_code
+  Since `@goal_rules` always run in order to produce side effects (generally: console output),
+  they are not cacheable, and the `Goal` product of a `@goal_rule` contains only a exit_code
   value to indicate whether the rule exited cleanly.
   """
   exit_code: int

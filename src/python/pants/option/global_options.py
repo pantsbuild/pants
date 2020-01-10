@@ -511,14 +511,14 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--v1', advanced=True, type=bool, default=True,
              help='Enables execution of v1 Tasks.')
     register('--v2', advanced=True, type=bool, default=False,
-             help='Enables execution of v2 @console_rules.')
+             help='Enables execution of v2 @goal_rules.')
     register('--v2-ui', default=False, type=bool, daemon=False,
              help='Whether to show v2 engine execution progress. '
                   'This requires the --v2 flag to take effect.')
 
     loop_flag = '--loop'
     register(loop_flag, type=bool,
-             help='Run v2 @console_rules continuously as file changes are detected. Requires '
+             help='Run v2 @goal_rules continuously as file changes are detected. Requires '
                   '`--v2`, and is best utilized with `--v2 --no-v1`.')
     register('--loop-max', type=int, default=2**32, advanced=True,
              help=f'The maximum number of times to loop when `{loop_flag}` is specified.')
@@ -562,7 +562,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     Raises pants.option.errors.OptionsError on validation failure.
     """
     if opts.loop and (not opts.v2 or opts.v1):
-      raise OptionsError('The `--loop` option only works with @console_rules, and thus requires '
+      raise OptionsError('The `--loop` option only works with @goal_rules, and thus requires '
                          '`--v2 --no-v1` to function as expected.')
     if opts.loop and not opts.enable_pantsd:
       raise OptionsError('The `--loop` option requires `--enable-pantsd`, in order to watch files.')

@@ -283,18 +283,18 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     ).create().run()
 
   def _maybe_run_v2(self):
-    # N.B. For daemon runs, @console_rules are invoked pre-fork -
+    # N.B. For daemon runs, @goal_rules are invoked pre-fork -
     # so this path only serves the non-daemon run mode.
     if self._is_daemon:
       return PANTS_SUCCEEDED_EXIT_CODE
 
     _, ambiguous_goals, v2_goals = self._options.goals_by_version
     goals = v2_goals + (ambiguous_goals if self._global_options.v2 else tuple())
-    self._run_tracker.set_v2_console_rule_names(goals)
+    self._run_tracker.set_v2_goal_rule_names(goals)
     if not goals:
       return PANTS_SUCCEEDED_EXIT_CODE
 
-    return self._graph_session.run_console_rules(
+    return self._graph_session.run_goal_rules(
       self._options_bootstrapper,
       self._options,
       goals,

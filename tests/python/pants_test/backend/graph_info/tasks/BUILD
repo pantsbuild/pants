@@ -80,7 +80,7 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/backend/python/targets',
     'src/python/pants/testutil/subsystem',
-    'src/python/pants/testutil:console_rule_test_base',
+    'src/python/pants/testutil:goal_rule_test_base',
   ],
   tags = {"partially_type_checked"},
 )

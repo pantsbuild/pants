@@ -95,14 +95,9 @@ def _make_rule(
 
   has_goal_return_type = issubclass(return_type, Goal)
   if cacheable and has_goal_return_type:
-    raise TypeError(
-      'An `@rule` that returns a `Goal` must be declared with `@console_rule` in order to signal '
-      'that it is not cacheable.'
-    )
+    raise TypeError("An `@rule` that returns a `Goal` must instead be declared with `@goal_rule`.")
   if not cacheable and not has_goal_return_type:
-    raise TypeError(
-      'An `@console_rule` must return a subclass of `engine.goal.Goal`.'
-    )
+    raise TypeError("An `@goal_rule` must return a subclass of `engine.goal.Goal`.")
   is_goal_cls = has_goal_return_type
 
   def wrapper(func):
@@ -145,7 +140,7 @@ def _make_rule(
       Get.create_statically_for_rule_graph(resolve_type(p), resolve_type(s))
       for p, s in rule_visitor.gets)
 
-    # Register dependencies for @console_rule/Goal.
+    # Register dependencies for @goal_rule/Goal.
     dependency_rules = (subsystem_rule(return_type.subsystem_cls),) if is_goal_cls else None
 
     # Set a default name for Goal classes if one is not explicitly provided
@@ -201,7 +196,7 @@ def _ensure_type_annotation(
 
 PUBLIC_RULE_DECORATOR_ARGUMENTS = {'name'}
 # We don't want @rule-writers to use 'cacheable' as a kwarg directly, but rather
-# set it implicitly based on whether the rule annotation is @rule or @console_rule.
+# set it implicitly based on whether the rule annotation is @rule or @goal_rule.
 # So we leave it out of PUBLIC_RULE_DECORATOR_ARGUMENTS.
 IMPLICIT_PRIVATE_RULE_DECORATOR_ARGUMENTS = {'cacheable'}
 
@@ -215,7 +210,7 @@ def rule_decorator(*args, **kwargs) -> Callable:
 
   if len(set(kwargs) - PUBLIC_RULE_DECORATOR_ARGUMENTS - IMPLICIT_PRIVATE_RULE_DECORATOR_ARGUMENTS) != 0:
     raise UnrecognizedRuleArgument(
-      f"`@rule`s and `@console_rule`s only accept the following keyword arguments: {PUBLIC_RULE_DECORATOR_ARGUMENTS}"
+      f"`@rule`s and `@goal_rule`s only accept the following keyword arguments: {PUBLIC_RULE_DECORATOR_ARGUMENTS}"
     )
 
   func = args[0]
@@ -256,7 +251,7 @@ def rule(*args, **kwargs) -> Callable:
   return inner_rule(*args, **kwargs, cacheable=True)
 
 
-def console_rule(*args, **kwargs) -> Callable:
+def goal_rule(*args, **kwargs) -> Callable:
   return inner_rule(*args, **kwargs, cacheable=False)
 
 

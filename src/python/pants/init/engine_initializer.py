@@ -191,14 +191,13 @@ class LegacyGraphSession:
     """Raised when invalid v2 goals are passed in a v2-only mode."""
 
     def __init__(self, invalid_goals):
-      super(LegacyGraphSession.InvalidGoals, self).__init__(
-        'could not satisfy the following goals with @console_rules: {}'
-        .format(', '.join(invalid_goals))
+      super().__init__(
+        f"could not satisfy the following goals with @goal_rules: {', '.join(invalid_goals)}"
       )
       self.invalid_goals = invalid_goals
 
-  def run_console_rules(self, options_bootstrapper, options, goals, target_roots):
-    """Runs @console_rules sequentially and interactively by requesting their implicit Goal products.
+  def run_goal_rules(self, options_bootstrapper, options, goals, target_roots):
+    """Runs @goal_rules sequentially and interactively by requesting their implicit Goal products.
 
     For retryable failures, raises scheduler.ExecutionError.
 
@@ -223,7 +222,7 @@ class LegacyGraphSession:
       params = Params(subject, options_bootstrapper, console, workspace, interactive_runner)
       logger.debug(f'requesting {goal_product} to satisfy execution of `{goal}` goal')
       try:
-        exit_code = self.scheduler_session.run_console_rule(goal_product, params)
+        exit_code = self.scheduler_session.run_goal_rule(goal_product, params)
       finally:
         console.flush()
 

@@ -456,7 +456,7 @@ class SchedulerSession:
         unique_exceptions
       )
 
-  def run_console_rule(self, product, subject):
+  def run_goal_rule(self, product, subject):
     """
     :param product: A Goal subtype.
     :param subject: subject for the request.

@@ -9,7 +9,7 @@ from pants.engine.console import Console
 from pants.engine.fs import DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
-from pants.engine.rules import console_rule
+from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get
 from pants.rules.core.binary import CreatedBinary
 from pants.util.contextutil import temporary_dir
@@ -24,7 +24,7 @@ class Run(Goal):
   subsystem_cls = RunOptions
 
 
-@console_rule
+@goal_rule
 async def run(
   console: Console,
   workspace: Workspace,

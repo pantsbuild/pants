@@ -8,7 +8,7 @@ from pants.engine.addressable import BuildFileAddresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.legacy.graph import HydratedTargets
-from pants.engine.rules import console_rule
+from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get
 
 
@@ -33,7 +33,7 @@ class List(Goal):
   subsystem_cls = ListOptions
 
 
-@console_rule
+@goal_rule
 async def list_targets(
   console: Console, list_options: ListOptions, address_specs: AddressSpecs,
 ) -> List:

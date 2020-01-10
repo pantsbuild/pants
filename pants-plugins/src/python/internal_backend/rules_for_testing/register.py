@@ -4,7 +4,7 @@
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.rules import console_rule
+from pants.engine.rules import goal_rule
 
 
 class ListAndDieForTestingOptions(GoalSubsystem):
@@ -16,7 +16,7 @@ class ListAndDieForTesting(Goal):
   subsystem_cls = ListAndDieForTestingOptions
 
 
-@console_rule
+@goal_rule
 def fast_list_and_die_for_testing(
   console: Console, addresses: BuildFileAddresses
 ) -> ListAndDieForTesting:
