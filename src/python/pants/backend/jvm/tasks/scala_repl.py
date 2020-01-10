@@ -45,9 +45,10 @@ class ScalaRepl(JvmToolTaskMixin, ReplTaskMixin, JvmTask):
             self.classpath(targets),
             self.preferred_jvm_distribution_for_targets(targets))
 
-  def launch_repl(self, classpath, distribution):
+  def launch_repl(self, session_setup):
     # The scala repl requires -Dscala.usejavacp=true since Scala 2.8 when launching in the way
     # we do here (not passing -classpath as a program arg to scala.tools.nsc.MainGenericRunner).
+    classpath, distribution = session_setup
     jvm_options = self.jvm_options
     if not any(opt.startswith('-Dscala.usejavacp=') for opt in jvm_options):
       jvm_options.append('-Dscala.usejavacp=true')
