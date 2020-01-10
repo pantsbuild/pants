@@ -198,7 +198,7 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, InjectablesMixin, Subsystem
         raise build_graph.ManualSyntheticTargetError(target_address)
 
   @property
-  def injectables_spec_mapping(self):
+  def injectables_address_spec_mapping(self):
     maybe_suffix = '' if self.version == 'custom' else '-synthetic'
     return {
       # Target spec for the scala compiler library.

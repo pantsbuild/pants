@@ -51,7 +51,7 @@ class Java(JvmToolMixin, ZincLanguageMixin, InjectablesMixin, Subsystem):
       raise build_graph.ManualSyntheticTargetError(tools_jar_address)
 
   @property
-  def injectables_spec_mapping(self):
+  def injectables_address_spec_mapping(self):
     return {
       # Zinc directly accesses the javac tool.
       'javac': [self._javac_spec],

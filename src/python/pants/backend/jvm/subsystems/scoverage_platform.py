@@ -64,7 +64,7 @@ class ScoveragePlatform(InjectablesMixin, Subsystem):
         raise build_graph.ManualSyntheticTargetError(target_address)
 
   @property
-  def injectables_spec_mapping(self):
+  def injectables_address_spec_mapping(self):
     return {
       # Target spec for scoverage plugin.
       'scoverage': [f"//:scoverage"],

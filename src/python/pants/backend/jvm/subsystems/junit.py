@@ -57,7 +57,7 @@ class JUnit(JvmToolMixin, InjectablesMixin, Subsystem):
                                           scope='forced')
 
   @property
-  def injectables_spec_mapping(self):
+  def injectables_address_spec_mapping(self):
     return {
       'library': [self.get_options().junit_library]
     }
