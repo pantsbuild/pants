@@ -244,8 +244,11 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
     @dataclass
     class Tracker:
       workunits: List[dict] = field(default_factory=list)
+      finished: bool = False
 
-      def add(self, workunits) -> None:
+      def add(self, workunits, **kwargs) -> None:
+        if kwargs['finished'] == True:
+          self.finished = True
         self.workunits.extend(workunits)
 
     tracker = Tracker()
@@ -262,4 +265,5 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
 
     # Requesting a bigger fibonacci number will result in more rule executions and thus more reported workunits.
     # In this case, we expect 10 invocations of the `fib` rule.
-    self.assertEquals(len(tracker.workunits), 10)
+    assert len(tracker.workunits) ==  10
+    assert tracker.finished
