@@ -15,7 +15,7 @@ from pants.backend.python.subsystems.subprocess_environment import SubprocessEnc
 from pants.build_graph.address import Address
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.fs import Digest, DirectoriesToMerge, FileContent, InputFilesContent
-from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
+from pants.engine.interactive_runner import InteractiveProcessRequest
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
 from pants.engine.legacy.structs import PythonTestsAdaptor
@@ -23,7 +23,7 @@ from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.option.global_options import GlobalOptions
 from pants.rules.core.strip_source_root import SourceRootStrippedSources
-from pants.rules.core.test import TestDebugResult, TestOptions, TestResult, TestTarget
+from pants.rules.core.test import TestDebugRequest, TestOptions, TestResult, TestTarget
 
 
 DEFAULT_COVERAGE_CONFIG = dedent(f"""
@@ -189,17 +189,14 @@ async def run_python_test(
 async def debug_python_test(
   test_target: PythonTestsAdaptor,
   test_setup: TestTargetSetup,
-  runner: InteractiveRunner
-) -> TestDebugResult:
+) -> TestDebugRequest:
 
   run_request = InteractiveProcessRequest(
     argv=(test_setup.requirements_pex.output_filename, *test_setup.args),
     run_in_workspace=False,
     input_files=test_setup.input_files_digest
   )
-
-  result = runner.run_local_interactive_process(run_request)
-  return TestDebugResult(result.process_exit_code)
+  return TestDebugRequest(run_request)
 
 
 def rules():
