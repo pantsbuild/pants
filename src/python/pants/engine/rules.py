@@ -242,8 +242,8 @@ def rule_decorator(*args, **kwargs) -> Callable:
 def validate_parameter_types(func_id: str, parameter_types: Tuple[Type, ...], cacheable: bool) -> None:
   if cacheable:
     for ty in parameter_types:
-      if getattr(ty, "uncacheable", False):
-        raise ValueError(f"Non-console `@rule` {func_id} has an uncacheable parameter: {ty}")
+      if getattr(ty, "side_effecting", False):
+        raise ValueError(f"Non-console `@rule` {func_id} has a side-effecting parameter: {ty}")
 
 
 def inner_rule(*args, **kwargs) -> Callable:

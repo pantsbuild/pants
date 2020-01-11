@@ -33,7 +33,7 @@ class InteractiveProcessRequest:
 @dataclass(frozen=True)
 class InteractiveRunner:
   _scheduler: 'SchedulerSession'
-  uncacheable = True
+  side_effecting = True
 
   def run_local_interactive_process(self, request: InteractiveProcessRequest) -> InteractiveProcessResult:
     ExceptionSink.toggle_ignoring_sigint_v2_engine(True)
