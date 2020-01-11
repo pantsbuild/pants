@@ -63,7 +63,7 @@ impl Executor {
     self
       .runtime
       .executor()
-      .spawn(Self::future_with_correct_logging_context(future))
+      .spawn(Self::future_with_correct_context(future))
   }
 
   ///
@@ -95,7 +95,7 @@ impl Executor {
     future: F,
   ) -> impl Future<Item = Item, Error = Error> {
     futures::sync::oneshot::spawn(
-      Self::future_with_correct_logging_context(future),
+      Self::future_with_correct_context(future),
       &self.runtime.executor(),
     )
   }
@@ -124,7 +124,7 @@ impl Executor {
     // for a user-facing thread).
     Runtime::new()
       .unwrap()
-      .block_on(Self::future_with_correct_logging_context(future))
+      .block_on(Self::future_with_correct_context(future))
   }
 
   ///
@@ -146,21 +146,25 @@ impl Executor {
   ) -> impl Future<Item = Item, Error = Error> {
     self
       .io_pool
-      .spawn(Self::future_with_correct_logging_context(future))
+      .spawn(Self::future_with_correct_context(future))
   }
 
   ///
-  /// Copy our (thread-local or task-local) logging destination into the task.
+  /// Copy our (thread-local or task-local) logging destination and current workunit parent into
+  /// the task. The former ensures that when a pantsd thread kicks off a future, any logging done
+  /// by it ends up in the pantsd log as we expect. The latter ensures that when a new workunit
+  /// is created it has an accurate handle to its parent.
   ///
-  /// This helps us to ensure that when a pantsd thread kicks off a future, any logging done by it
-  /// ends up in the pantsd log as we expect.
-  ///
-  fn future_with_correct_logging_context<Item, Error, F: Future<Item = Item, Error = Error>>(
+  fn future_with_correct_context<Item, Error, F: Future<Item = Item, Error = Error>>(
     future: F,
   ) -> impl Future<Item = Item, Error = Error> {
     let logging_destination = logging::get_destination();
+    let workunit_parent_id = workunit_store::get_parent_id();
     futures::lazy(move || {
       logging::set_destination(logging_destination);
+      if let Some(parent_id) = workunit_parent_id {
+        workunit_store::set_parent_id(parent_id);
+      }
       future
     })
   }

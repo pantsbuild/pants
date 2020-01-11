@@ -41,6 +41,24 @@ pub struct WorkUnit {
   pub parent_id: Option<String>,
 }
 
+pub struct StartedWorkUnit {
+  pub name: String,
+  pub start_time: std::time::SystemTime,
+  pub span_id: String,
+  pub parent_id: Option<String>,
+}
+
+impl StartedWorkUnit {
+  pub fn finish(self) -> WorkUnit {
+    WorkUnit {
+      name: self.name,
+      time_span: TimeSpan::since(&self.start_time),
+      span_id: self.span_id,
+      parent_id: self.parent_id,
+    }
+  }
+}
+
 impl WorkUnit {
   pub fn new(name: String, time_span: TimeSpan, parent_id: Option<String>) -> WorkUnit {
     let span_id = generate_random_64bit_string();
@@ -113,16 +131,22 @@ task_local! {
 }
 
 pub fn set_parent_id(parent_id: String) {
-  TASK_PARENT_ID.with(|task_parent_id| {
-    *task_parent_id.lock() = Some(parent_id);
-  })
+  if futures::task::is_in_task() {
+    TASK_PARENT_ID.with(|task_parent_id| {
+      *task_parent_id.lock() = Some(parent_id);
+    })
+  }
 }
 
 pub fn get_parent_id() -> Option<String> {
-  TASK_PARENT_ID.with(|task_parent_id| {
-    let task_parent_id = task_parent_id.lock();
-    (*task_parent_id).clone()
-  })
+  if futures::task::is_in_task() {
+    TASK_PARENT_ID.with(|task_parent_id| {
+      let task_parent_id = task_parent_id.lock();
+      (*task_parent_id).clone()
+    })
+  } else {
+    None
+  }
 }
 
 #[cfg(test)]
