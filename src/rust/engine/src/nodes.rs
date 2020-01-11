@@ -1219,10 +1219,7 @@ impl Node for NodeKey {
   type Error = Failure;
 
   fn run(self, context: Context) -> NodeFuture<NodeResult> {
-    let handle_workunits =
-      context.session.should_report_workunits() || context.session.should_record_zipkin_spans();
-
-    let (node_workunit_params, maybe_span_id) = if handle_workunits {
+    let (node_workunit_params, maybe_span_id) = if context.session.should_handle_workunits() {
       let span_id = generate_random_64bit_string();
       let node_workunit_params = match self.user_facing_name() {
         Some(ref node_name) => {
