@@ -32,6 +32,8 @@ class ExportDepAsJar(ConsoleTask):
   jvm dependencies instead of sources.
   """
 
+  _register_console_transitivity_option = False
+
   @classmethod
   def subsystem_dependencies(cls):
     return super().subsystem_dependencies() + (DependencyContext,)
@@ -43,6 +45,19 @@ class ExportDepAsJar(ConsoleTask):
       help='Causes output to be a single line of JSON.')
     register('--sources', type=bool,
       help='Causes the sources of dependencies to be zipped and included in the project.')
+    register(
+      '--transitive', type=bool, default=True, fingerprint=True,
+      help='If True, use all targets in the build graph, else use only target roots.',
+      removal_version="1.27.0.dev0",
+      removal_hint="`export-dep-as-jar` should always act transitively, which is the default. "
+                   "This option will be going away to ensure that Pants always does the right "
+                   "thing.",
+    )
+
+  @property
+  def act_transitively(self):
+    # NB: `export-dep-as-jar` should always act transitively
+    return self.get_options().transitive
 
   @classmethod
   def prepare(cls, options, round_manager):
