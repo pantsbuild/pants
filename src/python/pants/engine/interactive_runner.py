@@ -30,8 +30,8 @@ class InteractiveProcessRequest:
       raise ValueError("InteractiveProessRequest should use the Workspace API to materialize any needed files when it runs in the workspace")
 
 
-@dataclass(frozen=True)
 @side_effecting
+@dataclass(frozen=True)
 class InteractiveRunner:
   _scheduler: 'SchedulerSession'
 

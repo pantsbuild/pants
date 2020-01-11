@@ -209,8 +209,8 @@ class UrlToFetch:
   digest: Digest
 
 
-@dataclass(frozen=True)
 @side_effecting
+@dataclass(frozen=True)
 class Workspace:
   """Abstract handle for operations that touch the real local filesystem."""
   _scheduler: "SchedulerSession"
