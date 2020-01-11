@@ -544,7 +544,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--lock', advanced=True, type=bool, default=True,
              help='Use a global lock to exclude other versions of pants from running during '
                   'critical operations.')
-    register('--streaming-workunits-report-interval', type=float, default=10,
+    register('--streaming-workunits-report-interval', type=float, default=10, advanced=True,
         help="Interval in seconds between when streaming workunit event receivers will be polled."
     )
     register('--streaming-workunits-handlers', type=list, member_type=str, default=[],
