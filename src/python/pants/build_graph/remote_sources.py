@@ -55,9 +55,9 @@ class RemoteSources(Target):
     return Address.parse(sources_target, relative_to=address.spec_path).spec
 
   @classmethod
-  def compute_dependency_specs(cls, kwargs=None, payload=None):
-    for spec in super().compute_dependency_specs(kwargs, payload):
-      yield spec
+  def compute_dependency_address_specs(cls, kwargs=None, payload=None):
+    for address_spec in super().compute_dependency_address_specs(kwargs, payload):
+      yield address_spec
 
     if kwargs:
       address = kwargs.get('address')

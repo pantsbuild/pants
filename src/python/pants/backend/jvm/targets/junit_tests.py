@@ -91,12 +91,12 @@ class JUnitTests(JvmTarget):
                                       + repr(self.VALID_CONCURRENCY_OPTS) + " got: " + concurrency)
 
   @classmethod
-  def compute_dependency_specs(cls, kwargs=None, payload=None):
-    for spec in super().compute_dependency_specs(kwargs, payload):
-      yield spec
+  def compute_dependency_address_specs(cls, kwargs=None, payload=None):
+    for address_spec in super().compute_dependency_address_specs(kwargs, payload):
+      yield address_spec
 
-    for spec in JUnit.global_instance().injectables_specs_for_key('library'):
-      yield spec
+    for address_spec in JUnit.global_instance().injectables_address_specs_for_key('library'):
+      yield address_spec
 
   @property
   def test_platform(self):

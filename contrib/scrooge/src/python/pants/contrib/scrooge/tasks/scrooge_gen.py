@@ -93,7 +93,7 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
     return path
 
   def _resolve_deps(self, depmap):
-    """Given a map of gen-key=>target specs, resolves the target specs into references."""
+    """Given a map of gen-key=>address specs, resolves the address specs into references."""
     deps = defaultdict(lambda: OrderedSet())
     for category, depspecs in depmap.items():
       dependencies = deps[category]

@@ -34,9 +34,9 @@ class PythonAWSLambda(Target):
     return 'python_awslambda'
 
   @classmethod
-  def compute_dependency_specs(cls, kwargs=None, payload=None):
-    for spec in super().compute_dependency_specs(kwargs, payload):
-      yield spec
+  def compute_dependency_address_specs(cls, kwargs=None, payload=None):
+    for address_spec in super().compute_dependency_address_specs(kwargs, payload):
+      yield address_spec
     target_representation = kwargs or payload.as_dict()
     binary = target_representation.get('binary')
     if binary:
