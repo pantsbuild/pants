@@ -10,7 +10,7 @@ from pants.engine.fs import Digest, DirectoriesToMerge, DirectoryToMaterialize, 
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.legacy.graph import HydratedTarget
 from pants.engine.objects import union
-from pants.engine.rules import console_rule, rule
+from pants.engine.rules import goal_rule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.rules.core.distdir import DistDir
 
@@ -36,7 +36,7 @@ class CreatedBinary:
   binary_name: str
 
 
-@console_rule
+@goal_rule
 async def create_binary(
     addresses: BuildFileAddresses,
     console: Console,

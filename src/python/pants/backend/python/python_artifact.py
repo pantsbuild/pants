@@ -49,7 +49,7 @@ class PythonArtifact(PayloadField):
     return self._version
 
   @property
-  def key(self):
+  def requirement(self):
     return '{}=={}'.format(self._name, self._version)
 
   @property

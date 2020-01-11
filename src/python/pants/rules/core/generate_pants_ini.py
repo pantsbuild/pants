@@ -14,7 +14,7 @@ from pants.engine.fs import (
   Workspace,
 )
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.rules import console_rule
+from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get
 from pants.version import VERSION as pants_version
 
@@ -28,7 +28,7 @@ class GeneratePantsIni(Goal):
   subsystem_cls = GeneratePantsIniOptions
 
 
-@console_rule
+@goal_rule
 async def generate_pants_ini(console: Console, workspace: Workspace) -> GeneratePantsIni:
   pants_ini_content = dedent(f"""\
     [GLOBAL]

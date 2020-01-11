@@ -6,10 +6,10 @@ from typing import List, Optional
 from pants.backend.project_info.rules import dependencies
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.testutil.console_rule_test_base import ConsoleRuleTestBase
+from pants.testutil.goal_rule_test_base import GoalRuleTestBase
 
 
-class FastDependenciesTest(ConsoleRuleTestBase):
+class FastDependenciesTest(GoalRuleTestBase):
   goal_cls = dependencies.Dependencies
 
   @classmethod

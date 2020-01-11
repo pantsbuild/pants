@@ -226,8 +226,8 @@ class SchedulerService(PantsService):
     if v2_goals or (ambiguous_goals and global_options.v2):
       goals = v2_goals + (ambiguous_goals if global_options.v2 else tuple())
 
-      # N.B. @console_rules run pre-fork in order to cache the products they request during execution.
-      exit_code = session.run_console_rules(
+      # N.B. @goal_rules run pre-fork in order to cache the products they request during execution.
+      exit_code = session.run_goal_rules(
           options_bootstrapper,
           options,
           goals,

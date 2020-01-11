@@ -69,7 +69,7 @@ python_library(
   sources = ['console_rule_test_base.py'],
   dependencies = [
     ':deprecated_testinfra',
-    'src/python/pants/testutil:console_rule_test_base',
+    'src/python/pants/testutil:goal_rule_test_base',
   ],
   tags = {'partially_type_checked'},
 )

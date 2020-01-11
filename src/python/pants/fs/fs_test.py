@@ -18,15 +18,15 @@ from pants.engine.fs import (
   Workspace,
 )
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.rules import RootRule, console_rule
+from pants.engine.rules import RootRule, goal_rule
 from pants.engine.selectors import Get
 from pants.fs.fs import is_child_of
-from pants.testutil.console_rule_test_base import ConsoleRuleTestBase
+from pants.testutil.goal_rule_test_base import GoalRuleTestBase
 from pants.testutil.test_base import TestBase
 
 
 @dataclass(frozen=True)
-class MessageToConsoleRule:
+class MessageToGoalRule:
   input_files_content: InputFilesContent
 
 
@@ -38,26 +38,26 @@ class MockWorkspaceGoal(Goal):
   subsystem_cls = MockWorkspaceGoalOptions
 
 
-@console_rule
-async def workspace_console_rule(console: Console, workspace: Workspace, msg: MessageToConsoleRule) -> MockWorkspaceGoal:
+@goal_rule
+async def workspace_goal_rule(console: Console, workspace: Workspace, msg: MessageToGoalRule) -> MockWorkspaceGoal:
   digest = await Get[Digest](InputFilesContent, msg.input_files_content)
   output = workspace.materialize_directory(DirectoryToMaterialize(digest))
   console.print_stdout(output.output_paths[0], end='')
   return MockWorkspaceGoal(exit_code=0)
 
 
-class WorkspaceInConsoleRuleTest(ConsoleRuleTestBase):
+class WorkspaceInGoalRuleTest(GoalRuleTestBase):
   """This test is meant to ensure that the Workspace type successfully
-  invokes the rust FFI function to write to disk in the context of a @console_rule,
+  invokes the rust FFI function to write to disk in the context of a @goal_rule,
   without crashing or otherwise failing."""
   goal_cls = MockWorkspaceGoal
 
   @classmethod
   def rules(cls):
-    return super().rules() + [RootRule(MessageToConsoleRule), workspace_console_rule]
+    return super().rules() + [RootRule(MessageToGoalRule), workspace_goal_rule]
 
   def test(self):
-    msg = MessageToConsoleRule(
+    msg = MessageToGoalRule(
       input_files_content=InputFilesContent([FileContent(path='a.txt', content=b'hello')])
     )
     output_path = Path(self.build_root, 'a.txt')
@@ -66,11 +66,11 @@ class WorkspaceInConsoleRuleTest(ConsoleRuleTestBase):
 
 
 #TODO(gshuflin) - it would be nice if this test, which tests that the MaterializeDirectoryResults value
-# is valid, could be subsumed into the above @console_rule-based test, but it's a bit awkward
-# to get the MaterializeDirectoriesResult out of a @console_rule at the moment.
+# is valid, could be subsumed into the above @goal_rule-based test, but it's a bit awkward
+# to get the MaterializeDirectoriesResult out of a @goal_rule at the moment.
 class FileSystemTest(TestBase):
   def test_workspace_materialize_directories_result(self):
-    #TODO(#8336): at some point, this test should require that Workspace only be invoked from a console_role
+    #TODO(#8336): at some point, this test should require that Workspace only be invoked from an @goal_rule
     workspace = Workspace(self.scheduler)
 
     input_files_content = InputFilesContent((

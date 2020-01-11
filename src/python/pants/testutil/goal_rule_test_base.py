@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from io import StringIO
-from typing import Any, Iterable
+from typing import Any, Dict, Iterable, Optional
 
 from pants.engine.console import Console
 from pants.engine.fs import Workspace
@@ -10,18 +10,16 @@ from pants.engine.goal import Goal
 from pants.engine.selectors import Params
 from pants.init.options_initializer import BuildConfigInitializer
 from pants.init.target_roots_calculator import TargetRootsCalculator
-from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 from pants.util.meta import classproperty
 
 
-class ConsoleRuleTestBase(TestBase):
-  """A baseclass useful for testing a Goal defined as a @console_rule.
+class GoalRuleTestBase(TestBase):
+  """A baseclass useful for testing a Goal defined as a @goal_rule.
 
   :API: public
   """
-
-  _implicit_args = ('--pants-config-files=[]',)
 
   @classproperty
   def goal_cls(cls):
@@ -37,17 +35,23 @@ class ConsoleRuleTestBase(TestBase):
     if not issubclass(self.goal_cls, Goal):
       raise AssertionError('goal_cls() must return a Goal subclass, got {}'.format(self.goal_cls))
 
-  def execute_rule(self, args=tuple(), env=tuple(), exit_code=0, additional_params: Iterable[Any]=tuple()):
-    """Executes the @console_rule for this test class.
+  def execute_rule(
+    self,
+    args: Optional[Iterable[str]] = None,
+    env: Optional[Dict[str, str]] = None,
+    exit_code: int = 0,
+    additional_params: Optional[Iterable[Any]] = None,
+  ) -> str:
+    """Executes the @goal_rule for this test class.
 
     :API: public
 
     Returns the text output of the task.
     """
     # Create an OptionsBootstrapper for these args/env, and a captured Console instance.
-    args = self._implicit_args + (self.goal_cls.name,) + tuple(args)
-    env = dict(env)
-    options_bootstrapper = OptionsBootstrapper.create(args=args, env=env)
+    options_bootstrapper = create_options_bootstrapper(
+      args=(self.goal_cls.name, *(args or [])), env=env,
+    )
     BuildConfigInitializer.get(options_bootstrapper)
     full_options = options_bootstrapper.get_full_options(list(self.goal_cls.subsystem_cls.known_scope_infos()))
     stdout, stderr = StringIO(), StringIO()
@@ -57,8 +61,8 @@ class ConsoleRuleTestBase(TestBase):
 
     # Run for the target specs parsed from the args.
     address_specs = TargetRootsCalculator.parse_address_specs(full_options.specs, self.build_root)
-    params = Params(address_specs, console, options_bootstrapper, workspace, *additional_params)
-    actual_exit_code = self.scheduler.run_console_rule(self.goal_cls, params)
+    params = Params(address_specs, console, options_bootstrapper, workspace, *(additional_params or []))
+    actual_exit_code = self.scheduler.run_goal_rule(self.goal_cls, params)
 
     # Flush and capture console output.
     console.flush()

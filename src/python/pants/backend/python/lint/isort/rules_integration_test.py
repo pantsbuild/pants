@@ -3,20 +3,10 @@
 
 from typing import List, Optional, Tuple
 
-from pants.backend.python.lint.isort.rules import IsortSetup, IsortTarget
+from pants.backend.python.lint.isort.rules import IsortTarget
 from pants.backend.python.lint.isort.rules import rules as isort_rules
-from pants.backend.python.lint.isort.subsystem import Isort
-from pants.backend.python.rules.download_pex_bin import download_pex_bin
-from pants.backend.python.rules.pex import CreatePex, create_pex
-from pants.backend.python.subsystems.python_native_code import (
-  PythonNativeCode,
-  create_pex_native_build_environment,
-)
-from pants.backend.python.subsystems.python_setup import PythonSetup
-from pants.backend.python.subsystems.subprocess_environment import (
-  SubprocessEnvironment,
-  create_subprocess_encoding_environment,
-)
+from pants.backend.python.rules import download_pex_bin, pex
+from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.build_graph.address import Address
 from pants.engine.fs import Digest, FileContent, InputFilesContent, Snapshot
 from pants.engine.legacy.structs import TargetAdaptor
@@ -25,7 +15,7 @@ from pants.engine.selectors import Params
 from pants.rules.core.fmt import FmtResult
 from pants.rules.core.lint import LintResult
 from pants.source.wrapped_globs import EagerFilesetWithSpec
-from pants.testutil.subsystem.util import global_subsystem_instance, init_subsystems
+from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
 
@@ -51,22 +41,12 @@ class IsortIntegrationTest(TestBase):
     return (
       *super().rules(),
       *isort_rules(),
-      create_pex,
-      create_subprocess_encoding_environment,
-      create_pex_native_build_environment,
-      download_pex_bin,
-      RootRule(CreatePex),
-      RootRule(Isort),
-      RootRule(IsortSetup),
+      *download_pex_bin.rules(),
+      *pex.rules(),
+      *python_native_code.rules(),
+      *subprocess_environment.rules(),
       RootRule(IsortTarget),
-      RootRule(PythonSetup),
-      RootRule(PythonNativeCode),
-      RootRule(SubprocessEnvironment),
     )
-
-  def setUp(self):
-    super().setUp()
-    init_subsystems([Isort, PythonSetup, PythonNativeCode, SubprocessEnvironment])
 
   def run_isort(
     self,
@@ -76,36 +56,26 @@ class IsortIntegrationTest(TestBase):
     passthrough_args: Optional[str] = None,
     skip: bool = False,
   ) -> Tuple[LintResult, FmtResult]:
+    args = ["--backend-packages2=pants.backend.python.lint.isort"]
     if config is not None:
       self.create_file(relpath=".isort.cfg", contents=config)
+      args.append("--isort-config=.isort.cfg")
+    if passthrough_args:
+      args.append(f"--isort-args='{passthrough_args}'")
+    if skip:
+      args.append(f"--isort-skip")
     input_snapshot = self.request_single_product(Snapshot, InputFilesContent(source_files))
     target_adaptor = TargetAdaptor(
       sources=EagerFilesetWithSpec('test', {'globs': []}, snapshot=input_snapshot),
       address=Address.parse("test:target"),
     )
     lint_target = IsortTarget(target_adaptor)
-    fmt_target = IsortTarget(target_adaptor, prior_formatter_result_digest=input_snapshot.directory_digest)
-    isort_subsystem = global_subsystem_instance(
-      Isort, options={Isort.options_scope: {
-        "config": [".isort.cfg"] if config else None,
-        "args": [passthrough_args] if passthrough_args else [],
-        "skip": skip,
-      }}
+    fmt_target = IsortTarget(
+      target_adaptor, prior_formatter_result_digest=input_snapshot.directory_digest,
     )
-    python_subsystems = [
-      PythonNativeCode.global_instance(),
-      PythonSetup.global_instance(),
-      SubprocessEnvironment.global_instance(),
-    ]
-    isort_setup = self.request_single_product(
-      IsortSetup, Params(isort_subsystem, *python_subsystems)
-    )
-    lint_result = self.request_single_product(
-      LintResult, Params(lint_target, isort_setup, *python_subsystems)
-    )
-    fmt_result = self.request_single_product(
-      FmtResult, Params(fmt_target, isort_setup, *python_subsystems)
-    )
+    options_bootstrapper = create_options_bootstrapper(args=args)
+    lint_result = self.request_single_product(LintResult, Params(lint_target, options_bootstrapper))
+    fmt_result = self.request_single_product(FmtResult, Params(fmt_target, options_bootstrapper))
     return lint_result, fmt_result
 
   def get_digest(self, source_files: List[FileContent]) -> Digest:
@@ -137,7 +107,7 @@ class IsortIntegrationTest(TestBase):
 
   def test_respects_config_file(self) -> None:
     lint_result, fmt_result = self.run_isort(
-      [self.needs_config_source], config="[settings]\ncombine_as_imports=True\n"
+      [self.needs_config_source], config="[settings]\ncombine_as_imports=True\n",
     )
     assert lint_result.exit_code == 1
     assert "test/config.py Imports are incorrectly sorted" in lint_result.stdout

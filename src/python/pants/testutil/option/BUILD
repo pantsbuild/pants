@@ -6,6 +6,7 @@ python_library(
     '//:build_root',
     '//:pants_ini',
     'src/python/pants/option',
+    'src/python/pants/bin',  # NB: not explicitly used, but necessary for OptionsBootstrapper to be set up properly.
   ],
   tags = {"partially_type_checked"},
 )

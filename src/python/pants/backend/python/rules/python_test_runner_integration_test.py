@@ -47,7 +47,7 @@ from pants.option.global_options import GlobalOptions
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.ranked_value import RankedValue
 from pants.rules.core.strip_source_root import strip_source_root
-from pants.rules.core.test import Status, TestDebugResult, TestResult, TestOptions
+from pants.rules.core.test import Status, TestDebugResult, TestOptions, TestResult
 from pants.source.source_root import SourceRootConfig
 from pants.testutil.interpreter_selection_utils import skip_unless_python27_and_python3_present
 from pants.testutil.subsystem.util import global_subsystem_instance, init_subsystems
