@@ -10,47 +10,26 @@ from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.rules import (
   download_pex_bin,
   inject_init,
+  pex,
+  pex_from_target_closure,
   prepare_chrooted_python_sources,
+  python_test_runner,
 )
-from pants.backend.python.rules.pex import create_pex
-from pants.backend.python.rules.pex_from_target_closure import (
-  CreatePexFromTargetClosure,
-  create_pex_from_target_closure,
-)
-from pants.backend.python.rules.python_test_runner import (
-  TestTargetSetup,
-  debug_python_test,
-  run_python_test,
-  setup_pytest_for_target,
-)
-from pants.backend.python.subsystems.pytest import PyTest
-from pants.backend.python.subsystems.python_native_code import (
-  PythonNativeCode,
-  create_pex_native_build_environment,
-)
-from pants.backend.python.subsystems.python_setup import PythonSetup
-from pants.backend.python.subsystems.subprocess_environment import (
-  SubprocessEnvironment,
-  create_subprocess_encoding_environment,
-)
+from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.build_graph.address import BuildFileAddress
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.engine.fs import FileContent, create_fs_rules
+from pants.engine.fs import FileContent
 from pants.engine.interactive_runner import InteractiveRunner
 from pants.engine.legacy.structs import PythonTestsAdaptor
-from pants.engine.rules import RootRule
+from pants.engine.rules import RootRule, subsystem_rule
 from pants.engine.selectors import Params
-from pants.option.global_options import GlobalOptions
-from pants.option.option_value_container import OptionValueContainer
-from pants.option.ranked_value import RankedValue
-from pants.rules.core.strip_source_root import strip_source_root
+from pants.rules.core import strip_source_root
 from pants.rules.core.test import Status, TestDebugResult, TestOptions, TestResult
-from pants.source.source_root import SourceRootConfig
 from pants.testutil.interpreter_selection_utils import skip_unless_python27_and_python3_present
-from pants.testutil.subsystem.util import global_subsystem_instance, init_subsystems
+from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
 
@@ -128,77 +107,33 @@ class PythonTestRunnerIntegrationTest(TestBase):
   def rules(cls):
     return (
       *super().rules(),
-      create_pex,
-      create_pex_from_target_closure,
-      create_pex_native_build_environment,
-      create_subprocess_encoding_environment,
-      debug_python_test,
-      run_python_test,
-      setup_pytest_for_target,
-      strip_source_root,
-      *create_fs_rules(),
+      *python_test_runner.rules(),
       *download_pex_bin.rules(),
       *inject_init.rules(),
+      *pex.rules(),
+      *pex_from_target_closure.rules(),
       *prepare_chrooted_python_sources.rules(),
-      RootRule(CreatePexFromTargetClosure),
-      RootRule(GlobalOptions),
-      RootRule(PyTest),
+      *python_native_code.rules(),
+      *strip_source_root.rules(),
+      *subprocess_environment.rules(),
+      subsystem_rule(TestOptions),
       RootRule(PythonTestsAdaptor),
-      RootRule(PythonSetup),
-      RootRule(PythonNativeCode),
-      RootRule(TestOptions),
-      RootRule(TestTargetSetup),
-      RootRule(SourceRootConfig),
-      RootRule(SubprocessEnvironment),
     )
 
-  def setUp(self):
-    super().setUp()
-    init_subsystems([
-      PyTest, PythonSetup, PythonNativeCode, SourceRootConfig, SubprocessEnvironment,
-    ])
-
   def run_pytest(self, *, passthrough_args: Optional[str] = None) -> TestResult:
+    args = [
+      "--backend-packages2=pants.backend.python",
+      "--pytest-version=pytest>=4.6.6,<4.7",  # so that we can run Python 2 tests
+    ]
+    if passthrough_args:
+      args.append(f"--pytest-args='{passthrough_args}'")
+    options_bootstrapper = create_options_bootstrapper(args=args)
     target = PythonTestsAdaptor(
       address=BuildFileAddress(rel_path=f"{self.source_root}/BUILD", target_name="target"),
     )
-    pytest_subsystem = global_subsystem_instance(
-      PyTest, options={
-        PyTest.options_scope: {
-          "args": [passthrough_args] if passthrough_args else [],
-          "version": "pytest>=4.6.6,<4.7",  # so that we can run Python 2 tests
-        },
-      },
-    )
-    test_target_setup = self.request_single_product(
-      TestTargetSetup,
-      Params(
-        target,
-        pytest_subsystem,
-        PythonNativeCode.global_instance(),
-        PythonSetup.global_instance(),
-        # TODO: How to pass an instance to `TestOptions`...? (A GoalSubsystem). Probably we should
-        # just use OptionsBootstrapper.
-        SourceRootConfig.global_instance(),
-        SubprocessEnvironment.global_instance(),
-      ),
-    )
-    # TODO: replace all this boilerplate with a utility to set up OptionsBootstrapper for
-    # non-ConsoleRuleTestBase tests.
-    mock_global_options = OptionValueContainer()
-    mock_global_options.colors = RankedValue(RankedValue.HARDCODED, False)
-    test_result = self.request_single_product(
-      TestResult,
-      Params(
-        target,
-        test_target_setup,
-        PythonSetup.global_instance(),
-        SubprocessEnvironment.global_instance(),
-        GlobalOptions(mock_global_options),
-      )
-    )
+    test_result = self.request_single_product(TestResult, Params(target, options_bootstrapper))
     debug_result = self.request_single_product(
-      TestDebugResult, Params(test_target_setup, InteractiveRunner(self.scheduler)),
+      TestDebugResult, Params(target, options_bootstrapper, InteractiveRunner(self.scheduler)),
     )
     if test_result.status == Status.SUCCESS:
       assert debug_result.exit_code == 0
