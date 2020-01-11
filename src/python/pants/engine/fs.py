@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Iterable, Optional, Tuple
 
 from pants.engine.objects import Collection
-from pants.engine.rules import RootRule
+from pants.engine.rules import RootRule, side_effecting
 from pants.option.custom_types import GlobExpansionConjunction as GlobExpansionConjunction
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.util.dirutil import (
@@ -210,9 +210,9 @@ class UrlToFetch:
 
 
 @dataclass(frozen=True)
+@side_effecting
 class Workspace:
   """Abstract handle for operations that touch the real local filesystem."""
-  side_effecting = True
   _scheduler: "SchedulerSession"
 
   def materialize_directory(

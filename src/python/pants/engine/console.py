@@ -7,6 +7,7 @@ from typing import Any, Optional
 from colors import blue, green, red
 
 from pants.engine.native import Native
+from pants.engine.rules import side_effecting
 
 
 #TODO this needs to be a file-like object/stream
@@ -34,6 +35,7 @@ class NativeStdErr(NativeWriter):
     self._native.write_stderr(self._session, payload)
 
 
+@side_effecting
 class Console:
   """Class responsible for writing text to the console while Pants is running. """
   side_effecting = True

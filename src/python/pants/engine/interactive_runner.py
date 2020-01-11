@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Tuple
 
 from pants.base.exception_sink import ExceptionSink
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, Digest
-from pants.engine.rules import RootRule
+from pants.engine.rules import RootRule, side_effecting
 
 
 if TYPE_CHECKING:
@@ -31,9 +31,9 @@ class InteractiveProcessRequest:
 
 
 @dataclass(frozen=True)
+@side_effecting
 class InteractiveRunner:
   _scheduler: 'SchedulerSession'
-  side_effecting = True
 
   def run_local_interactive_process(self, request: InteractiveProcessRequest) -> InteractiveProcessResult:
     ExceptionSink.toggle_ignoring_sigint_v2_engine(True)

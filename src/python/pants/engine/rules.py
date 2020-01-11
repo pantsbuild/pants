@@ -22,6 +22,13 @@ from pants.util.memo import memoized
 from pants.util.meta import frozen_after_init
 
 
+def side_effecting(cls):
+  """Annotates a class to indicate that it is a side-effecting type, which needs
+  to be handled specially with respect to rule caching semantics."""
+  cls.__side_effecting = True
+  return cls
+
+
 class _RuleVisitor(ast.NodeVisitor):
   """Pull `Get` calls out of an @rule body."""
 
@@ -242,7 +249,7 @@ def rule_decorator(*args, **kwargs) -> Callable:
 def validate_parameter_types(func_id: str, parameter_types: Tuple[Type, ...], cacheable: bool) -> None:
   if cacheable:
     for ty in parameter_types:
-      if getattr(ty, "side_effecting", False):
+      if getattr(ty, "__side_effecting", False):
         raise ValueError(f"Non-console `@rule` {func_id} has a side-effecting parameter: {ty}")
 
 
