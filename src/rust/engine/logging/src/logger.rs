@@ -145,6 +145,9 @@ impl Log for Logger {
     match destination {
       Destination::Stderr => {
         let mut handles_map = self.engine_display_handles.lock();
+        if handles_map.is_empty() {
+          self.stderr_log.lock().log(record)
+        }
         for handle in handles_map.values_mut() {
           let cur_time = chrono::Utc::now().format(TIME_FORMAT_STR);
           let level = record.level();
@@ -152,7 +155,6 @@ impl Log for Logger {
           let mut display_engine = handle.lock();
           display_engine.log(log_string);
         }
-        self.stderr_log.lock().log(record)
       }
       Destination::Pantsd => self.pantsd_log.lock().log(record),
     }
