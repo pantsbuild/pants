@@ -12,7 +12,7 @@ import time
 import uuid
 from collections import OrderedDict
 from contextlib import contextmanager
-from typing import Dict
+from typing import Any, Dict, Optional
 
 import requests
 
@@ -371,7 +371,7 @@ class RunTracker(Subsystem):
             }
 
   @classmethod
-  def post_stats(cls, stats_url, stats, timeout=2, auth_provider=None, stats_version=1):
+  def post_stats(cls, stats_url: str, stats: Dict[str, Any], timeout: int=2, auth_provider: Optional[str] = None, stats_version: int = 1):
     """POST stats to the given url.
 
     :return: True if upload was successful, False otherwise.
@@ -396,7 +396,7 @@ class RunTracker(Subsystem):
       # TODO(benjy): The upload protocol currently requires separate top-level params, with JSON
       # values.  Probably better for there to be one top-level JSON value, namely json.dumps(stats).
       # But this will first require changing the upload receiver at every shop that uses this.
-      params = {k: cls._json_dump_options(v) for (k, v) in stats.items()}
+      params = {k: cls._json_dump_options(v) for (k, v) in stats.items()}  # type: ignore[assignment]
 
 
     # We can't simply let requests handle redirects, as we only allow them for specific codes:
@@ -428,11 +428,11 @@ class RunTracker(Subsystem):
       return error(f'Error: {e!r}')
 
   @classmethod
-  def _json_dump_options(cls, stats):
+  def _json_dump_options(cls, stats: dict) -> str:
     return json.dumps(stats, cls=RunTrackerOptionEncoder)
 
   @classmethod
-  def write_stats_to_json(cls, file_name, stats):
+  def write_stats_to_json(cls, file_name: str, stats: dict) -> None:
     """Write stats to a local json file."""
     params = cls._json_dump_options(stats)
     try:
@@ -449,7 +449,7 @@ class RunTracker(Subsystem):
       run_information['target_data'] = ast.literal_eval(target_data)
     return run_information
 
-  def _stats(self):
+  def _stats(self) -> dict:
     stats = {
       'run_info': self.run_information(),
       'artifact_cache_stats': self.artifact_cache_stats.get_all(),
@@ -462,7 +462,7 @@ class RunTracker(Subsystem):
     else:
       stats.update({
         'self_timings': self.self_timings.get_all(),
-        'critical_path_timings': self.get_critical_path_timings().get_all(),        
+        'critical_path_timings': self.get_critical_path_timings().get_all(),
         'outcomes': self.outcomes,
       })
     return stats
@@ -484,7 +484,7 @@ class RunTracker(Subsystem):
 
   _log_levels = [Report.ERROR, Report.ERROR, Report.WARN, Report.INFO, Report.INFO]
 
-  def has_ended(self):
+  def has_ended(self) -> bool:
     return self._end_memoized_result is not None
 
   def end(self):
@@ -617,7 +617,7 @@ class RunTracker(Subsystem):
     """
     SubprocPool.shutdown(self._aborted)
 
-  def _get_options_to_record(self):
+  def _get_options_to_record(self) -> dict:
     recorded_options = {}
     for scope in self.get_options().stats_option_scopes_to_record:
       scope_and_maybe_option = scope.split("^")
