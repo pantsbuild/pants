@@ -20,7 +20,9 @@ python_tests(
   dependencies = [
     'src/python/pants/backend/jvm/tasks/jvm_compile',
     'src/python/pants/backend/jvm/tasks:classpath_products',
+    'src/python/pants/backend/jvm/subsystems:jvm_platform',
     'src/python/pants/testutil/jvm:nailgun_task_test_base',
+    'src/python/pants/testutil/subsystem',
   ],
   tags = {"partially_type_checked"},
 )

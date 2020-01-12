@@ -10,3 +10,23 @@ python_library(
   ],
   tags = {"type_checked"},
 )
+
+python_tests(
+  name='integration',
+  sources=globs('*_integration_test.py'),
+  dependencies=[
+    'src/python/pants/backend/python/lint',
+    'src/python/pants/backend/python/lint/black',
+    'src/python/pants/backend/python/lint/isort',
+    'src/python/pants/backend/python/subsystems',
+    'src/python/pants/engine:fs',
+    'src/python/pants/engine:rules',
+    'src/python/pants/engine:selectors',
+    'src/python/pants/engine/legacy:structs',
+    'src/python/pants/rules/core',
+    'src/python/pants/source',
+    'src/python/pants/testutil:test_base',
+    'src/python/pants/testutil/subsystem',
+  ],
+  tags = {'integration'},
+)

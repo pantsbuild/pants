@@ -75,7 +75,7 @@ class MetaRename(Task):
   def dependency_graph(self, scope=''):
     dependency_graph = defaultdict(set)
 
-    for address in self.context.build_graph.inject_specs_closure([DescendantAddresses(scope)]):
+    for address in self.context.build_graph.inject_address_specs_closure([DescendantAddresses(scope)]):
       target = self.context.build_graph.get_target(address)
 
       for dependency in target.dependencies:

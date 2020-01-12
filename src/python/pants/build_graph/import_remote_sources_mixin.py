@@ -101,11 +101,11 @@ class ImportRemoteSourcesMixin(Target, metaclass=ABCMeta):
     return libs
 
   @classmethod
-  def compute_dependency_specs(cls, kwargs=None, payload=None):
+  def compute_dependency_address_specs(cls, kwargs=None, payload=None):
     """Tack imported_target_specs onto the traversable_specs generator for this target."""
-    for spec in super().compute_dependency_specs(kwargs, payload):
-      yield spec
+    for address_spec in super().compute_dependency_address_specs(kwargs, payload):
+      yield address_spec
 
     imported_target_specs = cls.imported_target_specs(kwargs=kwargs, payload=payload)
-    for spec in imported_target_specs:
-      yield spec
+    for address_spec in imported_target_specs:
+      yield address_spec

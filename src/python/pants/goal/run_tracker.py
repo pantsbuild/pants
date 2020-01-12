@@ -112,7 +112,7 @@ class RunTracker(Subsystem):
     self._run_timestamp = time.time()
     self._cmd_line = ' '.join(['pants'] + sys.argv[1:])
     self._sorted_goal_infos = tuple()
-    self._v2_console_rule_names = tuple()
+    self._v2_goal_rule_names = tuple()
 
     self.run_uuid = uuid.uuid4().hex
     # Select a globally unique ID for the run, that sorts by time.
@@ -184,8 +184,8 @@ class RunTracker(Subsystem):
   def set_sorted_goal_infos(self, sorted_goal_infos):
     self._sorted_goal_infos = sorted_goal_infos
 
-  def set_v2_console_rule_names(self, v2_console_rule_names):
-    self._v2_console_rule_names = v2_console_rule_names
+  def set_v2_goal_rule_names(self, v2_goal_rule_names):
+    self._v2_goal_rule_names = v2_goal_rule_names
 
   def register_thread(self, parent_workunit):
     """Register the parent workunit for all work in the calling thread.
@@ -527,7 +527,7 @@ class RunTracker(Subsystem):
     if self._sorted_goal_infos and self.run_info.get_info("computed_goals") is None:
       self.run_info.add_info(
         "computed_goals",
-        self._v2_console_rule_names + tuple(goal.goal.name for goal in self._sorted_goal_infos),
+        self._v2_goal_rule_names + tuple(goal.goal.name for goal in self._sorted_goal_infos),
         stringify=False,
         # If the goal is clean-all then the run info dir no longer exists, so ignore that error.
         ignore_errors=True,

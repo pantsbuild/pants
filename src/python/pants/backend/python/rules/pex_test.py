@@ -6,28 +6,22 @@ import os.path
 import zipfile
 from typing import Dict, Optional, cast
 
-from pants.backend.python.rules.download_pex_bin import download_pex_bin
+from pants.backend.python.rules import download_pex_bin
 from pants.backend.python.rules.pex import (
   CreatePex,
   Pex,
   PexInterpreterConstraints,
   PexRequirements,
-  create_pex,
 )
-from pants.backend.python.subsystems.python_native_code import (
-  PythonNativeCode,
-  create_pex_native_build_environment,
-)
+from pants.backend.python.rules.pex import rules as pex_rules
+from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.subsystems.python_setup import PythonSetup
-from pants.backend.python.subsystems.subprocess_environment import (
-  SubprocessEnvironment,
-  create_subprocess_encoding_environment,
-)
 from pants.engine.fs import Digest, DirectoryToMaterialize, FileContent, InputFilesContent
 from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
-from pants.testutil.subsystem.util import init_subsystems
+from pants.testutil.option.util import create_options_bootstrapper
+from pants.testutil.subsystem.util import init_subsystem
 from pants.testutil.test_base import TestBase
 from pants.util.strutil import create_path_env_var
 
@@ -36,25 +30,23 @@ class TestResolveRequirements(TestBase):
 
   @classmethod
   def rules(cls):
-    return super().rules() + [
-      create_pex,
-      create_pex_native_build_environment,
-      create_subprocess_encoding_environment,
-      download_pex_bin,
+    return (
+      *super().rules(),
+      *pex_rules(),
+      *download_pex_bin.rules(),
+      *python_native_code.rules(),
+      *subprocess_environment.rules(),
       RootRule(CreatePex),
-      RootRule(PythonSetup),
-      RootRule(PythonNativeCode),
-      RootRule(SubprocessEnvironment)
-    ]
+    )
 
-  def setUp(self):
-    super().setUp()
-    init_subsystems([PythonSetup, PythonNativeCode, SubprocessEnvironment])
-
-  def create_pex_and_get_all_data(self, *, requirements=PexRequirements(),
-      entry_point=None,
-      interpreter_constraints=PexInterpreterConstraints(),
-      input_files: Optional[Digest] = None) -> Dict:
+  def create_pex_and_get_all_data(
+    self,
+    *,
+    requirements=PexRequirements(),
+    entry_point=None,
+    interpreter_constraints=PexInterpreterConstraints(),
+    input_files: Optional[Digest] = None,
+  ) -> Dict:
     request = CreatePex(
       output_filename="test.pex",
       requirements=requirements,
@@ -65,10 +57,7 @@ class TestResolveRequirements(TestBase):
     requirements_pex = self.request_single_product(
       Pex,
       Params(
-        request,
-        PythonSetup.global_instance(),
-        SubprocessEnvironment.global_instance(),
-        PythonNativeCode.global_instance()
+        request, create_options_bootstrapper(args=["--backend-packages2=pants.backend.python"]),
       )
     )
     self.scheduler.materialize_directory(
@@ -91,7 +80,7 @@ class TestResolveRequirements(TestBase):
       input_files=input_files
     )['info'])
 
-  def test_generic_pex_creation(self) -> None:
+  def test_pex_execution(self) -> None:
     input_files_content = InputFilesContent((
       FileContent(path='main.py', content=b'print("from main")'),
       FileContent(path='subdir/sub.py', content=b'print("from sub")'),
@@ -105,12 +94,16 @@ class TestResolveRequirements(TestBase):
     self.assertTrue('main.py' in pex_files)
     self.assertTrue('subdir/sub.py' in pex_files)
 
+    init_subsystem(PythonSetup)
     python_setup = PythonSetup.global_instance()
     env = {"PATH": create_path_env_var(python_setup.interpreter_search_paths)}
 
-    pex = pex_output['pex']
-
-    req = ExecuteProcessRequest(argv=('python', 'test.pex'), env=env, input_files=pex.directory_digest, description="Run the pex and make sure it works")
+    req = ExecuteProcessRequest(
+      argv=('python', 'test.pex'),
+      env=env,
+      input_files=pex_output['pex'].directory_digest,
+      description="Run the pex and make sure it works",
+    )
     result = self.request_single_product(ExecuteProcessResult, req)
     self.assertEqual(result.stdout, b"from main\n")
 

@@ -10,15 +10,16 @@ from pants.base.specs import AddressSpec, AddressSpecs, DescendantAddresses, Sin
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.build_files import AddressProvenanceMap
-from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, Snapshot
+from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, Digest, FileContent, InputFilesContent, Snapshot
+from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
 from pants.engine.legacy.graph import HydratedTarget
 from pants.engine.legacy.structs import PythonBinaryAdaptor, PythonTestsAdaptor
 from pants.engine.rules import UnionMembership
 from pants.rules.core.test import (
-  AddressAndDebugResult,
+  AddressAndDebugRequest,
   AddressAndTestResult,
   Status,
-  TestDebugResult,
+  TestDebugRequest,
   TestResult,
   TestTarget,
   coordinator_of_tests,
@@ -35,13 +36,33 @@ class MockOptions:
 
 
 class TestTest(TestBase):
+  def make_ipr(self, content: bytes) -> InteractiveProcessRequest:
+    input_files_content = InputFilesContent((
+      FileContent(path='program.py', content=content, is_executable=True),
+    ))
+    digest = self.request_single_product(Digest, input_files_content)
+    return InteractiveProcessRequest(
+      argv=("/usr/bin/python", "program.py",),
+      run_in_workspace=False,
+      input_files=digest,
+    )
+
+  def make_successful_ipr(self) -> InteractiveProcessRequest:
+    content = b"import sys; sys.exit(0)"
+    return self.make_ipr(content)
+
+  def make_failure_ipr(self) -> InteractiveProcessRequest:
+    content = b"import sys; sys.exit(1)"
+    return self.make_ipr(content)
+
   def single_target_test(self, result, expected_console_output, success=True, debug=False):
     console = MockConsole(use_colors=False)
     options = MockOptions(debug=debug)
+    runner = InteractiveRunner(self.scheduler)
     addr = self.make_build_target_address("some/target")
     res = run_rule(
       run_tests,
-      rule_args=[console, options, BuildFileAddresses([addr])],
+      rule_args=[console, options, runner, BuildFileAddresses([addr])],
       mock_gets=[
         MockGet(
           product_type=AddressAndTestResult,
@@ -49,9 +70,9 @@ class TestTest(TestBase):
           mock=lambda _: AddressAndTestResult(addr, result),
         ),
         MockGet(
-          product_type=AddressAndDebugResult,
+          product_type=AddressAndDebugRequest,
           subject_type=Address,
-          mock=lambda _: AddressAndDebugResult(addr, TestDebugResult(exit_code=0 if success else 1))
+          mock=lambda _: AddressAndDebugRequest(addr, TestDebugRequest(ipr=self.make_successful_ipr() if success else self.make_failure_ipr()))
         ),
         MockGet(
           product_type=BuildFileAddress,
@@ -98,6 +119,7 @@ class TestTest(TestBase):
   def test_output_mixed(self):
     console = MockConsole(use_colors=False)
     options = MockOptions(debug=False)
+    runner = InteractiveRunner(self.scheduler)
     target1 = self.make_build_target_address("testprojects/tests/python/pants/passes")
     target2 = self.make_build_target_address("testprojects/tests/python/pants/fails")
 
@@ -110,16 +132,16 @@ class TestTest(TestBase):
         raise Exception("Unrecognised target")
       return AddressAndTestResult(target, tr)
 
-    def make_debug_result(target):
-      result = TestDebugResult(exit_code=0 if target == target1 else 1)
-      return AddressAndDebugResult(target, result)
+    def make_debug_request(target):
+      request = TestDebugRequest(ipr=self.make_successful_ipr() if target == target1 else self.make_failure_ipr())
+      return AddressAndDebugRequest(target, request)
 
     res = run_rule(
       run_tests,
-      rule_args=[console, options, (target1, target2)],
+      rule_args=[console, options, runner, (target1, target2)],
       mock_gets=[
         MockGet(product_type=AddressAndTestResult, subject_type=Address, mock=make_result),
-        MockGet(product_type=AddressAndDebugResult, subject_type=Address, mock=make_debug_result),
+        MockGet(product_type=AddressAndDebugRequest, subject_type=Address, mock=make_debug_request),
         MockGet(
           product_type=BuildFileAddress,
           subject_type=AddressSpecs,

@@ -7,11 +7,11 @@ from pants.engine.fs import Digest, FileContent, InputFilesContent, Workspace
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
 from pants.rules.core import run
 from pants.rules.core.binary import CreatedBinary
-from pants.testutil.console_rule_test_base import ConsoleRuleTestBase
 from pants.testutil.engine.util import MockConsole, MockGet, run_rule
+from pants.testutil.goal_rule_test_base import GoalRuleTestBase
 
 
-class RunTest(ConsoleRuleTestBase):
+class RunTest(GoalRuleTestBase):
   goal_cls = run.Run
 
   def create_mock_binary(self, program_text: bytes) -> CreatedBinary:

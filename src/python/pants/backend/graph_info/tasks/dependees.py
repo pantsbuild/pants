@@ -35,7 +35,7 @@ class ReverseDepmap(ConsoleTask):
 
   def console_output(self, _):
     dependees_by_target = defaultdict(set)
-    for address in self.context.build_graph.inject_specs_closure([DescendantAddresses('')]):
+    for address in self.context.build_graph.inject_address_specs_closure([DescendantAddresses('')]):
       target = self.context.build_graph.get_target(address)
       # TODO(John Sirois): tighten up the notion of targets written down in a BUILD by a
       # user vs. targets created by pants at runtime.

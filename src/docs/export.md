@@ -186,13 +186,13 @@ Definition of `modulizable_targets`:
 2. Computationally: dependees of target roots within the transitive context.
 
 For example, A -> B -> C -> D
-Given `./panst export-dep-as-jar A`,
+Given `./pants export-dep-as-jar A`,
 ```
 modulizable_targets = [A]
 libraries = [B,C,D]
 ```
 
-Given `./panst export-dep-as-jar A C`,
+Given `./pants export-dep-as-jar A C`,
  ```
 modulizable_targets = [A, B, C]
 libraries = [D]

@@ -123,7 +123,7 @@ class GoalRunnerFactory:
 class GoalRunner:
   """Lists installed goals or else executes a named goal.
 
-  NB: GoalRunner represents a v1-only codepath. v2 goals are registered via `@console_rule` and
+  NB: GoalRunner represents a v1-only codepath. v2 goals are registered via `@goal_rule` and
   the `pants.engine.goal.Goal` class.
   """
 

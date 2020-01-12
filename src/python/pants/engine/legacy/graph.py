@@ -7,7 +7,7 @@ from collections import defaultdict, deque
 from contextlib import contextmanager
 from dataclasses import dataclass
 from os.path import dirname
-from typing import Any, Iterable, Tuple
+from typing import Any, Dict, Iterable, List, Tuple
 
 from twitter.common.collections import OrderedSet
 
@@ -117,11 +117,11 @@ class LegacyBuildGraph(BuildGraph):
     self.apply_injectables(new_targets)
 
     for target in new_targets:
-      for spec in target.compute_dependency_specs(payload=target.payload):
-        inject(target, spec, is_dependency=True)
+      for address_spec in target.compute_dependency_address_specs(payload=target.payload):
+        inject(target, address_spec, is_dependency=True)
 
-      for spec in target.compute_injectable_specs(payload=target.payload):
-        inject(target, spec, is_dependency=False)
+      for address_spec in target.compute_injectable_address_specs(payload=target.payload):
+        inject(target, address_spec, is_dependency=False)
 
     # Inject all addresses, then declare injected dependencies.
     self.inject_addresses_closure(addresses_to_inject)
@@ -201,9 +201,9 @@ class LegacyBuildGraph(BuildGraph):
     for address in self._inject_address_specs(target_roots.specs):
       yield address
 
-  def inject_specs_closure(self, specs: Iterable[AddressSpec], fail_fast=None):
-    # Request loading of these specs.
-    for address in self._inject_address_specs(AddressSpecs(specs)):
+  def inject_address_specs_closure(self, address_specs: Iterable[AddressSpec], fail_fast=None):
+    # Request loading of these address specs.
+    for address in self._inject_address_specs(AddressSpecs(address_specs)):
       yield address
 
   def resolve_address(self, address):
@@ -239,18 +239,18 @@ class LegacyBuildGraph(BuildGraph):
         yielded_addresses.add(address)
         yield address
 
-  def _inject_address_specs(self, specs: AddressSpecs):
+  def _inject_address_specs(self, address_specs: AddressSpecs):
     """Injects targets into the graph for the given `AddressSpecs` object.
 
     Yields the resulting addresses.
     """
-    if not specs:
+    if not address_specs:
       return
 
-    logger.debug('Injecting specs to %s: %s', self, specs)
+    logger.debug('Injecting address specs to %s: %s', self, address_specs)
     with self._resolve_context():
       thts, = self._scheduler.product_request(TransitiveHydratedTargets,
-                                              [specs])
+                                              [address_specs])
 
     self._index(thts.closure)
 
@@ -317,7 +317,7 @@ class _DependentGraph:
     implicit_deps = (Address.parse(s,
                                    relative_to=target_adaptor.address.spec_path,
                                    subproject_roots=self._address_mapper.subproject_roots)
-                     for s in target_cls.compute_dependency_specs(kwargs=target_adaptor.kwargs()))
+                     for s in target_cls.compute_dependency_address_specs(kwargs=target_adaptor.kwargs()))
     for dep in declared_deps:
       self._dependent_address_map[dep].add(target_adaptor.address)
     for dep in implicit_deps:
@@ -387,6 +387,20 @@ class TransitiveHydratedTargets:
 
 class HydratedTargets(Collection[HydratedTarget]):
   """An intransitive set of HydratedTarget objects."""
+
+
+@dataclass(frozen=True)
+class TopologicallyOrderedTargets:
+  """A set of HydratedTargets, ordered topologically from least to most dependent.
+
+  That is if B depends on A then B follows A in the order.
+
+  Note that most rules won't need to consider target dependency order, as those dependencies
+  usually implicitly create corresponding rule graph dependencies and per-target rules will then
+  execute in the right order automatically. However there can be cases where it's still useful for
+  a single rule invocation to know about the order of multiple targets under its consideration.
+  """
+  hydrated_targets: HydratedTargets
 
 
 @dataclass(frozen=True)
@@ -488,6 +502,34 @@ async def transitive_hydrated_targets(
 async def transitive_hydrated_target(root: HydratedTarget) -> TransitiveHydratedTarget:
   dependencies = await MultiGet(Get[TransitiveHydratedTarget](Address, d) for d in root.dependencies)
   return TransitiveHydratedTarget(root, dependencies)
+
+
+@rule
+async def sort_targets(targets: HydratedTargets) -> TopologicallyOrderedTargets:
+  return TopologicallyOrderedTargets(HydratedTargets(topo_sort(tuple(targets))))
+
+
+def topo_sort(targets: Iterable[HydratedTarget]) -> Tuple[HydratedTarget, ...]:
+  """Sort the targets so that if B depends on A, B follows A in the order."""
+  visited: Dict[HydratedTarget, bool] = defaultdict(bool)
+  res: List[HydratedTarget] = []
+
+  def recursive_topo_sort(ht):
+    if visited[ht]:
+      return
+    visited[ht] = True
+    for dep in ht.dependencies:
+      recursive_topo_sort(dep)
+    res.append(ht)
+
+  for target in targets:
+    recursive_topo_sort(target)
+
+  # Note that if the input set is not transitively closed then res may contain targets
+  # that aren't in the input set.  We subtract those out here.
+  input_set = set(targets)
+  return tuple(tgt for tgt in res if tgt in input_set)
+
 
 
 @rule
@@ -594,5 +636,6 @@ def create_legacy_graph_tasks():
     find_owners,
     hydrate_sources,
     hydrate_bundles,
+    sort_targets,
     RootRule(OwnersRequest),
   ]

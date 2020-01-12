@@ -11,7 +11,7 @@ class ResolveJarsTestMixin:
   """Mixin for evaluating tasks which resolve their own source and javadoc jars (such as Export)."""
 
   def evaluate_subtask(self, targets, workdir, load_extra_confs, extra_args, expected_jars):
-    """Evaluate the underlying task with the given target specs.
+    """Evaluate the underlying task with the given address specs.
 
     :param targets: the list of targets.
     :param string workdir: the working directory to execute in.

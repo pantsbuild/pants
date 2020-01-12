@@ -283,18 +283,18 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     ).create().run()
 
   def _maybe_run_v2(self):
-    # N.B. For daemon runs, @console_rules are invoked pre-fork -
+    # N.B. For daemon runs, @goal_rules are invoked pre-fork -
     # so this path only serves the non-daemon run mode.
     if self._is_daemon:
       return PANTS_SUCCEEDED_EXIT_CODE
 
     _, ambiguous_goals, v2_goals = self._options.goals_by_version
     goals = v2_goals + (ambiguous_goals if self._global_options.v2 else tuple())
-    self._run_tracker.set_v2_console_rule_names(goals)
+    self._run_tracker.set_v2_goal_rule_names(goals)
     if not goals:
       return PANTS_SUCCEEDED_EXIT_CODE
 
-    return self._graph_session.run_console_rules(
+    return self._graph_session.run_goal_rules(
       self._options_bootstrapper,
       self._options,
       goals,
@@ -320,24 +320,24 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
   def _run(self):
     engine_result = PANTS_FAILED_EXIT_CODE
     goal_runner_result = PANTS_FAILED_EXIT_CODE
-    try:
-      self._maybe_handle_help()
 
-      streaming_handlers = self._options.for_global_scope().streaming_workunits_handlers
-      callbacks = Subsystem.get_streaming_workunit_callbacks(streaming_handlers)
-      streaming_reporter = StreamingWorkunitHandler(self._scheduler_session, callbacks=callbacks)
-      with streaming_reporter.session():
-        engine_result = self._maybe_run_v2()
+    streaming_handlers = self._options.for_global_scope().streaming_workunits_handlers
+    callbacks = Subsystem.get_streaming_workunit_callbacks(streaming_handlers)
+    streaming_reporter = StreamingWorkunitHandler(self._scheduler_session, callbacks=callbacks)
 
-      goal_runner_result = self._maybe_run_v1()
-    finally:
+    with streaming_reporter.session():
       try:
-        self._update_stats()
-        run_tracker_result = self._run_tracker.end()
-      except ValueError as e:
-        # Calling .end() sometimes writes to a closed file, so we return a dummy result here.
-        logger.exception(e)
-        run_tracker_result = PANTS_SUCCEEDED_EXIT_CODE
+        self._maybe_handle_help()
+        engine_result = self._maybe_run_v2()
+        goal_runner_result = self._maybe_run_v1()
+      finally:
+        try:
+          self._update_stats()
+          run_tracker_result = self._run_tracker.end()
+        except ValueError as e:
+          # Calling .end() sometimes writes to a closed file, so we return a dummy result here.
+          logger.exception(e)
+          run_tracker_result = PANTS_SUCCEEDED_EXIT_CODE
 
     final_exit_code = self._compute_final_exit_code(
       engine_result,

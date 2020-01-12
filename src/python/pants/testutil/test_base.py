@@ -92,7 +92,6 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
   """
 
   _scheduler: Optional[SchedulerSession] = None
-  _local_store_dir = None
   _build_graph = None
   _address_mapper = None
 
@@ -246,7 +245,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
 
     # TODO(John Sirois): This re-creates a little bit too much work done by the BuildGraph.
     # Fixup the BuildGraph to deal with non BuildFileAddresses better and just leverage it.
-    traversables = [target.compute_dependency_specs(payload=target.payload)]
+    traversables = [target.compute_dependency_address_specs(payload=target.payload)]
 
     for dependency_spec in itertools.chain(*traversables):
       dependency_address = Address.parse(dependency_spec, relative_to=address.spec_path)
@@ -350,19 +349,23 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
       self._build_graph.reset()
       self._scheduler.invalidate_all_files()
 
-  def aggressively_reset_scheduler(self):
-    self._scheduler = None
-    if self._local_store_dir is not None:
-      safe_rmtree(self._local_store_dir)
-
   @contextmanager
   def isolated_local_store(self):
-    self.aggressively_reset_scheduler()
-    self._init_engine()
+    """Temporarily use an anonymous, empty Store for the Scheduler.
+
+    In most cases we re-use a Store across all tests, since `file` and `directory` entries are
+    content addressed, and `process` entries are intended to have strong cache keys. But when
+    dealing with non-referentially transparent `process` executions, it can sometimes be necessary
+    to avoid this cache.
+    """
+    self._scheduler = None
+    local_store_dir = os.path.realpath(safe_mkdtemp())
+    self._init_engine(local_store_dir=local_store_dir)
     try:
       yield
     finally:
-      self.aggressively_reset_scheduler()
+      self._scheduler = None
+      safe_rmtree(local_store_dir)
 
   @property
   def build_root(self):
@@ -380,21 +383,21 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
   def _pants_workdir(self):
     return os.path.join(self._build_root(), '.pants.d')
 
-  def _init_engine(self) -> None:
+  def _init_engine(self, local_store_dir: Optional[str] = None) -> None:
     if self._scheduler is not None:
       return
 
-    self._local_store_dir = os.path.realpath(safe_mkdtemp())
-    safe_mkdir(self._local_store_dir)
+    options_bootstrapper = OptionsBootstrapper.create(args=['--pants-config-files=[]'])
+    local_store_dir = local_store_dir or options_bootstrapper.bootstrap_options.for_global_scope().local_store_dir
 
     # NB: This uses the long form of initialization because it needs to directly specify
     # `cls.alias_groups` rather than having them be provided by bootstrap options.
     graph_session = EngineInitializer.setup_legacy_graph_extended(
       pants_ignore_patterns=None,
-      local_store_dir=self._local_store_dir,
+      local_store_dir=local_store_dir,
       build_file_imports_behavior='allow',
       native=init_native(),
-      options_bootstrapper=OptionsBootstrapper.create(args=['--pants-config-files=[]']),
+      options_bootstrapper=options_bootstrapper,
       build_root=self.build_root,
       build_configuration=self.build_config(),
       build_ignore_patterns=None,
@@ -554,7 +557,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     self.build_graph.inject_address_closure(address)
     return self.build_graph.get_target(address)
 
-  def targets(self, spec):
+  def targets(self, address_spec):
     """Resolves a target spec to one or more Target objects.
 
     :API: public
@@ -565,9 +568,9 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     Returns the set of all Targets found.
     """
 
-    spec = CmdLineSpecParser(self.build_root).parse_address_spec(spec)
+    address_spec = CmdLineSpecParser(self.build_root).parse_address_spec(address_spec)
     targets = []
-    for address in self.build_graph.inject_specs_closure([spec]):
+    for address in self.build_graph.inject_address_specs_closure([address_spec]):
       targets.append(self.build_graph.get_target(address))
     return targets
 
@@ -762,10 +765,10 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     target_dict = {}
 
     # Create a target from each specification and insert it into `target_dict`.
-    for target_spec, target_kwargs in target_map.items():
+    for address_spec, target_kwargs in target_map.items():
       unprocessed_kwargs = target_kwargs.copy()
 
-      target_base = Address.parse(target_spec).spec_path
+      target_base = Address.parse(address_spec).spec_path
 
       # Populate the target's owned files from the specification.
       filemap = unprocessed_kwargs.pop('filemap', {})
@@ -776,7 +779,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
       # Ensure any dependencies exist in the target dict (`target_map` must then be an
       # OrderedDict).
       # The 'key' is used to access the target in `target_dict`, and defaults to `target_spec`.
-      target_address = Address.parse(target_spec)
+      target_address = Address.parse(address_spec)
       key = unprocessed_kwargs.pop('key', target_address.target_name)
       dep_targets = []
       for dep_spec in unprocessed_kwargs.pop('dependencies', []):
@@ -785,7 +788,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
 
       # Register the generated target.
       generated_target = self.make_target(
-        spec=target_spec, dependencies=dep_targets, **unprocessed_kwargs)
+        spec=address_spec, dependencies=dep_targets, **unprocessed_kwargs)
       target_dict[key] = generated_target
 
     return target_dict

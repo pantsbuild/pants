@@ -22,6 +22,13 @@ from pants.util.memo import memoized
 from pants.util.meta import frozen_after_init
 
 
+def side_effecting(cls):
+  """Annotates a class to indicate that it is a side-effecting type, which needs
+  to be handled specially with respect to rule caching semantics."""
+  cls.__side_effecting = True
+  return cls
+
+
 class _RuleVisitor(ast.NodeVisitor):
   """Pull `Get` calls out of an @rule body."""
 
@@ -75,8 +82,11 @@ def _get_starting_indent(source):
 
 
 def _make_rule(
-  return_type: Type, parameter_types: typing.Iterable[Type], cacheable: bool = True,
-  name: Optional[bool] = None
+  return_type: Type,
+  parameter_types: typing.Iterable[Type],
+  *,
+  cacheable: bool = True,
+  name: Optional[str] = None
 ) -> Callable[[Callable], Callable]:
   """A @decorator that declares that a particular static function may be used as a TaskRule.
 
@@ -90,12 +100,12 @@ def _make_rule(
                     its inputs.
   """
 
-  is_goal_cls = issubclass(return_type, Goal)
-  if is_goal_cls == cacheable:
-    raise TypeError(
-      'An `@rule` that produces a `Goal` must be declared with @console_rule in order to signal '
-      'that it is not cacheable.'
-    )
+  has_goal_return_type = issubclass(return_type, Goal)
+  if cacheable and has_goal_return_type:
+    raise TypeError("An `@rule` that returns a `Goal` must instead be declared with `@goal_rule`.")
+  if not cacheable and not has_goal_return_type:
+    raise TypeError("An `@goal_rule` must return a subclass of `engine.goal.Goal`.")
+  is_goal_cls = has_goal_return_type
 
   def wrapper(func):
     if not inspect.isfunction(func):
@@ -137,7 +147,7 @@ def _make_rule(
       Get.create_statically_for_rule_graph(resolve_type(p), resolve_type(s))
       for p, s in rule_visitor.gets)
 
-    # Register dependencies for @console_rule/Goal.
+    # Register dependencies for @goal_rule/Goal.
     dependency_rules = (subsystem_rule(return_type.subsystem_cls),) if is_goal_cls else None
 
     # Set a default name for Goal classes if one is not explicitly provided
@@ -193,7 +203,7 @@ def _ensure_type_annotation(
 
 PUBLIC_RULE_DECORATOR_ARGUMENTS = {'name'}
 # We don't want @rule-writers to use 'cacheable' as a kwarg directly, but rather
-# set it implicitly based on whether the rule annotation is @rule or @console_rule.
+# set it implicitly based on whether the rule annotation is @rule or @goal_rule.
 # So we leave it out of PUBLIC_RULE_DECORATOR_ARGUMENTS.
 IMPLICIT_PRIVATE_RULE_DECORATOR_ARGUMENTS = {'cacheable'}
 
@@ -207,13 +217,13 @@ def rule_decorator(*args, **kwargs) -> Callable:
 
   if len(set(kwargs) - PUBLIC_RULE_DECORATOR_ARGUMENTS - IMPLICIT_PRIVATE_RULE_DECORATOR_ARGUMENTS) != 0:
     raise UnrecognizedRuleArgument(
-      f"`@rule`s and `@console_rule`s only accept the following keyword arguments: {PUBLIC_RULE_DECORATOR_ARGUMENTS}"
+      f"`@rule`s and `@goal_rule`s only accept the following keyword arguments: {PUBLIC_RULE_DECORATOR_ARGUMENTS}"
     )
 
   func = args[0]
 
   cacheable: bool = kwargs['cacheable']
-  name = kwargs.get('name')
+  name: Optional[str] = kwargs.get('name')
 
   signature = inspect.signature(func)
   func_id = f'@rule {func.__module__}:{func.__name__}'
@@ -232,7 +242,15 @@ def rule_decorator(*args, **kwargs) -> Callable:
     )
     for name, parameter in signature.parameters.items()
   )
+  validate_parameter_types(func_id, parameter_types, cacheable)
   return _make_rule(return_type, parameter_types, cacheable=cacheable, name=name)(func)
+
+
+def validate_parameter_types(func_id: str, parameter_types: Tuple[Type, ...], cacheable: bool) -> None:
+  if cacheable:
+    for ty in parameter_types:
+      if getattr(ty, "__side_effecting", False):
+        raise ValueError(f"Non-console `@rule` {func_id} has a side-effecting parameter: {ty}")
 
 
 def inner_rule(*args, **kwargs) -> Callable:
@@ -248,7 +266,7 @@ def rule(*args, **kwargs) -> Callable:
   return inner_rule(*args, **kwargs, cacheable=True)
 
 
-def console_rule(*args, **kwargs) -> Callable:
+def goal_rule(*args, **kwargs) -> Callable:
   return inner_rule(*args, **kwargs, cacheable=False)
 
 

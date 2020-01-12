@@ -7,7 +7,7 @@ from pants.base.specs import AddressSpecs
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
-from pants.engine.rules import console_rule
+from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get
 
 
@@ -29,7 +29,7 @@ class DependenciesOptions(LineOriented, GoalSubsystem):
 class Dependencies(Goal):
   subsystem_cls = DependenciesOptions
 
-@console_rule
+@goal_rule
 async def dependencies(
   console: Console, address_specs: AddressSpecs, options: DependenciesOptions,
 ) -> Dependencies:

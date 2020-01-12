@@ -13,7 +13,7 @@ from pants.engine.fs import Digest, FilesContent
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.legacy.graph import HydratedTarget, HydratedTargets
 from pants.engine.objects import Collection
-from pants.engine.rules import console_rule, rule, subsystem_rule
+from pants.engine.rules import goal_rule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method
@@ -217,7 +217,7 @@ class MultiMatcher:
 
 # TODO: Switch this to `lint` once we figure out a good way for v1 tasks and v2 rules
 # to share goal names.
-@console_rule
+@goal_rule
 async def validate(
   console: Console, hydrated_targets: HydratedTargets, validate_options: ValidateOptions
 ) -> Validate:

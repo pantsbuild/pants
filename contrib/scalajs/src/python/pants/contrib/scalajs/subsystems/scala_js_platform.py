@@ -24,7 +24,7 @@ class ScalaJSPlatform(InjectablesMixin, Subsystem, NodeResolverBase):
     # TODO: revisit after https://rbcommons.com/s/twitter/r/3225/
     register('--runtime', advanced=True, type=list, member_type=target_option,
              default=['//:scala-js-library'],
-             help='Target specs pointing to the scala-js runtime libraries.')
+             help='Address specs pointing to the scala-js runtime libraries.')
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -53,7 +53,7 @@ class ScalaJSPlatform(InjectablesMixin, Subsystem, NodeResolverBase):
       json.dump(package, fp, indent=2)
 
   @property
-  def injectables_spec_mapping(self):
+  def injectables_address_spec_mapping(self):
     return {
       'runtime': self.get_options().runtime,
     }

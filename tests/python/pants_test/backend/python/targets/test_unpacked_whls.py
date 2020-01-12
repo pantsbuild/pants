@@ -34,7 +34,7 @@ class UnpackedWheelsTest(TestBase):
     target = self.make_target(':foo', UnpackedWheels, libraries=[':import_whls'], module_name='foo')
 
     self.assertIsInstance(target, UnpackedWheels)
-    dependency_specs = [spec for spec in target.compute_dependency_specs(payload=target.payload)]
+    dependency_specs = [spec for spec in target.compute_dependency_address_specs(payload=target.payload)]
     self.assertSequenceEqual([':import_whls'], dependency_specs)
     import_whl_dep = assert_single_element(target.all_imported_requirements)
     self.assertIsInstance(import_whl_dep, PythonRequirement)
