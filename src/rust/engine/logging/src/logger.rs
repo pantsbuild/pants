@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use crate::PythonLogLevel;
+
 use chrono;
 use futures01::task_local;
 use lazy_static::lazy_static;
@@ -16,7 +17,7 @@ use std::io::{stderr, Stderr, Write};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use ui::EngineDisplay;
+use ui::{stdio, EngineDisplay};
 use uuid::Uuid;
 
 const TIME_FORMAT_STR: &str = "%H:%M:%S";
@@ -25,9 +26,17 @@ lazy_static! {
   pub static ref LOGGER: Logger = Logger::new();
 }
 
+///
+/// An Engine specific Logger that supports writing to multiple destinations, all of which are
+/// optional:
+///   1) The pantsd log file.
+///   2) stderr (NB: which is currently a singleton, but which should likely be thread/task local:
+///      see `lib.rs` in this crate).
+///   3) one or more EngineDisplays.
+///
 pub struct Logger {
   pantsd_log: Mutex<MaybeWriteLogger<File>>,
-  stderr_log: Mutex<MaybeWriteLogger<Stderr>>,
+  stderr_log: Mutex<MaybeWriteLogger<stdio::PausableStdioWriter<'static, Stderr>>>,
   show_rust_3rdparty_logs: AtomicBool,
   engine_display_handles: Mutex<HashMap<Uuid, Arc<Mutex<EngineDisplay>>>>,
 }
@@ -67,7 +76,7 @@ impl Logger {
     python_level.try_into().map(|level: PythonLogLevel| {
       self.maybe_increase_global_verbosity(level.into());
       *self.stderr_log.lock() = MaybeWriteLogger::new(
-        stderr(),
+        stdio::PausableStdioWriter::new(stderr()),
         level.into(),
         self.show_rust_3rdparty_logs.load(Ordering::SeqCst),
       )
@@ -166,6 +175,9 @@ impl Log for Logger {
   }
 }
 
+///
+/// An optional-present logger (ie: using it may be a noop).
+///
 struct MaybeWriteLogger<W: Write + Send + 'static> {
   level: LevelFilter,
   show_rust_3rdparty_logs: bool,

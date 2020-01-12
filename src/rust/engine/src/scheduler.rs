@@ -132,14 +132,14 @@ impl Session {
 
   pub fn with_console_ui_disabled<F: FnOnce() -> T, T>(&self, f: F) -> T {
     if let Some(display) = self.maybe_display() {
-      {
+      let guard = {
         let mut d = display.lock();
         d.suspend()
-      }
+      };
       let output = f();
       {
         let mut d = display.lock();
-        d.unsuspend();
+        d.unsuspend(guard);
       }
       output
     } else {

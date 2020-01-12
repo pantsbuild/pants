@@ -25,12 +25,16 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
+pub mod stdio;
+
+use crate::stdio::{StdioAccess, STDIO_ACCESS};
+
+use futures::future::Future;
+use futures_locks;
 use termion;
 
 use std::collections::{BTreeMap, VecDeque};
-use std::io::Read;
-use std::io::Write;
-use std::io::{stdout, Result, Stdout};
+use std::io::{self, stdout, Stdout, Write, Read};
 
 use termion::raw::IntoRawMode;
 use termion::raw::RawTerminal;
@@ -67,6 +71,10 @@ pub struct EngineDisplay {
   divider: String,
   padding: String,
   terminal: Console,
+  // While an EngineDisplay is running (and not suspended), it holds a lock on stdio, which will force
+  // StdioAccess-aware codepaths to either buffer or block until the EngineDisplay is suspended or
+  // finished.
+  stdio_access: Option<futures_locks::MutexGuard<StdioAccess>>,
   action_map: BTreeMap<String, String>,
   logs: VecDeque<String>,
   printable_msgs: VecDeque<PrintableMsg>,
@@ -86,6 +94,7 @@ impl EngineDisplay {
       divider: "▵".to_string(),
       padding: " ".repeat(indent_level.into()),
       terminal: Console::Uninitialized,
+      stdio_access: None,
       action_map: BTreeMap::new(),
       // This is arbitrary based on a guesstimated peak terminal row size for modern displays.
       // The reason this can't be capped to e.g. the starting size is because of resizing - we
@@ -134,7 +143,7 @@ impl EngineDisplay {
     });
   }
 
-  fn start_raw_mode(&mut self) -> Result<()> {
+  fn start_raw_mode(&mut self) -> io::Result<()> {
     match self.terminal {
       Console::Terminal(ref mut t) => t.activate_raw_mode(),
       _ => Ok(()),
@@ -171,7 +180,7 @@ impl EngineDisplay {
   }
 
   // Flush terminal output.
-  fn flush(&mut self) -> Result<()> {
+  fn flush(&mut self) -> io::Result<()> {
     match self.terminal {
       Console::Terminal(ref mut t) => t.flush(),
       Console::Pipe(ref mut p) => p.flush(),
@@ -180,7 +189,7 @@ impl EngineDisplay {
   }
 
   // Writes output to the terminal.
-  fn write(&mut self, msg: &str) -> Result<usize> {
+  fn write(&mut self, msg: &str) -> io::Result<usize> {
     let res = match self.terminal {
       Console::Terminal(ref mut t) => t.write(msg.as_bytes()),
       Console::Pipe(ref mut p) => p.write(msg.as_bytes()),
@@ -318,7 +327,16 @@ impl EngineDisplay {
   }
 
   // Starts the EngineDisplay at the current cursor position.
+  //
+  // TODO: This blocks on a future to acquire stdout: avoiding that and exposing a Future would
+  // require the Display to be passed between yield points, so would require either:
+  // 1) async/await
+  // 2) changing EngineDisplay to be threadsafe
   pub fn start(&mut self) {
+    if self.stdio_access.is_some() {
+      panic!("stdio is already acquired, and should not be acquired reentrantly.");
+    }
+    self.stdio_access = Some(STDIO_ACCESS.lock().wait().unwrap());
     let write_handle = termion::screen::AlternateScreen::from(stdout());
     self.terminal = match write_handle.into_raw_mode() {
       Ok(t) => Console::Terminal(t),
@@ -362,14 +380,19 @@ impl EngineDisplay {
     self.action_map.len()
   }
 
-  pub fn suspend(&mut self) {
+  pub fn suspend(&mut self) -> futures_locks::MutexGuard<StdioAccess> {
     {
       self.terminal = Console::Uninitialized;
     }
     println!("{}", termion::cursor::Show);
+    self
+      .stdio_access
+      .take()
+      .expect("The Console should never operate without the lock on stdio.")
   }
 
-  pub fn unsuspend(&mut self) {
+  pub fn unsuspend(&mut self, stdio_access: futures_locks::MutexGuard<StdioAccess>) {
+    self.stdio_access = Some(stdio_access);
     let write_handle = termion::screen::AlternateScreen::from(stdout());
     self.terminal = match write_handle.into_raw_mode() {
       Ok(t) => Console::Terminal(t),
@@ -397,5 +420,9 @@ impl EngineDisplay {
         PrintableMsgOutput::Stderr => eprint!("{}", msg),
       }
     }
+    self.stdio_access = None
   }
 }
+
+#[cfg(test)]
+mod tests;
