@@ -32,7 +32,7 @@ def python_interpreter_path(version):
   :rtype: string
   """
   try:
-    command = ['python{}'.format(version), '-c', 'import sys; print(sys.executable)']
+    command = [f'python{version}', '-c', 'import sys; print(sys.executable)']
     py_path = subprocess.check_output(command).decode().strip()
     return os.path.realpath(py_path)
   except (subprocess.CalledProcessError, FileNotFoundError):
@@ -46,7 +46,7 @@ def skip_unless_all_pythons_present(*versions):
   """
   missing_versions = [v for v in versions if not has_python_version(v)]
   if len(missing_versions) == 1:
-    return skipIf(True, 'Could not find python {} on system. Skipping.'.format(missing_versions[0]))
+    return skipIf(True, f'Could not find python {missing_versions[0]} on system. Skipping.')
   elif len(missing_versions) > 1:
     return skipIf(True,
                   'Skipping due to the following missing required pythons: {}'

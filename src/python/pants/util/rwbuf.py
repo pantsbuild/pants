@@ -30,7 +30,7 @@ class _RWBuf(object):
 
   def write(self, s):
     if not isinstance(s, bytes):
-      raise ValueError('Expected bytes, not {}, for argument {}'.format(type(s), s))
+      raise ValueError(f'Expected bytes, not {type(s)}, for argument {s}')
     with self._lock:
       self.do_write(s)
       self._io.flush()
@@ -96,7 +96,7 @@ class StringWriter:
 
   def write(self, s):
     if not isinstance(s, str):
-      raise ValueError('Expected unicode str, not {}, for argument {}'.format(type(s), s))
+      raise ValueError(f'Expected unicode str, not {type(s)}, for argument {s}')
     self.buffer.write(s.encode())
 
   def flush(self):

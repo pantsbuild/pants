@@ -28,6 +28,6 @@ def setup_pexrc_with_pex_python_path(interpreter_paths):
       os.symlink(cache_dir, target)
 
       with open(os.path.join(home, '.pexrc'), 'w') as pexrc:
-        pexrc.write('PEX_PYTHON_PATH={}'.format(':'.join(interpreter_paths)))
+        pexrc.write(f"PEX_PYTHON_PATH={':'.join(interpreter_paths)}")
 
       yield

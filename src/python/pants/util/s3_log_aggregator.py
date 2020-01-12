@@ -55,7 +55,7 @@ class S3LogAccumulator:
       print(heading)
       print('=' * len(heading))
       for key, measure in data[0:n]:
-        print('{} {} {}'.format(measure.count, self._prettyprint_bytes(measure.bytes), key))
+        print(f'{measure.count} {self._prettyprint_bytes(measure.bytes)} {key}')
     do_print('Paths by count:', self.get_paths_sorted_by_count())
     do_print('Paths by bytes:', self.get_paths_sorted_by_bytes())
     do_print('IPs by count:', self.get_ips_sorted_by_count())

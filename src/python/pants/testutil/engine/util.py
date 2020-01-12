@@ -70,7 +70,7 @@ def run_rule(
 
   task_rule = getattr(rule, 'rule', None)
   if task_rule is None:
-    raise TypeError('Expected to receive a decorated `@rule`; got: {}'.format(rule))
+    raise TypeError(f'Expected to receive a decorated `@rule`; got: {rule}')
 
   if rule_args is not None and len(rule_args) != len(task_rule.input_selectors):
     raise ValueError('Rule expected to receive arguments of the form: {}; got: {}'.format(

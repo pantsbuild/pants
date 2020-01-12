@@ -471,7 +471,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
       # contextmanager that yields its results while the tmpdir workdir is still active and change
       # this test back to using an un-archived bundle.
       with temporary_dir() as workdir:
-        ZIP.extract('dist/{bundle_name}.zip'.format(bundle_name=bundle_name), workdir)
+        ZIP.extract(f'dist/{bundle_name}.zip', workdir)
         if expected_bundle_content:
           self.assertTrue(contains_exact_files(workdir, expected_bundle_content))
         if expected_bundle_jar_content:
