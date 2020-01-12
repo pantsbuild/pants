@@ -396,7 +396,7 @@ class RunTracker(Subsystem):
       # TODO(benjy): The upload protocol currently requires separate top-level params, with JSON
       # values.  Probably better for there to be one top-level JSON value, namely json.dumps(stats).
       # But this will first require changing the upload receiver at every shop that uses this.
-      params = {k: cls._json_dump_options(v) for (k, v) in stats.items()}
+      params = {k: cls._json_dump_options(v) for (k, v) in stats.items()}  # type: ignore[assignment]
 
 
     # We can't simply let requests handle redirects, as we only allow them for specific codes:
@@ -441,7 +441,7 @@ class RunTracker(Subsystem):
       print(f'WARNING: Failed to write stats to {file_name} due to Error: {e!r}',
             file=sys.stderr)
 
-  def run_information(self) -> dict:
+  def run_information(self):
     """Basic information about this run."""
     run_information = self.run_info.get_as_dict()
     target_data = run_information.get('target_data', None)
