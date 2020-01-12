@@ -35,8 +35,14 @@ function remove_venv() {
 }
 
 function create_venv() {
+  if command -v "${PY}" >/dev/null; then
+    PY="$(command -v "${PY}")"
+    log "Using python at ${PY}"
+  else
+    die "No ${PY} interpreter found on the path. Python will not work!"
+  fi
   remove_venv
-  "${REPO_ROOT}/build-support/virtualenv" "$(venv_dir)"
+  "${PY}" -m venv "$(venv_dir)"
 }
 
 function ensure_gcc() {
