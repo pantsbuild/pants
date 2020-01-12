@@ -77,7 +77,7 @@ class PailgunHandler(PailgunHandlerBase):
     # (e.g. [list', '::'] -> ['./pants', 'list', '::']).
     arguments.insert(0, './pants')
 
-    self.logger.info('handling pailgun request: `{}`'.format(' '.join(arguments)))
+    self.logger.info(f"handling pailgun request: `{' '.join(arguments)}`")
     self.logger.debug('pailgun request environment: %s', environment)
 
     # Execute the requested command with optional daemon-side profiling.
@@ -86,7 +86,7 @@ class PailgunHandler(PailgunHandlerBase):
 
     # NB: This represents the end of pantsd's involvement in the request, but the request will
     # continue to run post-fork.
-    self.logger.info('pailgun request completed: `{}`'.format(' '.join(arguments)))
+    self.logger.info(f"pailgun request completed: `{' '.join(arguments)}`")
 
   def handle_error(self, exc=None):
     """Error handler for failed calls to handle()."""
@@ -252,7 +252,7 @@ class PailgunServer(ThreadingMixIn, TCPServer):
     @contextmanager
     def yield_and_release(time_waited):
       try:
-        self.logger.debug("request lock acquired {}.".format("on the first try" if time_waited == 0 else "in {} seconds".format(time_waited)))
+        self.logger.debug(f"request lock acquired {('on the first try' if time_waited == 0 else f'in {time_waited} seconds')}.")
         yield
       finally:
         self.free_to_handle_request_lock.release()
@@ -260,7 +260,7 @@ class PailgunServer(ThreadingMixIn, TCPServer):
 
     time_polled = 0.0
     user_notification_interval = 5.0 # Stop polling to notify the user every second.
-    self.logger.debug("request {} is trying to acquire the request lock.".format(request))
+    self.logger.debug(f"request {request} is trying to acquire the request lock.")
 
     # NB: Optimistically try to acquire the lock without blocking, in case we are the only request being handled.
     # This could be merged into the `while` loop below, but separating this special case for logging helps.
@@ -268,7 +268,7 @@ class PailgunServer(ThreadingMixIn, TCPServer):
       with yield_and_release(time_polled):
         yield
     else:
-      self.logger.debug("request {} didn't acquire the lock on the first try, polling...".format(request))
+      self.logger.debug(f"request {request} didn't acquire the lock on the first try, polling...")
       # We have to wait for another request to finish being handled.
       self._send_stderr(request, "Another pants invocation is running. "
                                  "Will wait {} for it to finish before giving up.\n".format(
@@ -281,7 +281,7 @@ class PailgunServer(ThreadingMixIn, TCPServer):
       while not self.free_to_handle_request_lock.acquire(timeout=user_notification_interval):
         time_polled += user_notification_interval
         if self._should_keep_polling(timeout, time_polled):
-          self._send_stderr(request, "Waiting for invocation to finish (waited for {}s so far)...\n".format(time_polled))
+          self._send_stderr(request, f"Waiting for invocation to finish (waited for {time_polled}s so far)...\n")
         else: # We have timed out.
           raise ExclusiveRequestTimeout("Timed out while waiting for another pants invocation to finish.")
       with yield_and_release(time_polled):
@@ -302,11 +302,11 @@ class PailgunServer(ThreadingMixIn, TCPServer):
         self.request_complete_callback()
     except BrokenPipeError as e:
       # The client has closed the connection, most likely from a SIGINT
-      self.logger.error("Request {} abruptly closed with {}, probably because the client crashed or was sent a SIGINT.".format(request, type(e)))
+      self.logger.error(f"Request {request} abruptly closed with {type(e)}, probably because the client crashed or was sent a SIGINT.")
     except Exception as e:
       # If that fails, (synchronously) handle the error with the error handler sans-fork.
       try:
-        self.logger.error("Request {} errored with {}({})".format(request, type(e), e))
+        self.logger.error(f"Request {request} errored with {type(e)}({e!r})")
         handler.handle_error(e)
       finally:
         # Shutdown the socket since we don't expect a fork() in the exception context.
