@@ -106,7 +106,7 @@ class TaskTestBase(TestBase):
     :param options_scope: The scope to give options on the generated task type.
     :return: A pair (type, options_scope)
     """
-    subclass_name = 'test_{0}_{1}'.format(task_type.__name__, options_scope)
+    subclass_name = f'test_{task_type.__name__}_{options_scope}'
     return type(subclass_name, (task_type,), {'_stable_name': task_type._compute_stable_name(),
                                               'options_scope': options_scope})
 
@@ -141,7 +141,7 @@ class TaskTestBase(TestBase):
                                    cache is non-zero.
     """
     with temporary_dir() as artifact_cache:
-      self.set_options_for_scope('cache.{}'.format(self.options_scope),
+      self.set_options_for_scope(f'cache.{self.options_scope}',
                                  write_to=[artifact_cache])
 
       yield
@@ -194,7 +194,7 @@ class ConsoleTaskTestBase(TaskTestBase):
 
     task_type = self.task_type()
     assert issubclass(task_type, ConsoleTask), \
-        'task_type() must return a ConsoleTask subclass, got %s' % task_type
+        f'task_type() must return a ConsoleTask subclass, got {task_type}'
 
   def execute_task(self, targets=None, options=None):
     """Creates a new task and executes it with the given config, command line args and targets.
@@ -332,7 +332,7 @@ class DeclarativeTaskTestMixin:
   @memoized_method
   def _synthesize_task_types(self, task_types=()):
     return [
-      self.synthesize_task_subtype(tsk, '__tmp_{}'.format(tsk.__name__))
+      self.synthesize_task_subtype(tsk, f'__tmp_{tsk.__name__}')
       # TODO(#7127): make @memoized_method convert lists to tuples for hashing!
       for tsk in task_types
     ]

@@ -238,7 +238,7 @@ def safe_file(path: str, suffix: Optional[str] = None, cleanup: bool = True) -> 
   :param suffix: Use this suffix to create the copy. Otherwise use a random string.
   :param cleanup: Whether or not to clean up the copy.
   """
-  safe_path = '{}.{}'.format(path, suffix or uuid.uuid4())
+  safe_path = f'{path}.{(suffix or uuid.uuid4())}'
   if os.path.exists(path):
     shutil.copy(path, safe_path)
   try:
@@ -287,7 +287,7 @@ def open_zip(path_or_file: Union[str, Any], *args, **kwargs) -> Iterator[zipfile
     zf = zipfile.ZipFile(path_or_file, *args, **kwargs)
   except zipfile.BadZipfile as bze:
     # Use the realpath in order to follow symlinks back to the problem source file.
-    raise zipfile.BadZipfile("Bad Zipfile {}: {}".format(os.path.realpath(path_or_file), bze))
+    raise zipfile.BadZipfile(f"Bad Zipfile {os.path.realpath(path_or_file)}: {bze}")
   try:
     yield zf
   finally:

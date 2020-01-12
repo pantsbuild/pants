@@ -73,8 +73,7 @@ def safe_kill(pid: Pid, signum: int) -> None:
     if e.errno in [errno.ESRCH, errno.EPERM]:
       pass
     elif e.errno == errno.EINVAL:
-      raise ValueError("Invalid signal number {}: {}"
-                       .format(signum, e),
+      raise ValueError(f"Invalid signal number {signum}: {e}",
                        e)
     else:
       raise

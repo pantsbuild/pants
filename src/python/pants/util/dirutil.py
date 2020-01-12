@@ -50,7 +50,7 @@ def fast_relpath(path: str, start: str) -> str:
   """A prefix-based relpath, with no normalization or support for returning `..`."""
   relpath = fast_relpath_optional(path, start)
   if relpath is None:
-    raise ValueError('{} is not a directory containing {}'.format(start, path))
+    raise ValueError(f'{start} is not a directory containing {path}')
   return relpath
 
 
@@ -427,7 +427,7 @@ def safe_concurrent_creation(target_path: str) -> Iterator[str]:
   :yields: A temporary path containing the original path with a unique (uuid4) suffix.
   """
   safe_mkdir_for(target_path)
-  tmp_path = '{}.tmp.{}'.format(target_path, uuid.uuid4().hex)
+  tmp_path = f'{target_path}.tmp.{uuid.uuid4().hex}'
   try:
     yield tmp_path
   except Exception:
@@ -460,11 +460,11 @@ def absolute_symlink(source_path: str, target_path: str) -> None:
   :raises OSError on failure UNLESS file already exists or no such file/directory
   """
   if not os.path.isabs(source_path):
-    raise ValueError("Path for source : {} must be absolute".format(source_path))
+    raise ValueError(f"Path for source : {source_path} must be absolute")
   if not os.path.isabs(target_path):
-    raise ValueError("Path for link : {} must be absolute".format(target_path))
+    raise ValueError(f"Path for link : {target_path} must be absolute")
   if source_path == target_path:
-    raise ValueError("Path for link is identical to source : {}".format(source_path))
+    raise ValueError(f"Path for link is identical to source : {source_path}")
   try:
     if os.path.lexists(target_path):
       if os.path.islink(target_path) or os.path.isfile(target_path):
@@ -488,15 +488,15 @@ def relative_symlink(source_path: str, link_path: str) -> None:
   :raises OSError on failure UNLESS file already exists or no such file/directory
   """
   if not os.path.isabs(source_path):
-    raise ValueError("Path for source:{} must be absolute".format(source_path))
+    raise ValueError(f"Path for source:{source_path} must be absolute")
   if not os.path.isabs(link_path):
-    raise ValueError("Path for link:{} must be absolute".format(link_path))
+    raise ValueError(f"Path for link:{link_path} must be absolute")
   if source_path == link_path:
-    raise ValueError("Path for link is identical to source:{}".format(source_path))
+    raise ValueError(f"Path for link is identical to source:{source_path}")
   # The failure state below had a long life as an uncaught error. No behavior was changed here, it just adds a catch.
   # Raising an exception does differ from absolute_symlink, which takes the liberty of deleting existing directories.
   if os.path.isdir(link_path) and not os.path.islink(link_path):
-    raise ValueError("Path for link would overwrite an existing directory: {}".format(link_path))
+    raise ValueError(f"Path for link would overwrite an existing directory: {link_path}")
   try:
     if os.path.lexists(link_path):
       os.unlink(link_path)
@@ -601,7 +601,7 @@ def rm_rf(name: str) -> None:
 
 def split_basename_and_dirname(path: str) -> Tuple[str, str]:
   if not os.path.isfile(path):
-    raise ValueError("{} does not exist or is not a regular file.".format(path))
+    raise ValueError(f"{path} does not exist or is not a regular file.")
   return os.path.dirname(path), os.path.basename(path)
 
 
@@ -611,10 +611,10 @@ def check_no_overlapping_paths(paths: Iterable[str]) -> None:
     list_copy_without_path = list(paths)
     list_copy_without_path.remove(path)
     if path in list_copy_without_path:
-      raise ValueError('{} appeared more than once. All paths must be unique.'.format(path))
+      raise ValueError(f'{path} appeared more than once. All paths must be unique.')
     for p in list_copy_without_path:
       if path in p:
-        raise ValueError('{} and {} have the same prefix. All paths must be unique and cannot overlap.'.format(path, p))
+        raise ValueError(f'{path} and {p} have the same prefix. All paths must be unique and cannot overlap.')
 
 
 def is_executable(path: str) -> bool:

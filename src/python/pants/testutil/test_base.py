@@ -79,9 +79,9 @@ class AbstractTestGenerator(ABC):
                             as its first parameter for instance method binding.
     """
     assert not hasattr(cls, method_name), (
-      'a test with name `{}` already exists on `{}`!'.format(method_name, cls.__name__)
+      f'a test with name `{method_name}` already exists on `{cls.__name__}`!'
     )
-    assert method_name.startswith('test_'), '{} is not a valid test name!'.format(method_name)
+    assert method_name.startswith('test_'), f'{method_name} is not a valid test name!'
     setattr(cls, method_name, method)
 
 
@@ -263,7 +263,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
 
   def sources_for(self, package_relative_path_globs, package_dir=''):
     sources_field = SourcesField(
-      Address.parse('{}:_bogus_target_for_test'.format(package_dir)),
+      Address.parse(f'{package_dir}:_bogus_target_for_test'),
       'sources',
       {'globs': package_relative_path_globs},
       None,
@@ -608,7 +608,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
                    dependencies=('dependencies=%s,' % kwargs.get('dependencies')
                               if 'dependencies' in kwargs else ''),
                    )))
-    return self.target('%s:%s' % (path, name))
+    return self.target(f'{path}:{name}')
 
   def create_resources(self, path, name, *sources):
     """
@@ -639,7 +639,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
 
     with open(file_path, 'r') as f:
       content = f.read()
-      self.assertIn(string, content, '"{}" is not in the file {}:\n{}'.format(string, f.name, content))
+      self.assertIn(string, content, f'"{string}" is not in the file {f.name}:\n{content}')
 
   @contextmanager
   def assertRaisesWithMessage(self, exception_type, error_text):
@@ -698,7 +698,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
       self._records.append(record)
 
     def _messages_for_level(self, levelname):
-      return ['{}: {}'.format(record.name, record.getMessage())
+      return [f'{record.name}: {record.getMessage()}'
               for record in self._records if record.levelname == levelname]
 
     def infos(self):

@@ -12,7 +12,7 @@ def ensure_binary(text_or_binary: Union[bytes, str]) -> bytes:
   elif isinstance(text_or_binary, str):
     return text_or_binary.encode('utf8')
   else:
-    raise TypeError('Argument is neither text nor binary type.({})'.format(type(text_or_binary)))
+    raise TypeError(f'Argument is neither text nor binary type.({type(text_or_binary)})')
 
 
 def ensure_text(text_or_binary: Union[bytes, str]) -> str:
@@ -21,7 +21,7 @@ def ensure_text(text_or_binary: Union[bytes, str]) -> str:
   elif isinstance(text_or_binary, str):
     return text_or_binary
   else:
-    raise TypeError('Argument is neither text nor binary type ({})'.format(type(text_or_binary)))
+    raise TypeError(f'Argument is neither text nor binary type ({type(text_or_binary)})')
 
 
 def is_text_or_binary(obj: Any) -> bool:
@@ -108,7 +108,7 @@ def pluralize(count: int, item_type: str) -> str:
     else:
       return x + 's'
 
-  text = '{} {}'.format(count, item_type if count == 1 else pluralize_string(item_type))
+  text = f'{count} {(item_type if count == 1 else pluralize_string(item_type))}'
   return text
 
 

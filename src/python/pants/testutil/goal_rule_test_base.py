@@ -33,7 +33,7 @@ class GoalRuleTestBase(TestBase):
     super().setUp()
 
     if not issubclass(self.goal_cls, Goal):
-      raise AssertionError('goal_cls() must return a Goal subclass, got {}'.format(self.goal_cls))
+      raise AssertionError(f'goal_cls() must return a Goal subclass, got {self.goal_cls}')
 
   def execute_rule(
     self,

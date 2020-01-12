@@ -61,7 +61,7 @@ class JvmToolTaskTestBase(JvmTaskTestBase):
     self.set_options_for_scope(bootstrap_scope,
                                execution_strategy=NailgunTask.ExecutionStrategy.subprocess,
                                jvm_options=['-Xmx128m'])
-    self.set_options_for_scope('cache.{}'.format(bootstrap_scope),
+    self.set_options_for_scope(f'cache.{bootstrap_scope}',
                                read_from=artifact_caches,
                                write_to=artifact_caches)
 

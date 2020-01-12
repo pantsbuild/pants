@@ -85,7 +85,7 @@ class TypeOnlyConstraint(TypeConstraint):
       type_list = types[0].__name__
     else:
       type_list = ' or '.join(t.__name__ for t in types)
-    description = '{}({})'.format(type(self).__name__, type_list)
+    description = f'{type(self).__name__}({type_list})'
 
     super().__init__(description=description)
 
@@ -116,9 +116,7 @@ class TypeOnlyConstraint(TypeConstraint):
 
   def __repr__(self):
     constrained_type = ', '.join(t.__name__ for t in self._types)
-    return ('{type_constraint_type}({constrained_type})'
-      .format(type_constraint_type=type(self).__name__,
-              constrained_type=constrained_type))
+    return (f'{type(self).__name__}({constrained_type})')
 
 
 class SuperclassesOf(TypeOnlyConstraint):

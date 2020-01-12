@@ -42,7 +42,7 @@ def init_subsystems(subsystem_types, options=None):
   optionables = set()
   for s in subsystem_types:
     if not Subsystem.is_subsystem_type(s):
-      raise TypeError('{} is not a subclass of `Subsystem`'.format(s))
+      raise TypeError(f'{s} is not a subclass of `Subsystem`')
     for si in s.known_scope_infos():
       optionables.add(si.optionable_cls)
   if options:
