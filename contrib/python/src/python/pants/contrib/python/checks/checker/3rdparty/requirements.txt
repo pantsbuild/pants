@@ -2,5 +2,5 @@
 # dependencies here.
 
 six>=1.9.0,<2
-pycodestyle==2.4.0
+pycodestyle==2.5.0
 pyflakes==2.1.1
