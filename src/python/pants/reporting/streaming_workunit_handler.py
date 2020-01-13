@@ -40,7 +40,7 @@ class StreamingWorkunitHandler:
       self.start()
       yield
       self.end()
-    except Exception as e:
+    except BaseException as e:
       if self._thread_runner:
         self._thread_runner.join()
       raise e
