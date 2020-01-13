@@ -502,13 +502,13 @@ def run_integration_tests_v1(*, shard: Optional[str]) -> None:
       start_message="Running integration tests via V1 no-chroot strategy.",
       die_message="Integration test failure (V1 no-chroot)",
     )
-  if target_sets.v1_chroot:
-    _run_command(
-      command=TestStrategy.v1_chroot.pants_command(targets=target_sets.v1_chroot, shard=shard),
-      slug="IntegrationTestsV1Chroot",
-      start_message="Running integration tests via V1 chroot strategy.",
-      die_message="Integration test failure (V1 chroot)",
-    )
+  # if target_sets.v1_chroot:
+  #   _run_command(
+  #     command=TestStrategy.v1_chroot.pants_command(targets=target_sets.v1_chroot, shard=shard),
+  #     slug="IntegrationTestsV1Chroot",
+  #     start_message="Running integration tests via V1 chroot strategy.",
+  #     die_message="Integration test failure (V1 chroot)",
+  #   )
 
 
 def run_integration_tests_v2(*, oauth_token_path: Optional[str] = None) -> None:
