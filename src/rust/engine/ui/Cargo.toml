@@ -4,13 +4,6 @@ version = "0.0.1"
 edition = "2018"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 
-[lib]
-path = "src/display.rs"
-
-[[bin]]
-name = "demo"
-path = "src/main.rs"
-
 [dependencies]
 rand = "0.5.1"
 termion = "1.5.5"
