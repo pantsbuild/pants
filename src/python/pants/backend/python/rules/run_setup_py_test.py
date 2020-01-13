@@ -3,12 +3,14 @@
 
 import json
 import textwrap
-from typing import Iterable, Type
+from typing import Iterable, Optional, Type
 
 import pytest
 
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.python_requirement import PythonRequirement
+from pants.backend.python.rules import download_pex_bin
+from pants.backend.python.rules.pex import rules as pex_rules
 from pants.backend.python.rules.run_setup_py import (
   AmbiguousOwnerError,
   AncestorInitPyFiles,
@@ -20,6 +22,7 @@ from pants.backend.python.rules.run_setup_py import (
   NoOwnerError,
   OwnedDependencies,
   OwnedDependency,
+  PythonVersion,
   SetupPyChroot,
   SetupPyChrootRequest,
   SetupPySources,
@@ -28,10 +31,15 @@ from pants.backend.python.rules.run_setup_py import (
   get_ancestor_init_py,
   get_exporting_owner,
   get_owned_dependencies,
+  get_python_version,
   get_requirements,
+  get_snapshot_subset,
   get_sources,
   validate_args,
 )
+from pants.backend.python.subsystems import python_native_code, subprocess_environment
+from pants.backend.python.subsystems.python_setup import PythonSetup
+from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.fs import Snapshot
@@ -41,8 +49,17 @@ from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Params
 from pants.rules.core.strip_source_root import strip_source_root
 from pants.source.source_root import SourceRootConfig
+from pants.testutil.interpreter_selection_utils import (
+  skip_unless_python3_present,
+  skip_unless_python27_present,
+  skip_unless_python36_present,
+)
+from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.subsystem.util import init_subsystem
 from pants.testutil.test_base import TestBase
+
+
+_namespace_decl = "__import__('pkg_resources').declare_namespace(__name__)"
 
 
 class TestSetupPyBase(TestBase):
@@ -58,12 +75,53 @@ class TestSetupPyBase(TestBase):
     return self.request_single_product(HydratedTarget, Params(Address.parse(addr)))
 
 
+class TestGetPythonVersion(TestSetupPyBase):
+  @classmethod
+  def rules(cls):
+    return super().rules() + [
+      get_python_version,
+      *pex_rules(),
+      *download_pex_bin.rules(),
+      *python_native_code.rules(),
+      *subprocess_environment.rules(),
+      RootRule(PythonSetup),
+      RootRule(SubprocessEncodingEnvironment),
+      RootRule(HydratedTargets)
+    ]
+
+  def _do_test(self, compatibility: str,
+               expected_major: int, expected_minor: Optional[int]) -> None:
+    init_subsystem(PythonSetup)
+    self.create_file('src/python/foo/BUILD', textwrap.dedent(f"""
+      python_library(compatibility=['{compatibility}'])
+    """))
+    python_version = self.request_single_product(
+      PythonVersion,
+      Params(HydratedTargets([self.tgt('src/python/foo')]), create_options_bootstrapper()))
+    assert python_version.major == expected_major
+    if expected_minor:
+      assert python_version.minor == expected_minor
+
+  @skip_unless_python27_present
+  def test_get_version_27(self) -> None:
+    self._do_test('CPython>=2.7,<3', 2, 7)
+
+  @skip_unless_python36_present
+  def test_get_version_36(self) -> None:
+    self._do_test('CPython>=3.6,<3.7', 3, 6)
+
+  @skip_unless_python3_present
+  def test_get_version_3(self) -> None:
+    self._do_test('CPython>=3', 3, None)
+
+
 class TestGenerateChroot(TestSetupPyBase):
   @classmethod
   def rules(cls):
     return super().rules() + [
       generate_chroot,
       get_sources,
+      get_snapshot_subset,
       get_requirements,
       strip_source_root,
       get_ancestor_init_py,
@@ -76,7 +134,7 @@ class TestGenerateChroot(TestSetupPyBase):
   def assert_chroot(self, expected_files, expected_setup_kwargs, addr):
     chroot = self.request_single_product(
       SetupPyChroot,
-      Params(SetupPyChrootRequest(ExportedTarget(self.tgt(addr))),
+      Params(SetupPyChrootRequest(ExportedTarget(self.tgt(addr)), py2=False),
              SourceRootConfig.global_instance()))
     snapshot = self.request_single_product(Snapshot, Params(chroot.digest))
     assert sorted(expected_files) == sorted(snapshot.files)
@@ -87,7 +145,7 @@ class TestGenerateChroot(TestSetupPyBase):
     with pytest.raises(ExecutionError) as excinfo:
       self.request_single_product(
         SetupPyChroot,
-        Params(SetupPyChrootRequest(ExportedTarget(self.tgt(addr))),
+        Params(SetupPyChrootRequest(ExportedTarget(self.tgt(addr)), py2=False),
                SourceRootConfig.global_instance()))
     ex = excinfo.value
     assert len(ex.wrapped_exceptions) == 1
@@ -112,17 +170,18 @@ class TestGenerateChroot(TestSetupPyBase):
                      provides=setup_py(name='foo', version='1.2.3').with_binaries(
                        foo_main='src/python/foo/qux:bin'))
     """))
+    self.create_file('src/python/foo/__init__.py', _namespace_decl)
     self.create_file('src/python/foo/foo.py', '')
     self.assert_chroot(
       ['src/foo/qux/__init__.py', 'src/foo/qux/qux.py', 'src/foo/resources/js/code.js',
-       'src/foo/foo.py', 'setup.py', 'MANIFEST.in'],
+       'src/foo/__init__.py', 'src/foo/foo.py', 'setup.py', 'MANIFEST.in'],
       {
         'name': 'foo',
         'version': '1.2.3',
         'package_dir': {'': 'src'},
-        'packages': ['foo', 'foo.qux', 'foo.resources'],
-        'namespace_packages': ['foo', 'foo.resources'],
-        'package_data': {'foo.resources': ['js/code.js']},
+        'packages': ['foo', 'foo.qux'],
+        'namespace_packages': ['foo'],
+        'package_data': {'foo': ['resources/js/code.js']},
         'install_requires': ['baz==1.1.1'],
         'entry_points': {'console_scripts': ['foo_main=foo.qux.bin']}
       },
@@ -154,6 +213,7 @@ class TestGetSources(TestSetupPyBase):
   def rules(cls):
     return super().rules() + [
       get_sources,
+      get_snapshot_subset,
       strip_source_root,
       get_ancestor_init_py,
       RootRule(SetupPySourcesRequest),
@@ -164,7 +224,7 @@ class TestGetSources(TestSetupPyBase):
                      expected_package_data, addrs):
     srcs = self.request_single_product(
       SetupPySources,
-      Params(SetupPySourcesRequest(HydratedTargets([self.tgt(addr) for addr in addrs])),
+      Params(SetupPySourcesRequest(HydratedTargets([self.tgt(addr) for addr in addrs]), py2=False),
              SourceRootConfig.global_instance()))
     chroot_snapshot = self.request_single_product(Snapshot, Params(srcs.digest))
 
@@ -181,33 +241,31 @@ class TestGetSources(TestSetupPyBase):
     """))
     self.create_file('src/python/foo/bar/baz/baz1.py', '')
     self.create_file('src/python/foo/bar/baz/baz2.py', '')
-    self.create_file('src/python/foo/bar/__init__.py', '')
+    self.create_file('src/python/foo/bar/__init__.py', _namespace_decl)
     self.create_file('src/python/foo/qux/BUILD', 'python_library()')
     self.create_file('src/python/foo/qux/__init__.py', '')
     self.create_file('src/python/foo/qux/qux.py', '')
     self.create_file('src/python/foo/resources/BUILD', 'resources(sources=["js/code.js"])')
     self.create_file('src/python/foo/resources/js/code.js', '')
-    self.create_file('resources/BUILD', 'resources(sources=["css/style.css"])')
-    self.create_file('resources/css/style.css', '')
     self.create_file('src/python/foo/__init__.py', '')
 
     self.assert_sources(
       expected_files=['foo/bar/baz/baz1.py', 'foo/bar/__init__.py', 'foo/__init__.py'],
-      expected_packages=['foo.bar.baz'],
-      expected_namespace_packages=['foo.bar.baz'],
+      expected_packages=['foo', 'foo.bar', 'foo.bar.baz'],
+      expected_namespace_packages=['foo.bar'],
       expected_package_data={},
       addrs=['src/python/foo/bar/baz:baz1'])
 
     self.assert_sources(
       expected_files=['foo/bar/baz/baz2.py', 'foo/bar/__init__.py', 'foo/__init__.py'],
-      expected_packages=['foo.bar.baz'],
-      expected_namespace_packages=['foo.bar.baz'],
+      expected_packages=['foo', 'foo.bar', 'foo.bar.baz'],
+      expected_namespace_packages=['foo.bar'],
       expected_package_data={},
       addrs=['src/python/foo/bar/baz:baz2'])
 
     self.assert_sources(
       expected_files=['foo/qux/qux.py', 'foo/qux/__init__.py', 'foo/__init__.py'],
-      expected_packages=['foo.qux'],
+      expected_packages=['foo', 'foo.qux'],
       expected_namespace_packages=[],
       expected_package_data={},
       addrs=['src/python/foo/qux'])
@@ -215,22 +273,21 @@ class TestGetSources(TestSetupPyBase):
     self.assert_sources(
       expected_files= ['foo/bar/baz/baz1.py', 'foo/bar/__init__.py',
                        'foo/qux/qux.py', 'foo/qux/__init__.py', 'foo/__init__.py',
-                       'foo/resources/js/code.js', 'css/style.css'],
-      expected_packages=['foo.bar.baz', 'foo.qux', 'foo.resources'],
-      expected_namespace_packages=['foo.bar.baz', 'foo.resources'],
-      expected_package_data={'foo.resources': ('js/code.js',), '': ('css/style.css',)},
-      addrs=['src/python/foo/bar/baz:baz1', 'src/python/foo/qux', 'src/python/foo/resources',
-             'resources'])
+                       'foo/resources/js/code.js'],
+      expected_packages=['foo', 'foo.bar', 'foo.bar.baz', 'foo.qux'],
+      expected_namespace_packages=['foo.bar'],
+      expected_package_data={'foo': ('resources/js/code.js',)},
+      addrs=['src/python/foo/bar/baz:baz1', 'src/python/foo/qux', 'src/python/foo/resources'])
 
     self.assert_sources(
       expected_files=['foo/bar/baz/baz1.py', 'foo/bar/baz/baz2.py',
                       'foo/bar/__init__.py', 'foo/qux/qux.py', 'foo/qux/__init__.py',
-                      'foo/__init__.py', 'foo/resources/js/code.js', 'css/style.css'],
-      expected_packages=['foo.bar.baz', 'foo.qux', 'foo.resources'],
-      expected_namespace_packages=['foo.bar.baz', 'foo.resources'],
-      expected_package_data={'foo.resources': ('js/code.js',), '': ('css/style.css',)},
+                      'foo/__init__.py', 'foo/resources/js/code.js'],
+      expected_packages=['foo', 'foo.bar', 'foo.bar.baz', 'foo.qux'],
+      expected_namespace_packages=['foo.bar'],
+      expected_package_data={'foo': ('resources/js/code.js',)},
       addrs=['src/python/foo/bar/baz:baz1', 'src/python/foo/bar/baz:baz2', 'src/python/foo/qux',
-             'src/python/foo/resources', 'resources'])
+             'src/python/foo/resources'])
 
 
 class TestGetRequirements(TestSetupPyBase):

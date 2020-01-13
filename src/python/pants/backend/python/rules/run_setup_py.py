@@ -34,9 +34,11 @@ from pants.engine.fs import (
   DirectoryWithPrefixToAdd,
   DirectoryWithPrefixToStrip,
   FileContent,
+  FilesContent,
   InputFilesContent,
   PathGlobs,
   Snapshot,
+  SnapshotSubset,
   Workspace,
 )
 from pants.engine.goal import Goal, GoalSubsystem
@@ -133,8 +135,15 @@ class AncestorInitPyFiles:
 
 
 @dataclass(frozen=True)
+class PythonVersion:
+  major: int
+  minor: int
+
+
+@dataclass(frozen=True)
 class SetupPySourcesRequest:
   hydrated_targets: HydratedTargets
+  py2: bool  # Whether to use py2 or py3 package semantics.
 
 
 @dataclass(frozen=True)
@@ -154,7 +163,7 @@ class SetupPySources:
 class SetupPyChrootRequest:
   """A request to create a chroot containing a setup.py and the sources it operates on."""
   exported_target: ExportedTarget
-  py2: bool = False  # Whether to use py2 or py3 namespace package semantics.
+  py2: bool  # Whether to use py2 or py3 package semantics.
 
 
 @dataclass(frozen=True)
@@ -230,7 +239,8 @@ def validate_args(args: Tuple[str, ...]):
 
 @goal_rule
 async def run_setup_pys(targets: HydratedTargets, options: SetupPyOptions, console: Console,
-                        provenance_map: AddressProvenanceMap,
+                        provenance_map: AddressProvenanceMap, python_setup: PythonSetup,
+                        subprocess_encoding_environment: SubprocessEncodingEnvironment,
                         distdir: DistDir, workspace: Workspace) -> SetupPy:
   """Run setup.py commands on all exported targets addressed."""
   args = tuple(options.values.args)
@@ -261,9 +271,11 @@ async def run_setup_pys(targets: HydratedTargets, options: SetupPyOptions, conso
     )
     exported_targets = list(set(owners))
 
-  chroots = await MultiGet(Get[SetupPyChroot](SetupPyChrootRequest(target))
-                           for target in exported_targets)
+  python_version = await Get[PythonVersion](HydratedTargets, targets)
+  chroots = await MultiGet(Get[SetupPyChroot](
+    SetupPyChrootRequest(target, py2=python_version.major == 2)) for target in exported_targets)
 
+  # If args were provided, run setup.py with them; Otherwise just dump chroots.
   if args:
     setup_py_results = await MultiGet(
       Get[RunSetupPyResult](RunSetupPyRequest(exported_target, chroot, tuple(args)))
@@ -272,7 +284,7 @@ async def run_setup_pys(targets: HydratedTargets, options: SetupPyOptions, conso
 
     for exported_target, setup_py_result in zip(exported_targets, setup_py_results):
       addr = exported_target.hydrated_target.address.reference()
-      console.print_stderr(f'Writing contents of dist dir for {addr} to {distdir.relpath}')
+      console.print_stderr(f'Writing dist for {addr} under {distdir.relpath}/.')
       workspace.materialize_directory(
         DirectoryToMaterialize(setup_py_result.output, path_prefix=str(distdir.relpath))
       )
@@ -288,6 +300,28 @@ async def run_setup_pys(targets: HydratedTargets, options: SetupPyOptions, conso
       )
 
   return SetupPy(0)
+
+
+@rule
+async def get_python_version(
+    targets: HydratedTargets, python_setup: PythonSetup,
+    subprocess_encoding_environment: SubprocessEncodingEnvironment) -> PythonVersion:
+  """Get the Python version for the given targets."""
+  py_version_pex: Pex = await Get[Pex](CreatePex(
+    output_filename='python_version.pex',
+    interpreter_constraints=PexInterpreterConstraints.create_from_adaptors(
+      tuple(t.adaptor for t in targets), python_setup)))
+  py_version_request = py_version_pex.create_execute_request(
+    python_setup=python_setup,
+    subprocess_encoding_environment=subprocess_encoding_environment,
+    pex_path="./python_version.pex",
+    pex_args=('-c', 'import sys; print(sys.version_info.major); print(sys.version_info.minor)'),
+    description='Check Python interpreter version.',
+    input_files=py_version_pex.directory_digest
+  )
+  py_version_result = await Get[ExecuteProcessResult](ExecuteProcessRequest, py_version_request)
+  major_str, minor_str = py_version_result.stdout.decode().strip().split()
+  return PythonVersion(int(major_str.strip()), int(minor_str.strip()))
 
 
 # We write .py sources into the chroot under this dir.
@@ -341,15 +375,9 @@ async def run_setup_py(
 
 @rule
 async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
-  if request.py2:
-    # TODO: Implement Python 2 support.  This will involve, among other things: merging ancestor
-    # __init__.py files into the chroot, detecting packages based on the presence of __init__.py,
-    # and inspecting all __init__.py files for the namespace package incantation.
-    raise UnsupportedPythonVersion('Running setup.py commands not supported for Python 2.')
-
   owned_deps = await Get[OwnedDependencies](DependencyOwner(request.exported_target))
   targets = HydratedTargets(od.hydrated_target for od in owned_deps)
-  sources = await Get[SetupPySources](SetupPySourcesRequest(targets))
+  sources = await Get[SetupPySources](SetupPySourcesRequest(targets, py2=request.py2))
   requirements = await Get[ExportedTargetRequirements](DependencyOwner(request.exported_target))
 
   # Nest the sources under the src/ prefix.
@@ -413,10 +441,32 @@ async def get_sources(request: SetupPySourcesRequest,
   sources_digest = await Get[Digest](
     DirectoriesToMerge(directories=tuple([*stripped_srcs_digests, *ancestor_init_pys.digests])))
   sources_snapshot = await Get[Snapshot](Digest, sources_digest)
+  init_pys_digest = await Get[Digest](SnapshotSubset(
+    sources_digest,
+    include_files=tuple(f for f in sources_snapshot.files if os.path.basename(f) == '__init__.py'),
+    include_dirs=tuple()))
+  init_py_contents = await Get[FilesContent](Digest, init_pys_digest)
+
   packages, namespace_packages, package_data = find_packages(
-    source_root_config.get_source_roots(), zip(targets, stripped_srcs_list), sources_snapshot)
+    source_roots=source_root_config.get_source_roots(),
+    tgts_and_stripped_srcs=list(zip(targets, stripped_srcs_list)),
+    init_py_contents=init_py_contents,
+    py2=request.py2)
   return SetupPySources(digest=sources_digest, packages=packages,
                         namespace_packages=namespace_packages, package_data=package_data)
+
+
+@rule
+async def get_snapshot_subset(snapshot_subset: SnapshotSubset) -> Digest:
+  # TODO: This is a HACK to compute a SnapshotSubset. Should be replaced with an intrinsic.
+  ep_result = await Get[ExecuteProcessResult](ExecuteProcessRequest(
+    argv=('/usr/bin/true',),
+    description='Create snapshot subset',
+    input_files=snapshot_subset.directory_digest,
+    output_files=snapshot_subset.include_files,
+    output_directories=snapshot_subset.include_dirs
+  ))
+  return ep_result.output_directory_digest
 
 
 @rule
@@ -590,7 +640,9 @@ def rules():
     run_setup_pys,
     run_setup_py,
     generate_chroot,
+    get_python_version,
     get_sources,
+    get_snapshot_subset,
     get_requirements,
     get_ancestor_init_py,
     get_owned_dependencies,
