@@ -38,9 +38,12 @@ use std::convert::TryFrom;
 use std::iter::{FromIterator, Iterator};
 use std::path::PathBuf;
 use std::process::exit;
+use std::sync::Arc;
 use std::time::Duration;
 use store::{BackoffConfig, Store};
 use tokio::runtime::Runtime;
+
+use ui::stdio::NoStdioHolder;
 use workunit_store::WorkUnitStore;
 
 /// A binary which takes args of format:
@@ -190,6 +193,15 @@ fn main() {
               .help("Whether or not to enable running the process through a Nailgun server.\
                         This will likely start a new Nailgun server as a side effect.")
       )
+      .arg(
+          Arg::with_name("foreground")
+              .long("foreground")
+              .takes_value(true)
+              .required(false)
+              .default_value("false")
+              .help("Whether to stream stdout/stderr from the process, and allow stdin. A\
+                        Foreground process is required to run locally.")
+      )
     .setting(AppSettings::TrailingVarArg)
     .arg(
       Arg::with_name("argv")
@@ -324,6 +336,7 @@ fn main() {
     .value_of("working-directory")
     .map(|path| RelativePath::new(path).expect("working-directory must be a relative path"));
   let is_nailgunnable: bool = args.value_of("use-nailgun").unwrap().parse().unwrap();
+  let foreground: bool = args.value_of("foreground").unwrap().parse().unwrap();
 
   let request = process_execution::ExecuteProcessRequest {
     argv,
@@ -340,6 +353,7 @@ fn main() {
     target_platform: Platform::try_from(&args.value_of("target-platform").unwrap().to_string())
       .expect("invalid value for `target-platform"),
     is_nailgunnable,
+    foreground,
   };
 
   let runner: Box<dyn process_execution::CommandRunner> = match server_arg {
@@ -389,7 +403,7 @@ fn main() {
   let mut runtime = Runtime::new().unwrap();
 
   let result = runtime
-    .block_on(runner.run(request.into(), Context::default()))
+    .block_on(runner.run(request.into(), empty_context()))
     .expect("Error executing");
 
   if let Some(output) = args.value_of("materialize-output-to").map(PathBuf::from) {
@@ -401,6 +415,14 @@ fn main() {
   print!("{}", String::from_utf8(result.stdout.to_vec()).unwrap());
   eprint!("{}", String::from_utf8(result.stderr.to_vec()).unwrap());
   exit(result.exit_code);
+}
+
+fn empty_context() -> Context {
+  Context {
+    workunit_store: WorkUnitStore::default(),
+    build_id: String::default(),
+    stdio_holder: Arc::new(NoStdioHolder),
+  }
 }
 
 fn collection_from_keyvalues<'a, It, Col>(keyvalues: It) -> Col

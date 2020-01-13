@@ -677,6 +677,7 @@ dependencies = [
  "fnv 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "fs 0.0.1",
  "futures 0.1.29 (registry+https://github.com/rust-lang/crates.io-index)",
+ "futures-locks 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "graph 0.0.1",
  "hashing 0.0.1",
  "indexmap 1.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -718,6 +719,7 @@ dependencies = [
  "store 0.1.0",
  "tar_api 0.0.1",
  "tempfile 3.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ui 0.0.1",
  "walkdir 2.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "workunit_store 0.0.1",
 ]
@@ -2024,6 +2026,7 @@ dependencies = [
  "tokio-codec 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-process 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-timer 0.2.13 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ui 0.0.1",
  "uname 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "walkdir 2.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "workunit_store 0.0.1",
@@ -2040,6 +2043,7 @@ dependencies = [
  "store 0.1.0",
  "task_executor 0.0.1",
  "tokio 0.1.22 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ui 0.0.1",
  "workunit_store 0.0.1",
 ]
 

@@ -87,6 +87,7 @@ concrete_time = { path = "concrete_time" }
 fnv = "1.0.5"
 fs = { path = "fs" }
 futures01 = { package = "futures", version = "0.1" }
+futures-locks = "0.5"
 graph = { path = "graph" }
 hashing = { path = "hashing" }
 indexmap = "1.0.2"

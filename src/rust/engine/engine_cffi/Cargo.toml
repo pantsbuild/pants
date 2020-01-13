@@ -18,6 +18,7 @@ rule_graph = { path = "../rule_graph" }
 store = { path = "../fs/store" }
 tar_api = { path = "../tar_api" }
 tempfile = "3"
+ui = { path = "../ui" }
 workunit_store = { path = "../workunit_store" }
 
 [build-dependencies]

@@ -9,6 +9,7 @@ use std::sync::{mpsc, Arc};
 use std::time::Duration;
 
 use futures01::future::{self, Future};
+use futures_locks;
 
 use crate::context::{Context, Core};
 use crate::core::{Failure, Params, TypeId, Value};
@@ -19,6 +20,7 @@ use indexmap::IndexMap;
 use log::{debug, info, warn};
 use logging::logger::LOGGER;
 use parking_lot::Mutex;
+use ui::stdio::{StdioAccess, StdioHolder};
 use ui::{EngineDisplay, KeyboardCommand};
 use workunit_store::WorkUnitStore;
 
@@ -130,25 +132,24 @@ impl Session {
     }
   }
 
-  pub fn with_console_ui_disabled<F: FnOnce() -> T, T>(&self, f: F) -> T {
-    if let Some(display) = self.maybe_display() {
-      let guard = {
-        let mut d = display.lock();
-        d.suspend()
-      };
-      let output = f();
-      {
-        let mut d = display.lock();
-        d.unsuspend(guard);
-      }
-      output
-    } else {
-      f()
-    }
-  }
-
   pub fn should_handle_workunits(&self) -> bool {
     self.should_report_workunits() || self.should_record_zipkin_spans()
+  }
+}
+
+impl StdioHolder for Session {
+  fn stdio_pause(&self) -> Option<futures_locks::MutexGuard<StdioAccess>> {
+    self.maybe_display().map(|display| {
+      let mut d = display.lock();
+      d.suspend()
+    })
+  }
+
+  fn stdio_unpause(&self, maybe_stdio_access: Option<futures_locks::MutexGuard<StdioAccess>>) {
+    if let Some(display) = self.maybe_display() {
+      let mut d = display.lock();
+      d.unsuspend(maybe_stdio_access.expect("The Console must operate under a lock on stdio. "))
+    }
   }
 }
 

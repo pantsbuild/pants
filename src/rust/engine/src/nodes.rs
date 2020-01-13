@@ -264,6 +264,7 @@ impl MultiPlatformExecuteProcess {
     };
 
     let is_nailgunnable = externs::project_bool(&value, "is_nailgunnable");
+    let foreground = externs::project_bool(&value, "foreground");
 
     let unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule =
       lift_digest(&externs::project_ignoring_type(
@@ -285,6 +286,7 @@ impl MultiPlatformExecuteProcess {
       jdk_home,
       target_platform,
       is_nailgunnable,
+      foreground,
     })
   }
 
@@ -338,6 +340,7 @@ impl WrappedNode for MultiPlatformExecuteProcess {
     let execution_context = process_execution::Context {
       workunit_store: context.session.workunit_store(),
       build_id: context.session.build_id().to_string(),
+      stdio_holder: Arc::new(context.session.clone()),
     };
     if context
       .core

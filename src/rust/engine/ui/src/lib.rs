@@ -34,7 +34,7 @@ use futures_locks;
 use termion;
 
 use std::collections::{BTreeMap, VecDeque};
-use std::io::{self, stdout, Stdout, Write, Read};
+use std::io::{self, stdout, Read, Stdout, Write};
 
 use termion::raw::IntoRawMode;
 use termion::raw::RawTerminal;

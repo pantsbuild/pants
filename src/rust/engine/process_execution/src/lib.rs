@@ -44,6 +44,7 @@ use futures::future::{FutureExt, TryFutureExt};
 
 use async_semaphore::AsyncSemaphore;
 use hashing::Digest;
+use ui::stdio::StdioHolder;
 
 pub mod cache;
 #[cfg(test)]
@@ -213,6 +214,17 @@ pub struct ExecuteProcessRequest {
   pub target_platform: Platform,
 
   pub is_nailgunnable: bool,
+
+  ///
+  /// True if the process should be forced to run in the foreground (ie: locally, with streaming
+  /// access to the console).
+  ///
+  /// TODO: Square this with the `target_platform` and `is_nailgunnable`: a foreground process must
+  /// be
+  ///   1) local
+  ///   2) not nailgunned (for now).
+  ///
+  pub foreground: bool,
 }
 
 impl TryFrom<MultiPlatformExecuteProcessRequest> for ExecuteProcessRequest {
@@ -312,10 +324,11 @@ impl AddAssign<UploadSummary> for ExecutionStats {
   }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct Context {
   pub workunit_store: WorkUnitStore,
   pub build_id: String,
+  pub stdio_holder: Arc<dyn StdioHolder>,
 }
 
 pub trait CommandRunner: Send + Sync {

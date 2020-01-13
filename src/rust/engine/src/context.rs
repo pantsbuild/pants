@@ -231,8 +231,6 @@ impl Core {
       store,
       command_runner,
       http_client,
-      // TODO: Errors in initialization should definitely be exposed as python
-      // exceptions, rather than as panics.
       vfs: PosixFS::new(&build_root, &ignore_patterns, executor)
         .map_err(|e| format!("Could not initialize VFS: {:?}", e))?,
       build_root: build_root,

@@ -236,6 +236,11 @@ impl super::CommandRunner for CommandRunner {
     context: Context,
   ) -> BoxFuture<FallibleExecuteProcessResult, String> {
     let compatible_underlying_request = self.extract_compatible_request(&req).unwrap();
+    if compatible_underlying_request.foreground {
+      try_future!(Err(
+        "A process intended to be run in the foreground cannot be remoted.".to_owned()
+      ));
+    }
     let operations_client = self.operations_client.clone();
     let store = self.store.clone();
     let execute_request_result =

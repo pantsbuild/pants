@@ -67,6 +67,7 @@ fn construct_nailgun_server_request(
     jdk_home: Some(jdk),
     target_platform: platform,
     is_nailgunnable: true,
+    foreground: false,
   }
 }
 
@@ -88,6 +89,7 @@ fn construct_nailgun_client_request(
     jdk_home: _jdk_home,
     target_platform,
     is_nailgunnable,
+    foreground,
   } = original_req;
   client_args.insert(0, client_main_class);
   ExecuteProcessRequest {
@@ -103,6 +105,7 @@ fn construct_nailgun_client_request(
     jdk_home: None,
     target_platform,
     is_nailgunnable,
+    foreground,
   }
 }
 
@@ -170,6 +173,11 @@ impl super::CommandRunner for CommandRunner {
     context: Context,
   ) -> BoxFuture<FallibleExecuteProcessResult, String> {
     let original_request = self.extract_compatible_request(&req).unwrap();
+    if original_request.foreground {
+      try_future!(Err(
+        "A process intended to be run in the foreground is not nailgunnable.".to_owned()
+      ));
+    }
 
     if !original_request.is_nailgunnable {
       trace!("The request is not nailgunnable! Short-circuiting to regular process execution");

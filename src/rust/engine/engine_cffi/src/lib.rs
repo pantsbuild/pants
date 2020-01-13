@@ -58,8 +58,11 @@ use std::mem;
 use std::os::raw;
 use std::panic;
 use std::path::{Path, PathBuf};
+use std::process;
 use std::time::Duration;
 use tempfile::TempDir;
+
+use ui::stdio::StdioHolder;
 use workunit_store::WorkUnit;
 
 #[cfg(test)]
@@ -942,87 +945,105 @@ pub extern "C" fn run_local_interactive_process(
   session_ptr: *mut Session,
   request: Handle,
 ) -> PyResult {
-  use std::process;
-
   with_scheduler(scheduler_ptr, |scheduler| {
     with_session(session_ptr, |session| {
-      session.with_console_ui_disabled(|| {
-        let types = &scheduler.core.types;
-        let construct_interactive_process_result = types.construct_interactive_process_result;
-
-        let value: Value = request.into();
-
-        let argv: Vec<String> = externs::project_multi_strs(&value, "argv");
-        if argv.is_empty() {
-          return Err("Empty argv list not permitted".to_string());
-        }
-
-        let run_in_workspace = externs::project_bool(&value, "run_in_workspace");
-        let maybe_tempdir = if run_in_workspace {
-          None
-        } else {
-          Some(TempDir::new().map_err(|err| format!("Error creating tempdir: {}", err))?)
-        };
-
-        let input_files_value = externs::project_ignoring_type(&value, "input_files");
-        let digest: Digest = nodes::lift_digest(&input_files_value)?;
-        if digest != EMPTY_DIGEST {
-          if run_in_workspace {
-            warn!("Local interactive process should not attempt to materialize files when run in workspace");
-          } else {
-            let destination = match maybe_tempdir {
-              Some(ref dir) => dir.path().to_path_buf(),
-              None => unreachable!()
-            };
-
-            let write_operation = scheduler.core.store().materialize_directory(
-              destination,
-              digest,
-              session.workunit_store(),
-            );
-
-            scheduler.core.executor.spawn_on_io_pool(write_operation).wait()?;
-          }
-        }
-
-        let p = Path::new(&argv[0]);
-        let program_name = match maybe_tempdir {
-          Some(ref tempdir) if p.is_relative() =>  {
-            let mut buf = PathBuf::new();
-            buf.push(tempdir);
-            buf.push(p);
-            buf
-          },
-          _ => p.to_path_buf()
-        };
-
-        let mut command = process::Command::new(program_name);
-        for arg in argv[1..].iter() {
-          command.arg(arg);
-        }
-
-        if let Some(ref tempdir) = maybe_tempdir {
-          command.current_dir(tempdir.path());
-        }
-
-        let env = externs::project_tuple_encoded_map(&value, "env")?;
-        for (key, value) in env.iter() {
-          command.env(key, value);
-        }
-
-        let mut subprocess = command.spawn().map_err(|e| format!("Error executing interactive process: {}", e.to_string()))?;
-        let exit_status = subprocess.wait().map_err(|e| e.to_string())?;
-        let code = exit_status.code().unwrap_or(-1);
-
-        let output: Result<Value, String> = Ok(externs::unsafe_call(
-          &construct_interactive_process_result,
-          &[externs::store_i64(i64::from(code))],
-        ));
-        output
-      })
+      let stdio_access_guard = session
+        .stdio_acquire()
+        .map_err(|()| "Could not acquire access to stdio.".to_owned())
+        .wait()?;
+      let res = run_local_interactive_process_inner(scheduler, session, request);
+      session.stdio_release(stdio_access_guard);
+      res
     })
   })
   .into()
+}
+
+fn run_local_interactive_process_inner(
+  scheduler: &Scheduler,
+  session: &Session,
+  request: Handle,
+) -> Result<Value, String> {
+  let types = &scheduler.core.types;
+  let construct_interactive_process_result = types.construct_interactive_process_result;
+
+  let value: Value = request.into();
+
+  let argv: Vec<String> = externs::project_multi_strs(&value, "argv");
+  if argv.is_empty() {
+    return Err("Empty argv list not permitted".to_string());
+  }
+
+  let run_in_workspace = externs::project_bool(&value, "run_in_workspace");
+  let maybe_tempdir = if run_in_workspace {
+    None
+  } else {
+    Some(TempDir::new().map_err(|err| format!("Error creating tempdir: {}", err))?)
+  };
+
+  let input_files_value = externs::project_ignoring_type(&value, "input_files");
+  let digest: Digest = nodes::lift_digest(&input_files_value)?;
+  if digest != EMPTY_DIGEST {
+    if run_in_workspace {
+      warn!(
+        "Local interactive process should not attempt to materialize files when run in workspace"
+      );
+    } else {
+      let destination = match maybe_tempdir {
+        Some(ref dir) => dir.path().to_path_buf(),
+        None => unreachable!(),
+      };
+
+      let write_operation =
+        scheduler
+          .core
+          .store()
+          .materialize_directory(destination, digest, session.workunit_store());
+
+      scheduler
+        .core
+        .executor
+        .spawn_on_io_pool(write_operation)
+        .wait()?;
+    }
+  }
+
+  let p = Path::new(&argv[0]);
+  let program_name = match maybe_tempdir {
+    Some(ref tempdir) if p.is_relative() => {
+      let mut buf = PathBuf::new();
+      buf.push(tempdir);
+      buf.push(p);
+      buf
+    }
+    _ => p.to_path_buf(),
+  };
+
+  let mut command = process::Command::new(program_name);
+  for arg in argv[1..].iter() {
+    command.arg(arg);
+  }
+
+  if let Some(ref tempdir) = maybe_tempdir {
+    command.current_dir(tempdir.path());
+  }
+
+  let env = externs::project_tuple_encoded_map(&value, "env")?;
+  for (key, value) in env.iter() {
+    command.env(key, value);
+  }
+
+  let mut subprocess = command
+    .spawn()
+    .map_err(|e| format!("Error executing interactive process: {}", e.to_string()))?;
+  let exit_status = subprocess.wait().map_err(|e| e.to_string())?;
+  let code = exit_status.code().unwrap_or(-1);
+
+  let output: Result<Value, String> = Ok(externs::unsafe_call(
+    &construct_interactive_process_result,
+    &[externs::store_i64(i64::from(code))],
+  ));
+  output
 }
 
 #[no_mangle]

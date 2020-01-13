@@ -17,6 +17,7 @@ use std::process::{Command, Stdio};
 use std::sync::Arc;
 use store::{OneOffStoreFileByDigest, Snapshot, Store};
 
+use tokio;
 use tokio::timer::Timeout;
 use tokio_codec::{BytesCodec, FramedRead};
 use tokio_process::CommandExt;
@@ -99,6 +100,7 @@ impl CommandRunner {
 
 pub struct StreamedHermeticCommand {
   inner: Command,
+  foreground: bool,
 }
 
 ///
@@ -112,7 +114,10 @@ impl StreamedHermeticCommand {
       // It would be really nice not to have to manually set PATH but this is sadly the only way
       // to stop automatic PATH searching.
       .env("PATH", "");
-    StreamedHermeticCommand { inner }
+    StreamedHermeticCommand {
+      inner,
+      foreground: false,
+    }
   }
 
   fn args<I, S>(&mut self, args: I) -> &mut StreamedHermeticCommand
@@ -139,18 +144,47 @@ impl StreamedHermeticCommand {
     self
   }
 
+  fn foreground(&mut self, foreground: bool) -> &mut StreamedHermeticCommand {
+    self.foreground = foreground;
+    self
+  }
+
   fn stream(&mut self) -> Result<impl Stream<Item = ChildOutput, Error = String> + Send, String> {
+    let foreground = self.foreground;
+    let stdin_config = if foreground {
+      Stdio::inherit()
+    } else {
+      Stdio::null()
+    };
     self
       .inner
-      .stdin(Stdio::null())
+      .stdin(stdin_config)
       .stdout(Stdio::piped())
       .stderr(Stdio::piped())
       .spawn_async()
       .map_err(|e| format!("Error launching process: {:?}", e))
       .and_then(|mut child| {
         let stdout_stream = FramedRead::new(child.stdout().take().unwrap(), BytesCodec::new())
+          .and_then(move |bytes| {
+            if foreground {
+              tokio::io::write_all(tokio::io::stdout(), bytes)
+                .map(|(_, bytes)| bytes)
+                .to_boxed()
+            } else {
+              future::ok(bytes).to_boxed()
+            }
+          })
           .map(|bytes| ChildOutput::Stdout(bytes.into()));
         let stderr_stream = FramedRead::new(child.stderr().take().unwrap(), BytesCodec::new())
+          .and_then(move |bytes| {
+            if foreground {
+              tokio::io::write_all(tokio::io::stderr(), bytes)
+                .map(|(_, bytes)| bytes)
+                .to_boxed()
+            } else {
+              future::ok(bytes).to_boxed()
+            }
+          })
           .map(|bytes| ChildOutput::Stderr(bytes.into()));
         let exit_stream = child.into_stream().map(|exit_status| {
           ChildOutput::Exit(ExitCode(
@@ -258,6 +292,7 @@ impl CapturedWorkdir for CommandRunner {
   ) -> Result<Box<dyn Stream<Item = ChildOutput, Error = String> + Send>, String> {
     StreamedHermeticCommand::new(&req.argv[0])
       .args(&req.argv[1..])
+      .foreground(req.foreground)
       .current_dir(if let Some(working_directory) = req.working_directory {
         workdir_path.join(working_directory)
       } else {
@@ -314,6 +349,8 @@ pub trait CapturedWorkdir {
     let unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule =
       req.unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule;
 
+    let foreground = req.foreground;
+
     store
       .materialize_directory(
         workdir_path.clone(),
@@ -359,49 +396,85 @@ pub trait CapturedWorkdir {
         }
         Ok(())
       })
-      .and_then(move |()| command_runner.run_in_workdir(&workdir_path, req2, context))
+      .and_then({
+        let context = context.clone();
+        let req_description = req_description.clone();
+        move |()| {
+          // If the process should run in the foreground, acquire access to stdio, and hold it until
+          // after the process has exited.
+          if foreground {
+            context
+              .stdio_holder
+              .stdio_acquire()
+              .map(move |guard| {
+                println!(">>> Launching in the foreground: {}", req_description);
+                Some(guard)
+              })
+              .map_err(|()| {
+                "Failed to acquire stdio while running process in the foreground.".to_owned()
+              })
+              .to_boxed()
+          } else {
+            future::ok(None).to_boxed()
+          }
+        }
+      })
+      .and_then({
+        let context = context.clone();
+        move |stdio_guard| {
+          command_runner
+            .run_in_workdir(&workdir_path, req2, context)
+            .map(|res| (res, stdio_guard))
+        }
+      })
       // NB: We fully buffer up the `Stream` above into final `ChildResults` below and so could
       // instead be using `CommandExt::output_async` above to avoid the `ChildResults::collect_from`
       // code. The idea going forward though is we eventually want to pass incremental results on
       // down the line for streaming process results to console logs, etc. as tracked by:
       //   https://github.com/pantsbuild/pants/issues/6089
-      .map(ChildResults::collect_from)
-      .and_then(move |child_results_future| {
-        Timeout::new(child_results_future, req_timeout).map_err(|e| e.to_string())
+      .and_then(move |(stream, stdio_guard)| {
+        Timeout::new(ChildResults::collect_from(stream), req_timeout)
+          .map_err(|e| e.to_string())
+          .map(move |res| (res, stdio_guard))
       })
-      .and_then(move |child_results| {
-        let output_snapshot = if output_file_paths.is_empty() && output_dir_paths.is_empty() {
-          future::ok(store::Snapshot::empty()).to_boxed()
-        } else {
-          // Use no ignore patterns, because we are looking for explicitly listed paths.
-          future::done(fs::PosixFS::new(workdir_path2, &[], executor))
-            .map_err(|err| {
-              format!(
-                "Error making posix_fs to fetch local process execution output files: {}",
-                err
-              )
-            })
-            .map(Arc::new)
-            .and_then(|posix_fs| {
-              CommandRunner::construct_output_snapshot(
-                store,
-                posix_fs,
-                output_file_paths,
-                output_dir_paths,
-              )
+      .and_then({
+        move |(child_results, stdio_guard)| {
+          if let Some(guard) = stdio_guard {
+            context.stdio_holder.stdio_release(guard)
+          }
+          let output_snapshot = if output_file_paths.is_empty() && output_dir_paths.is_empty() {
+            future::ok(store::Snapshot::empty()).to_boxed()
+          } else {
+            // Use no ignore patterns, because we are looking for explicitly listed paths.
+            future::done(fs::PosixFS::new(workdir_path2, &[], executor))
+              .map_err(|err| {
+                format!(
+                  "Error making posix_fs to fetch local process execution output files: {}",
+                  err
+                )
+              })
+              .map(Arc::new)
+              .and_then(|posix_fs| {
+                CommandRunner::construct_output_snapshot(
+                  store,
+                  posix_fs,
+                  output_file_paths,
+                  output_dir_paths,
+                )
+              })
+              .to_boxed()
+          };
+
+          output_snapshot
+            .map(move |snapshot| FallibleExecuteProcessResult {
+              stdout: child_results.stdout,
+              stderr: child_results.stderr,
+              exit_code: child_results.exit_code,
+              output_directory: snapshot.digest,
+              execution_attempts: vec![],
             })
             .to_boxed()
-        };
-
-        output_snapshot
-          .map(move |snapshot| FallibleExecuteProcessResult {
-            stdout: child_results.stdout,
-            stderr: child_results.stderr,
-            exit_code: child_results.exit_code,
-            output_directory: snapshot.digest,
-            execution_attempts: vec![],
-          })
-          .to_boxed()
+        }
       })
       .then(move |result| {
         // Force workdir not to get dropped until after we've ingested the outputs
