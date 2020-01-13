@@ -104,7 +104,11 @@ async def setup_pytest_for_target(
       output_filename='pytest-with-requirements.pex',
       entry_point="pytest:main",
       additional_requirements=pytest.get_requirement_strings(),
-      include_source_files=False
+      # NB: We set `--not-zip-safe` because Pytest plugin discovery, which uses
+      # `importlib_metadata` and thus `zipp`, does not play nicely when doing import magic directly
+      # from zip files. `zipp` has pathologically bad behavior with large zipfiles.
+      additional_args=("--not-zip-safe",),
+      include_source_files=False,
     )
   )
 
@@ -186,11 +190,7 @@ async def run_python_test(
 
 
 @rule(name="Run pytest in an interactive process")
-async def debug_python_test(
-  test_target: PythonTestsAdaptor,
-  test_setup: TestTargetSetup,
-) -> TestDebugRequest:
-
+async def debug_python_test(test_setup: TestTargetSetup) -> TestDebugRequest:
   run_request = InteractiveProcessRequest(
     argv=(test_setup.requirements_pex.output_filename, *test_setup.args),
     run_in_workspace=False,

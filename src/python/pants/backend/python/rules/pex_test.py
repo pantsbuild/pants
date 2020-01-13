@@ -4,7 +4,7 @@
 import json
 import os.path
 import zipfile
-from typing import Dict, Optional, cast
+from typing import Dict, Optional, Tuple, cast
 
 from pants.backend.python.rules import download_pex_bin
 from pants.backend.python.rules.pex import (
@@ -26,7 +26,7 @@ from pants.testutil.test_base import TestBase
 from pants.util.strutil import create_path_env_var
 
 
-class TestResolveRequirements(TestBase):
+class PexTest(TestBase):
 
   @classmethod
   def rules(cls):
@@ -46,6 +46,7 @@ class TestResolveRequirements(TestBase):
     entry_point=None,
     interpreter_constraints=PexInterpreterConstraints(),
     input_files: Optional[Digest] = None,
+    additional_args: Tuple[str, ...] = (),
   ) -> Dict:
     request = CreatePex(
       output_filename="test.pex",
@@ -53,6 +54,7 @@ class TestResolveRequirements(TestBase):
       interpreter_constraints=interpreter_constraints,
       entry_point=entry_point,
       input_files_digest=input_files,
+      additional_args=additional_args,
     )
     requirements_pex = self.request_single_product(
       Pex,
@@ -70,14 +72,20 @@ class TestResolveRequirements(TestBase):
     return {'pex': requirements_pex, 'info': json.loads(pex_info_content), 'files': pex_list}
 
   def create_pex_and_get_pex_info(
-    self, *, requirements=PexRequirements(), entry_point=None,
+    self,
+    *,
+    requirements=PexRequirements(),
+    entry_point=None,
     interpreter_constraints=PexInterpreterConstraints(),
-    input_files: Optional[Digest] = None) -> Dict:
+    input_files: Optional[Digest] = None,
+    additional_args: Tuple[str, ...] = (),
+  ) -> Dict:
     return cast(Dict, self.create_pex_and_get_all_data(
       requirements=requirements,
       entry_point=entry_point,
       interpreter_constraints=interpreter_constraints,
-      input_files=input_files
+      input_files=input_files,
+      additional_args=additional_args,
     )['info'])
 
   def test_pex_execution(self) -> None:
@@ -120,8 +128,10 @@ class TestResolveRequirements(TestBase):
     self.assertEqual(pex_info["entry_point"], entry_point)
 
   def test_interpreter_constraints(self) -> None:
-    constraints = PexInterpreterConstraints(
-        constraint_set=("CPython>=2.7,<3", "CPython>=3.6")
-    )
+    constraints = PexInterpreterConstraints(constraint_set=("CPython>=2.7,<3", "CPython>=3.6"))
     pex_info = self.create_pex_and_get_pex_info(interpreter_constraints=constraints)
     self.assertEqual(set(pex_info["interpreter_constraints"]), set(constraints.constraint_set))
+
+  def test_additional_args(self) -> None:
+    pex_info = self.create_pex_and_get_pex_info(additional_args=("--not-zip-safe",))
+    assert pex_info["zip_safe"] is False
