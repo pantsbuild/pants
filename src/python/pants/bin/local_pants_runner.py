@@ -4,22 +4,27 @@
 import logging
 import os
 from contextlib import contextmanager
+from typing import Dict, List, Optional, Tuple
 
 from pants.base.build_environment import get_buildroot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, Exiter
+from pants.base.target_roots import TargetRoots
 from pants.base.workunit import WorkUnit
 from pants.bin.goal_runner import GoalRunner
+from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.native import Native
+from pants.engine.scheduler import SchedulerSession
 from pants.goal.run_tracker import RunTracker
 from pants.help.help_printer import HelpPrinter
-from pants.init.engine_initializer import EngineInitializer
+from pants.init.engine_initializer import EngineInitializer, LegacyGraphSession
 from pants.init.logging import setup_logging_from_options
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
 from pants.init.repro import Reproducer
 from pants.init.target_roots_calculator import TargetRootsCalculator
 from pants.option.arg_splitter import UnknownGoalHelp
+from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.reporting.reporting import Reporting
 from pants.reporting.streaming_workunit_handler import StreamingWorkunitHandler
@@ -90,14 +95,23 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
   """Handles a single pants invocation running in the process-local context."""
 
   @staticmethod
-  def parse_options(args, env, options_bootstrapper=None):
+  def parse_options(
+    args: List[str],
+    env: Dict[str, str],
+    options_bootstrapper: Optional[OptionsBootstrapper] = None,
+  ) -> Tuple[Options, BuildConfiguration, OptionsBootstrapper]:
     options_bootstrapper = options_bootstrapper or OptionsBootstrapper.create(args=args, env=env)
     build_config = BuildConfigInitializer.get(options_bootstrapper)
     options = OptionsInitializer.create(options_bootstrapper, build_config)
     return options, build_config, options_bootstrapper
 
   @staticmethod
-  def _maybe_init_graph_session(graph_session, options_bootstrapper,build_config, options):
+  def _maybe_init_graph_session(
+    graph_session: Optional[LegacyGraphSession],
+    options_bootstrapper: OptionsBootstrapper,
+    build_config: BuildConfiguration,
+    options: Options,
+  ) -> Tuple[LegacyGraphSession, SchedulerSession]:
     if not graph_session:
       native = Native()
       native.set_panic_handler()
@@ -119,7 +133,12 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     return graph_session, graph_session.scheduler_session
 
   @staticmethod
-  def _maybe_init_target_roots(target_roots, graph_session, options, build_root):
+  def _maybe_init_target_roots(
+    target_roots: Optional[TargetRoots],
+    graph_session: LegacyGraphSession,
+    options: Options,
+    build_root: str,
+  ) -> TargetRoots:
     if target_roots:
       return target_roots
 
@@ -133,15 +152,21 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     )
 
   @classmethod
-  def create(cls, args, env, target_roots=None, daemon_graph_session=None,
-             options_bootstrapper=None):
+  def create(
+    cls,
+    args: List[str],
+    env: Dict[str, str],
+    target_roots: Optional[TargetRoots] = None,
+    daemon_graph_session: Optional[LegacyGraphSession] = None,
+    options_bootstrapper: Optional[OptionsBootstrapper] = None,
+  ) -> "LocalPantsRunner":
     """Creates a new LocalPantsRunner instance by parsing options.
 
-    :param list args: The arguments (e.g. sys.argv) for this run.
-    :param dict env: The environment (e.g. os.environ) for this run.
-    :param TargetRoots target_roots: The target roots for this run.
-    :param LegacyGraphSession daemon_graph_session: The graph helper for this session.
-    :param OptionsBootstrapper options_bootstrapper: The OptionsBootstrapper instance to reuse.
+    :param args: The arguments (e.g. sys.argv) for this run.
+    :param env: The environment (e.g. os.environ) for this run.
+    :param target_roots: The target roots for this run.
+    :param daemon_graph_session: The graph helper for this session.
+    :param options_bootstrapper: The OptionsBootstrapper instance to reuse.
     """
     build_root = get_buildroot()
 
@@ -194,17 +219,27 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
       profile_path
     )
 
-  def __init__(self, build_root, options, options_bootstrapper, build_config, target_roots,
-               graph_session, scheduler_session, is_daemon, profile_path):
+  def __init__(
+    self,
+    build_root: str,
+    options: Options,
+    options_bootstrapper: OptionsBootstrapper,
+    build_config: BuildConfiguration,
+    target_roots: TargetRoots,
+    graph_session: LegacyGraphSession,
+    scheduler_session: SchedulerSession,
+    is_daemon: bool,
+    profile_path: Optional[str],
+  ) -> None:
     """
-    :param string build_root: The build root for this run.
-    :param Options options: The parsed options for this run.
-    :param OptionsBootstrapper options_bootstrapper: The OptionsBootstrapper instance to use.
-    :param BuildConfiguration build_config: The parsed build configuration for this run.
-    :param TargetRoots target_roots: The `TargetRoots` for this run.
-    :param LegacyGraphSession graph_session: A LegacyGraphSession instance for graph reuse.
-    :param bool is_daemon: Whether or not this run was launched with a daemon graph helper.
-    :param string profile_path: The profile path - if any (from from the `PANTS_PROFILE` env var).
+    :param build_root: The build root for this run.
+    :param options: The parsed options for this run.
+    :param options_bootstrapper: The OptionsBootstrapper instance to use.
+    :param build_config: The parsed build configuration for this run.
+    :param target_roots: The `TargetRoots` for this run.
+    :param graph_session: A LegacyGraphSession instance for graph reuse.
+    :param is_daemon: Whether or not this run was launched with a daemon graph helper.
+    :param profile_path: The profile path - if any (from from the `PANTS_PROFILE` env var).
     """
     self._build_root = build_root
     self._options = options
@@ -235,12 +270,12 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     self._reporting.initialize(self._run_tracker, self._options, start_time=self._run_start_time)
 
     spec_parser = CmdLineSpecParser(get_buildroot())
-    target_specs = [
+    address_specs = [
       spec_parser.parse_address_spec(spec).to_spec_string()
       for spec in self._options.specs
     ]
     # Note: This will not include values from `--owner-of` or `--changed-*` flags.
-    self._run_tracker.run_info.add_info("specs_from_command_line", target_specs, stringify=False)
+    self._run_tracker.run_info.add_info("specs_from_command_line", address_specs, stringify=False)
 
     # Capture a repro of the 'before' state for this build, if needed.
     self._repro = Reproducer.global_instance().create_repro()
@@ -318,9 +353,6 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
       self._run_tracker.report.bulk_record_workunits(engine_workunits)
 
   def _run(self):
-    engine_result = PANTS_FAILED_EXIT_CODE
-    goal_runner_result = PANTS_FAILED_EXIT_CODE
-
     global_options = self._options.for_global_scope()
 
     streaming_handlers = global_options.streaming_workunits_handlers

@@ -5,6 +5,7 @@ import os
 import sys
 from collections import defaultdict
 from contextlib import contextmanager
+from typing import Dict
 
 from twitter.common.collections import OrderedSet
 
@@ -18,7 +19,9 @@ from pants.engine.isolated_process import (
   fallible_to_exec_result_or_raise,
 )
 from pants.goal.products import Products
+from pants.goal.run_tracker import RunTracker
 from pants.goal.workspace import ScmWorkspace
+from pants.option.options import Options
 from pants.process.lock import OwnerPrintingInterProcessFileLock
 from pants.source.source_root import SourceRootConfig
 
@@ -37,18 +40,30 @@ class Context:
 
   # TODO: Figure out a more structured way to construct and use context than this big flat
   # repository of attributes?
-  def __init__(self, options, run_tracker, target_roots,
-               requested_goals=None, target_base=None, build_graph=None,
-               build_file_parser=None, build_configuration=None,
-               address_mapper=None, console_outstream=None, scm=None,
-               workspace=None, invalidation_report=None, scheduler=None):
+  def __init__(
+    self,
+    options: Options,
+    run_tracker: RunTracker,
+    target_roots,
+    requested_goals=None,
+    target_base=None,
+    build_graph=None,
+    build_file_parser=None,
+    build_configuration=None,
+    address_mapper=None,
+    console_outstream=None,
+    scm=None,
+    workspace=None,
+    invalidation_report=None,
+    scheduler=None,
+  ) -> None:
     self._options = options
 
     # We register a callback that will cause build graph edits to invalidate our caches, and we hold
     # a handle directly to the callback function to ensure that it is not GC'd until the context is.
     self.build_graph = build_graph
     self._clear_target_cache_handle = self._clear_target_cache
-    self._targets_cache = dict()
+    self._targets_cache: Dict = dict()
     self.build_graph.add_invalidation_callback(self._clear_target_cache_handle)
 
     self._build_file_parser = build_file_parser
