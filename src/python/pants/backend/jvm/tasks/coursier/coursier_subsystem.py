@@ -47,22 +47,11 @@ class CoursierSubsystem(Script):
              help='Specify the type of artifacts to fetch. See `packaging` at https://maven.apache.org/pom.html#Maven_Coordinates, '
                   'except `src` and `doc` being coursier specific terms for sources and javadoc.')
     # TODO(yic): Use a published version of Coursier. https://github.com/pantsbuild/pants/issues/6852
-    register('--bootstrap-jar-url', fingerprint=True, default=cls._default_urls[0],
-             removal_version='1.25.0.dev1', removal_hint='Use --bootstrap-jar-urls',
-             help='Location to download a bootstrap version of Coursier from.')
     register('--bootstrap-jar-urls', fingerprint=True, type=list, default=cls._default_urls,
              help='Locations to download a bootstrap version of Coursier from.')
-    register('--bootstrap-fetch-timeout-secs', type=int, advanced=True, default=10,
-             removal_version='1.25.0.dev1', removal_hint='Use --binaries-fetch-timeout-secs.',
-             help='Timeout the fetch if the connection is idle for longer than this value.')
 
   def get_external_url_generator(self):
-    # NB: Remove with deprecation.
-    if self.get_options().is_flagged('bootstrap_jar_url'):
-      urls = [self.get_options().bootstrap_jar_url]
-    else:
-      urls = list(self.get_options().bootstrap_jar_urls)
-    return CoursierUrlGenerator(urls)
+    return CoursierUrlGenerator(list(self.get_options().bootstrap_jar_urls))
 
 
 class CoursierUrlGenerator(BinaryToolUrlGenerator):

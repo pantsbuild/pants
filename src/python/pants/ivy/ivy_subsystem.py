@@ -29,14 +29,8 @@ class IvySubsystem(Script):
              help='Specify a proxy URL for http requests.')
     register('--https-proxy', advanced=True,
              help='Specify a proxy URL for https requests.')
-    register('--bootstrap-jar-url', advanced=True, default=cls._default_urls[0],
-             removal_version='1.25.0.dev1', removal_hint='Use --bootstrap-jar-urls',
-             help='Location to download a bootstrap version of Ivy.')
     register('--bootstrap-jar-urls', advanced=True, type=list, default=cls._default_urls,
              help='List of URLs with templated {version}s to use to download a bootstrap copy of Ivy.')
-    register('--bootstrap-fetch-timeout-secs', type=int, advanced=True, default=10,
-             removal_version='1.25.0.dev1', removal_hint='Use --binaries-fetch-timeout-secs.',
-             help='Timeout the fetch if the connection is idle for longer than this value.')
     register('--ivy-profile', advanced=True, default=None,
              help='An ivy.xml file.')
     register('--cache-dir', advanced=True, default=os.path.expanduser('~/.ivy2/pants'),
@@ -58,12 +52,7 @@ class IvySubsystem(Script):
     return super().subsystem_dependencies() + (DistributionLocator,)
 
   def get_external_url_generator(self):
-    # NB: Remove with deprecation.
-    if self.get_options().is_flagged('bootstrap_jar_url'):
-      urls = [self.get_options().bootstrap_jar_url]
-    else:
-      urls = list(self.get_options().bootstrap_jar_urls)
-    return IvyUrlGenerator(urls)
+    return IvyUrlGenerator(list(self.get_options().bootstrap_jar_urls))
 
   def http_proxy(self):
     """Set ivy to use an http proxy.
