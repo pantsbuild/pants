@@ -310,7 +310,7 @@ async def get_python_version(
   py_version_pex: Pex = await Get[Pex](CreatePex(
     output_filename='python_version.pex',
     interpreter_constraints=PexInterpreterConstraints.create_from_adaptors(
-      tuple(t.adaptor for t in targets), python_setup)))
+      (t.adaptor for t in targets), python_setup)))
   py_version_request = py_version_pex.create_execute_request(
     python_setup=python_setup,
     subprocess_encoding_environment=subprocess_encoding_environment,
