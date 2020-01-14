@@ -107,6 +107,9 @@ async def setup_pytest_for_target(
       # NB: We set `--not-zip-safe` because Pytest plugin discovery, which uses
       # `importlib_metadata` and thus `zipp`, does not play nicely when doing import magic directly
       # from zip files. `zipp` has pathologically bad behavior with large zipfiles.
+      # TODO: this does have a performance cost as the pex must now be expanded to disk. Long term,
+      # it would be better to fix Zipp (whose fix would then need to be used by importlib_metadata
+      # and then by Pytest). See https://github.com/jaraco/zipp/pull/26.
       additional_args=("--not-zip-safe",),
       include_source_files=False,
     )
