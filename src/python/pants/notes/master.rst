@@ -17,6 +17,12 @@ API Changes
 * Rename `@console_rule` to `@goal_rule` (#8942)
   `PR #8942 <https://github.com/pantsbuild/pants/pull/8942>`_
 
+* Deprecate `--positional-arg-file` in favor of `--spec-file` (#8928)
+  `PR #8928 <https://github.com/pantsbuild/pants/pull/8928>`_
+
+* Rename `optionable_rule` to `subsystem_rule` (#8893)
+  `PR #8893 <https://github.com/pantsbuild/pants/pull/8893>`_
+
 New Features
 ~~~~~~~~~~~~
 
@@ -77,9 +83,6 @@ Refactoring, Improvements, and Tooling
 * Have handle_workunits callback use kwargs (#8918)
   `PR #8918 <https://github.com/pantsbuild/pants/pull/8918>`_
 
-* Deprecate `--positional-arg-file` in favor of `--spec-file` (#8928)
-  `PR #8928 <https://github.com/pantsbuild/pants/pull/8928>`_
-
 * Refactor `options_test.py` (#8906)
   `PR #8906 <https://github.com/pantsbuild/pants/pull/8906>`_
 
@@ -109,9 +112,6 @@ Refactoring, Improvements, and Tooling
 
 * Add type hints to `specs.py` (#8913)
   `PR #8913 <https://github.com/pantsbuild/pants/pull/8913>`_
-
-* Rename `optionable_rule` to `subsystem_rule` (#8893)
-  `PR #8893 <https://github.com/pantsbuild/pants/pull/8893>`_
 
 * Add experimental --fmt-only flag (#8911)
   `PR #8911 <https://github.com/pantsbuild/pants/pull/8911>`_
