@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Tuple
 
 from pants.backend.python.rules.pex import (
   CreatePex,
@@ -24,8 +24,9 @@ class CreatePexFromTargetClosure:
   build_file_addresses: BuildFileAddresses
   output_filename: str
   entry_point: Optional[str] = None
-  additional_requirements: tuple = ()
+  additional_requirements: Tuple[str, ...] = ()
   include_source_files: bool = True
+  additional_args: Tuple[str, ...] = ()
 
 
 @rule(name="Create PEX from targets")
@@ -55,6 +56,7 @@ async def create_pex_from_target_closure(request: CreatePexFromTargetClosure,
     interpreter_constraints=interpreter_constraints,
     entry_point=request.entry_point,
     input_files_digest=chrooted_sources.digest if request.include_source_files else None,
+    additional_args=request.additional_args,
   )
 
   pex = await Get[Pex](CreatePex, create_pex_request)

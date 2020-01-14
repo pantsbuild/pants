@@ -73,6 +73,7 @@ class CreatePex:
   interpreter_constraints: PexInterpreterConstraints = PexInterpreterConstraints()
   entry_point: Optional[str] = None
   input_files_digest: Optional[Digest] = None
+  additional_args: Tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -91,7 +92,7 @@ async def create_pex(
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
     pex_build_environment: PexBuildEnvironment,
-    platform: Platform
+    platform: Platform,
 ) -> Pex:
   """Returns a PEX with the given requirements, optional entry point, and optional
   interpreter constraints."""
@@ -100,11 +101,13 @@ async def create_pex(
   if request.entry_point is not None:
     argv.extend(["--entry-point", request.entry_point])
   argv.extend(request.interpreter_constraints.generate_pex_arg_list())
-  argv.extend(request.requirements.requirements)
+  argv.extend(request.additional_args)
 
   source_dir_name = 'source_files'
-
   argv.append(f'--sources-directory={source_dir_name}')
+
+  argv.extend(request.requirements.requirements)
+
   sources_digest = request.input_files_digest if request.input_files_digest else EMPTY_DIRECTORY_DIGEST
   sources_digest_as_subdir = await Get[Digest](DirectoryWithPrefixToAdd(sources_digest, source_dir_name))
   all_inputs = (pex_bin.directory_digest, sources_digest_as_subdir,)
