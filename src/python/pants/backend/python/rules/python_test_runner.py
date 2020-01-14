@@ -146,7 +146,7 @@ async def setup_pytest_for_target(
     for package in packages_to_cover:
       coverage_args.extend(['--cov', package])
 
-  merged_input_files: Digest = await Get[Digest](DirectoriesToMerge(directories=tuple(directories_to_merge)))
+  merged_input_files = await Get[Digest](DirectoriesToMerge(directories=tuple(directories_to_merge)))
 
   return TestTargetSetup(
     requirements_pex=resolved_requirements_pex,
