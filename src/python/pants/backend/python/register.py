@@ -47,9 +47,6 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.resources import Resources
 from pants.goal.task_registrar import TaskRegistrar as task
 
-from pants.backend.python.rules.coverage import MergedCoverageData
-
-
 
 def global_subsystems():
   return python_native_code.PythonNativeCode, subprocess_environment.SubprocessEnvironment

@@ -1,9 +1,13 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import configparser
+import json
 from dataclasses import dataclass
-from textwrap import dedent
-from typing import Tuple, List
+from io import StringIO
+from typing import Dict, Tuple
+
+import pkg_resources
 
 from pants.backend.python.rules.inject_init import InjectedInitDigest
 from pants.backend.python.rules.pex import (
@@ -12,6 +16,11 @@ from pants.backend.python.rules.pex import (
   PexInterpreterConstraints,
   PexRequirements,
 )
+from pants.backend.python.rules.python_test_runner import (
+  DEFAULT_COVERAGE_CONFIG,
+  get_coveragerc_input,
+)
+from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
@@ -23,16 +32,17 @@ from pants.engine.fs import (
   DirectoriesToMerge,
   DirectoryWithPrefixToAdd,
   FileContent,
+  FilesContent,
   InputFilesContent,
 )
+from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTarget, TransitiveHydratedTargets
-from pants.engine.rules import rule, subsystem_rule
+from pants.engine.rules import console_rule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.rules.core.strip_source_root import SourceRootStrippedSources
 from pants.rules.core.test import AddressAndTestResult, MergedCoverageData
 from pants.source.source_root import SourceRootConfig
-from pants.backend.python.rules.python_test_runner import DEFAULT_COVERAGE_CONFIG, get_coveragerc_input
 
 
 class CoverageToolBase(PythonToolBase):
@@ -42,17 +52,17 @@ class CoverageToolBase(PythonToolBase):
   default_interpreter_constraints = ["CPython>=3.6"]
 
 
-@rule(name="Merge coverage reports")
-async def merge_coverage_reports(
-  addresses: BuildFileAddresses,
-  address_specs: AddressSpecs,
-  # address_and_test_results: AddressAndTestResult,
-  python_setup: PythonSetup,
+@dataclass(frozen=True)
+class CoverageSetup:
+  requirements_pex: Pex
+  filename: str
+
+
+@rule
+async def setup_coverage(
   coverage: CoverageToolBase,
-  source_root_config: SourceRootConfig,
-  subprocess_encoding_environment: SubprocessEncodingEnvironment,
-) -> MergedCoverageData:
-  """Takes all python test results and merges their coverage data into a single sql file."""
+) -> CoverageSetup:
+  plugin_file_digest: Digest = await Get[Digest](InputFilesContent, get_coverage_plugin_input())
   output_pex_filename = "coverage.pex"
   requirements_pex = await Get[Pex](
     CreatePex(
@@ -62,8 +72,33 @@ async def merge_coverage_reports(
         constraint_set=tuple(coverage.default_interpreter_constraints)
       ),
       entry_point=coverage.get_entry_point(),
+      input_files_digest=plugin_file_digest,
     )
   )
+  return CoverageSetup(requirements_pex, output_pex_filename)
+
+
+@rule
+async def create_coverage_request(
+  coverage_setup: CoverageSetup,
+  python_setup: PythonSetup,
+  subprocess_encoding_environment: SubprocessEncodingEnvironment,
+) -> ExecuteProcessRequest:
+  pass
+
+
+@rule(name="Merge coverage reports")
+async def merge_coverage_reports(
+  addresses: BuildFileAddresses,
+  address_specs: AddressSpecs,
+  python_setup: PythonSetup,
+  coverage: CoverageToolBase,
+  coverage_setup: CoverageSetup,
+  source_root_config: SourceRootConfig,
+  subprocess_encoding_environment: SubprocessEncodingEnvironment,
+) -> MergedCoverageData:
+  """Takes all python test results and merges their coverage data into a single sql file."""
+  requirements_pex = coverage_setup.requirements_pex
 
   transitive_targets = await Get[TransitiveHydratedTargets](AddressSpecs, address_specs)
   python_targets = [
@@ -114,7 +149,7 @@ async def merge_coverage_reports(
   request = requirements_pex.create_execute_request(
     python_setup=python_setup,
     subprocess_encoding_environment=subprocess_encoding_environment,
-    pex_path=f'./{output_pex_filename}',
+    pex_path=f'./{coverage_setup.filename}',
     pex_args=coverage_args,
     input_files=merged_input_files,
     output_files=('.coverage',),
@@ -128,8 +163,151 @@ async def merge_coverage_reports(
   return MergedCoverageData(coverage_data=result.output_directory_digest)
 
 
+COVERAGE_PLUGIN_MODULE_NAME = '__coverage_coverage_plugin__'
+
+
+def get_coverage_plugin_input():
+  return InputFilesContent(
+    FilesContent(
+      (
+        FileContent(
+          path=f'{COVERAGE_PLUGIN_MODULE_NAME}.py',
+          content=pkg_resources.resource_string(__name__, 'coverage/plugin.py'),
+          is_executable=False,
+        ),
+      )
+    )
+  )
+
+
+def ensure_section(config_parser: configparser.ConfigParser, section: str) -> None:
+  """Ensure a section exists in a ConfigParser."""
+  if not config_parser.has_section(section):
+    config_parser.add_section(section)
+
+
+def construct_coverage_config(
+  src_to_target_base: Dict
+) -> str:
+  config_parser = configparser.ConfigParser()
+  config_parser.read_file(StringIO(DEFAULT_COVERAGE_CONFIG))
+  ensure_section(config_parser, 'run')
+  config_parser.set('run', 'plugins', COVERAGE_PLUGIN_MODULE_NAME)
+  config_parser.add_section(COVERAGE_PLUGIN_MODULE_NAME)
+  config_parser.set(COVERAGE_PLUGIN_MODULE_NAME, 'src_to_target_base', json.dumps(src_to_target_base))
+  config = StringIO()
+  config_parser.write(config)
+  return config.getvalue()
+
+
+def get_file_names(all_target_adaptors):
+  def iter_files():
+    for adaptor in all_target_adaptors:
+      if hasattr(adaptor, 'sources'):
+        for file in adaptor.sources.snapshot.files:
+          if file.endswith('.py'):
+            yield file
+
+  return list(iter_files())
+
+
+# TODO: Make this not a goal again when the build graph ambiguity is worked out.
+class CoverageOptions(GoalSubsystem):
+  name = 'coverage2'
+
+
+class CoverageReport(Goal):
+  subsystem_cls = CoverageOptions
+  # report: Digest
+
+
+@console_rule(name="Generate coverage report")
+async def generate_coverage_report(
+  addresses: BuildFileAddresses,
+  specs: AddressSpecs,
+  pytest: PyTest,
+  python_setup: PythonSetup,
+  coverage: CoverageToolBase,
+  coverage_setup: CoverageSetup,
+  source_root_config: SourceRootConfig,
+  subprocess_encoding_environment: SubprocessEncodingEnvironment,
+  merged_coverage_data: MergedCoverageData,
+) -> CoverageReport:
+  """Takes all python test results and generates a single coverage report in dist/coverage."""
+  # plugin_file_digest = await Get(Digest, InputFilesContent, get_coverage_plugin_input())
+  requirements_pex = coverage_setup.requirements_pex
+
+  transitive_targets = await Get[TransitiveHydratedTargets](AddressSpecs, specs)
+  python_targets = [
+    target for target in transitive_targets.closure
+    if target.adaptor.type_alias == 'python_library' or target.adaptor.type_alias == 'python_tests'
+  ]
+
+  # python_files = frozenset(itertools.chain.from_iterable(
+  #   target.adaptor.sources.snapshot.files for target in python_targets
+  # ))
+  # A map from source root stripped source to its source root. eg:
+  #  {'pants/testutil/subsystem/util.py': 'src/python'}
+  # This is so coverage reports referencing /chroot/path/pants/testutil/subsystem/util.py can be mapped
+  # back to the actual sources they reference when merging coverage reports.
+  source_roots_and_source_root_stripped_sources: Dict[str, str] = {}
+  # for filename in python_files:
+  #   for source_root in source_root_config:
+  #     if filename.startswith(source_root):
+  #       source_roots_and_source_root_stripped_sources[filename[len(source_root)+1:]] = source_root
+
+  # results = await MultiGet(Get[AddressAndTestResult](Address, addr.to_address()) for addr in addresses)
+  # test_results = [
+  #   (x.address.to_address().path_safe_spec, x.test_result.coverage_digest)
+  #   for x in results if x.test_result is not None
+  # ]
+
+  coverage_config_content = construct_coverage_config(source_roots_and_source_root_stripped_sources)
+  coveragerc_digest = await Get[Digest](InputFilesContent, get_coveragerc_input(coverage_config_content))
+  source_root_stripped_sources = await MultiGet(
+    Get[SourceRootStrippedSources](HydratedTarget, hydrated_target)
+    for hydrated_target in python_targets
+  )
+  stripped_sources_digests = tuple(
+    stripped_sources.snapshot.directory_digest for stripped_sources in source_root_stripped_sources
+  )
+  sources_digest = await Get[Digest](DirectoriesToMerge(directories=stripped_sources_digests))
+  inits_digest = await Get[InjectedInitDigest](Digest, sources_digest)
+  merged_input_files: Digest = await Get(
+    Digest,
+    DirectoriesToMerge(directories=(
+      merged_coverage_data.coverage_data,
+      coveragerc_digest,
+      requirements_pex.directory_digest,
+      sources_digest,
+      inits_digest.directory_digest,
+    )),
+  )
+
+  coverage_args = ['html'] # TODO: Respect the option of html or xml reports.
+  request = requirements_pex.create_execute_request(
+    python_setup=python_setup,
+    subprocess_encoding_environment=subprocess_encoding_environment,
+    pex_path=f'./{coverage_setup.filename}',
+    pex_args=coverage_args,
+    input_files=merged_input_files,
+    output_files=('htmlcov',), # TODO: Respect the xml option.
+    description=f'Generate coverage report.',
+  )
+
+  result = await Get[FallibleExecuteProcessResult](
+    ExecuteProcessRequest,
+    request
+  )
+  print(result)
+  # return CoverageReport(result.output_directory_digest)
+  return CoverageReport(0)
+
+
 def rules():
   return [
     subsystem_rule(CoverageToolBase),
+    generate_coverage_report,
     merge_coverage_reports,
+    setup_coverage,
   ]

@@ -20,7 +20,6 @@ from pants.engine.legacy.graph import HydratedTarget
 from pants.engine.objects import union
 from pants.engine.rules import UnionMembership, goal_rule, rule
 from pants.engine.selectors import Get, MultiGet
-from pants.engine.objects import Collection
 
 
 # TODO(#6004): use proper Logging singleton, rather than static logger.
@@ -137,6 +136,7 @@ class AddressAndTestResult:
 class AddressesAndTestResults(Collection[AddressAndTestResult]):
   pass
 
+
 @dataclass(frozen=True)
 class AddressAndDebugRequest:
   address: BuildFileAddress
@@ -156,9 +156,9 @@ async def run_tests(
   results = await MultiGet(Get[AddressAndTestResult](Address, addr.to_address()) for addr in addresses)
   did_any_fail = False
   filtered_results = [(x.address, x.test_result) for x in results if x.test_result is not None]
-  if options.values.run_coverage:
-    coverage_data = await Get[MergedCoverageData](BuildFileAddress, addresses)
-    import pdb; pdb.set_trace()
+  # if options.values.run_coverage:
+    # coverage_data = await Get[MergedCoverageData](BuildFileAddress, addresses)
+    # import pdb; pdb.set_trace()
   for address, test_result in filtered_results:
     if test_result.status == Status.FAILURE:
       did_any_fail = True
@@ -215,8 +215,6 @@ async def coordinator_of_debug_tests(target: HydratedTarget) -> AddressAndDebugR
   logger.info(f"Starting tests in debug mode: {target.address.reference()}")
   request = await Get[TestDebugRequest](TestTarget, target.adaptor)
   return AddressAndDebugRequest(target.address, request)
-
-
 
 
 def rules():
