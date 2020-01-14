@@ -4,6 +4,152 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+
+1.25.0.dev1 (01/14/2020)
+------------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Mark certain types as "side-effecting" (#8922)
+  `PR #8922 <https://github.com/pantsbuild/pants/pull/8922>`_
+
+* Rename `@console_rule` to `@goal_rule` (#8942)
+  `PR #8942 <https://github.com/pantsbuild/pants/pull/8942>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Make streaming workunits report interval a configurable option (#8946)
+  `PR #8946 <https://github.com/pantsbuild/pants/pull/8946>`_
+
+* A rule to topologically sort targets. (#8921)
+  `PR #8921 <https://github.com/pantsbuild/pants/pull/8921>`_
+
+* Add `--debug` option to run V2 tests interactively. (#8827)
+  `PR #8827 <https://github.com/pantsbuild/pants/pull/8827>`_
+
+* Rules to support running setup.py commands (#8882)
+  `PR #8882 <https://github.com/pantsbuild/pants/pull/8882>`_
+
+Bugfixes
+~~~~~~~~
+
+* Set V2 Pytest pex files as `--not-zip-safe` to fix occasional hanging (#8953)
+  `PR #8953 <https://github.com/pantsbuild/pants/pull/8953>`_
+
+* Fix _maybe_handle_help (#8945)
+  `PR #8945 <https://github.com/pantsbuild/pants/pull/8945>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Use f-strings in `src/python/pants/pantsd/pailgun_server.py` + fix typos in comments. (#8949)
+  `PR #8949 <https://github.com/pantsbuild/pants/pull/8949>`_
+
+* Add some type annotations to `goal/` and `auth/` (#8934)
+  `PR #8934 <https://github.com/pantsbuild/pants/pull/8934>`_
+
+* Use f-strings on `src/python/pants/testutil` and `src/python/pants/util/` (#8950)
+  `PR #8950 <https://github.com/pantsbuild/pants/pull/8950>`_
+
+* Rename public Target methods to use `address_spec` instead of `spec` (#8944)
+  `PR #8944 <https://github.com/pantsbuild/pants/pull/8944>`_
+
+* Only compile non-module exports for `export-dep-as-jar` goal (#8914)
+  `PR #8914 <https://github.com/pantsbuild/pants/pull/8914>`_
+
+* Address some remaining issues with setup-py2. (#8927)
+  `PR #8927 <https://github.com/pantsbuild/pants/pull/8927>`_
+
+* Tweak the argument parser to allow file system specs (#8932)
+  `PR #8932 <https://github.com/pantsbuild/pants/pull/8932>`_
+
+* Share the local LMDB store to avoid creating one per test method. (#8933)
+  `PR #8933 <https://github.com/pantsbuild/pants/pull/8933>`_
+
+* Allow `python_test_runner.py` to get coverage for individual targets (#8910)
+  `PR #8910 <https://github.com/pantsbuild/pants/pull/8910>`_
+
+* Fix confusing error for an `@console_rule` not returning a `Goal` (#8931)
+  `PR #8931 <https://github.com/pantsbuild/pants/pull/8931>`_
+
+* Have handle_workunits callback use kwargs (#8918)
+  `PR #8918 <https://github.com/pantsbuild/pants/pull/8918>`_
+
+* Deprecate `--positional-arg-file` in favor of `--spec-file` (#8928)
+  `PR #8928 <https://github.com/pantsbuild/pants/pull/8928>`_
+
+* Refactor `options_test.py` (#8906)
+  `PR #8906 <https://github.com/pantsbuild/pants/pull/8906>`_
+
+* Simplify `./pants test --debug` requesting one single address (#8925)
+  `PR #8925 <https://github.com/pantsbuild/pants/pull/8925>`_
+
+* Stop adding our own colors to V2 test output (#8926)
+  `PR #8926 <https://github.com/pantsbuild/pants/pull/8926>`_
+
+* Update core test model to include coverage results (#8851)
+  `PR #8851 <https://github.com/pantsbuild/pants/pull/8851>`_
+
+* Use color in v2 pytest (#8901)
+  `PR #8901 <https://github.com/pantsbuild/pants/pull/8901>`_
+
+* Hotfix Specs rename conflicting with setup-py2 change (#8920)
+  `PR #8920 <https://github.com/pantsbuild/pants/pull/8920>`_
+
+* Prepare 1.24.0rc1. (#8919)
+  `PR #8919 <https://github.com/pantsbuild/pants/pull/8919>`_
+
+* Rename `Spec` to `AddressSpec` (#8916)
+  `PR #8916 <https://github.com/pantsbuild/pants/pull/8916>`_
+
+* Bump up deprecations for the 1.26 series to earlier in the 1.26 dev series (#8908)
+  `PR #8908 <https://github.com/pantsbuild/pants/pull/8908>`_
+
+* Add type hints to `specs.py` (#8913)
+  `PR #8913 <https://github.com/pantsbuild/pants/pull/8913>`_
+
+* Rename `optionable_rule` to `subsystem_rule` (#8893)
+  `PR #8893 <https://github.com/pantsbuild/pants/pull/8893>`_
+
+* Add experimental --fmt-only flag (#8911)
+  `PR #8911 <https://github.com/pantsbuild/pants/pull/8911>`_
+
+* Extract rule for preparing chrooted python sources (#8899)
+  `PR #8899 <https://github.com/pantsbuild/pants/pull/8899>`_
+
+* Add `deprecated.resolve_conflicting_options` to facilitate moving options (#8903)
+  `PR #8903 <https://github.com/pantsbuild/pants/pull/8903>`_
+
+* Add `shell_str` type to improve `--args` option support (#8904)
+  `PR #8904 <https://github.com/pantsbuild/pants/pull/8904>`_
+
+Testing
+~~~~~~~
+
+* Skip hanging Pantsd integration test (#8961)
+  `PR #8961 <https://github.com/pantsbuild/pants/pull/8961>`_
+
+* Test multiple V2 formatters modifying the same files (#8850)
+  `PR #8850 <https://github.com/pantsbuild/pants/pull/8850>`_
+
+* Skip failing tests from #8943 (#8948)
+  `PR #8948 <https://github.com/pantsbuild/pants/pull/8948>`_
+
+* Add `create_options_bootstrapper()` test util for less boilerplate in V2 tests (#8943)
+  `PR #8943 <https://github.com/pantsbuild/pants/pull/8943>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Add helpful error message to rule authors when merging non-digests (#8962)
+  `PR #8962 <https://github.com/pantsbuild/pants/pull/8962>`_
+
+* Fix typo in export docs (#8936)
+  `PR #8936 <https://github.com/pantsbuild/pants/pull/8936>`_
+
+
 1.25.0.dev0 (01/06/2020)
 ------------------------
 
