@@ -73,6 +73,10 @@ class TestTargetSetup:
   requirements_pex: Pex
   args: Tuple[str, ...]
   input_files_digest: Digest
+  timeout_seconds: Optional[int]
+
+  # Prevent this class from being detected by pytest as a test class.
+  __test__ = False
 
 
 def get_packages_to_cover(
@@ -92,7 +96,8 @@ async def setup_pytest_for_target(
   pytest: PyTest,
   test_options: TestOptions,
 ) -> TestTargetSetup:
-  # TODO: Rather than consuming the TestOptions subsystem, the TestRunner should pass on coverage configuration via #7490.
+  # TODO: Rather than consuming the TestOptions subsystem, the TestRunner should pass on coverage
+  # configuration via #7490.
   transitive_hydrated_targets = await Get[TransitiveHydratedTargets](
     BuildFileAddresses((test_target.address,))
   )
@@ -115,6 +120,12 @@ async def setup_pytest_for_target(
     )
   )
 
+  chrooted_sources = await Get[ChrootedPythonSources](HydratedTargets(all_targets))
+  directories_to_merge = [
+    chrooted_sources.digest,
+    resolved_requirements_pex.directory_digest,
+  ]
+
   # Get the file names for the test_target, adjusted for the source root. This allows us to
   # specify to Pytest which files to test and thus to avoid the test auto-discovery defined by
   # https://pytest.org/en/latest/goodpractices.html#test-discovery. In addition to a performance
@@ -123,13 +134,6 @@ async def setup_pytest_for_target(
   source_root_stripped_test_target_sources = await Get[SourceRootStrippedSources](
     Address, test_target.address.to_address()
   )
-
-  chrooted_sources = await Get[ChrootedPythonSources](HydratedTargets(all_targets))
-
-  directories_to_merge = [
-    chrooted_sources.digest,
-    resolved_requirements_pex.directory_digest,
-  ]
 
   coverage_args = []
   test_target_sources_file_names = source_root_stripped_test_target_sources.snapshot.files
@@ -141,31 +145,12 @@ async def setup_pytest_for_target(
       source_root_stripped_file_paths=test_target_sources_file_names,
     )
     coverage_args = [
-      '--cov-report=', # To not generate any output. https://pytest-cov.readthedocs.io/en/latest/config.html
+      '--cov-report=',  # To not generate any output. https://pytest-cov.readthedocs.io/en/latest/config.html
     ]
     for package in packages_to_cover:
       coverage_args.extend(['--cov', package])
 
   merged_input_files = await Get[Digest](DirectoriesToMerge(directories=tuple(directories_to_merge)))
-
-  return TestTargetSetup(
-    requirements_pex=resolved_requirements_pex,
-    args=(*pytest.options.args, *coverage_args, *sorted(test_target_sources_file_names)),
-    input_files_digest=merged_input_files
-  )
-
-
-@rule(name="Run pytest")
-async def run_python_test(
-  test_target: PythonTestsAdaptor,
-  test_setup: TestTargetSetup,
-  pytest: PyTest,
-  python_setup: PythonSetup,
-  subprocess_encoding_environment: SubprocessEncodingEnvironment,
-  global_options: GlobalOptions,
-  test_options: TestOptions,
-) -> TestResult:
-  """Runs pytest for one target."""
 
   timeout_seconds = calculate_timeout_seconds(
     timeouts_enabled=pytest.options.timeouts,
@@ -174,6 +159,24 @@ async def run_python_test(
     timeout_maximum=pytest.options.timeout_maximum,
   )
 
+  return TestTargetSetup(
+    requirements_pex=resolved_requirements_pex,
+    args=(*pytest.options.args, *coverage_args, *sorted(test_target_sources_file_names)),
+    input_files_digest=merged_input_files,
+    timeout_seconds=timeout_seconds,
+  )
+
+
+@rule(name="Run pytest")
+async def run_python_test(
+  test_target: PythonTestsAdaptor,
+  test_setup: TestTargetSetup,
+  python_setup: PythonSetup,
+  subprocess_encoding_environment: SubprocessEncodingEnvironment,
+  global_options: GlobalOptions,
+  test_options: TestOptions,
+) -> TestResult:
+  """Runs pytest for one target."""
   colors = global_options.colors
   env = {"PYTEST_ADDOPTS": f"--color={'yes' if colors else 'no'}"}
 
@@ -185,8 +188,8 @@ async def run_python_test(
     input_files=test_setup.input_files_digest,
     output_directories=('.coverage',) if test_options.values.run_coverage else None,
     description=f'Run Pytest for {test_target.address.reference()}',
-    timeout_seconds=timeout_seconds if timeout_seconds is not None else 9999,
-    env=env
+    timeout_seconds=test_setup.timeout_seconds if test_setup.timeout_seconds is not None else 9999,
+    env=env,
   )
   result = await Get[FallibleExecuteProcessResult](ExecuteProcessRequest, request)
   return TestResult.from_fallible_execute_process_result(result)

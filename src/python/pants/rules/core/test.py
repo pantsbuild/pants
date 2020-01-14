@@ -58,6 +58,9 @@ class TestResult:
 class TestDebugRequest:
   ipr: InteractiveProcessRequest
 
+  # Prevent this class from being detected by pytest as a test class.
+  __test__ = False
+
 
 @union
 class TestTarget:
@@ -76,6 +79,9 @@ class TestTarget:
 class TestOptions(GoalSubsystem):
   """Runs tests."""
   name = "test"
+
+  # Prevent this class from being detected by pytest as a test class.
+  __test__ = False
 
   @classmethod
   def register_options(cls, register) -> None:

@@ -64,7 +64,7 @@ def test_no_configured_timeouts():
     target_timeout=None,
     timeout_default=None,
     timeout_maximum=2,
-  ) == None
+  ) is None
 
 
 def test_no_timeouts():
@@ -73,4 +73,4 @@ def test_no_timeouts():
     target_timeout=10,
     timeout_default=1,
     timeout_maximum=2,
-  ) == None
+  ) is None

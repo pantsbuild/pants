@@ -75,7 +75,7 @@ class RunTest(GoalRuleTestBase):
     program_text = b'#!/usr/bin/python\nprint("hello")'
     binary = self.create_mock_binary(program_text)
     with self.assertRaises(ValueError):
-      _ = InteractiveProcessRequest(
+      InteractiveProcessRequest(
           argv=("/usr/bin/python",),
           run_in_workspace=True,
           input_files=binary.digest
