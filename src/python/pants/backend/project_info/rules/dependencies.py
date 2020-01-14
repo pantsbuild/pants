@@ -1,6 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from enum import Enum
 from typing import Set
 
 from pants.engine.addressable import BuildFileAddresses
@@ -9,6 +10,12 @@ from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
 from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get
+
+
+class DependencyType(Enum):
+  INTERNAL = "internal"
+  EXTERNAL = "external"
+  INTERNAL_AND_EXTERNAL = "internal-and-external"
 
 
 # TODO(#8762) Get this rule to feature parity with the dependencies task.
@@ -20,9 +27,15 @@ class DependenciesOptions(LineOriented, GoalSubsystem):
     super().register_options(register)
     register(
       '--transitive',
-      default=True,
+      default=False,
       type=bool,
       help='Run dependencies against transitive dependencies of targets specified on the command line.',
+    )
+    # TODO(#8762): Wire this up. Currently we only support `internal`.
+    register(
+      '--type', type=DependencyType, default=DependencyType.INTERNAL,
+      help="Which types of dependencies to find, where `internal` means source code dependencies "
+           "and `external` means 3rd party requirements and JARs."
     )
 
 
