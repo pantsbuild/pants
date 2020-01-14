@@ -51,8 +51,8 @@ class ScoveragePlatform(InjectablesMixin, Subsystem):
     ]
 
     for spec_key, create_jardep_func in specs_to_create:
-      spec = self.injectables_spec_for_key(spec_key)
-      target_address = Address.parse(spec)
+      address_spec = self.injectables_address_spec_for_key(spec_key)
+      target_address = Address.parse(address_spec)
       if not build_graph.contains_address(target_address):
         target_jars = create_jardep_func()
         jars = target_jars if isinstance(target_jars, list) else [target_jars]
@@ -64,7 +64,7 @@ class ScoveragePlatform(InjectablesMixin, Subsystem):
         raise build_graph.ManualSyntheticTargetError(target_address)
 
   @property
-  def injectables_spec_mapping(self):
+  def injectables_address_spec_mapping(self):
     return {
       # Target spec for scoverage plugin.
       'scoverage': [f"//:scoverage"],

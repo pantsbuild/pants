@@ -154,7 +154,7 @@ class Jacoco(CoverageEngine):
   def _get_jacoco_coverage_targets(self, targets):
     coverage_targets = {t for t in targets if (self.is_coverage_target(t) and self._include_target(t))}
     if len(coverage_targets) == 0:
-      raise TaskError(f"No coverage target specs matched jacoco report filters ({self._target_filters})")
+      raise TaskError(f"No coverage address specs matched jacoco report filters ({self._target_filters})")
     return coverage_targets
 
   def _get_target_classpaths(self):

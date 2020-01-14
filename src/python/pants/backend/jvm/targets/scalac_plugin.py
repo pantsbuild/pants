@@ -24,9 +24,9 @@ class ScalacPlugin(ScalaLibrary):
     self.classname = classname
 
   @classmethod
-  def compute_dependency_specs(cls, kwargs=None, payload=None):
-    for spec in super().compute_dependency_specs(kwargs, payload):
-      yield spec
+  def compute_dependency_address_specs(cls, kwargs=None, payload=None):
+    for address_spec in super().compute_dependency_address_specs(kwargs, payload):
+      yield address_spec
 
-    for spec in ScalaPlatform.global_instance().injectables_specs_for_key('scalac'):
-      yield spec
+    for address_spec in ScalaPlatform.global_instance().injectables_address_specs_for_key('scalac'):
+      yield address_spec

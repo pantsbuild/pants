@@ -27,7 +27,7 @@ from pants.engine.legacy.structs import PythonTestsAdaptor
 from pants.engine.rules import RootRule, subsystem_rule
 from pants.engine.selectors import Params
 from pants.rules.core import strip_source_root
-from pants.rules.core.test import Status, TestDebugResult, TestOptions, TestResult
+from pants.rules.core.test import Status, TestDebugRequest, TestOptions, TestResult
 from pants.testutil.interpreter_selection_utils import skip_unless_python27_and_python3_present
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
@@ -132,13 +132,14 @@ class PythonTestRunnerIntegrationTest(TestBase):
       address=BuildFileAddress(rel_path=f"{self.source_root}/BUILD", target_name="target"),
     )
     test_result = self.request_single_product(TestResult, Params(target, options_bootstrapper))
-    debug_result = self.request_single_product(
-      TestDebugResult, Params(target, options_bootstrapper, InteractiveRunner(self.scheduler)),
+    debug_request = self.request_single_product(
+      TestDebugRequest, Params(target, options_bootstrapper),
     )
+    debug_result = InteractiveRunner(self.scheduler).run_local_interactive_process(debug_request.ipr)
     if test_result.status == Status.SUCCESS:
-      assert debug_result.exit_code == 0
+      assert debug_result.process_exit_code == 0
     else:
-      assert debug_result.exit_code != 0
+      assert debug_result.process_exit_code != 0
     return test_result
 
   def test_single_passing_test(self) -> None:

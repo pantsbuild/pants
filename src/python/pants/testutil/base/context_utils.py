@@ -87,7 +87,7 @@ class TestContext(Context):
     """
     :API: public
     """
-    sys.stderr.write('\nStarting workunit {}\n'.format(name))
+    sys.stderr.write(f'\nStarting workunit {name}\n')
     yield TestContext.DummyWorkUnit()
 
   @property

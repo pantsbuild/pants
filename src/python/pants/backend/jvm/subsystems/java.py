@@ -25,7 +25,7 @@ class Java(JvmToolMixin, ZincLanguageMixin, InjectablesMixin, Subsystem):
     super().register_options(register)
     # This target, if specified, serves as both a tool (for compiling java code) and a
     # dependency (for javac plugins).  See below for the different methods for accessing
-    # classpath entries (in the former case) or target specs (in the latter case).
+    # classpath entries (in the former case) or address specs (in the latter case).
     #
     # Javac plugins can access basically all of the compiler internals, so we don't shade anything.
     # Hence the unspecified main= argument. This tool is optional, hence the empty classpath list.
@@ -51,7 +51,7 @@ class Java(JvmToolMixin, ZincLanguageMixin, InjectablesMixin, Subsystem):
       raise build_graph.ManualSyntheticTargetError(tools_jar_address)
 
   @property
-  def injectables_spec_mapping(self):
+  def injectables_address_spec_mapping(self):
     return {
       # Zinc directly accesses the javac tool.
       'javac': [self._javac_spec],

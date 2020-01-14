@@ -30,7 +30,7 @@ class AvroJavaGenTask(SimpleCodegenTask, NailgunTask):
                           classpath=[JarDependency(org='org.apache.avro', name='avro-tools', rev=AVRO_REV)],)
     register('--runtime-deps', advanced=True, type=list, fingerprint=True,
              default=['//:avro-java-runtime'],
-             help='A list of specs pointing to dependencies of Avro generated code.')
+             help='A list of address specs pointing to dependencies of Avro generated code.')
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)

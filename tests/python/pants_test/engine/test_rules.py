@@ -86,7 +86,7 @@ async def a_goal_rule_generator(console: Console) -> Example:
   return Example(exit_code=0)
 
 
-class RuleTest(unittest.TestCase):
+class RuleTest(TestBase):
   def test_run_rule_goal_rule_generator(self):
     res = run_rule(
       a_goal_rule_generator,
@@ -94,6 +94,20 @@ class RuleTest(unittest.TestCase):
       mock_gets=[MockGet(product_type=A, subject_type=str, mock=lambda _: A())],
     )
     self.assertEquals(res, Example(0))
+
+  def test_side_effecting_inputs(self) -> None:
+    @goal_rule
+    def valid_rule(console: Console, b: str) -> Example:
+      return Example(exit_code=0)
+
+    with self.assertRaises(ValueError) as cm:
+      @rule
+      def invalid_rule(console: Console, b: str) -> bool:
+        return False
+
+    error_str = str(cm.exception)
+    assert "invalid_rule has a side-effecting parameter" in error_str
+    assert "pants.engine.console.Console" in error_str
 
 
 class RuleIndexTest(TestBase):

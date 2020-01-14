@@ -42,8 +42,8 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
 
     self.assertEqual('targets', actual_properties[0].getAttribute('name'))
     actual_targets = json.loads(actual_properties[0].getAttribute('value'))
-    abs_expected_target_specs = [os.path.join(get_buildroot(), relative_spec) for relative_spec in expected_targets]
-    self.assertEqual(abs_expected_target_specs, actual_targets)
+    abs_expected_address_specs = [os.path.join(get_buildroot(), relative_spec) for relative_spec in expected_targets]
+    self.assertEqual(abs_expected_address_specs, actual_targets)
 
     self.assertEqual('project_path', actual_properties[1].getAttribute('name'))
     actual_project_path = actual_properties[1].getAttribute('value')
@@ -65,19 +65,19 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
     with open(output_file, 'r') as result:
       return result.readlines()[0].strip()
 
-  def _run_and_check(self, target_specs, incremental_import=None):
+  def _run_and_check(self, address_specs, incremental_import=None):
     """
     Invoke idea-plugin goal and check for target specs and project in the
     generated project and workspace file.
 
-    :param target_specs: list of target specs
+    :param address_specs: list of address specs
     :return: n/a
     """
-    self.assertTrue(target_specs, "targets are empty")
+    self.assertTrue(address_specs, "targets are empty")
     spec_parser = CmdLineSpecParser(get_buildroot())
     # project_path is always the directory of the first target,
     # which is where intellij is going to zoom in under project view.
-    project_path = spec_parser.parse_address_spec(target_specs[0]).directory
+    project_path = spec_parser.parse_address_spec(address_specs[0]).directory
 
     with self.temporary_workdir() as workdir:
       with temporary_file(root_dir=workdir, cleanup=True) as output_file:
@@ -88,12 +88,12 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
           ]
         if incremental_import is not None:
           args.append(f'--incremental-import={incremental_import}')
-        pants_run = self.run_pants_with_workdir(args + target_specs, workdir)
+        pants_run = self.run_pants_with_workdir(args + address_specs, workdir)
         self.assert_success(pants_run)
 
         project_dir = self._get_project_dir(output_file.name)
         self.assertTrue(os.path.exists(project_dir), f"{project_dir} does not exist")
-        self._do_check(project_dir, project_path, target_specs, incremental_import=incremental_import)
+        self._do_check(project_dir, project_path, address_specs, incremental_import=incremental_import)
 
   def test_idea_plugin_single_target(self):
     target = 'examples/src/scala/org/pantsbuild/example/hello:hello'

@@ -95,6 +95,6 @@ class BasicAuth(Subsystem):
 
     cookies.update(response.cookies) 
 
-  def get_auth_for_provider(self, auth_provider: str) -> Authentication:
+  def get_auth_for_provider(self, auth_provider: Optional[str]) -> Authentication:
     cookies = Cookies.global_instance()
     return Authentication(headers={}, request_args={'cookies': cookies.get_cookie_jar()})

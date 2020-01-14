@@ -10,6 +10,7 @@ from typing import Iterable
 
 from twitter.common.collections import OrderedSet
 
+from pants.base.deprecated import warn_or_error
 from pants.base.specs import AddressSpec
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
@@ -604,6 +605,17 @@ class BuildGraph(ABC):
     """
 
   @abstractmethod
+  def inject_address_specs_closure(self, address_specs: Iterable[AddressSpec], fail_fast=None):
+    """Resolves, constructs and injects Targets and their transitive closures of dependencies.
+
+    :API: public
+
+    :param address_specs: An iterable of AddressSpec objects to resolve and inject.
+    :param fail_fast: Whether to fail quickly for the first error, or to complete all
+      possible injections before failing.
+    :returns: Yields a sequence of resolved Address objects.
+    """
+
   def inject_specs_closure(self, specs: Iterable[AddressSpec], fail_fast=None):
     """Resolves, constructs and injects Targets and their transitive closures of dependencies.
 
@@ -614,6 +626,13 @@ class BuildGraph(ABC):
       possible injections before failing.
     :returns: Yields a sequence of resolved Address objects.
     """
+    warn_or_error(
+      removal_version="1.27.0.dev0",
+      deprecated_entity_description="inject_specs_closure()",
+      hint="Use `inject_address_specs_closure()` instead. The API is the same as "
+           "before. This change is to prepare for Pants eventually supporting file system specs, "
+           "e.g. `./pants cloc foo.py`. In preparation, we renamed `Spec` to `AddressSpec`."
+    )
 
   def resolve(self, spec):
     """Returns an iterator over the target(s) the given address points to."""

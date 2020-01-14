@@ -257,7 +257,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     if self._options.help_request:
       help_printer = HelpPrinter(self._options)
       result = help_printer.print_help()
-      self._exiter(result)
+      return result
 
   def _maybe_run_v1(self):
     v1_goals, ambiguous_goals, _ = self._options.goals_by_version
@@ -321,27 +321,35 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     engine_result = PANTS_FAILED_EXIT_CODE
     goal_runner_result = PANTS_FAILED_EXIT_CODE
 
-    streaming_handlers = self._options.for_global_scope().streaming_workunits_handlers
+    global_options = self._options.for_global_scope()
+
+    streaming_handlers = global_options.streaming_workunits_handlers
+    report_interval = global_options.streaming_workunits_report_interval
     callbacks = Subsystem.get_streaming_workunit_callbacks(streaming_handlers)
-    streaming_reporter = StreamingWorkunitHandler(self._scheduler_session, callbacks=callbacks)
+    streaming_reporter = StreamingWorkunitHandler(self._scheduler_session, callbacks=callbacks, report_interval_seconds=report_interval)
+
+    help_output = self._maybe_handle_help()
+    if help_output is not None:
+      self._exiter.exit(help_output)
 
     with streaming_reporter.session():
       try:
-        self._maybe_handle_help()
         engine_result = self._maybe_run_v2()
         goal_runner_result = self._maybe_run_v1()
       finally:
-        try:
-          self._update_stats()
-          run_tracker_result = self._run_tracker.end()
-        except ValueError as e:
-          # Calling .end() sometimes writes to a closed file, so we return a dummy result here.
-          logger.exception(e)
-          run_tracker_result = PANTS_SUCCEEDED_EXIT_CODE
-
+        run_tracker_result = self._finish_run()
     final_exit_code = self._compute_final_exit_code(
       engine_result,
       goal_runner_result,
       run_tracker_result
     )
     self._exiter.exit(final_exit_code)
+
+  def _finish_run(self):
+    try:
+      self._update_stats()
+      return self._run_tracker.end()
+    except ValueError as e:
+      # Calling .end() sometimes writes to a closed file, so we return a dummy result here.
+      logger.exception(e)
+      return PANTS_SUCCEEDED_EXIT_CODE

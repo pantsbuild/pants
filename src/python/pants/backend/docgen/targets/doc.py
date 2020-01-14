@@ -86,7 +86,7 @@ class Page(Target):
     :param format: Page's format, ``md`` or ``rst``. By default, Pants infers from ``source`` file
        extension: ``.rst`` is ReStructured Text; anything else is Markdown.
     :param links: Other ``page`` targets that this `page` links to.
-    :type links: List of target specs
+    :type links: List of address specs
     :param provides: Optional "Addresses" at which this page is published.
        E.g., a wiki location.
     :type provides: List of ``wiki_artifact``s
@@ -116,13 +116,13 @@ class Page(Target):
     return list(self.payload.sources.source_paths)[0]
 
   @classmethod
-  def compute_injectable_specs(cls, kwargs=None, payload=None):
-    for spec in super().compute_injectable_specs(kwargs, payload):
-      yield spec
+  def compute_injectable_address_specs(cls, kwargs=None, payload=None):
+    for address_spec in super().compute_injectable_address_specs(kwargs, payload):
+      yield address_spec
 
     target_representation = kwargs or payload.as_dict()
-    for spec in target_representation.get('links', []):
-      yield spec
+    for address_spec in target_representation.get('links', []):
+      yield address_spec
 
   @property
   def provides(self):

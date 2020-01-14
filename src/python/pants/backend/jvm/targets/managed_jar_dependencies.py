@@ -32,17 +32,17 @@ class ManagedJarDependencies(Target):
 
   @classmethod
   def compute_injectable_specs(cls, kwargs=None, payload=None):
-    for spec in super().compute_injectable_specs(kwargs, payload):
-      yield spec
+    for address_spec in super().compute_injectable_address_specs(kwargs, payload):
+      yield address_spec
 
     if kwargs:
-      _, specs = cls._split_jars_and_specs(kwargs.get('artifacts', ()))
-      for spec in specs:
-        yield spec
+      _, address_specs = cls._split_jars_and_specs(kwargs.get('artifacts', ()))
+      for address_spec in address_specs:
+        yield address_spec
     elif payload:
       payload_dict = payload.as_dict()
-      for spec in payload_dict.get('library_specs', ()):
-        yield spec
+      for address_spec in payload_dict.get('library_specs', ()):
+        yield address_spec
 
   @memoized_property
   def library_specs(self):

@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Tuple
 
 from pants.base.exception_sink import ExceptionSink
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, Digest
-from pants.engine.rules import RootRule
+from pants.engine.rules import RootRule, side_effecting
 
 
 if TYPE_CHECKING:
@@ -30,6 +30,7 @@ class InteractiveProcessRequest:
       raise ValueError("InteractiveProessRequest should use the Workspace API to materialize any needed files when it runs in the workspace")
 
 
+@side_effecting
 @dataclass(frozen=True)
 class InteractiveRunner:
   _scheduler: 'SchedulerSession'

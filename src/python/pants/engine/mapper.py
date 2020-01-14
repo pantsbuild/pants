@@ -31,7 +31,7 @@ class AddressMap:
 
   To construct an AddressMap, use `parse`.
 
-  :param path: The path to the byte source this address map's objects were pased from.
+  :param path: The path to the byte source this address map's objects were passed from.
   :param objects_by_name: A dict mapping from object name to the parsed 'thin' addressable object.
   """
   path: Any
@@ -42,7 +42,7 @@ class AddressMap:
     """Parses a source for addressable Serializable objects.
 
     No matter the parser used, the parsed and mapped addressable objects are all 'thin'; ie: any
-    objects they point to in other namespaces or even in the same namespace but from a seperate
+    objects they point to in other namespaces or even in the same namespace but from a separate
     source are left as unresolved pointers.
 
     :param string filepath: The path to the byte source containing serialized objects.

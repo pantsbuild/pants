@@ -71,15 +71,15 @@ class PythonTarget(Target):
         raise TargetDefinitionException(self, str(e))
 
   @classmethod
-  def compute_injectable_specs(cls, kwargs=None, payload=None):
-    for spec in super().compute_injectable_specs(kwargs, payload):
-      yield spec
+  def compute_injectable_address_specs(cls, kwargs=None, payload=None):
+    for address_spec in super().compute_injectable_address_specs(kwargs, payload):
+      yield address_spec
 
     target_representation = kwargs or payload.as_dict()
     provides = target_representation.get('provides', None) or []
     if provides:
-      for spec in provides._binaries.values():
-        yield spec
+      for address_spec in provides._binaries.values():
+        yield address_spec
 
   @property
   def provides(self):

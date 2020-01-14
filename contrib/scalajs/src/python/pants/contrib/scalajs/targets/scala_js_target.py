@@ -26,11 +26,11 @@ class ScalaJSTarget:
     super().__init__(address=address, payload=payload, **kwargs)
 
   @classmethod
-  def compute_dependency_specs(cls, kwargs=None, payload=None):
-    for spec in super().compute_dependency_specs(kwargs, payload):
-      yield spec
-    for spec in ScalaJSPlatform.global_instance().injectables_specs_for_key('runtime'):
-      yield spec
+  def compute_dependency_address_specs(cls, kwargs=None, payload=None):
+    for address_spec in super().compute_dependency_address_specs(kwargs, payload):
+      yield address_spec
+    for address_spec in ScalaJSPlatform.global_instance().injectables_address_specs_for_key('runtime'):
+      yield address_spec
 
   @property
   def strict_deps(self):

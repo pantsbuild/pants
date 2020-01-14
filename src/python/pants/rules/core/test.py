@@ -13,6 +13,7 @@ from pants.engine.build_files import AddressProvenanceMap
 from pants.engine.console import Console
 from pants.engine.fs import Digest
 from pants.engine.goal import Goal, GoalSubsystem
+from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
 from pants.engine.isolated_process import FallibleExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTarget
 from pants.engine.objects import union
@@ -54,8 +55,8 @@ class TestResult:
 
 
 @dataclass(frozen=True)
-class TestDebugResult:
-  exit_code: int
+class TestDebugRequest:
+  ipr: InteractiveProcessRequest
 
   # Prevent this class from being detected by pytest as a test class.
   __test__ = False
@@ -125,17 +126,19 @@ class AddressAndTestResult:
 
 
 @dataclass(frozen=True)
-class AddressAndDebugResult:
+class AddressAndDebugRequest:
   address: BuildFileAddress
-  test_result: TestDebugResult
+  request: TestDebugRequest
 
 
 @goal_rule
-async def run_tests(console: Console, options: TestOptions, addresses: BuildFileAddresses) -> Test:
+async def run_tests(console: Console, options: TestOptions, runner: InteractiveRunner, addresses: BuildFileAddresses) -> Test:
   if options.values.debug:
     address = await Get[BuildFileAddress](BuildFileAddresses, addresses)
-    result = await Get[AddressAndDebugResult](Address, address.to_address())
-    return Test(result.test_result.exit_code)
+    addr_debug_request = await Get[AddressAndDebugRequest](Address, address.to_address())
+    result = runner.run_local_interactive_process(addr_debug_request.request.ipr)
+    return Test(result.process_exit_code)
+
   results = await MultiGet(Get[AddressAndTestResult](Address, addr.to_address()) for addr in addresses)
   did_any_fail = False
   filtered_results = [(x.address, x.test_result) for x in results if x.test_result is not None]
@@ -192,10 +195,10 @@ async def coordinator_of_tests(
 
 
 @rule
-async def coordinator_of_debug_tests(target: HydratedTarget) -> AddressAndDebugResult:
+async def coordinator_of_debug_tests(target: HydratedTarget) -> AddressAndDebugRequest:
   logger.info(f"Starting tests in debug mode: {target.address.reference()}")
-  result = await Get[TestDebugResult](TestTarget, target.adaptor)
-  return AddressAndDebugResult(target.address, result)
+  request = await Get[TestDebugRequest](TestTarget, target.adaptor)
+  return AddressAndDebugRequest(target.address, request)
 
 
 def rules():

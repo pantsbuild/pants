@@ -42,9 +42,9 @@ class ApacheThriftGenBase(SimpleCodegenTask):
              default=cls.default_gen_options_map,
              help='Use these options for the {} generator.'.format(cls.thrift_generator))
     register('--deps', advanced=True, type=list, member_type=target_option,
-             help='A list of specs pointing to dependencies of thrift generated code.')
+             help='A list of address specs pointing to dependencies of thrift generated code.')
     register('--service-deps', advanced=True, type=list, member_type=target_option,
-             help='A list of specs pointing to dependencies of thrift generated service '
+             help='A list of address specs pointing to dependencies of thrift generated service '
                   'code.  If not supplied, then --deps will be used for service deps.')
 
   @classmethod

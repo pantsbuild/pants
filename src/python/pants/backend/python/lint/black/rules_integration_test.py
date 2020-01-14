@@ -3,6 +3,8 @@
 
 from typing import List, Optional, Tuple
 
+import pytest
+
 from pants.backend.python.lint.black.rules import BlackTarget
 from pants.backend.python.lint.black.rules import rules as black_rules
 from pants.backend.python.rules import download_pex_bin, pex
@@ -92,6 +94,7 @@ class BlackIntegrationTest(TestBase):
     self.assertIn("1 file reformatted, 1 file left unchanged", fmt_result.stderr)
     self.assertEqual(fmt_result.digest, self.get_digest([self.good_source, self.fixed_bad_source]))
 
+  @pytest.mark.skip(reason="Get config file creation to work with options parsing")
   def test_respects_config_file(self) -> None:
     lint_result, fmt_result = self.run_black(
       [self.needs_config_source], config="[tool.black]\nskip-string-normalization = 'true'\n",

@@ -32,7 +32,7 @@ class FileDeps(ConsoleTask):
     for target in targets:
       concrete_target = target.concrete_derived_from
       concrete_targets.add(concrete_target)
-      # TODO(John Sirois): This hacks around ScalaLibraries' psuedo-deps on JavaLibraries.  We've
+      # TODO(John Sirois): This hacks around ScalaLibraries' pseudo-deps on JavaLibraries.  We've
       # already tried to tuck away this hack by subclassing closure() in ScalaLibrary - but in this
       # case that's not enough when a ScalaLibrary with java_sources is an interior node of the
       # active context graph.  This awkwardness should be eliminated when ScalaLibrary can point

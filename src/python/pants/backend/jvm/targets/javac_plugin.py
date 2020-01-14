@@ -25,8 +25,8 @@ class JavacPlugin(JavaLibrary):
     self.classname = classname
 
   @classmethod
-  def compute_dependency_specs(cls, kwargs=None, payload=None):
-    for spec in super().compute_dependency_specs(kwargs, payload):
-      yield spec
+  def compute_dependency_address_specs(cls, kwargs=None, payload=None):
+    for address_spec in super().compute_dependency_address_specs(kwargs, payload):
+      yield address_spec
 
-    yield Java.global_instance().injectables_spec_for_key('tools.jar')
+    yield Java.global_instance().injectables_address_spec_for_key('tools.jar')
