@@ -11,7 +11,7 @@ from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 
-from pants.engine.fs import (
+from pants.engine.fs import (  # SnapshotSubset,
   EMPTY_DIRECTORY_DIGEST,
   Digest,
   DirectoriesToMerge,
@@ -24,7 +24,6 @@ from pants.engine.fs import (
   PathGlobs,
   PathGlobsAndRoot,
   Snapshot,
-  SnapshotSubset,
   UrlToFetch,
   create_fs_rules,
 )
@@ -596,6 +595,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
 
   def test_snapshot_subset(self):
     pass
+
 
 class StubHandler(BaseHTTPRequestHandler):
   response_text = b"www.pantsbuild.org"
