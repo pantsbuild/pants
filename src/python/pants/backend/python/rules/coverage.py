@@ -211,26 +211,28 @@ def get_file_names(all_target_adaptors):
   return list(iter_files())
 
 
-# TODO: Make this not a goal again when the build graph ambiguity is worked out.
-class CoverageOptions(GoalSubsystem):
-  name = 'coverage2'
+# # TODO: Make this not a goal again when the build graph ambiguity is worked out.
+# class CoverageOptions(GoalSubsystem):
+#   name = 'coverage2'
 
 
-class CoverageReport(Goal):
-  subsystem_cls = CoverageOptions
-  # report: Digest
+# class CoverageReport(Goal):
+#   subsystem_cls = CoverageOptions
+#   # report: Digest
+
+@dataclass(frozen=True)
+class CoverageReport:
+  report: Digest
 
 
-@goal_rule(name="Generate coverage report")
+@rule(name="Generate coverage report")
 async def generate_coverage_report(
-  addresses: BuildFileAddresses,
+  # addresses: BuildFileAddresses,
+  test_results: tuple,
   specs: AddressSpecs,
-  pytest: PyTest,
   python_setup: PythonSetup,
-  coverage: CoverageToolBase,
   coverage_setup: CoverageSetup,
   source_root_config: SourceRootConfig,
-  subprocess_encoding_environment: SubprocessEncodingEnvironment,
   merged_coverage_data: MergedCoverageData,
 ) -> CoverageReport:
   """Takes all python test results and generates a single coverage report in dist/coverage."""
@@ -300,8 +302,8 @@ async def generate_coverage_report(
     request
   )
   print(result)
-  # return CoverageReport(result.output_directory_digest)
-  return CoverageReport(0)
+  return CoverageReport(result.output_directory_digest)
+  # return CoverageReport(0)
 
 
 def rules():

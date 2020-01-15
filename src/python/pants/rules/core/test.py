@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 
-# from pants.backend.python.rules.coverage import MergedCoverageData
+# from pants.backend.python.rules.coverage import CoverageReport
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.addressable import BuildFileAddresses
@@ -138,6 +138,10 @@ class AddressAndDebugRequest:
   address: BuildFileAddress
   request: TestDebugRequest
 
+@dataclass(frozen=True)
+class CoverageReport:
+  report: Digest
+
 
 @goal_rule
 async def run_tests(
@@ -152,9 +156,9 @@ async def run_tests(
   results = await MultiGet(Get[AddressAndTestResult](Address, addr.to_address()) for addr in addresses)
   did_any_fail = False
   filtered_results = [(x.address, x.test_result) for x in results if x.test_result is not None]
-  # if options.values.run_coverage:
-    # coverage_data = await Get[MergedCoverageData](BuildFileAddress, addresses)
-    # import pdb; pdb.set_trace()
+  if options.values.run_coverage:
+    coverage_report = await Get[CoverageReport](tuple, tuple(sorted(filtered_results)))
+    import pdb; pdb.set_trace()
   for address, test_result in filtered_results:
     if test_result.status == Status.FAILURE:
       did_any_fail = True
