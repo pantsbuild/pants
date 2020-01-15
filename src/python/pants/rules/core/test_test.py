@@ -6,7 +6,7 @@ from textwrap import dedent
 from typing import Dict, Optional
 from unittest.mock import Mock
 
-from pants.base.specs import AddressSpec, AddressSpecs, DescendantAddresses, SingleAddress
+from pants.base.specs import AddressSpec, DescendantAddresses, SingleAddress
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.build_files import AddressProvenanceMap
@@ -144,11 +144,9 @@ class TestTest(TestBase):
         MockGet(product_type=AddressAndDebugRequest, subject_type=Address, mock=make_debug_request),
         MockGet(
           product_type=BuildFileAddress,
-          subject_type=AddressSpecs,
+          subject_type=BuildFileAddresses,
           mock=lambda tgt: BuildFileAddress(
-            build_file=None,
-            target_name=tgt.target_name,
-            rel_path=f'{tgt.spec_path}/BUILD'
+            rel_path=f'{tgt.spec_path}/BUILD', target_name=tgt.target_name,
           )
         ),
       ],
@@ -254,7 +252,7 @@ class TestTest(TestBase):
     assert result == AddressAndTestResult(addr, None)
 
   def test_coordinator_globbed_test_target(self):
-    bfaddr = BuildFileAddress(None, 'tests', 'some/dir')
+    bfaddr = BuildFileAddress(rel_path='some/dir', target_name='tests')
     result = self.run_coordinator_of_tests(
       address=bfaddr.to_address(),
       bfaddr_to_address_spec={bfaddr: DescendantAddresses(directory='some/dir')}
@@ -264,7 +262,7 @@ class TestTest(TestBase):
     )
 
   def test_coordinator_globbed_non_test_target(self):
-    bfaddr = BuildFileAddress(None, 'bin', 'some/dir')
+    bfaddr = BuildFileAddress(rel_path='some/dir', target_name='bin')
     result = self.run_coordinator_of_tests(
       address=bfaddr.to_address(),
       bfaddr_to_address_spec={bfaddr: DescendantAddresses(directory='some/dir')},

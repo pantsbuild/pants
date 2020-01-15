@@ -103,7 +103,7 @@ class TargetRootsCalculator:
       # We've been provided no spec roots (e.g. `./pants list`) AND a changed request. Compute
       # alternate target roots.
       request = OwnersRequest(sources=tuple(changed_files),
-                              include_dependees=str(changed_request.include_dependees))
+                              include_dependees=changed_request.include_dependees)
       changed_addresses, = session.product_request(BuildFileAddresses, [request])
       logger.debug('changed addresses: %s', changed_addresses)
       dependencies = tuple(SingleAddress(a.spec_path, a.target_name) for a in changed_addresses)
@@ -114,7 +114,7 @@ class TargetRootsCalculator:
     if owned_files:
       # We've been provided no spec roots (e.g. `./pants list`) AND a owner request. Compute
       # alternate target roots.
-      request = OwnersRequest(sources=tuple(owned_files), include_dependees=str('none'))
+      request = OwnersRequest(sources=tuple(owned_files), include_dependees='none')
       owner_addresses, = session.product_request(BuildFileAddresses, [request])
       logger.debug('owner addresses: %s', owner_addresses)
       dependencies = tuple(SingleAddress(a.spec_path, a.target_name) for a in owner_addresses)

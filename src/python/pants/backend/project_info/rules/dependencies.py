@@ -3,7 +3,7 @@
 
 from typing import Set
 
-from pants.base.specs import AddressSpecs
+from pants.engine.addressable import BuildFileAddresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
@@ -31,18 +31,17 @@ class Dependencies(Goal):
 
 @goal_rule
 async def dependencies(
-  console: Console, address_specs: AddressSpecs, options: DependenciesOptions,
+  console: Console, build_file_addresses: BuildFileAddresses, options: DependenciesOptions,
 ) -> Dependencies:
   addresses: Set[str] = set()
   if options.values.transitive:
-    transitive_targets = await Get[TransitiveHydratedTargets](AddressSpecs, address_specs)
-    addresses.update(hydrated_target.address.spec for hydrated_target in transitive_targets.closure)
-    # transitive_targets.closure includes the initial target. To keep the behavior consistent with intransitive
-    # dependencies, we remove the initial target from the set of addresses.
-    for address_spec in address_specs.dependencies:
-      addresses.discard(address_spec.to_spec_string())
+    transitive_targets = await Get[TransitiveHydratedTargets](
+      BuildFileAddresses, build_file_addresses,
+    )
+    transitive_dependencies = transitive_targets.closure - set(transitive_targets.roots)
+    addresses.update(hydrated_target.address.spec for hydrated_target in transitive_dependencies)
   else:
-    hydrated_targets = await Get[HydratedTargets](AddressSpecs, address_specs)
+    hydrated_targets = await Get[HydratedTargets](BuildFileAddresses, build_file_addresses)
     addresses.update(
       dep.spec
       for hydrated_target in hydrated_targets
