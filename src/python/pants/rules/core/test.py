@@ -26,11 +26,6 @@ from pants.engine.selectors import Get, MultiGet
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
-class MergedCoverageData:
-  coverage_data: Digest
-
-
 class Status(Enum):
   SUCCESS = "SUCCESS"
   FAILURE = "FAILURE"
@@ -137,6 +132,7 @@ class AddressAndTestResult:
 class AddressAndDebugRequest:
   address: BuildFileAddress
   request: TestDebugRequest
+
 
 @dataclass(frozen=True)
 class CoverageReport:

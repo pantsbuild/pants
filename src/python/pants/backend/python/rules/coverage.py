@@ -41,7 +41,7 @@ from pants.engine.legacy.graph import HydratedTarget, TransitiveHydratedTargets
 from pants.engine.rules import goal_rule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.rules.core.strip_source_root import SourceRootStrippedSources
-from pants.rules.core.test import AddressAndTestResult, MergedCoverageData
+from pants.rules.core.test import AddressAndTestResult
 from pants.source.source_root import SourceRootConfig
 
 
@@ -86,6 +86,10 @@ async def create_coverage_request(
 ) -> ExecuteProcessRequest:
   pass
 
+
+@dataclass(frozen=True)
+class MergedCoverageData:
+  coverage_data: Digest
 
 @rule(name="Merge coverage reports")
 async def merge_coverage_reports(
