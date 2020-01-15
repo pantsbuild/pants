@@ -38,7 +38,7 @@ from pants.engine.fs import (
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTarget, TransitiveHydratedTargets
-from pants.engine.rules import console_rule, rule, subsystem_rule
+from pants.engine.rules import goal_rule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.rules.core.strip_source_root import SourceRootStrippedSources
 from pants.rules.core.test import AddressAndTestResult, MergedCoverageData
@@ -221,7 +221,7 @@ class CoverageReport(Goal):
   # report: Digest
 
 
-@console_rule(name="Generate coverage report")
+@goal_rule(name="Generate coverage report")
 async def generate_coverage_report(
   addresses: BuildFileAddresses,
   specs: AddressSpecs,

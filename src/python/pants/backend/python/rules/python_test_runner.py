@@ -4,15 +4,8 @@
 import os
 from dataclasses import dataclass
 from textwrap import dedent
-<<<<<<< HEAD
-<<<<<<< HEAD
-from typing import Optional, Tuple
-=======
+
 from typing import Optional, Set, Tuple
->>>>>>> Remove dead things.
-=======
-from typing import Optional, Tuple
->>>>>>> cherrypick python_test_runner
 
 from pants.backend.python.rules.inject_init import InjectedInitDigest
 from pants.backend.python.rules.pex import Pex
@@ -32,7 +25,6 @@ from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.option.global_options import GlobalOptions
 from pants.rules.core.strip_source_root import SourceRootStrippedSources
-<<<<<<< HEAD
 from pants.rules.core.test import TestDebugRequest, TestOptions, TestResult, TestTarget
 
 
@@ -54,9 +46,6 @@ def get_coveragerc_input(coveragerc_content: str) -> InputFilesContent:
       ),
     ]
   )
-=======
-from pants.rules.core.test import TestDebugResult, TestOptions, TestResult, TestTarget
->>>>>>> cherrypick python_test_runner
 
 
 DEFAULT_COVERAGE_CONFIG = dedent(f"""
@@ -140,12 +129,8 @@ async def setup_pytest_for_target(
   pytest: PyTest,
   test_options: TestOptions,
 ) -> TestTargetSetup:
-<<<<<<< HEAD
   # TODO: Rather than consuming the TestOptions subsystem, the TestRunner should pass on coverage
   # configuration via #7490.
-=======
-  # TODO: Rather than consuming the TestOptions subsystem, the TestRunner should pass on coverage configuration via #7490.
->>>>>>> cherrypick python_test_runner
   transitive_hydrated_targets = await Get[TransitiveHydratedTargets](
     BuildFileAddresses((test_target.address,))
   )

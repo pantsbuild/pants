@@ -133,10 +133,6 @@ class AddressAndTestResult:
     return is_valid_target_type and has_sources
 
 
-class AddressesAndTestResults(Collection[AddressAndTestResult]):
-  pass
-
-
 @dataclass(frozen=True)
 class AddressAndDebugRequest:
   address: BuildFileAddress
