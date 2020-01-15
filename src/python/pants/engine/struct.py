@@ -1,21 +1,12 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-
 from collections.abc import MutableMapping, MutableSequence
+from typing import Any, Dict, Iterable, Optional
 
 from pants.engine.addressable import addressable, addressable_list
 from pants.engine.objects import Serializable, SerializableFactory, Validatable, ValidationError
 from pants.util.objects import SubclassesOf, SuperclassesOf
-
-
-def _normalize_utf8_keys(kwargs):
-  """When kwargs are passed literally in a source file, their keys are ascii: normalize."""
-  if any(type(key) is bytes for key in kwargs.keys()):
-    # This is to preserve the original dict type for kwargs.
-    dict_type = type(kwargs)
-    return dict_type([(str(k), v) for k, v in kwargs.items()])
-  return kwargs
 
 
 class Struct(Serializable, SerializableFactory, Validatable):
@@ -36,7 +27,14 @@ class Struct(Serializable, SerializableFactory, Validatable):
   # Fields that are only intended for consumption by the Struct baseclass.
   _INTERNAL_FIELDS = _INHERITANCE_FIELDS | {_ABSTRACT_FIELD}
 
-  def __init__(self, abstract=False, extends=None, merges=None, type_alias=None, **kwargs):
+  def __init__(
+    self,
+    abstract: bool = False,
+    extends: Optional[Serializable] = None,
+    merges: Optional[Iterable[Serializable]] = None,
+    type_alias: Optional[str] = None,
+    **kwargs: Any,
+  ) -> None:
     """Creates a new struct data blob.
 
     By default Structs are anonymous (un-named), concrete (not `abstract`), and they neither
@@ -55,8 +53,8 @@ class Struct(Serializable, SerializableFactory, Validatable):
     value can serve as documentation, or, for subclasses that provide an implementation for
     `validate_concrete`, it allows skipping validation for abstract instances.
 
-    :param bool abstract: `True` to mark this struct as abstract, in which case no
-                          validation is performed (see `validate_concrete`); `False` by default.
+    :param abstract: `True` to mark this struct as abstract, in which case no
+                      validation is performed (see `validate_concrete`); `False` by default.
     :param extends: The struct instance to inherit field values from.  Any shared fields are
                     over-written with this instances values.
     :type extends: An addressed or concrete struct instance that is a type compatible with
@@ -69,8 +67,6 @@ class Struct(Serializable, SerializableFactory, Validatable):
                   this struct or this structs superclasses.
     :param **kwargs: The struct parameters.
     """
-    kwargs = _normalize_utf8_keys(kwargs)
-
     self._kwargs = kwargs
 
     self._kwargs['abstract'] = abstract
@@ -89,7 +85,7 @@ class Struct(Serializable, SerializableFactory, Validatable):
                                      .format(self.address, self.name))
       self._kwargs['name'] = target_name
 
-  def kwargs(self):
+  def kwargs(self) -> Dict[str, Any]:
     """Returns a dict of the kwargs for this Struct which were not interpreted by the baseclass.
 
     This excludes fields like `extends`, `merges`, and `abstract`, which are consumed by
@@ -98,7 +94,7 @@ class Struct(Serializable, SerializableFactory, Validatable):
     return {k: v for k, v in self._kwargs.items() if k not in self._INTERNAL_FIELDS}
 
   @property
-  def name(self):
+  def name(self) -> Optional[str]:
     """Return the name of this object, if any.
 
     In general structs need not be named, in which case they are generally embedded
@@ -110,6 +106,8 @@ class Struct(Serializable, SerializableFactory, Validatable):
     """
     return self._kwargs.get('name')
 
+  # TODO: this should return Optional[Address], but then we get a bunch of errors in rules using
+  # TargetAdaptor. Possibly, wait for the Target API to deal with this.
   @property
   def address(self):
     """Return the address of this object, if any.
@@ -123,28 +121,22 @@ class Struct(Serializable, SerializableFactory, Validatable):
     return self._kwargs.get('address')
 
   @property
-  def type_alias(self):
+  def type_alias(self) -> str:
     """Return the type alias this target was constructed via.
 
     For a target read from a BUILD file, this will be target alias, like 'java_library'.
     For a target constructed in memory, this will be the simple class name, like 'JavaLibrary'.
 
     The end result is that the type alias should be the most natural way to refer to this target's
-    type to the author of the target instance.
-
-    :rtype: string
-    """
-    type_alias = self._kwargs.get(self._TYPE_ALIAS_FIELD, None)
+    type to the author of the target instance."""
+    type_alias: Optional[str] = self._kwargs.get(self._TYPE_ALIAS_FIELD, None)
     return type_alias if type_alias is not None else type(self).__name__
 
   @property
-  def abstract(self):
+  def abstract(self) -> bool:
     """Return `True` if this object has been marked as abstract.
 
-    Abstract objects are not validated. See: `validate_concrete`.
-
-    :rtype: bool
-    """
+    Abstract objects are not validated. See: `validate_concrete`."""
     return self._kwargs.get('abstract', False)
 
   # It only makes sense to inherit a subset of our own fields (we should not inherit new fields!),
@@ -175,7 +167,7 @@ class Struct(Serializable, SerializableFactory, Validatable):
     :rtype: list of :class:`Serializable`
     """
 
-  def _asdict(self):
+  def _asdict(self) -> Dict[str, Any]:
     return self._kwargs
 
   def _extract_inheritable_attributes(self, serializable):
@@ -191,7 +183,7 @@ class Struct(Serializable, SerializableFactory, Validatable):
 
     return attributes
 
-  def create(self):
+  def create(self) -> "Struct":
     if not (self.extends or self.merges):
       return self
 
@@ -223,7 +215,7 @@ class Struct(Serializable, SerializableFactory, Validatable):
     struct_type = type(self)
     return struct_type(**attributes)
 
-  def validate(self):
+  def validate(self) -> None:
     if not self.abstract:
       self.validate_concrete()
 
@@ -235,7 +227,7 @@ class Struct(Serializable, SerializableFactory, Validatable):
     """
     raise ValidationError(self.address, message)
 
-  def validate_concrete(self):
+  def validate_concrete(self) -> None:
     """Subclasses can override to implement validation logic.
 
     The object will be fully hydrated state and it's guaranteed the object will be concrete, aka.

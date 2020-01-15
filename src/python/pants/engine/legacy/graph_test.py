@@ -7,6 +7,7 @@ from typing import Dict, Tuple
 import pytest
 
 from pants.engine.legacy.graph import HydratedTarget, topo_sort
+from pants.engine.legacy.structs import TargetAdaptor
 
 
 def make_graph(name_to_deps: Dict[str, Tuple[str, ...]]) -> Dict[str, HydratedTarget]:
@@ -15,7 +16,7 @@ def make_graph(name_to_deps: Dict[str, Tuple[str, ...]]) -> Dict[str, HydratedTa
   def make_ht(nm: str) -> HydratedTarget:
     if nm not in name_to_ht:
       dep_hts = tuple(make_ht(dep) for dep in name_to_deps[nm])
-      name_to_ht[nm] = HydratedTarget(address=nm, adaptor=None, dependencies=dep_hts)
+      name_to_ht[nm] = HydratedTarget(address=nm, adaptor=TargetAdaptor(), dependencies=dep_hts)
     return name_to_ht[nm]
 
   for name in name_to_deps:

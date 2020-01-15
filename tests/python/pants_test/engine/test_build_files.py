@@ -4,7 +4,7 @@
 import os
 import re
 import unittest
-from typing import Type, cast
+from typing import Tuple, Type, cast
 
 from pants.base.project_tree import Dir
 from pants.base.specs import AddressSpecs, SiblingAddresses, SingleAddress
@@ -20,7 +20,7 @@ from pants.engine.build_files import (
 from pants.engine.fs import Digest, FileContent, FilesContent, PathGlobs, Snapshot, create_fs_rules
 from pants.engine.legacy.structs import TargetAdaptor
 from pants.engine.mapper import AddressFamily, AddressMapper, ResolveError
-from pants.engine.nodes import Return, Throw
+from pants.engine.nodes import Return, State, Throw
 from pants.engine.parser import HydratedStruct, SymbolTable
 from pants.engine.rules import rule
 from pants.engine.scheduler import SchedulerSession
@@ -231,7 +231,9 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
   def create_json(self) -> SchedulerSession:
     return self.create(build_patterns=('*.BUILD.json',), parser=JsonParser(TEST_TABLE))
 
-  def _populate(self, scheduler, address):
+  def _populate(
+    self, scheduler: SchedulerSession, address: Address,
+  ) -> Tuple[HydratedStruct, State]:
     """Perform an ExecutionRequest to parse the given Address into a Struct."""
     request = scheduler.execution_request([HydratedStruct], [address])
     returns, throws = scheduler.execute(request)
@@ -241,21 +243,21 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
       state = throws[0][1]
     return request, state
 
-  def resolve_failure(self, scheduler, address):
+  def resolve_failure(self, scheduler: SchedulerSession, address: Address):
     _, state = self._populate(scheduler, address)
-    self.assertEqual(type(state), Throw, f'{state} is not a Throw.')
+    assert isinstance(state, Throw)
     return state.exc
 
-  def resolve(self, scheduler, address):
+  def resolve(self, scheduler: SchedulerSession, address: Address):
     _, state = self._populate(scheduler, address)
-    self.assertEqual(type(state), Return, f'{state} is not a Return.')
+    assert isinstance(state, Return)
     return state.value.value
 
 
 class InlinedGraphTest(GraphTestBase):
 
   def do_test_codegen_simple(self, scheduler):
-    def address(name):
+    def address(name: str) -> Address:
       return Address(spec_path='graph_test', target_name=name)
 
     resolved_java1 = self.resolve(scheduler, address('java1'))
@@ -332,7 +334,7 @@ class InlinedGraphTest(GraphTestBase):
       print(trace_message)
       self.assertRegex(trace_message, expected_regex)
 
-  def do_test_cycle(self, address_str, cyclic_address_str) -> None:
+  def do_test_cycle(self, address_str: str, cyclic_address_str: str) -> None:
     scheduler = self.create_json()
     parsed_address = Address.parse(address_str)
     self.do_test_trace_message(

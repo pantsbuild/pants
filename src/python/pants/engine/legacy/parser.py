@@ -5,13 +5,15 @@ import logging
 import os
 import tokenize
 from io import StringIO
+from typing import Dict, Tuple
 
 from pants.base.build_file_target_factory import BuildFileTargetFactory
 from pants.base.parse_context import ParseContext
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.legacy.structs import BundleAdaptor, Globs, RGlobs, TargetAdaptor, ZGlobs
 from pants.engine.mapper import UnaddressableObjectError
 from pants.engine.objects import Serializable
-from pants.engine.parser import ParseError, Parser
+from pants.engine.parser import ParseError, Parser, SymbolTable
 from pants.util.memo import memoized_property
 
 
@@ -28,13 +30,13 @@ class LegacyPythonCallbacksParser(Parser):
   macros and target factories.
   """
 
-  def __init__(self, symbol_table, aliases, build_file_imports_behavior):
+  def __init__(
+    self, symbol_table: SymbolTable, aliases: BuildFileAliases, build_file_imports_behavior: str,
+  ) -> None:
     """
     :param symbol_table: A SymbolTable for this parser, which will be overlaid with the given
       additional aliases.
-    :type symbol_table: :class:`pants.engine.parser.SymbolTable`
     :param aliases: Additional BuildFileAliases to register.
-    :type aliases: :class:`pants.build_graph.build_file_aliases.BuildFileAliases`
     :param build_file_imports_behavior: How to behave if a BUILD file being parsed tries to use
       import statements. Valid values: "allow", "warn", "error".
     :type build_file_imports_behavior: string
@@ -44,8 +46,10 @@ class LegacyPythonCallbacksParser(Parser):
     self._build_file_imports_behavior = build_file_imports_behavior
 
   @staticmethod
-  def _generate_symbols(symbol_table, aliases):
-    symbols = {}
+  def _generate_symbols(
+    symbol_table: SymbolTable, aliases: BuildFileAliases,
+  ) -> Tuple[Dict, ParseContext]:
+    symbols: Dict = {}
 
     # Compute "per path" symbols.  For performance, we use the same ParseContext, which we
     # mutate (in a critical section) to set the rel_path appropriately before it's actually used.
@@ -120,7 +124,7 @@ class LegacyPythonCallbacksParser(Parser):
 
     return symbols, parse_context
 
-  def parse(self, filepath, filecontent):
+  def parse(self, filepath: str, filecontent: bytes):
     python = filecontent.decode()
 
     # Mutate the parse context for the new path, then exec, and copy the resulting objects.

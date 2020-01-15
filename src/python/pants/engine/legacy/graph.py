@@ -7,7 +7,7 @@ from collections import defaultdict, deque
 from contextlib import contextmanager
 from dataclasses import dataclass
 from os.path import dirname
-from typing import Any, Dict, Iterable, List, Tuple
+from typing import Any, Dict, Iterable, List, Tuple, cast
 
 from twitter.common.collections import OrderedSet
 
@@ -30,7 +30,13 @@ from pants.build_graph.remote_sources import RemoteSources
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
-from pants.engine.legacy.structs import BundleAdaptor, BundlesField, HydrateableField, SourcesField
+from pants.engine.legacy.structs import (
+  BundleAdaptor,
+  BundlesField,
+  HydrateableField,
+  SourcesField,
+  TargetAdaptor,
+)
 from pants.engine.mapper import AddressMapper
 from pants.engine.objects import Collection
 from pants.engine.parser import HydratedStruct
@@ -358,35 +364,33 @@ class HydratedTarget:
   of hashing: we implement eq/hash via direct usage of an Address field to speed that up.
   """
   address: Any
-  adaptor: Any
-  dependencies: Any
+  adaptor: TargetAdaptor
+  dependencies: Tuple
 
   @property
-  def addresses(self):
+  def addresses(self) -> Tuple:
     return self.dependencies
 
   def __hash__(self):
     return hash(self.address)
 
 
-# TODO: add type-checking to datatype fields in this file! Tuple fields such as 'dependencies' need
-# some groundwork to be more ergonomic -- see #6936 for one possible implementation.
+class HydratedTargets(Collection[HydratedTarget]):
+  """An intransitive set of HydratedTarget objects."""
+
+
 @dataclass(frozen=True)
 class TransitiveHydratedTarget:
   """A recursive structure wrapping a HydratedTarget root and TransitiveHydratedTarget deps."""
   root: HydratedTarget
-  dependencies: Any
+  dependencies: Tuple["TransitiveHydratedTarget", ...]
 
 
 @dataclass(frozen=True)
 class TransitiveHydratedTargets:
   """A set of HydratedTarget roots, and their transitive, flattened, de-duped closure."""
-  roots: Any
-  closure: Any
-
-
-class HydratedTargets(Collection[HydratedTarget]):
-  """An intransitive set of HydratedTarget objects."""
+  roots: Tuple[HydratedTarget, ...]
+  closure: OrderedSet  # TODO: this is an OrderedSet[HydratedTarget]
 
 
 @dataclass(frozen=True)
@@ -548,8 +552,8 @@ class HydratedField:
 
 @rule
 async def hydrate_target(hydrated_struct: HydratedStruct) -> HydratedTarget:
-  target_adaptor = hydrated_struct.value
   """Construct a HydratedTarget from a TargetAdaptor and hydrated versions of its adapted fields."""
+  target_adaptor = cast(TargetAdaptor, hydrated_struct.value)
   # Hydrate the fields of the adaptor and re-construct it.
   hydrated_fields = await MultiGet(Get[HydratedField](HydrateableField, fa)
                                    for fa in target_adaptor.field_adaptors)
