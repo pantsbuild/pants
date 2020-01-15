@@ -3,7 +3,7 @@
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Optional, cast
+from typing import Any, Iterable, Optional, Tuple, cast
 
 from pants.backend.docgen.targets.doc import Page
 from pants.backend.jvm.targets.jvm_app import JvmApp
@@ -16,6 +16,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.file_system_project_tree import FileSystemProjectTree
+from pants.base.target_roots import TargetRoots
 from pants.build_graph.address import BuildFileAddress
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
@@ -60,6 +61,7 @@ from pants.option.global_options import (
   ExecutionOptions,
   GlobMatchErrorBehavior,
 )
+from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 
 
@@ -196,30 +198,36 @@ class LegacyGraphSession:
       )
       self.invalid_goals = invalid_goals
 
-  def run_goal_rules(self, options_bootstrapper, options, goals, target_roots):
+  def run_goal_rules(
+    self,
+    options_bootstrapper: OptionsBootstrapper,
+    options: Options,
+    goals: Iterable[str],
+    target_roots: TargetRoots,
+  ):
     """Runs @goal_rules sequentially and interactively by requesting their implicit Goal products.
 
     For retryable failures, raises scheduler.ExecutionError.
 
-    :param list goals: The list of requested goal names as passed on the commandline.
-    :param TargetRoots target_roots: The targets root of the request.
+    :param goals: The list of requested goal names as passed on the commandline.
+    :param target_roots: The targets root of the request.
 
     :returns: An exit code.
     """
 
     global_options = options.for_global_scope()
 
-    subject = target_roots.specs
+    address_specs = target_roots.specs
     console = Console(
       use_colors=global_options.colors,
-      session=self.scheduler_session if global_options.v2_ui else None
+      session=self.scheduler_session if global_options.v2_ui else None,
     )
     workspace = Workspace(self.scheduler_session)
     interactive_runner = InteractiveRunner(self.scheduler_session)
 
     for goal in goals:
       goal_product = self.goal_map[goal]
-      params = Params(subject, options_bootstrapper, console, workspace, interactive_runner)
+      params = Params(address_specs, options_bootstrapper, console, workspace, interactive_runner)
       logger.debug(f'requesting {goal_product} to satisfy execution of `{goal}` goal')
       try:
         exit_code = self.scheduler_session.run_goal_rule(goal_product, params)
@@ -231,13 +239,10 @@ class LegacyGraphSession:
 
     return PANTS_SUCCEEDED_EXIT_CODE
 
-  def create_build_graph(self, target_roots, build_root=None):
-    """Construct and return a `BuildGraph` given a set of input specs.
-
-    :param TargetRoots target_roots: The targets root of the request.
-    :param string build_root: The build root.
-    :returns: A tuple of (BuildGraph, AddressMapper).
-    """
+  def create_build_graph(
+    self, target_roots: TargetRoots, build_root: Optional[str] = None,
+  ) -> Tuple[LegacyBuildGraph, LegacyAddressMapper]:
+    """Construct and return a `BuildGraph` given a set of input specs."""
     logger.debug('target_roots are: %r', target_roots)
     graph = LegacyBuildGraph.create(self.scheduler_session, self.build_file_aliases)
     logger.debug('build_graph is: %s', graph)

@@ -3,16 +3,22 @@
 
 import logging
 import sys
+from typing import List
 
-from pants.base.cmd_line_spec_parser import CmdLineSpecParser
+from pants.base.target_roots import TargetRoots
 from pants.base.workunit import WorkUnit, WorkUnitLabel
+from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_parser import BuildFileParser
+from pants.engine.legacy.graph import LegacyBuildGraph
 from pants.engine.round_engine import RoundEngine
 from pants.goal.context import Context
 from pants.goal.goal import Goal
 from pants.goal.run_tracker import RunTracker
+from pants.init.engine_initializer import LegacyGraphSession
 from pants.java.nailgun_executor import NailgunProcessGroup
+from pants.option.options import Options
 from pants.option.ranked_value import RankedValue
+from pants.reporting.reporting import Reporting
 from pants.task.task import QuietTaskMixin
 
 
@@ -20,16 +26,25 @@ logger = logging.getLogger(__name__)
 
 
 class GoalRunnerFactory:
-  def __init__(self, root_dir, options, build_config, run_tracker, reporting, graph_session,
-               target_roots, exiter=sys.exit):
+  def __init__(
+    self,
+    root_dir: str,
+    options: Options,
+    build_config: BuildConfiguration,
+    run_tracker: RunTracker,
+    reporting: Reporting,
+    graph_session: LegacyGraphSession,
+    target_roots: TargetRoots,
+    exiter=sys.exit,
+  ) -> None:
     """
-    :param str root_dir: The root directory of the pants workspace (aka the "build root").
-    :param Options options: The global, pre-initialized Options instance.
-    :param BuildConfiguration build_config: A pre-initialized BuildConfiguration instance.
-    :param Runtracker run_tracker: The global, pre-initialized/running RunTracker instance.
-    :param Reporting reporting: The global, pre-initialized Reporting instance.
-    :param LegacyGraphSession graph_session: The graph session for this run.
-    :param TargetRoots target_roots: A pre-existing `TargetRoots` object, if available.
+    :param root_dir: The root directory of the pants workspace (aka the "build root").
+    :param options: The global, pre-initialized Options instance.
+    :param build_config: A pre-initialized BuildConfiguration instance.
+    :param run_tracker: The global, pre-initialized/running RunTracker instance.
+    :param reporting: The global, pre-initialized Reporting instance.
+    :param graph_session: The graph session for this run.
+    :param target_roots: A pre-existing `TargetRoots` object, if available.
     :param func exiter: A function that accepts an exit code value and exits. (for tests, Optional)
     """
     self._root_dir = root_dir
@@ -46,21 +61,12 @@ class GoalRunnerFactory:
     self._explain = self._global_options.explain
     self._kill_nailguns = self._global_options.kill_nailguns
 
-  def _determine_v1_goals(self, address_mapper, options):
+  def _determine_v1_goals(self, options: Options) -> List[Goal]:
     """Check and populate the requested goals for a given run."""
     v1_goals, ambiguous_goals, _ = options.goals_by_version
-    requested_goals = v1_goals + ambiguous_goals
+    return [Goal.by_name(goal) for goal in v1_goals + ambiguous_goals]
 
-    spec_parser = CmdLineSpecParser(self._root_dir)
-
-    for goal in requested_goals:
-      if address_mapper.is_valid_single_address(spec_parser.parse_address_spec(goal)):
-        logger.warning("Command-line argument '{0}' is ambiguous and was assumed to be "
-                       "a goal. If this is incorrect, disambiguate it with ./{0}.".format(goal))
-
-    return [Goal.by_name(goal) for goal in requested_goals]
-
-  def _roots_to_targets(self, build_graph, target_roots):
+  def _roots_to_targets(self, build_graph: LegacyBuildGraph, target_roots: TargetRoots):
     """Populate the BuildGraph and target list from a set of input TargetRoots."""
     with self._run_tracker.new_workunit(name='parse', labels=[WorkUnitLabel.SETUP]):
       return [
@@ -86,7 +92,7 @@ class GoalRunnerFactory:
         self._root_dir
       )
 
-      goals = self._determine_v1_goals(address_mapper, self._options)
+      goals = self._determine_v1_goals(self._options)
       is_quiet = self._should_be_quiet(goals)
 
       target_root_instances = self._roots_to_targets(build_graph, self._target_roots)
