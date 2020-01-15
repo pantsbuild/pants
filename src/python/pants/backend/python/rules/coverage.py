@@ -305,7 +305,7 @@ async def generate_coverage_report(
     pex_path=f'./{coverage_setup.filename}',
     pex_args=coverage_args,
     input_files=merged_input_files,
-    output_files=('htmlcov',), # TODO: Respect the xml option.
+    output_directories=('htmlcov',), # TODO: Respect the xml option.
     description=f'Generate coverage report.',
   )
 
