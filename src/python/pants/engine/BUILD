@@ -159,10 +159,7 @@ python_library(
   sources=['parser.py'],
   dependencies=[
     '3rdparty/python:dataclasses',
-    ':addressable',
-    ':objects',
-    'src/python/pants/build_graph',
-    'src/python/pants/util:memo',
+    ':struct',
   ],
   tags = {"partially_type_checked"},
 )
