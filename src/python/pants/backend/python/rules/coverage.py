@@ -6,6 +6,7 @@ import json
 from dataclasses import dataclass
 from io import StringIO
 from typing import Dict, Tuple
+import itertools
 
 import pkg_resources
 
@@ -41,7 +42,7 @@ from pants.engine.legacy.graph import HydratedTarget, TransitiveHydratedTargets
 from pants.engine.rules import goal_rule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.rules.core.strip_source_root import SourceRootStrippedSources
-from pants.rules.core.test import AddressAndTestResult
+from pants.rules.core.test import AddressAndTestResult, AddressAndTestResults, CoverageReport
 from pants.source.source_root import SourceRootConfig
 
 
@@ -133,6 +134,13 @@ async def merge_coverage_reports(
   stripped_sources_digests = tuple(
     stripped_sources.snapshot.directory_digest for stripped_sources in source_root_stripped_sources
   )
+  # TODO: PythonTestRunner replaced sources and inits digest with this:
+  # chrooted_sources = await Get[ChrootedPythonSources](HydratedTargets(all_targets))
+  # directories_to_merge = [
+  #   chrooted_sources.digest,
+  #   resolved_requirements_pex.directory_digest,
+  # ]
+
 
   sources_digest = await Get[Digest](DirectoriesToMerge(directories=stripped_sources_digests))
   inits_digest = await Get[InjectedInitDigest](Digest, sources_digest)
@@ -224,34 +232,34 @@ def get_file_names(all_target_adaptors):
 #   subsystem_cls = CoverageOptions
 #   # report: Digest
 
-@dataclass(frozen=True)
-class CoverageReport:
-  report: Digest
+# @dataclass(frozen=True)
+# class CoverageReport:
+#   report: Digest
 
 
 @rule(name="Generate coverage report")
 async def generate_coverage_report(
   # addresses: BuildFileAddresses,
-  test_results: tuple,
-  specs: AddressSpecs,
+  test_results: AddressAndTestResults,
+  transitive_targets: TransitiveHydratedTargets,
+  # specs: AddressSpecs,
   python_setup: PythonSetup,
   coverage_setup: CoverageSetup,
   source_root_config: SourceRootConfig,
   merged_coverage_data: MergedCoverageData,
+  subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> CoverageReport:
   """Takes all python test results and generates a single coverage report in dist/coverage."""
-  # plugin_file_digest = await Get(Digest, InputFilesContent, get_coverage_plugin_input())
   requirements_pex = coverage_setup.requirements_pex
 
-  transitive_targets = await Get[TransitiveHydratedTargets](AddressSpecs, specs)
   python_targets = [
     target for target in transitive_targets.closure
     if target.adaptor.type_alias == 'python_library' or target.adaptor.type_alias == 'python_tests'
   ]
 
-  # python_files = frozenset(itertools.chain.from_iterable(
-  #   target.adaptor.sources.snapshot.files for target in python_targets
-  # ))
+  python_files = frozenset(itertools.chain.from_iterable(
+    target.adaptor.sources.snapshot.files for target in python_targets
+  ))
   # A map from source root stripped source to its source root. eg:
   #  {'pants/testutil/subsystem/util.py': 'src/python'}
   # This is so coverage reports referencing /chroot/path/pants/testutil/subsystem/util.py can be mapped
@@ -306,8 +314,7 @@ async def generate_coverage_report(
     request
   )
   print(result)
-  return CoverageReport(result.output_directory_digest)
-  # return CoverageReport(0)
+  return CoverageReport(result.output_directory_digest, 'coverage/python') # TODO Get this from an option.
 
 
 def rules():

@@ -4,7 +4,8 @@
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
+from typing import Optional, Tuple
+from pathlib import PurePath
 
 # from pants.backend.python.rules.coverage import CoverageReport
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
@@ -17,10 +18,10 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
 from pants.engine.isolated_process import FallibleExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTarget
-from pants.engine.objects import union
+from pants.engine.objects import union, Collection
 from pants.engine.rules import UnionMembership, goal_rule, rule
 from pants.engine.selectors import Get, MultiGet
-
+from pants.engine.fs import DirectoryToMaterialize, Workspace
 
 # TODO(#6004): use proper Logging singleton, rather than static logger.
 logger = logging.getLogger(__name__)
@@ -128,6 +129,10 @@ class AddressAndTestResult:
     return is_valid_target_type and has_sources
 
 
+class AddressAndTestResults(Collection[AddressAndTestResult]):
+  pass
+
+
 @dataclass(frozen=True)
 class AddressAndDebugRequest:
   address: BuildFileAddress
@@ -136,12 +141,17 @@ class AddressAndDebugRequest:
 
 @dataclass(frozen=True)
 class CoverageReport:
-  report: Digest
+  digest: Digest
+  output_path: PurePath
 
 
 @goal_rule
 async def run_tests(
-  console: Console, options: TestOptions, runner: InteractiveRunner, addresses: BuildFileAddresses,
+  console: Console,
+  options: TestOptions,
+  runner: InteractiveRunner,
+  addresses: BuildFileAddresses,
+  workspace: Workspace,
 ) -> Test:
   if options.values.debug:
     address = await Get[BuildFileAddress](BuildFileAddresses, addresses)
@@ -153,8 +163,13 @@ async def run_tests(
   did_any_fail = False
   filtered_results = [(x.address, x.test_result) for x in results if x.test_result is not None]
   if options.values.run_coverage:
-    coverage_report = await Get[CoverageReport](tuple, tuple(sorted(filtered_results)))
-    import pdb; pdb.set_trace()
+    # TODO rename CoverageReport and make this generic.
+    pytest_coverage_report = await Get[CoverageReport](AddressAndTestResults, AddressAndTestResults(tuple(sorted(filtered_results))))
+    workspace.materialize_directory(DirectoryToMaterialize(
+      pytest_coverage_report.digest,
+      path_prefix=str(pytest_coverage_report.output_path)
+    ))
+    console.print_stdout(f"Wrote coverage report to `{pytest_coverage_report.output_path}`")
   for address, test_result in filtered_results:
     if test_result.status == Status.FAILURE:
       did_any_fail = True
