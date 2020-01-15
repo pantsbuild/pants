@@ -1,7 +1,7 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.base.deprecated import deprecated_conditional, resolve_conflicting_options
+from pants.base.deprecated import resolve_conflicting_options
 from pants.subsystem.subsystem import Subsystem
 from pants.task.goal_options_mixin import GoalOptionsMixin, GoalOptionsRegistrar
 
@@ -124,39 +124,17 @@ class SkipAndTransitiveGoalOptionsRegistrar(SkipAndTransitiveOptionsRegistrar,
   """Registrar of --skip and --transitive at the goal level."""
 
 
-# TODO: delete this class once we change the default of `--fmt-transitive` and `--lint-transitive`
-# to False. Go back to using HasSkipAndTransitiveOptionsMixin.
-class HasSkipAndDeprecatedTransitiveGoalOptionsMixin(GoalOptionsMixin, HasSkipAndTransitiveOptionsMixin):
-  """A mixin for tasks that have a --transitive and a --skip option registered at the goal level."""
-
-  @property
-  def act_transitively(self):
-    deprecated_conditional(
-      lambda: self.get_options().is_default("transitive"),
-      removal_version="1.25.0.dev2",
-      entity_description="Pants defaulting to `--fmt-transitive` and `--lint-transitive`",
-      hint_message="Pants will soon default to `--no-fmt-transitive` and `--no-lint-transitive`. "
-                   "Currently, Pants defaults to `--fmt-transitive` and `--lint-transitive`, which "
-                   "means that tools like isort and Scalafmt will work on transitive dependencies "
-                   "as well. This behavior is unexpected. Normally when running tools like isort, "
-                   "you'd expect them to only work on the files you specify.\n\nTo prepare, "
-                   "please add to your `pants.ini` under both the `fmt` and the `lint` "
-                   "sections the option `transitive: False`. If you want to keep the default, use "
-                   "`True`, although we recommend setting to `False` as the `--transitive` option "
-                   "will be removed in a future Pants version."
-    )
-    return self.get_options().transitive
-
-
 class DeprecatedSkipAndDeprecatedTransitiveGoalOptionsRegistrar(GoalOptionsRegistrar):
 
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    # TODO: deprecate this option once the default for `--fmt-transitive` and `--lint-transitive`
-    # changes.
     register(
-      '--transitive', type=bool, default=True, fingerprint=True, recursive=True,
+      '--transitive', type=bool, default=False, fingerprint=True, recursive=True,
+      removal_version="1.27.0.dev0",
+      removal_hint="This feature is going away. Instead of relying on the `--transitive` flag, "
+                   "directly specify on the command line every target that you want to format or "
+                   "lint.",
       help="If false, act only on the targets directly specified on the command line. "
            "If true, act on the transitive dependency closure of those targets.",
     )
