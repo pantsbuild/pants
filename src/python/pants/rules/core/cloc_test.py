@@ -33,31 +33,26 @@ class ClocTest(GoalRuleTestBase):
     self.fail(f'Found no output line for {lang}')
 
   def test_cloc(self) -> None:
-    self.create_file('src/py/foo/foo.py', '# A comment.\n\nprint("some code")\n# Another comment.')
-    self.create_file('src/py/foo/bar.py', '# A comment.\n\nprint("some more code")')
-    self.create_file('src/py/dep/dep.py', 'print("a dependency")')
-    self.create_file('src/java/foo/Foo.java', '// A comment. \n class Foo(){}\n')
-    self.create_file('src/java/foo/Bar.java', '// We do not expect this file to appear in counts.')
+    py_dir = 'src/py/foo'
+    self.create_file(f'{py_dir}/foo.py', '# A comment.\n\nprint("some code")\n# Another comment.')
+    self.create_file(f'{py_dir}/bar.py', '# A comment.\n\nprint("some more code")')
+    self.add_to_build_file(py_dir, 'python_library()')
 
-    self.add_to_build_file('src/py/dep', 'python_library(sources=["dep.py"])')
-    self.add_to_build_file('src/py/foo', 'python_library(dependencies=["src/py/dep"], sources=["foo.py", "bar.py"])')
-    self.add_to_build_file('src/java/foo', 'java_library(sources=["Foo.java"])')
+    java_dir = 'src/java/foo'
+    self.create_file(f'{java_dir}/Foo.java', '// A comment. \n class Foo(){}\n')
+    self.create_file(f'{java_dir}/Ignored.java', '// We do not expect this file to appear in counts.')
+    self.add_to_build_file(java_dir, "java_library(source='Foo.java')")
 
-    output = self.execute_rule(args=['src/py/foo', 'src/java/foo']).splitlines()
-    self.assert_counts(output, 'Python', num_files=3, blank=2, comment=3, code=3)
-    self.assert_counts(output, 'Java', num_files=1, blank=0, comment=1, code=1)
-
-    output = self.execute_rule(args=['src/py/foo', 'src/java/foo', '--cloc2-no-transitive']).splitlines()
+    output = self.execute_rule(args=[py_dir, java_dir]).splitlines()
     self.assert_counts(output, 'Python', num_files=2, blank=2, comment=3, code=2)
     self.assert_counts(output, 'Java', num_files=1, blank=0, comment=1, code=1)
 
   def test_ignored(self) -> None:
-    self.create_file('src/py/foo/foo.py', 'print("some code")')
-    self.create_file('src/py/foo/empty.py', '')
+    py_dir = 'src/py/foo'
+    self.create_file(f"{py_dir}/foo.py", "print('some code')")
+    self.create_file(f'{py_dir}/empty.py', '')
+    self.add_to_build_file(py_dir, 'python_library()')
 
-    self.add_to_build_file('src/py/foo', 'python_library(sources=["foo.py", "empty.py"])')
-
-    output = self.execute_rule(args=['src/py/foo', '--cloc2-ignored'])
-
-    self.assertIn("Ignored the following files:", output)
-    self.assertIn("empty.py: zero sized file", output)
+    output = self.execute_rule(args=[py_dir, '--cloc2-ignored'])
+    assert "Ignored the following files:" in output
+    assert "empty.py: zero sized file" in output

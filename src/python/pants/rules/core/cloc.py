@@ -4,7 +4,6 @@
 from dataclasses import dataclass
 from typing import Set
 
-from pants.base.specs import AddressSpecs
 from pants.engine.console import Console
 from pants.engine.fs import (
   Digest,
@@ -18,7 +17,7 @@ from pants.engine.fs import (
 )
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
-from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
+from pants.engine.legacy.graph import HydratedTargets
 from pants.engine.rules import goal_rule, rule
 from pants.engine.selectors import Get
 
@@ -49,14 +48,12 @@ async def download_cloc_script() -> DownloadedClocScript:
 
 
 class CountLinesOfCodeOptions(GoalSubsystem):
+  """Print counts of lines of code."""
   name = 'cloc2'
 
   @classmethod
   def register_options(cls, register) -> None:
     super().register_options(register)
-    register('--transitive', type=bool, fingerprint=True, default=True,
-             help='Operate on the transitive dependencies of the specified targets.  '
-                  'Unset to operate only on the specified targets.')
     register('--ignored', type=bool, fingerprint=True,
              help='Show information about files ignored by cloc.')
 
@@ -70,20 +67,11 @@ async def run_cloc(
   console: Console,
   options: CountLinesOfCodeOptions,
   cloc_script: DownloadedClocScript,
-  address_specs: AddressSpecs,
+  hydrated_targets: HydratedTargets,
 ) -> CountLinesOfCode:
   """Runs the cloc perl script in an isolated process"""
 
-  transitive = options.values.transitive
-  ignored = options.values.ignored
-
-  if transitive:
-    transitive_hydrated_targets = await Get[TransitiveHydratedTargets](AddressSpecs, address_specs)
-    all_target_adaptors = {ht.adaptor for ht in transitive_hydrated_targets.closure}
-  else:
-    hydrated_targets = await Get[HydratedTargets](AddressSpecs, address_specs)
-    all_target_adaptors = {ht.adaptor for ht in hydrated_targets}
-
+  all_target_adaptors = {ht.adaptor for ht in hydrated_targets}
   digests_to_merge = []
 
   source_paths: Set[str] = set()
@@ -132,7 +120,7 @@ async def run_cloc(
   for line in output.splitlines():
     console.print_stdout(line)
 
-  if ignored:
+  if options.values.ignored:
     console.print_stdout("\nIgnored the following files:")
     ignored = file_outputs[ignore_filename]
     for line in ignored.splitlines():
