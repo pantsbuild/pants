@@ -162,8 +162,12 @@ async def run_tests(
   did_any_fail = False
   filtered_results = [(x.address, x.test_result) for x in results if x.test_result is not None]
   if options.values.run_coverage:
-    # TODO rename CoverageReport and make this generic.
-    pytest_coverage_report = await Get[PytestCoverageReport](AddressAndTestResults, AddressAndTestResults(tuple(sorted(filtered_results))))
+    # TODO(#8915) Make a generic interface for collecting coverage reports. This class shouldn't have to know about
+    # PytestCoverageReport and JunitCoverageReport etc. It should only know about CoverageReport.
+    pytest_coverage_report = await Get[PytestCoverageReport](
+      AddressAndTestResults,
+      AddressAndTestResults(tuple(sorted(filtered_results)))
+    )
     workspace.materialize_directory(DirectoryToMaterialize(
       pytest_coverage_report.digest,
       path_prefix=str(pytest_coverage_report.output_path)
