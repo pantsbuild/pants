@@ -3,7 +3,6 @@
 
 from typing import Tuple
 
-from pants.base.deprecated import deprecated_conditional
 from pants.option.custom_types import shell_str
 from pants.subsystem.subsystem import Subsystem
 
@@ -19,19 +18,14 @@ class PyTest(Subsystem):
       help="Arguments to pass directly to Pytest, e.g. `--pytest-args=\"-k test_foo --quiet\"`",
     )
     register(
-      '--version', default='pytest>=4.6.6,<4.7', fingerprint=True,
+      '--version', default='pytest', fingerprint=True,
       help="Requirement string for Pytest.",
     )
     register(
       '--pytest-plugins',
       type=list,
       fingerprint=True,
-      default=[
-        'pytest-timeout>=1.3.3,<1.4',
-        'pytest-cov>=2.8.1,<3',
-        "unittest2>=1.1.0 ; python_version<'3'",
-        "more-itertools<6.0.0 ; python_version<'3'",
-      ],
+      default=['pytest-timeout', 'pytest-cov'],
       help="Requirement strings for any plugins or additional requirements you'd like to use.",
     )
     register(
@@ -39,9 +33,9 @@ class PyTest(Subsystem):
       type=bool,
       default=True,
       help='Enable test target timeouts. If timeouts are enabled then test targets with a '
-          'timeout= parameter set on their target will time out after the given number of '
-          'seconds if not completed. If no timeout is set, then either the default timeout '
-          'is used or no timeout is configured.',
+           'timeout= parameter set on their target will time out after the given number of '
+           'seconds if not completed. If no timeout is set, then either the default timeout '
+           'is used or no timeout is configured.',
     )
     register(
       '--timeout-default',
@@ -58,16 +52,4 @@ class PyTest(Subsystem):
 
   def get_requirement_strings(self) -> Tuple[str, ...]:
     """Returns a tuple of requirements-style strings for Pytest and Pytest plugins."""
-    deprecated_conditional(
-      lambda: self.options.is_default("version"),
-      removal_version="1.25.0.dev2",
-      entity_description="Pants defaulting to a Python 2-compatible Pytest version",
-      hint_message="Pants will soon start defaulting to Pytest 5.x, which no longer supports "
-                   "running tests with Python 2. In preparation for this change, you should "
-                   "explicitly set what version of Pytest to use in your `pants.ini` under the "
-                   "section `pytest`.\n\nIf you need to keep running tests with Python 2, set "
-                   "`version` to `pytest>=4.6.6,<4.7` (the current default). If you don't have any "
-                   "tests with Python 2 and want the newest Pytest, set `version` to "
-                   "`pytest>=5.2.4`."
-    )
     return (self.options.version, *self.options.pytest_plugins)

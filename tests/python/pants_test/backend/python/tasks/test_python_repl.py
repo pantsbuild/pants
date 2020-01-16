@@ -43,7 +43,7 @@ class PythonReplTest(PythonTaskTestBase):
   def setUp(self):
     super().setUp()
     self.six = self.create_python_requirement_library('3rdparty/python/six', 'six',
-                                                      requirements=['six==1.9.0'])
+                                                      requirements=['six==1.13.0'])
     self.requests = self.create_python_requirement_library('3rdparty/python/requests', 'requests',
                                                            requirements=['requests==2.6.0'])
 
@@ -132,7 +132,7 @@ class PythonReplTest(PythonTaskTestBase):
 
   def test_requirement(self):
     self.do_test_repl(code=['import six',
-                            'six._print("Hello there")'],
+                            'six.print_("Hello there")'],
                       expected=['Hello there'],
                       targets=[self.six])
 
@@ -142,7 +142,7 @@ class PythonReplTest(PythonTaskTestBase):
                             'from lib.lib import go',
                             'print("teapot response code is: {}".format(requests.codes.teapot))',
                             'go()',
-                            'six._print("Hello there")'],
+                            'six.print_("Hello there")'],
                       expected=['teapot response code is: 418',
                                 'gogogo!',
                                 'Hello there'],
