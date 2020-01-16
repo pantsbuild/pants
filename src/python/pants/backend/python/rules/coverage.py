@@ -39,7 +39,7 @@ from pants.engine.fs import (
   InputFilesContent,
 )
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
+from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTarget, TransitiveHydratedTargets, HydratedTargets
 from pants.engine.rules import goal_rule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
@@ -97,15 +97,6 @@ async def setup_coverage(
     )
   )
   return CoverageSetup(requirements_pex, output_pex_filename)
-
-
-@rule
-async def create_coverage_request(
-  coverage_setup: CoverageSetup,
-  python_setup: PythonSetup,
-  subprocess_encoding_environment: SubprocessEncodingEnvironment,
-) -> ExecuteProcessRequest:
-  pass
 
 
 @dataclass(frozen=True)
@@ -275,13 +266,11 @@ async def generate_coverage_report(
     description=f'Generate coverage report.',
   )
 
-  result = await Get[FallibleExecuteProcessResult](
+  result = await Get[ExecuteProcessResult](
     ExecuteProcessRequest,
     request
   )
-  print(result.stderr)
-  if result.exit_code != 0:
-    raise Exception(result.stdout)
+
   return PytestCoverageReport(result.output_directory_digest, coverage_toolbase.options.output_path)
 
 
