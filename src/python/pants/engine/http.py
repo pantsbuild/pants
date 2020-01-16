@@ -18,6 +18,7 @@ class HttpGetResponse:
 
 
 @side_effecting
+@dataclass(frozen=True)
 class HttpRequester:
 
   def get_request(self, url: str, headers: Dict[str, str] = {}) -> HttpGetResponse:
