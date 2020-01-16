@@ -44,7 +44,7 @@ from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.source.filespec import any_matches_filespec
-from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
+from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper, Filespec
 
 
 logger = logging.getLogger(__name__)
@@ -441,7 +441,7 @@ async def find_owners(
     #  1) having two implementations isn't great
     #  2) we're expanding sources via HydratedTarget, but it isn't necessary to do that to match
     target_sources = target_kwargs.get('sources', None)
-    if target_sources and any_matches_filespec(sources_set, target_sources.filespec):
+    if target_sources and any_matches_filespec(paths=sources_set, spec=target_sources.filespec):
       return True
 
     return False
@@ -546,7 +546,7 @@ async def hydrated_targets(build_file_addresses: BuildFileAddresses) -> Hydrated
 @dataclass(frozen=True)
 class HydratedField:
   """A wrapper for a fully constructed replacement kwarg for a HydratedTarget."""
-  name: Any
+  name: str
   value: Any
 
 
@@ -565,7 +565,9 @@ async def hydrate_target(hydrated_struct: HydratedStruct) -> HydratedTarget:
                        tuple(target_adaptor.dependencies))
 
 
-def _eager_fileset_with_spec(spec_path, filespec, snapshot, include_dirs=False):
+def _eager_fileset_with_spec(
+  spec_path: str, filespec: Filespec, snapshot: Snapshot, include_dirs: bool = False,
+) -> EagerFilesetWithSpec:
   rel_include_globs = filespec['globs']
 
   relpath_adjusted_filespec = FilesetRelPathWrapper.to_filespec(rel_include_globs, spec_path)
@@ -594,8 +596,10 @@ async def hydrate_sources(
   fileset_with_spec = _eager_fileset_with_spec(
     sources_field.address.spec_path,
     sources_field.filespecs,
-    snapshot)
-  sources_field.validate_fn(fileset_with_spec)
+    snapshot,
+  )
+  # MyPy seems to incorrectly think that validate_fn is None
+  sources_field.validate_fn(fileset_with_spec)  # type: ignore[misc]
   return HydratedField(sources_field.arg, fileset_with_spec)
 
 

@@ -8,10 +8,10 @@ from pants.testutil.test_base import TestBase
 
 
 class PayloadTest(TestBase):
-  def sources(self, rel_path, *args):
+  def sources(self, rel_path: str, *args) -> LazyFilesetWithSpec:
     return Globs.create_fileset_with_spec(rel_path, *args)
 
-  def test_sources_field(self):
+  def test_sources_field(self) -> None:
     self.create_file('foo/bar/a.txt', 'a_contents')
     self.create_file('foo/bar/b.txt', 'b_contents')
 
@@ -52,11 +52,11 @@ class PayloadTest(TestBase):
 
     self.assertNotEqual(fp1, fp2)
 
-  def test_fails_on_invalid_sources_kwarg(self):
+  def test_fails_on_invalid_sources_kwarg(self) -> None:
     with self.assertRaises(ValueError):
-      SourcesField(sources='not-a-list')
+      SourcesField(sources='not-a-list')  # type: ignore[arg-type]
 
-  def test_passes_lazy_fileset_with_spec_through(self):
+  def test_passes_lazy_fileset_with_spec_through(self) -> None:
     self.create_file('foo/a.txt', 'a_contents')
 
     fileset = LazyFilesetWithSpec('foo', {'globs':['foo/a.txt']}, lambda: ['foo/a.txt'])
@@ -65,7 +65,7 @@ class PayloadTest(TestBase):
     self.assertIs(fileset, sf.sources)
     self.assertEqual(['foo/a.txt'], list(sf.source_paths))
 
-  def test_passes_eager_fileset_with_spec_through(self):
+  def test_passes_eager_fileset_with_spec_through(self) -> None:
     self.create_file('foo/foo/a.txt', 'a_contents')
 
     fileset = self.sources_for(['foo/a.txt'], 'foo')

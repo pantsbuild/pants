@@ -145,11 +145,11 @@ class SourcesField:
     acceptable. This API will almost certainly change in the near future.
   """
   address: Any
-  arg: Any
+  arg: str
   filespecs: Any
   base_globs: Any
   path_globs: PathGlobs
-  validate_fn: Callable
+  validate_fn: Callable[["SourcesField", wrapped_globs.EagerFilesetWithSpec], None]
 
   def __hash__(self):
     return hash((self.address, self.arg))
