@@ -64,6 +64,12 @@ class CoverageToolBase(PythonToolBase):
       default='coverage/python',
       help='Path to write pytest coverage report to. Must be relative to build root.',
     )
+    register(
+      '--report',
+      type=str,
+      default='html',
+      help='Type of report to write, either "html" or "xml"',
+    )
 
 
 
@@ -257,15 +263,15 @@ async def generate_coverage_report(
       chrooted_sources.digest,
     )),
   )
-
-  coverage_args = ['html'] # TODO: Respect the option of html or xml reports.
+  coverage_args = [coverage_toolbase.options.report]
   request = requirements_pex.create_execute_request(
     python_setup=python_setup,
     subprocess_encoding_environment=subprocess_encoding_environment,
     pex_path=f'./{coverage_setup.filename}',
     pex_args=coverage_args,
     input_files=merged_input_files,
-    output_directories=('htmlcov',), # TODO: Respect the xml option.
+    output_directories=('htmlcov',),
+    output_files=('coverage.xml',),
     description=f'Generate coverage report.',
   )
 
