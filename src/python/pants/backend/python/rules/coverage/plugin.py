@@ -93,5 +93,5 @@ class ChrootRemappingPlugin(CoveragePlugin):
 
 def coverage_init(reg, options):
   src_chroot_path = os.getcwd()
-  src_to_target_base = json.loads(options['src_to_target_base'])
+  src_to_target_base = json.loads(options['source_to_target_base'])
   reg.add_file_tracer(ChrootRemappingPlugin(src_chroot_path, src_to_target_base))

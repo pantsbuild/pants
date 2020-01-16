@@ -48,26 +48,6 @@ def get_coveragerc_input(coveragerc_content: str) -> InputFilesContent:
   )
 
 
-DEFAULT_COVERAGE_CONFIG = dedent(f"""
-  [run]
-  branch = True
-  timid = False
-  relative_files = True
-  """)
-
-
-def get_coveragerc_input(coveragerc_content: str) -> InputFilesContent:
-  return InputFilesContent(
-    [
-      FileContent(
-        path='.coveragerc',
-        content=coveragerc_content.encode(),
-        is_executable=False,
-      ),
-    ]
-  )
-
-
 def calculate_timeout_seconds(
   *,
   timeouts_enabled: bool,
