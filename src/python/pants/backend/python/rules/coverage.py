@@ -106,13 +106,9 @@ class MergedCoverageData:
 @rule(name="Merge coverage reports")
 async def merge_coverage_reports(
   test_results: AddressAndTestResults,
-  addresses: BuildFileAddresses,
-  address_specs: AddressSpecs,
   transitive_targets: TransitiveHydratedTargets,
   python_setup: PythonSetup,
-  coverage: CoverageToolBase,
   coverage_setup: CoverageSetup,
-  source_root_config: SourceRootConfig,
   subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> MergedCoverageData:
   """Takes all python test results and merges their coverage data into a single sql file."""
@@ -154,7 +150,7 @@ async def merge_coverage_reports(
     description=f'Merge coverage reports.',
   )
 
-  result = await Get[FallibleExecuteProcessResult](
+  result = await Get[ExecuteProcessResult](
     ExecuteProcessRequest,
     request
   )
