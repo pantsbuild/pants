@@ -555,8 +555,9 @@ async def hydrate_target(hydrated_struct: HydratedStruct) -> HydratedTarget:
   """Construct a HydratedTarget from a TargetAdaptor and hydrated versions of its adapted fields."""
   target_adaptor = cast(TargetAdaptor, hydrated_struct.value)
   # Hydrate the fields of the adaptor and re-construct it.
-  hydrated_fields = await MultiGet(Get[HydratedField](HydrateableField, fa)
-                                   for fa in target_adaptor.field_adaptors)
+  hydrated_fields = await MultiGet(
+    Get[HydratedField](HydrateableField, fa) for fa in target_adaptor.field_adaptors
+  )
   kwargs = target_adaptor.kwargs()
   for field in hydrated_fields:
     kwargs[field.name] = field.value
@@ -598,8 +599,7 @@ async def hydrate_sources(
     sources_field.filespecs,
     snapshot,
   )
-  # MyPy seems to incorrectly think that validate_fn is None
-  sources_field.validate_fn(fileset_with_spec)  # type: ignore[misc]
+  sources_field.validate_fn(fileset_with_spec)
   return HydratedField(sources_field.arg, fileset_with_spec)
 
 

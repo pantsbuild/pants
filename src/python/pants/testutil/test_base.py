@@ -11,7 +11,7 @@ from collections import defaultdict
 from contextlib import contextmanager
 from tempfile import mkdtemp
 from textwrap import dedent
-from typing import Any, Optional, Type, TypeVar, Union, cast
+from typing import Any, List, Optional, Type, TypeVar, Union, cast
 
 from pants.base.build_root import BuildRoot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
@@ -32,6 +32,7 @@ from pants.init.engine_initializer import EngineInitializer
 from pants.init.util import clean_global_runtime_state
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source.source_root import SourceRootConfig
+from pants.source.wrapped_globs import EagerFilesetWithSpec
 from pants.subsystem.subsystem import Subsystem
 from pants.task.goal_options_mixin import GoalOptionsMixin
 from pants.testutil.base.context_utils import create_context_from_options
@@ -261,17 +262,21 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
 
     return target
 
-  def sources_for(self, package_relative_path_globs, package_dir=''):
+  def sources_for(
+    self, package_relative_path_globs: List[str], package_dir: str = '',
+  ) -> EagerFilesetWithSpec:
     sources_field = SourcesField(
-      Address.parse(f'{package_dir}:_bogus_target_for_test'),
-      'sources',
-      {'globs': package_relative_path_globs},
-      None,
-      PathGlobs(tuple(os.path.join(package_dir, path) for path in package_relative_path_globs)),
-      lambda _: True,
+      address=Address.parse(f'{package_dir}:_bogus_target_for_test'),
+      arg='sources',
+      filespecs={'globs': package_relative_path_globs},
+      base_globs=None,
+      path_globs=PathGlobs(
+        tuple(os.path.join(package_dir, path) for path in package_relative_path_globs),
+      ),
+      validate_fn=lambda _: True,
     )
     field = self.scheduler.product_request(HydratedField, [sources_field])[0]
-    return field.value
+    return cast(EagerFilesetWithSpec, field.value)
 
   @classmethod
   def alias_groups(cls):
