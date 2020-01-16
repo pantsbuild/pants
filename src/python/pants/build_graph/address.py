@@ -3,7 +3,9 @@
 
 import os
 from collections import namedtuple
+from typing import Optional, Sequence, Tuple
 
+from pants.base.build_file import BuildFile
 from pants.util.dirutil import fast_relpath, longest_dir_prefix
 from pants.util.strutil import strip_prefix
 
@@ -12,7 +14,11 @@ from pants.util.strutil import strip_prefix
 BANNED_CHARS_IN_TARGET_NAME = frozenset('@')
 
 
-def parse_spec(spec, relative_to=None, subproject_roots=None):
+def parse_spec(
+  spec: str,
+  relative_to: Optional[str] = None,
+  subproject_roots: Optional[Sequence[str]] = None,
+) -> Tuple[str, str]:
   """Parses a target address spec and returns the path from the root of the repo to this Target
   and Target name.
 
@@ -54,12 +60,16 @@ def parse_spec(spec, relative_to=None, subproject_roots=None):
       dependencies=['//:targetname']
     )
   """
-  def normalize_absolute_refs(ref):
+  def normalize_absolute_refs(ref: str) -> str:
     return strip_prefix(ref, '//')
 
-  subproject = longest_dir_prefix(relative_to, subproject_roots) if subproject_roots else None
+  subproject = (
+    longest_dir_prefix(relative_to, subproject_roots)
+    if relative_to and subproject_roots
+    else None
+  )
 
-  def prefix_subproject(spec_path):
+  def prefix_subproject(spec_path: str) -> str:
     if not subproject:
       return spec_path
     elif spec_path:
@@ -81,6 +91,9 @@ def parse_spec(spec, relative_to=None, subproject_roots=None):
   return spec_path, target_name
 
 
+# TODO: this isn't used anywhere in Pants, but it's a public API so we can't delete it immediately.
+# It's unclear, though, in a deprecation warning what should be the alternative that we recommend
+# people use?
 class Addresses(namedtuple('Addresses', ['addresses', 'rel_path'])):
   """ Used as a sentinel type for identifying a list of string specs.
 
@@ -120,16 +133,14 @@ class Address:
   """
 
   @classmethod
-  def parse(cls, spec, relative_to='', subproject_roots=None):
+  def parse(cls, spec: str, relative_to: str = '', subproject_roots=None) -> "Address":
     """Parses an address from its serialized form.
 
-    :param string spec: An address in string form <path>:<name>.
-    :param string relative_to: For sibling specs, ie: ':another_in_same_build_family', interprets
-                               the missing spec_path part as `relative_to`.
+    :param spec: An address in string form <path>:<name>.
+    :param relative_to: For sibling specs, ie: ':another_in_same_build_family', interprets
+                        the missing spec_path part as `relative_to`.
     :param list subproject_roots: Paths that correspond with embedded build roots
                                   under the current build root.
-    :returns: A new address.
-    :rtype: :class:`pants.base.address.Address`
     """
     spec_path, target_name = parse_spec(spec,
                                         relative_to=relative_to,
@@ -137,7 +148,7 @@ class Address:
     return cls(spec_path, target_name)
 
   @classmethod
-  def sanitize_path(cls, path):
+  def sanitize_path(cls, path: str) -> str:
     # A root or relative spec is OK
     if path == '':
       return path
@@ -155,7 +166,7 @@ class Address:
     return normpath if normpath != '.' else ''
 
   @classmethod
-  def check_target_name(cls, spec_path, name):
+  def check_target_name(cls, spec_path: str, name: str) -> None:
     if not name:
       raise InvalidTargetName('Address spec {spec}:{name} has no name part'
                                  .format(spec=spec_path, name=name))
@@ -167,10 +178,10 @@ class Address:
                               '{banned_chars} not allowed in target name: {name}'
                               .format(banned_chars=banned_chars, name=name))
 
-  def __init__(self, spec_path, target_name):
+  def __init__(self, spec_path: str, target_name: str) -> None:
     """
-    :param string spec_path: The path from the root of the repo to this Target.
-    :param string target_name: The name of a target this Address refers to.
+    :param spec_path: The path from the root of the repo to this Target.
+    :param target_name: The name of a target this Address refers to.
     """
     self._spec_path = self.sanitize_path(spec_path)
     self.check_target_name(spec_path, target_name)
@@ -178,21 +189,21 @@ class Address:
     self._hash = hash((self._spec_path, self._target_name))
 
   @property
-  def spec_path(self):
+  def spec_path(self) -> str:
     """
     :API: public
     """
     return self._spec_path
 
   @property
-  def target_name(self):
+  def target_name(self) -> str:
     """
     :API: public
     """
     return self._target_name
 
   @property
-  def spec(self):
+  def spec(self) -> str:
     """The canonical string representation of the Address.
 
     Prepends '//' if the target is at the root, to disambiguate root-level targets
@@ -205,7 +216,7 @@ class Address:
                                               target_name=self._target_name)
 
   @property
-  def path_safe_spec(self):
+  def path_safe_spec(self) -> str:
     """
     :API: public
     """
@@ -214,13 +225,13 @@ class Address:
                     target_name=self._target_name.replace(os.sep, '.')))
 
   @property
-  def relative_spec(self):
+  def relative_spec(self) -> str:
     """
     :API: public
     """
     return ':{target_name}'.format(target_name=self._target_name)
 
-  def reference(self, referencing_path=None):
+  def reference(self, referencing_path: Optional[str] = None) -> str:
     """How to reference this address in a BUILD file.
 
     :API: public
@@ -244,7 +255,7 @@ class Address:
   def __ne__(self, other):
     return not self == other
 
-  def __repr__(self):
+  def __repr__(self) -> str:
     return self.spec
 
   def __lt__(self, other):
@@ -257,28 +268,38 @@ class BuildFileAddress(Address):
   :API: public
   """
 
-  def __init__(self, build_file=None, target_name=None, rel_path=None):
+  def __init__(
+    self,
+    build_file: Optional[BuildFile] = None,
+    target_name: Optional[str] = None,
+    rel_path: Optional[str] = None
+  ) -> None:
     """
     :param build_file: The build file that contains the object this address points to.
-    :type build_file: :class:`pants.base.build_file.BuildFile`
-    :param string rel_path: The BUILD files' path, relative to the root_dir.
-    :param string target_name: The name of the target within the BUILD file; defaults to the default
-                               target, aka the name of the BUILD file parent dir.
+    :param rel_path: The BUILD files' path, relative to the root_dir.
+    :param target_name: The name of the target within the BUILD file; defaults to the default
+                        target, aka the name of the BUILD file parent dir.
 
     :API: public
     """
-    rel_path = rel_path or build_file.relpath
+    if rel_path is None:
+      if build_file is None:
+        raise ValueError(
+          "You must either provide `rel_path` or `build_file` to the `BuildFileAddress` "
+          "constructor. Both values were None."
+        )
+      rel_path = build_file.relpath
     spec_path = os.path.dirname(rel_path)
     super().__init__(spec_path=spec_path, target_name=target_name or os.path.basename(spec_path))
     self.rel_path = rel_path
 
-  def to_address(self):
+  def to_address(self) -> Address:
     """Convert this BuildFileAddress to an Address."""
     # This is weird, since BuildFileAddress is a subtype of Address, but the engine's exact
     # type matching requires a new instance.
     # TODO: Possibly BuildFileAddress should wrap an Address instead of subclassing it.
     return Address(spec_path=self.spec_path, target_name=self.target_name)
 
-  def __repr__(self):
+  def __repr__(self) -> str:
     return ('BuildFileAddress({rel_path}, {target_name})'
             .format(rel_path=self.rel_path, target_name=self.target_name))

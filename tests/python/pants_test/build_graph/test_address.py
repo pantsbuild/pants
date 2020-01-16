@@ -20,7 +20,7 @@ from pants.util.dirutil import touch
 
 
 class ParseSpecTest(unittest.TestCase):
-  def test_parse_spec(self):
+  def test_parse_spec(self) -> None:
     spec_path, target_name = parse_spec('a/b/c')
     self.assertEqual(spec_path, 'a/b/c')
     self.assertEqual(target_name, 'c')
@@ -33,7 +33,7 @@ class ParseSpecTest(unittest.TestCase):
     self.assertEqual(spec_path, 'a/b/c')
     self.assertEqual(target_name, 'c')
 
-  def test_parse_local_spec(self):
+  def test_parse_local_spec(self) -> None:
     spec_path, target_name = parse_spec(':c')
     self.assertEqual(spec_path, '')
     self.assertEqual(target_name, 'c')
@@ -42,7 +42,7 @@ class ParseSpecTest(unittest.TestCase):
     self.assertEqual(spec_path, 'here')
     self.assertEqual(target_name, 'c')
 
-  def test_parse_absolute_spec(self):
+  def test_parse_absolute_spec(self) -> None:
     spec_path, target_name = parse_spec('//a/b/c')
     self.assertEqual(spec_path, 'a/b/c')
     self.assertEqual(target_name, 'c')
@@ -55,7 +55,7 @@ class ParseSpecTest(unittest.TestCase):
     self.assertEqual(spec_path, '')
     self.assertEqual(target_name, 'c')
 
-  def test_parse_bad_spec_non_normalized(self):
+  def test_parse_bad_spec_non_normalized(self) -> None:
     self.do_test_bad_spec_path('..')
     self.do_test_bad_spec_path('.')
 
@@ -70,16 +70,16 @@ class ParseSpecTest(unittest.TestCase):
     self.do_test_bad_spec_path('a/')
     self.do_test_bad_spec_path('a/b/')
 
-  def test_parse_bad_spec_bad_path(self):
+  def test_parse_bad_spec_bad_path(self) -> None:
     self.do_test_bad_spec_path('/a')
     self.do_test_bad_spec_path('///a')
 
-  def test_parse_bad_spec_bad_name(self):
+  def test_parse_bad_spec_bad_name(self) -> None:
     self.do_test_bad_target_name('a:')
     self.do_test_bad_target_name('a::')
     self.do_test_bad_target_name('//')
 
-  def test_parse_bad_spec_build_trailing_path_component(self):
+  def test_parse_bad_spec_build_trailing_path_component(self) -> None:
     self.do_test_bad_spec_path('BUILD')
     self.do_test_bad_spec_path('BUILD.suffix')
     self.do_test_bad_spec_path('//BUILD')
@@ -93,19 +93,19 @@ class ParseSpecTest(unittest.TestCase):
     self.do_test_bad_spec_path('//a/BUILD:b')
     self.do_test_bad_spec_path('//a/BUILD.suffix:b')
 
-  def test_banned_chars_in_target_name(self):
+  def test_banned_chars_in_target_name(self) -> None:
     with self.assertRaises(InvalidTargetName):
       Address(*parse_spec('a/b:c@d'))
 
-  def do_test_bad_spec_path(self, spec):
+  def do_test_bad_spec_path(self, spec: str) -> None:
     with self.assertRaises(InvalidSpecPath):
       Address(*parse_spec(spec))
 
-  def do_test_bad_target_name(self, spec):
+  def do_test_bad_target_name(self, spec: str) -> None:
     with self.assertRaises(InvalidTargetName):
       Address(*parse_spec(spec))
 
-  def test_subproject_spec(self):
+  def test_subproject_spec(self) -> None:
     # Ensure that a spec referring to a subproject gets assigned to that subproject properly.
     def parse(spec, relative_to):
       return parse_spec(spec,
@@ -165,20 +165,20 @@ class BaseAddressTest(unittest.TestCase):
             touch(os.path.join(root_dir, buildfile))
           yield os.path.realpath(root_dir)
 
-  def assert_address(self, spec_path, target_name, address):
+  def assert_address(self, spec_path: str, target_name: str, address: Address) -> None:
     self.assertEqual(spec_path, address.spec_path)
     self.assertEqual(target_name, address.target_name)
 
 
 class AddressTest(BaseAddressTest):
-  def test_equivalence(self):
+  def test_equivalence(self) -> None:
     self.assertNotEqual("Not really an address", Address('a/b', 'c'))
 
     self.assertEqual(Address('a/b', 'c'), Address('a/b', 'c'))
     self.assertEqual(Address('a/b', 'c'), Address.parse('a/b:c'))
     self.assertEqual(Address.parse('a/b:c'), Address.parse('a/b:c'))
 
-  def test_parse(self):
+  def test_parse(self) -> None:
     self.assert_address('a/b', 'target', Address.parse('a/b:target'))
     self.assert_address('a/b', 'target', Address.parse('//a/b:target'))
     self.assert_address('a/b', 'b', Address.parse('a/b'))
@@ -190,7 +190,7 @@ class AddressTest(BaseAddressTest):
 
 
 class BuildFileAddressTest(BaseAddressTest):
-  def test_build_file_forms(self):
+  def test_build_file_forms(self) -> None:
     with self.workspace('a/b/c/BUILD') as root_dir:
       build_file = BuildFile(FileSystemProjectTree(root_dir), relpath='a/b/c/BUILD')
       self.assert_address('a/b/c', 'c', BuildFileAddress(build_file=build_file))

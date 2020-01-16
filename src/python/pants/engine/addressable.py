@@ -5,7 +5,7 @@ import inspect
 from collections.abc import MutableMapping, MutableSequence
 from dataclasses import dataclass
 from functools import update_wrapper
-from typing import Any, Set, Tuple, Type
+from typing import Any, List, Set, Tuple, Type
 
 from pants.base.specs import AddressSpec
 from pants.build_graph.address import Address, BuildFileAddress
@@ -26,7 +26,7 @@ class ProvenancedBuildFileAddress:
 
 class BuildFileAddresses(Collection[BuildFileAddress]):
   @property
-  def addresses(self):
+  def addresses(self) -> List[Address]:
     """Converts the BuildFileAddress objects in this collection to Address objects."""
     return [bfa.to_address() for bfa in self]
 

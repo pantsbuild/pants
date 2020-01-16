@@ -2,15 +2,17 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import re
-from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, Optional, Tuple
+from typing import Any, Dict, Iterable, Optional, Tuple, Union
 
 from pants.build_graph.address import BuildFileAddress
 from pants.engine.objects import Serializable
 from pants.engine.parser import Parser
 from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
+
+
+ThinAddressableObject = Union[Serializable, Any]
 
 
 class MappingError(Exception):
@@ -34,29 +36,26 @@ class AddressMap:
   :param path: The path to the byte source this address map's objects were passed from.
   :param objects_by_name: A dict mapping from object name to the parsed 'thin' addressable object.
   """
-  path: Any
-  objects_by_name: Any
+  path: str
+  objects_by_name: Dict[str, ThinAddressableObject]
 
   @classmethod
-  def parse(cls, filepath, filecontent, parser):
+  def parse(cls, filepath: str, filecontent: bytes, parser: Parser) -> "AddressMap":
     """Parses a source for addressable Serializable objects.
 
     No matter the parser used, the parsed and mapped addressable objects are all 'thin'; ie: any
     objects they point to in other namespaces or even in the same namespace but from a separate
     source are left as unresolved pointers.
 
-    :param string filepath: The path to the byte source containing serialized objects.
-    :param string filecontent: The content of byte source containing serialized objects to be parsed.
-    :param symbol_table: The symbol table cls to expose a symbol table dict.
-    :type symbol_table: Instance of :class:`pants.engine.parser.SymbolTable`.
+    :param filepath: The path to the byte source containing serialized objects.
+    :param filecontent: The content of byte source containing serialized objects to be parsed.
     :param parser: The parser cls to use.
-    :type parser: A :class:`pants.engine.parser.Parser`.
     """
     try:
       objects = parser.parse(filepath, filecontent)
     except Exception as e:
-      raise MappingError('Failed to parse {}:\n{}'.format(filepath, e))
-    objects_by_name = {}
+      raise MappingError(f'Failed to parse {filepath}:\n{e!r}')
+    objects_by_name: Dict[str, ThinAddressableObject] = {}
     for obj in objects:
       if not Serializable.is_serializable(obj):
         raise UnaddressableObjectError('Parsed a non-serializable object: {!r}'.format(obj))
@@ -70,7 +69,7 @@ class AddressMap:
         raise DuplicateNameError('An object already exists at {!r} with name {!r}: {!r}.  Cannot '
                                  'map {!r}'.format(filepath, name, objects_by_name[name], obj))
       objects_by_name[name] = obj
-    return cls(filepath, OrderedDict(sorted(objects_by_name.items())))
+    return cls(filepath, dict(sorted(objects_by_name.items())))
 
 
 class DifferingFamiliesError(MappingError):
@@ -90,18 +89,15 @@ class AddressFamily:
   :param namespace: The namespace path of this address family.
   :param objects_by_name: A dict mapping from object name to the parsed 'thin' addressable object.
   """
-  namespace: Any
-  objects_by_name: Any
+  namespace: str
+  objects_by_name: Dict[str, Tuple[str, ThinAddressableObject]]
 
   @classmethod
-  def create(cls, spec_path, address_maps) -> 'AddressFamily':
+  def create(cls, spec_path: str, address_maps: Iterable[AddressMap]) -> 'AddressFamily':
     """Creates an address family from the given set of address maps.
 
     :param spec_path: The directory prefix shared by all address_maps.
     :param address_maps: The family of maps that form this namespace.
-    :type address_maps: :class:`collections.Iterable` of :class:`AddressMap`
-    :returns: a new address family.
-    :rtype: :class:`AddressFamily`
     :raises: :class:`MappingError` if the given address maps do not form a family.
     """
     if spec_path == '.':
@@ -112,8 +108,7 @@ class AddressFamily:
                                      'but received: {}'
                                      .format(spec_path, address_map.path))
 
-
-    objects_by_name: Dict[str, Tuple[str, Any]] = {}
+    objects_by_name: Dict[str, Tuple[str, ThinAddressableObject]] = {}
     for address_map in address_maps:
       current_path = address_map.path
       for name, obj in address_map.objects_by_name.items():
@@ -128,16 +123,16 @@ class AddressFamily:
                                            obj=obj,
                                            current_path=current_path))
         objects_by_name[name] = (current_path, obj)
-    return AddressFamily(namespace=spec_path,
-                         objects_by_name=OrderedDict((name, (path, obj)) for name, (path, obj)
-                                                      in sorted(objects_by_name.items())))
+    return AddressFamily(
+      namespace=spec_path,
+      objects_by_name={name: (path, obj) for name, (path, obj) in sorted(objects_by_name.items())},
+    )
 
   @memoized_property
-  def addressables(self):
+  def addressables(self) -> Dict[BuildFileAddress, ThinAddressableObject]:
     """Return a mapping from BuildFileAddress to thin addressable objects in this namespace.
 
-    :rtype: dict from :class:`pants.build_graph.address.BuildFileAddress` to thin addressable
-            objects.
+    :rtype: dict from `BuildFileAddress` to thin addressable objects.
     """
     return {
       BuildFileAddress(rel_path=path, target_name=name): obj
@@ -161,18 +156,18 @@ class ResolveError(MappingError):
 class AddressMapper:
   """Configuration to parse build files matching a filename pattern."""
   parser: Parser
-  build_patterns: Tuple
-  build_ignore_patterns: Tuple
-  exclude_target_regexps: Tuple
-  subproject_roots: Tuple
+  build_patterns: Tuple[str, ...]
+  build_ignore_patterns: Tuple[str, ...]
+  exclude_target_regexps: Tuple[str, ...]
+  subproject_roots: Tuple[str, ...]
 
   def __init__(
     self,
     parser: Parser,
-    build_patterns: Optional[Iterable] = None,
-    build_ignore_patterns: Optional[Iterable] = None,
-    exclude_target_regexps: Optional[Iterable] = None,
-    subproject_roots: Optional[Iterable] = None,
+    build_patterns: Optional[Iterable[str]] = None,
+    build_ignore_patterns: Optional[Iterable[str]] = None,
+    exclude_target_regexps: Optional[Iterable[str]] = None,
+    subproject_roots: Optional[Iterable[str]] = None,
   ) -> None:
     """Create an AddressMapper.
 

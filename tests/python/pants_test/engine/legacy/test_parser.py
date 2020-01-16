@@ -10,7 +10,7 @@ from pants.engine.parser import SymbolTable
 
 class LegacyPythonCallbacksParserTest(unittest.TestCase):
 
-  def test_no_import_sideeffects(self):
+  def test_no_import_sideeffects(self) -> None:
     # A parser with no symbols registered.
     parser = LegacyPythonCallbacksParser(SymbolTable({}), BuildFileAliases(), build_file_imports_behavior='allow')
     # Call to import a module should succeed.

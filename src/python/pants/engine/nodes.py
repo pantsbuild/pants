@@ -52,21 +52,3 @@ class Return(State):
 class Throw(State):
   """Indicates that a Node should have been able to return a value, but failed."""
   exc: Any
-
-
-@dataclass(frozen=True)
-class Runnable(State):
-  """Indicates that the Node is ready to run with the given closure.
-
-  The return value of the Runnable will become the final state of the Node.
-  """
-  func: Any
-  args: Any
-  cacheable: Any
-
-  @classmethod
-  def _from_components(cls, components):
-    return cls(components[0], components[2:], components[1])
-
-  def _to_components(self):
-    return (self.func, self.cacheable) + self.args
