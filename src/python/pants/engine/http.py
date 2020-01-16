@@ -21,7 +21,7 @@ class HttpGetResponse:
 @dataclass(frozen=True)
 class HttpRequester:
 
-  def get_request(self, url: str, headers: Dict[str, str] = {}) -> HttpGetResponse:
+  def get_request(self, url: str, *, headers: Dict[str, str] = {}) -> HttpGetResponse:
     r = requests.get(url, headers)
     header_list = [ (str(item), r.headers[item]) for item in r.headers ]
     return HttpGetResponse(
