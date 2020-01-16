@@ -273,5 +273,6 @@ python_tests(
     'src/python/pants/testutil:test_base',
     'tests/python/pants_test:console_rule_test_base',
     'tests/python/pants_test/engine:util'
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )

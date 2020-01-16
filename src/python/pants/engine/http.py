@@ -23,10 +23,10 @@ class HttpRequester:
 
   def get_request(self, url: str, *, headers: Dict[str, str] = {}) -> HttpGetResponse:
     r = requests.get(url, headers)
-    header_list = [ (str(item), r.headers[item]) for item in r.headers ]
+    header_list = [(str(item), r.headers[item]) for item in r.headers]
     return HttpGetResponse(
-      url = r.url,
-      headers = tuple(header_list),
-      status_code = r.status_code,
-      output_bytes = r.content,
+      url=r.url,
+      headers=tuple(header_list),
+      status_code=r.status_code,
+      output_bytes=r.content,
     )
