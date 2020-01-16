@@ -7,7 +7,6 @@ from enum import Enum
 from typing import Optional, Tuple
 from pathlib import PurePath
 
-# from pants.backend.python.rules.coverage import CoverageReport
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.addressable import BuildFileAddresses
@@ -140,7 +139,7 @@ class AddressAndDebugRequest:
 
 
 @dataclass(frozen=True)
-class CoverageReport:
+class PytestCoverageReport:
   digest: Digest
   output_path: PurePath
 
@@ -164,7 +163,7 @@ async def run_tests(
   filtered_results = [(x.address, x.test_result) for x in results if x.test_result is not None]
   if options.values.run_coverage:
     # TODO rename CoverageReport and make this generic.
-    pytest_coverage_report = await Get[CoverageReport](AddressAndTestResults, AddressAndTestResults(tuple(sorted(filtered_results))))
+    pytest_coverage_report = await Get[PytestCoverageReport](AddressAndTestResults, AddressAndTestResults(tuple(sorted(filtered_results))))
     workspace.materialize_directory(DirectoryToMaterialize(
       pytest_coverage_report.digest,
       path_prefix=str(pytest_coverage_report.output_path)

@@ -44,15 +44,27 @@ from pants.engine.legacy.graph import HydratedTarget, TransitiveHydratedTargets,
 from pants.engine.rules import goal_rule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.rules.core.strip_source_root import SourceRootStrippedSources
-from pants.rules.core.test import AddressAndTestResult, AddressAndTestResults, CoverageReport
+from pants.rules.core.test import AddressAndTestResults, PytestCoverageReport
 from pants.source.source_root import SourceRootConfig
 
 
 class CoverageToolBase(PythonToolBase):
-  options_scope = 'merge-coverage'
+  options_scope = 'pytest-coverage'
   default_version = 'coverage==5.0.0'
   default_entry_point = 'coverage'
   default_interpreter_constraints = ["CPython>=3.6"]
+
+
+  @classmethod
+  def register_options(cls, register):
+    super().register_options(register)
+    register(
+      '--output-path',
+      type=str,
+      default='coverage/python',
+      help='Path to write pytest coverage report to. Must be relative to build root.',
+    )
+
 
 
 @dataclass(frozen=True)
@@ -129,11 +141,11 @@ async def merge_coverage_reports(
       *coverage_directory_digests,
       coveragerc_digest,
       coverage_setup.requirements_pex.directory_digest,
-      chrooted_sources.digest
+      chrooted_sources.digest,
     )),
   )
 
-  prefixes = [f'{prefix}/.coverage' for prefix, _ in test_results]
+  prefixes = [f'{address.to_address().path_safe_spec}/.coverage' for address, _ in test_results]
   coverage_args = ['combine', *prefixes]
   request = coverage_setup.requirements_pex.create_execute_request(
     python_setup=python_setup,
@@ -175,15 +187,23 @@ def ensure_section(config_parser: configparser.ConfigParser, section: str) -> No
     config_parser.add_section(section)
 
 
-def construct_coverage_config(
-  src_to_target_base: Dict
-) -> str:
+def construct_coverage_config(source_roots, python_files) -> str:
+  # A map from source root stripped source to its source root. eg:
+  #  {'pants/testutil/subsystem/util.py': 'src/python'}
+  # This is so coverage reports referencing /chroot/path/pants/testutil/subsystem/util.py can be mapped
+  # back to the actual sources they reference when merging coverage reports.
+  source_to_target_base: Dict[str, str] = {}
+  for file_name in python_files:
+    source_root = source_roots.find_by_path(file_name)
+    source_root_stripped_path = file_name[len(source_root.path) + 1:]
+    source_to_target_base[source_root_stripped_path] = source_root.path
+
   config_parser = configparser.ConfigParser()
   config_parser.read_file(StringIO(DEFAULT_COVERAGE_CONFIG))
   ensure_section(config_parser, 'run')
   config_parser.set('run', 'plugins', COVERAGE_PLUGIN_MODULE_NAME)
   config_parser.add_section(COVERAGE_PLUGIN_MODULE_NAME)
-  config_parser.set(COVERAGE_PLUGIN_MODULE_NAME, 'src_to_target_base', json.dumps(src_to_target_base))
+  config_parser.set(COVERAGE_PLUGIN_MODULE_NAME, 'source_to_target_base', json.dumps(source_to_target_base))
   config = StringIO()
   config_parser.write(config)
   return config.getvalue()
@@ -207,9 +227,10 @@ async def generate_coverage_report(
   transitive_targets: TransitiveHydratedTargets,
   python_setup: PythonSetup,
   coverage_setup: CoverageSetup,
+  coverage_toolbase: CoverageToolBase,
   source_root_config: SourceRootConfig,
   subprocess_encoding_environment: SubprocessEncodingEnvironment,
-) -> CoverageReport:
+) -> PytestCoverageReport:
   """Takes all python test results and generates a single coverage report in dist/coverage."""
   requirements_pex = coverage_setup.requirements_pex
   merged_coverage_data = await Get[MergedCoverageData](AddressAndTestResults, test_results)
@@ -218,44 +239,22 @@ async def generate_coverage_report(
     if target.adaptor.type_alias == 'python_library' or target.adaptor.type_alias == 'python_tests'
   ]
 
+  source_roots = source_root_config.get_source_roots()
   python_files = frozenset(itertools.chain.from_iterable(
     target.adaptor.sources.snapshot.files for target in python_targets
   ))
-  # A map from source root stripped source to its source root. eg:
-  #  {'pants/testutil/subsystem/util.py': 'src/python'}
-  # This is so coverage reports referencing /chroot/path/pants/testutil/subsystem/util.py can be mapped
-  # back to the actual sources they reference when merging coverage reports.
-  source_roots_and_source_root_stripped_sources: Dict[str, str] = {}
-  # for filename in python_files:
-  #   for source_root in source_root_config:
-  #     if filename.startswith(source_root):
-  #       source_roots_and_source_root_stripped_sources[filename[len(source_root)+1:]] = source_root
+  coverage_config_content = construct_coverage_config(source_roots, python_files)
 
-  # results = await MultiGet(Get[AddressAndTestResult](Address, addr.to_address()) for addr in addresses)
-  # test_results = [
-  #   (x.address.to_address().path_safe_spec, x.test_result.coverage_digest)
-  #   for x in results if x.test_result is not None
-  # ]
-
-  coverage_config_content = construct_coverage_config(source_roots_and_source_root_stripped_sources)
   coveragerc_digest = await Get[Digest](InputFilesContent, get_coveragerc_input(coverage_config_content))
-  source_root_stripped_sources = await MultiGet(
-    Get[SourceRootStrippedSources](HydratedTarget, hydrated_target)
-    for hydrated_target in python_targets
-  )
-  stripped_sources_digests = tuple(
-    stripped_sources.snapshot.directory_digest for stripped_sources in source_root_stripped_sources
-  )
-  sources_digest = await Get[Digest](DirectoriesToMerge(directories=stripped_sources_digests))
-  inits_digest = await Get[InjectedInitDigest](Digest, sources_digest)
+  chrooted_sources = await Get[ChrootedPythonSources](HydratedTargets(transitive_targets.closure))
+
   merged_input_files: Digest = await Get(
     Digest,
     DirectoriesToMerge(directories=(
       merged_coverage_data.coverage_data,
       coveragerc_digest,
       requirements_pex.directory_digest,
-      sources_digest,
-      inits_digest.directory_digest,
+      chrooted_sources.digest,
     )),
   )
 
@@ -274,8 +273,10 @@ async def generate_coverage_report(
     ExecuteProcessRequest,
     request
   )
-  print(result)
-  return CoverageReport(result.output_directory_digest, 'coverage/python') # TODO Get this from an option.
+  print(result.stderr)
+  if result.exit_code != 0:
+    raise Exception(result.stdout)
+  return PytestCoverageReport(result.output_directory_digest, coverage_toolbase.options.output_path)
 
 
 def rules():
