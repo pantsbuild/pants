@@ -6,7 +6,12 @@ import pytest
 from pants.backend.python.rules.setup_py_util import (
   declares_pkg_resources_namespace_package,
   distutils_repr,
+  is_python2,
 )
+from pants.backend.python.subsystems.python_setup import PythonSetup
+from pants.option.ranked_value import RankedValue
+from pants.subsystem.subsystem import Subsystem
+from pants.testutil.subsystem.util import init_subsystem
 
 
 testdata = {
@@ -74,3 +79,28 @@ def test_declares_pkg_resources_namespace_package(python_src: str) -> None:
 ])
 def test_does_not_declare_pkg_resources_namespace_package(python_src: str) -> None:
   assert not declares_pkg_resources_namespace_package(python_src)
+
+
+@pytest.mark.parametrize(['constraints', 'compatibilities'], [
+  ([], [['CPython>=2.7,<3']]),
+  (['CPython>=2.7,<3'], [None]),
+  (['CPython>=2.7,<3'], [['CPython>=2.7,<3'], ['CPython>=3.6']]),
+])
+def test_is_python2(constraints, compatibilities):
+  Subsystem.reset()
+  init_subsystem(PythonSetup, {PythonSetup.options_scope: {
+    'interpreter_constraints': RankedValue(RankedValue.CONFIG, constraints)}})
+  assert is_python2(compatibilities, PythonSetup.global_instance())
+
+
+@pytest.mark.parametrize(['constraints', 'compatibilities'], [
+  ([], [['CPython>=3.6']]),
+  (['CPython>=3.6'], [None]),
+  (['CPython>=3.7'], [['CPython>=3.6']]),
+  (['CPython>=3.7'], [['CPython>=3.6'], ['CPython>=3.8']])
+])
+def test_is_not_python2(constraints, compatibilities):
+  Subsystem.reset()
+  init_subsystem(PythonSetup, {PythonSetup.options_scope: {
+    'interpreter_constraints': RankedValue(RankedValue.CONFIG, constraints)}})
+  assert not is_python2(compatibilities, PythonSetup.global_instance())

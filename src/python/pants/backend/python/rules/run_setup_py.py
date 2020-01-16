@@ -17,6 +17,7 @@ from pants.backend.python.rules.setup_py_util import (
   PackageDatum,
   distutils_repr,
   find_packages,
+  is_python2,
   source_root_or_raise,
 )
 from pants.backend.python.rules.setuptools import Setuptools
@@ -132,12 +133,6 @@ class ExportedTargetRequirements:
 class AncestorInitPyFiles:
   """__init__.py files in enclosing packages of the exported code."""
   digests: Tuple[Digest, ...]  # The files stripped of their source roots.
-
-
-@dataclass(frozen=True)
-class PythonVersion:
-  major: int
-  minor: int
 
 
 @dataclass(frozen=True)
@@ -271,9 +266,10 @@ async def run_setup_pys(targets: HydratedTargets, options: SetupPyOptions, conso
     )
     exported_targets = list(set(owners))
 
-  python_version = await Get[PythonVersion](HydratedTargets, targets)
+  py2 = is_python2((getattr(target.adaptor, 'compatibility', None) for target in targets),
+                   python_setup)
   chroots = await MultiGet(Get[SetupPyChroot](
-    SetupPyChrootRequest(target, py2=python_version.major == 2)) for target in exported_targets)
+    SetupPyChrootRequest(target, py2)) for target in exported_targets)
 
   # If args were provided, run setup.py with them; Otherwise just dump chroots.
   if args:
@@ -300,28 +296,6 @@ async def run_setup_pys(targets: HydratedTargets, options: SetupPyOptions, conso
       )
 
   return SetupPy(0)
-
-
-@rule
-async def get_python_version(
-    targets: HydratedTargets, python_setup: PythonSetup,
-    subprocess_encoding_environment: SubprocessEncodingEnvironment) -> PythonVersion:
-  """Get the Python version for the given targets."""
-  py_version_pex: Pex = await Get[Pex](CreatePex(
-    output_filename='python_version.pex',
-    interpreter_constraints=PexInterpreterConstraints.create_from_adaptors(
-      (t.adaptor for t in targets), python_setup)))
-  py_version_request = py_version_pex.create_execute_request(
-    python_setup=python_setup,
-    subprocess_encoding_environment=subprocess_encoding_environment,
-    pex_path="./python_version.pex",
-    pex_args=('-c', 'import sys; print(sys.version_info.major); print(sys.version_info.minor)'),
-    description='Check Python interpreter version.',
-    input_files=py_version_pex.directory_digest
-  )
-  py_version_result = await Get[ExecuteProcessResult](ExecuteProcessRequest, py_version_request)
-  major_str, minor_str = py_version_result.stdout.decode().strip().split()
-  return PythonVersion(int(major_str.strip()), int(minor_str.strip()))
 
 
 # We write .py sources into the chroot under this dir.
@@ -640,7 +614,6 @@ def rules():
     run_setup_pys,
     run_setup_py,
     generate_chroot,
-    get_python_version,
     get_sources,
     get_snapshot_subset,
     get_requirements,

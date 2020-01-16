@@ -3,14 +3,12 @@
 
 import json
 import textwrap
-from typing import Iterable, Optional, Type
+from typing import Iterable, Type
 
 import pytest
 
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.python_requirement import PythonRequirement
-from pants.backend.python.rules import download_pex_bin
-from pants.backend.python.rules.pex import rules as pex_rules
 from pants.backend.python.rules.run_setup_py import (
   AmbiguousOwnerError,
   AncestorInitPyFiles,
@@ -22,7 +20,6 @@ from pants.backend.python.rules.run_setup_py import (
   NoOwnerError,
   OwnedDependencies,
   OwnedDependency,
-  PythonVersion,
   SetupPyChroot,
   SetupPyChrootRequest,
   SetupPySources,
@@ -31,15 +28,11 @@ from pants.backend.python.rules.run_setup_py import (
   get_ancestor_init_py,
   get_exporting_owner,
   get_owned_dependencies,
-  get_python_version,
   get_requirements,
   get_snapshot_subset,
   get_sources,
   validate_args,
 )
-from pants.backend.python.subsystems import python_native_code, subprocess_environment
-from pants.backend.python.subsystems.python_setup import PythonSetup
-from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.fs import Snapshot
@@ -49,12 +42,6 @@ from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Params
 from pants.rules.core.strip_source_root import strip_source_root
 from pants.source.source_root import SourceRootConfig
-from pants.testutil.interpreter_selection_utils import (
-  skip_unless_python3_present,
-  skip_unless_python27_present,
-  skip_unless_python36_present,
-)
-from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.subsystem.util import init_subsystem
 from pants.testutil.test_base import TestBase
 
@@ -73,46 +60,6 @@ class TestSetupPyBase(TestBase):
 
   def tgt(self, addr: str) -> HydratedTarget:
     return self.request_single_product(HydratedTarget, Params(Address.parse(addr)))
-
-
-class TestGetPythonVersion(TestSetupPyBase):
-  @classmethod
-  def rules(cls):
-    return super().rules() + [
-      get_python_version,
-      *pex_rules(),
-      *download_pex_bin.rules(),
-      *python_native_code.rules(),
-      *subprocess_environment.rules(),
-      RootRule(PythonSetup),
-      RootRule(SubprocessEncodingEnvironment),
-      RootRule(HydratedTargets)
-    ]
-
-  def _do_test(self, compatibility: str,
-               expected_major: int, expected_minor: Optional[int]) -> None:
-    init_subsystem(PythonSetup)
-    self.create_file('src/python/foo/BUILD', textwrap.dedent(f"""
-      python_library(compatibility=['{compatibility}'])
-    """))
-    python_version = self.request_single_product(
-      PythonVersion,
-      Params(HydratedTargets([self.tgt('src/python/foo')]), create_options_bootstrapper()))
-    assert python_version.major == expected_major
-    if expected_minor:
-      assert python_version.minor == expected_minor
-
-  @skip_unless_python27_present
-  def test_get_version_27(self) -> None:
-    self._do_test('CPython>=2.7,<3', 2, 7)
-
-  @skip_unless_python36_present
-  def test_get_version_36(self) -> None:
-    self._do_test('CPython>=3.6,<3.7', 3, 6)
-
-  @skip_unless_python3_present
-  def test_get_version_3(self) -> None:
-    self._do_test('CPython>=3', 3, None)
 
 
 class TestGenerateChroot(TestSetupPyBase):

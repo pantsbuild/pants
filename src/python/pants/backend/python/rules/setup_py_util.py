@@ -4,8 +4,11 @@
 import io
 import os
 from collections import abc, defaultdict
-from typing import Dict, Iterable, List, Set, Tuple, cast
+from typing import Dict, Iterable, List, Optional, Set, Tuple, cast
 
+from pkg_resources import Requirement
+
+from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.engine.fs import FilesContent
 from pants.engine.legacy.graph import HydratedTarget
 from pants.engine.legacy.structs import PythonTargetAdaptor, ResourcesAdaptor
@@ -192,5 +195,18 @@ def declares_pkg_resources_namespace_package(python_src: str) -> bool:
     #   __import__('pkg_resources').declare_namespace(__name__).
     if (is_call_to(ast_node, 'declare_namespace') and
         has_args(cast(ast.Call, ast_node), ('__name__',))):
+      return True
+  return False
+
+
+def is_python2(compatibilities: Iterable[Optional[List[str]]], python_setup: PythonSetup) -> bool:
+  """Checks if we should assume python2 code."""
+
+  reqs = [Requirement.parse(constraint)
+          for compatibility in compatibilities
+          for constraint in python_setup.compatibility_or_constraints(compatibility)]
+  for req in reqs:
+    if req.specifier.contains('2.7'):  # type: ignore
+      # At least one constraint limits us to Python 2, so assume that.
       return True
   return False
