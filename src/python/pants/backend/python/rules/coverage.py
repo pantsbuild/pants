@@ -72,12 +72,6 @@ class CoverageToolBase(PythonToolBase):
       help='Which coverage reports to emit.',
     )
 
-    register( # TODO wire this up.
-      '--coverage-include-test-sources',
-      type=bool,
-      help='Whether to include test source files in coverage measurement.',
-    )
-
 
 @dataclass(frozen=True)
 class CoverageSetup:

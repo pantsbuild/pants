@@ -50,7 +50,6 @@ class PyTest(Subsystem):
       help='The maximum timeout (in seconds) that can be set on a test target.',
     )
 
-
   def get_requirement_strings(self) -> Tuple[str, ...]:
     """Returns a tuple of requirements-style strings for Pytest and Pytest plugins."""
     return (self.options.version, *self.options.pytest_plugins)
