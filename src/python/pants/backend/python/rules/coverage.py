@@ -17,6 +17,8 @@ from pants.backend.python.rules.pex import (
   PexInterpreterConstraints,
   PexRequirements,
 )
+from pants.backend.python.rules.prepare_chrooted_python_sources import ChrootedPythonSources
+
 from pants.backend.python.rules.python_test_runner import (
   DEFAULT_COVERAGE_CONFIG,
   get_coveragerc_input,
@@ -38,7 +40,7 @@ from pants.engine.fs import (
 )
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
-from pants.engine.legacy.graph import HydratedTarget, TransitiveHydratedTargets
+from pants.engine.legacy.graph import HydratedTarget, TransitiveHydratedTargets, HydratedTargets
 from pants.engine.rules import goal_rule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.rules.core.strip_source_root import SourceRootStrippedSources
@@ -94,8 +96,10 @@ class MergedCoverageData:
 
 @rule(name="Merge coverage reports")
 async def merge_coverage_reports(
+  test_results: AddressAndTestResults,
   addresses: BuildFileAddresses,
   address_specs: AddressSpecs,
+  transitive_targets: TransitiveHydratedTargets,
   python_setup: PythonSetup,
   coverage: CoverageToolBase,
   coverage_setup: CoverageSetup,
@@ -103,17 +107,6 @@ async def merge_coverage_reports(
   subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> MergedCoverageData:
   """Takes all python test results and merges their coverage data into a single sql file."""
-  requirements_pex = coverage_setup.requirements_pex
-
-  transitive_targets = await Get[TransitiveHydratedTargets](AddressSpecs, address_specs)
-  python_targets = [
-    target for target in transitive_targets.closure
-    if target.adaptor.type_alias == 'python_library' or target.adaptor.type_alias == 'python_tests'
-  ]
-
-  results = await MultiGet(Get[AddressAndTestResult](Address, addr.to_address()) for addr in addresses)
-  test_results = [
-    (x.address.to_address().path_safe_spec, x.test_result._python_sqlite_coverage_file) for x in results if x.test_result is not None]
 
   coveragerc_digest = await Get[Digest](InputFilesContent, get_coveragerc_input(DEFAULT_COVERAGE_CONFIG))
 
@@ -121,44 +114,28 @@ async def merge_coverage_reports(
     Get(
       Digest,
       DirectoryWithPrefixToAdd(
-        directory_digest=coverage_file_digest,
-        prefix=prefix
+        directory_digest=test_result._python_sqlite_coverage_file,
+        prefix=address.to_address().path_safe_spec,
       )
     )
-    for prefix, coverage_file_digest in test_results if coverage_file_digest is not None
+    for address, test_result in test_results if test_result._python_sqlite_coverage_file is not None
   )
-  source_root_stripped_sources = await MultiGet(
-    Get[SourceRootStrippedSources](HydratedTarget, hydrated_target)
-    for hydrated_target in python_targets
-  )
-  stripped_sources_digests = tuple(
-    stripped_sources.snapshot.directory_digest for stripped_sources in source_root_stripped_sources
-  )
-  # TODO: PythonTestRunner replaced sources and inits digest with this:
-  # chrooted_sources = await Get[ChrootedPythonSources](HydratedTargets(all_targets))
-  # directories_to_merge = [
-  #   chrooted_sources.digest,
-  #   resolved_requirements_pex.directory_digest,
-  # ]
 
-
-  sources_digest = await Get[Digest](DirectoriesToMerge(directories=stripped_sources_digests))
-  inits_digest = await Get[InjectedInitDigest](Digest, sources_digest)
+  chrooted_sources = await Get[ChrootedPythonSources](HydratedTargets(transitive_targets.closure))
 
   merged_input_files: Digest = await Get(
     Digest,
     DirectoriesToMerge(directories=(
       *coverage_directory_digests,
       coveragerc_digest,
-      requirements_pex.directory_digest,
-      sources_digest,
-      inits_digest.directory_digest,
+      coverage_setup.requirements_pex.directory_digest,
+      chrooted_sources.digest
     )),
   )
 
   prefixes = [f'{prefix}/.coverage' for prefix, _ in test_results]
   coverage_args = ['combine', *prefixes]
-  request = requirements_pex.create_execute_request(
+  request = coverage_setup.requirements_pex.create_execute_request(
     python_setup=python_setup,
     subprocess_encoding_environment=subprocess_encoding_environment,
     pex_path=f'./{coverage_setup.filename}',
@@ -223,35 +200,19 @@ def get_file_names(all_target_adaptors):
   return list(iter_files())
 
 
-# # TODO: Make this not a goal again when the build graph ambiguity is worked out.
-# class CoverageOptions(GoalSubsystem):
-#   name = 'coverage2'
-
-
-# class CoverageReport(Goal):
-#   subsystem_cls = CoverageOptions
-#   # report: Digest
-
-# @dataclass(frozen=True)
-# class CoverageReport:
-#   report: Digest
-
 
 @rule(name="Generate coverage report")
 async def generate_coverage_report(
-  # addresses: BuildFileAddresses,
   test_results: AddressAndTestResults,
   transitive_targets: TransitiveHydratedTargets,
-  # specs: AddressSpecs,
   python_setup: PythonSetup,
   coverage_setup: CoverageSetup,
   source_root_config: SourceRootConfig,
-  merged_coverage_data: MergedCoverageData,
   subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> CoverageReport:
   """Takes all python test results and generates a single coverage report in dist/coverage."""
   requirements_pex = coverage_setup.requirements_pex
-
+  merged_coverage_data = await Get[MergedCoverageData](AddressAndTestResults, test_results)
   python_targets = [
     target for target in transitive_targets.closure
     if target.adaptor.type_alias == 'python_library' or target.adaptor.type_alias == 'python_tests'
