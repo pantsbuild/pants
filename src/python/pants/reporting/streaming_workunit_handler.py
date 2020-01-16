@@ -48,7 +48,7 @@ class StreamingWorkunitHandler:
 
 class _InnerHandler(threading.Thread):
   def __init__(self, scheduler: Any, callbacks: Iterable[Callable], report_interval: float):
-    super(_InnerHandler, self).__init__()
+    super().__init__(daemon=True)
     self.scheduler = scheduler
     self.stop_request = threading.Event()
     self.report_interval = report_interval
