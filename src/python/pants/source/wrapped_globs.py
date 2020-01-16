@@ -4,7 +4,7 @@
 import os
 from abc import ABC, abstractmethod
 from hashlib import sha1
-from typing import Callable, Iterable, Iterator, List, Sequence, Tuple, Union, cast
+from typing import Callable, Iterable, Iterator, List, Sequence, Tuple, cast
 
 from twitter.common.dirutil.fileset import Fileset
 from typing_extensions import TypedDict
@@ -52,19 +52,19 @@ class FilesetWithSpec(ABC):
     self.filespec = filespec
     self._validate_globs_in_filespec(filespec, rel_root)
 
-  def _validate_globs_in_filespec(
-    self, filespec: Union[Filespec, _GlobsDict], rel_root: str,
-  ) -> None:
-    for glob in filespec['globs']:
-      if not glob.startswith(rel_root):
-        raise ValueError('expected glob filespec: {!r}'
-                         ' to start with its root path: {!r}!'.format(glob, rel_root))
-    # _GlobsDict won't have this field, as expected. This should be fine with us using .get(), but
-    # MyPy complains. They say TypedDicts are still experimental, so this will likely be fixed.
-    exclude = filespec.get('exclude')  # type: ignore[misc]
+  @staticmethod
+  def _validate_globs_in_filespec(filespec: Filespec, rel_root: str) -> None:
+    def validate(globs_dict: _GlobsDict) -> None:
+      for glob in globs_dict["globs"]:
+        if not glob.startswith(rel_root):
+          raise ValueError(
+            f'expected glob filespec: {glob!r} to start with its root path: {rel_root!r}!'
+          )
+    validate(filespec)
+    exclude = filespec.get('exclude')
     if exclude:
       for exclude_filespec in exclude:
-        self._validate_globs_in_filespec(exclude_filespec, rel_root)
+        validate(exclude_filespec)
 
   @property
   @abstractmethod
