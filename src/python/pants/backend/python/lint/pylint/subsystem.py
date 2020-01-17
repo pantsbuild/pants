@@ -8,7 +8,6 @@ from pants.option.custom_types import file_option, shell_str
 class Pylint(PythonToolBase):
   options_scope = 'pylint'
   default_version = 'pylint'
-  default_extra_requirements = ['setuptools']
   default_entry_point = 'pylint'
   default_interpreter_constraints = ["CPython>=2.7,<3", "CPython>=3.4"]
 
