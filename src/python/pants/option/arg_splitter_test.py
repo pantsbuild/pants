@@ -92,6 +92,10 @@ class ArgSplitterTest(unittest.TestCase):
       'a/',
       './a.txt',
       '.',
+      '*',
+      'a/b/*.txt',
+      'a/b/test*',
+      'a/**/*',
     ]
     for s in unambiguous_specs:
       assert_spec(s)
@@ -168,6 +172,9 @@ class ArgSplitterTest(unittest.TestCase):
     assert_test_goal_split('./pants test test/test.txt', expected_specs=['test/test.txt'])
     assert_test_goal_split('./pants test test/test', expected_specs=['test/test'])
     assert_test_goal_split('./pants test .', expected_specs=['.'])
+    assert_test_goal_split('./pants test *', expected_specs=['*'])
+    assert_test_goal_split('./pants test test/*.txt', expected_specs=['test/*.txt'])
+    assert_test_goal_split('./pants test test/**/*', expected_specs=['test/**/*'])
 
     # An argument that looks like a file, but is a known scope, should be interpreted as a goal.
     self.assert_valid_split(

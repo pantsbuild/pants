@@ -211,7 +211,7 @@ class ArgSplitter:
     An arg is a spec if it looks like an AddressSpec or a FilesystemSpec.
     In the future we can expand this heuristic to support other kinds of specs, such as URLs.
     """
-    return os.path.sep in arg or ':' in arg or Path(arg).exists()
+    return os.path.sep in arg or ':' in arg or '*' in arg or Path(arg).exists()
 
   def _consume_scope(self) -> Tuple[Optional[str], List[str]]:
     """Returns a pair (scope, list of flags encountered in that scope).
