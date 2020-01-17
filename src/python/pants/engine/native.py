@@ -10,7 +10,7 @@ import sysconfig
 import traceback
 from contextlib import closing
 from types import CoroutineType
-from typing import Any, NamedTuple, Tuple, Type
+from typing import Any, Iterable, NamedTuple, Tuple, Type, cast
 
 import cffi
 import pkg_resources
@@ -871,11 +871,11 @@ class Native(metaclass=SingletonMetaclass):
   def override_thread_logging_destination_to_just_stderr(self):
     self.lib.override_thread_logging_destination(self.lib.Stderr)
 
-  def match_path_globs(self, path_globs, paths):
+  def match_path_globs(self, path_globs: PathGlobs, paths: Iterable[str]) -> bool:
     path_globs = self.context.to_value(path_globs)
     paths_buf = self.context.utf8_buf_buf(tuple(paths))
     result = self.lib.match_path_globs(path_globs, paths_buf)
-    return self.context.raise_or_return(result)
+    return cast(bool, self.context.raise_or_return(result))
 
   def new_tasks(self):
     return self.gc(self.lib.tasks_create(), self.lib.tasks_destroy)
