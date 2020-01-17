@@ -3,7 +3,7 @@
 
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler
-from typing import Dict, Iterator, Tuple
+from typing import Dict, Iterator, Optional, Tuple
 from urllib.parse import parse_qs, urlparse
 
 from pants.engine.http import HttpGetResponse, HttpRequester
@@ -23,6 +23,9 @@ class HttpHandlerForTests(BaseHTTPRequestHandler):
     elif self.path == "/deliberate500":
       self.wfile.write(self.server_failure_text)
     elif "test-headers" in self.path:
+      output = str(self.headers)
+      self.wfile.write(output.encode())
+    elif "test-query-params" in self.path:
       output = str(parse_qs(urlparse(self.path).query))
       self.wfile.write(output.encode())
     elif self.path == "/redirect":
@@ -31,7 +34,8 @@ class HttpHandlerForTests(BaseHTTPRequestHandler):
       self.wfile.write(self.not_found_text)
 
   def send_headers(self):
-    if self.path == "/valid-url" or "/test-headers" in self.path:
+    p = self.path
+    if any(["/valid-url" in p, "/test-headers" in p, "test-query-params" in p]):
       code = 200
     elif self.path == "/deliberate500":
       code = 500
@@ -52,7 +56,7 @@ class HttpHandlerForTests(BaseHTTPRequestHandler):
 class HttpIntrinsicTest(TestBase):
 
   @contextmanager
-  def make_request_to_path(self, path: str, headers: Dict[str, str] = {}) -> Iterator[Tuple[HttpGetResponse, int]]:
+  def make_request_to_path(self, path: str, headers: Optional[Dict[str, str]] = None) -> Iterator[Tuple[HttpGetResponse, int]]:
     with http_server(HttpHandlerForTests) as port:
       url = f'http://localhost:{port}/{path}'
       requester = HttpRequester()
@@ -88,7 +92,13 @@ class HttpIntrinsicTest(TestBase):
       assert response.status_code == 200
       assert response.output_bytes is not None
       output = response.output_bytes.decode()
-      assert "X-My-Custom-Header" in output
-      assert "custom-info" in output
-      assert "X-Other-Header" in output
-      assert "more-info" in output
+      assert "X-My-Custom-Header: custom-info" in output
+      assert "X-Other-Header: more-info" in output
+
+  def test_query_params(self) -> None:
+    with self.make_request_to_path("test-query-params?xxx=yyy") as (response, port):
+      assert response.status_code == 200
+      assert response.output_bytes is not None
+      output = response.output_bytes.decode()
+      assert "xxx" in output
+      assert "yyy" in output

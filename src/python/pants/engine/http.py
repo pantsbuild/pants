@@ -21,12 +21,12 @@ class HttpGetResponse:
 @dataclass(frozen=True)
 class HttpRequester:
 
-  def get_request(self, url: str, *, headers: Dict[str, str] = {}) -> HttpGetResponse:
-    r = requests.get(url, headers)
-    header_list = [(str(item), r.headers[item]) for item in r.headers]
+  def get_request(self, url: str, *, headers: Optional[Dict[str, str]] = None) -> HttpGetResponse:
+    r = requests.get(url, headers=headers)
+    header_list = tuple((str(item), r.headers[item]) for item in r.headers)
     return HttpGetResponse(
       url=r.url,
-      headers=tuple(header_list),
+      headers=header_list,
       status_code=r.status_code,
       output_bytes=r.content,
     )
