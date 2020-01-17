@@ -10,6 +10,9 @@ not undergone the vetting associated with ``stable`` releases.
 API Changes
 ~~~~~~~~~~~
 
+* Deprecate `--fmt-transitive` and `--lint-transitive` and switch defaults to False (#8969)
+  `PR #8969 <https://github.com/pantsbuild/pants/pull/8969>`_
+
 * Use Python 3.6+ by default for Python users (#8968)
   `PR #8968 <https://github.com/pantsbuild/pants/pull/8968>`_
 
