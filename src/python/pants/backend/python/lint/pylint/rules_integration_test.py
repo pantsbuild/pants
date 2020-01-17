@@ -23,8 +23,8 @@ from pants.testutil.test_base import TestBase
 
 
 class PylintIntegrationTest(TestBase):
-  good_source = FileContent(path="test/good.py", content=b"notSnakeCasedVar = 42)\n")
-  bad_source = FileContent(path="test/bad.py", content=b"snake_cased_var = 42\n")
+  good_source = FileContent(path="test/good.py", content=b"'''docstring'''\nVAR = 42\n")
+  bad_source = FileContent(path="test/bad.py", content=b"VAR = 42\n")
 
   @classmethod
   def alias_groups(cls) -> BuildFileAliases:
@@ -75,29 +75,29 @@ class PylintIntegrationTest(TestBase):
   def test_single_passing_source(self) -> None:
     result = self.run_pylint([self.good_source])
     assert result.exit_code == 0
-    assert result.stdout.strip() == ""
+    assert "Your code has been rated at 10.00/10" in result.stdout.strip()
 
   def test_single_failing_source(self) -> None:
     result = self.run_pylint([self.bad_source])
-    assert result.exit_code == 1
-    assert "test/bad.py:1:1: C0103" in result.stdout
+    assert result.exit_code == 16
+    assert "test/bad.py:1:0: C0114" in result.stdout
 
   def test_mixed_sources(self) -> None:
     result = self.run_pylint([self.good_source, self.bad_source])
-    assert result.exit_code == 18
+    assert result.exit_code == 16
     assert "test/good.py" not in result.stdout
-    assert "test/bad.py:1:1: C0103" in result.stdout
+    assert "test/bad.py:1:0: C0114" in result.stdout
 
   @pytest.mark.skip(reason="Get config file creation to work with options parsing")
   def test_respects_config_file(self) -> None:
-    result = self.run_pylint([self.bad_source], config="[pylint]\disable = C0103\n")
+    result = self.run_pylint([self.bad_source], config="[pylint]\disable = C0114\n")
     assert result.exit_code == 0
     assert result.stdout.strip() == ""
 
   def test_respects_passthrough_args(self) -> None:
-    result = self.run_pylint([self.bad_source], passthrough_args="--disable=C0103")
+    result = self.run_pylint([self.bad_source], passthrough_args="--disable=C0114")
     assert result.exit_code == 0
-    assert result.stdout.strip() == ""
+    assert "Your code has been rated at 10.00/10" in result.stdout.strip()
 
   def test_skip(self) -> None:
     result = self.run_pylint([self.bad_source], skip=True)
