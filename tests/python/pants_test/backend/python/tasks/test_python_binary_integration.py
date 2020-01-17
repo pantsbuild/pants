@@ -12,7 +12,7 @@ from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import open_zip, temporary_dir
 
 
-_LINUX_PLATFORM = "manylinux1-x86_64-cp-36-m"
+_LINUX_PLATFORM = "linux-x86_64-cp-36-m"
 _LINUX_WHEEL_SUBSTRING = "manylinux"
 _OSX_PLATFORM = "macosx-10.13-x86_64-cp-36-m"
 _OSX_WHEEL_SUBSTRING = "macosx"

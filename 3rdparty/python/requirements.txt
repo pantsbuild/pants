@@ -3,7 +3,6 @@ beautifulsoup4>=4.6.0,<4.7
 cffi==1.13.2
 contextlib2==0.5.5
 coverage>=4.5,<4.6
-cryptography==2.7
 dataclasses==0.6
 docutils==0.14
 fasteners==0.15.0

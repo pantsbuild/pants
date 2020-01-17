@@ -59,7 +59,7 @@ class PythonSetup(Subsystem):
                   '"<PEXRC>" (paths in the PEX_PYTHON_PATH variable in a pexrc file), '
                   '"<PYENV>" (all python versions under $(pyenv root)/versions).')
     register('--resolver-use-manylinux', advanced=True, type=bool, default=False, fingerprint=True,
-             removal_version='1.26.0.dev2',
+             removal_version='1.27.0.dev2',
              removal_hint='Use --resolver-manylinux=<manylinux spec upper bound> instead.',
              help='Whether to consider manylinux wheels when resolving requirements for foreign'
                   'linux platforms.')
