@@ -2,11 +2,13 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+import json
 from dataclasses import dataclass
 from textwrap import dedent
-
-from typing import Optional, Set, Tuple
-
+from typing import Optional, Set, Tuple, Dict
+import pkg_resources
+import configparser
+from io import StringIO
 from pants.backend.python.rules.inject_init import InjectedInitDigest
 from pants.backend.python.rules.pex import Pex
 from pants.backend.python.rules.pex_from_target_closure import CreatePexFromTargetClosure
@@ -16,7 +18,7 @@ from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.build_graph.address import Address
 from pants.engine.addressable import BuildFileAddresses
-from pants.engine.fs import Digest, DirectoriesToMerge, FileContent, InputFilesContent
+from pants.engine.fs import Digest, DirectoriesToMerge, FileContent, FilesContent, InputFilesContent
 from pants.engine.interactive_runner import InteractiveProcessRequest
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
@@ -26,6 +28,7 @@ from pants.engine.selectors import Get
 from pants.option.global_options import GlobalOptions
 from pants.rules.core.strip_source_root import SourceRootStrippedSources
 from pants.rules.core.test import TestDebugRequest, TestOptions, TestResult, TestTarget
+from pants.source.source_root import SourceRootConfig
 
 
 DEFAULT_COVERAGE_CONFIG = dedent(f"""
@@ -46,6 +49,50 @@ def get_coveragerc_input(coveragerc_content: str) -> InputFilesContent:
       ),
     ]
   )
+
+COVERAGE_PLUGIN_MODULE_NAME = '__coverage_coverage_plugin__'
+
+
+def get_coverage_plugin_input():
+  return InputFilesContent(
+    FilesContent(
+      (
+        FileContent(
+          path=f'pex_root/{COVERAGE_PLUGIN_MODULE_NAME}.py',
+          content=pkg_resources.resource_string(__name__, 'coverage/plugin.py'),
+          is_executable=False,
+        ),
+      )
+    )
+  )
+
+
+def ensure_section(config_parser: configparser.ConfigParser, section: str) -> None:
+  """Ensure a section exists in a ConfigParser."""
+  if not config_parser.has_section(section):
+    config_parser.add_section(section)
+
+
+def construct_coverage_config(source_roots, python_files) -> str:
+  # A map from source root stripped source to its source root. eg:
+  #  {'pants/testutil/subsystem/util.py': 'src/python'}
+  # This is so coverage reports referencing /chroot/path/pants/testutil/subsystem/util.py can be mapped
+  # back to the actual sources they reference when merging coverage reports.
+  source_to_target_base: Dict[str, str] = {}
+  for file_name in python_files:
+    source_root = source_roots.find_by_path(file_name)
+    source_root_stripped_path = file_name[len(source_root.path) + 1:]
+    source_to_target_base[source_root_stripped_path] = source_root.path
+
+  config_parser = configparser.ConfigParser()
+  config_parser.read_file(StringIO(DEFAULT_COVERAGE_CONFIG))
+  ensure_section(config_parser, 'run')
+  config_parser.set('run', 'plugins', COVERAGE_PLUGIN_MODULE_NAME)
+  config_parser.add_section(COVERAGE_PLUGIN_MODULE_NAME)
+  config_parser.set(COVERAGE_PLUGIN_MODULE_NAME, 'source_to_target_base', json.dumps(source_to_target_base))
+  config = StringIO()
+  config_parser.write(config)
+  return config.getvalue()
 
 
 def calculate_timeout_seconds(
@@ -92,6 +139,7 @@ def get_packages_to_cover(
     for source_root_stripped_source_file_path in source_root_stripped_file_paths
   }))
 
+
 def get_packages_to_cover(
   test_target: PythonTestsAdaptor,
   source_root_stripped_file_paths: Tuple[str, ...],
@@ -108,6 +156,7 @@ async def setup_pytest_for_target(
   test_target: PythonTestsAdaptor,
   pytest: PyTest,
   test_options: TestOptions,
+  source_root_config: SourceRootConfig
 ) -> TestTargetSetup:
   # TODO: Rather than consuming the TestOptions subsystem, the TestRunner should pass on coverage
   # configuration via #7490.
@@ -115,7 +164,7 @@ async def setup_pytest_for_target(
     BuildFileAddresses((test_target.address,))
   )
   all_targets = transitive_hydrated_targets.closure
-
+  plugin_file_digest: Digest = await Get[Digest](InputFilesContent, get_coverage_plugin_input())
   resolved_requirements_pex = await Get[Pex](
     CreatePexFromTargetClosure(
       build_file_addresses=BuildFileAddresses((test_target.address,)),
@@ -130,12 +179,14 @@ async def setup_pytest_for_target(
       # and then by Pytest). See https://github.com/jaraco/zipp/pull/26.
       additional_args=("--not-zip-safe",),
       include_source_files=False,
+      # additional_input_files=plugin_file_digest,
     )
   )
 
   chrooted_sources = await Get[ChrootedPythonSources](HydratedTargets(all_targets))
   directories_to_merge = [
     chrooted_sources.digest,
+    plugin_file_digest,
     resolved_requirements_pex.directory_digest,
   ]
 
@@ -151,7 +202,15 @@ async def setup_pytest_for_target(
   coverage_args = []
   test_target_sources_file_names = source_root_stripped_test_target_sources.snapshot.files
   if test_options.values.run_coverage:
-    coveragerc_digest = await Get[Digest](InputFilesContent, get_coveragerc_input(DEFAULT_COVERAGE_CONFIG))
+    coveragerc_digest = await Get[Digest](
+      InputFilesContent,
+      get_coveragerc_input(
+        construct_coverage_config(
+          source_root_config.get_source_roots(),
+          test_target_sources_file_names,
+        )
+      )
+    )
     directories_to_merge.append(coveragerc_digest)
     packages_to_cover = get_packages_to_cover(
       test_target,
@@ -171,21 +230,6 @@ async def setup_pytest_for_target(
     timeout_default=pytest.options.timeout_default,
     timeout_maximum=pytest.options.timeout_maximum,
   )
-  test_target_sources_file_names = source_root_stripped_test_target_sources.snapshot.files
-  coverage_args = []
-  test_target_sources_file_names = source_root_stripped_test_target_sources.snapshot.files
-  if test_options.values.run_coverage:
-    coveragerc_digest = await Get[Digest](InputFilesContent, get_coveragerc_input(DEFAULT_COVERAGE_CONFIG))
-    directories_to_merge.append(coveragerc_digest)
-    packages_to_cover = get_packages_to_cover(
-      test_target,
-      source_root_stripped_file_paths=test_target_sources_file_names,
-    )
-    coverage_args = [
-      '--cov-report=', # To not generate any output. https://pytest-cov.readthedocs.io/en/latest/config.html
-    ]
-    for package in packages_to_cover:
-      coverage_args.extend(['--cov', package])
 
   merged_input_files: Digest = await Get[Digest](DirectoriesToMerge(directories=tuple(directories_to_merge)))
 

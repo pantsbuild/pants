@@ -16,6 +16,7 @@ from pants.engine.addressable import BuildFileAddresses
 from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
 from pants.engine.rules import rule
 from pants.engine.selectors import Get
+from pants.engine.fs import Digest, DirectoriesToMerge
 
 
 @dataclass(frozen=True)
@@ -27,6 +28,7 @@ class CreatePexFromTargetClosure:
   additional_requirements: Tuple[str, ...] = ()
   include_source_files: bool = True
   additional_args: Tuple[str, ...] = ()
+  additional_input_files: Optional[Digest] = None
 
 
 @rule(name="Create PEX from targets")
@@ -41,21 +43,29 @@ async def create_pex_from_target_closure(request: CreatePexFromTargetClosure,
     adaptors=tuple(all_target_adaptors),
     python_setup=python_setup
   )
-
+  input_files = []
+  if request.additional_input_files:
+    input_files.append(request.additional_input_files)
   if request.include_source_files:
     chrooted_sources = await Get[ChrootedPythonSources](HydratedTargets(all_targets))
-
+    input_files.append(chrooted_sources)
+  merged_input_files = None
+  if input_files:
+    merged_input_files: Digest = await Get[Digest](
+      DirectoriesToMerge(directories=tuple(input_files)),
+    )
   requirements = PexRequirements.create_from_adaptors(
     adaptors=all_target_adaptors,
     additional_requirements=request.additional_requirements
   )
+
 
   create_pex_request = CreatePex(
     output_filename=request.output_filename,
     requirements=requirements,
     interpreter_constraints=interpreter_constraints,
     entry_point=request.entry_point,
-    input_files_digest=chrooted_sources.digest if request.include_source_files else None,
+    input_files_digest=merged_input_files,
     additional_args=request.additional_args,
   )
 

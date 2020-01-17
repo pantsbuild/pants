@@ -4,23 +4,23 @@
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, Tuple
 from pathlib import PurePath
+from typing import Optional, Tuple
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.build_files import AddressProvenanceMap
 from pants.engine.console import Console
-from pants.engine.fs import Digest
+from pants.engine.fs import Digest, DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
 from pants.engine.isolated_process import FallibleExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTarget
-from pants.engine.objects import union, Collection
+from pants.engine.objects import Collection, union
 from pants.engine.rules import UnionMembership, goal_rule, rule
 from pants.engine.selectors import Get, MultiGet
-from pants.engine.fs import DirectoryToMaterialize, Workspace
+
 
 # TODO(#6004): use proper Logging singleton, rather than static logger.
 logger = logging.getLogger(__name__)
