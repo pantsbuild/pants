@@ -326,8 +326,6 @@ async def run_setup_py(
   )
   # The setuptools dist dir, created by it under the chroot (not to be confused with
   # pants's own dist dir, at the buildroot).
-  # TODO: The user can change this with the --dist-dir flag to the sdist and bdist_wheel commands.
-  #  See https://github.com/pantsbuild/pants/issues/8912.
   dist_dir = 'dist/'
   request = setuptools_setup.requirements_pex.create_execute_request(
     python_setup=python_setup,
