@@ -9,7 +9,7 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.testutil.goal_rule_test_base import GoalRuleTestBase
 
 
-class FastDependenciesTest(GoalRuleTestBase):
+class DependenciesIntegrationTest(GoalRuleTestBase):
   goal_cls = dependencies.Dependencies
 
   @classmethod

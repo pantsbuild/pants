@@ -3,7 +3,7 @@
 
 from pants.task.target_restriction_mixins import (
   DeprecatedSkipAndDeprecatedTransitiveGoalOptionsRegistrar,
-  HasSkipAndDeprecatedTransitiveGoalOptionsMixin,
+  HasSkipAndTransitiveGoalOptionsMixin,
 )
 
 
@@ -16,7 +16,7 @@ class FmtGoalRegistrar(DeprecatedSkipAndDeprecatedTransitiveGoalOptionsRegistrar
                   "`scalafix` or not setting any value.")
 
 
-class FmtTaskMixin(HasSkipAndDeprecatedTransitiveGoalOptionsMixin):
+class FmtTaskMixin(HasSkipAndTransitiveGoalOptionsMixin):
   """A mixin to combine with code formatting tasks."""
   goal_options_registrar_cls = FmtGoalRegistrar
   target_filtering_enabled = True

@@ -10,7 +10,7 @@ from pants.engine.struct import Struct
 
 class StructTest(unittest.TestCase):
 
-  def test_attribute_error_raised_in_property(self):
+  def test_attribute_error_raised_in_property(self) -> None:
     """This tests that Struct#__getattr__ doesn't prevent correct attribution of AttributeErrors."""
     class StructWithProperty(Struct):
       @property
@@ -22,15 +22,15 @@ class StructTest(unittest.TestCase):
     self.assertEqual("'StructWithProperty' object has no attribute 'missing_attribute'",
                      str(cm.exception))
 
-  def test_address_no_name(self):
+  def test_address_no_name(self) -> None:
     config = Struct(address=Address.parse('a:b'))
     self.assertEqual('b', config.name)
 
-  def test_address_name_conflict(self):
+  def test_address_name_conflict(self) -> None:
     with self.assertRaises(ValidationError):
       Struct(name='a', address=Address.parse('a:b'))
 
-  def test_type_alias(self):
+  def test_type_alias(self) -> None:
     self.assertEqual('Struct', Struct().type_alias)
     self.assertEqual('aliased', Struct(type_alias='aliased').type_alias)
 
@@ -40,7 +40,7 @@ class StructTest(unittest.TestCase):
     self.assertEqual('Subclass', Subclass().type_alias)
     self.assertEqual('aliased_subclass', Subclass(type_alias='aliased_subclass').type_alias)
 
-  def test_extend(self):
+  def test_extend(self) -> None:
     extends = Struct(age=32, label='green', items=[],
                             extends=Struct(age=42, other=True, items=[1, 2]))
 
@@ -50,7 +50,7 @@ class StructTest(unittest.TestCase):
     # But we do pick it up now.
     self.assertEqual(Struct(age=32, label='green', items=[], other=True), extends.create())
 
-  def test_merge(self):
+  def test_merge(self) -> None:
     merges = Struct(age=32, items=[3], knobs={'b': False},
                            merges=[Struct(age=42,
                                           other=True,
@@ -71,7 +71,7 @@ class StructTest(unittest.TestCase):
                             other=True),
                      merges.create())
 
-  def test_extend_and_merge(self):
+  def test_extend_and_merge(self) -> None:
     extends_and_merges = Struct(age=32, label='green', items=[5],
                                 extends=Struct(age=42,
                                                other=True,
@@ -89,7 +89,7 @@ class StructTest(unittest.TestCase):
                             knobs={'a': False, 'b': True}),
                      extends_and_merges.create())
 
-  def test_validate_concrete(self):
+  def test_validate_concrete(self) -> None:
     class Subclass(Struct):
       def validate_concrete(self):
         if self.name != 'jake':

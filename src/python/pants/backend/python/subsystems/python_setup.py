@@ -4,10 +4,10 @@
 import logging
 import os
 import subprocess
+from typing import Tuple
 
 from pex.variables import Variables
 
-from pants.base.deprecated import deprecated_conditional
 from pants.option.custom_types import UnsetBool
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
@@ -24,7 +24,7 @@ class PythonSetup(Subsystem):
   def register_options(cls, register):
     super().register_options(register)
     register('--interpreter-constraints', advanced=True, fingerprint=True, type=list,
-             default=['CPython>=2.7,<3', 'CPython>=3.6'],
+             default=['CPython>=3.6'],
              metavar='<requirement>',
              help="Constrain the selected Python interpreter.  Specify with requirement syntax, "
                   "e.g. 'CPython>=2.7,<3' (A CPython interpreter with version >=2.7 AND version <3)"
@@ -65,21 +65,7 @@ class PythonSetup(Subsystem):
                   'platforms.')
 
   @property
-  def interpreter_constraints(self):
-    deprecated_conditional(
-      lambda: self.get_options().is_default("interpreter_constraints"),
-      removal_version="1.25.0.dev2",
-      entity_description="Pants defaulting to Python 2.7+ for --python-setup-interpreter-constraints",
-      hint_message="Pants will soon default to using Python 3.6+ for Python commands like "
-                   "`./pants test` and `./pants repl`, whereas now it defaults to Python 2.7 or "
-                   "Python 3.6+. In preparation for this change, you should explicitly mark what "
-                   "Python version(s) your project uses in your `pants.ini` under the section "
-                   "`python-setup`.\n\nFor example, if you need to still support Python 2, set "
-                   "`interpreter_constraints` to `['CPython>=2.7,<3', 'CPython>=3.6']`. "
-                   "Otherwise, set the value to something like `['CPython>=3.6']`. See "
-                   "https://www.pantsbuild.org/python_readme.html#configure-the-python-version "
-                   "for more information on setting interpreter constraints."
-    )
+  def interpreter_constraints(self) -> Tuple[str, ...]:
     return tuple(self.get_options().interpreter_constraints)
 
   @memoized_property

@@ -1,18 +1,20 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from typing import cast
+
 from pants.base.build_root import BuildRoot
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.fs import Digest, FileContent, InputFilesContent, Workspace
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
-from pants.rules.core import run
 from pants.rules.core.binary import CreatedBinary
+from pants.rules.core.run import Run, run
 from pants.testutil.engine.util import MockConsole, MockGet, run_rule
 from pants.testutil.goal_rule_test_base import GoalRuleTestBase
 
 
 class RunTest(GoalRuleTestBase):
-  goal_cls = run.Run
+  goal_cls = Run
 
   def create_mock_binary(self, program_text: bytes) -> CreatedBinary:
     input_files_content = InputFilesContent((
@@ -24,10 +26,12 @@ class RunTest(GoalRuleTestBase):
       digest=digest,
     )
 
-  def single_target_run(self, *, console: MockConsole, program_text: bytes, spec: str):
+  def single_target_run(
+    self, *, console: MockConsole, program_text: bytes, address_spec: str,
+  ) -> Run:
     workspace = Workspace(self.scheduler)
     interactive_runner = InteractiveRunner(self.scheduler)
-    address = Address.parse(spec)
+    address = Address.parse(address_spec)
     bfa = BuildFileAddress(
       build_file=None,
       target_name=address.target_name,
@@ -35,7 +39,7 @@ class RunTest(GoalRuleTestBase):
     )
     BuildRoot().path = self.build_root
     res = run_rule(
-      run.run,
+      run,
       rule_args=[console, workspace, interactive_runner, BuildRoot(), bfa],
       mock_gets=[
         MockGet(
@@ -45,7 +49,7 @@ class RunTest(GoalRuleTestBase):
         ),
       ],
     )
-    return res
+    return cast(Run, res)
 
   def test_normal_run(self) -> None:
     console = MockConsole(use_colors=False)
@@ -53,7 +57,7 @@ class RunTest(GoalRuleTestBase):
     res = self.single_target_run(
       console=console,
       program_text=program_text,
-      spec='some/addr'
+      address_spec='some/addr',
     )
     self.assertEqual(res.exit_code, 0)
     self.assertEquals(console.stdout.getvalue(), "Running target: some/addr:addr\nsome/addr:addr ran successfully.\n")
@@ -75,7 +79,7 @@ class RunTest(GoalRuleTestBase):
     program_text = b'#!/usr/bin/python\nprint("hello")'
     binary = self.create_mock_binary(program_text)
     with self.assertRaises(ValueError):
-      _ = InteractiveProcessRequest(
+      InteractiveProcessRequest(
           argv=("/usr/bin/python",),
           run_in_workspace=True,
           input_files=binary.digest
@@ -87,7 +91,7 @@ class RunTest(GoalRuleTestBase):
     res = self.single_target_run(
       console=console,
       program_text=program_text,
-      spec='some/addr'
+      address_spec='some/addr'
     )
     self.assertEqual(res.exit_code, 1)
     self.assertEquals(console.stdout.getvalue(), "Running target: some/addr:addr\n")

@@ -3,6 +3,7 @@
 
 import functools
 import os
+from typing import cast
 
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
@@ -22,14 +23,14 @@ class GraphTest(TestBase):
   _TAG = 'tag_added_by_macro'
 
   @classmethod
-  def alias_groups(cls):
-    return super().alias_groups().merge(
+  def alias_groups(cls) -> BuildFileAliases:
+    return cast(BuildFileAliases, super().alias_groups().merge(
       BuildFileAliases(targets={
           'files': Files,
           'tagged_files': TargetMacro.Factory.wrap(functools.partial(macro, Files, cls._TAG), Files),
-        }))
+        })))
 
-  def test_with_missing_target_in_existing_build_file(self):
+  def test_with_missing_target_in_existing_build_file(self) -> None:
     self.create_library('3rdparty/python', 'target', 'Markdown')
     self.create_library('3rdparty/python', 'target', 'Pygments')
     # When a target is missing,
@@ -42,21 +43,21 @@ class GraphTest(TestBase):
     with self.assertRaisesRegex(AddressLookupError, expected_message):
       self.targets('3rdparty/python:rutabaga')
 
-  def test_with_missing_directory_fails(self):
+  def test_with_missing_directory_fails(self) -> None:
     with self.assertRaises(AddressLookupError) as cm:
       self.targets('no-such-path:')
 
     self.assertIn('Path "no-such-path" does not contain any BUILD files',
                   str(cm.exception))
 
-  def test_invalidate_fsnode(self):
+  def test_invalidate_fsnode(self) -> None:
     # NB: Invalidation is now more directly tested in unit tests in the `graph` crate.
     self.create_library('src/example', 'target', 'things')
     self.targets('src/example::')
     invalidated_count = self.invalidate_for('src/example/BUILD')
     self.assertGreater(invalidated_count, 0)
 
-  def test_sources_ordering(self):
+  def test_sources_ordering(self) -> None:
     input_sources = ['p', 'a', 'n', 't', 's', 'b', 'u', 'i', 'l', 'd']
     expected_sources = sorted(input_sources)
     self.create_library('src/example', 'files', 'things', sources=input_sources)
@@ -65,7 +66,7 @@ class GraphTest(TestBase):
     sources = [os.path.basename(s) for s in target.sources_relative_to_buildroot()]
     self.assertEqual(expected_sources, sources)
 
-  def test_target_macro_override(self):
+  def test_target_macro_override(self) -> None:
     """Tests that we can "wrap" an existing target type with additional functionality.
 
     Installs an additional TargetMacro that wraps `target` aliases to add a tag to all definitions.

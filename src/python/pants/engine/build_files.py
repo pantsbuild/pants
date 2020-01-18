@@ -86,7 +86,10 @@ async def hydrate_struct(address_mapper: AddressMapper, address: Address) -> Hyd
 
   address_family = await Get[AddressFamily](Dir(address.spec_path))
 
-  struct = address_family.addressables.get(address)
+  # NB: `address_family.addressables` is a dictionary of `BuildFileAddress`es and we look it up
+  # with an `Address`. This works because `BuildFileAddress` is a subclass, but MyPy warns that it
+  # could be a bug.
+  struct = address_family.addressables.get(address)  # type: ignore[call-overload]
   addresses = address_family.addressables
   if not struct or address not in addresses:
     _raise_did_you_mean(address_family, address.target_name)

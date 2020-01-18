@@ -6,11 +6,17 @@ import os
 import queue
 import sys
 import threading
+from typing import List, Optional, Set, Tuple, cast
 
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
+from pants.base.target_roots import TargetRoots
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.goal.run_tracker import RunTracker
+from pants.init.engine_initializer import LegacyGraphScheduler, LegacyGraphSession
 from pants.init.target_roots_calculator import TargetRootsCalculator
+from pants.option.options import Options
+from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.pantsd.service.fs_event_service import FSEventService
 from pants.pantsd.service.pants_service import PantsService
 
 
@@ -24,21 +30,19 @@ class SchedulerService(PantsService):
 
   def __init__(
     self,
-    fs_event_service,
-    legacy_graph_scheduler,
-    build_root,
-    invalidation_globs,
-    pantsd_pidfile,
-  ):
+    fs_event_service: FSEventService,
+    legacy_graph_scheduler: LegacyGraphScheduler,
+    build_root: str,
+    invalidation_globs: List[str],
+    pantsd_pidfile: Optional[str],
+  ) -> None:
     """
-    :param FSEventService fs_event_service: An unstarted FSEventService instance for setting up
-                                            filesystem event handlers.
-    :param LegacyGraphScheduler legacy_graph_scheduler: The LegacyGraphScheduler instance for graph
-                                                        construction.
-    :param str build_root: The current build root.
-    :param list invalidation_globs: A list of `globs` that when encountered in filesystem event
-                                    subscriptions will tear down the daemon.
-    :param string pantsd_pidfile: The path to the pantsd pidfile for fs event monitoring.
+    :param fs_event_service: An unstarted FSEventService instance for setting up filesystem event handlers.
+    :param legacy_graph_scheduler: The LegacyGraphScheduler instance for graph construction.
+    :param build_root: The current build root.
+    :param invalidation_globs: A list of `globs` that when encountered in filesystem event
+                               subscriptions will tear down the daemon.
+    :param pantsd_pidfile: The path to the pantsd pidfile for fs event monitoring.
     """
     super().__init__()
     self._fs_event_service = fs_event_service
@@ -55,10 +59,10 @@ class SchedulerService(PantsService):
       build_id="background_pantsd_session",
     )
     self._logger = logging.getLogger(__name__)
-    self._event_queue = queue.Queue(maxsize=self.QUEUE_SIZE)
+    self._event_queue: queue.Queue = queue.Queue(maxsize=self.QUEUE_SIZE)
     self._watchman_is_running = threading.Event()
     self._invalidating_snapshot = None
-    self._invalidating_files = set()
+    self._invalidating_files: Set[str] = set()
 
     self._loop_condition = LoopCondition()
 
@@ -167,14 +171,13 @@ class SchedulerService(PantsService):
     """
     return self._scheduler.graph_len()
 
-  def prepare_v1_graph_run_v2(self, options, options_bootstrapper):
+  def prepare_v1_graph_run_v2(
+    self, options: Options, options_bootstrapper: OptionsBootstrapper,
+  ) -> Tuple[LegacyGraphSession, TargetRoots, int]:
     """For v1 (and v2): computing TargetRoots for a later v1 run
 
     For v2: running an entire v2 run
-    The exit_code in the return indicates whether any issue was encountered
-
-    :returns: `(LegacyGraphSession, TargetRoots, exit_code)`
-    """
+    The exit_code in the return indicates whether any issue was encountered"""
     # If any nodes exist in the product graph, wait for the initial watchman event to avoid
     # racing watchman startup vs invalidation events.
     graph_len = self._scheduler.graph_len()
@@ -194,7 +197,9 @@ class SchedulerService(PantsService):
     target_roots, exit_code = fn(session, options, options_bootstrapper)
     return session, target_roots, exit_code
 
-  def _loop(self, session, options, options_bootstrapper):
+  def _loop(
+    self, session: LegacyGraphSession, options: Options, options_bootstrapper: OptionsBootstrapper,
+  ) -> Tuple[TargetRoots, int]:
     # TODO: See https://github.com/pantsbuild/pants/issues/6288 regarding Ctrl+C handling.
     iterations = options.for_global_scope().loop_max
     target_roots = None
@@ -209,9 +214,11 @@ class SchedulerService(PantsService):
       iterations -= 1
       while iterations and not self._state.is_terminating and not self._loop_condition.wait(timeout=1):
         continue
-    return target_roots, exit_code
+    return cast(TargetRoots, target_roots), exit_code
 
-  def _body(self, session, options, options_bootstrapper):
+  def _body(
+    self, session: LegacyGraphSession, options: Options, options_bootstrapper: OptionsBootstrapper,
+  ) -> Tuple[TargetRoots, int]:
     global_options = options.for_global_scope()
     target_roots = TargetRootsCalculator.create(
       options=options,

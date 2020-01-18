@@ -90,7 +90,7 @@ class BuildFile(ABC):
     return OrderedSet(sorted((BuildFile._cached(project_tree, relpath) for relpath in build_files_without_ignores),
                              key=lambda build_file: build_file.full_path))
 
-  def __init__(self, project_tree: ProjectTree, relpath: str):
+  def __init__(self, project_tree: ProjectTree, relpath: str) -> None:
     """Creates a BuildFile object representing the BUILD file family at the specified path.
 
     :param project_tree: Project tree the BUILD file exist in.
