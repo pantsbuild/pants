@@ -11,7 +11,7 @@ from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.engine.console import Console
 from pants.engine.fs import Digest, FilesContent
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.legacy.graph import HydratedTarget, HydratedTargets
+from pants.engine.legacy.graph import SourcesSnapshot, SourcesSnapshots
 from pants.engine.objects import Collection
 from pants.engine.rules import goal_rule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
@@ -219,10 +219,13 @@ class MultiMatcher:
 # to share goal names.
 @goal_rule
 async def validate(
-  console: Console, hydrated_targets: HydratedTargets, validate_options: ValidateOptions
+  console: Console, sources_snapshots: SourcesSnapshots, validate_options: ValidateOptions,
 ) -> Validate:
-  per_tgt_rmrs = await MultiGet(Get[RegexMatchResults](HydratedTarget, ht) for ht in hydrated_targets)
-  regex_match_results = list(itertools.chain(*per_tgt_rmrs))
+  per_snapshot_rmrs = await MultiGet(
+    Get[RegexMatchResults](SourcesSnapshot, source_snapshot)
+    for source_snapshot in sources_snapshots
+  )
+  regex_match_results = list(itertools.chain(*per_snapshot_rmrs))
 
   detail_level = validate_options.values.detail_level
   regex_match_results = sorted(regex_match_results, key=lambda x: x.path)
@@ -258,21 +261,20 @@ async def validate(
 
 
 @rule
-async def match_regexes_for_one_target(
-  hydrated_target: HydratedTarget, source_file_validation: SourceFileValidation
+async def match_regexes_for_one_snapshot(
+  sources_snapshot: SourcesSnapshot, source_file_validation: SourceFileValidation,
 ) -> RegexMatchResults:
   multi_matcher = source_file_validation.get_multi_matcher()
-  rmrs = []
-  if hasattr(hydrated_target.adaptor, 'sources'):
-    files_content = await Get[FilesContent](Digest, hydrated_target.adaptor.sources.snapshot.directory_digest)
-    for file_content in files_content:
-      rmrs.append(multi_matcher.check_source_file(file_content.path, file_content.content))
-  return RegexMatchResults(rmrs)
+  files_content = await Get[FilesContent](Digest, sources_snapshot.snapshot.directory_digest)
+  return RegexMatchResults(
+    multi_matcher.check_source_file(file_content.path, file_content.content)
+    for file_content in files_content
+  )
 
 
 def rules():
   return [
     validate,
-    match_regexes_for_one_target,
+    match_regexes_for_one_snapshot,
     subsystem_rule(SourceFileValidation),
   ]

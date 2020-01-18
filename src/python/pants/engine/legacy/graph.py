@@ -394,6 +394,23 @@ class TransitiveHydratedTargets:
 
 
 @dataclass(frozen=True)
+class SourcesSnapshot:
+  """A light wrapper around source files for Pants to operate on.
+
+  This corresponds 1-to-1 with the `sources` field of a target. When given filesystem specs, ...
+  TODO: what is the mapping for filesystem specs? Should each individual spec -> SourcesSnapshot?
+  Decide this once implementing the hydration of FilesystemSpecs to SourcesSnapshots."""
+  snapshot: Snapshot
+
+
+class SourcesSnapshots(Collection[SourcesSnapshot]):
+  """A set of SourceSnapshots, with each representing the sources for individual targets.
+
+  `@goal_rule`s may request this when they only need source files to operate and do not need
+  any target information."""
+
+
+@dataclass(frozen=True)
 class TopologicallyOrderedTargets:
   """A set of HydratedTargets, ordered topologically from least to most dependent.
 
@@ -634,6 +651,32 @@ async def hydrate_bundles(
   return HydratedField('bundles', bundles)
 
 
+@rule
+async def hydrate_sources_snapshot(
+  hydrated_struct: HydratedStruct,
+) -> SourcesSnapshot:
+  """Construct a SourcesSnapshot from a TargetAdaptor without hydrating any other fields."""
+  target_adaptor = cast(TargetAdaptor, hydrated_struct.value)
+  sources_field = next(fa for fa in target_adaptor.field_adaptors if isinstance(fa, SourcesField))
+  hydrated_sources_field = await Get[HydratedField](HydrateableField, sources_field)
+  efws = cast(EagerFilesetWithSpec, hydrated_sources_field.value)
+  return SourcesSnapshot(efws.snapshot)
+
+
+@rule
+async def sources_snapshots_from_build_file_addresses(
+  build_file_addresses: BuildFileAddresses,
+) -> SourcesSnapshots:
+  """Request SourcesSnapshots for the given BuildFileAddresses.
+
+  Each address will map to a corresponding SourcesSnapshot. This rule avoids hydrating any other
+  fields."""
+  snapshots = await MultiGet(
+    Get[SourcesSnapshot](Address, a) for a in build_file_addresses.addresses
+  )
+  return SourcesSnapshots(snapshots)
+
+
 def create_legacy_graph_tasks():
   """Create tasks to recursively parse the legacy graph."""
   return [
@@ -645,5 +688,7 @@ def create_legacy_graph_tasks():
     hydrate_sources,
     hydrate_bundles,
     sort_targets,
+    hydrate_sources_snapshot,
+    sources_snapshots_from_build_file_addresses,
     RootRule(OwnersRequest),
   ]
