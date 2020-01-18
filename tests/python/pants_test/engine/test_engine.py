@@ -91,7 +91,8 @@ class Omega:
 
 @rule(name="rule_one")
 async def rule_one(i: Input) -> Beta:
-  """This rule should be the first one executed by the engine."""
+  """This rule should be the first one executed by the engine, and
+  thus have no parent."""
   a = Alpha()
   o = await Get[Omega](Alpha, a)
   b = await Get[Beta](Omega, o)
@@ -337,7 +338,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
     r3 = next(item for item in tracker.workunits if item['name'] == 'rule_three')
     r4 = next(item for item in tracker.workunits if item['name'] == 'rule_four')
 
+    assert r1.get('parent_id', None) is None
     assert r2['parent_id'] == r1['span_id']
     assert r3['parent_id'] == r1['span_id']
     assert r4['parent_id'] == r2['span_id']
-
