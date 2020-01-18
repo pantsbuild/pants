@@ -395,19 +395,16 @@ class TransitiveHydratedTargets:
 
 @dataclass(frozen=True)
 class SourcesSnapshot:
-  """A light wrapper around source files for Pants to operate on.
-
-  This corresponds 1-to-1 with the `sources` field of a target. When given filesystem specs, ...
-  TODO: what is the mapping for filesystem specs? Should each individual spec -> SourcesSnapshot?
-  Decide this once implementing the hydration of FilesystemSpecs to SourcesSnapshots."""
+  """A light wrapper around source files for Pants to operate on."""
   snapshot: Snapshot
 
 
 class SourcesSnapshots(Collection[SourcesSnapshot]):
-  """A set of SourceSnapshots, with each representing the sources for individual targets.
+  """`@goal_rule`s may request this when they only need source files to operate and do not need
+  any target information.
 
-  `@goal_rule`s may request this when they only need source files to operate and do not need
-  any target information."""
+  When paired with filesystem specs, this allows goals to operate on sources that do not have
+  any owning targets."""
 
 
 @dataclass(frozen=True)

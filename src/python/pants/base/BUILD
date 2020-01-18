@@ -147,6 +147,7 @@ python_library(
   sources = ['specs.py'],
   dependencies = [
     '3rdparty/python:dataclasses',
+    'src/python/pants/engine:objects',
     'src/python/pants/util:collections',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:filtering',

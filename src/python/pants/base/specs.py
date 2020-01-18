@@ -5,8 +5,20 @@ import os
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple, cast
+from typing import (
+  TYPE_CHECKING,
+  Dict,
+  Iterable,
+  Iterator,
+  List,
+  Optional,
+  Sequence,
+  Tuple,
+  Union,
+  cast,
+)
 
+from pants.engine.objects import Collection
 from pants.util.collections import assert_single_element
 from pants.util.dirutil import fast_relpath_optional, recursive_dirname
 from pants.util.filtering import create_filters, wrap_filters
@@ -298,3 +310,45 @@ class AddressSpecs:
 
   def __iter__(self) -> Iterator[AddressSpec]:
     return iter(self.dependencies)
+
+
+@dataclass(frozen=True)
+class FilesystemSpec:
+  """The glob may be anything understood by `PathGlobs`.
+
+  The syntax supported is roughly Git's glob syntax."""
+  glob: str
+
+
+class FilesystemSpecs(Collection[FilesystemSpec]):
+  pass
+
+
+class AmbiguousSpecs(Exception):
+  pass
+
+
+@dataclass(frozen=True)
+class ParsedSpecs:
+  address_specs: AddressSpecs
+  filesystem_specs: FilesystemSpecs
+
+  def __post_init__(self) -> None:
+    if self.address_specs.dependencies and self.filesystem_specs.dependencies:
+      raise AmbiguousSpecs(
+        "Both address specs and filesystem specs given. Please use only one type of spec.\n\n"
+        f"Address specs: {', '.join(spec.to_spec_string() for spec in self.address_specs)}\n"
+        f"Filesystem specs: {', '.join(spec.glob for spec in self.filesystem_specs)}"
+      )
+
+  @property
+  def provided_specs(self) -> Union[AddressSpecs, FilesystemSpecs]:
+    """Return whichever types of specs was provided by the user.
+
+    It is guaranteed that there will only ever be AddressSpecs or FilesystemSpecs, but not both,
+    through validation in the constructor."""
+    return (
+      self.address_specs
+      if self.address_specs.dependencies else
+      self.filesystem_specs
+    )
