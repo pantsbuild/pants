@@ -18,6 +18,7 @@ from pants.base.specs import (
   AddressSpecs,
   AscendantAddresses,
   DescendantAddresses,
+  FilesystemSpecs,
   SingleAddress,
 )
 from pants.build_graph.address import Address
@@ -700,6 +701,20 @@ async def sources_snapshots_from_build_file_addresses(
   return SourcesSnapshots(snapshots)
 
 
+@rule
+async def sources_snapshots_from_filesystem_specs(
+  filesystem_specs: FilesystemSpecs, glob_match_error_behavior: GlobMatchErrorBehavior,
+) -> SourcesSnapshots:
+  """Resolve the snapshot associated with the provided filesystem specs."""
+  snapshot = await Get[Snapshot](
+    PathGlobs(
+      include=(fs_spec.glob for fs_spec in filesystem_specs),
+      glob_match_error_behavior=glob_match_error_behavior,
+    )
+  )
+  return SourcesSnapshots([SourcesSnapshot(snapshot)])
+
+
 def create_legacy_graph_tasks():
   """Create tasks to recursively parse the legacy graph."""
   return [
@@ -713,5 +728,7 @@ def create_legacy_graph_tasks():
     sort_targets,
     hydrate_sources_snapshot,
     sources_snapshots_from_build_file_addresses,
+    sources_snapshots_from_filesystem_specs,
+    RootRule(FilesystemSpecs),
     RootRule(OwnersRequest),
   ]
