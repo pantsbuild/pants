@@ -235,7 +235,6 @@ def validate_args(args: Tuple[str, ...]):
 @goal_rule
 async def run_setup_pys(targets: HydratedTargets, options: SetupPyOptions, console: Console,
                         provenance_map: AddressProvenanceMap, python_setup: PythonSetup,
-                        subprocess_encoding_environment: SubprocessEncodingEnvironment,
                         distdir: DistDir, workspace: Workspace) -> SetupPy:
   """Run setup.py commands on all exported targets addressed."""
   args = tuple(options.values.args)
