@@ -424,13 +424,40 @@ class TopologicallyOrderedTargets:
   hydrated_targets: HydratedTargets
 
 
+class InvalidOwnersOfArgs(Exception):
+  pass
+
+
 @dataclass(frozen=True)
 class OwnersRequest:
   """A request for the owners (and optionally, transitive dependees) of a set of file paths."""
-  sources: Tuple
+  sources: Tuple[str, ...]
   # TODO: `include_dependees` should become an `enum` of the choices from the
   # `--changed-include-dependees` global option.
   include_dependees: str
+
+  def __post_init__(self) -> None:
+    """Some useful checks that users are passing valid args."""
+    # Check for improperly trying to use commas to run against multiple files.
+    sources_with_commas = [source for source in self.sources if "," in source]
+    if sources_with_commas:
+      offenders = ', '.join(f"`{source}`" for source in sources_with_commas)
+      raise InvalidOwnersOfArgs(
+        "Rather than using a comma with `--owner-of` to specify multiple files, use "
+        "Pants list syntax: https://www.pantsbuild.org/options.html#list-options. For example, "
+        "`./pants --owner-of=src/python/example/foo.py --owner-of=src/python/example/test.py list`."
+        f"\n\n(You used commas in these arguments: {offenders})"
+      )
+    # Validate that users aren't using globs. FilesystemSpecs _do_ support globs via PathGlobs,
+    # so it's feasible that a user will then try to also use globs with `--owner-of`.
+    sources_with_globs = [source for source in self.sources if '*' in source]
+    if sources_with_globs:
+      offenders = ', '.join(f"`{source}`" for source in sources_with_globs)
+      raise InvalidOwnersOfArgs(
+        "`--owner-of` does not allow globs. Instead, please directly specify the files you want "
+        "to operate on, e.g. `./pants --owner-of=src/python/example/foo.py.\n\n(You used globs "
+        f"in these arguments: {offenders})"
+      )
 
 
 @rule
