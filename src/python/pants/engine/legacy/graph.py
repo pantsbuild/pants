@@ -20,7 +20,6 @@ from pants.base.specs import (
   DescendantAddresses,
   SingleAddress,
 )
-from pants.base.target_roots import TargetRoots
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.app_base import AppBase, Bundle
@@ -203,8 +202,8 @@ class LegacyBuildGraph(BuildGraph):
     for _ in self._inject_address_specs(AddressSpecs(dependencies)):
       pass
 
-  def inject_roots_closure(self, target_roots: TargetRoots, fail_fast=None):
-    for address in self._inject_address_specs(target_roots.specs):
+  def inject_roots_closure(self, address_specs: AddressSpecs, fail_fast=None):
+    for address in self._inject_address_specs(address_specs):
       yield address
 
   def inject_address_specs_closure(self, address_specs: Iterable[AddressSpec], fail_fast=None):

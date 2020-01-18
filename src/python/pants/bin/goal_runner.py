@@ -5,7 +5,7 @@ import logging
 import sys
 from typing import List
 
-from pants.base.target_roots import TargetRoots
+from pants.base.specs import AddressSpecs, ParsedSpecs
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_parser import BuildFileParser
@@ -34,7 +34,7 @@ class GoalRunnerFactory:
     run_tracker: RunTracker,
     reporting: Reporting,
     graph_session: LegacyGraphSession,
-    target_roots: TargetRoots,
+    parsed_specs: ParsedSpecs,
     exiter=sys.exit,
   ) -> None:
     """
@@ -44,7 +44,7 @@ class GoalRunnerFactory:
     :param run_tracker: The global, pre-initialized/running RunTracker instance.
     :param reporting: The global, pre-initialized Reporting instance.
     :param graph_session: The graph session for this run.
-    :param target_roots: A pre-existing `TargetRoots` object, if available.
+    :param parsed_specs: The specs for this run, i.e. either the address or filesystem specs.
     :param func exiter: A function that accepts an exit code value and exits. (for tests, Optional)
     """
     self._root_dir = root_dir
@@ -53,7 +53,7 @@ class GoalRunnerFactory:
     self._run_tracker = run_tracker
     self._reporting = reporting
     self._graph_session = graph_session
-    self._target_roots = target_roots
+    self._parsed_specs = parsed_specs
     self._exiter = exiter
 
     self._global_options = options.for_global_scope()
@@ -66,13 +66,13 @@ class GoalRunnerFactory:
     v1_goals, ambiguous_goals, _ = options.goals_by_version
     return [Goal.by_name(goal) for goal in v1_goals + ambiguous_goals]
 
-  def _roots_to_targets(self, build_graph: LegacyBuildGraph, target_roots: TargetRoots):
+  def _address_specs_to_targets(self, build_graph: LegacyBuildGraph, address_specs: AddressSpecs):
     """Populate the BuildGraph and target list from a set of input TargetRoots."""
     with self._run_tracker.new_workunit(name='parse', labels=[WorkUnitLabel.SETUP]):
       return [
         build_graph.get_target(address)
         for address
-        in build_graph.inject_roots_closure(target_roots, self._fail_fast)
+        in build_graph.inject_roots_closure(address_specs, self._fail_fast)
       ]
 
   def _should_be_quiet(self, goals):
@@ -88,14 +88,16 @@ class GoalRunnerFactory:
     with self._run_tracker.new_workunit(name='setup', labels=[WorkUnitLabel.SETUP]):
       build_file_parser = BuildFileParser(self._build_config, self._root_dir)
       build_graph, address_mapper = self._graph_session.create_build_graph(
-        self._target_roots,
+        self._parsed_specs,
         self._root_dir
       )
 
       goals = self._determine_v1_goals(self._options)
       is_quiet = self._should_be_quiet(goals)
 
-      target_root_instances = self._roots_to_targets(build_graph, self._target_roots)
+      target_root_instances = self._address_specs_to_targets(
+        build_graph, self._parsed_specs.address_specs,
+      )
 
       # Now that we've parsed the bootstrap BUILD files, and know about the SCM system.
       self._run_tracker.run_info.add_scm_info()

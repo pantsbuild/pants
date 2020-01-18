@@ -16,7 +16,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.file_system_project_tree import FileSystemProjectTree
-from pants.base.target_roots import TargetRoots
+from pants.base.specs import ParsedSpecs
 from pants.build_graph.address import BuildFileAddress
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
@@ -203,21 +203,17 @@ class LegacyGraphSession:
     options_bootstrapper: OptionsBootstrapper,
     options: Options,
     goals: Iterable[str],
-    target_roots: TargetRoots,
+    parsed_specs: ParsedSpecs,
   ):
     """Runs @goal_rules sequentially and interactively by requesting their implicit Goal products.
 
     For retryable failures, raises scheduler.ExecutionError.
-
-    :param goals: The list of requested goal names as passed on the commandline.
-    :param target_roots: The targets root of the request.
 
     :returns: An exit code.
     """
 
     global_options = options.for_global_scope()
 
-    address_specs = target_roots.specs
     console = Console(
       use_colors=global_options.colors,
       session=self.scheduler_session if global_options.v2_ui else None,
@@ -227,7 +223,13 @@ class LegacyGraphSession:
 
     for goal in goals:
       goal_product = self.goal_map[goal]
-      params = Params(address_specs, options_bootstrapper, console, workspace, interactive_runner)
+      params = Params(
+        parsed_specs.provided_specs,
+        options_bootstrapper,
+        console,
+        workspace,
+        interactive_runner,
+      )
       logger.debug(f'requesting {goal_product} to satisfy execution of `{goal}` goal')
       try:
         exit_code = self.scheduler_session.run_goal_rule(goal_product, params)
@@ -240,14 +242,14 @@ class LegacyGraphSession:
     return PANTS_SUCCEEDED_EXIT_CODE
 
   def create_build_graph(
-    self, target_roots: TargetRoots, build_root: Optional[str] = None,
+    self, parsed_specs: ParsedSpecs, build_root: Optional[str] = None,
   ) -> Tuple[LegacyBuildGraph, LegacyAddressMapper]:
     """Construct and return a `BuildGraph` given a set of input specs."""
-    logger.debug('target_roots are: %r', target_roots)
+    logger.debug('parsed_specs are: %r', parsed_specs)
     graph = LegacyBuildGraph.create(self.scheduler_session, self.build_file_aliases)
     logger.debug('build_graph is: %s', graph)
     # Ensure the entire generator is unrolled.
-    for _ in graph.inject_roots_closure(target_roots):
+    for _ in graph.inject_roots_closure(parsed_specs.address_specs):
       pass
 
     address_mapper = LegacyAddressMapper(self.scheduler_session, build_root or get_buildroot())

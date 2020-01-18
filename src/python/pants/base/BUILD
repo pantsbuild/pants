@@ -187,15 +187,6 @@ python_library(
 )
 
 python_library(
-  name = 'target_roots',
-  sources = ['target_roots.py'],
-  dependencies = [
-    '3rdparty/python:dataclasses',
-  ],
-  tags = {'partially_type_checked'},
-)
-
-python_library(
   name = 'worker_pool',
   sources = ['worker_pool.py'],
   dependencies = [
