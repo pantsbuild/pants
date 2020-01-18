@@ -25,6 +25,10 @@ from pants.task.task import QuietTaskMixin
 logger = logging.getLogger(__name__)
 
 
+class FilesystemSpecsUnsupported(Exception):
+  """This feature won't be backported to V1."""
+
+
 class GoalRunnerFactory:
   def __init__(
     self,
@@ -60,6 +64,29 @@ class GoalRunnerFactory:
     self._fail_fast = self._global_options.fail_fast
     self._explain = self._global_options.explain
     self._kill_nailguns = self._global_options.kill_nailguns
+
+    if self._parsed_specs.filesystem_specs.dependencies:
+      v1_goals = ' '.join(repr(goal) for goal in self._determine_v1_goals(options))
+      provided_specs = ' '.join(spec.glob for spec in self._parsed_specs.filesystem_specs)
+      approximate_original_command = f"./pants {v1_goals} {provided_specs}"
+      suggested_owners_args = " ".join(
+        f"--owner-of={spec.glob}" for spec in self._parsed_specs.filesystem_specs
+      )
+      suggestion = f"run `./pants {suggested_owners_args} {v1_goals}`."
+      trying_to_use_globs = any("*" in spec.glob for spec in self._parsed_specs.filesystem_specs)
+      if trying_to_use_globs:
+        suggestion = f"run `./pants --owner-of=src/python/f1.py --owner-of=src/python/f2.py " \
+                     f"{v1_goals}`. (You must explicitly enumerate every file because " \
+                     f"`--owner-of` does not support globs.)"
+      raise FilesystemSpecsUnsupported(
+        f"Instead of running `{approximate_original_command}`, {suggestion}\n\n"
+        f"Why? Filesystem specs like `src/python/example.py` and `src/**/*.java` only work when "
+        f"running goals implemented with the V2 engine. When using V1 goals, either use "
+        f"traditional address specs like `src/python/example:foo` and `::` or use `--owner-of` "
+        f"for Pants to find the file's owning target(s) for you.\n\n"
+        "(You may find which goals are implemented in V1 by running `./pants --v1 --no-v2 goals` "
+        "and find V2 goals by running `./pants --no-v1 --v2 goals`.)"
+      )
 
   def _determine_v1_goals(self, options: Options) -> List[Goal]:
     """Check and populate the requested goals for a given run."""
