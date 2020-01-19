@@ -16,12 +16,18 @@ from pants.engine.fs import (
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get
-from pants.version import VERSION as pants_version
+from pants.version import VERSION
 
 
 class GeneratePantsIniOptions(GoalSubsystem):
   """Generate pants.ini with sensible defaults."""
   name = 'generate-pants-ini'
+
+  @classmethod
+  def register_options(cls, register) -> None:
+    super().register_options(register)
+    register('--v2-only', type=bool, fingerprint=True, default=False,
+             help='Support only v2 rules. If unspecified, this repo will also run v1 tasks.')
 
 
 class GeneratePantsIni(Goal):
@@ -29,23 +35,31 @@ class GeneratePantsIni(Goal):
 
 
 @goal_rule
-async def generate_pants_ini(console: Console, workspace: Workspace) -> GeneratePantsIni:
+async def generate_pants_ini(console: Console, workspace: Workspace,
+                             options: GeneratePantsIniOptions) -> GeneratePantsIni:
   pants_ini_content = dedent(f"""\
     [GLOBAL]
-    pants_version: {pants_version}
+    pants_version: {VERSION}
+    v1: {'False' if options.values.v2_only else 'True'}
+    v2: True
+    v2_ui: {'True' if options.values.v2_only else 'False'}
+    backend_packages: []
+    plugins: []
+    backend_packages2: []
+    plugins2: []
     """)
 
   preexisting_snapshot = await Get[Snapshot](PathGlobs(include=('pants.ini',)))
   if preexisting_snapshot.files:
     console.print_stderr(
-      "./pants.ini already exists. This goal is only meant to be run the first time you run Pants "
-      "in a project.\n\nTo update config values, please directly modify the file."
+      "./pants.ini already exists. This goal is only meant to be run to set up Pants "
+      "in a repo for the first time.\n\nTo update config values, please directly modify the file."
     )
     return GeneratePantsIni(exit_code=1)
 
   console.print_stdout(dedent(f"""\
-    Adding sensible defaults to ./pants.ini:
-      * Pinning `pants_version` to `{pants_version}`.
+      * Adding sensible defaults to ./pants.ini.
+      * Pinning `pants_version` to `{VERSION}`.
     """))
 
   digest = await Get[Digest](InputFilesContent([

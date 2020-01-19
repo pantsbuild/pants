@@ -22,10 +22,26 @@ class GeneratePantsIniTest(GoalRuleTestBase):
     Path(self.build_root, "pants.ini").touch()
     self.execute_rule(exit_code=1)
 
-  def test_generates_file(self) -> None:
+  def test_generates_v1_file(self) -> None:
     self.execute_rule()
     pants_ini = Path(self.build_root, "pants.ini")
     assert pants_ini.exists()
     config = configparser.ConfigParser()
     config.read(pants_ini)
-    assert config["GLOBAL"]["pants_version"] == VERSION
+    global_config = config["GLOBAL"]
+    assert global_config["pants_version"] == VERSION
+    assert global_config["v1"] == 'True'
+    assert global_config["v2"] == 'True'
+    assert global_config["v2_ui"] == 'False'
+
+  def test_generates_v2_file(self) -> None:
+    self.execute_rule(args=['--v2-only'])
+    pants_ini = Path(self.build_root, "pants.ini")
+    assert pants_ini.exists()
+    config = configparser.ConfigParser()
+    config.read(pants_ini)
+    global_config = config["GLOBAL"]
+    assert global_config["pants_version"] == VERSION
+    assert global_config["v1"] == 'False'
+    assert global_config["v2"] == 'True'
+    assert global_config["v2_ui"] == 'True'
