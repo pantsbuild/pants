@@ -159,6 +159,7 @@ class Snapshot:
 
 # TODO: An intrinsic to compute this subset.  Currently this is here just as a
 #  design guide to what that intrinsic should do.
+#  See https://github.com/pantsbuild/pants/issues/8986.
 @dataclass(frozen=True)
 class SnapshotSubset:
   """A request to create a subset of a snapshot."""

@@ -85,6 +85,8 @@ def test_does_not_declare_pkg_resources_namespace_package(python_src: str) -> No
   ([], [['CPython>=2.7,<3']]),
   (['CPython>=2.7,<3'], [None]),
   (['CPython>=2.7,<3'], [['CPython>=2.7,<3'], ['CPython>=3.6']]),
+  (['CPython>=2.7.13'], [None]),
+  (['CPython>=2.7.13,<2.7.16'], [None]),
 ])
 def test_is_python2(constraints, compatibilities):
   Subsystem.reset()

@@ -430,6 +430,7 @@ async def get_sources(request: SetupPySourcesRequest,
 @rule
 async def get_snapshot_subset(snapshot_subset: SnapshotSubset) -> Digest:
   # TODO: This is a HACK to compute a SnapshotSubset. Should be replaced with an intrinsic.
+  # See https://github.com/pantsbuild/pants/issues/8986.
   ep_result = await Get[ExecuteProcessResult](ExecuteProcessRequest(
     argv=('/usr/bin/true',),
     description='Create snapshot subset',
