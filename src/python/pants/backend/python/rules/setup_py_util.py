@@ -209,7 +209,7 @@ def is_python2(compatibilities: Iterable[Optional[List[str]]], python_setup: Pyt
 
   for req in iter_reqs():
     for python_27_ver in range(0, 17):  # The last python 2.7 version was 2.7.17.
-      if req.specifier.contains(f'2.7.{python_27_ver}'):  # type: ignore
+      if req.specifier.contains(f'2.7.{python_27_ver}'):
         # At least one constraint limits us to Python 2, so assume that.
         return True
   return False
