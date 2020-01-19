@@ -4,7 +4,7 @@
 import logging
 import os
 from contextlib import contextmanager
-from typing import Dict, List, Optional, Tuple
+from typing import List, Mapping, Optional, Tuple
 
 from pants.base.build_environment import get_buildroot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
@@ -97,7 +97,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
   @staticmethod
   def parse_options(
     args: List[str],
-    env: Dict[str, str],
+    env: Mapping[str, str],
     options_bootstrapper: Optional[OptionsBootstrapper] = None,
   ) -> Tuple[Options, BuildConfiguration, OptionsBootstrapper]:
     options_bootstrapper = options_bootstrapper or OptionsBootstrapper.create(args=args, env=env)
@@ -155,7 +155,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
   def create(
     cls,
     args: List[str],
-    env: Dict[str, str],
+    env: Mapping[str, str],
     specs: Optional[Specs] = None,
     daemon_graph_session: Optional[LegacyGraphSession] = None,
     options_bootstrapper: Optional[OptionsBootstrapper] = None,

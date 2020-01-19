@@ -5,11 +5,13 @@ import logging
 import sys
 import time
 from contextlib import contextmanager
+from typing import List, Mapping
 
 from pants.base.exception_sink import ExceptionSink, SignalHandler
 from pants.console.stty_utils import STTYSettings
 from pants.java.nailgun_client import NailgunClient
 from pants.java.nailgun_protocol import NailgunProtocol
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.pantsd.pants_daemon import PantsDaemon
 from pants.util.dirutil import maybe_read_file
 
@@ -65,12 +67,21 @@ class RemotePantsRunner:
     NailgunClient.NailgunExecutionError
   )
 
-  def __init__(self, exiter, args, env, options_bootstrapper, stdin=None, stdout=None, stderr=None):
+  def __init__(
+    self,
+    exiter,
+    args: List[str],
+    env: Mapping[str, str],
+    options_bootstrapper: OptionsBootstrapper,
+    stdin=None,
+    stdout=None,
+    stderr=None
+  ) -> None:
     """
     :param Exiter exiter: The Exiter instance to use for this run.
-    :param list args: The arguments (e.g. sys.argv) for this run.
-    :param dict env: The environment (e.g. os.environ) for this run.
-    :param OptionsBootstrapper options_bootstrapper: The bootstrap options.
+    :param args: The arguments (e.g. sys.argv) for this run.
+    :param env: The environment (e.g. os.environ) for this run.
+    :param options_bootstrapper: The bootstrap options.
     :param file stdin: The stream representing stdin.
     :param file stdout: The stream representing stdout.
     :param file stderr: The stream representing stderr.
