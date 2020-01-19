@@ -56,3 +56,9 @@ class ClocTest(GoalRuleTestBase):
     output = self.execute_rule(args=[py_dir, '--cloc2-ignored'])
     assert "Ignored the following files:" in output
     assert "empty.py: zero sized file" in output
+
+  def test_no_sources_exits_gracefully(self) -> None:
+    py_dir = 'src/py/foo'
+    self.add_to_build_file(py_dir, 'python_library()')
+    output = self.execute_rule(args=[py_dir])
+    assert output.strip() == ""

@@ -62,7 +62,7 @@ fn attr_for(inode: Inode, size: u64, kind: fuse::FileType, perm: u16) -> fuse::F
   fuse::FileAttr {
     ino: inode,
     size: size,
-    // TODO: Find out whether blocks is actaully important
+    // TODO: Find out whether blocks is actually important
     blocks: 0,
     atime: CREATE_TIME,
     mtime: CREATE_TIME,
@@ -429,7 +429,7 @@ impl fuse::Filesystem for BuildResultFS {
       (DIRECTORY_ROOT, Some(digest_str)) => match digest_from_filepath(digest_str) {
         Ok(digest) => self.dir_attr_for(digest),
         Err(err) => {
-          warn!("Invalid digest for directroy in directory root: {}", err);
+          warn!("Invalid digest for directory in directory root: {}", err);
           Err(libc::ENOENT)
         }
       },

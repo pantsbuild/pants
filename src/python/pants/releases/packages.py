@@ -73,7 +73,7 @@ class Package:
 
 def core_packages():
   # N.B. We constrain the ABI (Application Binary Interface) to cp36 to allow pantsbuild.pants to
-  # work with any Python 3 version>= 3.6. We are able to get this future compatibility by specifing
+  # work with any Python 3 version>= 3.6. We are able to get this future compatibility by specifying
   # `abi3`, which signifies any version >= 3.6 must work. This is possible to set because in
   # `src/rust/engine/src/cffi/native_engine.c` we set up `Py_LIMITED_API` and in `src/python/pants/BUILD` we
   # set ext_modules, which together allows us to mark the abi tag. See https://docs.python.org/3/c-api/stable.html

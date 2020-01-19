@@ -245,7 +245,7 @@ class TaskTest(TaskTestBase):
   def test_revert_after_failure(self):
     # Regression test to catch the following scenario:
     #
-    # 1) In state A: Task suceeds and writes some output.  Key is recorded by the invalidator.
+    # 1) In state A: Task succeeds and writes some output.  Key is recorded by the invalidator.
     # 2) In state B: Task fails, but writes some output.  Key is not recorded.
     # 3) After reverting back to state A: The current key is the same as the one recorded at the
     #    end of step 1), so it looks like no work needs to be done, but actually the task
@@ -437,7 +437,7 @@ class TaskTest(TaskTestBase):
     self.assertEqual(vtB.current_results_dir, vtC.previous_results_dir)
 
     # Verify the content. The task was invalid twice - the initial run and the run with the changed
-    # source file. Only vtC (previous sucessful runs + cache miss) resulted in copying the
+    # source file. Only vtC (previous successful runs + cache miss) resulted in copying the
     # previous_results.
     self.assertContent(vtC, first_contents + second_contents)
 
