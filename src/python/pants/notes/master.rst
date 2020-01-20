@@ -7,6 +7,18 @@ not undergone the vetting associated with ``stable`` releases.
 1.25.0.dev2 (01/17/2020)
 ------------------------
 
+New Features
+~~~~~~~~~~~~
+
+* Add Bandit Python linter (#8929)
+  `PR #8929 <https://github.com/pantsbuild/pants/pull/8929>`_
+
+* Tweak options parser to allow globs in filesystem specs (#8981)
+  `PR #8981 <https://github.com/pantsbuild/pants/pull/8981>`_
+
+* Introduce `SourcesSnapshot` for goals that only need source files to operate (#8980)
+  `PR #8980 <https://github.com/pantsbuild/pants/pull/8980>`_
+
 API Changes
 ~~~~~~~~~~~
 
@@ -21,6 +33,12 @@ API Changes
 
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Gitignore the twine venv created when we run the release script. (#8966)
+  `PR #8966 <https://github.com/pantsbuild/pants/pull/8966>`_
+
+* Fix more typos (#8983)
+  `PR #8983 <https://github.com/pantsbuild/pants/pull/8983>`_
 
 * Add type hints to `source/` (#8977)
   `PR #8977 <https://github.com/pantsbuild/pants/pull/8977>`_
