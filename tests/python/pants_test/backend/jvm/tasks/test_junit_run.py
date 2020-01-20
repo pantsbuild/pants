@@ -504,7 +504,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
       touch(os.path.join(target_cwd, 'target_cwd_sentinel'))
       with temporary_dir() as option_cwd:
         touch(os.path.join(option_cwd, 'option_cwd_sentinel'))
-        self.set_options(cwd=option_cwd)
+        self.set_options(cwd=option_cwd, chroot=False)
         self._execute_junit_runner([('FooTest.java', content)],
                                    target_name='tests/java/org/pantsbuild/foo:foo_test')
 
