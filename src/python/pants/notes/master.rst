@@ -4,6 +4,63 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.25.0.dev2 (01/17/2020)
+------------------------
+
+New Features
+~~~~~~~~~~~~
+
+* Add Bandit Python linter (#8929)
+  `PR #8929 <https://github.com/pantsbuild/pants/pull/8929>`_
+
+API Changes
+~~~~~~~~~~~
+
+* Deprecate `--fmt-transitive` and `--lint-transitive` and switch defaults to False (#8969)
+  `PR #8969 <https://github.com/pantsbuild/pants/pull/8969>`_
+
+* Use Python 3.6+ by default for Python users (#8968)
+  `PR #8968 <https://github.com/pantsbuild/pants/pull/8968>`_
+
+* Remove `--cloc2-transitive` (#8957)
+  `PR #8957 <https://github.com/pantsbuild/pants/pull/8957>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Introduce `SourcesSnapshot` for goals that only need source files to operate (#8980)
+  `PR #8980 <https://github.com/pantsbuild/pants/pull/8980>`_
+
+* Tweak options parser to allow globs in filesystem specs (#8981)
+  `PR #8981 <https://github.com/pantsbuild/pants/pull/8981>`_
+
+* Gitignore the twine venv created when we run the release script. (#8966)
+  `PR #8966 <https://github.com/pantsbuild/pants/pull/8966>`_
+
+* Fix more typos (#8983)
+  `PR #8983 <https://github.com/pantsbuild/pants/pull/8983>`_
+
+* Add type hints to `source/` (#8977)
+  `PR #8977 <https://github.com/pantsbuild/pants/pull/8977>`_
+
+* Add type hints to `Address`, `Struct`, `TargetAdaptor`, `Parser`, and `HydratedTarget` (#8967)
+  `PR #8967 <https://github.com/pantsbuild/pants/pull/8967>`_
+
+* Stop requesting AddressSpecs in `@goal_rules` (#8972)
+  `PR #8972 <https://github.com/pantsbuild/pants/pull/8972>`_
+
+* update maven artifact url (#8975)
+  `PR #8975 <https://github.com/pantsbuild/pants/pull/8975>`_
+
+* Use daemon thread (#8959)
+  `PR #8959 <https://github.com/pantsbuild/pants/pull/8959>`_
+
+* Add type hints to the setup of target roots (#8965)
+  `PR #8965 <https://github.com/pantsbuild/pants/pull/8965>`_
+
+* Port V2 `python_test_runner.py` integration tests to V2 style (#8924)
+  `PR #8924 <https://github.com/pantsbuild/pants/pull/8924>`_
+
 
 1.25.0.dev1 (01/14/2020)
 ------------------------
