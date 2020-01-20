@@ -13,12 +13,6 @@ New Features
 * Add Bandit Python linter (#8929)
   `PR #8929 <https://github.com/pantsbuild/pants/pull/8929>`_
 
-* Tweak options parser to allow globs in filesystem specs (#8981)
-  `PR #8981 <https://github.com/pantsbuild/pants/pull/8981>`_
-
-* Introduce `SourcesSnapshot` for goals that only need source files to operate (#8980)
-  `PR #8980 <https://github.com/pantsbuild/pants/pull/8980>`_
-
 API Changes
 ~~~~~~~~~~~
 
@@ -33,6 +27,12 @@ API Changes
 
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Introduce `SourcesSnapshot` for goals that only need source files to operate (#8980)
+  `PR #8980 <https://github.com/pantsbuild/pants/pull/8980>`_
+
+* Tweak options parser to allow globs in filesystem specs (#8981)
+  `PR #8981 <https://github.com/pantsbuild/pants/pull/8981>`_
 
 * Gitignore the twine venv created when we run the release script. (#8966)
   `PR #8966 <https://github.com/pantsbuild/pants/pull/8966>`_
