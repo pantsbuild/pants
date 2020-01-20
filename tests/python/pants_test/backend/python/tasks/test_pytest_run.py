@@ -56,7 +56,9 @@ class PytestTestBase(PythonTaskTestBase, DeclarativeTaskTestMixin):
 
   _default_test_options = {
     'colors': False,
-    'level': 'info'  # When debugging a test failure it may be helpful to set this to 'debug'.
+    'level': 'info',  # When debugging a test failure it may be helpful to set this to 'debug'.
+    'chroot': False,
+    'fast': True,
   }
 
   def _augment_options(self, options):
