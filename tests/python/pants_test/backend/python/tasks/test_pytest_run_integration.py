@@ -25,6 +25,13 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
   # correctness of timeout behavior, so we set this to a higher value to avoid flakiness.
   _non_flaky_timeout_seconds = 5
 
+  pytest_setup_for_python_2_tests = {
+    'pytest': {
+      'version': 'pytest==4.6.6',  # so that we can run Python 2 tests
+      'pytest_plugins': 'zipp==1.0.0',  # transitive dep of Pytest
+    }
+  }
+
   def test_pytest_run_timeout_succeeds(self):
     pants_run = self.run_pants(['clean-all',
                                 'test.pytest',
@@ -142,10 +149,7 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
             'interpreter_cache_dir': interpreters_cache,
             'interpreter_search_paths': ['<PEXRC>'],
           },
-          'pytest': {
-            'version': 'pytest==4.6.6',  # so that we can run Python 2 tests
-            'pytest_plugins': 'zipp==1.0.0',  # transitive dep of Pytest; we pin to ensure Python 2 support
-          }
+          **self.pytest_setup_for_python_2_tests,
         }
         pants_run_27 = self.run_pants(
           command=['test', '{}:test_py2'.format(os.path.join(self.testproject,
@@ -172,10 +176,7 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
           'interpreter_constraints': ['CPython>=2.7'],
           'interpreter_cache_dir': interpreters_cache,
         },
-        # NB: we pin Pytest to 4.6 to ensure Pytest still works with Python 2.
-        'pytest': {
-          'version': 'pytest==4.6.6',
-        }
+        **self.pytest_setup_for_python_2_tests,
       }
       pants_run_2 = self.run_pants(
         command=[
