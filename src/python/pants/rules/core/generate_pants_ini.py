@@ -41,11 +41,26 @@ async def generate_pants_ini(console: Console, workspace: Workspace,
     [GLOBAL]
     pants_version: {VERSION}
     v1: {'False' if options.values.v2_only else 'True'}
-    v2: True
+    v2: {'True' if options.values.v2_only else 'False'}
     v2_ui: {'True' if options.values.v2_only else 'False'}
-    backend_packages: []
+    
+    backend_packages: [
+        # 'pants.backend.graph_info',
+        # 'pants.backend.project_info',
+        # 'pants.backend.python',
+        # 'pants.backend.jvm',
+        # 'pants.backend.native',
+      ]
+    
     plugins: []
-    backend_packages2: []
+    
+    backend_packages2: [
+        # 'pants.backend.project_info',
+        # 'pants.backend.python',
+        # 'pants.backend.python.lint.flake8',
+        # 'pants.backend.python.lint.isort',
+      ]
+    
     plugins2: []
     """)
 
@@ -57,9 +72,14 @@ async def generate_pants_ini(console: Console, workspace: Workspace,
     )
     return GeneratePantsIni(exit_code=1)
 
+  enabled = {'v2' if options.values.v2_only else 'v1'}
+  disabled = {'v1' if options.values.v2_only else 'v2'}
+
   console.print_stdout(dedent(f"""\
-      * Adding sensible defaults to ./pants.ini.
+      Setting sensible defaults in ./pants.ini:
       * Pinning `pants_version` to `{VERSION}`.
+      * Enabling the {enabled} engine and disabling the {disabled} engine.
+      * Setting empty v1 and v2 `plugins` and `backend_packages` so you can opt in to the functionality you need.
     """))
 
   digest = await Get[Digest](InputFilesContent([
