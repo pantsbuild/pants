@@ -72,8 +72,8 @@ async def generate_pants_ini(console: Console, workspace: Workspace,
     )
     return GeneratePantsIni(exit_code=1)
 
-  enabled = {'v2' if options.values.v2_only else 'v1'}
-  disabled = {'v1' if options.values.v2_only else 'v2'}
+  enabled = 'v2' if options.values.v2_only else 'v1'
+  disabled = 'v1' if options.values.v2_only else 'v2'
 
   console.print_stdout(dedent(f"""\
       Setting sensible defaults in ./pants.ini:
