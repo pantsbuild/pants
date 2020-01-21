@@ -39,7 +39,7 @@ Relevant Goals and Targets
 > <a pantsref="bdict_python_requirement_library">`python_requirement_library`</a>
 > and a
 > <a pantsref="bdict_python_requirement">`python_requirement`</a> to refer to
-> the code. To use several several of these via a `pip`-style
+> the code. To use several of these via a `pip`-style
 > `requirements.txt` file, use a
 > <a pantsref="bdict_python_requirements">`python_requirements`</a>.
 > For details, see [[Python 3rdparty Pattern|pants('examples/src/python/example:3rdparty_py')]].
