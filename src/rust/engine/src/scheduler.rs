@@ -140,6 +140,10 @@ impl Session {
       f()
     }
   }
+
+  pub fn should_handle_workunits(&self) -> bool {
+    self.should_report_workunits() || self.should_record_zipkin_spans()
+  }
 }
 
 pub struct ExecutionRequest {

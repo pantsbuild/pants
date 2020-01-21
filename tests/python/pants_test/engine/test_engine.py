@@ -66,6 +66,58 @@ class MyFloat:
 def upcast(n: MyInt) -> MyFloat:
   return MyFloat(float(n.val))
 
+# This set of dummy types and the following `@rule`s are intended to test that workunits are
+# being generated correctly and with the correct parent-child relationships.
+
+class Input:
+  pass
+
+
+class Alpha:
+  pass
+
+
+class Beta:
+  pass
+
+
+class Gamma:
+  pass
+
+
+class Omega:
+  pass
+
+
+@rule(name="rule_one")
+async def rule_one(i: Input) -> Beta:
+  """This rule should be the first one executed by the engine, and
+  thus have no parent."""
+  a = Alpha()
+  o = await Get[Omega](Alpha, a)
+  b = await Get[Beta](Omega, o)
+  return b
+
+@rule(name="rule_two")
+async def rule_two(a: Alpha) -> Omega:
+  """This rule should be invoked in the body of `rule_one` and
+  therefore its workunit should be a child of `rule_one`'s workunit."""
+  await Get[Gamma](Alpha, a)
+  return Omega()
+
+@rule(name="rule_three")
+async def rule_three(o: Omega) -> Beta:
+  """This rule should be invoked in the body of `rule_one` and
+  therefore its workunit should be a child of `rule_one`'s workunit."""
+  return Beta()
+
+
+@rule(name="rule_four")
+def rule_four(a: Alpha) -> Gamma:
+  """This rule should be invoked in the body of `rule_two` and
+  therefore its workunit should be a child of `rule_two`'s workunit."""
+  return Gamma()
+
 
 class EngineTest(unittest.TestCase, SchedulerTestBase):
 
@@ -237,33 +289,56 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
       str(cm.exception)
     )
 
-  def test_async_reporting(self):
+
+  @dataclass
+  class WorkunitTracker:
+    workunits: List[dict] = field(default_factory=list)
+    finished: bool = False
+
+    def add(self, workunits, **kwargs) -> None:
+      if kwargs['finished'] == True:
+        self.finished = True
+      self.workunits.extend(workunits)
+
+  def test_streaming_workunits_reporting(self):
     rules = [ fib, RootRule(int)]
     scheduler = self.mk_scheduler(rules, include_trace_on_error=False, should_report_workunits=True)
 
-    @dataclass
-    class Tracker:
-      workunits: List[dict] = field(default_factory=list)
-      finished: bool = False
-
-      def add(self, workunits, **kwargs) -> None:
-        if kwargs['finished'] == True:
-          self.finished = True
-        self.workunits.extend(workunits)
-
-    tracker = Tracker()
-    async_reporter = StreamingWorkunitHandler(scheduler, callbacks=[tracker.add], report_interval_seconds=0.01)
-    with async_reporter.session():
+    tracker = self.WorkunitTracker()
+    handler = StreamingWorkunitHandler(scheduler, callbacks=[tracker.add], report_interval_seconds=0.01)
+    with handler.session():
       scheduler.product_request(Fib, subjects=[0])
 
     # The execution of the single named @rule "fib" should be providing this one workunit.
     self.assertEquals(len(tracker.workunits), 1)
 
     tracker.workunits = []
-    with async_reporter.session():
+    with handler.session():
       scheduler.product_request(Fib, subjects=[10])
 
     # Requesting a bigger fibonacci number will result in more rule executions and thus more reported workunits.
     # In this case, we expect 10 invocations of the `fib` rule.
     assert len(tracker.workunits) ==  10
     assert tracker.finished
+
+  def test_streaming_workunits_parent_id(self):
+    rules = [RootRule(Input), rule_one, rule_two, rule_three, rule_four]
+    scheduler = self.mk_scheduler(rules, include_trace_on_error=False, should_report_workunits=True)
+    tracker = self.WorkunitTracker()
+    handler = StreamingWorkunitHandler(scheduler, callbacks=[tracker.add], report_interval_seconds=0.01)
+
+    with handler.session():
+      i = Input()
+      scheduler.product_request(Beta, subjects=[i])
+
+    assert tracker.finished
+
+    r1 = next(item for item in tracker.workunits if item['name'] == 'rule_one')
+    r2 = next(item for item in tracker.workunits if item['name'] == 'rule_two')
+    r3 = next(item for item in tracker.workunits if item['name'] == 'rule_three')
+    r4 = next(item for item in tracker.workunits if item['name'] == 'rule_four')
+
+    assert r1.get('parent_id', None) is None
+    assert r2['parent_id'] == r1['span_id']
+    assert r3['parent_id'] == r1['span_id']
+    assert r4['parent_id'] == r2['span_id']
