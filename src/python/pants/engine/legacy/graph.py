@@ -433,8 +433,8 @@ class OwnersRequest:
   # `--changed-include-dependees` global option.
   include_dependees: str
 
-  def __post_init__(self) -> None:
-    """Some useful checks that users are passing valid args."""
+  def validate(self, *, pants_bin_name: str) -> None:
+    """Ensure that users are passing valid args."""
     # Check for improperly trying to use commas to run against multiple files.
     sources_with_commas = [source for source in self.sources if "," in source]
     if sources_with_commas:
@@ -442,7 +442,7 @@ class OwnersRequest:
       raise InvalidOwnersOfArgs(
         "Rather than using a comma with `--owner-of` to specify multiple files, use "
         "Pants list syntax: https://www.pantsbuild.org/options.html#list-options. For example, "
-        "`./pants --owner-of=src/python/example/foo.py --owner-of=src/python/example/test.py list`."
+        f"`{pants_bin_name} --owner-of=src/python/example/foo.py --owner-of=src/python/example/test.py list`."
         f"\n\n(You used commas in these arguments: {offenders})"
       )
     # Validate that users aren't using globs. FilesystemSpecs _do_ support globs via PathGlobs,
@@ -452,8 +452,8 @@ class OwnersRequest:
       offenders = ', '.join(f"`{source}`" for source in sources_with_globs)
       raise InvalidOwnersOfArgs(
         "`--owner-of` does not allow globs. Instead, please directly specify the files you want "
-        "to operate on, e.g. `./pants --owner-of=src/python/example/foo.py.\n\n(You used globs "
-        f"in these arguments: {offenders})"
+        f"to operate on, e.g. `{pants_bin_name} --owner-of=src/python/example/foo.py.\n\n"
+        f"(You used globs in these arguments: {offenders})"
       )
 
 

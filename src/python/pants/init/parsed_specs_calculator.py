@@ -135,6 +135,7 @@ class ParsedSpecsCalculator:
       # We've been provided no spec roots (e.g. `./pants list`) AND a owner request. Compute
       # alternate target roots.
       request = OwnersRequest(sources=tuple(owned_files), include_dependees='none')
+      request.validate(pants_bin_name=options.for_global_scope().pants_bin_name)
       owner_addresses, = session.product_request(BuildFileAddresses, [request])
       logger.debug('owner addresses: %s', owner_addresses)
       dependencies = tuple(SingleAddress(a.spec_path, a.target_name) for a in owner_addresses)
