@@ -35,7 +35,7 @@ Now, run this command to create an initial `pants.ini` config file:
 
 This config pins the `pants_version`. When you'd like to upgrade Pants, edit the version in `pants.ini` and `./pants` will self-update on the next run.
 
-To use Pants plugins published to PyPi, add them to a `plugins` list, like so:
+To use Pants plugins published to PyPI, add them to a `plugins` list, like so:
 
     :::ini
     [GLOBAL]
