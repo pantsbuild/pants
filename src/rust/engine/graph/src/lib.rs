@@ -658,7 +658,9 @@ impl<N: Node> Graph<N> {
           // TODO: doing cycle detection under the lock... unfortunate, but probably unavoidable
           // without a much more complicated algorithm.
           let potential_dst_id = inner.ensure_entry(dst_node);
-          if let Some(cycle_path) = Self::report_cycle(src_id, potential_dst_id, &mut inner) {
+          if let Some(cycle_path) =
+            Self::report_cycle(src_id, potential_dst_id, &mut inner, context)
+          {
             // Cyclic dependency: render an error.
             let path_strs = cycle_path
               .into_iter()
@@ -697,6 +699,7 @@ impl<N: Node> Graph<N> {
     src_id: EntryId,
     potential_dst_id: EntryId,
     inner: &mut InnerGraph<N>,
+    context: &N::Context,
   ) -> Option<Vec<Entry<N>>> {
     let mut counter = 0;
     loop {
@@ -706,7 +709,7 @@ impl<N: Node> Graph<N> {
         // them, and then check if there are still any cycles in the graph.
         let dirty_nodes: HashSet<_> = cycle_path
           .iter()
-          .filter(|n| n.may_have_dirty_edges())
+          .filter(|n| !n.is_clean(context))
           .map(|n| n.node().clone())
           .collect();
         if dirty_nodes.is_empty() {
@@ -873,19 +876,28 @@ impl<N: Node> Graph<N> {
     run_token: RunToken,
     result: Option<Result<N::Item, N::Error>>,
   ) {
-    let (entry, entry_id, dep_generations) = {
+    let (entry, complete_as_dirty, dep_generations) = {
       let inner = self.inner.lock();
+      let mut complete_as_dirty = false;
       // Get the Generations of all dependencies of the Node. We can trust that these have not changed
       // since we began executing, as long as we are not currently marked dirty (see the method doc).
       let dep_generations = inner
         .pg
         .neighbors_directed(entry_id, Direction::Outgoing)
         .filter_map(|dep_id| inner.entry_for_id(dep_id))
-        .map(Entry::generation)
+        .map(|entry| {
+          // If a dependency is uncacheable or currently dirty, this Node should complete as dirty,
+          // independent of matching Generation values. This is to allow for the behaviour that an
+          // uncacheable Node should always have dirty dependents, transitively.
+          if !entry.node().cacheable(context) || !entry.is_clean(context) {
+            complete_as_dirty = true;
+          }
+          entry.generation()
+        })
         .collect();
       (
         inner.entry_for_id(entry_id).cloned(),
-        entry_id,
+        complete_as_dirty,
         dep_generations,
       )
     };
@@ -897,6 +909,7 @@ impl<N: Node> Graph<N> {
         run_token,
         dep_generations,
         result,
+        complete_as_dirty,
         &mut inner,
       );
     }

@@ -1087,11 +1087,9 @@ impl Node for NodeKey {
     }
   }
 
-  fn cacheable(&self) -> bool {
+  fn cacheable(&self, _context: &Self::Context) -> bool {
     match self {
       &NodeKey::Task(ref s) => s.task.cacheable,
-      // TODO Select nodes are made uncacheable as a workaround to #6146. Will be worked on in #6598
-      &NodeKey::Select(_) => false,
       _ => true,
     }
   }

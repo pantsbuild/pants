@@ -44,6 +44,7 @@ struct InnerSession {
   should_record_zipkin_spans: bool,
   // A place to store info about workunits in rust part
   workunit_store: WorkUnitStore,
+  // The unique id for this run. Used as the id of the session, and for metrics gathering purposes.
   build_id: String,
   should_report_workunits: bool,
 }
@@ -110,7 +111,7 @@ impl Session {
     self.0.workunit_store.clone()
   }
 
-  pub fn build_id(&self) -> &str {
+  pub fn build_id(&self) -> &String {
     &self.0.build_id
   }
 

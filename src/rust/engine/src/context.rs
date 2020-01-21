@@ -283,6 +283,7 @@ impl Context {
 
 impl NodeContext for Context {
   type Node = NodeKey;
+  type SessionId = String;
 
   ///
   /// Clones this Context for a new EntryId. Because the Core of the context is an Arc, this
@@ -294,6 +295,10 @@ impl NodeContext for Context {
       core: self.core.clone(),
       session: self.session.clone(),
     }
+  }
+
+  fn session_id(&self) -> &Self::SessionId {
+    self.session.build_id()
   }
 
   fn graph(&self) -> &Graph<NodeKey> {
