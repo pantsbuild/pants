@@ -142,9 +142,9 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
             'interpreter_cache_dir': interpreters_cache,
             'interpreter_search_paths': ['<PEXRC>'],
           },
-          # NB: we pin Pytest to 4.6 to ensure Pytest still works with Python 2.
           'pytest': {
-            'version': 'pytest==4.6.6',
+            'version': 'pytest==4.6.6',  # so that we can run Python 2 tests
+            'pytest_plugins': 'zipp==1.0.0',  # transitive dep of Pytest; we pin to ensure Python 2 support
           }
         }
         pants_run_27 = self.run_pants(
