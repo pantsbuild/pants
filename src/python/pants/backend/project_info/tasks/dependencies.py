@@ -24,16 +24,16 @@ class Dependencies(ConsoleTask):
   def register_options(cls, register):
     super().register_options(register)
     register(
-      '--type', type=DependencyType, default=DependencyType.INTERNAL,
-      help="Which types of dependencies to find, where `internal` means source code dependencies "
-           "and `external` means 3rd party requirements and JARs."
+      '--type', type=DependencyType, default=DependencyType.SOURCE,
+      help="Which types of dependencies to find, where `source` means source code dependencies "
+           "and `3rdparty` means third-party requirements and JARs."
     )
     register(
       '--internal-only', type=bool,
       help='Specifies that only internal dependencies should be included in the graph output '
            '(no external jars).',
       removal_version="1.27.0.dev0",
-      removal_hint="Use `--dependencies-type=internal` instead.",
+      removal_hint="Use `--dependencies-type=source` instead.",
     )
     register(
       '--external-only',
@@ -41,7 +41,7 @@ class Dependencies(ConsoleTask):
       help='Specifies that only external dependencies should be included in the graph output '
            '(only external jars).',
       removal_version="1.27.0.dev0",
-      removal_hint="Use `--dependencies-type=external` instead.",
+      removal_hint="Use `--dependencies-type=3rdparty` instead.",
     )
 
   def __init__(self, *args, **kwargs):
@@ -55,11 +55,11 @@ class Dependencies(ConsoleTask):
       if opts.internal_only and opts.external_only:
         raise TaskError('At most one of --internal-only or --external-only can be selected.')
       if opts.internal_only:
-        self.dependency_type = DependencyType.INTERNAL
+        self.dependency_type = DependencyType.SOURCE
       elif opts.external_only:
-        self.dependency_type = DependencyType.EXTERNAL
+        self.dependency_type = DependencyType.THIRD_PARTY
       else:
-        self.dependency_type = DependencyType.INTERNAL_AND_EXTERNAL
+        self.dependency_type = DependencyType.SOURCE_AND_THIRD_PARTY
 
   def console_output(self, unused_method_argument):
     opts = self.get_options()
@@ -67,9 +67,9 @@ class Dependencies(ConsoleTask):
       lambda: opts.is_default("type") and not opts.internal_only and not opts.external_only,
       removal_version="1.27.0.dev0",
       entity_description="The default dependencies output including external dependencies",
-      hint_message="Pants will soon default to `--dependencies-type=internal`, rather than "
-                   "`--dependencies-type=internal-and-external`. To prepare, run this task with"
-                   " `--dependencies-type=internal`.",
+      hint_message="Pants will soon default to `--dependencies-type=source`, rather than "
+                   "`--dependencies-type=source-and-3rdparty`. To prepare, run this goal with"
+                   " `--dependencies-type=source`.",
     )
     ordered_closure = OrderedSet()
     for target in self.context.target_roots:
@@ -79,9 +79,9 @@ class Dependencies(ConsoleTask):
         ordered_closure.update(target.dependencies)
 
     for tgt in ordered_closure:
-      if self.dependency_type in [DependencyType.INTERNAL, DependencyType.INTERNAL_AND_EXTERNAL]:
+      if self.dependency_type in [DependencyType.SOURCE, DependencyType.SOURCE_AND_THIRD_PARTY]:
         yield tgt.address.spec
-      if self.dependency_type in [DependencyType.EXTERNAL, DependencyType.INTERNAL_AND_EXTERNAL]:
+      if self.dependency_type in [DependencyType.THIRD_PARTY, DependencyType.SOURCE_AND_THIRD_PARTY]:
         # TODO(John Sirois): We need an external payload abstraction at which point knowledge
         # of jar and requirement payloads can go and this hairball will be untangled.
         if isinstance(tgt.payload.get_field('requirements'), PythonRequirementsField):

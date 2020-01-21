@@ -13,9 +13,9 @@ from pants.engine.selectors import Get
 
 
 class DependencyType(Enum):
-  INTERNAL = "internal"
-  EXTERNAL = "external"
-  INTERNAL_AND_EXTERNAL = "internal-and-external"
+  SOURCE = "source"
+  THIRD_PARTY = "3rdparty"
+  SOURCE_AND_THIRD_PARTY = "source-and-3rdparty"
 
 
 # TODO(#8762) Get this rule to feature parity with the dependencies task.
@@ -33,9 +33,9 @@ class DependenciesOptions(LineOriented, GoalSubsystem):
     )
     # TODO(#8762): Wire this up. Currently we only support `internal`.
     register(
-      '--type', type=DependencyType, default=DependencyType.INTERNAL,
-      help="Which types of dependencies to find, where `internal` means source code dependencies "
-           "and `external` means 3rd party requirements and JARs."
+      '--type', type=DependencyType, default=DependencyType.SOURCE,
+      help="Which types of dependencies to find, where `source` means source code dependencies "
+           "and `3rdparty` means third-party requirements and JARs."
     )
 
 
