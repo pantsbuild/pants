@@ -28,10 +28,6 @@ class BooleanOptionNameWithNo(RegistrationError):
   """"Boolean option names cannot start with --no."""
 
 
-class FrozenRegistration(RegistrationError):
-  """Cannot register an option on a scope after registering on any of its inner scopes."""
-
-
 class ImplicitValIsNone(RegistrationError):
   """Implicit value cannot be None."""
 
