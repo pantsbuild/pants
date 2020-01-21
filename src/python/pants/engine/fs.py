@@ -185,6 +185,13 @@ class Snapshot:
     return self == EMPTY_SNAPSHOT
 
 
+class SnapshotSubset:
+  """A request to create a subset of a snapshot."""
+  directory_digest: Digest
+  include_files: Tuple[str, ...]
+  include_dirs: Tuple[str, ...]
+
+
 @dataclass(frozen=True)
 class DirectoriesToMerge:
   directories: Tuple[Digest, ...]
