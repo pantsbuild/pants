@@ -2690,6 +2690,7 @@ dependencies = [
  "futures-cpupool 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "logging 0.0.1",
  "tokio 0.1.22 (registry+https://github.com/rust-lang/crates.io-index)",
+ "workunit_store 0.0.1",
 ]
 
 [[package]]
