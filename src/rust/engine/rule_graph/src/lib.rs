@@ -48,7 +48,7 @@ impl<R: Rule> UnreachableError<R> {
       rule,
       diagnostic: Diagnostic {
         params: ParamTypes::default(),
-        reason: "Was not reachable, possibly because it was shadowed by another rule.".to_string(),
+        reason: "Was not reachable, either because no rules can produce the params or it was shadowed by another @rule.".to_string(),
         details: vec![],
       },
     }

@@ -251,9 +251,9 @@ class RuleGraphTest(TestBase):
         """\
         Rules with errors: 3
           Rule(func=a_from_b_and_c(), product=A, params=[B, C]):
-            Was not reachable, possibly because it was shadowed by another rule.
+            Was not reachable, either because no rules can produce the params or it was shadowed by another @rule.
           Rule(func=a_from_c_and_b(), product=A, params=[C, B]):
-            Was not reachable, possibly because it was shadowed by another rule.
+            Was not reachable, either because no rules can produce the params or it was shadowed by another @rule.
           Rule(func=d_from_a(), product=D, params=[A]):
             Ambiguous rules to compute A with parameter types (B, C):
               Rule(func=a_from_b_and_c(), product=A, params=[B, C]) for (B, C)
@@ -381,7 +381,7 @@ class RuleGraphTest(TestBase):
         """\
         Rules with errors: 3
           Rule(func=a_from_c(), product=A, params=[C]):
-            Was not reachable, possibly because it was shadowed by another rule.
+            Was not reachable, either because no rules can produce the params or it was shadowed by another @rule.
           Rule(func=b_from_d(), product=B, params=[D]):
             No rule was available to compute D with parameter type SubA
           Rule(func=d_from_a_and_suba(), product=D, params=[A, SubA], gets=[Get(A, C)]):
@@ -415,7 +415,7 @@ class RuleGraphTest(TestBase):
         """\
         Rules with errors: 1
           Rule(func=d_for_b(), product=D, params=[B]):
-            Was not reachable, possibly because it was shadowed by another rule.
+            Was not reachable, either because no rules can produce the params or it was shadowed by another @rule.
         """
       ).strip(),
       str(cm.exception)
