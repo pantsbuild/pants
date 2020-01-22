@@ -194,20 +194,22 @@ fn input_files_content_to_digest(context: Context, files_content: Value) -> Node
 }
 
 fn snapshot_subset_to_digest(context: Context, value: Value) -> NodeFuture<Value> {
-
-  let include_files = externs::project_multi_strs(&value, "include_files"); //same as output_files
-  let include_dirs = externs::project_multi_strs(&value, "include_dirs");
+  let workunit_store = context.session.workunit_store();
+  let include_files = externs::project_multi_strs(&value, "include_files").into_iter();
+  let include_dirs = externs::project_multi_strs(&value, "include_dirs").into_iter();
   let store = context.core.store();
 
-  future::result(
-    lift_digest(&externs::project_ignoring_type(&value, "directory_digest"))
-  )
+  future::result(lift_digest(&externs::project_ignoring_type(
+    &value,
+    "directory_digest",
+  )))
   .and_then(move |original_digest| {
     store::Snapshot::get_snapshot_subset(
       store,
       original_digest,
-      include_files,
-      include_dirs,
+      include_files.collect(),
+      include_dirs.collect(),
+      workunit_store,
     )
   })
   .map(move |digest: hashing::Digest| Snapshot::store_directory(&context.core, &digest))

@@ -594,8 +594,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
           82
         ))
 
-  def test_snapshot_subset(self):
-
+  def generate_original_digest(self) -> Digest:
     content = b'dummy content'
     input_files_content = InputFilesContent((
       FileContent(path='a.txt', content=content),
@@ -605,19 +604,28 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
       FileContent(path='subdir/b.txt', content=content),
       FileContent(path='subdir2/a.txt', content=content),
     ))
-
     digest = self.request_single_product(Digest, input_files_content)
+    return digest
 
-    ss = SnapshotSubset(directory_digest=digest,
+  def test_empty_snapshot_subset(self) -> None:
+    ss = SnapshotSubset(directory_digest=self.generate_original_digest(),
         include_files=(),
         include_dirs=(),
     )
-
     subset_digest = self.request_single_product(Digest, ss)
-    print(f"Subset digest: {subset_digest}")
+    assert subset_digest == EMPTY_DIRECTORY_DIGEST
 
-    assert 1 == 2
-
+  def test_snapshot_subset_files_dirs(self) -> None:
+    ss = SnapshotSubset(directory_digest=self.generate_original_digest(),
+        include_files=("a.txt", "c.txt"),
+        include_dirs=('subdir2',),
+    )
+    subset_digest = self.request_single_product(Digest, ss)
+    result_files = self.request_single_product(FilesContent, subset_digest)
+    assert len(result_files.dependencies) == 3
+    assert any(fc.path == 'a.txt' for fc in result_files.dependencies)
+    assert any(fc.path == 'c.txt' for fc in result_files.dependencies)
+    assert any(fc.path == 'subdir2/a.txt' for fc in result_files.dependencies)
 
 
 class StubHandler(BaseHTTPRequestHandler):

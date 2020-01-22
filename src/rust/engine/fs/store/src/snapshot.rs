@@ -11,6 +11,7 @@ use hashing::{Digest, EMPTY_DIGEST};
 use indexmap::{self, IndexMap};
 use itertools::Itertools;
 use protobuf;
+use std::collections::BTreeSet;
 use std::ffi::OsString;
 use std::fmt;
 use std::iter::Iterator;
@@ -561,21 +562,42 @@ impl Snapshot {
   }
 
   pub fn get_snapshot_subset(
-    _store: Store,
-    _digest: Digest,
-    _include_files: Vec<String>,
-    _include_dirs: Vec<String>,
+    store: Store,
+    digest: Digest,
+    include_files: BTreeSet<String>,
+    include_dirs: BTreeSet<String>,
+    workunit_store: WorkUnitStore,
   ) -> BoxFuture<Digest, String> {
+    use bazel_protos::remote_execution::{Directory, DirectoryNode, FileNode};
+    use protobuf::RepeatedField;
 
-    future::ok(EMPTY_DIGEST).to_boxed()
-      /*
-         let directory = store.load_directory(original_digest, workunit_store)
-         .and_then(move |maybe_directory| {
+    let directory = store
+      .load_directory(digest, workunit_store)
+      .and_then(move |maybe_directory| {
+        maybe_directory
+          .map(|(dir, _metadata)| dir)
+          .ok_or_else(|| format!("Digest {:?} did not exist in the Store.", digest))
+      });
+    directory
+      .and_then(move |mut directory: Directory| {
+        let mut out_dir = Directory::new();
+        let file_nodes: RepeatedField<FileNode> = directory.take_files();
+        let subset_file_nodes = file_nodes
+          .into_iter()
+          .filter(|orig_file: &FileNode| include_files.contains(orig_file.get_name()))
+          .collect();
+        out_dir.set_files(subset_file_nodes);
 
-         .map(|(dir, _metadata)| dir)
-         .ok_or_else(|| format!("Digest {:?} did not exist in the Store.", digest))
-         })
-         */
+        let directory_nodes: RepeatedField<DirectoryNode> = directory.take_directories();
+        let subset_dir_nodes = directory_nodes
+          .into_iter()
+          .filter(|orig_dir: &DirectoryNode| include_dirs.contains(orig_dir.get_name()))
+          .collect();
+
+        out_dir.set_directories(subset_dir_nodes);
+        store.record_directory(&out_dir, true)
+      })
+      .to_boxed()
   }
 }
 
