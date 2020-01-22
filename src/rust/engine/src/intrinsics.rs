@@ -17,6 +17,8 @@ pub fn run_intrinsic(input: TypeId, product: TypeId, context: Context, value: Va
     directory_with_prefix_to_strip_to_digest(context, value)
   } else if product == types.directory_digest && input == types.directory_with_prefix_to_add {
     directory_with_prefix_to_add_to_digest(context, value)
+  } else if product == types.snapshot && input == types.directory_digest {
+    digest_to_snapshot(context, value)
   } else {
     panic!("Unrecognized intrinsic: {:?} -> {:?}", input, product)
   }
@@ -101,4 +103,16 @@ fn directory_with_prefix_to_add_to_digest(context: Context, request: Value) -> N
         .map(move |digest| Snapshot::store_directory(&core, &digest))
     })
   .to_boxed()
+}
+
+fn digest_to_snapshot(context: Context, directory_digest_val: Value) -> NodeFuture<Value> {
+  let workunit_store = context.session.workunit_store();
+  let core = context.core.clone();
+  let store = context.core.store();
+  future::result(lift_digest(&directory_digest_val).map_err(|str| throw(&str)))
+  .and_then(move |digest| {
+    store::Snapshot::from_digest(store, digest, workunit_store).map_err(|str| throw(&str))
+  })
+  .map(move |snapshot| Snapshot::store_snapshot(&core, &snapshot))
+    .to_boxed()
 }
