@@ -11,7 +11,7 @@ from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 
-from pants.engine.fs import (  # SnapshotSubset,
+from pants.engine.fs import (
   EMPTY_DIRECTORY_DIGEST,
   Digest,
   DirectoriesToMerge,
@@ -24,6 +24,7 @@ from pants.engine.fs import (  # SnapshotSubset,
   PathGlobs,
   PathGlobsAndRoot,
   Snapshot,
+  SnapshotSubset,
   UrlToFetch,
   create_fs_rules,
 )
@@ -594,7 +595,29 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
         ))
 
   def test_snapshot_subset(self):
-    pass
+
+    content = b'dummy content'
+    input_files_content = InputFilesContent((
+      FileContent(path='a.txt', content=content),
+      FileContent(path='b.txt', content=content),
+      FileContent(path='c.txt', content=content),
+      FileContent(path='subdir/a.txt', content=content),
+      FileContent(path='subdir/b.txt', content=content),
+      FileContent(path='subdir2/a.txt', content=content),
+    ))
+
+    digest = self.request_single_product(Digest, input_files_content)
+
+    ss = SnapshotSubset(directory_digest=digest,
+        include_files=(),
+        include_dirs=(),
+    )
+
+    subset_digest = self.request_single_product(Digest, ss)
+    print(f"Subset digest: {subset_digest}")
+
+    assert 1 == 2
+
 
 
 class StubHandler(BaseHTTPRequestHandler):
