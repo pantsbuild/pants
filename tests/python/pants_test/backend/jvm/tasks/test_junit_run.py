@@ -234,7 +234,6 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
       target_type=JUnitTests,
       sources=['FooTest.java'],
       runtime_platform='java8-extra',
-      #extra_jvm_options=['-Dexample.property=1'],
     )
     self.set_options_for_scope(JvmPlatform.options_scope,
       platforms={
