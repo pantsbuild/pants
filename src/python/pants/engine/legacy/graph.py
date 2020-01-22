@@ -43,6 +43,7 @@ from pants.engine.parser import HydratedStruct
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.option.global_options import GlobMatchErrorBehavior
+from pants.scm.subsystems.changed import IncludeDependeesOption
 from pants.source.filespec import any_matches_filespec
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper, Filespec
 
@@ -428,9 +429,7 @@ class TopologicallyOrderedTargets:
 class OwnersRequest:
   """A request for the owners (and optionally, transitive dependees) of a set of file paths."""
   sources: Tuple
-  # TODO: `include_dependees` should become an `enum` of the choices from the
-  # `--changed-include-dependees` global option.
-  include_dependees: str
+  include_dependees: IncludeDependeesOption
 
 
 @rule
@@ -460,7 +459,6 @@ async def find_owners(
     target_sources = target_kwargs.get('sources', None)
     if target_sources and any_matches_filespec(paths=sources_set, spec=target_sources.filespec):
       return True
-
     return False
 
   direct_owners = tuple(ht.adaptor.address
@@ -469,25 +467,24 @@ async def find_owners(
                            owns_any_source(ht))
 
   # If the OwnersRequest does not require dependees, then we're done.
-  if owners_request.include_dependees == 'none':
+  if owners_request.include_dependees == IncludeDependeesOption.NONE:
     return BuildFileAddresses(direct_owners)
-  else:
-    # Otherwise: find dependees.
-    all_addresses = await Get[BuildFileAddresses](AddressSpecs((DescendantAddresses(''),)))
-    all_structs = [
-      s.value for s in
-      await MultiGet(Get[HydratedStruct](Address, a.to_address()) for a in all_addresses)
-    ]
 
-    bfa = build_configuration.registered_aliases()
-    graph = _DependentGraph.from_iterable(target_types_from_build_file_aliases(bfa),
-                                          address_mapper,
-                                          all_structs)
-    if owners_request.include_dependees == 'direct':
-      return BuildFileAddresses(tuple(graph.dependents_of_addresses(direct_owners)))
-    else:
-      assert owners_request.include_dependees == 'transitive'
-      return BuildFileAddresses(tuple(graph.transitive_dependents_of_addresses(direct_owners)))
+  # Otherwise: find dependees.
+  all_addresses = await Get[BuildFileAddresses](AddressSpecs((DescendantAddresses(''),)))
+  all_structs = [
+    s.value for s in
+    await MultiGet(Get[HydratedStruct](Address, a.to_address()) for a in all_addresses)
+  ]
+
+  bfa = build_configuration.registered_aliases()
+  graph = _DependentGraph.from_iterable(target_types_from_build_file_aliases(bfa),
+                                        address_mapper,
+                                        all_structs)
+  if owners_request.include_dependees == IncludeDependeesOption.DIRECT:
+    return BuildFileAddresses(tuple(graph.dependents_of_addresses(direct_owners)))
+  assert owners_request.include_dependees == IncludeDependeesOption.TRANSITIVE
+  return BuildFileAddresses(tuple(graph.transitive_dependents_of_addresses(direct_owners)))
 
 
 @rule

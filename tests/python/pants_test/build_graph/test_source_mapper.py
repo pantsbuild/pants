@@ -8,6 +8,7 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.legacy.graph import OwnersRequest
+from pants.scm.subsystems.changed import IncludeDependeesOption
 from pants.testutil.test_base import TestBase
 
 
@@ -21,7 +22,7 @@ class SourceMapperTest(TestBase):
     )
 
   def owner(self, owner, f):
-    request = OwnersRequest(sources=(f,), include_dependees='none')
+    request = OwnersRequest(sources=(f,), include_dependees=IncludeDependeesOption.NONE)
     addresses = self.request_single_product(BuildFileAddresses, request)
     self.assertEqual(set(owner), {i.spec for i in addresses})
 
