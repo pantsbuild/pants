@@ -208,17 +208,6 @@ impl WrappedNode for Select {
             })
             .to_boxed()
         }
-        &Rule::Intrinsic(Intrinsic { product, input })
-          if product == types.snapshot && input == types.path_globs =>
-        {
-          let context = context.clone();
-          let core = context.core.clone();
-          self
-            .select_product(&context, types.path_globs, "intrinsic")
-            .and_then(move |val| context.get(Snapshot(externs::key_for(val))))
-            .map(move |snapshot| Snapshot::store_snapshot(&core, &snapshot))
-            .to_boxed()
-        }
         &Rule::Intrinsic(Intrinsic { product, input }) =>
           self.select_product(&context, input, "intrinsic")
           .and_then(move |value| {
@@ -508,7 +497,7 @@ impl From<Scandir> for NodeKey {
 /// A Node that captures an store::Snapshot for a PathGlobs subject.
 ///
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct Snapshot(Key);
+pub struct Snapshot(pub Key);
 
 impl Snapshot {
   fn create(context: Context, path_globs: PathGlobs) -> NodeFuture<store::Snapshot> {

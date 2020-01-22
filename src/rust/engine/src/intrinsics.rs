@@ -24,6 +24,8 @@ pub fn run_intrinsic(input: TypeId, product: TypeId, context: Context, value: Va
     directories_to_merge_to_digest(context, value)
   } else if product == types.snapshot && input == types.url_to_fetch {
     url_to_fetch_to_snapshot(context, value)
+  } else if product == types.snapshot && input == types.path_globs {
+    path_globs_to_snapshot(context, value)
   } else {
     panic!("Unrecognized intrinsic: {:?} -> {:?}", input, product)
   }
@@ -140,6 +142,13 @@ fn directories_to_merge_to_digest(context: Context, request: Value) -> NodeFutur
 fn url_to_fetch_to_snapshot(context: Context, val: Value) -> NodeFuture<Value> {
   let core = context.core.clone();
   context.get(DownloadedFile(externs::key_for(val)))
+    .map(move |snapshot| Snapshot::store_snapshot(&core, &snapshot))
+    .to_boxed()
+}
+
+fn path_globs_to_snapshot(context: Context, val: Value) -> NodeFuture<Value> {
+  let core = context.core.clone();
+  context.get(Snapshot(externs::key_for(val)))
     .map(move |snapshot| Snapshot::store_snapshot(&core, &snapshot))
     .to_boxed()
 }
