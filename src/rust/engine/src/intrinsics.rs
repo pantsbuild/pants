@@ -7,6 +7,7 @@ use crate::externs;
 use hashing;
 use boxfuture::{try_future, Boxable};
 use std::path::PathBuf;
+use bytes;
 
 pub fn run_intrinsic(input: TypeId, product: TypeId, context: Context, value: Value) -> NodeFuture<Value> {
   let types = &context.core.types;
@@ -26,6 +27,8 @@ pub fn run_intrinsic(input: TypeId, product: TypeId, context: Context, value: Va
     url_to_fetch_to_snapshot(context, value)
   } else if product == types.snapshot && input == types.path_globs {
     path_globs_to_snapshot(context, value)
+  } else if product == types.directory_digest && input == types.input_files_content {
+    input_files_content_to_digest(context, value)
   } else {
     panic!("Unrecognized intrinsic: {:?} -> {:?}", input, product)
   }
@@ -151,4 +154,35 @@ fn path_globs_to_snapshot(context: Context, val: Value) -> NodeFuture<Value> {
   context.get(Snapshot(externs::key_for(val)))
     .map(move |snapshot| Snapshot::store_snapshot(&core, &snapshot))
     .to_boxed()
+}
+
+fn input_files_content_to_digest(context: Context, files_content: Value) -> NodeFuture<Value> {
+  let workunit_store = context.session.workunit_store();
+  let file_values = externs::project_multi(&files_content, "dependencies");
+  let digests: Vec<_> = file_values
+    .iter()
+    .map(|file| {
+      let filename = externs::project_str(&file, "path");
+      let path: PathBuf = filename.into();
+      let bytes = bytes::Bytes::from(externs::project_bytes(&file, "content"));
+      let is_executable = externs::project_bool(&file, "is_executable");
+
+      let store = context.core.store();
+      store
+        .store_file_bytes(bytes, true)
+        .and_then(move |digest| store.snapshot_of_one_file(path, digest, is_executable))
+        .map(|snapshot| snapshot.digest)
+        .map_err(|err| throw(&err))
+        .to_boxed()
+    })
+  .collect();
+  futures::future::join_all(digests)
+    .and_then(|digests| {
+      store::Snapshot::merge_directories(context.core.store(), digests, workunit_store)
+        .map_err(|err| throw(&err))
+        .map(move |digest: hashing::Digest| {
+          Snapshot::store_directory(&context.core, &digest)
+        })
+    })
+  .to_boxed()
 }

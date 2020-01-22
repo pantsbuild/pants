@@ -159,8 +159,6 @@ impl WrappedNode for Select {
   type Item = Value;
 
   fn run(self, context: Context) -> NodeFuture<Value> {
-    let workunit_store = context.session.workunit_store();
-    let types = &context.core.types;
     match &self.entry {
       &rule_graph::Entry::WithDeps(rule_graph::EntryWithDeps::Inner(ref inner)) => match inner
         .rule()
@@ -171,43 +169,6 @@ impl WrappedNode for Select {
           task: task.clone(),
           entry: Arc::new(self.entry.clone()),
         }),
-        &Rule::Intrinsic(Intrinsic { product, input })
-          if product == types.directory_digest && input == types.input_files_content =>
-        {
-          let new_context = context.clone();
-
-          self
-            .select_product(&new_context, types.input_files_content, "intrinsic")
-            .and_then(move |files_content: Value| {
-              let file_values = externs::project_multi(&files_content, "dependencies");
-              let digests: Vec<_> = file_values
-                .iter()
-                .map(|file| {
-                  let filename = externs::project_str(&file, "path");
-                  let path: PathBuf = filename.into();
-                  let bytes = bytes::Bytes::from(externs::project_bytes(&file, "content"));
-                  let is_executable = externs::project_bool(&file, "is_executable");
-
-                  let store = new_context.core.store();
-                  store
-                    .store_file_bytes(bytes, true)
-                    .and_then(move |digest| store.snapshot_of_one_file(path, digest, is_executable))
-                    .map(|snapshot| snapshot.digest)
-                    .map_err(|err| throw(&err))
-                    .to_boxed()
-                })
-                .collect();
-              futures::future::join_all(digests)
-            })
-            .and_then(|digests| {
-              store::Snapshot::merge_directories(context.core.store(), digests, workunit_store)
-                .map_err(|err| throw(&err))
-                .map(move |digest: hashing::Digest| {
-                  Snapshot::store_directory(&context.core, &digest)
-                })
-            })
-            .to_boxed()
-        }
         &Rule::Intrinsic(Intrinsic { product, input }) =>
           self.select_product(&context, input, "intrinsic")
           .and_then(move |value| {
