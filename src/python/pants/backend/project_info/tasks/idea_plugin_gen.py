@@ -86,7 +86,6 @@ class IdeaPluginGen(ConsoleTask):
                                            'modules-12.mustache')
     self.idea_workspace_template = os.path.join(_TEMPLATE_BASEDIR,
                                            'workspace-12.mustache')
-    
     self.java_language_level = self.get_options().java_language_level
 
     if self.get_options().java_jdk_name:
