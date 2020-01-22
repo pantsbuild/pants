@@ -507,21 +507,14 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     # global-scope options, for convenience.
     cls.register_bootstrap_options(register)
 
-    if register.bootstrap.v1:
-      register('-x', '--time', type=bool,
-               help='Output a timing report at the end of the run.')
-      register('-e', '--explain', type=bool,
-               help='Explain the execution of goals.')
     register('--tag', type=list, metavar='[+-]tag1,tag2,...',
              help="Include only targets with these tags (optional '+' prefix) or without these "
                   "tags ('-' prefix).  Useful with ::, to find subsets of targets "
                   "(e.g., integration tests.)")
 
-    register('--v2-ui', default=False, type=bool, daemon=False,
-             help='Whether to show v2 engine execution progress. '
-                  'This requires the --v2 flag to take effect.')
-
     if register.bootstrap.v2:
+      register('--v2-ui', default=True, type=bool, daemon=False,
+               help='Whether to show v2 engine execution progress.')
       loop_flag = '--loop'
       register(loop_flag, type=bool,
                help='Run v2 @goal_rules continuously as file changes are detected.')
@@ -529,6 +522,10 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                help=f'The maximum number of times to loop when `{loop_flag}` is specified.')
 
     if register.bootstrap.v1:
+      register('-x', '--time', type=bool,
+               help='Output a timing report at the end of the run.')
+      register('-e', '--explain', type=bool,
+               help='Explain the execution of goals.')
       register('-t', '--timeout', advanced=True, type=int, metavar='<seconds>',
                removal_version="1.26.0.dev1",
                removal_hint="This option is not used and may be removed with no change in behavior. ",
