@@ -348,7 +348,7 @@ class ParsedSpecs:
     It is guaranteed that there will only ever be AddressSpecs or FilesystemSpecs, but not both,
     through validation in the constructor."""
     return (
-      self.address_specs
-      if self.address_specs.dependencies else
       self.filesystem_specs
+      if self.filesystem_specs.dependencies
+      else self.address_specs
     )
