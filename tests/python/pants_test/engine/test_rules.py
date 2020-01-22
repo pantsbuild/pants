@@ -212,12 +212,15 @@ class RuleGraphTest(TestBase):
     with self.assertRaises(Exception) as cm:
       create_scheduler(rules)
 
-    self.assert_equal_with_printing(dedent("""
-                     Rules with errors: 1
-                       (A, [B], a_from_b_noop()):
-                         No rule was available to compute B with parameter type SubA
-                     """).strip(),
-                                    str(cm.exception))
+    self.assert_equal_with_printing(
+      dedent(
+        """\
+        Rules with errors: 1
+         (A, [B], a_from_b_noop()):
+           No rule was available to compute B with parameter type SubA
+        """).strip(),
+      str(cm.exception),
+    )
 
   def test_ruleset_with_ambiguity(self):
     @rule
@@ -232,7 +235,6 @@ class RuleGraphTest(TestBase):
     def d_from_a(a: A) -> D:
       pass
 
-
     rules = [
         a_from_c_and_b,
         a_from_b_and_c,
@@ -244,18 +246,22 @@ class RuleGraphTest(TestBase):
     with self.assertRaises(Exception) as cm:
       create_scheduler(rules)
 
-    self.assert_equal_with_printing(dedent("""
-                     Rules with errors: 3
-                       (A, [B, C], a_from_b_and_c()):
-                         Was not usable by any other @rule.
-                       (A, [C, B], a_from_c_and_b()):
-                         Was not usable by any other @rule.
-                       (D, [A], d_from_a()):
-                         Ambiguous rules to compute A with parameter types (B+C):
-                           (A, [B, C], a_from_b_and_c()) for (B+C)
-                           (A, [C, B], a_from_c_and_b()) for (B+C)
-                     """).strip(),
-      str(cm.exception))
+    self.assert_equal_with_printing(
+      dedent(
+        """\
+        Rules with errors: 3
+          (A, [B, C], a_from_b_and_c()):
+            Was not usable by any other @rule.
+          (A, [C, B], a_from_c_and_b()):
+            Was not usable by any other @rule.
+          (D, [A], d_from_a()):
+            Ambiguous rules to compute A with parameter types (B+C):
+              (A, [B, C], a_from_b_and_c()) for (B+C)
+              (A, [C, B], a_from_c_and_b()) for (B+C)
+        """
+      ).strip(),
+      str(cm.exception),
+    )
 
   def test_ruleset_with_rule_with_two_missing_selects(self):
     @rule
@@ -266,13 +272,17 @@ class RuleGraphTest(TestBase):
     with self.assertRaises(Exception) as cm:
       create_scheduler(rules)
 
-    self.assert_equal_with_printing(dedent("""
-                     Rules with errors: 1
-                       (A, [B, C], a_from_b_and_c()):
-                         No rule was available to compute B with parameter type SubA
-                         No rule was available to compute C with parameter type SubA
-                     """).strip(),
-      str(cm.exception))
+    self.assert_equal_with_printing(
+      dedent(
+        """\
+        Rules with errors: 1
+          (A, [B, C], a_from_b_and_c()):
+            No rule was available to compute B with parameter type SubA
+            No rule was available to compute C with parameter type SubA
+        """
+      ).strip(),
+      str(cm.exception),
+    )
 
   def test_ruleset_with_selector_only_provided_as_root_subject(self):
     @rule
@@ -299,14 +309,18 @@ class RuleGraphTest(TestBase):
 
     with self.assertRaises(Exception) as cm:
       create_scheduler(rules)
-    self.assert_equal_with_printing(dedent("""
-                                      Rules with errors: 2
-                                        (A, [B], a_from_b()):
-                                          No rule was available to compute B with parameter type C
-                                        (B, [SubA], b_from_suba()):
-                                          No rule was available to compute SubA with parameter type C
-                                      """).strip(),
-                                    str(cm.exception))
+    self.assert_equal_with_printing(
+      dedent(
+        """\
+        Rules with errors: 2
+          (A, [B], a_from_b()):
+            No rule was available to compute B with parameter type C
+          (B, [SubA], b_from_suba()):
+            No rule was available to compute SubA with parameter type C
+        """
+      ).strip(),
+      str(cm.exception),
+    )
 
   def test_ruleset_with_failure_due_to_incompatible_subject_for_singleton(self):
     @rule
@@ -327,12 +341,15 @@ class RuleGraphTest(TestBase):
       create_scheduler(rules)
 
     # This error message could note near matches like the singleton.
-    self.assert_equal_with_printing(dedent("""
-                                      Rules with errors: 1
-                                        (D, [C], d_from_c()):
-                                          No rule was available to compute C with parameter type A
-                                      """).strip(),
-                                    str(cm.exception))
+    self.assert_equal_with_printing(
+      dedent(
+        """\
+        Rules with errors: 1
+          (D, [C], d_from_c()):
+            No rule was available to compute C with parameter type A
+        """).strip(),
+        str(cm.exception),
+    )
 
   def test_not_fulfillable_duplicated_dependency(self):
     # If a rule depends on another rule+subject in two ways, and one of them is unfulfillable
@@ -359,16 +376,20 @@ class RuleGraphTest(TestBase):
     with self.assertRaises(Exception) as cm:
       create_scheduler(rules)
 
-    self.assert_equal_with_printing(dedent("""
-                      Rules with errors: 3
-                        (A, [C], a_from_c()):
-                          Was not usable by any other @rule.
-                        (B, [D], b_from_d()):
-                          No rule was available to compute D with parameter type SubA
-                        (D, [A, SubA], [Get(A, C)], d_from_a_and_suba()):
-                          No rule was available to compute A with parameter type SubA
-                      """).strip(),
-        str(cm.exception))
+    self.assert_equal_with_printing(
+      dedent(
+        """\
+        Rules with errors: 3
+          (A, [C], a_from_c()):
+            Was not usable by any other @rule.
+          (B, [D], b_from_d()):
+            No rule was available to compute D with parameter type SubA
+          (D, [A, SubA], [Get(A, C)], d_from_a_and_suba()):
+            No rule was available to compute A with parameter type SubA
+        """
+      ).strip(),
+      str(cm.exception),
+    )
 
   def test_unreachable_rule(self):
     """Test that when one rule "shadows" another, we get an error."""
@@ -389,13 +410,16 @@ class RuleGraphTest(TestBase):
     with self.assertRaises(Exception) as cm:
       create_scheduler(rules)
 
-    self.assert_equal_with_printing(dedent("""
+    self.assert_equal_with_printing(
+      dedent(
+        """\
         Rules with errors: 1
           (D, [B], d_for_b()):
             Was not usable by any other @rule.
-        """).strip(),
-        str(cm.exception)
-      )
+        """
+      ).strip(),
+      str(cm.exception)
+    )
 
   def test_smallest_full_test(self):
     @rule
@@ -860,16 +884,21 @@ class RuleGraphTest(TestBase):
                                     subgraph)
 
   def test_invalid_get_arguments(self):
-    with self.assertRaisesWithMessage(ValueError, """\
-Could not resolve type `XXX` in top level of module pants_test.engine.test_rules"""):
+    with self.assertRaisesWithMessage(
+      ValueError,
+      "Could not resolve type `XXX` in top level of module pants_test.engine.test_rules",
+    ):
       class XXX: pass
+
       @rule
       async def f() -> A:
-        return await Get(A, XXX, 3)
+        return await Get[A](XXX, 3)
 
     # This fails because the argument is defined in this file's module, but it is not a type.
-    with self.assertRaisesWithMessage(ValueError, """\
-Expected a `type` constructor for `_this_is_not_a_type`, but got: 3 (type `int`)"""):
+    with self.assertRaisesWithMessage(
+      ValueError,
+      "Expected a `type` constructor for `_this_is_not_a_type`, but got: 3 (type `int`)"
+    ):
       @rule
       async def g() -> A:
         return await Get(A, _this_is_not_a_type, 3)
