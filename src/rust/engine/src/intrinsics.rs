@@ -5,6 +5,7 @@ use crate::nodes::{NodeFuture, Snapshot, lift_digest};
 use crate::nodes::MultiPlatformExecuteProcess;
 use crate::externs;
 use boxfuture::Boxable;
+use std::path::PathBuf;
 
 pub fn run_intrinsic(input: TypeId, product: TypeId, context: Context, value: Value) -> NodeFuture<Value> {
   let types = &context.core.types;
@@ -12,6 +13,10 @@ pub fn run_intrinsic(input: TypeId, product: TypeId, context: Context, value: Va
     multi_platform_process_request_to_process_result(context, value)
   } else if product == types.files_content && input == types.directory_digest {
     directory_digest_to_files_content(context, value)
+  } else if product == types.directory_digest && input == types.directory_with_prefix_to_strip {
+    directory_with_prefix_to_strip_to_digest(context, value)
+  } else if product == types.directory_digest && input == types.directory_with_prefix_to_add {
+    directory_with_prefix_to_add_to_digest(context, value)
   } else {
     panic!("Unrecognized intrinsic: {:?} -> {:?}", input, product)
   }
@@ -52,5 +57,48 @@ fn directory_digest_to_files_content(context: Context, directory_digest_val: Val
       .map_err(|str| throw(&str))
       .map(move |files_content| Snapshot::store_files_content(&context, &files_content))
   })
+  .to_boxed()
+}
+
+fn directory_with_prefix_to_strip_to_digest(context: Context, request: Value) -> NodeFuture<Value> {
+  let core = context.core.clone();
+  let workunit_store = context.session.workunit_store();
+
+  future::result(lift_digest(&externs::project_ignoring_type(
+        &request,
+        "directory_digest",
+  )).map_err(|str| throw(&str))
+  )
+    .and_then(move |digest| {
+      let prefix = externs::project_str(&request, "prefix");
+      store::Snapshot::strip_prefix(
+        core.store(),
+        digest,
+        PathBuf::from(prefix),
+        workunit_store,
+      )
+        .map_err(|err| throw(&err))
+        .map(move |digest| Snapshot::store_directory(&core, &digest))
+    })
+  .to_boxed()
+}
+
+fn directory_with_prefix_to_add_to_digest(context: Context, request: Value) -> NodeFuture<Value> {
+  let core = context.core.clone();
+  future::result(lift_digest(&externs::project_ignoring_type(
+        &request,
+        "directory_digest",
+  )).map_err(|str| throw(&str))
+  )
+    .and_then(move |digest| {
+      let prefix = externs::project_str(&request, "prefix");
+      store::Snapshot::add_prefix(
+        core.store(),
+        digest,
+        PathBuf::from(prefix),
+      )
+        .map_err(|err| throw(&err))
+        .map(move |digest| Snapshot::store_directory(&core, &digest))
+    })
   .to_boxed()
 }

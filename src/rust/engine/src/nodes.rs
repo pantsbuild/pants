@@ -265,57 +265,6 @@ impl WrappedNode for Select {
             .map(move |snapshot| Snapshot::store_snapshot(&core, &snapshot))
             .to_boxed()
         }
-        &Rule::Intrinsic(Intrinsic { product, input })
-          if product == types.directory_digest && input == types.directory_with_prefix_to_add =>
-        {
-          let request =
-            self.select_product(&context, types.directory_with_prefix_to_add, "intrinsic");
-          let core = context.core.clone();
-          request
-            .and_then(move |request| {
-              let digest = lift_digest(&externs::project_ignoring_type(
-                &request,
-                "directory_digest",
-              ))
-              .map_err(|str| throw(&str))?;
-              let prefix = externs::project_str(&request, "prefix");
-              Ok((digest, prefix))
-            })
-            .and_then(|(digest, prefix)| {
-              store::Snapshot::add_prefix(core.store(), digest, PathBuf::from(prefix))
-                .map_err(|err| throw(&err))
-                .map(move |digest| Snapshot::store_directory(&core, &digest))
-            })
-            .to_boxed()
-        }
-        &Rule::Intrinsic(Intrinsic { product, input })
-          if product == types.directory_digest && input == types.directory_with_prefix_to_strip =>
-        {
-          let request =
-            self.select_product(&context, types.directory_with_prefix_to_strip, "intrinsic");
-          let core = context.core.clone();
-          request
-            .and_then(move |request| {
-              let digest = lift_digest(&externs::project_ignoring_type(
-                &request,
-                "directory_digest",
-              ))
-              .map_err(|str| throw(&str))?;
-              let prefix = externs::project_str(&request, "prefix");
-              Ok((digest, prefix))
-            })
-            .and_then(|(digest, prefix)| {
-              store::Snapshot::strip_prefix(
-                core.store(),
-                digest,
-                PathBuf::from(prefix),
-                workunit_store,
-              )
-              .map_err(|err| throw(&err))
-              .map(move |digest| Snapshot::store_directory(&core, &digest))
-            })
-            .to_boxed()
-        }
         &Rule::Intrinsic(Intrinsic { product, input }) =>
           self.select_product(&context, input, "intrinsic")
           .and_then(move |value| {
