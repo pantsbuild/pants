@@ -166,8 +166,9 @@ pub struct Function(pub Key);
 impl Function {
   fn pretty_print(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     let Function(key) = self;
+    let module = externs::project_str(&externs::val_for(&key), "__module__");
     let name = externs::project_str(&externs::val_for(&key), "__name__");
-    write!(f, "{}()", name)
+    write!(f, "{}.{}()", module, name)
   }
 }
 

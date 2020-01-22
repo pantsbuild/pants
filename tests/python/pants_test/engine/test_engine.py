@@ -177,10 +177,10 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
     with self.assertRaises(ExecutionError) as cm:
       list(scheduler.product_request(A, subjects=[(B())]))
 
-    self.assert_equal_with_printing(dedent('''
+    self.assert_equal_with_printing(dedent(f'''
       1 Exception encountered:
-      Computing Select(<pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, A)
-        Computing Task(nested_raise(), <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, A, true)
+      Computing Select(<{__name__}.B object at 0xEEEEEEEEE>, A)
+        Computing Task({__name__}.nested_raise(), <{__name__}.B object at 0xEEEEEEEEE>, A, true)
           Throw(An exception for B)
             Traceback (most recent call last):
               File LOCATION-INFO, in call
@@ -188,7 +188,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
               File LOCATION-INFO, in nested_raise
                 fn_raises(x)
               File LOCATION-INFO, in fn_raises
-                raise Exception(f'An exception for {type(x).__name__}')
+                raise Exception(f'An exception for {{type(x).__name__}}')
             Exception: An exception for B
       ''').lstrip()+'\n',
       remove_locations_from_traceback(str(cm.exception)))
@@ -229,11 +229,11 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
     with self.assertRaises(ExecutionError) as cm:
       list(scheduler.product_request(A, subjects=[(B())]))
 
-    self.assert_equal_with_printing(dedent('''
+    self.assert_equal_with_printing(dedent(f'''
       1 Exception encountered:
-      Computing Select(<pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, A)
-        Computing Task(a_from_c_and_d(), <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, A, true)
-          Computing Task(d_from_b_nested_raise(), <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =D, true)
+      Computing Select(<{__name__}..B object at 0xEEEEEEEEE>, A)
+        Computing Task(a_from_c_and_d(), <{__name__}..B object at 0xEEEEEEEEE>, A, true)
+          Computing Task(d_from_b_nested_raise(), <{__name__}..B object at 0xEEEEEEEEE>, =D, true)
             Throw(An exception for B)
               Traceback (most recent call last):
                 File LOCATION-INFO, in call
@@ -241,13 +241,13 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
                 File LOCATION-INFO, in d_from_b_nested_raise
                   fn_raises(b)
                 File LOCATION-INFO, in fn_raises
-                  raise Exception('An exception for {}'.format(type(x).__name__))
+                  raise Exception('An exception for {{}}'.format(type(x).__name__))
               Exception: An exception for B
 
 
-      Computing Select(<pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, A)
-        Computing Task(a_from_c_and_d(), <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, A, true)
-          Computing Task(c_from_b_nested_raise(), <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =C, true)
+      Computing Select(<{__name__}..B object at 0xEEEEEEEEE>, A)
+        Computing Task(a_from_c_and_d(), <{__name__}..B object at 0xEEEEEEEEE>, A, true)
+          Computing Task(c_from_b_nested_raise(), <{__name__}..B object at 0xEEEEEEEEE>, =C, true)
             Throw(An exception for B)
               Traceback (most recent call last):
                 File LOCATION-INFO, in call
@@ -255,7 +255,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
                 File LOCATION-INFO, in c_from_b_nested_raise
                   fn_raises(b)
                 File LOCATION-INFO, in fn_raises
-                  raise Exception('An exception for {}'.format(type(x).__name__))
+                  raise Exception('An exception for {{}}'.format(type(x).__name__))
               Exception: An exception for B
       ''').lstrip()+'\n',
       remove_locations_from_traceback(str(cm.exception)))
@@ -281,9 +281,9 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
     with self.assertRaises(Exception) as cm:
       list(self.mk_scheduler(rules=rules, include_trace_on_error=False))
 
-    self.assert_equal_with_printing(dedent('''
+    self.assert_equal_with_printing(dedent(f'''
       Rules with errors: 1
-        Rule(func=upcast(), product=MyFloat, params=[MyInt]):
+        Rule(func={__name__}.upcast(), product=MyFloat, params=[MyInt]):
           No rule was available to compute MyInt. Maybe declare RootRule(MyInt)?
         ''').strip(),
       str(cm.exception)
