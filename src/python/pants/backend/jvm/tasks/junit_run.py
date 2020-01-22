@@ -77,9 +77,9 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
                   'If cwd is set on a target, it will supersede this option. It is an error to '
                   'use this option in combination with `--chroot`')
     register('--strict-jvm-version', type=bool, advanced=True, fingerprint=True,
-      help='If true, will strictly require running jvms with the same version of Java as '
-           'the platform -target level. Otherwise, the platform -target level will be '
-           'treated as the minimum jvm to run.')
+             help='If true, will strictly require running junits with the same version of java as '
+                  'the platform -target level. Otherwise, the platform -target level will be '
+                  'treated as the minimum jvm to run.')
     register('--failure-summary', type=bool, default=True,
              help='If true, includes a summary of which test-cases failed at the end of a failed '
                   'junit run.')
