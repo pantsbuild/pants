@@ -559,6 +559,24 @@ impl Snapshot {
       })
       .to_boxed()
   }
+
+  pub fn get_snapshot_subset(
+    _store: Store,
+    _digest: Digest,
+    _include_files: Vec<String>,
+    _include_dirs: Vec<String>,
+  ) -> BoxFuture<Digest, String> {
+
+    future::ok(EMPTY_DIGEST).to_boxed()
+      /*
+         let directory = store.load_directory(original_digest, workunit_store)
+         .and_then(move |maybe_directory| {
+
+         .map(|(dir, _metadata)| dir)
+         .ok_or_else(|| format!("Digest {:?} did not exist in the Store.", digest))
+         })
+         */
+  }
 }
 
 impl fmt::Debug for Snapshot {

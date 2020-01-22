@@ -34,6 +34,8 @@ pub fn run_intrinsic(
     path_globs_to_snapshot(context, value)
   } else if product == types.directory_digest && input == types.input_files_content {
     input_files_content_to_digest(context, value)
+  } else if product == types.directory_digest && input == types.snapshot_subset {
+    snapshot_subset_to_digest(context, value)
   } else {
     panic!("Unrecognized intrinsic: {:?} -> {:?}", input, product)
   }
@@ -189,4 +191,26 @@ fn input_files_content_to_digest(context: Context, files_content: Value) -> Node
         .map(move |digest: hashing::Digest| Snapshot::store_directory(&context.core, &digest))
     })
     .to_boxed()
+}
+
+fn snapshot_subset_to_digest(context: Context, value: Value) -> NodeFuture<Value> {
+
+  let include_files = externs::project_multi_strs(&value, "include_files"); //same as output_files
+  let include_dirs = externs::project_multi_strs(&value, "include_dirs");
+  let store = context.core.store();
+
+  future::result(
+    lift_digest(&externs::project_ignoring_type(&value, "directory_digest"))
+  )
+  .and_then(move |original_digest| {
+    store::Snapshot::get_snapshot_subset(
+      store,
+      original_digest,
+      include_files,
+      include_dirs,
+    )
+  })
+  .map(move |digest: hashing::Digest| Snapshot::store_directory(&context.core, &digest))
+  .map_err(|err| throw(&err))
+  .to_boxed()
 }
