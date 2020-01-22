@@ -97,8 +97,6 @@ class IdeaPluginGen(ConsoleTask):
     safe_mkdir(output_dir)
 
     with temporary_dir(root_dir=output_dir, cleanup=False) as output_project_dir:
-      project_name = self.get_project_name(self.context.options.specs)
-
       self.gen_project_workdir = output_project_dir
       self.idea_workspace_filename = os.path.join(self.gen_project_workdir,
                                                   ".idea", "workspace.xml")
