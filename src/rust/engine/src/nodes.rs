@@ -10,7 +10,6 @@ use std::sync::Arc;
 use std::time::Duration;
 use std::{self, fmt};
 
-use concrete_time::TimeSpan;
 use futures::future::{self, Future};
 use futures::Stream;
 use url::Url;
@@ -34,7 +33,9 @@ use rule_graph;
 
 use graph::{Entry, Node, NodeError, NodeTracer, NodeVisualizer};
 use store::{self, StoreFileByDigest};
-use workunit_store::{generate_random_64bit_string, set_parent_id, WorkUnit, WorkUnitStore};
+use workunit_store::{
+  generate_random_64bit_string, set_parent_id, StartedWorkUnit, WorkUnit, WorkUnitStore,
+};
 
 pub type NodeFuture<T> = BoxFuture<T, Failure>;
 
@@ -1219,19 +1220,24 @@ impl Node for NodeKey {
   type Error = Failure;
 
   fn run(self, context: Context) -> NodeFuture<NodeResult> {
-    let handle_workunits =
-      context.session.should_report_workunits() || context.session.should_record_zipkin_spans();
-
-    let (node_workunit_params, maybe_span_id) = if handle_workunits {
+    let (maybe_started_workunit, maybe_span_id) = if context.session.should_handle_workunits() {
+      let user_facing_name = self.user_facing_name();
       let span_id = generate_random_64bit_string();
-      let node_workunit_params = match self.user_facing_name() {
-        Some(ref node_name) => {
-          let start_time = std::time::SystemTime::now();
-          Some((node_name.clone(), start_time, span_id.clone()))
-        }
-        _ => None,
+      let parent_id = workunit_store::get_parent_id();
+      let maybe_started_workunit = user_facing_name
+        .as_ref()
+        .map(|ref node_name| StartedWorkUnit {
+          name: node_name.to_string(),
+          start_time: std::time::SystemTime::now(),
+          span_id: span_id.clone(),
+          parent_id,
+        });
+      let maybe_span_id = if user_facing_name.is_some() {
+        Some(span_id)
+      } else {
+        None
       };
-      (node_workunit_params, Some(span_id))
+      (maybe_started_workunit, maybe_span_id)
     } else {
       (None, None)
     };
@@ -1253,16 +1259,10 @@ impl Node for NodeKey {
       }
     })
     .inspect(move |_: &NodeResult| {
-      if let Some((name, start_time, span_id)) = node_workunit_params {
-        let workunit = WorkUnit {
-          name,
-          time_span: TimeSpan::since(&start_time),
-          span_id,
-          // TODO: set parent_id with the proper value, issue #7969
-          parent_id: None,
-        };
+      if let Some(started_workunit) = maybe_started_workunit {
+        let workunit: WorkUnit = started_workunit.finish();
         context2.session.workunit_store().add_workunit(workunit)
-      };
+      }
     })
     .to_boxed()
   }

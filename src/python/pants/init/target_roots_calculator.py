@@ -15,7 +15,7 @@ from pants.engine.legacy.graph import OwnersRequest
 from pants.engine.scheduler import SchedulerSession
 from pants.goal.workspace import ScmWorkspace
 from pants.option.options import Options
-from pants.scm.subsystems.changed import ChangedRequest
+from pants.scm.subsystems.changed import ChangedRequest, IncludeDependeesOption
 
 
 logger = logging.getLogger(__name__)
@@ -102,8 +102,9 @@ class TargetRootsCalculator:
           diffspec=changed_request.diffspec)
       # We've been provided no spec roots (e.g. `./pants list`) AND a changed request. Compute
       # alternate target roots.
-      request = OwnersRequest(sources=tuple(changed_files),
-                              include_dependees=changed_request.include_dependees)
+      request = OwnersRequest(
+        sources=tuple(changed_files), include_dependees=changed_request.include_dependees,
+      )
       changed_addresses, = session.product_request(BuildFileAddresses, [request])
       logger.debug('changed addresses: %s', changed_addresses)
       dependencies = tuple(SingleAddress(a.spec_path, a.target_name) for a in changed_addresses)
@@ -114,7 +115,9 @@ class TargetRootsCalculator:
     if owned_files:
       # We've been provided no spec roots (e.g. `./pants list`) AND a owner request. Compute
       # alternate target roots.
-      request = OwnersRequest(sources=tuple(owned_files), include_dependees='none')
+      request = OwnersRequest(
+        sources=tuple(owned_files), include_dependees=IncludeDependeesOption.NONE,
+      )
       owner_addresses, = session.product_request(BuildFileAddresses, [request])
       logger.debug('owner addresses: %s', owner_addresses)
       dependencies = tuple(SingleAddress(a.spec_path, a.target_name) for a in owner_addresses)

@@ -1,12 +1,12 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_target import JvmTarget
+from pants.backend.project_info.rules.dependencies import DependencyType
 from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.base.payload_field import JarsField, PythonRequirementsField
@@ -23,39 +23,53 @@ class Dependencies(ConsoleTask):
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--internal-only', type=bool,
-             help='Specifies that only internal dependencies should be included in the graph '
-                  'output (no external jars).')
+    register(
+      '--type', type=DependencyType, default=DependencyType.SOURCE,
+      help="Which types of dependencies to find, where `source` means source code dependencies "
+           "and `3rdparty` means third-party requirements and JARs."
+    )
+    register(
+      '--internal-only', type=bool,
+      help='Specifies that only internal dependencies should be included in the graph output '
+           '(no external jars).',
+      removal_version="1.27.0.dev0",
+      removal_hint="Use `--dependencies-type=source` instead.",
+    )
     register(
       '--external-only',
       type=bool,
-      help='Specifies that only external dependencies should be included in the graph output (only external jars).',
-      removal_version="1.26.0.dev0",
-      removal_hint="This feature is being removed. If you depend on this functionality, please let us know in the "
-                   "#general channel on Slack at https://pantsbuild.slack.com/. \nYou can join the pants slack here: "
-                   "https://pantsslack.herokuapp.com/ ",
+      help='Specifies that only external dependencies should be included in the graph output '
+           '(only external jars).',
+      removal_version="1.27.0.dev0",
+      removal_hint="Use `--dependencies-type=3rdparty` instead.",
     )
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
-
-    self.is_internal_only = self.get_options().internal_only
-    self.is_external_only = self.get_options().external_only
-    if self.is_internal_only and self.is_external_only:
-      raise TaskError('At most one of --internal-only or --external-only can be selected.')
+    opts = self.get_options()
+    type_configured = not opts.is_default("type")
+    if type_configured:
+      self.dependency_type = opts.type
+      return
+    else:
+      if opts.internal_only and opts.external_only:
+        raise TaskError('At most one of --internal-only or --external-only can be selected.')
+      if opts.internal_only:
+        self.dependency_type = DependencyType.SOURCE
+      elif opts.external_only:
+        self.dependency_type = DependencyType.THIRD_PARTY
+      else:
+        self.dependency_type = DependencyType.SOURCE_AND_THIRD_PARTY
 
   def console_output(self, unused_method_argument):
+    opts = self.get_options()
     deprecated_conditional(
-      lambda: not self.is_external_only and not self.is_internal_only,
-      removal_version="1.26.0.dev0",
+      lambda: opts.is_default("type") and not opts.internal_only and not opts.external_only,
+      removal_version="1.27.0.dev0",
       entity_description="The default dependencies output including external dependencies",
-      hint_message="Pants will soon default to `--internal-only`, and remove the `--external-only` option. "
-                    "Currently, Pants defaults to include both internal and external dependencies, which means this "
-                    "task returns a mix of both target addresses and requirement strings."
-                    "\n\nTo prepare, you can run this task with the `--internal-only` option. "
-                    "If you need still need support for including external dependencies in the output, please let us "
-                    "know in the #general channel on Slack at https://pantsbuild.slack.com/."
-                    "\nYou can join the pants slack here: https://pantsslack.herokuapp.com/",
+      hint_message="Pants will soon default to `--dependencies-type=source`, rather than "
+                   "`--dependencies-type=source-and-3rdparty`. To prepare, run this goal with"
+                   " `--dependencies-type=source`.",
     )
     ordered_closure = OrderedSet()
     for target in self.context.target_roots:
@@ -65,9 +79,9 @@ class Dependencies(ConsoleTask):
         ordered_closure.update(target.dependencies)
 
     for tgt in ordered_closure:
-      if not self.is_external_only:
+      if self.dependency_type in [DependencyType.SOURCE, DependencyType.SOURCE_AND_THIRD_PARTY]:
         yield tgt.address.spec
-      if not self.is_internal_only:
+      if self.dependency_type in [DependencyType.THIRD_PARTY, DependencyType.SOURCE_AND_THIRD_PARTY]:
         # TODO(John Sirois): We need an external payload abstraction at which point knowledge
         # of jar and requirement payloads can go and this hairball will be untangled.
         if isinstance(tgt.payload.get_field('requirements'), PythonRequirementsField):
