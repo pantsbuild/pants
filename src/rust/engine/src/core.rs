@@ -101,7 +101,7 @@ impl Params {
       1 => params.pop().unwrap(),
       _ => {
         params.sort();
-        format!("({})", params.join("+"))
+        format!("({})", params.join(", "))
       }
     }
   }

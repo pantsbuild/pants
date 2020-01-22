@@ -68,18 +68,18 @@ impl fmt::Display for Rule {
         get_portion = if task.gets.is_empty() {
           "".to_string()
         } else {
-          format!("[{}], ", get_portion)
+          format!(", gets=[{}]", get_portion)
         };
 
         write!(
           f,
-          "({}, {}, {}{})",
-          product, clause_portion, get_portion, task.func,
+          "Rule(func={}, product={}, params={}{})",
+          task.func, product, clause_portion, get_portion,
         )
       }
       &Rule::Intrinsic(ref intrinsic) => write!(
         f,
-        "({}, [{}], <intrinsic>)",
+        "Rule(product={}, params=[{}], <intrinsic>)",
         intrinsic.product, intrinsic.input,
       ),
     }

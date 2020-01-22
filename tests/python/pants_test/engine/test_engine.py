@@ -283,8 +283,8 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
 
     self.assert_equal_with_printing(dedent('''
       Rules with errors: 1
-        (MyFloat, [MyInt], upcast()):
-          No rule was available to compute MyInt. Maybe declare it as a RootRule(MyInt)?
+        Rule(func=upcast(), product=MyFloat, params=[MyInt]):
+          No rule was available to compute MyInt. Maybe declare RootRule(MyInt)?
         ''').strip(),
       str(cm.exception)
     )

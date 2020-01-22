@@ -93,7 +93,7 @@ class RuleTest(TestBase):
       rule_args=[Console()],
       mock_gets=[MockGet(product_type=A, subject_type=str, mock=lambda _: A())],
     )
-    self.assertEquals(res, Example(0))
+    self.assertEqual(res, Example(0))
 
   def test_side_effecting_inputs(self) -> None:
     @goal_rule
@@ -216,8 +216,8 @@ class RuleGraphTest(TestBase):
       dedent(
         """\
         Rules with errors: 1
-         (A, [B], a_from_b_noop()):
-           No rule was available to compute B with parameter type SubA
+          Rule(func=a_from_b_noop(), product=A, params=[B]):
+            No rule was available to compute B with parameter type SubA
         """).strip(),
       str(cm.exception),
     )
@@ -250,15 +250,15 @@ class RuleGraphTest(TestBase):
       dedent(
         """\
         Rules with errors: 3
-          (A, [B, C], a_from_b_and_c()):
-            Was not usable by any other @rule.
-          (A, [C, B], a_from_c_and_b()):
-            Was not usable by any other @rule.
-          (D, [A], d_from_a()):
-            Ambiguous rules to compute A with parameter types (B+C):
-              (A, [B, C], a_from_b_and_c()) for (B+C)
-              (A, [C, B], a_from_c_and_b()) for (B+C)
-        """
+          Rule(func=a_from_b_and_c(), product=A, params=[B, C]):
+            Was not reachable, possibly because it was shadowed by another rule.
+          Rule(func=a_from_c_and_b(), product=A, params=[C, B]):
+            Was not reachable, possibly because it was shadowed by another rule.
+          Rule(func=d_from_a(), product=D, params=[A]):
+            Ambiguous rules to compute A with parameter types (B, C):
+              Rule(func=a_from_b_and_c(), product=A, params=[B, C]) for (B, C)
+              Rule(func=a_from_c_and_b(), product=A, params=[C, B]) for (B, C)
+       """
       ).strip(),
       str(cm.exception),
     )
@@ -276,7 +276,7 @@ class RuleGraphTest(TestBase):
       dedent(
         """\
         Rules with errors: 1
-          (A, [B, C], a_from_b_and_c()):
+          Rule(func=a_from_b_and_c(), product=A, params=[B, C]):
             No rule was available to compute B with parameter type SubA
             No rule was available to compute C with parameter type SubA
         """
@@ -313,9 +313,9 @@ class RuleGraphTest(TestBase):
       dedent(
         """\
         Rules with errors: 2
-          (A, [B], a_from_b()):
+          Rule(func=a_from_b(), product=A, params=[B]):
             No rule was available to compute B with parameter type C
-          (B, [SubA], b_from_suba()):
+          Rule(func=b_from_suba(), product=B, params=[SubA]):
             No rule was available to compute SubA with parameter type C
         """
       ).strip(),
@@ -345,7 +345,7 @@ class RuleGraphTest(TestBase):
       dedent(
         """\
         Rules with errors: 1
-          (D, [C], d_from_c()):
+          Rule(func=d_from_c(), product=D, params=[C]):
             No rule was available to compute C with parameter type A
         """).strip(),
         str(cm.exception),
@@ -380,11 +380,11 @@ class RuleGraphTest(TestBase):
       dedent(
         """\
         Rules with errors: 3
-          (A, [C], a_from_c()):
-            Was not usable by any other @rule.
-          (B, [D], b_from_d()):
+          Rule(func=a_from_c(), product=A, params=[C]):
+            Was not reachable, possibly because it was shadowed by another rule.
+          Rule(func=b_from_d(), product=B, params=[D]):
             No rule was available to compute D with parameter type SubA
-          (D, [A, SubA], [Get(A, C)], d_from_a_and_suba()):
+          Rule(func=d_from_a_and_suba(), product=D, params=[A, SubA], gets=[Get(A, C)]):
             No rule was available to compute A with parameter type SubA
         """
       ).strip(),
@@ -414,8 +414,8 @@ class RuleGraphTest(TestBase):
       dedent(
         """\
         Rules with errors: 1
-          (D, [B], d_for_b()):
-            Was not usable by any other @rule.
+          Rule(func=d_for_b(), product=D, params=[B]):
+            Was not reachable, possibly because it was shadowed by another rule.
         """
       ).strip(),
       str(cm.exception)
@@ -432,15 +432,20 @@ class RuleGraphTest(TestBase):
     ]
     fullgraph = self.create_full_graph(rules)
 
-    self.assert_equal_with_printing(dedent("""
-                     digraph {
-                       // root subject types: SubA
-                       // root entries
-                         "Select(A) for SubA" [color=blue]
-                         "Select(A) for SubA" -> {"(A, [SubA], a_from_suba()) for SubA"}
-                       // internal entries
-                         "(A, [SubA], a_from_suba()) for SubA" -> {"Param(SubA)"}
-                     }""").strip(), fullgraph)
+    self.assert_equal_with_printing(
+      dedent(
+        """\
+        digraph {
+          // root subject types: SubA
+          // root entries
+            "Select(A) for SubA" [color=blue]
+            "Select(A) for SubA" -> {"Rule(func=a_from_suba(), product=A, params=[SubA]) for SubA"}
+          // internal entries
+            "Rule(func=a_from_suba(), product=A, params=[SubA]) for SubA" -> {"Param(SubA)"}
+        }"""
+      ).strip(),
+      fullgraph,
+    )
 
   def test_full_graph_for_planner_example(self):
     address_mapper = AddressMapper(JsonParser(TARGET_TABLE), '*.BUILD.json')
@@ -489,25 +494,28 @@ class RuleGraphTest(TestBase):
       b_from_a,
     ]
     fullgraph = self.create_full_graph(rules)
-
-    self.assert_equal_with_printing(dedent("""
-                     digraph {
-                       // root subject types: A, SubA
-                       // root entries
-                         "Select(A) for A" [color=blue]
-                         "Select(A) for A" -> {"Param(A)"}
-                         "Select(A) for SubA" [color=blue]
-                         "Select(A) for SubA" -> {"(A, [SubA], a_from_suba()) for SubA"}
-                         "Select(B) for A" [color=blue]
-                         "Select(B) for A" -> {"(B, [A], b_from_a()) for A"}
-                         "Select(B) for SubA" [color=blue]
-                         "Select(B) for SubA" -> {"(B, [A], b_from_a()) for SubA"}
-                       // internal entries
-                         "(A, [SubA], a_from_suba()) for SubA" -> {"Param(SubA)"}
-                         "(B, [A], b_from_a()) for A" -> {"Param(A)"}
-                         "(B, [A], b_from_a()) for SubA" -> {"(A, [SubA], a_from_suba()) for SubA"}
-                     }""").strip(),
-                     fullgraph)
+    self.assert_equal_with_printing(
+      dedent(
+        """\
+        digraph {
+          // root subject types: A, SubA
+          // root entries
+            "Select(A) for A" [color=blue]
+            "Select(A) for A" -> {"Param(A)"}
+            "Select(A) for SubA" [color=blue]
+            "Select(A) for SubA" -> {"Rule(func=a_from_suba(), product=A, params=[SubA]) for SubA"}
+            "Select(B) for A" [color=blue]
+            "Select(B) for A" -> {"Rule(func=b_from_a(), product=B, params=[A]) for A"}
+            "Select(B) for SubA" [color=blue]
+            "Select(B) for SubA" -> {"Rule(func=b_from_a(), product=B, params=[A]) for SubA"}
+          // internal entries
+            "Rule(func=a_from_suba(), product=A, params=[SubA]) for SubA" -> {"Param(SubA)"}
+            "Rule(func=b_from_a(), product=B, params=[A]) for A" -> {"Param(A)"}
+            "Rule(func=b_from_a(), product=B, params=[A]) for SubA" -> {"Rule(func=a_from_suba(), product=A, params=[SubA]) for SubA"}
+        }"""
+      ).strip(),
+      fullgraph,
+    )
 
   def test_single_rule_depending_on_subject_selection(self):
     @rule
@@ -520,16 +528,20 @@ class RuleGraphTest(TestBase):
 
     subgraph = self.create_subgraph(A, rules, SubA())
 
-    self.assert_equal_with_printing(dedent("""
-                     digraph {
-                       // root subject types: SubA
-                       // root entries
-                         "Select(A) for SubA" [color=blue]
-                         "Select(A) for SubA" -> {"(A, [SubA], a_from_suba()) for SubA"}
-                       // internal entries
-                         "(A, [SubA], a_from_suba()) for SubA" -> {"Param(SubA)"}
-                     }""").strip(),
-      subgraph)
+    self.assert_equal_with_printing(
+      dedent(
+        """\
+        digraph {
+          // root subject types: SubA
+          // root entries
+            "Select(A) for SubA" [color=blue]
+            "Select(A) for SubA" -> {"Rule(func=a_from_suba(), product=A, params=[SubA]) for SubA"}
+          // internal entries
+            "Rule(func=a_from_suba(), product=A, params=[SubA]) for SubA" -> {"Param(SubA)"}
+        }"""
+      ).strip(),
+      subgraph,
+    )
 
   def test_multiple_selects(self):
     @rule
@@ -547,17 +559,21 @@ class RuleGraphTest(TestBase):
 
     subgraph = self.create_subgraph(A, rules, SubA())
 
-    self.assert_equal_with_printing(dedent("""
-                     digraph {
-                       // root subject types: SubA
-                       // root entries
-                         "Select(A) for SubA" [color=blue]
-                         "Select(A) for SubA" -> {"(A, [SubA, B], a_from_suba_and_b()) for SubA"}
-                       // internal entries
-                         "(A, [SubA, B], a_from_suba_and_b()) for SubA" -> {"(B, [], b()) for ()" "Param(SubA)"}
-                         "(B, [], b()) for ()" -> {}
-                     }""").strip(),
-      subgraph)
+    self.assert_equal_with_printing(
+      dedent(
+        """\
+        digraph {
+          // root subject types: SubA
+          // root entries
+            "Select(A) for SubA" [color=blue]
+            "Select(A) for SubA" -> {"Rule(func=a_from_suba_and_b(), product=A, params=[SubA, B]) for SubA"}
+          // internal entries
+            "Rule(func=a_from_suba_and_b(), product=A, params=[SubA, B]) for SubA" -> {"Param(SubA)" "Rule(func=b(), product=B, params=[]) for ()"}
+            "Rule(func=b(), product=B, params=[]) for ()" -> {}
+        }"""
+      ).strip(),
+      subgraph,
+    )
 
   def test_potentially_ambiguous_get(self):
     # In this case, we validate that a Get is satisfied by a rule that actually consumes its
@@ -587,17 +603,17 @@ class RuleGraphTest(TestBase):
 
     subgraph = self.create_subgraph(A, rules, SubA())
     self.assert_equal_with_printing(
-        dedent("""
+        dedent("""\
             digraph {
               // root subject types: SubA
               // root entries
                 "Select(A) for SubA" [color=blue]
-                "Select(A) for SubA" -> {"(A, [SubA], [Get(B, C)], a()) for SubA"}
+                "Select(A) for SubA" -> {"Rule(func=a(), product=A, params=[SubA], gets=[Get(B, C)]) for SubA"}
               // internal entries
-                "(A, [SubA], [Get(B, C)], a()) for SubA" -> {"(B, [SubA], b_from_suba()) for C" "Param(SubA)"}
-                "(B, [SubA], b_from_suba()) for C" -> {"(SubA, [C], suba_from_c()) for C"}
-                "(B, [SubA], b_from_suba()) for SubA" -> {"Param(SubA)"}
-                "(SubA, [C], suba_from_c()) for C" -> {"Param(C)"}
+                "Rule(func=a(), product=A, params=[SubA], gets=[Get(B, C)]) for SubA" -> {"Param(SubA)" "Rule(func=b_from_suba(), product=B, params=[SubA]) for C"}
+                "Rule(func=b_from_suba(), product=B, params=[SubA]) for C" -> {"Rule(func=suba_from_c(), product=SubA, params=[C]) for C"}
+                "Rule(func=b_from_suba(), product=B, params=[SubA]) for SubA" -> {"Param(SubA)"}
+                "Rule(func=suba_from_c(), product=SubA, params=[C]) for C" -> {"Param(C)"}
             }
         """).strip(),
         subgraph,
@@ -619,17 +635,21 @@ class RuleGraphTest(TestBase):
 
     subgraph = self.create_subgraph(A, rules, SubA())
 
-    self.assert_equal_with_printing(dedent("""
-                     digraph {
-                       // root subject types: SubA
-                       // root entries
-                         "Select(A) for SubA" [color=blue]
-                         "Select(A) for SubA" -> {"(A, [B], a_from_b()) for SubA"}
-                       // internal entries
-                         "(A, [B], a_from_b()) for SubA" -> {"(B, [SubA], b_from_suba()) for SubA"}
-                         "(B, [SubA], b_from_suba()) for SubA" -> {"Param(SubA)"}
-                     }""").strip(),
-      subgraph)
+    self.assert_equal_with_printing(
+      dedent(
+        """\
+        digraph {
+          // root subject types: SubA
+          // root entries
+            "Select(A) for SubA" [color=blue]
+            "Select(A) for SubA" -> {"Rule(func=a_from_b(), product=A, params=[B]) for SubA"}
+          // internal entries
+            "Rule(func=a_from_b(), product=A, params=[B]) for SubA" -> {"Rule(func=b_from_suba(), product=B, params=[SubA]) for SubA"}
+            "Rule(func=b_from_suba(), product=B, params=[SubA]) for SubA" -> {"Param(SubA)"}
+        }"""
+      ).strip(),
+      subgraph,
+    )
 
   def test_noop_removal_in_subgraph(self):
     @rule
@@ -652,16 +672,20 @@ class RuleGraphTest(TestBase):
 
     subgraph = self.create_subgraph(A, rules, SubA(), validate=False)
 
-    self.assert_equal_with_printing(dedent("""
-                     digraph {
-                       // root subject types: SubA
-                       // root entries
-                         "Select(A) for ()" [color=blue]
-                         "Select(A) for ()" -> {"(A, [], a()) for ()"}
-                       // internal entries
-                         "(A, [], a()) for ()" -> {}
-                     }""").strip(),
-      subgraph)
+    self.assert_equal_with_printing(
+      dedent(
+        """\
+        digraph {
+          // root subject types: SubA
+          // root entries
+            "Select(A) for ()" [color=blue]
+            "Select(A) for ()" -> {"Rule(func=a(), product=A, params=[]) for ()"}
+          // internal entries
+            "Rule(func=a(), product=A, params=[]) for ()" -> {}
+        }"""
+      ).strip(),
+      subgraph,
+    )
 
   def test_noop_removal_full_single_subject_type(self):
     @rule
@@ -679,16 +703,20 @@ class RuleGraphTest(TestBase):
 
     fullgraph = self.create_full_graph(rules, validate=False)
 
-    self.assert_equal_with_printing(dedent("""
-                     digraph {
-                       // root subject types: SubA
-                       // root entries
-                         "Select(A) for ()" [color=blue]
-                         "Select(A) for ()" -> {"(A, [], a()) for ()"}
-                       // internal entries
-                         "(A, [], a()) for ()" -> {}
-                     }""").strip(),
-      fullgraph)
+    self.assert_equal_with_printing(
+      dedent(
+        """\
+        digraph {
+          // root subject types: SubA
+          // root entries
+            "Select(A) for ()" [color=blue]
+            "Select(A) for ()" -> {"Rule(func=a(), product=A, params=[]) for ()"}
+          // internal entries
+            "Rule(func=a(), product=A, params=[]) for ()" -> {}
+        }"""
+      ).strip(),
+      fullgraph,
+    )
 
   def test_root_tuple_removed_when_no_matches(self):
     @rule
@@ -708,19 +736,23 @@ class RuleGraphTest(TestBase):
 
     fullgraph = self.create_full_graph(rules, validate=False)
 
-    self.assert_equal_with_printing(dedent("""
-                     digraph {
-                       // root subject types: C, D
-                       // root entries
-                         "Select(A) for C" [color=blue]
-                         "Select(A) for C" -> {"(A, [C], a_from_c()) for C"}
-                         "Select(B) for (C+D)" [color=blue]
-                         "Select(B) for (C+D)" -> {"(B, [D, A], b_from_d_and_a()) for (C+D)"}
-                       // internal entries
-                         "(A, [C], a_from_c()) for C" -> {"Param(C)"}
-                         "(B, [D, A], b_from_d_and_a()) for (C+D)" -> {"(A, [C], a_from_c()) for C" "Param(D)"}
-                     }""").strip(),
-      fullgraph)
+    self.assert_equal_with_printing(
+      dedent(
+        """\
+        digraph {
+          // root subject types: C, D
+          // root entries
+            "Select(A) for C" [color=blue]
+            "Select(A) for C" -> {"Rule(func=a_from_c(), product=A, params=[C]) for C"}
+            "Select(B) for (C, D)" [color=blue]
+            "Select(B) for (C, D)" -> {"Rule(func=b_from_d_and_a(), product=B, params=[D, A]) for (C, D)"}
+          // internal entries
+            "Rule(func=a_from_c(), product=A, params=[C]) for C" -> {"Param(C)"}
+            "Rule(func=b_from_d_and_a(), product=B, params=[D, A]) for (C, D)" -> {"Param(D)" "Rule(func=a_from_c(), product=A, params=[C]) for C"}
+        }"""
+      ).strip(),
+      fullgraph,
+    )
 
   def test_noop_removal_transitive(self):
     # If a noop-able rule has rules that depend on it,
@@ -745,16 +777,20 @@ class RuleGraphTest(TestBase):
     ]
     subgraph = self.create_subgraph(A, rules, SubA(), validate=False)
 
-    self.assert_equal_with_printing(dedent("""
-                     digraph {
-                       // root subject types: SubA
-                       // root entries
-                         "Select(A) for ()" [color=blue]
-                         "Select(A) for ()" -> {"(A, [], a()) for ()"}
-                       // internal entries
-                         "(A, [], a()) for ()" -> {}
-                     }""").strip(),
-      subgraph)
+    self.assert_equal_with_printing(
+      dedent(
+        """\
+        digraph {
+          // root subject types: SubA
+          // root entries
+            "Select(A) for ()" [color=blue]
+            "Select(A) for ()" -> {"Rule(func=a(), product=A, params=[]) for ()"}
+          // internal entries
+            "Rule(func=a(), product=A, params=[]) for ()" -> {}
+        }"""
+      ).strip(),
+      subgraph,
+    )
 
   def test_matching_singleton(self):
     @rule
@@ -772,17 +808,21 @@ class RuleGraphTest(TestBase):
 
     subgraph = self.create_subgraph(A, rules, SubA())
 
-    self.assert_equal_with_printing(dedent("""
-                     digraph {
-                       // root subject types: SubA
-                       // root entries
-                         "Select(A) for SubA" [color=blue]
-                         "Select(A) for SubA" -> {"(A, [SubA, B], a_from_suba()) for SubA"}
-                       // internal entries
-                         "(A, [SubA, B], a_from_suba()) for SubA" -> {"(B, [], b_singleton()) for ()" "Param(SubA)"}
-                         "(B, [], b_singleton()) for ()" -> {}
-                     }""").strip(),
-      subgraph)
+    self.assert_equal_with_printing(
+      dedent(
+        """\
+        digraph {
+          // root subject types: SubA
+          // root entries
+            "Select(A) for SubA" [color=blue]
+            "Select(A) for SubA" -> {"Rule(func=a_from_suba(), product=A, params=[SubA, B]) for SubA"}
+          // internal entries
+            "Rule(func=a_from_suba(), product=A, params=[SubA, B]) for SubA" -> {"Param(SubA)" "Rule(func=b_singleton(), product=B, params=[]) for ()"}
+            "Rule(func=b_singleton(), product=B, params=[]) for ()" -> {}
+        }"""
+      ).strip(),
+      subgraph,
+    )
 
   def test_depends_on_multiple_one_noop(self):
     @rule
@@ -805,17 +845,21 @@ class RuleGraphTest(TestBase):
 
     subgraph = self.create_subgraph(B, rules, SubA(), validate=False)
 
-    self.assert_equal_with_printing(dedent("""
-                     digraph {
-                       // root subject types: SubA
-                       // root entries
-                         "Select(B) for SubA" [color=blue]
-                         "Select(B) for SubA" -> {"(B, [A], b_from_a()) for SubA"}
-                       // internal entries
-                         "(A, [SubA], a_from_suba()) for SubA" -> {"Param(SubA)"}
-                         "(B, [A], b_from_a()) for SubA" -> {"(A, [SubA], a_from_suba()) for SubA"}
-                     }""").strip(),
-      subgraph)
+    self.assert_equal_with_printing(
+      dedent(
+        """\
+        digraph {
+          // root subject types: SubA
+          // root entries
+            "Select(B) for SubA" [color=blue]
+            "Select(B) for SubA" -> {"Rule(func=b_from_a(), product=B, params=[A]) for SubA"}
+          // internal entries
+            "Rule(func=a_from_suba(), product=A, params=[SubA]) for SubA" -> {"Param(SubA)"}
+            "Rule(func=b_from_a(), product=B, params=[A]) for SubA" -> {"Rule(func=a_from_suba(), product=A, params=[SubA]) for SubA"}
+        }"""
+      ).strip(),
+      subgraph,
+    )
 
   def test_multiple_depend_on_same_rule(self):
     @rule
@@ -838,22 +882,26 @@ class RuleGraphTest(TestBase):
 
     subgraph = self.create_full_graph(rules)
 
-    self.assert_equal_with_printing(dedent("""
-                     digraph {
-                       // root subject types: SubA
-                       // root entries
-                         "Select(A) for SubA" [color=blue]
-                         "Select(A) for SubA" -> {"(A, [SubA], a_from_suba()) for SubA"}
-                         "Select(B) for SubA" [color=blue]
-                         "Select(B) for SubA" -> {"(B, [A], b_from_a()) for SubA"}
-                         "Select(C) for SubA" [color=blue]
-                         "Select(C) for SubA" -> {"(C, [A], c_from_a()) for SubA"}
-                       // internal entries
-                         "(A, [SubA], a_from_suba()) for SubA" -> {"Param(SubA)"}
-                         "(B, [A], b_from_a()) for SubA" -> {"(A, [SubA], a_from_suba()) for SubA"}
-                         "(C, [A], c_from_a()) for SubA" -> {"(A, [SubA], a_from_suba()) for SubA"}
-                     }""").strip(),
-      subgraph)
+    self.assert_equal_with_printing(
+      dedent(
+        """\
+        digraph {
+          // root subject types: SubA
+          // root entries
+            "Select(A) for SubA" [color=blue]
+            "Select(A) for SubA" -> {"Rule(func=a_from_suba(), product=A, params=[SubA]) for SubA"}
+            "Select(B) for SubA" [color=blue]
+            "Select(B) for SubA" -> {"Rule(func=b_from_a(), product=B, params=[A]) for SubA"}
+            "Select(C) for SubA" [color=blue]
+            "Select(C) for SubA" -> {"Rule(func=c_from_a(), product=C, params=[A]) for SubA"}
+          // internal entries
+            "Rule(func=a_from_suba(), product=A, params=[SubA]) for SubA" -> {"Param(SubA)"}
+            "Rule(func=b_from_a(), product=B, params=[A]) for SubA" -> {"Rule(func=a_from_suba(), product=A, params=[SubA]) for SubA"}
+            "Rule(func=c_from_a(), product=C, params=[A]) for SubA" -> {"Rule(func=a_from_suba(), product=A, params=[SubA]) for SubA"}
+        }"""
+      ).strip(),
+      subgraph,
+    )
 
   def test_get_simple(self):
     @rule
@@ -871,17 +919,21 @@ class RuleGraphTest(TestBase):
 
     subgraph = self.create_subgraph(A, rules, SubA())
 
-    self.assert_equal_with_printing(dedent("""
-                     digraph {
-                       // root subject types: SubA
-                       // root entries
-                         "Select(A) for ()" [color=blue]
-                         "Select(A) for ()" -> {"(A, [], [Get(B, D)], a()) for ()"}
-                       // internal entries
-                         "(A, [], [Get(B, D)], a()) for ()" -> {"(B, [D], b_from_d()) for D"}
-                         "(B, [D], b_from_d()) for D" -> {"Param(D)"}
-                     }""").strip(),
-                                    subgraph)
+    self.assert_equal_with_printing(
+      dedent(
+        """\
+        digraph {
+          // root subject types: SubA
+          // root entries
+            "Select(A) for ()" [color=blue]
+            "Select(A) for ()" -> {"Rule(func=a(), product=A, params=[], gets=[Get(B, D)]) for ()"}
+          // internal entries
+            "Rule(func=a(), product=A, params=[], gets=[Get(B, D)]) for ()" -> {"Rule(func=b_from_d(), product=B, params=[D]) for D"}
+            "Rule(func=b_from_d(), product=B, params=[D]) for D" -> {"Param(D)"}
+        }"""
+      ).strip(),
+      subgraph,
+    )
 
   def test_invalid_get_arguments(self):
     with self.assertRaisesWithMessage(

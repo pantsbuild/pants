@@ -48,7 +48,7 @@ impl<R: Rule> UnreachableError<R> {
       rule,
       diagnostic: Diagnostic {
         params: ParamTypes::default(),
-        reason: "Was not usable by any other @rule.".to_string(),
+        reason: "Was not reachable, possibly because it was shadowed by another rule.".to_string(),
         details: vec![],
       },
     }
@@ -441,7 +441,7 @@ impl<'t, R: Rule> GraphMaker<'t, R> {
           params: params.clone(),
           reason: if params.is_empty() {
             format!(
-              "No rule was available to compute {}. Maybe declare it as a RootRule({})?",
+              "No rule was available to compute {}. Maybe declare RootRule({})?",
               dependency_key, product,
             )
           } else {

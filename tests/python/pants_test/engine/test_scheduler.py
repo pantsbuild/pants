@@ -234,15 +234,11 @@ class SchedulerTest(TestBase):
     a = self.request_single_product(A, Params(UnionWrapper(UnionB())))
     self.assertTrue(isinstance(a, A))
     # Fails due to no union relationship from A -> UnionBase.
-    expected_msg = """\
-Type A is not a member of the UnionBase @union
-"""
-    with self._assert_execution_error(expected_msg):
+    with self._assert_execution_error("Type A is not a member of the UnionBase @union"):
       self.request_single_product(A, Params(UnionWrapper(A())))
 
   def test_union_rules_no_docstring(self):
-    expected_msg = "specific error message for UnionA instance"
-    with self._assert_execution_error(expected_msg):
+    with self._assert_execution_error("specific error message for UnionA instance"):
       self.request_single_product(UnionX, Params(UnionWrapper(UnionA())))
 
 
