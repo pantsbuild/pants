@@ -1,4 +1,4 @@
-// Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
+// Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::{BTreeMap, HashMap};
@@ -14,6 +14,7 @@ use futures::future::{self, Future};
 use futures::Stream;
 use url::Url;
 
+use crate::intrinsics;
 use crate::context::{Context, Core};
 use crate::core::{throw, Failure, Key, Params, TypeId, Value};
 use crate::externs;
@@ -334,36 +335,12 @@ impl WrappedNode for Select {
             })
             .to_boxed()
         }
-        &Rule::Intrinsic(Intrinsic { product, input })
-          if product == types.process_result && input == types.multi_platform_process_request =>
-        {
-          let context = context.clone();
-          let core = context.core.clone();
-          self
-            .select_product(&context, types.multi_platform_process_request, "intrinsic")
-            .and_then(|request| {
-              MultiPlatformExecuteProcess::lift(&request).map_err(|str| {
-                throw(&format!(
-                  "Error lifting MultiPlatformExecuteProcess: {}",
-                  str
-                ))
-              })
-            })
-            .and_then(move |process_request| context.get(process_request))
-            .map(move |result| {
-              externs::unsafe_call(
-                &core.types.construct_process_result,
-                &[
-                  externs::store_bytes(&result.0.stdout),
-                  externs::store_bytes(&result.0.stderr),
-                  externs::store_i64(result.0.exit_code.into()),
-                  Snapshot::store_directory(&core, &result.0.output_directory),
-                ],
-              )
-            })
-            .to_boxed()
-        }
-        &Rule::Intrinsic(i) => panic!("Unrecognized intrinsic: {:?}", i),
+        &Rule::Intrinsic(Intrinsic { product, input }) =>
+          self.select_product(&context, input, "intrinsic")
+          .and_then(move |value| {
+            intrinsics::run_intrinsic(input, product, context, value)
+          })
+        .to_boxed()
       },
       &rule_graph::Entry::Param(type_id) => {
         if let Some(key) = self.params.find(type_id) {
@@ -479,7 +456,7 @@ impl MultiPlatformExecuteProcess {
     })
   }
 
-  fn lift(value: &Value) -> Result<MultiPlatformExecuteProcess, String> {
+  pub fn lift(value: &Value) -> Result<MultiPlatformExecuteProcess, String> {
     let constraint_parts = externs::project_multi_strs(&value, "platform_constraints");
     if constraint_parts.len() % 2 != 0 {
       return Err("Error parsing platform_constraints: odd number of parts".to_owned());
@@ -553,7 +530,7 @@ impl WrappedNode for MultiPlatformExecuteProcess {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ProcessResult(process_execution::FallibleExecuteProcessResult);
+pub struct ProcessResult(pub process_execution::FallibleExecuteProcessResult);
 
 ///
 /// A Node that represents reading the destination of a symlink (non-recursively).
