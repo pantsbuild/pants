@@ -1,7 +1,7 @@
 use crate::context::{Context};
 use futures::future::{self, Future};
 use crate::core::{throw, Failure, /*Key, Params,*/ TypeId, Value};
-use crate::nodes::{NodeFuture, Snapshot, lift_digest};
+use crate::nodes::{NodeFuture, Snapshot, lift_digest, DownloadedFile};
 use crate::nodes::MultiPlatformExecuteProcess;
 use crate::externs;
 use hashing;
@@ -22,6 +22,8 @@ pub fn run_intrinsic(input: TypeId, product: TypeId, context: Context, value: Va
     digest_to_snapshot(context, value)
   } else if product == types.directory_digest && input == types.directories_to_merge {
     directories_to_merge_to_digest(context, value)
+  } else if product == types.snapshot && input == types.url_to_fetch {
+    url_to_fetch_to_snapshot(context, value)
   } else {
     panic!("Unrecognized intrinsic: {:?} -> {:?}", input, product)
   }
@@ -133,4 +135,11 @@ fn directories_to_merge_to_digest(context: Context, request: Value) -> NodeFutur
     .map(move |digest| Snapshot::store_directory(&core, &digest))
     .to_boxed()
 
+}
+
+fn url_to_fetch_to_snapshot(context: Context, val: Value) -> NodeFuture<Value> {
+  let core = context.core.clone();
+  context.get(DownloadedFile(externs::key_for(val)))
+    .map(move |snapshot| Snapshot::store_snapshot(&core, &snapshot))
+    .to_boxed()
 }

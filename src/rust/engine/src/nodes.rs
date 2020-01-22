@@ -219,17 +219,6 @@ impl WrappedNode for Select {
             .map(move |snapshot| Snapshot::store_snapshot(&core, &snapshot))
             .to_boxed()
         }
-        &Rule::Intrinsic(Intrinsic { product, input })
-          if product == types.snapshot && input == types.url_to_fetch =>
-        {
-          let context = context.clone();
-          let core = context.core.clone();
-          self
-            .select_product(&context, types.url_to_fetch, "intrinsic")
-            .and_then(move |val| context.get(DownloadedFile(externs::key_for(val))))
-            .map(move |snapshot| Snapshot::store_snapshot(&core, &snapshot))
-            .to_boxed()
-        }
         &Rule::Intrinsic(Intrinsic { product, input }) =>
           self.select_product(&context, input, "intrinsic")
           .and_then(move |value| {
@@ -643,7 +632,7 @@ impl From<Snapshot> for NodeKey {
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct DownloadedFile(Key);
+pub struct DownloadedFile(pub Key);
 
 impl DownloadedFile {
   fn load_or_download(
