@@ -283,7 +283,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
 
     self.assert_equal_with_printing(dedent(f'''
       Rules with errors: 1
-        Rule(func={__name__}.upcast(), product=MyFloat, params=[MyInt]):
+        Rule({__name__}.upcast(MyInt) -> MyFloat):
           No rule was available to compute MyInt. Maybe declare RootRule(MyInt)?
         ''').strip(),
       str(cm.exception)

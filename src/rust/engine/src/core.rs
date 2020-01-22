@@ -164,11 +164,15 @@ pub const ANY_TYPE: TypeId = TypeId(0);
 pub struct Function(pub Key);
 
 impl Function {
-  fn pretty_print(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+  pub fn name(&self) -> String {
     let Function(key) = self;
     let module = externs::project_str(&externs::val_for(&key), "__module__");
     let name = externs::project_str(&externs::val_for(&key), "__name__");
-    write!(f, "{}.{}()", module, name)
+    format!("{}.{}", module, name)
+  }
+
+  fn pretty_print(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "{}()", self.name())
   }
 }
 
