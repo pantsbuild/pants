@@ -230,25 +230,6 @@ impl WrappedNode for Select {
             .map(move |snapshot| Snapshot::store_snapshot(&core, &snapshot))
             .to_boxed()
         }
-        &Rule::Intrinsic(Intrinsic { product, input })
-          if product == types.directory_digest && input == types.directories_to_merge =>
-        {
-          let request = self.select_product(&context, types.directories_to_merge, "intrinsic");
-          let core = context.core.clone();
-          request
-            .and_then(move |request| {
-              let digests: Result<Vec<hashing::Digest>, Failure> =
-                externs::project_multi(&request, "directories")
-                  .into_iter()
-                  .map(|val| lift_digest(&val).map_err(|str| throw(&str)))
-                  .collect();
-              store::Snapshot::merge_directories(core.store(), try_future!(digests), workunit_store)
-                .map_err(|err| throw(&err))
-                .map(move |digest| Snapshot::store_directory(&core, &digest))
-                .to_boxed()
-            })
-            .to_boxed()
-        }
         &Rule::Intrinsic(Intrinsic { product, input }) =>
           self.select_product(&context, input, "intrinsic")
           .and_then(move |value| {

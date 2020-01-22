@@ -1,10 +1,11 @@
 use crate::context::{Context};
 use futures::future::{self, Future};
-use crate::core::{throw,/* Failure, Key, Params,*/ TypeId, Value};
+use crate::core::{throw, Failure, /*Key, Params,*/ TypeId, Value};
 use crate::nodes::{NodeFuture, Snapshot, lift_digest};
 use crate::nodes::MultiPlatformExecuteProcess;
 use crate::externs;
-use boxfuture::Boxable;
+use hashing;
+use boxfuture::{try_future, Boxable};
 use std::path::PathBuf;
 
 pub fn run_intrinsic(input: TypeId, product: TypeId, context: Context, value: Value) -> NodeFuture<Value> {
@@ -19,6 +20,8 @@ pub fn run_intrinsic(input: TypeId, product: TypeId, context: Context, value: Va
     directory_with_prefix_to_add_to_digest(context, value)
   } else if product == types.snapshot && input == types.directory_digest {
     digest_to_snapshot(context, value)
+  } else if product == types.directory_digest && input == types.directories_to_merge {
+    directories_to_merge_to_digest(context, value)
   } else {
     panic!("Unrecognized intrinsic: {:?} -> {:?}", input, product)
   }
@@ -115,4 +118,19 @@ fn digest_to_snapshot(context: Context, directory_digest_val: Value) -> NodeFutu
   })
   .map(move |snapshot| Snapshot::store_snapshot(&core, &snapshot))
     .to_boxed()
+}
+
+fn directories_to_merge_to_digest(context: Context, request: Value) -> NodeFuture<Value> {
+  let workunit_store = context.session.workunit_store();
+  let core = context.core.clone();
+  let digests: Result<Vec<hashing::Digest>, Failure> =
+    externs::project_multi(&request, "directories")
+    .into_iter()
+    .map(|val| lift_digest(&val).map_err(|str| throw(&str)))
+    .collect();
+  store::Snapshot::merge_directories(core.store(), try_future!(digests), workunit_store)
+    .map_err(|err| throw(&err))
+    .map(move |digest| Snapshot::store_directory(&core, &digest))
+    .to_boxed()
+
 }
