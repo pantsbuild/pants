@@ -14,10 +14,10 @@ use futures::future::{self, Future};
 use futures::Stream;
 use url::Url;
 
-use crate::intrinsics;
 use crate::context::{Context, Core};
 use crate::core::{throw, Failure, Key, Params, TypeId, Value};
 use crate::externs;
+use crate::intrinsics;
 use crate::selectors;
 use crate::tasks::{self, Intrinsic, Rule};
 use boxfuture::{try_future, BoxFuture, Boxable};
@@ -160,22 +160,20 @@ impl WrappedNode for Select {
 
   fn run(self, context: Context) -> NodeFuture<Value> {
     match &self.entry {
-      &rule_graph::Entry::WithDeps(rule_graph::EntryWithDeps::Inner(ref inner)) => match inner
-        .rule()
-      {
-        &tasks::Rule::Task(ref task) => context.get(Task {
-          params: self.params.clone(),
-          product: self.product,
-          task: task.clone(),
-          entry: Arc::new(self.entry.clone()),
-        }),
-        &Rule::Intrinsic(Intrinsic { product, input }) =>
-          self.select_product(&context, input, "intrinsic")
-          .and_then(move |value| {
-            intrinsics::run_intrinsic(input, product, context, value)
-          })
-        .to_boxed()
-      },
+      &rule_graph::Entry::WithDeps(rule_graph::EntryWithDeps::Inner(ref inner)) => {
+        match inner.rule() {
+          &tasks::Rule::Task(ref task) => context.get(Task {
+            params: self.params.clone(),
+            product: self.product,
+            task: task.clone(),
+            entry: Arc::new(self.entry.clone()),
+          }),
+          &Rule::Intrinsic(Intrinsic { product, input }) => self
+            .select_product(&context, input, "intrinsic")
+            .and_then(move |value| intrinsics::run_intrinsic(input, product, context, value))
+            .to_boxed(),
+        }
+      }
       &rule_graph::Entry::Param(type_id) => {
         if let Some(key) = self.params.find(type_id) {
           ok(externs::val_for(key))
