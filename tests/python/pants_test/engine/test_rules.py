@@ -384,7 +384,7 @@ class RuleGraphTest(TestBase):
             Was not reachable, either because no rules can produce the params or it was shadowed by another @rule.
           Rule({__name__}.b_from_d(D) -> B):
             No rule was available to compute D with parameter type SubA
-          Rule({__name__}.d_from_a_and_suba(A, SubA) -> D, gets=[Get(A, C)]):
+          Rule({__name__}.d_from_a_and_suba(A, SubA) -> D, gets=[Get((C) -> A)]):
             No rule was available to compute A with parameter type SubA
         """
       ).strip(),
@@ -608,9 +608,9 @@ class RuleGraphTest(TestBase):
               // root subject types: SubA
               // root entries
                 "Select(A) for SubA" [color=blue]
-                "Select(A) for SubA" -> {{"Rule({__name__}.a(SubA) -> A, gets=[Get(B, C)]) for SubA"}}
+                "Select(A) for SubA" -> {{"Rule({__name__}.a(SubA) -> A, gets=[Get((C) -> B)]) for SubA"}}
               // internal entries
-                "Rule({__name__}.a(SubA) -> A, gets=[Get(B, C)]) for SubA" -> {{"Param(SubA)" "Rule({__name__}.b_from_suba(SubA) -> B) for C"}}
+                "Rule({__name__}.a(SubA) -> A, gets=[Get((C) -> B)]) for SubA" -> {{"Param(SubA)" "Rule({__name__}.b_from_suba(SubA) -> B) for C"}}
                 "Rule({__name__}.b_from_suba(SubA) -> B) for C" -> {{"Rule({__name__}.suba_from_c(C) -> SubA) for C"}}
                 "Rule({__name__}.b_from_suba(SubA) -> B) for SubA" -> {{"Param(SubA)"}}
                 "Rule({__name__}.suba_from_c(C) -> SubA) for C" -> {{"Param(C)"}}
@@ -926,9 +926,9 @@ class RuleGraphTest(TestBase):
           // root subject types: SubA
           // root entries
             "Select(A) for ()" [color=blue]
-            "Select(A) for ()" -> {{"Rule({__name__}.a() -> A, gets=[Get(B, D)]) for ()"}}
+            "Select(A) for ()" -> {{"Rule({__name__}.a() -> A, gets=[Get((D) -> B)]) for ()"}}
           // internal entries
-            "Rule({__name__}.a() -> A, gets=[Get(B, D)]) for ()" -> {{"Rule({__name__}.b_from_d(D) -> B) for D"}}
+            "Rule({__name__}.a() -> A, gets=[Get((D) -> B)]) for ()" -> {{"Rule({__name__}.b_from_d(D) -> B) for D"}}
             "Rule({__name__}.b_from_d(D) -> B) for D" -> {{"Param(D)"}}
         }}"""
       ).strip(),
