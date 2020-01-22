@@ -35,6 +35,7 @@ mod core;
 pub mod externs;
 mod handles;
 mod interning;
+mod intrinsics;
 pub mod nodes;
 mod scheduler;
 mod selectors;
