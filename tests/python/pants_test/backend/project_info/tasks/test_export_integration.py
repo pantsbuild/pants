@@ -205,7 +205,7 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
         json_data['jvm_platforms'])
 
   @ensure_resolver
-  def test_test_runtime_platform(self):
+  def test_runtime_platform(self):
     with self.temporary_workdir() as workdir:
       test_target = 'testprojects/tests/java/org/pantsbuild/testproject/testjvms:eight-runtime-platform'
       json_data = self.run_export(test_target, workdir)
