@@ -1,7 +1,7 @@
 use crate::context::{Context};
 use futures::future::{self, Future};
 use crate::core::{throw,/* Failure, Key, Params,*/ TypeId, Value};
-use crate::nodes::{NodeFuture, Snapshot};
+use crate::nodes::{NodeFuture, Snapshot, lift_digest};
 use crate::nodes::MultiPlatformExecuteProcess;
 use crate::externs;
 use boxfuture::Boxable;
@@ -10,6 +10,8 @@ pub fn run_intrinsic(input: TypeId, product: TypeId, context: Context, value: Va
   let types = &context.core.types;
   if product == types.process_result && input == types.multi_platform_process_request {
     multi_platform_process_request_to_process_result(context, value)
+  } else if product == types.files_content && input == types.directory_digest {
+    directory_digest_to_files_content(context, value)
   } else {
     panic!("Unrecognized intrinsic: {:?} -> {:?}", input, product)
   }
@@ -36,5 +38,19 @@ fn multi_platform_process_request_to_process_result(context: Context, value: Val
         ],
       )
     })
+  .to_boxed()
+}
+
+fn directory_digest_to_files_content(context: Context, directory_digest_val: Value) -> NodeFuture<Value> {
+  let workunit_store = context.session.workunit_store();
+  future::result(lift_digest(&directory_digest_val).map_err(|str| throw(&str)))
+  .and_then(move |digest| {
+    context
+      .core
+      .store()
+      .contents_for_directory(digest, workunit_store)
+      .map_err(|str| throw(&str))
+      .map(move |files_content| Snapshot::store_files_content(&context, &files_content))
+  })
   .to_boxed()
 }

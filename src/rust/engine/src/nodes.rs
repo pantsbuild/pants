@@ -316,25 +316,6 @@ impl WrappedNode for Select {
             })
             .to_boxed()
         }
-        &Rule::Intrinsic(Intrinsic { product, input })
-          if product == types.files_content && input == types.directory_digest =>
-        {
-          let context = context.clone();
-          self
-            .select_product(&context, types.directory_digest, "intrinsic")
-            .and_then(|directory_digest_val| {
-              lift_digest(&directory_digest_val).map_err(|str| throw(&str))
-            })
-            .and_then(move |digest| {
-              context
-                .core
-                .store()
-                .contents_for_directory(digest, workunit_store)
-                .map_err(|str| throw(&str))
-                .map(move |files_content| Snapshot::store_files_content(&context, &files_content))
-            })
-            .to_boxed()
-        }
         &Rule::Intrinsic(Intrinsic { product, input }) =>
           self.select_product(&context, input, "intrinsic")
           .and_then(move |value| {
@@ -716,7 +697,7 @@ impl Snapshot {
     )
   }
 
-  fn store_files_content(context: &Context, item: &[FileContent]) -> Value {
+  pub fn store_files_content(context: &Context, item: &[FileContent]) -> Value {
     let entries: Vec<_> = item
       .iter()
       .map(|e| Self::store_file_content(context, e))
