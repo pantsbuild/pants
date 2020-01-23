@@ -11,9 +11,7 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm import argfile
 from pants.backend.jvm.subsystems.junit import JUnit
-from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.junit_tests import JUnitTests
-from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.coverage.manager import CodeCoverage
 from pants.backend.jvm.tasks.jvm_task import JvmTask
@@ -193,14 +191,13 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
 
   def classpath(self, targets, classpath_product=None, **kwargs):
     return super().classpath(targets,
-                                           classpath_product=classpath_product,
-                                           include_scopes=Scopes.JVM_TEST_SCOPES,
-                                           **kwargs)
+                             classpath_product=classpath_product,
+                             include_scopes=Scopes.JVM_TEST_SCOPES,
+                             **kwargs)
 
-  def preferred_jvm_distribution_for_targets(self, targets):
-    return JvmPlatform.preferred_jvm_distribution([target.platform for target in targets
-                                                  if isinstance(target, JvmTarget)],
-                                                  self._strict_jvm_version)
+  def _jvm_platforms_from_targets(self, targets):
+    return [target.test_platform for target in targets
+            if isinstance(target, JUnitTests)]
 
   def _spawn(self, distribution, executor=None, *args, **kwargs):
     """Returns a processhandler to a process executing java.
@@ -223,7 +220,8 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     across test targets. Used for coverage instrumentation.
     """
 
-    distribution = self.preferred_jvm_distribution_for_targets(targets)
+    distribution = self.preferred_jvm_distribution_for_targets(targets,
+      strict=self._strict_jvm_version)
     actual_executor = SubprocessExecutor(distribution)
     return distribution.execute_java(*args, executor=actual_executor, **kwargs)
 
@@ -292,7 +290,7 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       complete_classpath.update(self.classpath(relevant_targets,
                                                classpath_product=classpath_product))
 
-      distribution = JvmPlatform.preferred_jvm_distribution([platform], self._strict_jvm_version)
+      distribution = self.preferred_jvm_distribution([platform], self._strict_jvm_version)
 
       # Override cmdline args with values from junit_test() target that specify concurrency:
       args = self._args(fail_fast, batch_output_dir) + [u'-xmlreport']

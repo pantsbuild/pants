@@ -87,7 +87,7 @@ class BenchmarkRun(JvmToolTaskMixin, JvmTask):
     # Collect a transitive classpath for the benchmark targets.
     classpath = self.classpath(targets, benchmark_tools_classpath)
 
-    java_executor = SubprocessExecutor(DistributionLocator.cached())
+    java_executor = SubprocessExecutor(self.preferred_jvm_distribution_for_targets(targets))
     exit_code = execute_java(classpath=classpath,
                              main=self._CALIPER_MAIN,
                              jvm_options=self.jvm_options,

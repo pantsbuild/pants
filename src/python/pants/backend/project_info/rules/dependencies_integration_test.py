@@ -40,7 +40,7 @@ class DependenciesIntegrationTest(GoalRuleTestBase):
     env = {
       'PANTS_BACKEND_PACKAGES2': 'pants.backend.project_info'
     }
-    args = ['--no-transitive'] if not transitive else []
+    args = ['--transitive'] if transitive else []
     self.assert_console_output(*expected, args=[*args, target], env=env)
 
   def test_no_target(self):
