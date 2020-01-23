@@ -221,11 +221,11 @@ def fmt_rule(
   gets_str = ""
   if gets:
     get_members = ', '.join(
-      f"Get(({product_subject_pair[1]}) -> {product_subject_pair[0]})"
+      f"Get[{product_subject_pair[0]}]({product_subject_pair[1]})"
       for product_subject_pair in gets
     )
     gets_str = f", gets=[{get_members}]"
-  return f"Rule({fmt_task_func(rule)}({params}) -> {product}{gets_str})"
+  return f"@rule({fmt_task_func(rule)}({params}) -> {product}{gets_str})"
 
 
 class RuleGraphTest(TestBase):
@@ -596,7 +596,7 @@ class RuleGraphTest(TestBase):
             "Select(A) for SubA" [color=blue]
             "Select(A) for SubA" -> {{"{fmt_rule(a_from_suba_and_b)} for SubA"}}
           // internal entries
-            "{fmt_rule(a_from_suba_and_b)} for SubA" -> {{"Param(SubA)" "{fmt_rule(b)} for ()"}}
+            "{fmt_rule(a_from_suba_and_b)} for SubA" -> {{"{fmt_rule(b)} for ()" "Param(SubA)"}}
             "{fmt_rule(b)} for ()" -> {{}}
         }}"""
       ).strip(),
@@ -638,7 +638,7 @@ class RuleGraphTest(TestBase):
                 "Select(A) for SubA" [color=blue]
                 "Select(A) for SubA" -> {{"{fmt_rule(a, gets=[("B", "C")])} for SubA"}}
               // internal entries
-                "{fmt_rule(a, gets=[("B", "C")])} for SubA" -> {{"Param(SubA)" "{fmt_rule(b_from_suba)} for C"}}
+                "{fmt_rule(a, gets=[("B", "C")])} for SubA" -> {{"{fmt_rule(b_from_suba)} for C" "Param(SubA)"}}
                 "{fmt_rule(b_from_suba)} for C" -> {{"{fmt_rule(suba_from_c)} for C"}}
                 "{fmt_rule(b_from_suba)} for SubA" -> {{"Param(SubA)"}}
                 "{fmt_rule(suba_from_c)} for C" -> {{"Param(C)"}}
@@ -776,7 +776,7 @@ class RuleGraphTest(TestBase):
             "Select(B) for (C, D)" -> {{"{fmt_rule(b_from_d_and_a)} for (C, D)"}}
           // internal entries
             "{fmt_rule(a_from_c)} for C" -> {{"Param(C)"}}
-            "{fmt_rule(b_from_d_and_a)} for (C, D)" -> {{"Param(D)" "{fmt_rule(a_from_c)} for C"}}
+            "{fmt_rule(b_from_d_and_a)} for (C, D)" -> {{"{fmt_rule(a_from_c)} for C" "Param(D)"}}
         }}"""
       ).strip(),
       fullgraph,
@@ -845,7 +845,7 @@ class RuleGraphTest(TestBase):
             "Select(A) for SubA" [color=blue]
             "Select(A) for SubA" -> {{"{fmt_rule(a_from_suba)} for SubA"}}
           // internal entries
-            "{fmt_rule(a_from_suba)} for SubA" -> {{"Param(SubA)" "{fmt_rule(b_singleton)} for ()"}}
+            "{fmt_rule(a_from_suba)} for SubA" -> {{"{fmt_rule(b_singleton)} for ()" "Param(SubA)"}}
             "{fmt_rule(b_singleton)} for ()" -> {{}}
         }}"""
       ).strip(),

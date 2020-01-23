@@ -69,9 +69,15 @@ impl fmt::Display for Rule {
             .join(", ");
           format!(", gets=[{}]", get_members)
         };
+        let rule_type = if task.cacheable {
+          "rule".to_string()
+        } else {
+          "goal_rule".to_string()
+        };
         write!(
           f,
-          "Rule({}({}) -> {}{})",
+          "@{}({}({}) -> {}{})",
+          rule_type,
           task.func.name(),
           params,
           product,
@@ -80,7 +86,7 @@ impl fmt::Display for Rule {
       }
       &Rule::Intrinsic(ref intrinsic) => write!(
         f,
-        "Rule(<intrinsic>({}) -> {})",
+        "@rule(<intrinsic>({}) -> {})",
         intrinsic.input, intrinsic.product,
       ),
     }
