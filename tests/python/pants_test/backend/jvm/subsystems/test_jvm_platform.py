@@ -33,14 +33,14 @@ class JvmPlatformTest(TestBase):
       runtime_platform='target-runtime-platform')
 
     instance = JvmPlatform.global_instance()
-    self.assertEqual(instance.get_runtime_platform_for_target(without_platforms).name,
-                     'default-runtime-platform')
-    self.assertEqual(instance.get_runtime_platform_for_target(just_platform).name,
-                     'default-runtime-platform')
-    self.assertEqual(instance.get_runtime_platform_for_target(just_runtime_platform).name,
-                     'target-runtime-platform')
-    self.assertEqual(instance.get_runtime_platform_for_target(both_platforms).name,
-                     'target-runtime-platform')
+    assert (instance.get_runtime_platform_for_target(without_platforms).name ==
+            'default-runtime-platform')
+    assert (instance.get_runtime_platform_for_target(just_platform).name ==
+            'default-runtime-platform')
+    assert (instance.get_runtime_platform_for_target(just_runtime_platform).name ==
+            'target-runtime-platform')
+    assert (instance.get_runtime_platform_for_target(both_platforms).name ==
+            'target-runtime-platform')
 
   def test_runtime_lookup_no_default_runtime_platform(self):
     init_subsystem(JvmPlatform, options={
@@ -66,14 +66,14 @@ class JvmPlatformTest(TestBase):
       runtime_platform='target-runtime-platform')
 
     instance = JvmPlatform.global_instance()
-    self.assertEqual(instance.get_runtime_platform_for_target(without_platforms).name,
-      'default-platform')
-    self.assertEqual(instance.get_runtime_platform_for_target(just_platform).name,
-      'default-platform')
-    self.assertEqual(instance.get_runtime_platform_for_target(just_runtime_platform).name,
-      'target-runtime-platform')
-    self.assertEqual(instance.get_runtime_platform_for_target(both_platforms).name,
-      'target-runtime-platform')
+    assert (instance.get_runtime_platform_for_target(without_platforms).name ==
+            'default-platform')
+    assert (instance.get_runtime_platform_for_target(just_platform).name ==
+            'default-platform')
+    assert (instance.get_runtime_platform_for_target(just_runtime_platform).name ==
+            'target-runtime-platform')
+    assert (instance.get_runtime_platform_for_target(both_platforms).name ==
+            'target-runtime-platform')
 
   def test_synthetic_target_runtime_platform_lookup(self):
     init_subsystem(JvmPlatform, options={
@@ -119,16 +119,13 @@ class JvmPlatformTest(TestBase):
       platform='target-platform')
 
     instance = JvmPlatform.global_instance()
-    self.assertEqual(instance.get_runtime_platform_for_target(synth_none).name,
-      'parent-target-runtime-platform')
-    self.assertEqual(instance.get_runtime_platform_for_target(synth_just_platform).name,
-      'parent-target-runtime-platform')
-    self.assertEqual(instance.get_runtime_platform_for_target(synth_just_runtime).name,
-      'target-runtime-platform')
-    self.assertEqual(instance.get_runtime_platform_for_target(synth_both).name,
-      'target-runtime-platform')
-    self.assertEqual(instance.get_runtime_platform_for_target(
-      synth_just_platform_with_parent_same
-    ).name,
-      'default-platform'
-    )
+    assert (instance.get_runtime_platform_for_target(synth_none).name ==
+            'parent-target-runtime-platform')
+    assert (instance.get_runtime_platform_for_target(synth_just_platform).name ==
+            'parent-target-runtime-platform')
+    assert (instance.get_runtime_platform_for_target(synth_just_runtime).name ==
+            'target-runtime-platform')
+    assert (instance.get_runtime_platform_for_target(synth_both).name ==
+            'target-runtime-platform')
+    assert (instance.get_runtime_platform_for_target(
+      synth_just_platform_with_parent_same).name == 'default-platform')
