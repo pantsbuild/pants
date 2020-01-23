@@ -100,6 +100,10 @@ class TestOptions(GoalSubsystem):
       help='Generate a coverage report for this test run.',
     )
 
+  @classmethod
+  def is_implemented(cls, *, union_membership: UnionMembership) -> bool:
+    return union_membership.union_rules.get(TestTarget) is not None
+
 
 class Test(Goal):
   subsystem_cls = TestOptions
@@ -132,7 +136,9 @@ class AddressAndDebugRequest:
 
 
 @goal_rule
-async def run_tests(console: Console, options: TestOptions, runner: InteractiveRunner, addresses: BuildFileAddresses) -> Test:
+async def run_tests(
+  console: Console, options: TestOptions, runner: InteractiveRunner, addresses: BuildFileAddresses,
+) -> Test:
   if options.values.debug:
     address = await Get[BuildFileAddress](BuildFileAddresses, addresses)
     addr_debug_request = await Get[AddressAndDebugRequest](Address, address.to_address())

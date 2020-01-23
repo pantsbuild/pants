@@ -4,13 +4,17 @@
 from abc import abstractmethod
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import ClassVar, Type
+from typing import TYPE_CHECKING, ClassVar, Type
 
 from pants.cache.cache_setup import CacheSetup
 from pants.option.optionable import Optionable
 from pants.option.scope import ScopeInfo
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
 from pants.util.meta import classproperty
+
+
+if TYPE_CHECKING:
+  from pants.engine.rules import UnionMembership
 
 
 class GoalSubsystem(SubsystemClientMixin, Optionable):
@@ -30,6 +34,8 @@ class GoalSubsystem(SubsystemClientMixin, Optionable):
     ...
   ```
   """
+
+  options_scope_category = ScopeInfo.GOAL
 
   @classproperty
   @abstractmethod
@@ -70,7 +76,17 @@ class GoalSubsystem(SubsystemClientMixin, Optionable):
       return dep,
     return tuple()
 
-  options_scope_category = ScopeInfo.GOAL
+  @classmethod
+  def is_implemented(cls, *, union_membership: "UnionMembership") -> bool:
+    """Whether the goal has an actual implementation, such that `./pants $goal` may do something
+    useful.
+
+    Some core goals like `fmt`, `lint`, and `test` depend upon downstream rules providing concrete
+    implementations - they do not work properly when no implementations are registered, so should
+    not show up in `./pants goals`, for example. Those core rules should override this method
+    and inspect the UnionMemership to see if any rules provide an implementation.
+    """
+    return True
 
   def __init__(self, scope, scoped_options):
     # NB: This constructor is shaped to meet the contract of `Optionable(Factory).signature`.

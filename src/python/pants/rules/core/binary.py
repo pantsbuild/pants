@@ -10,18 +10,9 @@ from pants.engine.fs import Digest, DirectoriesToMerge, DirectoryToMaterialize, 
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.legacy.graph import HydratedTarget
 from pants.engine.objects import union
-from pants.engine.rules import goal_rule, rule
+from pants.engine.rules import UnionMembership, goal_rule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.rules.core.distdir import DistDir
-
-
-class BinaryOptions(LineOriented, GoalSubsystem):
-  """Create a runnable binary."""
-  name = 'binary'
-
-
-class Binary(Goal):
-  subsystem_cls = BinaryOptions
 
 
 @union
@@ -36,14 +27,27 @@ class CreatedBinary:
   binary_name: str
 
 
+class BinaryOptions(LineOriented, GoalSubsystem):
+  """Create a runnable binary."""
+  name = 'binary'
+
+  @classmethod
+  def is_implemented(cls, *, union_membership: UnionMembership) -> bool:
+    return union_membership.union_rules.get(BinaryTarget) is not None
+
+
+class Binary(Goal):
+  subsystem_cls = BinaryOptions
+
+
 @goal_rule
 async def create_binary(
-    addresses: BuildFileAddresses,
-    console: Console,
-    workspace: Workspace,
-    options: BinaryOptions,
-    distdir: DistDir,
-    ) -> Binary:
+  addresses: BuildFileAddresses,
+  console: Console,
+  workspace: Workspace,
+  options: BinaryOptions,
+  distdir: DistDir,
+) -> Binary:
   with options.line_oriented(console) as print_stdout:
     print_stdout(f"Generating binaries in `./{distdir.relpath}`")
     binaries = await MultiGet(Get[CreatedBinary](Address, address.to_address()) for address in addresses)

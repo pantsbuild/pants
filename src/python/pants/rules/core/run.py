@@ -9,15 +9,20 @@ from pants.engine.console import Console
 from pants.engine.fs import DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
-from pants.engine.rules import goal_rule
+from pants.engine.rules import UnionMembership, goal_rule
 from pants.engine.selectors import Get
-from pants.rules.core.binary import CreatedBinary
+from pants.rules.core.binary import BinaryTarget, CreatedBinary
 from pants.util.contextutil import temporary_dir
 
 
 class RunOptions(GoalSubsystem):
   """Runs a runnable target."""
   name = 'run'
+
+  @classmethod
+  def is_implemented(cls, *, union_membership: UnionMembership) -> bool:
+    # NB: To be runnable, you must be a BinaryTarget.
+    return union_membership.union_rules.get(BinaryTarget) is not None
 
 
 class Run(Goal):

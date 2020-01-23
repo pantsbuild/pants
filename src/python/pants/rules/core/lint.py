@@ -62,6 +62,10 @@ class LintOptions(GoalSubsystem):
   # Blocked on https://github.com/pantsbuild/pants/issues/8351
   name = 'lint2'
 
+  @classmethod
+  def is_implemented(cls, *, union_membership: UnionMembership) -> bool:
+    return union_membership.union_rules.get(LintTarget) is not None
+
 
 class Lint(Goal):
   subsystem_cls = LintOptions
