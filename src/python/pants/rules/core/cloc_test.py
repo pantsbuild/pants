@@ -64,12 +64,23 @@ class ClocTest(GoalRuleTestBase):
     assert "Ignored the following files:" in output
     assert "empty.py: zero sized file" in output
 
-  def test_files_without_owners(self) -> None:
+  def test_filesystem_specs_with_owners(self) -> None:
+    """Even if a file belongs to a target which has multiple sources, we should only run over the
+    specified file.
+    """
+    py_dir = "src/py/foo"
+    self.create_file(f"{py_dir}/foo.py", "print('some code')")
+    self.create_file(f"{py_dir}/bar.py", "print('some code')\nprint('more code')")
+    self.add_to_build_file(py_dir, 'python_library()')
+    output = self.execute_rule(args=[f"{py_dir}/foo.py"])
+    self.assert_counts(output, 'Python', num_files=1, code=1)
+
+  def test_filesystem_specs_without_owners(self) -> None:
     """Unlike most goals, cloc works on any readable file in the build root, regardless of whether
     it's declared in a BUILD file.
     """
-    self.create_file(f"test/foo.ex", 'IO.puts("im a free thinker!")')
-    self.create_file(f"test/foo.hs", 'main = putStrLn "Whats Pants, precious?"')
+    self.create_file("test/foo.ex", 'IO.puts("im a free thinker!")')
+    self.create_file("test/foo.hs", 'main = putStrLn "Whats Pants, precious?"')
     output = self.execute_rule(args=["test/foo.*"])
     self.assert_counts(output, 'Elixir', code=1)
     self.assert_counts(output, 'Haskell', code=1)
