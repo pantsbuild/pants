@@ -254,12 +254,12 @@ function activate_tmp_venv() {
   # place, Shellcheck will not be able to find it so we tell Shellcheck to ignore the file.
   # shellcheck source=/dev/null
   VENV_DIR=$(mktemp -d -t pants.XXXXX) && \
-  "${ROOT}/build-support/virtualenv" "$VENV_DIR" && \
-  source "$VENV_DIR/bin/activate"
+  "${PY}" -m venv "${VENV_DIR}" && \
+  source "${VENV_DIR}/bin/activate"
 }
 
 function pre_install() {
-  start_travis_section "SetupVenv" "Setting up virtualenv"
+  start_travis_section "SetupVenv" "Setting up a virtual environment"
   activate_tmp_venv
   end_travis_section
 }
@@ -269,8 +269,8 @@ function post_install() {
   if [[ "${pause_after_venv_creation}" == "true" ]]; then
     cat <<EOM
 
-If you want to poke around with the new version of pants that has been built
-and installed in a temporary virtualenv, fire up another shell window and type:
+If you want to poke around with the new version of Pants that has been built
+and installed in a temporary virtual environment, fire up another shell window and type:
 
   source ${VENV_DIR}/bin/activate
   cd ${ROOT}
@@ -303,7 +303,7 @@ function install_and_test_packages() {
   deactivate
   end_travis_section
 
-  pre_install || die "Failed to setup virtualenv while testing ${NAME}-${VERSION}!"
+  pre_install || die "Failed to setup virtual environment while testing ${NAME}-${VERSION}!"
 
   # Avoid caching plugin installs.
   PANTS_PLUGIN_CACHE_DIR=$(mktemp -d -t plugins_cache.XXXXX)
@@ -567,9 +567,9 @@ function activate_twine() {
   local -r venv_dir="${ROOT}/build-support/twine-deps.venv"
 
   rm -rf "${venv_dir}"
-  "${ROOT}/build-support/virtualenv" "${venv_dir}"
-  # Because the venv/bin/activate script's location is dynamic and not located in a fixed
-  # place, Shellcheck will not be able to find it so we tell Shellcheck to ignore the file.
+  "${PY}" -m venv "${venv_dir}"
+  # While the `activate` script is in a fixed location, it might not exist on the user's machine as
+  # we gitignore the venv. So, we tell Shellcheck to ignore the file.
   # shellcheck source=/dev/null
   source "${venv_dir}/bin/activate"
   pip install twine
@@ -710,12 +710,12 @@ function usage() {
   echo " -h  Prints out this help message."
   echo " -n  Performs a release dry run."
   echo "       All package distributions will be built, installed locally in"
-  echo "       an ephemeral virtualenv and exercised to validate basic"
+  echo "       an ephemeral virtual environment and exercised to validate basic"
   echo "       functioning."
   echo " -f  Build the fs_util binary."
   echo " -t  Tests a live release."
   echo "       Ensures the latest packages have been propagated to PyPI"
-  echo "       and can be installed in an ephemeral virtualenv."
+  echo "       and can be installed in an ephemeral virtual environment."
   echo " -l  Lists all pantsbuild packages that this script releases."
   echo " -o  Lists all pantsbuild package owners."
   echo " -w  List pre-built wheels for this release."
