@@ -396,16 +396,21 @@ class TransitiveHydratedTargets:
 
 @dataclass(frozen=True)
 class SourcesSnapshot:
-  """A light wrapper around source files for Pants to operate on."""
+  """Sources matched by command line specs, either directly via FilesystemSpecs or indirectly via
+  AddressSpecs.
+
+  Note that the resolved sources do not need an owning target. Any source resolvable by
+  `PathGlobs` is valid here.
+  """
   snapshot: Snapshot
 
 
 class SourcesSnapshots(Collection[SourcesSnapshot]):
-  """`@goal_rule`s may request this when they only need source files to operate and do not need
-  any target information.
+  """A collection of sources matched by command line specs.
 
-  When paired with filesystem specs, this allows goals to operate on sources that do not have
-  any owning targets."""
+  `@goal_rule`s may request this when they only need source files to operate and do not need
+  any target information.
+  """
 
 
 @dataclass(frozen=True)

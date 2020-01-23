@@ -66,7 +66,8 @@ class ClocTest(GoalRuleTestBase):
 
   def test_files_without_owners(self) -> None:
     """Unlike most goals, cloc works on any readable file in the build root, regardless of whether
-    it's declared in a BUILD file."""
+    it's declared in a BUILD file.
+    """
     self.create_file(f"test/foo.ex", 'IO.puts("im a free thinker!")')
     self.create_file(f"test/foo.hs", 'main = putStrLn "Whats Pants, precious?"')
     output = self.execute_rule(args=["test/foo.*"])
