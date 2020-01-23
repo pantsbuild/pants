@@ -29,8 +29,6 @@ class PythonRepl(ReplTaskMixin, PythonExecutionTaskBase):
   def register_options(cls, register):
     super().register_options(register)
     register('--ipython', type=bool, fingerprint=True,
-             removal_version="1.27.0.dev0",
-             removal_hint="Use `--ipython-enabled` instead of `--repl-py-ipython`.",
              help='Run an IPython REPL instead of the standard python one.')
     register('--ipython-entry-point', advanced=True, default='IPython:start_ipython',
              removal_version="1.27.0.dev0",
@@ -51,7 +49,7 @@ class PythonRepl(ReplTaskMixin, PythonExecutionTaskBase):
     return isinstance(target, (PythonTarget, PythonRequirementLibrary))
 
   def extra_requirements(self):
-    if not self.get_options().ipython and not IPython.global_instance().options.enabled:
+    if not self.get_options().ipython:
       return []
     ipython_version = self._resolve_conflicting_options(
       old_option="ipython_requirements", new_option="version",
@@ -64,8 +62,7 @@ class PythonRepl(ReplTaskMixin, PythonExecutionTaskBase):
     return [ipython_version, *ipython_extra_requirements]
 
   def setup_repl_session(self, targets):
-    ipython_enabled = self._resolve_conflicting_options(old_option="ipython", new_option="enabled")
-    if ipython_enabled:
+    if self.get_options().ipython:
       entry_point = self._resolve_conflicting_options(
         old_option="ipython_entry_point", new_option="entry_point",
       )

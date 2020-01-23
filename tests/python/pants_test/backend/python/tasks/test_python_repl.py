@@ -170,9 +170,9 @@ class PythonReplTest(PythonTaskTestBase):
   def test_ipython(self):
     # IPython supports shelling out with a leading !, so indirectly test its presence by reading
     # the head of this very file.
+    self.set_options(ipython=True)
     with open(__file__, 'r') as fp:
       me = fp.readline()
-      self.set_options_for_scope(IPython.options_scope, enabled=True)
       self.do_test_repl(code=[f'!head -1 {__file__}'],
                         expected=[me],
                         targets=[self.six])  # Just to get the repl to pop up.

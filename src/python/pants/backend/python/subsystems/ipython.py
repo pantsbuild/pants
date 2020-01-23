@@ -12,11 +12,3 @@ class IPython(PythonToolBase):
   default_extra_requirements: List[str] = []
   default_entry_point = 'IPython:start_ipython'
   default_interpreter_constraints = ["CPython>=2.7,<3", "CPython>=3.4"]
-
-  @classmethod
-  def register_options(cls, register):
-    super().register_options(register)
-    register(
-      '--enabled', type=bool, default=False, fingerprint=True,
-      help="Use IPython instead of the standard Python REPL.",
-    )
