@@ -28,7 +28,7 @@ from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.remote_sources import RemoteSources
 from pants.engine.addressable import BuildFileAddresses
-from pants.engine.fs import PathGlobs, Snapshot
+from pants.engine.fs import EMPTY_SNAPSHOT, PathGlobs, Snapshot
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.structs import (
   BundleAdaptor,
@@ -649,12 +649,14 @@ async def hydrate_bundles(
 
 
 @rule
-async def hydrate_sources_snapshot(
-  hydrated_struct: HydratedStruct,
-) -> SourcesSnapshot:
+async def hydrate_sources_snapshot(hydrated_struct: HydratedStruct) -> SourcesSnapshot:
   """Construct a SourcesSnapshot from a TargetAdaptor without hydrating any other fields."""
   target_adaptor = cast(TargetAdaptor, hydrated_struct.value)
-  sources_field = next(fa for fa in target_adaptor.field_adaptors if isinstance(fa, SourcesField))
+  sources_field = next(
+    (fa for fa in target_adaptor.field_adaptors if isinstance(fa, SourcesField)), None
+  )
+  if sources_field is None:
+    return SourcesSnapshot(EMPTY_SNAPSHOT)
   hydrated_sources_field = await Get[HydratedField](HydrateableField, sources_field)
   efws = cast(EagerFilesetWithSpec, hydrated_sources_field.value)
   return SourcesSnapshot(efws.snapshot)
