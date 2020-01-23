@@ -5,7 +5,7 @@ import logging
 import sys
 from typing import List
 
-from pants.base.specs import AddressSpecs, ParsedSpecs
+from pants.base.specs import AddressSpecs, Specs
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_parser import BuildFileParser
@@ -38,7 +38,7 @@ class GoalRunnerFactory:
     run_tracker: RunTracker,
     reporting: Reporting,
     graph_session: LegacyGraphSession,
-    parsed_specs: ParsedSpecs,
+    specs: Specs,
     exiter=sys.exit,
   ) -> None:
     """
@@ -48,7 +48,7 @@ class GoalRunnerFactory:
     :param run_tracker: The global, pre-initialized/running RunTracker instance.
     :param reporting: The global, pre-initialized Reporting instance.
     :param graph_session: The graph session for this run.
-    :param parsed_specs: The specs for this run, i.e. either the address or filesystem specs.
+    :param specs: The specs for this run, i.e. either the address or filesystem specs.
     :param func exiter: A function that accepts an exit code value and exits. (for tests, Optional)
     """
     self._root_dir = root_dir
@@ -57,7 +57,7 @@ class GoalRunnerFactory:
     self._run_tracker = run_tracker
     self._reporting = reporting
     self._graph_session = graph_session
-    self._parsed_specs = parsed_specs
+    self._specs = specs
     self._exiter = exiter
 
     self._global_options = options.for_global_scope()
@@ -65,16 +65,16 @@ class GoalRunnerFactory:
     self._explain = self._global_options.explain
     self._kill_nailguns = self._global_options.kill_nailguns
 
-    if self._parsed_specs.filesystem_specs.dependencies:
+    if self._specs.filesystem_specs.dependencies:
       pants_bin_name = self._global_options.pants_bin_name
       v1_goals = ' '.join(repr(goal) for goal in self._determine_v1_goals(options))
-      provided_specs = ' '.join(spec.glob for spec in self._parsed_specs.filesystem_specs)
+      provided_specs = ' '.join(spec.glob for spec in self._specs.filesystem_specs)
       approximate_original_command = f"{pants_bin_name} {v1_goals} {provided_specs}"
       suggested_owners_args = " ".join(
-        f"--owner-of={spec.glob}" for spec in self._parsed_specs.filesystem_specs
+        f"--owner-of={spec.glob}" for spec in self._specs.filesystem_specs
       )
       suggestion = f"run `{pants_bin_name} {suggested_owners_args} {v1_goals}`."
-      trying_to_use_globs = any("*" in spec.glob for spec in self._parsed_specs.filesystem_specs)
+      trying_to_use_globs = any("*" in spec.glob for spec in self._specs.filesystem_specs)
       if trying_to_use_globs:
         suggestion = (
           f"run `{pants_bin_name} --owner-of=src/python/f1.py --owner-of=src/python/f2.py "
@@ -118,7 +118,7 @@ class GoalRunnerFactory:
     with self._run_tracker.new_workunit(name='setup', labels=[WorkUnitLabel.SETUP]):
       build_file_parser = BuildFileParser(self._build_config, self._root_dir)
       build_graph, address_mapper = self._graph_session.create_build_graph(
-        self._parsed_specs,
+        self._specs,
         self._root_dir
       )
 
@@ -126,7 +126,7 @@ class GoalRunnerFactory:
       is_quiet = self._should_be_quiet(goals)
 
       target_root_instances = self._address_specs_to_targets(
-        build_graph, self._parsed_specs.address_specs,
+        build_graph, self._specs.address_specs,
       )
 
       # Now that we've parsed the bootstrap BUILD files, and know about the SCM system.

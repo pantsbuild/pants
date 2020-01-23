@@ -16,7 +16,7 @@ from typing import Any, List, Optional, Type, TypeVar, Union, cast
 from pants.base.build_root import BuildRoot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.exceptions import TaskError
-from pants.base.specs import AddressSpec, AddressSpecs, FilesystemSpecs, ParsedSpecs
+from pants.base.specs import AddressSpec, AddressSpecs, FilesystemSpecs, Specs
 from pants.build_graph.address import Address
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
@@ -408,7 +408,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     ).new_session(zipkin_trace_v2=False, build_id="buildid_for_test")
     self._scheduler = graph_session.scheduler_session
     self._build_graph, self._address_mapper = graph_session.create_build_graph(
-      ParsedSpecs(address_specs=AddressSpecs([]), filesystem_specs=FilesystemSpecs([])),
+      Specs(address_specs=AddressSpecs([]), filesystem_specs=FilesystemSpecs([])),
       self._build_root()
     )
 

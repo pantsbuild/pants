@@ -9,7 +9,7 @@ from pants.engine.fs import Workspace
 from pants.engine.goal import Goal
 from pants.engine.selectors import Params
 from pants.init.options_initializer import BuildConfigInitializer
-from pants.init.parsed_specs_calculator import ParsedSpecsCalculator
+from pants.init.specs_calculator import SpecsCalculator
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 from pants.util.meta import classproperty
@@ -60,9 +60,9 @@ class GoalRuleTestBase(TestBase):
     workspace = Workspace(scheduler)
 
     # Run for the target specs parsed from the args.
-    parsed_specs = ParsedSpecsCalculator.parse_specs(full_options.specs, self.build_root)
+    specs = SpecsCalculator.parse_specs(full_options.specs, self.build_root)
     params = Params(
-      parsed_specs.provided_specs,
+      specs.provided_specs,
       console,
       options_bootstrapper,
       workspace,

@@ -329,7 +329,7 @@ class AmbiguousSpecs(Exception):
 
 
 @dataclass(frozen=True)
-class ParsedSpecs:
+class Specs:
   address_specs: AddressSpecs
   filesystem_specs: FilesystemSpecs
 

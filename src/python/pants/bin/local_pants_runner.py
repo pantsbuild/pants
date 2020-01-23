@@ -10,7 +10,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, Exiter
-from pants.base.specs import AddressSpec, ParsedSpecs
+from pants.base.specs import AddressSpec, Specs
 from pants.base.workunit import WorkUnit
 from pants.bin.goal_runner import GoalRunner
 from pants.build_graph.build_configuration import BuildConfiguration
@@ -21,8 +21,8 @@ from pants.help.help_printer import HelpPrinter
 from pants.init.engine_initializer import EngineInitializer, LegacyGraphSession
 from pants.init.logging import setup_logging_from_options
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
-from pants.init.parsed_specs_calculator import ParsedSpecsCalculator
 from pants.init.repro import Reproducer
+from pants.init.specs_calculator import SpecsCalculator
 from pants.option.arg_splitter import UnknownGoalHelp
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -133,17 +133,17 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     return graph_session, graph_session.scheduler_session
 
   @staticmethod
-  def _maybe_init_parsed_specs(
-    parsed_specs: Optional[ParsedSpecs],
+  def _maybe_init_specs(
+    specs: Optional[Specs],
     graph_session: LegacyGraphSession,
     options: Options,
     build_root: str,
-  ) -> ParsedSpecs:
-    if parsed_specs:
-      return parsed_specs
+  ) -> Specs:
+    if specs:
+      return specs
 
     global_options = options.for_global_scope()
-    return ParsedSpecsCalculator.create(
+    return SpecsCalculator.create(
       options=options,
       build_root=build_root,
       session=graph_session.scheduler_session,
@@ -156,7 +156,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     cls,
     args: List[str],
     env: Dict[str, str],
-    parsed_specs: Optional[ParsedSpecs] = None,
+    specs: Optional[Specs] = None,
     daemon_graph_session: Optional[LegacyGraphSession] = None,
     options_bootstrapper: Optional[OptionsBootstrapper] = None,
   ) -> "LocalPantsRunner":
@@ -164,7 +164,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
 
     :param args: The arguments (e.g. sys.argv) for this run.
     :param env: The environment (e.g. os.environ) for this run.
-    :param parsed_specs: The specs for this run, i.e. either the address or filesystem specs.
+    :param specs: The specs for this run, i.e. either the address or filesystem specs.
     :param daemon_graph_session: The graph helper for this session.
     :param options_bootstrapper: The OptionsBootstrapper instance to reuse.
     """
@@ -198,8 +198,8 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
       options
     )
 
-    parsed_specs = cls._maybe_init_parsed_specs(
-      parsed_specs,
+    specs = cls._maybe_init_specs(
+      specs,
       graph_session,
       options,
       build_root
@@ -212,7 +212,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
       options,
       options_bootstrapper,
       build_config,
-      parsed_specs,
+      specs,
       graph_session,
       scheduler_session,
       daemon_graph_session is not None,
@@ -225,7 +225,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     options: Options,
     options_bootstrapper: OptionsBootstrapper,
     build_config: BuildConfiguration,
-    parsed_specs: ParsedSpecs,
+    specs: Specs,
     graph_session: LegacyGraphSession,
     scheduler_session: SchedulerSession,
     is_daemon: bool,
@@ -236,7 +236,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     :param options: The parsed options for this run.
     :param options_bootstrapper: The OptionsBootstrapper instance to use.
     :param build_config: The parsed build configuration for this run.
-    :param parsed_specs: The specs for this run, i.e. either the address or filesystem specs.
+    :param specs: The specs for this run, i.e. either the address or filesystem specs.
     :param graph_session: A LegacyGraphSession instance for graph reuse.
     :param is_daemon: Whether or not this run was launched with a daemon graph helper.
     :param profile_path: The profile path - if any (from from the `PANTS_PROFILE` env var).
@@ -245,7 +245,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     self._options = options
     self._options_bootstrapper = options_bootstrapper
     self._build_config = build_config
-    self._parsed_specs = parsed_specs
+    self._specs = specs
     self._graph_session = graph_session
     self._scheduler_session = scheduler_session
     self._is_daemon = is_daemon
@@ -314,7 +314,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
       self._run_tracker,
       self._reporting,
       self._graph_session,
-      self._parsed_specs,
+      self._specs,
       self._exiter
     ).create().run()
 
@@ -334,7 +334,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
       self._options_bootstrapper,
       self._options,
       goals,
-      self._parsed_specs,
+      self._specs,
     )
 
   @staticmethod

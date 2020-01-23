@@ -13,8 +13,8 @@ from pants.base.specs import (
   AddressSpecs,
   FilesystemSpec,
   FilesystemSpecs,
-  ParsedSpecs,
   SingleAddress,
+  Specs,
 )
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.legacy.graph import OwnersRequest
@@ -31,8 +31,8 @@ class InvalidSpecConstraint(Exception):
   """Raised when invalid constraints are given via specs and arguments like --changed*."""
 
 
-class ParsedSpecsCalculator:
-  """Determines the parsed specs for a given Pants run."""
+class SpecsCalculator:
+  """Determines the specs for a given Pants run."""
 
   @classmethod
   def parse_specs(
@@ -41,20 +41,20 @@ class ParsedSpecsCalculator:
     build_root: Optional[str] = None,
     exclude_patterns: Optional[Iterable[str]] = None,
     tags: Optional[Iterable[str]] = None,
-  ) -> ParsedSpecs:
-    """Parse string specs into a ParsedSpecs object."""
+  ) -> Specs:
+    """Parse raw string specs into a Specs object."""
     build_root = build_root or get_buildroot()
     spec_parser = CmdLineSpecParser(build_root)
-    parsed_specs = OrderedSet(spec_parser.parse_spec(spec_str) for spec_str in raw_specs)
+    specs = OrderedSet(spec_parser.parse_spec(spec_str) for spec_str in raw_specs)
     address_specs = AddressSpecs(
-      dependencies=(spec for spec in parsed_specs if isinstance(spec, AddressSpec)),
+      dependencies=(spec for spec in specs if isinstance(spec, AddressSpec)),
       exclude_patterns=exclude_patterns if exclude_patterns else tuple(),
       tags=tags,
     )
     filesystem_specs = FilesystemSpecs(
-      spec for spec in parsed_specs if isinstance(spec, FilesystemSpec)
+      spec for spec in specs if isinstance(spec, FilesystemSpec)
     )
-    return ParsedSpecs(address_specs=address_specs, filesystem_specs=filesystem_specs)
+    return Specs(address_specs=address_specs, filesystem_specs=filesystem_specs)
 
   @classmethod
   def changed_files(cls, scm, changes_since=None, diffspec=None):
@@ -74,9 +74,9 @@ class ParsedSpecsCalculator:
     build_root: Optional[str] = None,
     exclude_patterns: Optional[Iterable[str]] = None,
     tags: Optional[Iterable[str]] = None,
-  ) -> ParsedSpecs:
+  ) -> Specs:
     # Determine the literal specs.
-    parsed_specs = cls.parse_specs(
+    specs = cls.parse_specs(
       raw_specs=options.specs,
       build_root=build_root,
       exclude_patterns=exclude_patterns,
@@ -91,12 +91,12 @@ class ParsedSpecsCalculator:
     # Determine the `--owner-of=` arguments provided from the global options
     owned_files = options.for_global_scope().owner_of
 
-    logger.debug('parsed_specs are: %s', parsed_specs)
+    logger.debug('specs are: %s', specs)
     logger.debug('changed_request is: %s', changed_request)
     logger.debug('owned_files are: %s', owned_files)
     targets_specified = sum(
       1 for item
-      in (changed_request.is_actionable(), owned_files, parsed_specs.provided_specs.dependencies)
+      in (changed_request.is_actionable(), owned_files, specs.provided_specs.dependencies)
       if item
     )
 
@@ -125,7 +125,7 @@ class ParsedSpecsCalculator:
       changed_addresses, = session.product_request(BuildFileAddresses, [request])
       logger.debug('changed addresses: %s', changed_addresses)
       dependencies = tuple(SingleAddress(a.spec_path, a.target_name) for a in changed_addresses)
-      return ParsedSpecs(
+      return Specs(
         address_specs=AddressSpecs(
           dependencies=dependencies, exclude_patterns=exclude_patterns, tags=tags,
         ),
@@ -142,11 +142,11 @@ class ParsedSpecsCalculator:
       owner_addresses, = session.product_request(BuildFileAddresses, [request])
       logger.debug('owner addresses: %s', owner_addresses)
       dependencies = tuple(SingleAddress(a.spec_path, a.target_name) for a in owner_addresses)
-      return ParsedSpecs(
+      return Specs(
         address_specs=AddressSpecs(
           dependencies=dependencies, exclude_patterns=exclude_patterns, tags=tags,
         ),
         filesystem_specs=FilesystemSpecs([])
       )
 
-    return parsed_specs
+    return specs

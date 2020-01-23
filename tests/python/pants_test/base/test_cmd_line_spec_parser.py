@@ -120,13 +120,13 @@ class CmdLineSpecParserTest(TestBase):
     self.assert_address_spec_parsed(os.path.join(self.build_root, './a/b/:b'), single('a/b', 'b'))
 
   def assert_address_spec_parsed(self, spec_str: str, expected_spec: AddressSpec) -> None:
-    parsed_spec = self._spec_parser.parse_spec(spec_str)
-    assert isinstance(parsed_spec, AddressSpec)
-    assert parsed_spec == expected_spec
+    spec = self._spec_parser.parse_spec(spec_str)
+    assert isinstance(spec, AddressSpec)
+    assert spec == expected_spec
 
   def assert_filesystem_spec_parsed(
     self, spec_str: str, *, expected_glob: Optional[str] = None,
   ) -> None:
-    parsed_spec = self._spec_parser.parse_spec(spec_str)
-    assert isinstance(parsed_spec, FilesystemSpec)
-    assert parsed_spec == FilesystemSpec(expected_glob or spec_str)
+    spec = self._spec_parser.parse_spec(spec_str)
+    assert isinstance(spec, FilesystemSpec)
+    assert spec == FilesystemSpec(expected_glob or spec_str)
