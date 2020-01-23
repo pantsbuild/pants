@@ -170,21 +170,17 @@ impl Function {
     let name = externs::project_str(&externs::val_for(&key), "__name__");
     format!("{}.{}", module, name)
   }
-
-  fn pretty_print(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{}()", self.name())
-  }
 }
 
 impl fmt::Display for Function {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    self.pretty_print(f)
+    write!(f, "{}()", self.name())
   }
 }
 
 impl fmt::Debug for Function {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    self.pretty_print(f)
+    write!(f, "{}()", self.name())
   }
 }
 
