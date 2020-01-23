@@ -3,7 +3,6 @@
 
 import unittest
 from textwrap import dedent
-from typing import Callable, List, Optional, Tuple, get_type_hints
 
 from pants.engine.build_files import create_graph_rules
 from pants.engine.console import Console
@@ -25,6 +24,7 @@ from pants.testutil.engine.util import (
   MockGet,
   assert_equal_with_printing,
   create_scheduler,
+  fmt_rule,
   run_rule,
 )
 from pants.testutil.test_base import TestBase
@@ -200,32 +200,6 @@ class GoalRuleValidation(TestBase):
       @goal_rule
       def goal_rule_returning_a_non_goal() -> int:
         return 0
-
-
-def fmt_task_func(func: Callable) -> str:
-  """Generate the str for a Rust Func, which is how Rust refers to `@rule`s."""
-  return f"{func.__module__}:{func.__code__.co_firstlineno}:{func.__name__}"
-
-
-def fmt_rule(
-  rule: Callable, *, gets: Optional[List[Tuple[str, str]]] = None,
-) -> str:
-  """Generate the str that the engine will use for the rule.
-
-  This is very tightly coupled with the engine - any changes to Rust's display of rules will
-  impact these tests. But, this function allows us to at least isolate that coupling to one helper
-  function, rather than hardcoding the formatting in every test."""
-  type_hints = get_type_hints(rule)
-  product = type_hints.pop("return").__name__
-  params = ", ".join(t.__name__ for t in type_hints.values())
-  gets_str = ""
-  if gets:
-    get_members = ', '.join(
-      f"Get[{product_subject_pair[0]}]({product_subject_pair[1]})"
-      for product_subject_pair in gets
-    )
-    gets_str = f", gets=[{get_members}]"
-  return f"@rule({fmt_task_func(rule)}({params}) -> {product}{gets_str})"
 
 
 class RuleGraphTest(TestBase):
