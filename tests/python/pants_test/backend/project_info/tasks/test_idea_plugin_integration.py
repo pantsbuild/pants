@@ -17,11 +17,11 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
                 incremental_import=None):
     """Check to see that the project contains the expected source folders."""
 
-    iws_file = os.path.join(
-      project_dir_path, f'{IdeaPluginGen.get_project_name(expected_targets)}.iws'
+    workspace_file = os.path.join(
+      project_dir_path, ".idea", 'workspace.xml'
     )
-    self.assertTrue(os.path.exists(iws_file))
-    dom = minidom.parse(iws_file)
+    self.assertTrue(os.path.exists(workspace_file))
+    dom = minidom.parse(workspace_file)
     self.assertEqual(1, len(dom.getElementsByTagName("project")))
     project = dom.getElementsByTagName("project")[0]
 

@@ -14,6 +14,7 @@ class OpenError(Exception):
 def _mac_open_with_idea(file_: str) -> None:
   subprocess.call(['open', "-a", "/Applications/IntelliJ IDEA CE.app", file_])
 
+
 def _mac_open(files: Sequence[str]) -> None:
   subprocess.call(['open'] + list(files))
 
@@ -65,6 +66,7 @@ def idea_open(file_: str) -> None:
       opener(file_)
     else:
       raise OpenError('Open currently not supported for ' + osname)
+
 
 def ui_open(*files: str) -> None:
   """Attempts to open the given files using the preferred desktop viewer or editor.
