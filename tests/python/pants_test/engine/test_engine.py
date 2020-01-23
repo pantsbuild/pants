@@ -12,6 +12,7 @@ from pants.engine.selectors import Get, MultiGet
 from pants.reporting.streaming_workunit_handler import StreamingWorkunitHandler
 from pants.testutil.engine.util import assert_equal_with_printing, remove_locations_from_traceback
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
+from pants_test.engine.test_rules import fmt_rule, fmt_task_func
 
 
 class A:
@@ -180,7 +181,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
     self.assert_equal_with_printing(dedent(f'''
       1 Exception encountered:
       Computing Select(<{__name__}.B object at 0xEEEEEEEEE>, A)
-        Computing Task({__name__}.nested_raise(), <{__name__}.B object at 0xEEEEEEEEE>, A, true)
+        Computing Task({fmt_task_func(nested_raise)}(), <{__name__}.B object at 0xEEEEEEEEE>, A, true)
           Throw(An exception for B)
             Traceback (most recent call last):
               File LOCATION-INFO, in call
@@ -283,7 +284,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
 
     self.assert_equal_with_printing(dedent(f'''
       Rules with errors: 1
-        Rule({__name__}.upcast(MyInt) -> MyFloat):
+        {fmt_rule(upcast)}:
           No rule was available to compute MyInt. Maybe declare RootRule(MyInt)?
         ''').strip(),
       str(cm.exception)

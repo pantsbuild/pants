@@ -16,6 +16,7 @@ from pants.engine.scheduler import ExecutionError, SchedulerSession
 from pants.engine.selectors import Get, Params
 from pants.testutil.engine.util import assert_equal_with_printing, remove_locations_from_traceback
 from pants.testutil.test_base import TestBase
+from pants_test.engine.test_rules import fmt_task_func
 
 
 @dataclass(frozen=True)
@@ -262,7 +263,7 @@ class SchedulerWithNestedRaiseTest(TestBase):
     expected_msg = (
       "Exception: WithDeps(Inner(InnerEntry { params: {TypeCheckFailWrapper}, rule: Task(Task { "
       "product: A, clause: [Select { product: TypeCheckFailWrapper }], gets: [Get { product: A, "
-      f"subject: B }}], func: {__name__}.a_typecheck_fail_test(), cacheable: true, display_info: "
+      f"subject: B }}], func: {fmt_task_func(a_typecheck_fail_test)}(), cacheable: true, display_info: "
       "None }) })) did not declare a dependency on JustGet(Get { product: A, subject: A })"
     )
     with assert_execution_error(self, expected_msg):
@@ -345,16 +346,21 @@ class SchedulerWithNestedRaiseTest(TestBase):
     self.scheduler.execute(request)
 
     trace = remove_locations_from_traceback('\n'.join(self.scheduler.trace(request)))
-    assert_equal_with_printing(self, dedent(f'''
-                     Computing Select(B(), A)
-                       Computing Task({__name__}.nested_raise(), B(), A, true)
-                         Throw(An exception for B)
-                           Traceback (most recent call last):
-                             File LOCATION-INFO, in call
-                               val = func(*args)
-                             File LOCATION-INFO, in nested_raise
-                               fn_raises(x)
-                             File LOCATION-INFO, in fn_raises
-                               raise Exception(f'An exception for {{type(x).__name__}}')
-                           Exception: An exception for B''').lstrip() + '\n\n',  # Traces include two empty lines after.
-                               trace)
+    assert_equal_with_printing(
+      self,
+      dedent(
+        f'''\
+        Computing Select(B(), A)
+          Computing Task({fmt_task_func(nested_raise)}(), B(), A, true)
+            Throw(An exception for B)
+              Traceback (most recent call last):
+                File LOCATION-INFO, in call
+                  val = func(*args)
+                File LOCATION-INFO, in nested_raise
+                  fn_raises(x)
+                File LOCATION-INFO, in fn_raises
+                  raise Exception(f'An exception for {{type(x).__name__}}')
+              Exception: An exception for B'''
+      ).lstrip() + '\n\n',  # Traces include two empty lines after.
+      trace,
+    )

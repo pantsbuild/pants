@@ -3,6 +3,7 @@
 
 import unittest
 from textwrap import dedent
+from typing import Callable, List, Optional, Tuple, get_type_hints
 
 from pants.engine.build_files import create_graph_rules
 from pants.engine.console import Console
@@ -201,6 +202,32 @@ class GoalRuleValidation(TestBase):
         return 0
 
 
+def fmt_task_func(func: Callable) -> str:
+  """Generate the str for a Rust Func, which is how Rust refers to `@rule`s."""
+  return f"{func.__module__}:{func.__code__.co_firstlineno}:{func.__name__}"
+
+
+def fmt_rule(
+  rule: Callable, *, gets: Optional[List[Tuple[str, str]]] = None,
+) -> str:
+  """Generate the str that the engine will use for the rule.
+
+  This is very tightly coupled with the engine - any changes to Rust's display of rules will
+  impact these tests. But, this function allows us to at least isolate that coupling to one helper
+  function, rather than hardcoding the formatting in every test."""
+  type_hints = get_type_hints(rule)
+  product = type_hints.pop("return").__name__
+  params = ", ".join(t.__name__ for t in type_hints.values())
+  gets_str = ""
+  if gets:
+    get_members = ', '.join(
+      f"Get(({product_subject_pair[1]}) -> {product_subject_pair[0]})"
+      for product_subject_pair in gets
+    )
+    gets_str = f", gets=[{get_members}]"
+  return f"Rule({fmt_task_func(rule)}({params}) -> {product}{gets_str})"
+
+
 class RuleGraphTest(TestBase):
   def test_ruleset_with_missing_product_type(self):
     @rule
@@ -216,19 +243,20 @@ class RuleGraphTest(TestBase):
       dedent(
         f"""\
         Rules with errors: 1
-          Rule({__name__}.a_from_b_noop(B) -> A):
+          {fmt_rule(a_from_b_noop)}:
             No rule was available to compute B with parameter type SubA
         """).strip(),
       str(cm.exception),
     )
 
   def test_ruleset_with_ambiguity(self):
-    @rule
-    def a_from_c_and_b(c: C, b: B) -> A:
-      pass
 
     @rule
     def a_from_b_and_c(b: B, c: C) -> A:
+      pass
+
+    @rule
+    def a_from_c_and_b(c: C, b: B) -> A:
       pass
 
     @rule
@@ -236,8 +264,8 @@ class RuleGraphTest(TestBase):
       pass
 
     rules = [
-        a_from_c_and_b,
         a_from_b_and_c,
+        a_from_c_and_b,
         RootRule(B),
         RootRule(C),
         # TODO: Without a rule triggering the selection of A, we don't detect ambiguity here.
@@ -250,14 +278,14 @@ class RuleGraphTest(TestBase):
       dedent(
         f"""\
         Rules with errors: 3
-          Rule({__name__}.a_from_b_and_c(B, C) -> A):
+          {fmt_rule(a_from_b_and_c)}:
             Was not reachable, either because no rules can produce the params or it was shadowed by another @rule.
-          Rule({__name__}.a_from_c_and_b(C, B) -> A):
+          {fmt_rule(a_from_c_and_b)}:
             Was not reachable, either because no rules can produce the params or it was shadowed by another @rule.
-          Rule({__name__}.d_from_a(A) -> D):
+          {fmt_rule(d_from_a)}:
             Ambiguous rules to compute A with parameter types (B, C):
-              Rule({__name__}.a_from_b_and_c(B, C) -> A) for (B, C)
-              Rule({__name__}.a_from_c_and_b(C, B) -> A) for (B, C)
+              {fmt_rule(a_from_b_and_c)} for (B, C)
+              {fmt_rule(a_from_c_and_b)} for (B, C)
        """
       ).strip(),
       str(cm.exception),
@@ -276,7 +304,7 @@ class RuleGraphTest(TestBase):
       dedent(
         f"""\
         Rules with errors: 1
-          Rule({__name__}.a_from_b_and_c(B, C) -> A):
+          {fmt_rule(a_from_b_and_c)}:
             No rule was available to compute B with parameter type SubA
             No rule was available to compute C with parameter type SubA
         """
@@ -313,9 +341,9 @@ class RuleGraphTest(TestBase):
       dedent(
         f"""\
         Rules with errors: 2
-          Rule({__name__}.a_from_b(B) -> A):
+          {fmt_rule(a_from_b)}:
             No rule was available to compute B with parameter type C
-          Rule({__name__}.b_from_suba(SubA) -> B):
+          {fmt_rule(b_from_suba)}:
             No rule was available to compute SubA with parameter type C
         """
       ).strip(),
@@ -345,7 +373,7 @@ class RuleGraphTest(TestBase):
       dedent(
         f"""\
         Rules with errors: 1
-          Rule({__name__}.d_from_c(C) -> D):
+          {fmt_rule(d_from_c)}:
             No rule was available to compute C with parameter type A
         """).strip(),
         str(cm.exception),
@@ -356,6 +384,10 @@ class RuleGraphTest(TestBase):
     # Only the unfulfillable one should be in the errors.
 
     @rule
+    def a_from_c(c: C) -> A:
+      pass
+
+    @rule
     def b_from_d(d: D) -> B:
       pass
 
@@ -363,14 +395,10 @@ class RuleGraphTest(TestBase):
     async def d_from_a_and_suba(a: A, suba: SubA) -> D:  # type: ignore[return]
       _ = await Get[A](C, C())  # noqa: F841
 
-    @rule
-    def a_from_c(c: C) -> A:
-      pass
-
     rules = _suba_root_rules + [
+      a_from_c,
       b_from_d,
       d_from_a_and_suba,
-      a_from_c,
     ]
 
     with self.assertRaises(Exception) as cm:
@@ -380,11 +408,11 @@ class RuleGraphTest(TestBase):
       dedent(
         f"""\
         Rules with errors: 3
-          Rule({__name__}.a_from_c(C) -> A):
+          {fmt_rule(a_from_c)}:
             Was not reachable, either because no rules can produce the params or it was shadowed by another @rule.
-          Rule({__name__}.b_from_d(D) -> B):
+          {fmt_rule(b_from_d)}:
             No rule was available to compute D with parameter type SubA
-          Rule({__name__}.d_from_a_and_suba(A, SubA) -> D, gets=[Get((C) -> A)]):
+          {fmt_rule(d_from_a_and_suba, gets=[("A", "C")])}:
             No rule was available to compute A with parameter type SubA
         """
       ).strip(),
@@ -414,7 +442,7 @@ class RuleGraphTest(TestBase):
       dedent(
         f"""\
         Rules with errors: 1
-          Rule({__name__}.d_for_b(B) -> D):
+          {fmt_rule(d_for_b)}:
             Was not reachable, either because no rules can produce the params or it was shadowed by another @rule.
         """
       ).strip(),
@@ -439,9 +467,9 @@ class RuleGraphTest(TestBase):
           // root subject types: SubA
           // root entries
             "Select(A) for SubA" [color=blue]
-            "Select(A) for SubA" -> {{"Rule({__name__}.a_from_suba(SubA) -> A) for SubA"}}
+            "Select(A) for SubA" -> {{"{fmt_rule(a_from_suba)} for SubA"}}
           // internal entries
-            "Rule({__name__}.a_from_suba(SubA) -> A) for SubA" -> {{"Param(SubA)"}}
+            "{fmt_rule(a_from_suba)} for SubA" -> {{"Param(SubA)"}}
         }}"""
       ).strip(),
       fullgraph,
@@ -503,15 +531,15 @@ class RuleGraphTest(TestBase):
             "Select(A) for A" [color=blue]
             "Select(A) for A" -> {{"Param(A)"}}
             "Select(A) for SubA" [color=blue]
-            "Select(A) for SubA" -> {{"Rule({__name__}.a_from_suba(SubA) -> A) for SubA"}}
+            "Select(A) for SubA" -> {{"{fmt_rule(a_from_suba)} for SubA"}}
             "Select(B) for A" [color=blue]
-            "Select(B) for A" -> {{"Rule({__name__}.b_from_a(A) -> B) for A"}}
+            "Select(B) for A" -> {{"{fmt_rule(b_from_a)} for A"}}
             "Select(B) for SubA" [color=blue]
-            "Select(B) for SubA" -> {{"Rule({__name__}.b_from_a(A) -> B) for SubA"}}
+            "Select(B) for SubA" -> {{"{fmt_rule(b_from_a)} for SubA"}}
           // internal entries
-            "Rule({__name__}.a_from_suba(SubA) -> A) for SubA" -> {{"Param(SubA)"}}
-            "Rule({__name__}.b_from_a(A) -> B) for A" -> {{"Param(A)"}}
-            "Rule({__name__}.b_from_a(A) -> B) for SubA" -> {{"Rule({__name__}.a_from_suba(SubA) -> A) for SubA"}}
+            "{fmt_rule(a_from_suba)} for SubA" -> {{"Param(SubA)"}}
+            "{fmt_rule(b_from_a)} for A" -> {{"Param(A)"}}
+            "{fmt_rule(b_from_a)} for SubA" -> {{"{fmt_rule(a_from_suba)} for SubA"}}
         }}"""
       ).strip(),
       fullgraph,
@@ -535,9 +563,9 @@ class RuleGraphTest(TestBase):
           // root subject types: SubA
           // root entries
             "Select(A) for SubA" [color=blue]
-            "Select(A) for SubA" -> {{"Rule({__name__}.a_from_suba(SubA) -> A) for SubA"}}
+            "Select(A) for SubA" -> {{"{fmt_rule(a_from_suba)} for SubA"}}
           // internal entries
-            "Rule({__name__}.a_from_suba(SubA) -> A) for SubA" -> {{"Param(SubA)"}}
+            "{fmt_rule(a_from_suba)} for SubA" -> {{"Param(SubA)"}}
         }}"""
       ).strip(),
       subgraph,
@@ -566,10 +594,10 @@ class RuleGraphTest(TestBase):
           // root subject types: SubA
           // root entries
             "Select(A) for SubA" [color=blue]
-            "Select(A) for SubA" -> {{"Rule({__name__}.a_from_suba_and_b(SubA, B) -> A) for SubA"}}
+            "Select(A) for SubA" -> {{"{fmt_rule(a_from_suba_and_b)} for SubA"}}
           // internal entries
-            "Rule({__name__}.a_from_suba_and_b(SubA, B) -> A) for SubA" -> {{"Param(SubA)" "Rule({__name__}.b() -> B) for ()"}}
-            "Rule({__name__}.b() -> B) for ()" -> {{}}
+            "{fmt_rule(a_from_suba_and_b)} for SubA" -> {{"Param(SubA)" "{fmt_rule(b)} for ()"}}
+            "{fmt_rule(b)} for ()" -> {{}}
         }}"""
       ).strip(),
       subgraph,
@@ -608,12 +636,12 @@ class RuleGraphTest(TestBase):
               // root subject types: SubA
               // root entries
                 "Select(A) for SubA" [color=blue]
-                "Select(A) for SubA" -> {{"Rule({__name__}.a(SubA) -> A, gets=[Get((C) -> B)]) for SubA"}}
+                "Select(A) for SubA" -> {{"{fmt_rule(a, gets=[("B", "C")])} for SubA"}}
               // internal entries
-                "Rule({__name__}.a(SubA) -> A, gets=[Get((C) -> B)]) for SubA" -> {{"Param(SubA)" "Rule({__name__}.b_from_suba(SubA) -> B) for C"}}
-                "Rule({__name__}.b_from_suba(SubA) -> B) for C" -> {{"Rule({__name__}.suba_from_c(C) -> SubA) for C"}}
-                "Rule({__name__}.b_from_suba(SubA) -> B) for SubA" -> {{"Param(SubA)"}}
-                "Rule({__name__}.suba_from_c(C) -> SubA) for C" -> {{"Param(C)"}}
+                "{fmt_rule(a, gets=[("B", "C")])} for SubA" -> {{"Param(SubA)" "{fmt_rule(b_from_suba)} for C"}}
+                "{fmt_rule(b_from_suba)} for C" -> {{"{fmt_rule(suba_from_c)} for C"}}
+                "{fmt_rule(b_from_suba)} for SubA" -> {{"Param(SubA)"}}
+                "{fmt_rule(suba_from_c)} for C" -> {{"Param(C)"}}
             }}
         """).strip(),
         subgraph,
@@ -642,10 +670,10 @@ class RuleGraphTest(TestBase):
           // root subject types: SubA
           // root entries
             "Select(A) for SubA" [color=blue]
-            "Select(A) for SubA" -> {{"Rule({__name__}.a_from_b(B) -> A) for SubA"}}
+            "Select(A) for SubA" -> {{"{fmt_rule(a_from_b)} for SubA"}}
           // internal entries
-            "Rule({__name__}.a_from_b(B) -> A) for SubA" -> {{"Rule({__name__}.b_from_suba(SubA) -> B) for SubA"}}
-            "Rule({__name__}.b_from_suba(SubA) -> B) for SubA" -> {{"Param(SubA)"}}
+            "{fmt_rule(a_from_b)} for SubA" -> {{"{fmt_rule(b_from_suba)} for SubA"}}
+            "{fmt_rule(b_from_suba)} for SubA" -> {{"Param(SubA)"}}
         }}"""
       ).strip(),
       subgraph,
@@ -679,9 +707,9 @@ class RuleGraphTest(TestBase):
           // root subject types: SubA
           // root entries
             "Select(A) for ()" [color=blue]
-            "Select(A) for ()" -> {{"Rule({__name__}.a() -> A) for ()"}}
+            "Select(A) for ()" -> {{"{fmt_rule(a)} for ()"}}
           // internal entries
-            "Rule({__name__}.a() -> A) for ()" -> {{}}
+            "{fmt_rule(a)} for ()" -> {{}}
         }}"""
       ).strip(),
       subgraph,
@@ -710,9 +738,9 @@ class RuleGraphTest(TestBase):
           // root subject types: SubA
           // root entries
             "Select(A) for ()" [color=blue]
-            "Select(A) for ()" -> {{"Rule({__name__}.a() -> A) for ()"}}
+            "Select(A) for ()" -> {{"{fmt_rule(a)} for ()"}}
           // internal entries
-            "Rule({__name__}.a() -> A) for ()" -> {{}}
+            "{fmt_rule(a)} for ()" -> {{}}
         }}"""
       ).strip(),
       fullgraph,
@@ -743,12 +771,12 @@ class RuleGraphTest(TestBase):
           // root subject types: C, D
           // root entries
             "Select(A) for C" [color=blue]
-            "Select(A) for C" -> {{"Rule({__name__}.a_from_c(C) -> A) for C"}}
+            "Select(A) for C" -> {{"{fmt_rule(a_from_c)} for C"}}
             "Select(B) for (C, D)" [color=blue]
-            "Select(B) for (C, D)" -> {{"Rule({__name__}.b_from_d_and_a(D, A) -> B) for (C, D)"}}
+            "Select(B) for (C, D)" -> {{"{fmt_rule(b_from_d_and_a)} for (C, D)"}}
           // internal entries
-            "Rule({__name__}.a_from_c(C) -> A) for C" -> {{"Param(C)"}}
-            "Rule({__name__}.b_from_d_and_a(D, A) -> B) for (C, D)" -> {{"Param(D)" "Rule({__name__}.a_from_c(C) -> A) for C"}}
+            "{fmt_rule(a_from_c)} for C" -> {{"Param(C)"}}
+            "{fmt_rule(b_from_d_and_a)} for (C, D)" -> {{"Param(D)" "{fmt_rule(a_from_c)} for C"}}
         }}"""
       ).strip(),
       fullgraph,
@@ -784,9 +812,9 @@ class RuleGraphTest(TestBase):
           // root subject types: SubA
           // root entries
             "Select(A) for ()" [color=blue]
-            "Select(A) for ()" -> {{"Rule({__name__}.a() -> A) for ()"}}
+            "Select(A) for ()" -> {{"{fmt_rule(a)} for ()"}}
           // internal entries
-            "Rule({__name__}.a() -> A) for ()" -> {{}}
+            "{fmt_rule(a)} for ()" -> {{}}
         }}"""
       ).strip(),
       subgraph,
@@ -815,19 +843,16 @@ class RuleGraphTest(TestBase):
           // root subject types: SubA
           // root entries
             "Select(A) for SubA" [color=blue]
-            "Select(A) for SubA" -> {{"Rule({__name__}.a_from_suba(SubA, B) -> A) for SubA"}}
+            "Select(A) for SubA" -> {{"{fmt_rule(a_from_suba)} for SubA"}}
           // internal entries
-            "Rule({__name__}.a_from_suba(SubA, B) -> A) for SubA" -> {{"Param(SubA)" "Rule({__name__}.b_singleton() -> B) for ()"}}
-            "Rule({__name__}.b_singleton() -> B) for ()" -> {{}}
+            "{fmt_rule(a_from_suba)} for SubA" -> {{"Param(SubA)" "{fmt_rule(b_singleton)} for ()"}}
+            "{fmt_rule(b_singleton)} for ()" -> {{}}
         }}"""
       ).strip(),
       subgraph,
     )
 
   def test_depends_on_multiple_one_noop(self):
-    @rule
-    def b_from_a(a: A) -> B:
-      pass
 
     @rule
     def a_from_c(c: C) -> A:
@@ -837,10 +862,14 @@ class RuleGraphTest(TestBase):
     def a_from_suba(suba: SubA) -> A:
       pass
 
+    @rule
+    def b_from_a(a: A) -> B:
+      pass
+
     rules = [
-     b_from_a,
       a_from_c,
       a_from_suba,
+      b_from_a,
     ]
 
     subgraph = self.create_subgraph(B, rules, SubA(), validate=False)
@@ -852,16 +881,21 @@ class RuleGraphTest(TestBase):
           // root subject types: SubA
           // root entries
             "Select(B) for SubA" [color=blue]
-            "Select(B) for SubA" -> {{"Rule({__name__}.b_from_a(A) -> B) for SubA"}}
+            "Select(B) for SubA" -> {{"{fmt_rule(b_from_a)} for SubA"}}
           // internal entries
-            "Rule({__name__}.a_from_suba(SubA) -> A) for SubA" -> {{"Param(SubA)"}}
-            "Rule({__name__}.b_from_a(A) -> B) for SubA" -> {{"Rule({__name__}.a_from_suba(SubA) -> A) for SubA"}}
+            "{fmt_rule(a_from_suba)} for SubA" -> {{"Param(SubA)"}}
+            "{fmt_rule(b_from_a)} for SubA" -> {{"{fmt_rule(a_from_suba)} for SubA"}}
         }}"""
       ).strip(),
       subgraph,
     )
 
   def test_multiple_depend_on_same_rule(self):
+
+    @rule
+    def a_from_suba(suba: SubA) -> A:
+      pass
+
     @rule
     def b_from_a(a: A) -> B:
       pass
@@ -870,14 +904,10 @@ class RuleGraphTest(TestBase):
     def c_from_a(a: A) -> C:
       pass
 
-    @rule
-    def a_from_suba(suba: SubA) -> A:
-      pass
-
     rules = _suba_root_rules + [
+      a_from_suba,
       b_from_a,
       c_from_a,
-      a_from_suba,
     ]
 
     subgraph = self.create_full_graph(rules)
@@ -889,15 +919,15 @@ class RuleGraphTest(TestBase):
           // root subject types: SubA
           // root entries
             "Select(A) for SubA" [color=blue]
-            "Select(A) for SubA" -> {{"Rule({__name__}.a_from_suba(SubA) -> A) for SubA"}}
+            "Select(A) for SubA" -> {{"{fmt_rule(a_from_suba)} for SubA"}}
             "Select(B) for SubA" [color=blue]
-            "Select(B) for SubA" -> {{"Rule({__name__}.b_from_a(A) -> B) for SubA"}}
+            "Select(B) for SubA" -> {{"{fmt_rule(b_from_a)} for SubA"}}
             "Select(C) for SubA" [color=blue]
-            "Select(C) for SubA" -> {{"Rule({__name__}.c_from_a(A) -> C) for SubA"}}
+            "Select(C) for SubA" -> {{"{fmt_rule(c_from_a)} for SubA"}}
           // internal entries
-            "Rule({__name__}.a_from_suba(SubA) -> A) for SubA" -> {{"Param(SubA)"}}
-            "Rule({__name__}.b_from_a(A) -> B) for SubA" -> {{"Rule({__name__}.a_from_suba(SubA) -> A) for SubA"}}
-            "Rule({__name__}.c_from_a(A) -> C) for SubA" -> {{"Rule({__name__}.a_from_suba(SubA) -> A) for SubA"}}
+            "{fmt_rule(a_from_suba)} for SubA" -> {{"Param(SubA)"}}
+            "{fmt_rule(b_from_a)} for SubA" -> {{"{fmt_rule(a_from_suba)} for SubA"}}
+            "{fmt_rule(c_from_a)} for SubA" -> {{"{fmt_rule(a_from_suba)} for SubA"}}
         }}"""
       ).strip(),
       subgraph,
@@ -926,10 +956,10 @@ class RuleGraphTest(TestBase):
           // root subject types: SubA
           // root entries
             "Select(A) for ()" [color=blue]
-            "Select(A) for ()" -> {{"Rule({__name__}.a() -> A, gets=[Get((D) -> B)]) for ()"}}
+            "Select(A) for ()" -> {{"{fmt_rule(a, gets=[("B", "D")])} for ()"}}
           // internal entries
-            "Rule({__name__}.a() -> A, gets=[Get((D) -> B)]) for ()" -> {{"Rule({__name__}.b_from_d(D) -> B) for D"}}
-            "Rule({__name__}.b_from_d(D) -> B) for D" -> {{"Param(D)"}}
+            "{fmt_rule(a, gets=[("B", "D")])} for ()" -> {{"{fmt_rule(b_from_d)} for D"}}
+            "{fmt_rule(b_from_d)} for D" -> {{"Param(D)"}}
         }}"""
       ).strip(),
       subgraph,

@@ -111,6 +111,7 @@ python_tests(
   dependencies=[
     '3rdparty/python:dataclasses',
     ':scheduler_test_base',
+    ':rules',
     'src/python/pants/base:cmd_line_spec_parser',
     'src/python/pants/build_graph',
     'src/python/pants/engine:nodes',
@@ -196,6 +197,7 @@ python_tests(
   dependencies=[
     '3rdparty/python:dataclasses',
     ':util',
+    ':rules',
     'src/python/pants/base:cmd_line_spec_parser',
     'src/python/pants/build_graph',
     'src/python/pants/engine:scheduler',
