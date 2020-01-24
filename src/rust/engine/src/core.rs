@@ -168,6 +168,8 @@ impl Function {
     let Function(key) = self;
     let module = externs::project_str(&externs::val_for(&key), "__module__");
     let name = externs::project_str(&externs::val_for(&key), "__name__");
+    // NB: this is a custom dunder method that Python code should populate before sending the
+    // function (e.g. an `@rule`) through FFI.
     let line_number = externs::project_str(&externs::val_for(&key), "__line_number__");
     format!("{}:{}:{}", module, line_number, name)
   }
