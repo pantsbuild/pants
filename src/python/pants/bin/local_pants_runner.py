@@ -270,13 +270,18 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     self._reporting.initialize(self._run_tracker, self._options, start_time=self._run_start_time)
 
     spec_parser = CmdLineSpecParser(get_buildroot())
-    address_specs = [
-      spec_parser.parse_spec(spec).to_spec_string()
-      for spec in self._options.specs
-      if isinstance(spec_parser.parse_spec(spec), AddressSpec)
-    ]
+    specs: List[str] = []
+    for spec in self._options.specs:
+      parsed_spec = spec_parser.parse_spec(spec).to_spec_string()
+      # NB: we parse the spec so that we may normalize the target shorthand, e.g.
+      # `src/python/pants/util` -> `src/python/pants/util:util`.
+      if isinstance(parsed_spec, AddressSpec):
+        specs.append(parsed_spec.to_spec_string())
+      # In contrast, filesystem specs need no normalization so we use the raw spec.
+      else:
+        specs.append(spec)
     # Note: This will not include values from `--owner-of` or `--changed-*` flags.
-    self._run_tracker.run_info.add_info("specs_from_command_line", address_specs, stringify=False)
+    self._run_tracker.run_info.add_info("specs_from_command_line", specs, stringify=False)
 
     # Capture a repro of the 'before' state for this build, if needed.
     self._repro = Reproducer.global_instance().create_repro()
