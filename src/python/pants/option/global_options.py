@@ -510,7 +510,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     # Toggles v1/v2 `Task` vs `@rule` pipelines on/off.
     register('--v1', advanced=True, type=bool, default=True,
              help='Enables execution of v1 Tasks.')
-    register('--v2', advanced=True, type=bool, default=False,
+    register('--v2', advanced=True, type=bool, default=True,
              help='Enables execution of v2 @goal_rules.')
     register('--v2-ui', default=False, type=bool, daemon=False,
              help='Whether to show v2 engine execution progress. '
