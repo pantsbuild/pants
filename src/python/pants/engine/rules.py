@@ -156,6 +156,9 @@ def _make_rule(
     else:
       effective_name = name
 
+    # Set our own custom `__line_number__` dunder so that the engine may visualize the line number.
+    func.__line_number__ = func.__code__.co_firstlineno
+
     func.rule = TaskRule(
         return_type,
         tuple(parameter_types),
