@@ -37,9 +37,9 @@ class GlobMatchErrorBehavior(Enum):
   NB: this object is interpreted from within Snapshot::lift_path_globs() -- that method will need to
   be aware of any changes to this object's definition.
   """
-  ignore = "ignore"
-  warn = "warn"
-  error = "error"
+  IGNORE = "ignore"
+  WARN = "warn"
+  ERROR = "error"
 
 
 @dataclass(frozen=True)
@@ -285,9 +285,11 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                   'Patterns use the gitignore syntax (https://git-scm.com/docs/gitignore). '
                   'The `--pants-distdir` and `--pants-workdir` locations are inherently ignored.')
     register('--glob-expansion-failure', advanced=True,
-             default=GlobMatchErrorBehavior.warn, type=GlobMatchErrorBehavior,
-             help="Raise an exception if any targets declaring source files "
-                  "fail to match any glob provided in the 'sources' argument.")
+             default=GlobMatchErrorBehavior.WARN, type=GlobMatchErrorBehavior,
+             help="What to do when any filesystem specs cannot be found or any files in a target's "
+                  "`sources` argument may not be found. This happens when the files specified do "
+                  "not exist on your machine or when they are ignored by the `--pants-ignore` "
+                  "option.")
 
     # TODO(#7203): make a regexp option type!
     register('--exclude-target-regexp', advanced=True, type=list, default=[], daemon=False,

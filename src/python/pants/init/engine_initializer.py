@@ -312,7 +312,7 @@ class EngineInitializer:
     build_configuration: BuildConfiguration,
     build_root: Optional[str] = None,
     native: Optional[Native] = None,
-    glob_match_error_behavior: Optional[GlobMatchErrorBehavior] = None,
+    glob_match_error_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.WARN,
     build_ignore_patterns=None,
     exclude_target_regexps=None,
     subproject_roots=None,
@@ -369,7 +369,7 @@ class EngineInitializer:
 
     @rule
     def glob_match_error_behavior_singleton() -> GlobMatchErrorBehavior:
-      return glob_match_error_behavior or GlobMatchErrorBehavior.ignore
+      return glob_match_error_behavior
 
     @rule
     def build_configuration_singleton() -> BuildConfiguration:

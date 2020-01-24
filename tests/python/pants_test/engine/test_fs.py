@@ -481,7 +481,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
       self.assert_walk_files(PathGlobs(
         include=['not-a-file.txt'],
         exclude=[],
-        glob_match_error_behavior=GlobMatchErrorBehavior.error,
+        glob_match_error_behavior=GlobMatchErrorBehavior.ERROR,
       ), [])
     expected_msg = (
       "Globs did not match. Excludes were: []. Unmatched globs were: [\"not-a-file.txt\"].")
@@ -492,7 +492,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
       self.assert_walk_files(PathGlobs(
         include=['*.txt'],
         exclude=['4.txt'],
-        glob_match_error_behavior=GlobMatchErrorBehavior.error,
+        glob_match_error_behavior=GlobMatchErrorBehavior.ERROR,
       ), [])
     expected_msg = (
       "Globs did not match. Excludes were: [\"4.txt\"]. Unmatched globs were: [\"*.txt\"].")
@@ -503,7 +503,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
       self.assert_walk_files(PathGlobs(
         include=['not-a-file.txt'],
         exclude=[''],
-        glob_match_error_behavior=GlobMatchErrorBehavior.ignore,
+        glob_match_error_behavior=GlobMatchErrorBehavior.IGNORE,
       ), [])
       self.assertEqual(0, len(captured.warnings()))
 
@@ -513,7 +513,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
       self.assert_walk_files(PathGlobs(
         include=['not-a-file.txt'],
         exclude=[''],
-        glob_match_error_behavior=GlobMatchErrorBehavior.warn,
+        glob_match_error_behavior=GlobMatchErrorBehavior.WARN,
       ), [])
       all_warnings = captured.warnings()
       self.assertEqual(1, len(all_warnings))
