@@ -52,6 +52,8 @@ class IdeaPluginGen(ConsoleTask):
 
   PROJECT_NAME_LIMIT = 200
 
+  _register_console_transitivity_option = False
+
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
@@ -75,6 +77,18 @@ class IdeaPluginGen(ConsoleTask):
                   'jdk name for the --java-language-level is used')
     register('--java-language-level', type=int, default=8,
              help='Sets the java language and jdk used to compile the project\'s java sources.')
+    register(
+      '--transitive', type=bool, default=True, fingerprint=True,
+      help='If True, use all targets in the build graph, else use only target roots.',
+      removal_version="1.27.0.dev0",
+      removal_hint="`idea-plugin` should always act transitively, which is the default. This option "
+                   "will be going away to ensure that Pants always does the right thing.",
+    )
+
+  @property
+  def act_transitively(self):
+    # NB: `idea-plugin` should always act transitively
+    return self.get_options().transitive
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)

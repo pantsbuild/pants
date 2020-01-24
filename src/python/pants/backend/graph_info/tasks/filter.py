@@ -24,6 +24,8 @@ class Filter(TargetFilterTaskMixin, ConsoleTask):
   between them.
   """
 
+  _register_console_transitivity_option = False
+
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
@@ -37,6 +39,12 @@ class Filter(TargetFilterTaskMixin, ConsoleTask):
              help='Filter on target addresses matching these regexes.')
     register('--tag-regex', type=list, metavar='[+-]regex1,regex2,...',
              help='Filter on targets with tags matching these regexes.')
+    register(
+      '--transitive', type=bool, default=True, fingerprint=True,
+      help='If True, use all targets in the build graph, else use only target roots.',
+      removal_version="1.27.0.dev0",
+      removal_hint="This option has no impact on the goal `filter`.",
+    )
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)

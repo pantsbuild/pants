@@ -61,6 +61,22 @@ class Dependencies(ConsoleTask):
       else:
         self.dependency_type = DependencyType.SOURCE_AND_THIRD_PARTY
 
+  @property
+  def act_transitively(self):
+    # NB: Stop overriding this property once the deprecation is complete.
+    deprecated_conditional(
+      lambda: self.get_options().is_default("transitive"),
+      entity_description=f"Pants defaulting to `--dependencies-transitive`",
+      removal_version="1.28.0.dev0",
+      hint_message="Currently, Pants defaults to `--dependencies-transitive`, which means that it "
+                   "will find all transitive dependencies for the target, rather than only direct "
+                   "dependencies. This is a useful feature, but surprising to be the default."
+                   "\n\nTo prepare for this change to the default value, set in `pants.ini` under "
+                   "the section `dependencies` the value `transitive: False`. In Pants 1.28.0, "
+                   "you can safely remove the setting."
+    )
+    return self.get_options().transitive
+
   def console_output(self, unused_method_argument):
     opts = self.get_options()
     deprecated_conditional(
