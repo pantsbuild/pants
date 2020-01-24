@@ -168,9 +168,8 @@ impl Function {
     let Function(key) = self;
     let module = externs::project_str(&externs::val_for(&key), "__module__");
     let name = externs::project_str(&externs::val_for(&key), "__name__");
-    let code = externs::project_ignoring_type(&externs::val_for(&key), "__code__");
-    let lineno = externs::project_str(&code, "co_firstlineno");
-    format!("{}:{}:{}", module, lineno, name)
+    let line_number = externs::project_str(&externs::val_for(&key), "__line_number__");
+    format!("{}:{}:{}", module, line_number, name)
   }
 }
 

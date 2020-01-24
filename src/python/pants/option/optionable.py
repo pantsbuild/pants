@@ -6,7 +6,6 @@ import inspect
 import re
 from abc import ABC, ABCMeta, abstractmethod
 from typing import Optional, Type
-from unittest.mock import Mock
 
 from pants.engine.selectors import Get
 from pants.option.errors import OptionsError
@@ -51,10 +50,8 @@ class OptionableFactory(ABC):
     snake_scope = cls.options_scope.replace('-', '_')
     partial_construct_optionable.__name__ = f'construct_scope_{snake_scope}'
     partial_construct_optionable.__module__ = cls.__module__
-    # It's a code smell to use unittest.mock in production, but this is a lightweight mechanism
-    # to get the engine to correctly display the class definition line.
     _, class_definition_lineno = inspect.getsourcelines(cls)
-    partial_construct_optionable.__code__ = Mock(co_firstlineno=class_definition_lineno)
+    partial_construct_optionable.__line_number__ = class_definition_lineno
 
     return dict(
         output_type=cls.optionable_cls,
