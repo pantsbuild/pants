@@ -2,9 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import functools
+import inspect
 import re
 from abc import ABC, ABCMeta, abstractmethod
 from typing import Optional, Type
+from unittest.mock import Mock
 
 from pants.engine.selectors import Get
 from pants.option.errors import OptionsError
@@ -41,9 +43,19 @@ class OptionableFactory(ABC):
 
     TODO: This indirection avoids a cycle between this module and the `rules` module.
     """
-    snake_scope = cls.options_scope.replace('-', '_')
     partial_construct_optionable = functools.partial(_construct_optionable, cls)
+
+    # NB: We must populate several dunder methods on the partial function because partial functions
+    # do not have these defined by default and the engine uses these values to visualize functions
+    # in error messages and the rule graph.
+    snake_scope = cls.options_scope.replace('-', '_')
     partial_construct_optionable.__name__ = f'construct_scope_{snake_scope}'
+    partial_construct_optionable.__module__ = cls.__module__
+    # It's a code smell to use unittest.mock in production, but this is a lightweight mechanism
+    # to get the engine to correctly display the class definition line.
+    _, class_definition_lineno = inspect.getsourcelines(cls)
+    partial_construct_optionable.__code__ = Mock(co_firstlineno=class_definition_lineno)
+
     return dict(
         output_type=cls.optionable_cls,
         input_selectors=tuple(),
