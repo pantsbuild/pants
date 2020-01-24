@@ -57,9 +57,8 @@ class PytestTestBase(PythonTaskTestBase, DeclarativeTaskTestMixin):
   _default_test_options = {
     'colors': False,
     'level': 'info',  # When debugging a test failure it may be helpful to set this to 'debug'.
-    # TODO(8989): Don't require chroot=False and fast=True
+    # TODO(8989): Don't require chroot=False
     'chroot': False,
-    'fast': True,
   }
 
   def _augment_options(self, options):
@@ -432,19 +431,20 @@ python_tests(
     self.py23 = self.target('tests:py23-tests')
     self.py3_and_more = self.target('tests:py3-and-more-tests')
 
-  @ensure_cached(PytestRun, expected_num_artifacts=0)
+  @ensure_cached(PytestRun, expected_num_artifacts=1)
   def test_error(self):
     """Test that a test that errors rather than fails shows up in ErrorWhileTesting."""
-
-    self.run_failing_tests(targets=[self.red, self.green, self.error],
-                           failed_targets=[self.red, self.error])
-
-  @ensure_cached(PytestRun, expected_num_artifacts=0)
-  def test_error_outside_function(self):
-    self.run_failing_tests(targets=[self.red, self.green, self.failure_outside_function],
-                           failed_targets=[self.red, self.failure_outside_function])
+    failing_targets = [self.red, self.error]
+    self.run_failing_tests(targets=[self.green, *failing_targets],
+                           failed_targets=failing_targets)
 
   @ensure_cached(PytestRun, expected_num_artifacts=1)
+  def test_error_outside_function(self):
+    failing_targets = [self.red, self.failure_outside_function]
+    self.run_failing_tests(targets=[self.green, *failing_targets],
+                           failed_targets=failing_targets)
+
+  @ensure_cached(PytestRun, expected_num_artifacts=2)
   def test_succeeds_for_intersecting_unique_constraints(self):
     self.run_tests(targets=[self.py23, self.py3_and_more])
 
@@ -457,15 +457,13 @@ python_tests(
     self.run_tests(targets=[self.green, self.green2, self.green3], fast=True)
 
   @ensure_cached(PytestRun, expected_num_artifacts=3)
-  def test_cache_greens_slow(self):
-    self.run_tests(targets=[self.green, self.green2, self.green3], fast=False)
+  def test_cache_greens(self):
+    self.run_tests(targets=[self.green, self.green2, self.green3])
 
   def test_timeout_slow(self):
-    # Confirm that if we run fast=False with timeouts, the correct test is blamed.
     self.run_failing_tests(
         targets=[self.green, self.sleep_timeout],
         failed_targets=[self.sleep_timeout],
-        fast=False,
         timeout_default=3,
       )
 
@@ -476,8 +474,8 @@ python_tests(
   # NB: Both red and green are cached. Red because its skipped via deselect and so runs (noops)
   # successfully. This is OK since the -k passthru is part of the task fingerprinting.
   @ensure_cached(PytestRun, expected_num_artifacts=2)
-  def test_out_of_band_deselect_no_fast_success(self):
-    self.run_tests([self.green, self.red], '-ktest_core_green', fast=False)
+  def test_out_of_band_deselect_success(self):
+    self.run_tests([self.green, self.red], '-ktest_core_green')
 
   @ensure_cached(PytestRun, expected_num_artifacts=0)
   def test_red(self):
@@ -491,17 +489,16 @@ python_tests(
                            fast=True)
 
   @ensure_cached(PytestRun, expected_num_artifacts=0)
-  def test_fail_fast_skips_second_red_test_with_isolated_chroots(self):
+  def test_fail_fast_skips_second_red_test(self):
     self.run_failing_tests(targets=[self.red, self.red_in_class],
                            failed_targets=[self.red],
-                           fail_fast=True,
-                           fast=False)
+                           fail_fast=True)
 
   @ensure_cached(PytestRun, expected_num_artifacts=0)
   def test_red_test_in_class(self):
     self.run_failing_tests(targets=[self.red_in_class], failed_targets=[self.red_in_class])
 
-  @ensure_cached(PytestRun, expected_num_artifacts=0)
+  @ensure_cached(PytestRun, expected_num_artifacts=1)
   def test_mixed(self):
     self.run_failing_tests(targets=[self.green, self.red], failed_targets=[self.red])
 
@@ -520,14 +517,12 @@ python_tests(
 
       self.assert_test_info(junit_xml_dir, ('test_one', 'success'))
 
-  @ensure_cached(PytestRun, expected_num_artifacts=0)
+  @ensure_cached(PytestRun, expected_num_artifacts=1)
   def test_red_junit_xml_dir(self):
     with temporary_dir() as junit_xml_dir:
       self.run_failing_tests(targets=[self.red, self.green],
                              failed_targets=[self.red],
-                             junit_xml_dir=junit_xml_dir,
-                             fast=True,
-                             fail_fast=False)
+                             junit_xml_dir=junit_xml_dir)
 
       self.assert_test_info(junit_xml_dir, ('test_one', 'success'), ('test_two', 'failure'))
 
@@ -611,12 +606,12 @@ python_tests(
     self.assertEqual([1, 2, 5, 6], all_statements)
     self.assertEqual([2], not_run_statements)
 
-  @ensure_cached(PytestRun, expected_num_artifacts=0)
+  @ensure_cached(PytestRun, expected_num_artifacts=1)
   def test_coverage_auto_option_mixed_multiple_targets(self):
     all_statements, not_run_statements = self.run_coverage_auto(targets=[self.green, self.red],
                                                                 failed_targets=[self.red])
     self.assertEqual([1, 2, 5, 6], all_statements)
-    self.assertEqual([], not_run_statements)
+    self.assertEqual([2], not_run_statements)
 
   @ensure_cached(PytestRun, expected_num_artifacts=0)
   def test_coverage_auto_option_mixed_single_target(self):
@@ -781,7 +776,7 @@ python_tests(
     # short-circuiting coverage.
     self.run_coverage_auto(targets=[self.all], failed_targets=[self.all], expect_coverage=False)
 
-  @ensure_cached(PytestRun, expected_num_artifacts=0)
+  @ensure_cached(PytestRun, expected_num_artifacts=1)
   def test_coverage_modules_dne_option(self):
     self.assertFalse(os.path.isfile(self.coverage_data_file()))
 
@@ -848,7 +843,6 @@ python_tests(
     self.assertEqual([1, 2, 5, 6], all_statements)
     self.assertEqual([2], not_run_statements)
 
-  @ensure_cached(PytestRun, expected_num_artifacts=1)
   def test_sharding(self):
     shard0_failed_targets = self.try_run_tests(targets=[self.red, self.green], test_shard='0/2')
     shard1_failed_targets = self.try_run_tests(targets=[self.red, self.green], test_shard='1/2')
