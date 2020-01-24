@@ -38,7 +38,7 @@ class JavadocGen(JvmdocGen):
       return None
 
     # Without a JDK/tools.jar we have no javadoc tool and cannot proceed, so check/acquire early.
-    jdk = DistributionLocator.cached(jdk=True)
+    jdk = self.preferred_jvm_distribution_for_targets(targets, jdk=True)
     tool_classpath = jdk.find_libs(['tools.jar'])
 
     args = ['-quiet',
