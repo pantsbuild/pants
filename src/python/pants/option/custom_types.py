@@ -338,5 +338,5 @@ class GlobExpansionConjunction(Enum):
   NB: this object is interpreted from within Snapshot::lift_path_globs() -- that method will need to
   be aware of any changes to this object's definition.
   """
-  ANY_MATCH = "any_match"
-  ALL_MATCH = "all_match"
+  any_match = "any_match"
+  all_match = "all_match"

@@ -64,13 +64,13 @@ class TargetAdaptor(StructWithDeps):
         globs = Globs(*self.default_sources_globs,
                       spec_path=self.address.spec_path,
                       exclude=self.default_sources_exclude_globs or [])
-        conjunction_globs = GlobsWithConjunction(globs, GlobExpansionConjunction.ANY_MATCH)
+        conjunction_globs = GlobsWithConjunction(globs, GlobExpansionConjunction.any_match)
       else:
         globs = None
         conjunction_globs = None
     else:
       globs = BaseGlobs.from_sources_field(sources, self.address.spec_path)
-      conjunction_globs = GlobsWithConjunction(globs, GlobExpansionConjunction.ALL_MATCH)
+      conjunction_globs = GlobsWithConjunction(globs, GlobExpansionConjunction.all_match)
 
     return conjunction_globs
 
@@ -240,7 +240,7 @@ class AppAdaptor(TargetAdaptor):
       # TODO: we want to have this field set from the global option --glob-expansion-failure, or
       # something set on the target. Should we move --glob-expansion-failure to be a bootstrap
       # option? See #5864.
-      path_globs = base_globs.to_path_globs(rel_root, GlobExpansionConjunction.ALL_MATCH)
+      path_globs = base_globs.to_path_globs(rel_root, GlobExpansionConjunction.all_match)
 
       filespecs_list.append(base_globs.filespecs)
       path_globs_list.append(path_globs)
@@ -277,7 +277,7 @@ class PythonTargetAdaptor(TargetAdaptor):
       if getattr(self, 'resources', None) is None:
         return field_adaptors
       base_globs = BaseGlobs.from_sources_field(self.resources, self.address.spec_path)
-      path_globs = base_globs.to_path_globs(self.address.spec_path, GlobExpansionConjunction.ALL_MATCH)
+      path_globs = base_globs.to_path_globs(self.address.spec_path, GlobExpansionConjunction.all_match)
       sources_field = SourcesField(self.address,
                                    'resources',
                                    base_globs.filespecs,
@@ -442,7 +442,7 @@ class GlobsWithConjunction:
 
   @classmethod
   def for_literal_files(cls, file_paths, spec_path):
-    return cls(Files(*file_paths, spec_path=spec_path), GlobExpansionConjunction.ALL_MATCH)
+    return cls(Files(*file_paths, spec_path=spec_path), GlobExpansionConjunction.all_match)
 
 
 def rules():

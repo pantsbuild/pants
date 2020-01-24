@@ -312,7 +312,7 @@ class EngineInitializer:
     build_configuration: BuildConfiguration,
     build_root: Optional[str] = None,
     native: Optional[Native] = None,
-    glob_match_error_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.WARN,
+    glob_match_error_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.warn,
     build_ignore_patterns=None,
     exclude_target_regexps=None,
     subproject_roots=None,
