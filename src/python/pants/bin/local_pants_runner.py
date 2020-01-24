@@ -272,7 +272,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     spec_parser = CmdLineSpecParser(get_buildroot())
     specs: List[str] = []
     for spec in self._options.specs:
-      parsed_spec = spec_parser.parse_spec(spec).to_spec_string()
+      parsed_spec = spec_parser.parse_spec(spec)
       # NB: we parse the spec so that we may normalize the target shorthand, e.g.
       # `src/python/pants/util` -> `src/python/pants/util:util`.
       if isinstance(parsed_spec, AddressSpec):
