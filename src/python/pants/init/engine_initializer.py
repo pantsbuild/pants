@@ -216,7 +216,7 @@ class LegacyGraphSession:
 
     console = Console(
       use_colors=global_options.colors,
-      session=self.scheduler_session if global_options.v2_ui else None,
+      session=self.scheduler_session if global_options.get('v2_ui') else None,
     )
     workspace = Workspace(self.scheduler_session)
     interactive_runner = InteractiveRunner(self.scheduler_session)
