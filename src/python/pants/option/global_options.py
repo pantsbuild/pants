@@ -286,10 +286,9 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                   'The `--pants-distdir` and `--pants-workdir` locations are inherently ignored.')
     register('--glob-expansion-failure', advanced=True,
              default=GlobMatchErrorBehavior.warn, type=GlobMatchErrorBehavior,
-             help="What to do when any filesystem specs cannot be found or any files in a target's "
-                  "`sources` argument may not be found. This happens when the files specified do "
-                  "not exist on your machine or when they are ignored by the `--pants-ignore` "
-                  "option.")
+             help="What to do when files specified on the command line or in BUILD files cannot be "
+                  "found. This happens when the files do not exist on your machine or when they "
+                  "are ignored by the `--pants-ignore` option.")
 
     # TODO(#7203): make a regexp option type!
     register('--exclude-target-regexp', advanced=True, type=list, default=[], daemon=False,
