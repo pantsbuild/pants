@@ -515,11 +515,12 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     if register.bootstrap.v2:
       register('--v2-ui', default=True, type=bool, daemon=False,
                help='Whether to show v2 engine execution progress.')
-      loop_flag = '--loop'
-      register(loop_flag, type=bool,
-               help='Run v2 @goal_rules continuously as file changes are detected.')
-      register('--loop-max', type=int, default=2**32, advanced=True,
-               help=f'The maximum number of times to loop when `{loop_flag}` is specified.')
+      if not register.bootstrap.v1:
+        loop_flag = '--loop'
+        register(loop_flag, type=bool,
+                 help='Run v2 @goal_rules continuously as file changes are detected.')
+        register('--loop-max', type=int, default=2**32, advanced=True,
+                 help=f'The maximum number of times to loop when `{loop_flag}` is specified.')
 
     if register.bootstrap.v1:
       register('-x', '--time', type=bool,
@@ -567,14 +568,8 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
 
     Raises pants.option.errors.OptionsError on validation failure.
     """
-    if opts.loop and (not opts.v2 or opts.v1):
-      raise OptionsError('The `--loop` option only works with @goal_rules, and thus requires '
-                         '`--v2 --no-v1` to function as expected.')
-    if opts.loop and not opts.enable_pantsd:
+    if opts.get('loop') and not opts.enable_pantsd:
       raise OptionsError('The `--loop` option requires `--enable-pantsd`, in order to watch files.')
-
-    if opts.v2_ui and not opts.v2:
-      raise OptionsError('The `--v2-ui` option requires `--v2` to be enabled together.')
 
     if opts.remote_execution and not opts.remote_execution_server:
       raise OptionsError("The `--remote-execution` option requires also setting "
