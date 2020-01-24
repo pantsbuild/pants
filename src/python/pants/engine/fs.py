@@ -189,6 +189,7 @@ class Snapshot:
 class SnapshotSubset:
   """A request to create a subset of a snapshot."""
   directory_digest: Digest
+  includes: PathGlobs
   include_files: Tuple[str, ...]
   include_dirs: Tuple[str, ...]
 

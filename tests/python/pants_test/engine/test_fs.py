@@ -603,25 +603,42 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
       FileContent(path='subdir/a.txt', content=content),
       FileContent(path='subdir/b.txt', content=content),
       FileContent(path='subdir2/a.txt', content=content),
+      FileContent(path='subdir2/nested_subdir/x.txt', content=content),
     ))
     digest = self.request_single_product(Digest, input_files_content)
     return digest
 
   def test_empty_snapshot_subset(self) -> None:
     ss = SnapshotSubset(directory_digest=self.generate_original_digest(),
+        includes = PathGlobs((), ()),
         include_files=(),
         include_dirs=(),
     )
-    subset_digest = self.request_single_product(Digest, ss)
-    assert subset_digest == EMPTY_DIRECTORY_DIGEST
+    subset_snapshot = self.request_single_product(Snapshot, ss)
+    assert subset_snapshot.directory_digest == EMPTY_DIRECTORY_DIGEST
+    assert subset_snapshot.files == ()
+    assert subset_snapshot.dirs == ()
 
   def test_snapshot_subset_files_dirs(self) -> None:
-    ss = SnapshotSubset(directory_digest=self.generate_original_digest(),
+    ss1 = SnapshotSubset(directory_digest=self.generate_original_digest(),
+        includes=PathGlobs(("a.txt", "c.txt", "subdir2/**"), ()),
         include_files=("a.txt", "c.txt"),
         include_dirs=('subdir2',),
     )
-    subset_snapshot = self.request_single_product(Snapshot, ss)
-    assert set(subset_snapshot.files) == {'a.txt', 'c.txt', 'subdir2/a.txt'}
+
+    subset_snapshot = self.request_single_product(Snapshot, ss1)
+    assert set(subset_snapshot.files) == {'a.txt', 'c.txt', 'subdir2/a.txt', 'subdir2/nested_subdir/x.txt'}
+
+    ss2 = SnapshotSubset(directory_digest=self.generate_original_digest(),
+        includes=PathGlobs(("a.txt", "c.txt", "subdir2/*"), ()),
+        include_files=("a.txt", "c.txt"),
+        include_dirs=('subdir2',),
+    )
+
+    subset_snapshot = self.request_single_product(Snapshot, ss2)
+    assert set(subset_snapshot.files) == {'a.txt', 'c.txt', 'subdir2/a.txt'} 
+
+
 
 
 class StubHandler(BaseHTTPRequestHandler):

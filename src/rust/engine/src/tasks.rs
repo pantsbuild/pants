@@ -175,7 +175,7 @@ impl Tasks {
         input: types.multi_platform_process_request,
       },
       Intrinsic {
-        product: types.directory_digest,
+        product: types.snapshot,
         input: types.snapshot_subset,
       },
     ];

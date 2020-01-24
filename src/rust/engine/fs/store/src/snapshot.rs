@@ -564,38 +564,76 @@ impl Snapshot {
   pub fn get_snapshot_subset(
     store: Store,
     digest: Digest,
-    include_files: BTreeSet<String>,
-    include_dirs: BTreeSet<String>,
+    path_globs: PathGlobs,
+    _include_files: BTreeSet<String>,
+    _include_dirs: BTreeSet<String>,
     workunit_store: WorkUnitStore,
-  ) -> BoxFuture<Digest, String> {
+  ) -> BoxFuture<Snapshot, String> {
     use bazel_protos::remote_execution::{Directory, DirectoryNode, FileNode};
-    use protobuf::RepeatedField;
 
-    let directory = store
-      .load_directory(digest, workunit_store)
-      .and_then(move |maybe_directory| {
-        maybe_directory
-          .map(|(dir, _metadata)| dir)
-          .ok_or_else(|| format!("Digest {:?} did not exist in the Store.", digest))
-      });
-    directory
-      .and_then(move |mut directory: Directory| {
-        let mut out_dir = Directory::new();
-        let file_nodes: RepeatedField<FileNode> = directory.take_files();
-        let subset_file_nodes = file_nodes
-          .into_iter()
-          .filter(|orig_file: &FileNode| include_files.contains(orig_file.get_name()))
-          .collect();
-        out_dir.set_files(subset_file_nodes);
+  let traverser = move |_store: &Store, path_so_far: &PathBuf, _digest: Digest, directory: &Directory| -> BoxFuture<Vec<PathStat>, String> {
+    let subdir_paths: Vec<PathBuf> = directory.get_directories()
+      .iter()
+      .map(move |node: &DirectoryNode| path_so_far.join(node.get_name()))
+      .collect();
 
-        let directory_nodes: RepeatedField<DirectoryNode> = directory.take_directories();
-        let subset_dir_nodes = directory_nodes
-          .into_iter()
-          .filter(|orig_dir: &DirectoryNode| include_dirs.contains(orig_dir.get_name()))
-          .collect();
+    let file_paths: Vec<PathBuf> = directory.get_files()
+      .iter()
+      .map(|node: &FileNode| path_so_far.join(node.get_name()))
+      .collect();
 
-        out_dir.set_directories(subset_dir_nodes);
-        store.record_directory(&out_dir, true)
+    let filtered_subdirs = future::result(path_globs.filter(subdir_paths));
+    let filtered_files = future::result(path_globs.filter(file_paths));
+
+    filtered_subdirs.join(filtered_files)
+      .and_then(|(subdirs, files): (Vec<PathBuf>, Vec<PathBuf>)| {
+
+        let mut path_stats: Vec<PathStat> = vec![];
+
+        for path in subdirs.into_iter() {
+          path_stats.push(PathStat::dir(path.clone(), Dir(path)));
+        }
+
+        for path in files.into_iter() {
+          path_stats.push(PathStat::file(path.clone(), File { path, is_executable: false }));
+        }
+
+        future::ok(path_stats)
+      })
+    .to_boxed()
+  };
+
+    #[derive(Clone)]
+    struct Digester {
+      digest: hashing::Digest,
+    }
+
+    impl StoreFileByDigest<String> for Digester {
+      fn store_by_digest(
+        &self,
+        _: fs::File,
+        _: WorkUnitStore,
+      ) -> BoxFuture<hashing::Digest, String> {
+        future::ok(self.digest).to_boxed()
+      }
+    }
+
+    store
+      .walk(digest, traverser, workunit_store.clone())
+      .and_then(move |path_stats_per_directory| {
+        println!("Path stats per directory: {:?}", path_stats_per_directory);
+        let mut path_stats =
+          Iterator::flatten(path_stats_per_directory.into_iter().map(Vec::into_iter))
+          .collect::<Vec<_>>();
+        path_stats.sort_by(|l, r| l.path().cmp(&r.path()));
+        println!("Path stats about to go into snapshot: {:?}", path_stats);
+        let digester = Digester { digest };
+        Snapshot::from_path_stats(
+          store,
+          &digester,
+          path_stats,
+          workunit_store,
+        )
       })
       .to_boxed()
   }
