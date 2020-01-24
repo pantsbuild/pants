@@ -53,7 +53,7 @@ class Filter(TargetFilterTaskMixin, ConsoleTask):
     def _get_targets(spec_str):
       spec_parser = CmdLineSpecParser(get_buildroot())
       try:
-        address_spec = spec_parser.parse_address_spec(spec_str)
+        address_spec = spec_parser.parse_spec(spec_str)
         addresses = self.context.address_mapper.scan_address_specs([address_spec])
       except AddressLookupError as e:
         raise TaskError('Failed to parse address selector: {spec_str}\n {message}'.format(spec_str=spec_str, message=e))

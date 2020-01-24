@@ -8,6 +8,7 @@ from xml.dom import minidom
 from pants.backend.project_info.tasks.idea_plugin_gen import IDEA_PLUGIN_VERSION, IdeaPluginGen
 from pants.base.build_environment import get_buildroot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
+from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import temporary_file
 
@@ -77,7 +78,9 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
     spec_parser = CmdLineSpecParser(get_buildroot())
     # project_path is always the directory of the first target,
     # which is where intellij is going to zoom in under project view.
-    project_path = spec_parser.parse_address_spec(address_specs[0]).directory
+    spec = spec_parser.parse_spec(address_specs[0])
+    assert isinstance(spec, (SingleAddress, SiblingAddresses, DescendantAddresses))
+    project_path = spec.directory
 
     with self.temporary_workdir() as workdir:
       with temporary_file(root_dir=workdir, cleanup=True) as output_file:
