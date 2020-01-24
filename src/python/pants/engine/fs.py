@@ -69,7 +69,7 @@ class PathGlobs:
     include: Iterable[str],
     exclude: Iterable[str] = (),
     glob_match_error_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.IGNORE,
-    conjunction: GlobExpansionConjunction = GlobExpansionConjunction.any_match
+    conjunction: GlobExpansionConjunction = GlobExpansionConjunction.ANY_MATCH
   ) -> None:
     self.include = tuple(include)
     self.exclude = tuple(exclude)
