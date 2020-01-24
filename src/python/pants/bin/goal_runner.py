@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 
 class FilesystemSpecsUnsupported(Exception):
-  """This feature won't be backported to V1."""
+  """FS specs are not yet backported to V1 (but will be to replace `--owner-of`)."""
 
 
 class GoalRunnerFactory:
@@ -83,8 +83,8 @@ class GoalRunnerFactory:
         )
       raise FilesystemSpecsUnsupported(
         f"Instead of running `{approximate_original_command}`, {suggestion}\n\n"
-        f"Why? Filesystem specs like `src/python/example.py` and `src/**/*.java` only work when "
-        f"running goals implemented with the V2 engine. When using V1 goals, either use "
+        f"Why? Filesystem specs like `src/python/example.py` and `src/**/*.java` (currently) only "
+        f"work when running goals implemented with the V2 engine. When using V1 goals, either use "
         f"traditional address specs like `src/python/example:foo` and `::` or use `--owner-of` "
         f"for Pants to find the file's owning target(s) for you.\n\n"
         f"(You may find which goals are implemented in V1 by running `{pants_bin_name} --v1 --no-v2 "
