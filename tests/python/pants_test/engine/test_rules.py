@@ -253,9 +253,9 @@ class RuleGraphTest(TestBase):
         f"""\
         Rules with errors: 3
           {fmt_rule(a_from_b_and_c)}:
-            Was not reachable, either because no rules can produce the params or it was shadowed by another @rule.
+            Was not reachable, either because no rules could produce the params or because it was shadowed by another @rule.
           {fmt_rule(a_from_c_and_b)}:
-            Was not reachable, either because no rules can produce the params or it was shadowed by another @rule.
+            Was not reachable, either because no rules could produce the params or because it was shadowed by another @rule.
           {fmt_rule(d_from_a)}:
             Ambiguous rules to compute A with parameter types (B, C):
               {fmt_rule(a_from_b_and_c)} for (B, C)
@@ -383,7 +383,7 @@ class RuleGraphTest(TestBase):
         f"""\
         Rules with errors: 3
           {fmt_rule(a_from_c)}:
-            Was not reachable, either because no rules can produce the params or it was shadowed by another @rule.
+            Was not reachable, either because no rules could produce the params or because it was shadowed by another @rule.
           {fmt_rule(b_from_d)}:
             No rule was available to compute D with parameter type SubA
           {fmt_rule(d_from_a_and_suba, gets=[("A", "C")])}:
@@ -417,7 +417,7 @@ class RuleGraphTest(TestBase):
         f"""\
         Rules with errors: 1
           {fmt_rule(d_for_b)}:
-            Was not reachable, either because no rules can produce the params or it was shadowed by another @rule.
+            Was not reachable, either because no rules could produce the params or because it was shadowed by another @rule.
         """
       ).strip(),
       str(cm.exception)
