@@ -710,16 +710,13 @@ async def sources_snapshots_from_filesystem_specs(
   filesystem_specs: FilesystemSpecs, glob_match_error_behavior: GlobMatchErrorBehavior,
 ) -> SourcesSnapshots:
   """Resolve the snapshot associated with the provided filesystem specs."""
-  snapshots = await MultiGet(
-    Get[Snapshot](
-      PathGlobs(
-        include=(fs_spec.glob,),
-        glob_match_error_behavior=glob_match_error_behavior,
-      )
+  snapshot = await Get[Snapshot](
+    PathGlobs(
+      include=(fs_spec.glob for fs_spec in filesystem_specs),
+      glob_match_error_behavior=glob_match_error_behavior,
     )
-    for fs_spec in filesystem_specs
   )
-  return SourcesSnapshots(SourcesSnapshot(snapshot) for snapshot in snapshots)
+  return SourcesSnapshots([SourcesSnapshot(snapshot)])
 
 
 def create_legacy_graph_tasks():
