@@ -101,7 +101,7 @@ impl Params {
       1 => params.pop().unwrap(),
       _ => {
         params.sort();
-        format!("({})", params.join("+"))
+        format!("({})", params.join(", "))
       }
     }
   }
@@ -164,22 +164,26 @@ pub const ANY_TYPE: TypeId = TypeId(0);
 pub struct Function(pub Key);
 
 impl Function {
-  fn pretty_print(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+  pub fn name(&self) -> String {
     let Function(key) = self;
+    let module = externs::project_str(&externs::val_for(&key), "__module__");
     let name = externs::project_str(&externs::val_for(&key), "__name__");
-    write!(f, "{}()", name)
+    // NB: this is a custom dunder method that Python code should populate before sending the
+    // function (e.g. an `@rule`) through FFI.
+    let line_number = externs::project_str(&externs::val_for(&key), "__line_number__");
+    format!("{}:{}:{}", module, line_number, name)
   }
 }
 
 impl fmt::Display for Function {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    self.pretty_print(f)
+    write!(f, "{}()", self.name())
   }
 }
 
 impl fmt::Debug for Function {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    self.pretty_print(f)
+    write!(f, "{}()", self.name())
   }
 }
 

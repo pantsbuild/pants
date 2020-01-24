@@ -21,6 +21,8 @@ class ExplainOptionsTask(ConsoleTask):
   value and then a cli FLAG value).
   """
 
+  _register_console_transitivity_option = False
+
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
@@ -36,6 +38,12 @@ class ExplainOptionsTask(ConsoleTask):
              help='Do not show inherited options, unless their values differ from their parents.')
     register('--output-format', choices=['text', 'json'], default='text',
              help='Specify the format options will be printed.')
+    register(
+      '--transitive', type=bool, default=True, fingerprint=True,
+      help='If True, use all targets in the build graph, else use only target roots.',
+      removal_version="1.27.0.dev0",
+      removal_hint="This option has no impact on the goal `options`.",
+    )
 
   def _scope_filter(self, scope):
     pattern = self.get_options().scope

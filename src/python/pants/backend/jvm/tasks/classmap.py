@@ -9,10 +9,15 @@ from pants.task.console_task import ConsoleTask
 class ClassmapTask(ConsoleTask):
   """Print a mapping from class name to the owning target from target's runtime classpath."""
 
+  _register_console_transitivity_option = False
+
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-
+    register(
+      "--transitive", default=True, type=bool, fingerprint=True,
+      help="Include transitive dependencies in the classmap.",
+    )
     register('--internal-only', default=False, type=bool, fingerprint=True,
              help='Specifies that only class names of internal dependencies should be included.')
 

@@ -17,6 +17,7 @@ from typing import (
   Dict,
   Iterable,
   List,
+  Mapping,
   Optional,
   Set,
   Tuple,
@@ -110,7 +111,7 @@ class Parser:
 
   def __init__(
     self,
-    env: Dict[str, str],
+    env: Mapping[str, str],
     config: Config,
     scope_info: ScopeInfo,
     parent_parser: Optional["Parser"],
@@ -624,8 +625,10 @@ class Parser:
     config_section = GLOBAL_SCOPE_CONFIG_SECTION if self._scope == GLOBAL_SCOPE else self._scope
     config_default_val_or_str = expand(self._config.get(Config.DEFAULT_SECTION, dest, default=None))
     config_val_or_str = expand(self._config.get(config_section, dest, default=None))
-    config_source_file = (self._config.get_source_for_option(config_section, dest) or
-        self._config.get_source_for_option(Config.DEFAULT_SECTION, dest))
+    config_source_file = (
+      self._config.get_source_for_option(config_section, dest) or
+      self._config.get_source_for_option(Config.DEFAULT_SECTION, dest)
+    )
     if config_source_file is not None:
       config_source_file = os.path.relpath(config_source_file)
       config_details = f'in {config_source_file}'

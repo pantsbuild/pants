@@ -17,6 +17,8 @@ class Login(ConsoleTask):
   :API: public
   """
 
+  _register_console_transitivity_option = False
+
   @classmethod
   def subsystem_dependencies(cls):
     return super().subsystem_dependencies() + (BasicAuth,)
@@ -35,6 +37,11 @@ class Login(ConsoleTask):
            'points to the URL `https://app.pantsbuild.org/auth`, then you '
            'could here use the option `--login-to=prod` to login at '
            '`https://app.pantsbuild.org/auth`.'
+    )
+    register(
+      '--transitive', type=bool, default=True, fingerprint=True,
+      removal_version="1.27.0.dev0",
+      removal_hint="This option has no impact on the goal `login`.",
     )
 
   def console_output(self, targets):

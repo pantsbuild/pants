@@ -10,13 +10,19 @@ from abc import ABC
 from contextlib import contextmanager
 from dataclasses import dataclass
 from hashlib import sha1
-from typing import Any, ClassVar, List, Optional, Sequence, Tuple
+from typing import Any, ClassVar, Dict, List, Optional, Sequence, Tuple, Union, cast
 
 from twitter.common.collections import OrderedSet
 from typing_extensions import Literal
 
 from pants.base.build_environment import get_buildroot, get_pants_cachedir, get_pants_configdir
+from pants.option.ranked_value import Value
 from pants.util.eval import parse_expression
+
+
+# A dict with optional override seed values for buildroot, pants_workdir, pants_supportdir and
+# pants_distdir.
+SeedValues = Dict[str, Value]
 
 
 class Config(ABC):
@@ -34,19 +40,15 @@ class Config(ABC):
     pass
 
   @classmethod
-  def load_file_contents(cls, file_contents, seed_values=None):
-    """Loads config from the given string payloads.
+  def load_file_contents(
+    cls, file_contents, *, seed_values: Optional[SeedValues] = None,
+  ) -> Union["_EmptyConfig", "_ChainedConfig"]:
+    """Loads config from the given string payloads, with later payloads taking precedence over
+    earlier ones.
 
     A handful of seed values will be set to act as if specified in the loaded config file's DEFAULT
     section, and be available for use in substitutions.  The caller may override some of these
-    seed values.
-
-    :param list[FileContents] file_contents: Load from these FileContents. Later instances take
-                                             precedence over earlier ones. If empty, returns an
-                                             empty config.
-    :param seed_values: A dict with optional override seed values for buildroot, pants_workdir,
-                        pants_supportdir and pants_distdir.
-    """
+    seed values."""
 
     @contextmanager
     def opener(file_content):
@@ -56,18 +58,14 @@ class Config(ABC):
     return cls._meta_load(opener, file_contents, seed_values=seed_values)
 
   @classmethod
-  def load(cls, config_paths, seed_values=None) -> "Config":
-    """Loads config from the given paths.
+  def load(
+    cls, config_paths: List[str], *, seed_values: Optional[SeedValues] = None,
+  ) -> Union["_EmptyConfig", "_ChainedConfig"]:
+    """Loads config from the given paths, with later paths taking precedence over earlier ones.
 
     A handful of seed values will be set to act as if specified in the loaded config file's DEFAULT
     section, and be available for use in substitutions.  The caller may override some of these
-    seed values.
-
-    :param list config_paths: Load from these paths. Later instances take precedence over earlier
-                              ones. If empty, returns an empty config.
-    :param seed_values: A dict with optional override seed values for buildroot, pants_workdir,
-                        pants_supportdir and pants_distdir.
-    """
+    seed values."""
 
     @contextmanager
     def opener(f):
@@ -77,7 +75,9 @@ class Config(ABC):
     return cls._meta_load(opener, config_paths, seed_values=seed_values)
 
   @classmethod
-  def _meta_load(cls, open_ctx, config_items, *, seed_values=None) -> "Config":
+  def _meta_load(
+    cls, open_ctx, config_items: Sequence, *, seed_values: Optional[SeedValues] = None,
+  ) -> Union["_EmptyConfig", "_ChainedConfig"]:
     if not config_items:
       return _EmptyConfig()
 
@@ -94,22 +94,12 @@ class Config(ABC):
     return _ChainedConfig(tuple(reversed(single_file_configs)))
 
   @classmethod
-  def _create_parser(cls, *, seed_values=None):
-    """Creates a config parser that supports %([key-name])s value substitution.
+  def _create_parser(cls, *, seed_values: Optional[SeedValues] = None) -> configparser.ConfigParser:
+    """Creates a config parser that supports %([key-name])s value substitution."""
+    safe_seed_values = seed_values or {}
+    buildroot = cast(str, safe_seed_values.get('buildroot', get_buildroot()))
 
-    A handful of seed values will be set to act as if specified in the loaded config file's DEFAULT
-    section, and be available for use in substitutions.  The caller may override some of these
-    seed values.
-
-    :param seed_values: A dict with optional override seed values for buildroot, pants_workdir,
-                        pants_supportdir and pants_distdir.
-    """
-    seed_values = seed_values or {}
-    buildroot = seed_values.get('buildroot')
-    if buildroot is None:
-      buildroot = get_buildroot()
-
-    all_seed_values = {
+    all_seed_values: Dict[str, str] = {
       'buildroot': buildroot,
       'homedir': os.path.expanduser('~'),
       'user': getpass.getuser(),
@@ -117,12 +107,12 @@ class Config(ABC):
       'pants_configdir': get_pants_configdir(),
     }
 
-    def update_dir_from_seed_values(key, default):
-      all_seed_values[key] = seed_values.get(key, os.path.join(buildroot, default))
+    def update_dir_from_seed_values(key: str, *, default: str) -> None:
+      all_seed_values[key] = cast(str, safe_seed_values.get(key, os.path.join(buildroot, default)))
 
-    update_dir_from_seed_values('pants_workdir', '.pants.d')
-    update_dir_from_seed_values('pants_supportdir', 'build-support')
-    update_dir_from_seed_values('pants_distdir', 'dist')
+    update_dir_from_seed_values('pants_workdir', default='.pants.d')
+    update_dir_from_seed_values('pants_supportdir', default='build-support')
+    update_dir_from_seed_values('pants_distdir', default='dist')
 
     return configparser.ConfigParser(all_seed_values)
 
@@ -148,11 +138,11 @@ class Config(ABC):
                             raise_type=self.ConfigError)
 
   # Subclasses must implement.
-  def configs(self) -> Sequence["Config"]:
+  def configs(self) -> Sequence["_SingleFileConfig"]:
     """Returns the underlying single-file configs represented by this object."""
     raise NotImplementedError()
 
-  def sources(self) -> Sequence[str]:
+  def sources(self) -> List[str]:
     """Returns the sources of this config as a list of filenames."""
     raise NotImplementedError()
 
@@ -189,7 +179,7 @@ class _EmptyConfig(Config):
   def sources(self) -> List[str]:
     return []
 
-  def configs(self) -> List[Config]:
+  def configs(self) -> List["_SingleFileConfig"]:
     return []
 
   def sections(self) -> List[str]:
@@ -225,7 +215,7 @@ class _SingleFileConfig(Config):
     self.content_digest = content_digest
     self.configparser = configparser
 
-  def configs(self) -> List[Config]:
+  def configs(self) -> List["_SingleFileConfig"]:
     return [self]
 
   def sources(self) -> List[str]:
@@ -264,13 +254,13 @@ class _ChainedConfig(Config):
   :param chained_configs: A tuple of Config instances to chain. Later instances take precedence
                           over earlier ones.
   """
-  chained_configs: Tuple[Config, ...]
+  chained_configs: Tuple[_SingleFileConfig, ...]
 
   @property
-  def _configs(self) -> Tuple[Config, ...]:
+  def _configs(self) -> Tuple[_SingleFileConfig, ...]:
     return self.chained_configs
 
-  def configs(self) -> Tuple[Config, ...]:
+  def configs(self) -> Tuple[_SingleFileConfig, ...]:
     return self.chained_configs
 
   def sources(self) -> List[str]:

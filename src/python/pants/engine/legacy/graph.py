@@ -18,9 +18,9 @@ from pants.base.specs import (
   AddressSpecs,
   AscendantAddresses,
   DescendantAddresses,
+  FilesystemSpecs,
   SingleAddress,
 )
-from pants.base.target_roots import TargetRoots
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.app_base import AppBase, Bundle
@@ -28,7 +28,7 @@ from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.remote_sources import RemoteSources
 from pants.engine.addressable import BuildFileAddresses
-from pants.engine.fs import PathGlobs, Snapshot
+from pants.engine.fs import EMPTY_SNAPSHOT, PathGlobs, Snapshot
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.structs import (
   BundleAdaptor,
@@ -204,8 +204,8 @@ class LegacyBuildGraph(BuildGraph):
     for _ in self._inject_address_specs(AddressSpecs(dependencies)):
       pass
 
-  def inject_roots_closure(self, target_roots: TargetRoots, fail_fast=None):
-    for address in self._inject_address_specs(target_roots.specs):
+  def inject_roots_closure(self, address_specs: AddressSpecs, fail_fast=None):
+    for address in self._inject_address_specs(address_specs):
       yield address
 
   def inject_address_specs_closure(self, address_specs: Iterable[AddressSpec], fail_fast=None):
@@ -396,19 +396,21 @@ class TransitiveHydratedTargets:
 
 @dataclass(frozen=True)
 class SourcesSnapshot:
-  """A light wrapper around source files for Pants to operate on.
+  """Sources matched by command line specs, either directly via FilesystemSpecs or indirectly via
+  AddressSpecs.
 
-  This corresponds 1-to-1 with the `sources` field of a target. When given filesystem specs, ...
-  TODO: what is the mapping for filesystem specs? Should each individual spec -> SourcesSnapshot?
-  Decide this once implementing the hydration of FilesystemSpecs to SourcesSnapshots."""
+  Note that the resolved sources do not need an owning target. Any source resolvable by
+  `PathGlobs` is valid here.
+  """
   snapshot: Snapshot
 
 
 class SourcesSnapshots(Collection[SourcesSnapshot]):
-  """A set of SourceSnapshots, with each representing the sources for individual targets.
+  """A collection of sources matched by command line specs.
 
   `@goal_rule`s may request this when they only need source files to operate and do not need
-  any target information."""
+  any target information.
+  """
 
 
 @dataclass(frozen=True)
@@ -425,11 +427,38 @@ class TopologicallyOrderedTargets:
   hydrated_targets: HydratedTargets
 
 
+class InvalidOwnersOfArgs(Exception):
+  pass
+
+
 @dataclass(frozen=True)
 class OwnersRequest:
   """A request for the owners (and optionally, transitive dependees) of a set of file paths."""
-  sources: Tuple
+  sources: Tuple[str, ...]
   include_dependees: IncludeDependeesOption
+
+  def validate(self, *, pants_bin_name: str) -> None:
+    """Ensure that users are passing valid args."""
+    # Check for improperly trying to use commas to run against multiple files.
+    sources_with_commas = [source for source in self.sources if "," in source]
+    if sources_with_commas:
+      offenders = ', '.join(f"`{source}`" for source in sources_with_commas)
+      raise InvalidOwnersOfArgs(
+        "Rather than using a comma with `--owner-of` to specify multiple files, use "
+        "Pants list syntax: https://www.pantsbuild.org/options.html#list-options. For example, "
+        f"`{pants_bin_name} --owner-of=src/python/example/foo.py --owner-of=src/python/example/test.py list`."
+        f"\n\n(You used commas in these arguments: {offenders})"
+      )
+    # Validate that users aren't using globs. FilesystemSpecs _do_ support globs via PathGlobs,
+    # so it's feasible that a user will then try to also use globs with `--owner-of`.
+    sources_with_globs = [source for source in self.sources if '*' in source]
+    if sources_with_globs:
+      offenders = ', '.join(f"`{source}`" for source in sources_with_globs)
+      raise InvalidOwnersOfArgs(
+        "`--owner-of` does not allow globs. Instead, please directly specify the files you want "
+        f"to operate on, e.g. `{pants_bin_name} --owner-of=src/python/example/foo.py.\n\n"
+        f"(You used globs in these arguments: {offenders})"
+      )
 
 
 @rule
@@ -649,12 +678,14 @@ async def hydrate_bundles(
 
 
 @rule
-async def hydrate_sources_snapshot(
-  hydrated_struct: HydratedStruct,
-) -> SourcesSnapshot:
+async def hydrate_sources_snapshot(hydrated_struct: HydratedStruct) -> SourcesSnapshot:
   """Construct a SourcesSnapshot from a TargetAdaptor without hydrating any other fields."""
   target_adaptor = cast(TargetAdaptor, hydrated_struct.value)
-  sources_field = next(fa for fa in target_adaptor.field_adaptors if isinstance(fa, SourcesField))
+  sources_field = next(
+    (fa for fa in target_adaptor.field_adaptors if isinstance(fa, SourcesField)), None
+  )
+  if sources_field is None:
+    return SourcesSnapshot(EMPTY_SNAPSHOT)
   hydrated_sources_field = await Get[HydratedField](HydrateableField, sources_field)
   efws = cast(EagerFilesetWithSpec, hydrated_sources_field.value)
   return SourcesSnapshot(efws.snapshot)
@@ -674,6 +705,20 @@ async def sources_snapshots_from_build_file_addresses(
   return SourcesSnapshots(snapshots)
 
 
+@rule
+async def sources_snapshots_from_filesystem_specs(
+  filesystem_specs: FilesystemSpecs, glob_match_error_behavior: GlobMatchErrorBehavior,
+) -> SourcesSnapshots:
+  """Resolve the snapshot associated with the provided filesystem specs."""
+  snapshot = await Get[Snapshot](
+    PathGlobs(
+      include=(fs_spec.glob for fs_spec in filesystem_specs),
+      glob_match_error_behavior=glob_match_error_behavior,
+    )
+  )
+  return SourcesSnapshots([SourcesSnapshot(snapshot)])
+
+
 def create_legacy_graph_tasks():
   """Create tasks to recursively parse the legacy graph."""
   return [
@@ -687,5 +732,7 @@ def create_legacy_graph_tasks():
     sort_targets,
     hydrate_sources_snapshot,
     sources_snapshots_from_build_file_addresses,
+    sources_snapshots_from_filesystem_specs,
+    RootRule(FilesystemSpecs),
     RootRule(OwnersRequest),
   ]
