@@ -2,9 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.backend.jvm.subsystems.jvm import JVM
+from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
+from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.target_scopes import Scopes
+from pants.java.distribution.distribution import DistributionLocator
 from pants.task.task import Task
 
 
@@ -23,7 +26,7 @@ class JvmTask(Task):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super().subsystem_dependencies() + (JVM.scoped(cls),)
+    return super().subsystem_dependencies() + (JVM.scoped(cls), DistributionLocator, JvmPlatform)
 
   @classmethod
   def register_options(cls, register):
@@ -68,3 +71,17 @@ class JvmTask(Task):
     classpath = list(classpath_prefix or ())
     classpath.extend(classpath_for_targets)
     return classpath
+
+  def preferred_jvm_distribution_for_targets(self, targets, jdk=False, strict=False):
+    """Find the preferred jvm distribution for running code from the given targets."""
+    return self.preferred_jvm_distribution(self._jvm_platforms_from_targets(targets),
+                                           jdk=jdk, strict=strict)
+
+  def preferred_jvm_distribution(self, platforms, jdk=False, strict=False):
+    return JvmPlatform.preferred_jvm_distribution(platforms, jdk=jdk, strict=strict)
+
+  def _jvm_platforms_from_targets(self, targets):
+    # Override this to change platform lookup.
+    # This overriding will be eliminated in the next change.
+    return [target.platform for target in targets
+            if isinstance(target, JvmTarget)]
