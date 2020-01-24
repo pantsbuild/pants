@@ -14,7 +14,7 @@ python_library(
     'src/python/pants/base:build_root',
     'src/python/pants/base:exception_sink',
     'src/python/pants/base:exceptions',
-    'src/python/pants/base:target_roots',
+    'src/python/pants/base:specs',
     'src/python/pants/binaries',
     'src/python/pants/build_graph',
     'src/python/pants/core_tasks',

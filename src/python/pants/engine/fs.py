@@ -54,7 +54,7 @@ class InputFilesContent(FilesContent):
 class PathGlobs:
   """A wrapper around sets of filespecs to include and exclude.
 
-  The syntax supported is roughly git's glob syntax.
+  The syntax supported is roughly Git's glob syntax.
 
   NB: this object is interpreted from within Snapshot::lift_path_globs() -- that method will need to
   be aware of any changes to this object's definition.

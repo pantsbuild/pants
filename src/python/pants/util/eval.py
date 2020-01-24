@@ -42,13 +42,15 @@ def parse_expression(
   try:
     parsed_value = eval(val)
   except Exception as e:
-    raise raise_type(dedent("""\
-      The {name} cannot be evaluated as a literal expression: {error}
-      Given raw value:
-      {value}
-      """.format(name=get_name(),
-                 error=e,
-                 value=format_raw_value())))
+    raise raise_type(
+      dedent(
+        f"""\
+        The {get_name()} cannot be evaluated as a literal expression: {e!r}
+        Given raw value:
+        {format_raw_value()}
+        """
+      )
+    )
 
   if not isinstance(parsed_value, acceptable_types):
     def iter_types(types):
@@ -59,15 +61,18 @@ def parse_expression(
           for typ in iter_types(item):
             yield typ
       else:
-        raise ValueError('The given acceptable_types is not a valid type (tuple): {}'
-                         .format(acceptable_types))
+        raise ValueError(
+          f'The given acceptable_types is not a valid type (tuple): {acceptable_types}'
+        )
 
-    raise raise_type(dedent("""\
-      The {name} is not of the expected type(s): {types}:
-      Given the following raw value that evaluated to type {type}:
-      {value}
-      """.format(name=get_name(),
-                 types=', '.join(format_type(t) for t in iter_types(acceptable_types)),
-                 type=format_type(type(parsed_value)),
-                 value=format_raw_value())))
+    expected_types = ', '.join(format_type(t) for t in iter_types(acceptable_types))
+    raise raise_type(
+      dedent(
+        f"""\
+        The {get_name()} is not of the expected type(s): {expected_types}:
+        Given the following raw value that evaluated to type {format_type(type(parsed_value))}:
+        {format_raw_value()}
+        """
+      )
+    )
   return parsed_value

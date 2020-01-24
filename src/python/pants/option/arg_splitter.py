@@ -6,7 +6,7 @@ import sys
 from abc import ABC
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 from twitter.common.collections import OrderedSet
 
@@ -128,7 +128,7 @@ class ArgSplitter:
         self._help_request = OptionsHelp(advanced=advanced, all_scopes=all_scopes)
     return True
 
-  def split_args(self, args: Optional[List[str]] = None) -> SplitArgs:
+  def split_args(self, args: Optional[Sequence[str]] = None) -> SplitArgs:
     """Split the specified arg list (or sys.argv if unspecified).
 
     args[0] is ignored.
