@@ -620,12 +620,8 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
         include_files=("a.txt", "c.txt"),
         include_dirs=('subdir2',),
     )
-    subset_digest = self.request_single_product(Digest, ss)
-    result_files = self.request_single_product(FilesContent, subset_digest)
-    assert len(result_files.dependencies) == 3
-    assert any(fc.path == 'a.txt' for fc in result_files.dependencies)
-    assert any(fc.path == 'c.txt' for fc in result_files.dependencies)
-    assert any(fc.path == 'subdir2/a.txt' for fc in result_files.dependencies)
+    subset_snapshot = self.request_single_product(Snapshot, ss)
+    assert set(subset_snapshot.files) == {'a.txt', 'c.txt', 'subdir2/a.txt'}
 
 
 class StubHandler(BaseHTTPRequestHandler):
