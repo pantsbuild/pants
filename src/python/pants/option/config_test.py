@@ -1,9 +1,10 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import configparser
 from textwrap import dedent
-from typing import Dict
 
+import pytest
 from twitter.common.collections import OrderedSet
 
 from pants.option.config import Config
@@ -11,14 +12,123 @@ from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_file
 
 
-class ConfigTest(TestBase):
+FILE1_INI = dedent(
+  """
+  [DEFAULT]
+  name: foo
+  answer: 42
+  scale: 1.2
+  path: /a/b/%(answer)s
+  embed: %(path)s::foo
+  disclaimer:
+    Let it be known
+    that.
 
-  def _setup_config(self, config1_content: str, config2_content: str, *, suffix: str) -> Config:
-    with temporary_file(binary_mode=False, suffix=suffix) as config1, \
-      temporary_file(binary_mode=False, suffix=suffix) as config2:
-      config1.write(config1_content)
+  [a]
+  list: [1, 2, 3, %(answer)s]
+  list2: +[7, 8, 9]
+  list3: -["x", "y", "z"]
+  list4: +[0, 1],-[8, 9]
+
+  [b]
+  preempt: True
+  
+  [b.nested]
+  dict: {
+      'a': 1,
+      'b': %(answer)s,
+      'c': ['%(answer)s', '%(answer)s'],
+    }
+  
+  [b.nested.nested-again]
+  movie: inception
+  """
+)
+
+FILE1_TOML = dedent(
+  """
+  [DEFAULT]
+  name = "foo"
+  answer = 42
+  scale = 1.2
+  path = "/a/b/%(answer)s"
+  embed = "%(path)s::foo"
+  disclaimer = '''
+  Let it be known
+  that.'''
+
+  [a]
+  # TODO: once TOML releases its new version with support for heterogenous lists, we should be 
+  # able to rewrite this to `[1, 2, 3, "%(answer)s"`. See 
+  # https://github.com/toml-lang/toml/issues/665. 
+  list = ["1", "2", "3", "%(answer)s"]
+  list2.append = [7, 8, 9]
+  list3.filter = ["x", "y", "z"]
+  list4.append = [0, 1]
+  list4.filter = [8, 9]
+
+  [b]
+  preempt = true
+
+  [b.nested]
+  dict = '''
+  {
+    "a": 1,
+    "b": "%(answer)s",
+    "c": ["%(answer)s", "%(answer)s"],
+  }'''
+
+  [b.nested.nested-again]
+  movie = "inception"
+  """
+)
+
+FILE2_INI = dedent(
+  """
+  [a]
+  fast: True
+
+  [b]
+  preempt: False
+  
+  [c.child]
+  no_values_in_parent: True
+
+  [defined_section]
+  """
+)
+
+FILE2_TOML = dedent(
+  """
+  [a]
+  fast = true
+
+  [b]
+  preempt = false
+
+  [c.child]
+  no_values_in_parent = true
+
+  [defined_section]
+  """
+)
+
+
+class ConfigBaseTest(TestBase):
+  __test__ = False
+
+  # Subclasses must define these
+  file1_suffix = ""
+  file2_suffix = ""
+  file1_content = ""
+  file2_content = ""
+
+  def _setup_config(self) -> Config:
+    with temporary_file(binary_mode=False, suffix=self.file1_suffix) as config1, \
+      temporary_file(binary_mode=False, suffix=self.file2_suffix) as config2:
+      config1.write(self.file1_content)
       config1.close()
-      config2.write(config2_content)
+      config2.write(self.file2_content)
       config2.close()
       parsed_config = Config.load(
         config_paths=[config1.name, config2.name], seed_values={"buildroot": self.build_root}
@@ -27,55 +137,14 @@ class ConfigTest(TestBase):
     return parsed_config
 
   def setUp(self) -> None:
-    ini1_content = dedent(
-      """
-      [DEFAULT]
-      name: foo
-      answer: 42
-      scale: 1.2
-      path: /a/b/%(answer)s
-      embed: %(path)s::foo
-      disclaimer:
-        Let it be known
-        that.
-
-      [a]
-      list: [1, 2, 3, %(answer)s]
-      list2: +[7, 8, 9]
-
-      [b]
-      preempt: True
-      
-      [b.nested]
-      dict: {
-          'a': 1,
-          'b': %(answer)s,
-          'c': ['%(answer)s', '%(answer)s'],
-        }
-      
-      [b.nested.nested-again]
-      movie: inception
-      """
-    )
-    ini2_content = dedent(
-      """
-      [a]
-      fast: True
-
-      [b]
-      preempt: False
-      
-      [c.child]
-      no_values_in_parent: True
-
-      [defined_section]
-      """
-    )
-    self.config = self._setup_config(ini1_content, ini2_content, suffix=".ini")
+    self.config = self._setup_config()
     self.default_seed_values = Config._determine_seed_values(
       seed_values={"buildroot": self.build_root},
     )
-    self.default_file1_values = {
+
+  @property
+  def default_file1_values(self):
+    return {
       "name": "foo",
       "answer": "42",
       "scale": "1.2",
@@ -83,10 +152,15 @@ class ConfigTest(TestBase):
       "embed": "/a/b/42::foo",
       "disclaimer": "\nLet it be known\nthat.",
     }
-    self.expected_file1_options = {
+
+  @property
+  def expected_file1_options(self):
+    return {
       "a": {
         "list": "[1, 2, 3, 42]",
         "list2": "+[7, 8, 9]",
+        "list3": '-["x", "y", "z"]',
+        "list4": "+[0, 1],-[8, 9]",
       },
       "b": {
         "preempt": "True",
@@ -98,7 +172,10 @@ class ConfigTest(TestBase):
         "movie": "inception",
       },
     }
-    self.expected_file2_options: Dict[str, Dict[str, str]] = {
+
+  @property
+  def expected_file2_options(self):
+    return {
       "a": {
         "fast": "True",
       },
@@ -110,7 +187,10 @@ class ConfigTest(TestBase):
       },
       "defined_section": {},
     }
-    self.expected_combined_values: Dict[str, Dict[str, str]] = {
+
+  @property
+  def expected_combined_values(self):
+    return {
       **self.expected_file1_options,
       **self.expected_file2_options,
       "a": {
@@ -156,6 +236,14 @@ class ConfigTest(TestBase):
     }
     for section, option in nonexistent_options.items():
       assert self.config.has_option(section=section, option=option) is False
+    # Check that sections aren't misclassified as options
+    nested_sections = {
+      "b": "nested",
+      "b.nested": "nested-again",
+      "c": "child",
+    }
+    for parent_section, child_section in nested_sections.items():
+      assert self.config.has_option(section=parent_section, option=child_section) is False
 
   def test_list_all_options(self) -> None:
     # This is used in `options_bootstrapper.py` to validate that every option is recognized.
@@ -168,20 +256,24 @@ class ConfigTest(TestBase):
     for section, options in self.expected_file2_options.items():
       assert file2_config.values.options(section=section) == [
         *options.keys(), *self.default_seed_values.keys()]
+    # Check non-existent section
+    for config in file1_config, file2_config:
+      with pytest.raises(configparser.NoSectionError):
+        config.values.options("fake")
 
   def test_default_values(self) -> None:
     # This is used in `options_bootstrapper.py` to ignore default values when validating options.
     file1_config = self.config.configs()[1]
     file2_config = self.config.configs()[0]
     # NB: string interpolation should only happen when calling _ConfigValues.get_value(). The
-    # values for _ConfigValues.defaults() are not yet interpolated.
+    # values for _ConfigValues.defaults are not yet interpolated.
     default_file1_values_unexpanded = {
       **self.default_file1_values, "path": "/a/b/%(answer)s", "embed": "%(path)s::foo",
     }
-    assert file1_config.values.defaults() == {
+    assert file1_config.values.defaults == {
       **self.default_seed_values, **default_file1_values_unexpanded,
     }
-    assert file2_config.values.defaults() == self.default_seed_values
+    assert file2_config.values.defaults == self.default_seed_values
 
   def test_get(self) -> None:
     # Check the DEFAULT section
@@ -210,3 +302,46 @@ class ConfigTest(TestBase):
     assert config.sources() == []
     assert config.has_section("DEFAULT") is False
     assert config.has_option(section="DEFAULT", option="name") is False
+
+
+class ConfigIniTest(ConfigBaseTest):
+  __test__ = True
+
+  file1_suffix = ".ini"
+  file2_suffix = ".ini"
+  file1_content = FILE1_INI
+  file2_content = FILE2_INI
+
+
+class ConfigTomlTest(ConfigBaseTest):
+  __test__ = True
+
+  file1_suffix = ".toml"
+  file2_suffix = ".toml"
+  file1_content = FILE1_TOML
+  file2_content = FILE2_TOML
+
+  @property
+  def default_file1_values(self):
+    return {**super().default_file1_values, "disclaimer": "Let it be known\nthat."}
+
+  @property
+  def expected_file1_options(self):
+    return {
+      **super().expected_file1_options,
+      "a": {
+        **super().expected_file1_options["a"], "list": '["1", "2", "3", "42"]',
+      },
+      "b.nested": {
+        "dict": '{\n  "a": 1,\n  "b": "42",\n  "c": ["42", "42"],\n}'
+      },
+    }
+
+
+class ConfigMixedTest(ConfigBaseTest):
+  __test__ = True
+
+  file1_suffix = ".ini"
+  file2_suffix = ".toml"
+  file1_content = FILE1_INI
+  file2_content = FILE2_TOML

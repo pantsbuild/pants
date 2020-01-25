@@ -6,12 +6,15 @@ import getpass
 import io
 import itertools
 import os
+import re
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from dataclasses import dataclass
 from hashlib import sha1
+from pathlib import PurePath
 from typing import Any, ClassVar, Dict, List, Mapping, Optional, Sequence, Tuple, Union, cast
 
+import toml
 from twitter.common.collections import OrderedSet
 from typing_extensions import Literal
 
@@ -90,11 +93,19 @@ class Config(ABC):
       content_digest = sha1(content).hexdigest()
       normalized_seed_values = cls._determine_seed_values(seed_values=seed_values)
 
-      ini_parser = configparser.ConfigParser(defaults=normalized_seed_values)
-      ini_parser.read_string(content.decode())
+      config_values: _ConfigValues
+      if PurePath(config_path).suffix == ".toml":
+        toml_values = cast(Dict[str, Any], toml.loads(content.decode()))
+        toml_values["DEFAULT"] = {**normalized_seed_values, **toml_values.get("DEFAULT", {})}
+        config_values = _TomlValues(toml_values)
+      else:
+        ini_parser = configparser.ConfigParser(defaults=normalized_seed_values)
+        ini_parser.read_string(content.decode())
+        config_values = _IniValues(ini_parser)
+
       single_file_configs.append(
         _SingleFileConfig(
-          config_path=config_path, content_digest=content_digest, values=_IniValues(ini_parser),
+          config_path=config_path, content_digest=content_digest, values=config_values,
         ),
       )
     return _ChainedConfig(tuple(reversed(single_file_configs)))
@@ -186,6 +197,7 @@ class _ConfigValues(ABC):
   in the future if we ever decide to support formats other than INI.
   """
 
+  @property
   @abstractmethod
   def sections(self) -> List[str]:
     """Returns the sections in this config (not including DEFAULT)."""
@@ -206,8 +218,9 @@ class _ConfigValues(ABC):
   def options(self, section: str) -> List[str]:
     """All options defined for the section."""
 
+  @property
   @abstractmethod
-  def defaults(self) -> Mapping[str, Any]:
+  def defaults(self) -> Mapping[str, str]:
     """All the DEFAULT values (not interpolated)."""
 
 
@@ -215,6 +228,7 @@ class _ConfigValues(ABC):
 class _IniValues(_ConfigValues):
   parser: configparser.ConfigParser
 
+  @property
   def sections(self) -> List[str]:
     return self.parser.sections()
 
@@ -230,8 +244,170 @@ class _IniValues(_ConfigValues):
   def options(self, section: str) -> List[str]:
     return self.parser.options(section)
 
+  @property
   def defaults(self) -> Mapping[str, str]:
     return self.parser.defaults()
+
+
+_TomlPrimitve = Union[bool, int, float, str]
+_TomlValue = Union[_TomlPrimitve, List[_TomlPrimitve]]
+
+
+@dataclass(frozen=True)
+class _TomlValues(_ConfigValues):
+  values: Dict[str, Any]
+
+  @staticmethod
+  def _section_explicitly_defined(section_values: Dict) -> bool:
+    """Because of the way TOML stores the config as a nested dictionary, it naively appears that
+    certain sections are defined when really only a subscope is defined.
+
+    For example, the user may have specified `cache.java` but not `cache`.
+    """
+    at_least_one_option_defined = any(
+      not isinstance(section_value, dict) for section_value in section_values.values()
+    )
+    blank_section = len(section_values.values()) == 0
+    return at_least_one_option_defined or blank_section
+
+  def _find_section(self, section: str) -> Optional[Dict]:
+    def recurse(mapping: Dict, *, remaining_sections: List[str]) -> Optional[Dict]:
+      if not remaining_sections:
+        return None
+      current_section = remaining_sections[0]
+      if current_section not in mapping:
+        return None
+      section_values = mapping[current_section]
+      if len(remaining_sections) > 1:
+        return recurse(section_values, remaining_sections=remaining_sections[1:])
+      if not self._section_explicitly_defined(section_values):
+        return None
+      return cast(Dict, section_values)
+
+    return recurse(mapping=self.values, remaining_sections=section.split("."))
+
+  def _possibly_interpolate_value(self, raw_value: str) -> str:
+    """For any values with %(foo)s, substitute it with the corresponding default val."""
+    def format_str(value: str) -> str:
+      # Because dictionaries use the symbols `{}`, we must proactively escape the symbols so that
+      # .format() does not try to improperly interpolate.
+      escaped_str = value.replace("{", "{{").replace("}", "}}")
+      new_style_format_str = re.sub(
+        pattern=r"%\((?P<interpolated>[a-zA-Z_0-9]*)\)s",
+        repl=r"{\g<interpolated>}",
+        string=escaped_str,
+      )
+      return new_style_format_str.format(**self.defaults)
+
+    def recursively_format_str(value: str) -> str:
+      # It's possible to interpolate with a value that itself has an interpolation. We must fully
+      # evaluate all expressions for parity with configparser.
+      if not re.search(r"%\([a-zA-Z_0-9]*\)s", value):
+        return value
+      return recursively_format_str(value=format_str(value))
+
+    return recursively_format_str(raw_value)
+
+  def _stringify_val(
+    self, raw_value: _TomlValue, *, interpolate: bool = True, list_prefix: Optional[str] = None,
+  ) -> str:
+    """For parity with configparser, we convert all values back to strings, which allows us to
+    avoid upstream changes to files like parser.py.
+
+    This is clunky. If we drop INI support, we should remove this and use native values."""
+    if isinstance(raw_value, str):
+      return self._possibly_interpolate_value(raw_value) if interpolate else raw_value
+
+    if isinstance(raw_value, list):
+      def stringify_list_member(member: _TomlPrimitve) -> str:
+        if not isinstance(member, str):
+          return str(member)
+        interpolated_member = self._possibly_interpolate_value(member) if interpolate else member
+        return f'"{interpolated_member}"'
+
+      list_members = ", ".join(stringify_list_member(member) for member in raw_value)
+      return f"{list_prefix or ''}[{list_members}]"
+
+    return str(raw_value)
+
+  @property
+  def sections(self) -> List[str]:
+    sections: List[str] = []
+
+    def recurse(mapping: Dict, *, parent_section: Optional[str] = None) -> None:
+      for section, section_values in mapping.items():
+        if not isinstance(section_values, dict):
+          continue
+        # We filter out "DEFAULT" and also check for the special `my_list_option.append` and
+        # `my_list_option.filter` syntax.
+        if section == "DEFAULT" or "append" in section_values or "filter" in section_values:
+          continue
+        section_name = section if not parent_section else f"{parent_section}.{section}"
+        if self._section_explicitly_defined(section_values):
+          sections.append(section_name)
+        recurse(section_values, parent_section=section_name)
+
+    recurse(self.values)
+    return sections
+
+  def has_section(self, section: str) -> bool:
+    return self._find_section(section) is not None
+
+  def has_option(self, section: str, option: str) -> bool:
+    try:
+      self.get_value(section, option)
+    except (configparser.NoSectionError, configparser.NoOptionError):
+      return False
+    else:
+      return True
+
+  def get_value(self, section: str, option: str) -> Optional[str]:
+    section_values = self._find_section(section)
+    if section_values is None:
+      raise configparser.NoSectionError(section)
+    if option in self.defaults:
+      return self._stringify_val(self.defaults[option])
+    if option not in section_values:
+      raise configparser.NoOptionError(option, section)
+    option_value = section_values[option]
+    # Handle the special `my_list_option.append` and `my_list_option.filter` syntax.
+    if isinstance(option_value, dict):
+      has_append = "append" in option_value
+      has_filter = "filter" in option_value
+      if not has_append and not has_filter:
+        raise configparser.NoOptionError(option, section)
+      append_val = (
+        self._stringify_val(option_value["append"], list_prefix="+") if has_append else None
+      )
+      filter_val = (
+        self._stringify_val(option_value["filter"], list_prefix="-") if has_filter else None
+      )
+      if has_append and has_filter:
+        return f"{append_val},{filter_val}"
+      if has_append:
+        return append_val
+      return filter_val
+    return self._stringify_val(option_value)
+
+  def options(self, section: str) -> List[str]:
+    section_values = self._find_section(section)
+    if section_values is None:
+      raise configparser.NoSectionError(section)
+    options = [
+      option
+      for option, option_value in section_values.items()
+      if not isinstance(option_value, dict)
+      or "filter" in option_value or "append" in option_value
+    ]
+    options.extend(self.defaults.keys())
+    return options
+
+  @property
+  def defaults(self) -> Mapping[str, str]:
+    return {
+      option: self._stringify_val(option_val, interpolate=False)
+      for option, option_val in self.values["DEFAULT"].items()
+    }
 
 
 @dataclass(frozen=True)
@@ -274,7 +450,7 @@ class _SingleFileConfig(Config):
     return [self.config_path]
 
   def sections(self) -> List[str]:
-    return self.values.sections()
+    return self.values.sections
 
   def has_section(self, section: str) -> bool:
     return self.values.has_section(section)

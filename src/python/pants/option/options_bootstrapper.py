@@ -222,7 +222,7 @@ class OptionsBootstrapper:
         else:
           # All the options specified under [`section`] in `config` excluding bootstrap defaults.
           all_options_under_scope = (
-            set(config.values.options(section)) - set(config.values.defaults())
+            set(config.values.options(section)) - set(config.values.defaults)
           )
           for option in all_options_under_scope:
             if option not in valid_options_under_scope:
