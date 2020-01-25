@@ -6,11 +6,11 @@ import getpass
 import io
 import itertools
 import os
-from abc import ABC
+from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from dataclasses import dataclass
 from hashlib import sha1
-from typing import Any, ClassVar, Dict, List, Optional, Sequence, Tuple, Union, cast
+from typing import Any, ClassVar, Dict, List, Mapping, Optional, Sequence, Tuple, Union, cast
 
 from twitter.common.collections import OrderedSet
 from typing_extensions import Literal
@@ -26,9 +26,10 @@ SeedValues = Dict[str, Value]
 
 
 class Config(ABC):
-  """Encapsulates ini-style config file loading and access.
+  """Encapsulates config file loading and access, including encapsulation of support for
+  multiple config files.
 
-  Supports recursive variable substitution using standard python format strings. E.g.,
+  Supports variable substitution using old-style Python format strings. E.g.,
   %(var_name)s will be replaced with the value of var_name.
   """
   DEFAULT_SECTION: ClassVar[str] = configparser.DEFAULTSECT
@@ -83,19 +84,26 @@ class Config(ABC):
 
     single_file_configs = []
     for config_item in config_items:
-      parser = cls._create_parser(seed_values=seed_values)
-      with open_ctx(config_item) as ini:
-        content = ini.read()
-        content_digest = sha1(content).hexdigest()
-        parser.read_string(content.decode())
-      config_path = config_item.path if hasattr(config_item, 'path') else config_item
-      single_file_configs.append(_SingleFileConfig(config_path, content_digest, parser))
+      config_path = config_item.path if hasattr(config_item, "path") else config_item
+      with open_ctx(config_item) as config_file:
+        content = config_file.read()
+      content_digest = sha1(content).hexdigest()
+      normalized_seed_values = cls._determine_seed_values(seed_values=seed_values)
 
+      ini_parser = configparser.ConfigParser(defaults=normalized_seed_values)
+      ini_parser.read_string(content.decode())
+      single_file_configs.append(
+        _SingleFileConfig(
+          config_path=config_path, content_digest=content_digest, values=_IniValues(ini_parser),
+        ),
+      )
     return _ChainedConfig(tuple(reversed(single_file_configs)))
 
-  @classmethod
-  def _create_parser(cls, *, seed_values: Optional[SeedValues] = None) -> configparser.ConfigParser:
-    """Creates a config parser that supports %([key-name])s value substitution."""
+  @staticmethod
+  def _determine_seed_values(*, seed_values: Optional[SeedValues] = None) -> Dict[str, str]:
+    """We pre-populate several default values to allow %([key-name])s interpolation.
+
+    This sets up those defaults and checks if the user overrided any of the values."""
     safe_seed_values = seed_values or {}
     buildroot = cast(str, safe_seed_values.get('buildroot', get_buildroot()))
 
@@ -107,14 +115,14 @@ class Config(ABC):
       'pants_configdir': get_pants_configdir(),
     }
 
-    def update_dir_from_seed_values(key: str, *, default: str) -> None:
-      all_seed_values[key] = cast(str, safe_seed_values.get(key, os.path.join(buildroot, default)))
+    def update_seed_values(key: str, *, default_dir: str) -> None:
+      all_seed_values[key] = cast(str, safe_seed_values.get(key, os.path.join(buildroot, default_dir)))
 
-    update_dir_from_seed_values('pants_workdir', default='.pants.d')
-    update_dir_from_seed_values('pants_supportdir', default='build-support')
-    update_dir_from_seed_values('pants_distdir', default='dist')
+    update_seed_values('pants_workdir', default_dir='.pants.d')
+    update_seed_values('pants_supportdir', default_dir='build-support')
+    update_seed_values('pants_distdir', default_dir='dist')
 
-    return configparser.ConfigParser(all_seed_values)
+    return all_seed_values
 
   def get(self, section, option, type_=str, default=None):
     """Retrieves option from the specified section (or 'DEFAULT') and attempts to parse it as type.
@@ -137,31 +145,31 @@ class Config(ABC):
     return parse_expression(name=key, val=raw_value, acceptable_types=type_,
                             raise_type=self.ConfigError)
 
-  # Subclasses must implement.
+  @abstractmethod
   def configs(self) -> Sequence["_SingleFileConfig"]:
     """Returns the underlying single-file configs represented by this object."""
-    raise NotImplementedError()
 
+  @abstractmethod
   def sources(self) -> List[str]:
     """Returns the sources of this config as a list of filenames."""
-    raise NotImplementedError()
 
+  @abstractmethod
   def sections(self) -> List[str]:
     """Returns the sections in this config (not including DEFAULT)."""
-    raise NotImplementedError()
 
+  @abstractmethod
   def has_section(self, section: str) -> bool:
     """Returns whether this config has the section."""
-    raise NotImplementedError()
 
+  @abstractmethod
   def has_option(self, section: str, option: str) -> bool:
-    """Returns whether this config specified a value the option."""
-    raise NotImplementedError()
+    """Returns whether this config specified a value for the option."""
 
+  @abstractmethod
   def get_value(self, section: str, option: str) -> Optional[str]:
     """Returns the value of the option in this config as a string, or None if no value specified."""
-    raise NotImplementedError()
 
+  @abstractmethod
   def get_source_for_option(self, section: str, option: str) -> Optional[str]:
     """Returns the path to the source file the given option was defined in.
 
@@ -169,7 +177,61 @@ class Config(ABC):
     :param option: the name of the option.
     :returns: the path to the config file, or None if the option was not defined by a config file.
     """
-    raise NotImplementedError
+
+
+class _ConfigValues(ABC):
+  """Encapsulates resolving the actual config values specified by the user's config file.
+
+  Beyond providing better encapsulation, this allows us to support alternative config file formats
+  in the future if we ever decide to support formats other than INI.
+  """
+
+  @abstractmethod
+  def sections(self) -> List[str]:
+    """Returns the sections in this config (not including DEFAULT)."""
+
+  @abstractmethod
+  def has_section(self, section: str) -> bool:
+    pass
+
+  @abstractmethod
+  def has_option(self, section: str, option: str) -> bool:
+    pass
+
+  @abstractmethod
+  def get_value(self, section: str, option: str) -> Optional[str]:
+    pass
+
+  @abstractmethod
+  def options(self, section: str) -> List[str]:
+    """All options defined for the section."""
+
+  @abstractmethod
+  def defaults(self) -> Mapping[str, Any]:
+    """All the DEFAULT values."""
+
+
+@dataclass(frozen=True)
+class _IniValues(_ConfigValues):
+  parser: configparser.ConfigParser
+
+  def sections(self) -> List[str]:
+    return self.parser.sections()
+
+  def has_section(self, section: str) -> bool:
+    return self.parser.has_section(section)
+
+  def has_option(self, section: str, option: str) -> bool:
+    return self.parser.has_option(section, option)
+
+  def get_value(self, section: str, option: str) -> Optional[str]:
+    return self.parser.get(section, option)
+
+  def options(self, section: str) -> List[str]:
+    return self.parser.options(section)
+
+  def defaults(self) -> Mapping[str, str]:
+    return self.parser.defaults()
 
 
 @dataclass(frozen=True)
@@ -198,40 +260,30 @@ class _EmptyConfig(Config):
     return None
 
 
+@dataclass(frozen=True)
 class _SingleFileConfig(Config):
-  """Config read from a single file.
-
-  NB: In order to have:
-    1. a specialized implementation of __eq__ and __hash__ that avoids comparing file contents
-    2. equality ignore the ConfigParser instance
-  ...this is not a dataclass.
-  """
-
-  def __init__(
-    self, configpath: str, content_digest: str, configparser: configparser.ConfigParser,
-  ) -> None:
-    super().__init__()
-    self.configpath = configpath
-    self.content_digest = content_digest
-    self.configparser = configparser
+  """Config read from a single file."""
+  config_path: str
+  content_digest: str
+  values: _ConfigValues
 
   def configs(self) -> List["_SingleFileConfig"]:
     return [self]
 
   def sources(self) -> List[str]:
-    return [self.configpath]
+    return [self.config_path]
 
   def sections(self) -> List[str]:
-    return self.configparser.sections()
+    return self.values.sections()
 
   def has_section(self, section: str) -> bool:
-    return self.configparser.has_section(section)
+    return self.values.has_section(section)
 
   def has_option(self, section: str, option: str) -> bool:
-    return self.configparser.has_option(section, option)
+    return self.values.has_option(section, option)
 
   def get_value(self, section: str, option: str) -> Optional[str]:
-    return self.configparser.get(section, option)
+    return self.values.get_value(section, option)
 
   def get_source_for_option(self, section: str, option: str) -> Optional[str]:
     if self.has_option(section, option):
@@ -241,7 +293,7 @@ class _SingleFileConfig(Config):
   def __eq__(self, other: Any) -> bool:
     if not isinstance(other, _SingleFileConfig):
       return NotImplemented
-    return self.configpath == other.configpath and self.content_digest == other.content_digest
+    return self.config_path == other.config_path and self.content_digest == other.content_digest
 
   def __hash__(self) -> int:
     return hash(self.content_digest)
