@@ -81,7 +81,7 @@ class PathGlobs:
     :param description_of_origin: a human-friendly description of where this PathGlobs request is
                                   coming from, used to improve the error message for unmatched
                                   globs. For example, this might be
-                                  "src/python/pants/util:strutil (line 84)".
+                                  "the option `--isort-config`".
     """
     self.include = tuple(include)
     self.exclude = tuple(exclude)
