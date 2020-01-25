@@ -513,7 +513,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                   "(e.g., integration tests.)")
 
     if register.bootstrap.v2:
-      register('--v2-ui', default=True, type=bool, daemon=False,
+      register('--v2-ui', default=False, type=bool, daemon=False,
                help='Whether to show v2 engine execution progress.')
       if not register.bootstrap.v1:
         loop_flag = '--loop'
