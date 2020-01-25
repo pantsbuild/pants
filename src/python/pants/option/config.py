@@ -208,7 +208,7 @@ class _ConfigValues(ABC):
 
   @abstractmethod
   def defaults(self) -> Mapping[str, Any]:
-    """All the DEFAULT values."""
+    """All the DEFAULT values (not interpolated)."""
 
 
 @dataclass(frozen=True)
