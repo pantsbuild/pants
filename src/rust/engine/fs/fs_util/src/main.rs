@@ -457,6 +457,7 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
               // something here, or we don't care. Is that a valid assumption?
               fs::StrictGlobMatching::Ignore,
               fs::GlobExpansionConjunction::AllMatch,
+              "".to_string(),
             )?)
             .map_err(|e| format!("Error expanding globs: {:?}", e))
             .and_then(move |paths| {

@@ -118,6 +118,7 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: VFS<E> {
       exclude,
       strict_match_behavior,
       conjunction,
+      description_of_origin,
     } = path_globs;
 
     if include.is_empty() {
@@ -172,13 +173,17 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: VFS<E> {
               .map(|parsed_source| parsed_source.0.clone())
               .collect::<Vec<_>>();
             non_matching_inputs.sort();
-            // TODO(#5427): document where the glob comes from, e.g. fs spec vs. a specific BUILD
-            // file and line number.
             let single_glob = non_matching_inputs.len() == 1;
-            let globs_portion = if single_glob {
-              format!("Unmatched glob: {:?}", non_matching_inputs[0])
+            let prefix = format!("Unmatched glob{}", if single_glob { "" } else { "s" });
+            let origin = if description_of_origin.is_empty() {
+              ": ".to_owned()
             } else {
-              format!("Unmatched globs: {:?}", non_matching_inputs)
+              format!(" from {}: ", description_of_origin)
+            };
+            let unmatched_globs = if single_glob {
+              format!("{:?}", non_matching_inputs[0])
+            } else {
+              format!("{:?}", non_matching_inputs)
             };
             let exclude_patterns = exclude.exclude_patterns();
             let excludes_portion = if exclude_patterns.is_empty() {
@@ -191,12 +196,13 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: VFS<E> {
                 format!(", excludes: {:?}", exclude_patterns)
               }
             };
-            let msg = format!("{}{}", globs_portion, excludes_portion);
+            let msg = format!(
+              "{}{}{}{}",
+              prefix, origin, unmatched_globs, excludes_portion
+            );
             if strict_match_behavior.should_throw_on_error() {
               return future::err(Self::mk_error(&msg));
             } else {
-              // TODO(#5683): this doesn't have any useful context (the stack trace) without
-              // being thrown -- this needs to be provided, otherwise this is far less useful.
               warn!("{}", msg);
             }
           }
@@ -321,7 +327,7 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: VFS<E> {
           .unwrap_or_else(|| vec![])
       })
       .and_then(move |link_globs| {
-        future::result(PathGlobs::from_globs(link_globs))
+        future::result(PathGlobs::from_globs(link_globs, "".to_string()))
           .map_err(|e| Self::mk_error(e.as_str()))
           .and_then(move |path_globs| context.expand(path_globs))
       })

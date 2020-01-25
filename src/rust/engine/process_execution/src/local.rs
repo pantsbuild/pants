@@ -80,6 +80,7 @@ impl CommandRunner {
       &[],
       StrictGlobMatching::Ignore,
       GlobExpansionConjunction::AllMatch,
+      "".to_string(),
     ));
 
     posix_fs

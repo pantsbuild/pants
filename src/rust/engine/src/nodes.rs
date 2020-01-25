@@ -492,7 +492,16 @@ impl Snapshot {
     let conjunction_string = externs::project_str(&conjunction_obj, "value");
     let conjunction = GlobExpansionConjunction::create(&conjunction_string)?;
 
-    PathGlobs::create(&include, &exclude, strict_glob_matching, conjunction).map_err(|e| {
+    let description_of_origin = externs::project_str(item, "description_of_origin");
+
+    PathGlobs::create(
+      &include,
+      &exclude,
+      strict_glob_matching,
+      conjunction,
+      description_of_origin,
+    )
+    .map_err(|e| {
       format!(
         "Failed to parse PathGlobs for include({:?}), exclude({:?}): {}",
         include, exclude, e

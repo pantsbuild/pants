@@ -453,6 +453,7 @@ pub struct PathGlobs {
   exclude: Arc<GitignoreStyleExcludes>,
   strict_match_behavior: StrictGlobMatching,
   conjunction: GlobExpansionConjunction,
+  description_of_origin: String,
 }
 
 impl PathGlobs {
@@ -461,9 +462,16 @@ impl PathGlobs {
     exclude: &[String],
     strict_match_behavior: StrictGlobMatching,
     conjunction: GlobExpansionConjunction,
+    description_of_origin: String,
   ) -> Result<PathGlobs, String> {
     let include = PathGlob::spread_filespecs(include)?;
-    Self::create_with_globs_and_match_behavior(include, exclude, strict_match_behavior, conjunction)
+    Self::create_with_globs_and_match_behavior(
+      include,
+      exclude,
+      strict_match_behavior,
+      conjunction,
+      description_of_origin,
+    )
   }
 
   fn create_with_globs_and_match_behavior(
@@ -471,6 +479,7 @@ impl PathGlobs {
     exclude: &[String],
     strict_match_behavior: StrictGlobMatching,
     conjunction: GlobExpansionConjunction,
+    description_of_origin: String,
   ) -> Result<PathGlobs, String> {
     let gitignore_excludes = GitignoreStyleExcludes::create(exclude)?;
     Ok(PathGlobs {
@@ -478,10 +487,14 @@ impl PathGlobs {
       exclude: gitignore_excludes,
       strict_match_behavior,
       conjunction,
+      description_of_origin,
     })
   }
 
-  pub fn from_globs(include: Vec<PathGlob>) -> Result<PathGlobs, String> {
+  pub fn from_globs(
+    include: Vec<PathGlob>,
+    description_of_origin: String,
+  ) -> Result<PathGlobs, String> {
     let include = include
       .into_iter()
       .map(|glob| PathGlobIncludeEntry {
@@ -495,6 +508,7 @@ impl PathGlobs {
       &[],
       StrictGlobMatching::Ignore,
       GlobExpansionConjunction::AllMatch,
+      description_of_origin,
     )
   }
 

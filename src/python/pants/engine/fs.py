@@ -63,18 +63,31 @@ class PathGlobs:
   exclude: Tuple[str, ...]
   glob_match_error_behavior: GlobMatchErrorBehavior
   conjunction: GlobExpansionConjunction
+  description_of_origin: str
 
   def __init__(
     self,
     include: Iterable[str],
     exclude: Iterable[str] = (),
     glob_match_error_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.ignore,
-    conjunction: GlobExpansionConjunction = GlobExpansionConjunction.any_match
+    conjunction: GlobExpansionConjunction = GlobExpansionConjunction.any_match,
+    description_of_origin: Optional[str] = None,
   ) -> None:
+    """
+    :param include: globs to match, e.g. "foo.txt" or "**/*.txt"
+    :param exclude: globs to exclude, in the same style as the args to `include`
+    :param glob_match_error_behavior: whether to warn or error upon match failures
+    :param conjunction: whether all `include`s must match or only at least one must match
+    :param description_of_origin: a human-friendly description of where this PathGlobs request is
+                                  coming from, used to improve the error message for unmatched
+                                  globs. For example, this might be
+                                  "src/python/pants/util:strutil (line 84)".
+    """
     self.include = tuple(include)
     self.exclude = tuple(exclude)
     self.glob_match_error_behavior = glob_match_error_behavior
     self.conjunction = conjunction
+    self.description_of_origin = description_of_origin or ""
 
 
 @dataclass(frozen=True)
