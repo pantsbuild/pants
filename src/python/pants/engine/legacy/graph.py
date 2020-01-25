@@ -42,6 +42,7 @@ from pants.engine.objects import Collection
 from pants.engine.parser import HydratedStruct
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
+from pants.option.custom_types import GlobExpansionConjunction
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.scm.subsystems.changed import IncludeDependeesOption
 from pants.source.filespec import any_matches_filespec
@@ -714,6 +715,8 @@ async def sources_snapshots_from_filesystem_specs(
     PathGlobs(
       include=(fs_spec.glob for fs_spec in filesystem_specs),
       glob_match_error_behavior=glob_match_error_behavior,
+      # We validate that _every_ filesystem spec is valid.
+      conjunction=GlobExpansionConjunction.all_match,
     )
   )
   return SourcesSnapshots([SourcesSnapshot(snapshot)])
