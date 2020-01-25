@@ -465,7 +465,7 @@ impl Snapshot {
     // and store::Snapshot::from_path_stats tracking dependencies for file digests.
     context
       .expand(path_globs)
-      .map_err(|e| format!("PathGlobs expansion failed: {}", e))
+      .map_err(|e| format!("{}", e))
       .and_then(move |path_stats| {
         store::Snapshot::from_path_stats(
           context.core.store(),
