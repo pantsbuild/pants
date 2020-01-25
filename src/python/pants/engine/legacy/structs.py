@@ -6,9 +6,9 @@ import os.path
 from abc import ABCMeta, abstractmethod
 from collections.abc import MutableSequence, MutableSet
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any, Callable, List, cast
 
-from pants.build_graph.address import Address
+from pants.build_graph.address import BuildFileAddress
 from pants.build_graph.target import Target
 from pants.engine.addressable import addressable_list
 from pants.engine.fs import GlobExpansionConjunction, PathGlobs
@@ -137,7 +137,7 @@ class SourcesField:
   lazy construction will be more natural.
     see https://github.com/pantsbuild/pants/issues/3560
 
-  :param address: The Address of the TargetAdaptor for which this field is an argument.
+  :param address: The BuildFileAddress of the TargetAdaptor for which this field is an argument.
   :param arg: The name of this argument: usually 'sources', but occasionally also 'resources' in the
     case of python resource globs.
   :param filespecs: The merged filespecs dict the describes the paths captured by this field.
@@ -145,7 +145,7 @@ class SourcesField:
   :param validate_fn: A function which takes an EagerFilesetWithSpec and throws if it's not
     acceptable. This API will almost certainly change in the near future.
   """
-  address: Address
+  address: BuildFileAddress
   arg: str
   filespecs: wrapped_globs.Filespec
   base_globs: Any
@@ -186,10 +186,10 @@ class PageAdaptor(TargetAdaptor):
 @dataclass(frozen=True)
 class BundlesField:
   """Represents the `bundles` argument, each of which has a PathGlobs to represent its `fileset`."""
-  address: Any
+  address: BuildFileAddress
   bundles: Any
-  filespecs_list: Any
-  path_globs_list: Any
+  filespecs_list: List[wrapped_globs.Filespec]
+  path_globs_list: List[PathGlobs]
 
   def __hash__(self):
     return hash(self.address)
@@ -370,27 +370,27 @@ class BaseGlobs(Locatable, metaclass=ABCMeta):
       raise ValueError('kwargs not supported for {}. Got: {}'.format(type(self), kwargs))
 
   @property
-  def filespecs(self):
+  def filespecs(self) -> wrapped_globs.Filespec:
     """Return a filespecs dict representing both globs and excludes."""
     filespecs = {'globs': self._file_globs}
     exclude_filespecs = self._exclude_filespecs
     if exclude_filespecs:
       filespecs['exclude'] = exclude_filespecs
-    return filespecs
+    return cast(wrapped_globs.Filespec, filespecs)
 
   @property
-  def _exclude_filespecs(self):
+  def _exclude_filespecs(self) -> List[wrapped_globs._GlobsDict]:
     if self._excluded_file_globs:
       return [{'globs': self._excluded_file_globs}]
-    else:
-      return []
+    return []
 
-  def to_path_globs(self, relpath, conjunction):
+  def to_path_globs(self, relpath: str, conjunction: GlobExpansionConjunction) -> PathGlobs:
     """Return a PathGlobs representing the included and excluded Files for these patterns."""
     return PathGlobs(
       include=tuple(os.path.join(relpath, glob) for glob in self._file_globs),
       exclude=tuple(os.path.join(relpath, exclude) for exclude in self._excluded_file_globs),
-      conjunction=conjunction)
+      conjunction=conjunction,
+    )
 
   def _gen_init_args_str(self):
     all_arg_strs = []

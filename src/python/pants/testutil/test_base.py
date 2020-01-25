@@ -17,7 +17,7 @@ from pants.base.build_root import BuildRoot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.exceptions import TaskError
 from pants.base.specs import AddressSpec, AddressSpecs, FilesystemSpecs, Specs
-from pants.build_graph.address import Address
+from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
@@ -265,7 +265,9 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     self, package_relative_path_globs: List[str], package_dir: str = '',
   ) -> EagerFilesetWithSpec:
     sources_field = SourcesField(
-      address=Address.parse(f'{package_dir}:_bogus_target_for_test'),
+      address=BuildFileAddress(
+        rel_path=os.path.join(package_dir, "BUILD"), target_name="_bogus_target_for_test",
+      ),
       arg='sources',
       filespecs={'globs': package_relative_path_globs},
       base_globs=None,

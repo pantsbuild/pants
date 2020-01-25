@@ -26,6 +26,7 @@ from pants.engine.isolated_process import (
 from pants.engine.legacy.structs import TargetAdaptor
 from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
+from pants.option.global_options import GlobMatchErrorBehavior
 from pants.rules.core.fmt import FmtResult
 from pants.rules.core.lint import LintResult
 
@@ -48,7 +49,11 @@ class BlackSetup:
 async def setup_black(black: Black) -> BlackSetup:
   config_path: Optional[str] = black.options.config
   config_snapshot = await Get[Snapshot](
-    PathGlobs(include=tuple([config_path] if config_path else []))
+    PathGlobs(
+      include=tuple([config_path] if config_path else []),
+      glob_match_error_behavior=GlobMatchErrorBehavior.error,
+      description_of_origin="the option `--black-config`",
+    )
   )
   requirements_pex = await Get[Pex](
     CreatePex(

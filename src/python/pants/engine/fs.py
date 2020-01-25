@@ -88,6 +88,14 @@ class PathGlobs:
     self.glob_match_error_behavior = glob_match_error_behavior
     self.conjunction = conjunction
     self.description_of_origin = description_of_origin or ""
+    self.__post_init__()
+
+  def __post_init__(self) -> None:
+    if not self.description_of_origin and self.glob_match_error_behavior != GlobMatchErrorBehavior.ignore:
+      raise ValueError(
+        "Please provide a `description_of_origin` so that the error message is more helpful to "
+        "users when their globs fail to match."
+      )
 
 
 @dataclass(frozen=True)
