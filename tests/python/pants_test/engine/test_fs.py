@@ -483,29 +483,16 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
         exclude=[],
         glob_match_error_behavior=GlobMatchErrorBehavior.error,
       ), [])
-    expected_msg = (
-      "Globs did not match. Excludes were: []. Unmatched globs were: [\"not-a-file.txt\"].")
-    self.assertIn(expected_msg, str(cm.exception))
+    assert 'Unmatched glob: "not-a-file.txt"' in str(cm.exception)
 
-  def test_glob_match_exclude_error(self):
+  def test_glob_match_error_with_exclude(self):
     with self.assertRaises(ValueError) as cm:
       self.assert_walk_files(PathGlobs(
         include=['*.txt'],
         exclude=['4.txt'],
         glob_match_error_behavior=GlobMatchErrorBehavior.error,
       ), [])
-    expected_msg = (
-      "Globs did not match. Excludes were: [\"4.txt\"]. Unmatched globs were: [\"*.txt\"].")
-    self.assertIn(expected_msg, str(cm.exception))
-
-  def test_glob_match_ignore_logging(self):
-    with self.captured_logging(logging.WARNING) as captured:
-      self.assert_walk_files(PathGlobs(
-        include=['not-a-file.txt'],
-        exclude=[''],
-        glob_match_error_behavior=GlobMatchErrorBehavior.ignore,
-      ), [])
-      self.assertEqual(0, len(captured.warnings()))
+    assert 'Unmatched glob: "*.txt", exclude: "4.txt"' in str(cm.exception)
 
   @unittest.skip('Skipped to expedite landing #5769: see #5863')
   def test_glob_match_warn_logging(self):
@@ -516,9 +503,17 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
         glob_match_error_behavior=GlobMatchErrorBehavior.warn,
       ), [])
       all_warnings = captured.warnings()
-      self.assertEqual(1, len(all_warnings))
-      single_warning = all_warnings[0]
-      self.assertEqual("???", str(single_warning))
+      assert len(all_warnings) == 1
+      assert 'Unmatched glob: "not-a-file.txt"' == str(all_warnings[0])
+
+  def test_glob_match_ignore_logging(self):
+    with self.captured_logging(logging.WARNING) as captured:
+      self.assert_walk_files(PathGlobs(
+        include=['not-a-file.txt'],
+        exclude=[''],
+        glob_match_error_behavior=GlobMatchErrorBehavior.ignore,
+      ), [])
+      assert len(captured.warnings()) == 0
 
   def prime_store_with_roland_digest(self):
     """This method primes the store with a directory of a file named 'roland' and contents 'European Burmese'."""
