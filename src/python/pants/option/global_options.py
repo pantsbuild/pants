@@ -229,6 +229,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--backend-packages', advanced=True, type=list,
              default=['pants.backend.graph_info',
                       'pants.backend.python',
+                      'pants.backend.python.lint.isort',
                       'pants.backend.jvm',
                       'pants.backend.native',
                       'pants.backend.codegen.antlr.java',
