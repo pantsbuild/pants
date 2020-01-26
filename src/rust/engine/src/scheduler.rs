@@ -13,7 +13,7 @@ use futures01::future::{self, Future};
 use crate::context::{Context, Core};
 use crate::core::{Failure, Params, TypeId, Value};
 use crate::nodes::{NodeKey, Select, Tracer, Visualizer};
-use graph::{EntryId, Graph, InvalidationResult, NodeContext};
+use graph::{Graph, InvalidationResult};
 use indexmap::IndexMap;
 use log::{debug, info, warn};
 use logging::logger::LOGGER;
@@ -282,7 +282,7 @@ impl Scheduler {
   /// give up.
   ///
   fn execute_helper(
-    context: RootContext,
+    context: Context,
     sender: mpsc::Sender<Vec<Result<Value, Failure>>>,
     roots: Vec<Root>,
     count: usize,
@@ -348,10 +348,7 @@ impl Scheduler {
 
     // Wait for all roots to complete. Failure here should be impossible, because each
     // individual Future in the join was (eventually) mapped into success.
-    let context = RootContext {
-      core: self.core.clone(),
-      session: session.clone(),
-    };
+    let context = Context::new(self.core.clone(), session.clone());
     let (sender, receiver) = mpsc::channel();
 
     Scheduler::execute_helper(context, sender, request.roots.clone(), 8);
@@ -477,33 +474,3 @@ impl Drop for Scheduler {
 type Root = Select;
 
 pub type RootResult = Result<Value, Failure>;
-
-///
-/// NB: This basic wrapper exists to allow us to implement the `NodeContext` trait (which lives
-/// outside of this crate) for the `Arc` struct (which also lives outside our crate), which is not
-/// possible without the wrapper due to "trait coherence".
-///
-#[derive(Clone)]
-struct RootContext {
-  core: Arc<Core>,
-  session: Session,
-}
-
-impl NodeContext for RootContext {
-  type Node = NodeKey;
-
-  fn clone_for(&self, entry_id: EntryId) -> Context {
-    Context::new(entry_id, self.core.clone(), self.session.clone())
-  }
-
-  fn graph(&self) -> &Graph<NodeKey> {
-    &self.core.graph
-  }
-
-  fn spawn<F>(&self, future: F)
-  where
-    F: Future<Item = (), Error = ()> + Send + 'static,
-  {
-    self.core.executor.spawn_and_ignore(future);
-  }
-}

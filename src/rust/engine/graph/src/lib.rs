@@ -642,10 +642,12 @@ impl<N: Node> Graph<N> {
   /// In the context of the given src Node, declare a dependency on the given dst Node and
   /// begin its execution if it has not already started.
   ///
-  pub fn get<C>(&self, src_id: EntryId, context: &C, dst_node: N) -> BoxFuture<N::Item, N::Error>
-  where
-    C: NodeContext<Node = N>,
-  {
+  pub fn get(
+    &self,
+    src_id: EntryId,
+    context: &N::Context,
+    dst_node: N,
+  ) -> BoxFuture<N::Item, N::Error> {
     let maybe_entry_and_id = {
       // Get or create the destination, and then insert the dep and return its state.
       let mut inner = self.inner.lock();
@@ -759,10 +761,7 @@ impl<N: Node> Graph<N> {
   ///
   /// Create the given Node if it does not already exist.
   ///
-  pub fn create<C>(&self, node: N, context: &C) -> BoxFuture<N::Item, N::Error>
-  where
-    C: NodeContext<Node = N>,
-  {
+  pub fn create(&self, node: N, context: &N::Context) -> BoxFuture<N::Item, N::Error> {
     let maybe_entry_and_id = {
       let mut inner = self.inner.lock();
       if inner.draining {
@@ -783,14 +782,11 @@ impl<N: Node> Graph<N> {
   /// Gets the generations of the dependencies of the given EntryId, (re)computing or cleaning
   /// them first if necessary.
   ///
-  fn dep_generations<C>(
+  fn dep_generations(
     &self,
     entry_id: EntryId,
-    context: &C,
-  ) -> BoxFuture<Vec<Generation>, N::Error>
-  where
-    C: NodeContext<Node = N>,
-  {
+    context: &N::Context,
+  ) -> BoxFuture<Vec<Generation>, N::Error> {
     let mut inner = self.inner.lock();
     let dep_ids = inner
       .pg
@@ -870,15 +866,13 @@ impl<N: Node> Graph<N> {
   /// contains dirty nodes, clearing those nodes (removing any edges from them). This is a little
   /// hacky, but will tide us over until we fully solve this problem.
   ///
-  fn complete<C>(
+  fn complete(
     &self,
-    context: &C,
+    context: &N::Context,
     entry_id: EntryId,
     run_token: RunToken,
     result: Option<Result<N::Item, N::Error>>,
-  ) where
-    C: NodeContext<Node = N>,
-  {
+  ) {
     let (entry, entry_id, dep_generations) = {
       let inner = self.inner.lock();
       // Get the Generations of all dependencies of the Node. We can trust that these have not changed

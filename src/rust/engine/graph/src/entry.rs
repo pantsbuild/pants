@@ -194,18 +194,15 @@ impl<N: Node> Entry<N> {
   /// Spawn the execution of the node on an Executor, which will cause it to execute outside of
   /// the Graph lock and call back into the graph lock to set the final value.
   ///
-  pub(crate) fn run<C>(
-    context_factory: &C,
+  pub(crate) fn run(
+    context_factory: &N::Context,
     node: &N,
     entry_id: EntryId,
     run_token: RunToken,
     generation: Generation,
     previous_dep_generations: Option<Vec<Generation>>,
     previous_result: Option<EntryResult<N>>,
-  ) -> EntryState<N>
-  where
-    C: NodeContext<Node = N>,
-  {
+  ) -> EntryState<N> {
     // Increment the RunToken to uniquely identify this work.
     let run_token = run_token.next();
     let context = context_factory.clone_for(entry_id);
@@ -280,14 +277,11 @@ impl<N: Node> Entry<N> {
   /// need to consume the state (which avoids cloning some of the values held there), so we take it
   /// by value.
   ///
-  pub(crate) fn get<C>(
+  pub(crate) fn get(
     &mut self,
-    context: &C,
+    context: &N::Context,
     entry_id: EntryId,
-  ) -> BoxFuture<(N::Item, Generation), N::Error>
-  where
-    C: NodeContext<Node = N>,
-  {
+  ) -> BoxFuture<(N::Item, Generation), N::Error> {
     {
       let mut state = self.state.lock();
 
@@ -400,17 +394,15 @@ impl<N: Node> Entry<N> {
   /// complete _while_ a batch of nodes are being marked as dirty, and this exclusive access ensures
   /// that can't happen.
   ///
-  pub(crate) fn complete<C>(
+  pub(crate) fn complete(
     &mut self,
-    context: &C,
+    context: &N::Context,
     entry_id: EntryId,
     result_run_token: RunToken,
     dep_generations: Vec<Generation>,
     result: Option<Result<N::Item, N::Error>>,
     _graph: &mut super::InnerGraph<N>,
-  ) where
-    C: NodeContext<Node = N>,
-  {
+  ) {
     let mut state = self.state.lock();
 
     // We care about exactly one case: a Running state with the same run_token. All other states
