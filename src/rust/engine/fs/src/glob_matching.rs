@@ -15,7 +15,7 @@ use parking_lot::Mutex;
 
 use crate::{
   Dir, GitignoreStyleExcludes, GlobExpansionConjunction, Link, PathGlob, PathGlobs, PathStat, Stat,
-  VFS,
+  StrictGlobMatching, VFS,
 };
 
 pub trait GlobMatching<E: Display + Send + Sync + 'static>: VFS<E> {
@@ -118,7 +118,6 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: VFS<E> {
       exclude,
       strict_match_behavior,
       conjunction,
-      description_of_origin,
     } = path_globs;
 
     if include.is_empty() {
@@ -175,10 +174,11 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: VFS<E> {
             non_matching_inputs.sort();
             let single_glob = non_matching_inputs.len() == 1;
             let prefix = format!("Unmatched glob{}", if single_glob { "" } else { "s" });
-            let origin = if description_of_origin.is_empty() {
-              ": ".to_owned()
-            } else {
-              format!(" from {}: ", description_of_origin)
+            let origin = match &strict_match_behavior {
+              StrictGlobMatching::Warn(description) | StrictGlobMatching::Error(description) => {
+                format!(" from {}: ", description)
+              }
+              _ => ": ".to_string(),
             };
             let unmatched_globs = if single_glob {
               format!("{:?}", non_matching_inputs[0])
@@ -327,7 +327,7 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: VFS<E> {
           .unwrap_or_else(|| vec![])
       })
       .and_then(move |link_globs| {
-        future::result(PathGlobs::from_globs(link_globs, "".to_string()))
+        future::result(PathGlobs::from_globs(link_globs))
           .map_err(|e| Self::mk_error(e.as_str()))
           .and_then(move |path_globs| context.expand(path_globs))
       })

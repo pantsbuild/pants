@@ -75,12 +75,12 @@ impl CommandRunner {
       })
       .collect();
 
+    // TODO: should we error when globs fail?
     let output_globs = try_future!(PathGlobs::create(
       &try_future!(output_paths),
       &[],
       StrictGlobMatching::Ignore,
       GlobExpansionConjunction::AllMatch,
-      "".to_string(),
     ));
 
     posix_fs

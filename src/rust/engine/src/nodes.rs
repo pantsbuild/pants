@@ -483,25 +483,24 @@ impl Snapshot {
     let include = externs::project_multi_strs(item, "include");
     let exclude = externs::project_multi_strs(item, "exclude");
 
+    let origin = externs::project_str(item, "description_of_origin");
+    let description_of_origin = if origin.is_empty() {
+      None
+    } else {
+      Some(origin)
+    };
+
     let glob_match_error_behavior =
       externs::project_ignoring_type(item, "glob_match_error_behavior");
     let failure_behavior = externs::project_str(&glob_match_error_behavior, "value");
-    let strict_glob_matching = StrictGlobMatching::create(failure_behavior.as_str())?;
+    let strict_glob_matching =
+      StrictGlobMatching::create(failure_behavior.as_str(), description_of_origin)?;
 
     let conjunction_obj = externs::project_ignoring_type(item, "conjunction");
     let conjunction_string = externs::project_str(&conjunction_obj, "value");
     let conjunction = GlobExpansionConjunction::create(&conjunction_string)?;
 
-    let description_of_origin = externs::project_str(item, "description_of_origin");
-
-    PathGlobs::create(
-      &include,
-      &exclude,
-      strict_glob_matching,
-      conjunction,
-      description_of_origin,
-    )
-    .map_err(|e| {
+    PathGlobs::create(&include, &exclude, strict_glob_matching, conjunction).map_err(|e| {
       format!(
         "Failed to parse PathGlobs for include({:?}), exclude({:?}): {}",
         include, exclude, e
