@@ -18,10 +18,16 @@ from pants.rules.core.lint import LintResult
 from pants.source.wrapped_globs import EagerFilesetWithSpec
 from pants.testutil.interpreter_selection_utils import skip_unless_python27_and_python3_present
 from pants.testutil.option.util import create_options_bootstrapper
+from pants.testutil.subsystem.util import init_subsystems
 from pants.testutil.test_base import TestBase
 
 
 class Flake8IntegrationTest(TestBase):
+
+  def setUp(self):
+    super().setUp()
+    init_subsystems([download_pex_bin.DownloadedPexBin.Factory])
+
   good_source = FileContent(path="test/good.py", content=b"print('Nothing suspicious here..')\n")
   bad_source = FileContent(path="test/bad.py", content=b"import typing\n")  # unused import
   py3_only_source = FileContent(path="test/py3.py", content=b"version: str = 'Py3 > Py2'\n")
@@ -32,7 +38,16 @@ class Flake8IntegrationTest(TestBase):
 
   @classmethod
   def rules(cls):
-    return (*super().rules(), *flake8_rules(), RootRule(Flake8Target))
+    return (
+      *super().rules(),
+      *flake8_rules(),
+      *[download_pex_bin.download_pex_bin],
+      *pex.rules(),
+      *python_native_code.rules(),
+      *subprocess_environment.rules(),
+      RootRule(Flake8Target),
+      RootRule(download_pex_bin.DownloadedPexBin.Factory),
+    )
 
   def run_flake8(
     self,
@@ -61,7 +76,11 @@ class Flake8IntegrationTest(TestBase):
       )
     )
     return self.request_single_product(
-      LintResult, Params(target, create_options_bootstrapper(args=args)),
+      LintResult, Params(
+        target,
+        create_options_bootstrapper(args=args),
+        download_pex_bin.DownloadedPexBin.Factory.global_instance(),
+      ),
     )
 
   def test_single_passing_source(self) -> None:
