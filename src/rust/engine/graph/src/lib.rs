@@ -446,9 +446,7 @@ impl<N: Node> InnerGraph<N> {
     // the Nodes (to avoid cloning them), adding equal edge weights, and then reversing it.
     // Because we do not remove any Nodes or edges, all EntryIds remain stable.
     let dependent_graph = {
-      let mut dg = self
-        .pg
-        .filter_map(|_, _| Some(()), |_, _| Some(1.0));
+      let mut dg = self.pg.filter_map(|_, _| Some(()), |_, _| Some(1.0));
       dg.reverse();
       dg
     };

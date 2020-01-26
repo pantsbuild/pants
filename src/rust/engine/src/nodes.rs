@@ -1032,14 +1032,12 @@ impl Node for NodeKey {
       let user_facing_name = self.user_facing_name();
       let span_id = generate_random_64bit_string();
       let parent_id = workunit_store::get_parent_id();
-      let maybe_started_workunit = user_facing_name
-        .as_ref()
-        .map(|node_name| StartedWorkUnit {
-          name: node_name.to_string(),
-          start_time: std::time::SystemTime::now(),
-          span_id: span_id.clone(),
-          parent_id,
-        });
+      let maybe_started_workunit = user_facing_name.as_ref().map(|node_name| StartedWorkUnit {
+        name: node_name.to_string(),
+        start_time: std::time::SystemTime::now(),
+        span_id: span_id.clone(),
+        parent_id,
+      });
       let maybe_span_id = if user_facing_name.is_some() {
         Some(span_id)
       } else {

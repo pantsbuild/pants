@@ -681,7 +681,7 @@ impl<'t, R: Rule> GraphMaker<'t, R> {
         Ordering::Equal => {
           rules.push(satisfiable_entry);
         }
-        Ordering::Greater => {},
+        Ordering::Greater => {}
       }
     }
 
@@ -990,7 +990,11 @@ impl<R: Rule> RuleGraph<R> {
       .collect();
     msgs.sort();
 
-    Err(format!("Rules with errors: {}\n  {}", msgs.len(), msgs.join("\n  ")))
+    Err(format!(
+      "Rules with errors: {}\n  {}",
+      msgs.len(),
+      msgs.join("\n  ")
+    ))
   }
 
   pub fn visualize(&self, f: &mut dyn io::Write) -> io::Result<()> {

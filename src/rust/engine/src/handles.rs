@@ -21,7 +21,7 @@ pub struct Handle(pub RawHandle);
 
 impl Handle {
   ///
-  /// An escape hatch to allow for cloning a Handle without cloning the value it points to. 
+  /// An escape hatch to allow for cloning a Handle without cloning the value it points to.
   ///
   /// # Safety
   ///

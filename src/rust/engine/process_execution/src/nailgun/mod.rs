@@ -231,12 +231,8 @@ impl CapturedWorkdir for CommandRunner {
       .jdk_home
       .clone()
       .ok_or("JDK home must be specified for all nailgunnable requests.")?;
-    let nailgun_req = construct_nailgun_server_request(
-      &nailgun_name,
-      nailgun_args,
-      jdk_home,
-      req.target_platform,
-    );
+    let nailgun_req =
+      construct_nailgun_server_request(&nailgun_name, nailgun_args, jdk_home, req.target_platform);
     trace!("Extracted nailgun request:\n {:#?}", &nailgun_req);
 
     let nailgun_req_digest = crate::digest(
