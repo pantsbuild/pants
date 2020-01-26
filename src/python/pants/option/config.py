@@ -260,7 +260,7 @@ class _EmptyConfig(Config):
     return None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, eq=False)
 class _SingleFileConfig(Config):
   """Config read from a single file."""
   config_path: str
