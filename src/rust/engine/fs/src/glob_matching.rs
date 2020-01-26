@@ -90,12 +90,12 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: VFS<E> {
                 match stat {
                   Stat::Link(l) => context.canonicalize(stat_symbolic_path, l.clone()),
                   Stat::Dir(d) => future::ok(Some(PathStat::dir(
-                    stat_symbolic_path.to_owned(),
+                    stat_symbolic_path,
                     d.clone(),
                   )))
                   .to_boxed(),
                   Stat::File(f) => future::ok(Some(PathStat::file(
-                    stat_symbolic_path.to_owned(),
+                    stat_symbolic_path,
                     f.clone(),
                   )))
                   .to_boxed(),
@@ -226,8 +226,8 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: VFS<E> {
         symbolic_path,
         wildcard,
       } => self.expand_wildcard(
-        result.clone(),
-        exclude.clone(),
+        result,
+        exclude,
         canonical_dir,
         symbolic_path,
         wildcard,
@@ -238,8 +238,8 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: VFS<E> {
         wildcard,
         remainder,
       } => self.expand_dir_wildcard(
-        result.clone(),
-        exclude.clone(),
+        result,
+        exclude,
         canonical_dir,
         symbolic_path,
         wildcard,

@@ -49,7 +49,7 @@ fn construct_nailgun_server_request(
 ) -> ExecuteProcessRequest {
   let mut full_args = args_for_the_jvm;
   full_args.push(NAILGUN_MAIN_CLASS.to_string());
-  full_args.extend(ARGS_TO_START_NAILGUN.iter().map(|a| a.to_string()));
+  full_args.extend(ARGS_TO_START_NAILGUN.iter().map(|&a| a.to_string()));
 
   ExecuteProcessRequest {
     argv: full_args,
@@ -234,7 +234,7 @@ impl CapturedWorkdir for CommandRunner {
     let nailgun_req = construct_nailgun_server_request(
       &nailgun_name,
       nailgun_args,
-      jdk_home.clone(),
+      jdk_home,
       req.target_platform,
     );
     trace!("Extracted nailgun request:\n {:#?}", &nailgun_req);
@@ -247,10 +247,9 @@ impl CapturedWorkdir for CommandRunner {
     let nailgun_pool = self.nailgun_pool.clone();
     let req2 = req.clone();
     let workdir_for_this_nailgun = self.get_nailgun_workdir(&nailgun_name)?;
-    let workdir_for_this_nailgun1 = workdir_for_this_nailgun.clone();
     let build_id = context.build_id.clone();
     let store = self.inner.store.clone();
-    let workunit_store = context.workunit_store.clone();
+    let workunit_store = context.workunit_store;
 
     // Streams to read child output from
     let (stdio_write, stdio_read) = child_channel::<ChildOutput>();
@@ -263,7 +262,7 @@ impl CapturedWorkdir for CommandRunner {
         nailgun_pool.connect(
           nailgun_name.clone(),
           nailgun_req,
-          workdir_for_this_nailgun1,
+          workdir_for_this_nailgun,
           nailgun_req_digest,
           build_id,
           store,

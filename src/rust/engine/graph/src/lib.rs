@@ -448,8 +448,7 @@ impl<N: Node> InnerGraph<N> {
     let dependent_graph = {
       let mut dg = self
         .pg
-        .filter_map(|_, _| Some(()), |_, _| Some(1.0))
-        .clone();
+        .filter_map(|_, _| Some(()), |_, _| Some(1.0));
       dg.reverse();
       dg
     };
@@ -660,7 +659,7 @@ impl<N: Node> Graph<N> {
         let dst_id = {
           // TODO: doing cycle detection under the lock... unfortunate, but probably unavoidable
           // without a much more complicated algorithm.
-          let potential_dst_id = inner.ensure_entry(dst_node.clone());
+          let potential_dst_id = inner.ensure_entry(dst_node);
           if let Some(cycle_path) = Self::report_cycle(src_id, potential_dst_id, &mut inner) {
             // Cyclic dependency: render an error.
             let path_strs = cycle_path

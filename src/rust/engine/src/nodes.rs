@@ -71,7 +71,7 @@ impl VFS<Failure> for Context {
 
 impl StoreFileByDigest<Failure> for Context {
   fn store_by_digest(&self, file: File, _: WorkUnitStore) -> BoxFuture<hashing::Digest, Failure> {
-    self.get(DigestFile(file.clone()))
+    self.get(DigestFile(file))
   }
 }
 
@@ -149,7 +149,7 @@ impl Select {
         ))
       });
     let context = context.clone();
-    Select::new_from_edges(self.params.clone(), product, &try_future!(edges)).run(context.clone())
+    Select::new_from_edges(self.params.clone(), product, &try_future!(edges)).run(context)
   }
 }
 
@@ -767,7 +767,7 @@ impl Task {
       .into_iter()
       .map(|get| {
         let context = context.clone();
-        let params = params.clone();
+        let mut params = params.clone();
         let entry = entry.clone();
         let dependency_key = selectors::DependencyKey::JustGet(selectors::Get {
           product: get.product,
@@ -808,7 +808,6 @@ impl Task {
           });
         // The subject of the get is a new parameter that replaces an existing param of the same
         // type.
-        let mut params = params.clone();
         params.put(get.subject);
         future::result(entry)
           .and_then(move |entry| Select::new(params, get.product, entry).run(context.clone()))
@@ -1035,7 +1034,7 @@ impl Node for NodeKey {
       let parent_id = workunit_store::get_parent_id();
       let maybe_started_workunit = user_facing_name
         .as_ref()
-        .map(|ref node_name| StartedWorkUnit {
+        .map(|node_name| StartedWorkUnit {
           name: node_name.to_string(),
           start_time: std::time::SystemTime::now(),
           span_id: span_id.clone(),

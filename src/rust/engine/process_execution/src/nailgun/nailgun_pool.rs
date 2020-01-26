@@ -146,7 +146,6 @@ impl NailgunPool {
               .lock()
               .try_wait()
               .map_err(|e| format!("Error getting the process status! {}", e))
-              .clone()
         };
         match status {
           Ok(None) => {

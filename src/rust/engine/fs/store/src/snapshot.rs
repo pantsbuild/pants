@@ -355,7 +355,7 @@ impl Snapshot {
                 .collect::<Result<Vec<_>, String>>();
               future::done(digests_result)
                 .and_then(move |digests| {
-                  Self::merge_directories(store2.clone(), digests, workunit_store2.clone())
+                  Self::merge_directories(store2, digests, workunit_store2)
                 })
                 .map(move |merged_digest| {
                   let mut child_dir = bazel_protos::remote_execution::DirectoryNode::new();

@@ -819,7 +819,7 @@ impl Store {
           })
           .map_err(|e| format!("Error writing file {:?}: {:?}", destination, e))
         },
-        workunit_store.clone(),
+        workunit_store,
       )
       .and_then(move |write_result| match write_result {
         Some((Ok(()), metadata)) => Ok(metadata),

@@ -103,7 +103,7 @@ fn directory_with_prefix_to_strip_to_digest(context: Context, request: Value) ->
 }
 
 fn directory_with_prefix_to_add_to_digest(context: Context, request: Value) -> NodeFuture<Value> {
-  let core = context.core.clone();
+  let core = context.core;
   future::result(
     lift_digest(&externs::project_ignoring_type(
       &request,
@@ -134,7 +134,7 @@ fn digest_to_snapshot(context: Context, directory_digest_val: Value) -> NodeFutu
 
 fn directories_to_merge_to_digest(context: Context, request: Value) -> NodeFuture<Value> {
   let workunit_store = context.session.workunit_store();
-  let core = context.core.clone();
+  let core = context.core;
   let digests: Result<Vec<hashing::Digest>, Failure> =
     externs::project_multi(&request, "directories")
       .into_iter()

@@ -345,7 +345,7 @@ fn make_core(
 
   let remote_execution_headers = remote_execution_headers_buf.to_map("remote-execution-headers")?;
   Core::new(
-    root_type_ids.clone(),
+    root_type_ids,
     tasks,
     types,
     PathBuf::from(build_root_buf.to_os_string()),
@@ -767,7 +767,7 @@ fn generate_panic_string(payload: &(dyn Any + Send)) -> String {
   match payload
     .downcast_ref::<String>()
     .cloned()
-    .or_else(|| payload.downcast_ref::<&str>().map(|s| s.to_string()))
+    .or_else(|| payload.downcast_ref::<&str>().map(|&s| s.to_string()))
   {
     Some(ref s) => format!("panic at '{}'", s),
     None => format!("Non-string panic payload at {:p}", payload),
@@ -970,7 +970,7 @@ pub extern "C" fn run_local_interactive_process(
             let write_operation = scheduler.core.store().materialize_directory(
               destination,
               digest,
-              session.workunit_store().clone(),
+              session.workunit_store(),
             );
 
             scheduler.core.executor.spawn_on_io_pool(write_operation).wait()?;
