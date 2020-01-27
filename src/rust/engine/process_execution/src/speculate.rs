@@ -93,8 +93,8 @@ impl CommandRunner for SpeculatingCommandRunner {
       self.primary.extract_compatible_request(req),
       self.secondary.extract_compatible_request(req),
     ) {
-      (Some(req), _) => Some(req.clone()),
-      (_, Some(req)) => Some(req.clone()),
+      (Some(req), _) => Some(req),
+      (_, Some(req)) => Some(req),
       _ => None,
     }
   }

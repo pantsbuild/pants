@@ -132,7 +132,7 @@ impl ByteStore {
       digest.1,
     );
     let workunit_name = format!("store_bytes({})", resource_name.clone());
-    let workunit_store = workunit_store.clone();
+    let workunit_store = workunit_store;
     let store = self.clone();
     self
       .with_byte_stream_client(move |client| {
@@ -246,7 +246,7 @@ impl ByteStore {
       digest.1
     );
     let workunit_name = format!("load_bytes_with({})", resource_name.clone());
-    let workunit_store = workunit_store.clone();
+    let workunit_store = workunit_store;
     self
       .with_byte_stream_client(move |client| {
         match client
@@ -323,7 +323,7 @@ impl ByteStore {
       "list_missing_digests({})",
       store.instance_name.clone().unwrap_or_default()
     );
-    let workunit_store = workunit_store.clone();
+    let workunit_store = workunit_store;
     self
       .with_cas_client(move |client| {
         client

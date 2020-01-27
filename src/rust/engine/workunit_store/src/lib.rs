@@ -97,7 +97,7 @@ impl WorkUnitStore {
   }
 
   pub fn add_workunit(&self, workunit: WorkUnit) {
-    self.inner.lock().workunits.push(workunit.clone());
+    self.inner.lock().workunits.push(workunit);
   }
 
   pub fn with_latest_workunits<F, T>(&mut self, f: F) -> T

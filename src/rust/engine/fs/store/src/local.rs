@@ -48,9 +48,8 @@ impl ByteStore {
         // travis fail because they can't allocate virtual memory, if there are multiple Stores
         // in memory at the same time. We don't know why they're not efficiently garbage collected
         // by python, but they're not, so...
-        file_dbs: ShardedLmdb::new(files_root.clone(), 100 * GIGABYTES, executor.clone())
-          .map(Arc::new),
-        directory_dbs: ShardedLmdb::new(directories_root.clone(), 5 * GIGABYTES, executor.clone())
+        file_dbs: ShardedLmdb::new(files_root, 100 * GIGABYTES, executor.clone()).map(Arc::new),
+        directory_dbs: ShardedLmdb::new(directories_root, 5 * GIGABYTES, executor.clone())
           .map(Arc::new),
         executor: executor,
       }),
