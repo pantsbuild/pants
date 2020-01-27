@@ -189,7 +189,7 @@ class SchedulerService(PantsService):
     zipkin_trace_v2 = options.for_scope('reporting').zipkin_trace_v2
     session = self._graph_helper.new_session(zipkin_trace_v2, build_id, v2_ui)
 
-    if options.for_global_scope().loop:
+    if options.for_global_scope().get('loop', False):
       fn = self._loop
     else:
       fn = self._body
