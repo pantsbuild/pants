@@ -19,6 +19,6 @@ class ClocBinary(Script):
     PlatformConstraint.none: ToolForPlatform(
       digest=Digest('2b23012b1c3c53bd6b9dd43cd6aa75715eed4feb2cb6db56ac3fbbd2dffeac9d',
                     546279),
-      version=ToolVersion('1.00'),
+      version=ToolVersion('1.80'),
     ),
   }

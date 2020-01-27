@@ -106,7 +106,7 @@ class PantsHosted(BinaryToolUrlGenerator):
         .format(binary_request.name))
     self._baseurls = baseurls
 
-  def generate_urls(self, _version, host_platform):
+  def generate_urls(self, version, host_platform):
     """Append the file's download path to each of --binaries-baseurls.
 
     This assumes that the urls in --binaries-baseurls point somewhere that mirrors Pants's
