@@ -432,7 +432,7 @@ impl StrictGlobMatching {
 
   pub fn should_throw_on_error(&self) -> bool {
     match self {
-      StrictGlobMatching::Error(_) => true,
+      &StrictGlobMatching::Error(_) => true,
       _ => false,
     }
   }
