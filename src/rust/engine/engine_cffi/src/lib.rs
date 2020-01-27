@@ -44,7 +44,7 @@ use engine::{
   externs, nodes, Core, ExecutionRequest, Function, Handle, Key, Params, RootResult, Rule,
   Scheduler, Session, Tasks, TypeId, Types, Value,
 };
-use futures::Future;
+use futures01::{future, Future};
 use hashing::{Digest, EMPTY_DIGEST};
 use log::{error, warn, Log};
 use logging::logger::LOGGER;
@@ -871,7 +871,7 @@ pub extern "C" fn capture_snapshots(
   with_scheduler(scheduler_ptr, |scheduler| {
     let core = scheduler.core.clone();
     core.executor.block_on(
-      futures::future::join_all(
+      future::join_all(
         path_globs_and_roots
           .into_iter()
           .map(|(path_globs, root, digest_hint)| {
@@ -1050,7 +1050,7 @@ pub extern "C" fn materialize_directories(
     let types = &scheduler.core.types;
     let construct_materialize_directories_results = types.construct_materialize_directories_results;
     let construct_materialize_directory_result = types.construct_materialize_directory_result;
-    let work_future = futures::future::join_all(
+    let work_future = future::join_all(
       digests_and_path_prefixes
         .into_iter()
         .map(|(digest, path_prefix)| {

@@ -5,7 +5,7 @@ use crate::nodes::MultiPlatformExecuteProcess;
 use crate::nodes::{lift_digest, DownloadedFile, NodeFuture, Snapshot};
 use boxfuture::{try_future, Boxable};
 use bytes;
-use futures::future::{self, Future};
+use futures01::{future, Future};
 use hashing;
 use std::path::PathBuf;
 
@@ -182,7 +182,7 @@ fn input_files_content_to_digest(context: Context, files_content: Value) -> Node
         .to_boxed()
     })
     .collect();
-  futures::future::join_all(digests)
+  future::join_all(digests)
     .and_then(|digests| {
       store::Snapshot::merge_directories(context.core.store(), digests, workunit_store)
         .map_err(|err| throw(&err))

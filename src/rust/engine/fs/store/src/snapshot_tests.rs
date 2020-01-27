@@ -1,4 +1,4 @@
-use futures::future::Future;
+use futures01::future::Future;
 use hashing::{Digest, Fingerprint};
 use tempfile;
 use testutil::data::TestDirectory;

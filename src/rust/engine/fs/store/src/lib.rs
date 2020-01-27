@@ -37,7 +37,7 @@ use bytes::Bytes;
 use concrete_time::TimeSpan;
 use dirs;
 use fs::FileContent;
-use futures::{future, Future};
+use futures01::{future, Future};
 use hashing::Digest;
 use protobuf::Message;
 use serde_derive::Serialize;

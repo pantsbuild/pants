@@ -3,7 +3,7 @@ use crate::{
   MultiPlatformExecuteProcessRequest,
 };
 use boxfuture::{BoxFuture, Boxable};
-use futures::future::{err, ok, Either, Future};
+use futures01::future::{err, ok, Either, Future};
 use log::{debug, trace};
 use std::sync::Arc;
 use std::time::{Duration, Instant};

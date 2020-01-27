@@ -8,7 +8,7 @@ use std::time::Duration;
 use std::time::Instant;
 
 use bazel_protos;
-use futures::{Future, Sink};
+use futures01::{Future, Sink};
 use grpcio;
 use parking_lot::Mutex;
 use protobuf;

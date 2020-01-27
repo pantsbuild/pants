@@ -46,7 +46,7 @@ use std::time::{Duration, Instant};
 
 use fnv::FnvHasher;
 
-use futures::future::{self, Future};
+use futures01::future::{self, Future};
 use indexmap::IndexSet;
 use log::{debug, trace, warn};
 use parking_lot::Mutex;
@@ -664,7 +664,7 @@ impl<N: Node> Graph<N> {
               .into_iter()
               .map(|e| e.node().to_string())
               .collect();
-            return futures::future::err(N::Error::cyclic(path_strs)).to_boxed();
+            return future::err(N::Error::cyclic(path_strs)).to_boxed();
           } else {
             // Valid dependency.
             trace!(

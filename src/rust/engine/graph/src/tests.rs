@@ -8,7 +8,7 @@ use std::thread;
 use std::time::Duration;
 
 use boxfuture::{BoxFuture, Boxable};
-use futures::future::{self, Future};
+use futures01::future::{self, Future};
 use hashing::Digest;
 use parking_lot::Mutex;
 

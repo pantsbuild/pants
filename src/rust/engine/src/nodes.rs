@@ -10,8 +10,8 @@ use std::sync::Arc;
 use std::time::Duration;
 use std::{self, fmt};
 
-use futures::future::{self, Future};
-use futures::Stream;
+use futures01::future::{self, Future};
+use futures01::Stream;
 use url::Url;
 
 use crate::context::{Context, Core};
@@ -1049,7 +1049,7 @@ impl Node for NodeKey {
     };
 
     let context2 = context.clone();
-    futures::future::lazy(|| {
+    future::lazy(|| {
       if let Some(span_id) = maybe_span_id {
         set_parent_id(span_id);
       }

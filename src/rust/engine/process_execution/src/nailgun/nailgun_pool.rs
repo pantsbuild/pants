@@ -11,7 +11,7 @@ use std::process::Stdio;
 use std::sync::Arc;
 
 use boxfuture::{try_future, BoxFuture, Boxable};
-use futures::future::Future;
+use futures01::future::Future;
 use log::{debug, info};
 use parking_lot::Mutex;
 use regex::Regex;

@@ -10,7 +10,7 @@ use bytes::Bytes;
 use concrete_time::TimeSpan;
 use digest::{Digest as DigestTrait, FixedOutput};
 use fs::{self, File, PathStat};
-use futures::{future, Future, Stream};
+use futures01::{future, Future, Stream};
 use grpcio;
 use hashing::{Digest, Fingerprint};
 use libc;
@@ -762,7 +762,7 @@ impl CommandRunner {
     history: ExecutionHistory,
     maybe_cancel_remote_exec_token: Option<CancelRemoteExecutionToken>,
   ) -> BoxFuture<
-    futures::future::Loop<
+    future::Loop<
       FallibleExecuteProcessResult,
       (
         ExecutionHistory,

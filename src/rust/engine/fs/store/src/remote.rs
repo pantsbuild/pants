@@ -5,7 +5,7 @@ use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::{Bytes, BytesMut};
 use concrete_time::TimeSpan;
 use digest::{Digest as DigestTrait, FixedOutput};
-use futures::{self, future, Future, IntoFuture, Sink, Stream};
+use futures01::{future, Future, IntoFuture, Sink, Stream};
 use grpcio;
 use hashing::{Digest, Fingerprint};
 use serverset::{Retry, Serverset};
@@ -150,7 +150,7 @@ impl ByteStore {
             let resource_name = resource_name.clone();
             let bytes = bytes.clone();
             let stream =
-              futures::stream::unfold::<_, _, futures::future::FutureResult<_, grpcio::Error>, _>(
+              futures01::stream::unfold::<_, _, future::FutureResult<_, grpcio::Error>, _>(
                 (0, false),
                 move |(offset, has_sent_any)| {
                   if offset >= bytes.len() && has_sent_any {
