@@ -57,7 +57,7 @@ class FilemapIntegrationTest(PantsRunIntegrationTest):
       pants_run = self.do_command('filemap',
                                   self._mk_target('exclude_strings_disallowed'),
                                   success=False)
-      self.assertRegex(pants_run.stderr_data, r'Excludes of type `.*` are not supported')
+      self.assertRegex(pants_run.stderr_data, r'Excludes should be a list of strings. Got:')
 
   def test_exclude_list_of_strings(self):
     test_out = self._extract_exclude_output('exclude_list_of_strings')

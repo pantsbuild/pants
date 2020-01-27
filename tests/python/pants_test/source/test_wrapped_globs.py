@@ -116,7 +116,9 @@ class FilesetRelPathWrapperTest(TestBase):
     self.add_to_build_file('y/BUILD', dedent("""
       dummy_target(name="y", sources=globs("*.java", exclude="fleem.java"))
       """))
-    with self.assertRaisesRegex(AddressLookupError, 'Excludes of type.*are not supported.*'):
+    with self.assertRaisesWithMessageContaining(
+      AddressLookupError, "Excludes should be a list of strings. Got: 'fleem.java'"
+    ):
       self.context().scan()
 
   def test_glob_exclude_string_in_list(self) -> None:
