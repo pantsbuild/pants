@@ -5,10 +5,10 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use boxfuture::{try_future, BoxFuture, Boxable};
-use futures01::future::Future;
-use futures01::stream::Stream;
 use futures::compat::Future01CompatExt;
 use futures::future::{FutureExt, TryFutureExt};
+use futures01::future::Future;
+use futures01::stream::Stream;
 use log::{debug, trace};
 use nails::execution::{child_channel, ChildInput, ChildOutput, Command};
 use tokio::net::TcpStream;
@@ -258,16 +258,18 @@ impl CapturedWorkdir for CommandRunner {
       .clone()
       .with_acquired(move || {
         // Get the port of a running nailgun server (or a new nailgun server if it doesn't exist)
-        nailgun_pool.connect(
-          nailgun_name.clone(),
-          nailgun_req,
-          workdir_for_this_nailgun,
-          nailgun_req_digest,
-          build_id,
-          store,
-          req.input_files,
-          workunit_store,
-        ).compat()
+        nailgun_pool
+          .connect(
+            nailgun_name.clone(),
+            nailgun_req,
+            workdir_for_this_nailgun,
+            nailgun_req_digest,
+            build_id,
+            store,
+            req.input_files,
+            workunit_store,
+          )
+          .compat()
       })
       .boxed()
       .compat()
