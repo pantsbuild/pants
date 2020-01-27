@@ -44,8 +44,10 @@ async def parse_address_family(address_mapper: AddressMapper, directory: Dir) ->
   The AddressFamily may be empty, but it will not be None.
   """
   path_globs = PathGlobs(
-    include=(os.path.join(directory.path, p) for p in address_mapper.build_patterns),
-    exclude=address_mapper.build_ignore_patterns,
+    globs=(
+      *(os.path.join(directory.path, p) for p in address_mapper.build_patterns),
+      *(f"!{p}" for p in address_mapper.build_ignore_patterns),
+    )
   )
   snapshot = await Get[Snapshot](PathGlobs, path_globs)
   files_content = await Get[FilesContent](Digest, snapshot.directory_digest)
@@ -285,7 +287,7 @@ def _address_spec_to_globs(address_mapper: AddressMapper, address_specs: Address
   patterns = set()
   for address_spec in address_specs:
     patterns.update(address_spec.make_glob_patterns(address_mapper))
-  return PathGlobs(include=patterns, exclude=address_mapper.build_ignore_patterns)
+  return PathGlobs(globs=(*patterns, *(f"!{p}" for p in address_mapper.build_ignore_patterns)))
 
 
 def create_graph_rules(address_mapper: AddressMapper):

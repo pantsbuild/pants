@@ -32,12 +32,12 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
   _ERR_TARGETS = {
     'testprojects/src/python/sources:some-missing-some-not': [
       "globs('*.txt', '*.rs')",
-      "Snapshot(PathGlobs(include=(\'testprojects/src/python/sources/*.txt\', \'testprojects/src/python/sources/*.rs\'), exclude=(), glob_match_error_behavior<Exactly(GlobMatchErrorBehavior)>=GlobMatchErrorBehavior(value=error), conjunction<Exactly(GlobExpansionConjunction)>=GlobExpansionConjunction(value=all_match)))",
+      "Snapshot(PathGlobs(globs=(\'testprojects/src/python/sources/*.txt\', \'testprojects/src/python/sources/*.rs\'), glob_match_error_behavior<Exactly(GlobMatchErrorBehavior)>=GlobMatchErrorBehavior(value=error), conjunction<Exactly(GlobExpansionConjunction)>=GlobExpansionConjunction(value=all_match)))",
       'Unmatched glob from testprojects/src/python/sources/BUILD for target :some-missing-some-not\'s `sources` field: "testprojects/src/python/sources/*.rs"',
     ],
     'testprojects/src/python/sources:missing-sources': [
       "*.scala",
-      "Snapshot(PathGlobs(include=(\'testprojects/src/python/sources/*.scala\',), exclude=(\'testprojects/src/python/sources/*Test.scala\', \'testprojects/src/python/sources/*Spec.scala\'), glob_match_error_behavior<Exactly(GlobMatchErrorBehavior)>=GlobMatchErrorBehavior(value=error), conjunction<Exactly(GlobExpansionConjunction)>=GlobExpansionConjunction(value=any_match)))",
+      "Snapshot(PathGlobs(globs=(\'testprojects/src/python/sources/*.scala\', \'!testprojects/src/python/sources/*Test.scala\', \'!testprojects/src/python/sources/*Spec.scala\'), glob_match_error_behavior<Exactly(GlobMatchErrorBehavior)>=GlobMatchErrorBehavior(value=error), conjunction<Exactly(GlobExpansionConjunction)>=GlobExpansionConjunction(value=any_match)))",
       'Unmatched glob from testprojects/src/python/sources/BUILD for target :missing-sources\'s `sources` field:: "testprojects/src/python/sources/*.scala", excludes: ["testprojects/src/python/sources/*Test.scala", "testprojects/src/python/sources/*Spec.scala"]',
     ],
     'testprojects/src/java/org/pantsbuild/testproject/bundle:missing-bundle-fileset': [
@@ -46,7 +46,7 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
       "Globs('*.aaaa')",
       "ZGlobs('**/*.abab')",
       "['file1.aaaa', 'file2.aaaa']",
-      "Snapshot(PathGlobs(include=(\'testprojects/src/java/org/pantsbuild/testproject/bundle/*.aaaa\',), exclude=(), glob_match_error_behavior<Exactly(GlobMatchErrorBehavior)>=GlobMatchErrorBehavior(value=error), conjunction<Exactly(GlobExpansionConjunction)>=GlobExpansionConjunction(value=all_match)))",
+      "Snapshot(PathGlobs(globs=(\'testprojects/src/java/org/pantsbuild/testproject/bundle/*.aaaa\',), glob_match_error_behavior<Exactly(GlobMatchErrorBehavior)>=GlobMatchErrorBehavior(value=error), conjunction<Exactly(GlobExpansionConjunction)>=GlobExpansionConjunction(value=all_match)))",
       'Unmatched glob from testprojects/src/java/org/pantsbuild/testproject/bundle/BUILD for target :missing-bundle-fileset\'s `bundles` field:: "testprojects/src/java/org/pantsbuild/testproject/bundle/*.aaaa"',
     ]
   }

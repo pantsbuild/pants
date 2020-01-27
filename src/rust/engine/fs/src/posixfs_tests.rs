@@ -348,7 +348,6 @@ fn memfs_expand_basic() {
   let fs = Arc::new(MemFS::new(vec![p1.clone(), p2.join("file")]));
   let globs = PathGlobs::create(
     &["some/*".into()],
-    &[],
     StrictGlobMatching::Ignore,
     GlobExpansionConjunction::AnyMatch,
   )

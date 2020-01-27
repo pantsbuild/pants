@@ -49,7 +49,7 @@ async def setup_isort(isort: Isort) -> IsortSetup:
   config_path: Optional[List[str]] = isort.options.config
   config_snapshot = await Get[Snapshot](
     PathGlobs(
-      include=config_path or (),
+      globs=config_path or (),
       glob_match_error_behavior=GlobMatchErrorBehavior.error,
       conjunction=GlobExpansionConjunction.all_match,
       description_of_origin="the option `--isort-config`",

@@ -207,7 +207,7 @@ pub enum PathGlob {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct GlobParsedSource(String);
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct PathGlobIncludeEntry {
   pub input: GlobParsedSource,
   pub globs: Vec<PathGlob>,
@@ -463,25 +463,26 @@ pub struct PathGlobs {
 
 impl PathGlobs {
   pub fn create(
-    include: &[String],
-    exclude: &[String],
+    globs: &[String],
     strict_match_behavior: StrictGlobMatching,
     conjunction: GlobExpansionConjunction,
   ) -> Result<PathGlobs, String> {
-    let include = PathGlob::spread_filespecs(include)?;
-    Self::create_with_globs_and_match_behavior(include, exclude, strict_match_behavior, conjunction)
-  }
-
-  fn create_with_globs_and_match_behavior(
-    include: Vec<PathGlobIncludeEntry>,
-    exclude: &[String],
-    strict_match_behavior: StrictGlobMatching,
-    conjunction: GlobExpansionConjunction,
-  ) -> Result<PathGlobs, String> {
-    let gitignore_excludes = GitignoreStyleExcludes::create(exclude)?;
+    // NB: We use a loop, rather than `.filter()`, to avoid traversing the globs twice.
+    let mut include_globs: Vec<String> = vec![];
+    let mut exclude_globs: Vec<String> = vec![];
+    for glob in globs {
+      if glob.starts_with('!') {
+        let normalized_exclude: String = glob.chars().skip(1).collect();
+        exclude_globs.push(normalized_exclude.clone());
+      } else {
+        include_globs.push(glob.clone());
+      }
+    }
+    let include = PathGlob::spread_filespecs(include_globs.as_slice())?;
+    let exclude = GitignoreStyleExcludes::create(exclude_globs.as_slice())?;
     Ok(PathGlobs {
       include,
-      exclude: gitignore_excludes,
+      exclude,
       strict_match_behavior,
       conjunction,
     })
@@ -495,13 +496,13 @@ impl PathGlobs {
         globs: vec![glob],
       })
       .collect();
-    // An empty exclude becomes EMPTY_IGNORE.
-    PathGlobs::create_with_globs_and_match_behavior(
+    Ok(PathGlobs {
       include,
-      &[],
-      StrictGlobMatching::Ignore,
-      GlobExpansionConjunction::AllMatch,
-    )
+      // An empty exclude becomes EMPTY_IGNORE.
+      exclude: GitignoreStyleExcludes::create(&[])?,
+      strict_match_behavior: StrictGlobMatching::Ignore,
+      conjunction: GlobExpansionConjunction::AllMatch,
+    })
   }
 
   ///
@@ -926,6 +927,9 @@ pub fn safe_create_dir(path: &Path) -> Result<(), String> {
     Err(err) => Err(format!("{}", err)),
   }
 }
+
+#[cfg(test)]
+mod fs_tests;
 
 #[cfg(test)]
 mod posixfs_tests;

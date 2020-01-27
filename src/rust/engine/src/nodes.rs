@@ -480,14 +480,13 @@ impl Snapshot {
   }
 
   pub fn lift_path_globs(item: &Value) -> Result<PathGlobs, String> {
-    let include = externs::project_multi_strs(item, "include");
-    let exclude = externs::project_multi_strs(item, "exclude");
+    let globs = externs::project_multi_strs(item, "globs");
 
-    let origin = externs::project_str(item, "description_of_origin");
-    let description_of_origin = if origin.is_empty() {
+    let description_of_origin_field = externs::project_str(item, "description_of_origin");
+    let description_of_origin = if description_of_origin_field.is_empty() {
       None
     } else {
-      Some(origin)
+      Some(description_of_origin_field)
     };
 
     let glob_match_error_behavior =
@@ -500,12 +499,8 @@ impl Snapshot {
     let conjunction_string = externs::project_str(&conjunction_obj, "value");
     let conjunction = GlobExpansionConjunction::create(&conjunction_string)?;
 
-    PathGlobs::create(&include, &exclude, strict_glob_matching, conjunction).map_err(|e| {
-      format!(
-        "Failed to parse PathGlobs for include({:?}), exclude({:?}): {}",
-        include, exclude, e
-      )
-    })
+    PathGlobs::create(&globs, strict_glob_matching, conjunction)
+      .map_err(|e| format!("Failed to parse PathGlobs for globs({:?}): {}", globs, e))
   }
 
   pub fn store_directory(core: &Arc<Core>, item: &hashing::Digest) -> Value {
