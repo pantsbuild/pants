@@ -371,7 +371,7 @@ fn main() {
           headers,
           store.clone(),
           Platform::Linux,
-          executor.clone(),
+          executor,
           std::time::Duration::from_secs(160),
           std::time::Duration::from_millis(500),
           std::time::Duration::from_secs(5),

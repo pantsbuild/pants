@@ -10,7 +10,7 @@ use bytes::Bytes;
 use concrete_time::TimeSpan;
 use digest::{Digest as DigestTrait, FixedOutput};
 use fs::{self, File, PathStat};
-use futures::{future, Future, Stream};
+use futures01::{future, Future, Stream};
 use grpcio;
 use hashing::{Digest, Fingerprint};
 use libc;
@@ -762,7 +762,7 @@ impl CommandRunner {
     history: ExecutionHistory,
     maybe_cancel_remote_exec_token: Option<CancelRemoteExecutionToken>,
   ) -> BoxFuture<
-    futures::future::Loop<
+    future::Loop<
       FallibleExecuteProcessResult,
       (
         ExecutionHistory,
@@ -843,7 +843,7 @@ pub fn make_execute_request(
 > {
   let mut command = bazel_protos::remote_execution::Command::new();
   command.set_arguments(protobuf::RepeatedField::from_vec(req.argv.clone()));
-  for (ref name, ref value) in &req.env {
+  for (name, value) in &req.env {
     if name.as_str() == CACHE_KEY_GEN_VERSION_ENV_VAR_NAME {
       return Err(format!(
         "Cannot set env var with name {} as that is reserved for internal use by pants",
@@ -949,7 +949,7 @@ pub fn populate_fallible_execution_result(
     .join(extract_output_files(
       store,
       &execute_response,
-      workunit_store.clone(),
+      workunit_store,
     ))
     .and_then(move |((stdout, stderr), output_directory)| {
       Ok(FallibleExecuteProcessResult {
@@ -1127,7 +1127,6 @@ pub fn extract_output_files(
     }
   }
 
-  let store = store.clone();
   Snapshot::digest_from_path_stats(
     store.clone(),
     &StoreOneOffRemoteDigest::new(path_map),

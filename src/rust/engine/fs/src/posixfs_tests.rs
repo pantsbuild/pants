@@ -6,7 +6,7 @@ use crate::{
   PathStatGetter, PosixFS, Stat, StrictGlobMatching, SymlinkBehavior, VFS,
 };
 use boxfuture::{BoxFuture, Boxable};
-use futures::future::{self, Future};
+use futures01::future::{self, Future};
 use std;
 use std::collections::HashMap;
 use std::path::{Components, Path, PathBuf};

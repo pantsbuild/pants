@@ -7,8 +7,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use boxfuture::{BoxFuture, Boxable};
-use futures::future;
-use futures::Future;
+use futures01::{future, Future};
 use glob::Pattern;
 use log::warn;
 use parking_lot::Mutex;
@@ -89,16 +88,12 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: VFS<E> {
               } else {
                 match stat {
                   Stat::Link(l) => context.canonicalize(stat_symbolic_path, l.clone()),
-                  Stat::Dir(d) => future::ok(Some(PathStat::dir(
-                    stat_symbolic_path.to_owned(),
-                    d.clone(),
-                  )))
-                  .to_boxed(),
-                  Stat::File(f) => future::ok(Some(PathStat::file(
-                    stat_symbolic_path.to_owned(),
-                    f.clone(),
-                  )))
-                  .to_boxed(),
+                  Stat::Dir(d) => {
+                    future::ok(Some(PathStat::dir(stat_symbolic_path, d.clone()))).to_boxed()
+                  }
+                  Stat::File(f) => {
+                    future::ok(Some(PathStat::file(stat_symbolic_path, f.clone()))).to_boxed()
+                  }
                 }
               }
             })
@@ -225,21 +220,15 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: VFS<E> {
         canonical_dir,
         symbolic_path,
         wildcard,
-      } => self.expand_wildcard(
-        result.clone(),
-        exclude.clone(),
-        canonical_dir,
-        symbolic_path,
-        wildcard,
-      ),
+      } => self.expand_wildcard(result, exclude, canonical_dir, symbolic_path, wildcard),
       PathGlob::DirWildcard {
         canonical_dir,
         symbolic_path,
         wildcard,
         remainder,
       } => self.expand_dir_wildcard(
-        result.clone(),
-        exclude.clone(),
+        result,
+        exclude,
         canonical_dir,
         symbolic_path,
         wildcard,

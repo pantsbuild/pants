@@ -7,7 +7,7 @@ publish = false
 
 [dependencies]
 boxfuture = { path = "../boxfuture" }
-futures = "^0.1.16"
+futures01 = { package = "futures", version = "0.1" }
 parking_lot = "0.6"
 tokio-timer = "0.2"
 

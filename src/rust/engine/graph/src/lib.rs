@@ -46,7 +46,7 @@ use std::time::{Duration, Instant};
 
 use fnv::FnvHasher;
 
-use futures::future::{self, Future};
+use futures01::future::{self, Future};
 use indexmap::IndexSet;
 use log::{debug, trace, warn};
 use parking_lot::Mutex;
@@ -446,10 +446,7 @@ impl<N: Node> InnerGraph<N> {
     // the Nodes (to avoid cloning them), adding equal edge weights, and then reversing it.
     // Because we do not remove any Nodes or edges, all EntryIds remain stable.
     let dependent_graph = {
-      let mut dg = self
-        .pg
-        .filter_map(|_, _| Some(()), |_, _| Some(1.0))
-        .clone();
+      let mut dg = self.pg.filter_map(|_, _| Some(()), |_, _| Some(1.0));
       dg.reverse();
       dg
     };
@@ -660,14 +657,14 @@ impl<N: Node> Graph<N> {
         let dst_id = {
           // TODO: doing cycle detection under the lock... unfortunate, but probably unavoidable
           // without a much more complicated algorithm.
-          let potential_dst_id = inner.ensure_entry(dst_node.clone());
+          let potential_dst_id = inner.ensure_entry(dst_node);
           if let Some(cycle_path) = Self::report_cycle(src_id, potential_dst_id, &mut inner) {
             // Cyclic dependency: render an error.
             let path_strs = cycle_path
               .into_iter()
               .map(|e| e.node().to_string())
               .collect();
-            return futures::future::err(N::Error::cyclic(path_strs)).to_boxed();
+            return future::err(N::Error::cyclic(path_strs)).to_boxed();
           } else {
             // Valid dependency.
             trace!(

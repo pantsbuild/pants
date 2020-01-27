@@ -28,6 +28,7 @@
 
 mod rules;
 
+use std::cmp::Ordering;
 use std::collections::{hash_map, BTreeSet, HashMap, HashSet};
 use std::io;
 
@@ -671,12 +672,16 @@ impl<'t, R: Rule> GraphMaker<'t, R> {
         Entry::WithDeps(ref wd) => wd.params().len(),
         Entry::Param(_) => 1,
       };
-      if param_set_size < minimum_param_set_size {
-        rules.clear();
-        rules.push(satisfiable_entry);
-        minimum_param_set_size = param_set_size;
-      } else if param_set_size == minimum_param_set_size {
-        rules.push(satisfiable_entry);
+      match param_set_size.cmp(&minimum_param_set_size) {
+        Ordering::Less => {
+          rules.clear();
+          rules.push(satisfiable_entry);
+          minimum_param_set_size = param_set_size;
+        }
+        Ordering::Equal => {
+          rules.push(satisfiable_entry);
+        }
+        Ordering::Greater => {}
       }
     }
 
@@ -972,7 +977,7 @@ impl<R: Rule> RuleGraph<R> {
           .into_iter()
           .map(|mut d| {
             if d.details.is_empty() {
-              d.reason.clone()
+              d.reason
             } else {
               d.details.sort();
               format!("{}:\n      {}", d.reason, d.details.join("\n      "))
@@ -985,7 +990,11 @@ impl<R: Rule> RuleGraph<R> {
       .collect();
     msgs.sort();
 
-    Err(format!("Rules with errors: {}\n  {}", msgs.len(), msgs.join("\n  ")).to_string())
+    Err(format!(
+      "Rules with errors: {}\n  {}",
+      msgs.len(),
+      msgs.join("\n  ")
+    ))
   }
 
   pub fn visualize(&self, f: &mut dyn io::Write) -> io::Result<()> {

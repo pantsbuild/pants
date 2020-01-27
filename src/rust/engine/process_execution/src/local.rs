@@ -3,7 +3,7 @@ use tempfile;
 
 use boxfuture::{try_future, BoxFuture, Boxable};
 use fs::{self, GlobExpansionConjunction, GlobMatching, PathGlobs, StrictGlobMatching};
-use futures::{future, Future, Stream};
+use futures01::{future, Future, Stream};
 use log::info;
 use nails::execution::{ChildOutput, ExitCode};
 

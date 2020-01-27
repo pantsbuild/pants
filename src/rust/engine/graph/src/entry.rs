@@ -4,8 +4,8 @@ use std::time::{Duration, Instant};
 
 use crate::node::{EntryId, Node, NodeContext, NodeError};
 
-use futures::future::{self, Future};
-use futures::sync::oneshot;
+use futures01::future::{self, Future};
+use futures01::sync::oneshot;
 use log::{self, trace};
 use parking_lot::Mutex;
 

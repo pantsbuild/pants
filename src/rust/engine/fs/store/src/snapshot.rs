@@ -5,8 +5,8 @@ use crate::Store;
 use bazel_protos;
 use boxfuture::{try_future, BoxFuture, Boxable};
 use fs::{Dir, File, GlobMatching, PathGlobs, PathStat, PosixFS, SymlinkBehavior};
-use futures::future::{self, join_all};
-use futures::Future;
+use futures01::future::{self, join_all};
+use futures01::Future;
 use hashing::{Digest, EMPTY_DIGEST};
 use indexmap::{self, IndexMap};
 use itertools::Itertools;
@@ -354,9 +354,7 @@ impl Snapshot {
                 .map(|d| d.get_digest().into())
                 .collect::<Result<Vec<_>, String>>();
               future::done(digests_result)
-                .and_then(move |digests| {
-                  Self::merge_directories(store2.clone(), digests, workunit_store2.clone())
-                })
+                .and_then(move |digests| Self::merge_directories(store2, digests, workunit_store2))
                 .map(move |merged_digest| {
                   let mut child_dir = bazel_protos::remote_execution::DirectoryNode::new();
                   child_dir.set_name(child_name);
@@ -399,7 +397,7 @@ impl Snapshot {
     let store2 = store.clone();
     Self::get_directory_or_err(store.clone(), root_digest, workunit_store.clone())
       .and_then(move |dir| {
-        futures::future::loop_fn(
+        future::loop_fn(
           (dir, PathBuf::new(), prefix),
           move |(dir, already_stripped, prefix)| {
             let has_already_stripped_any = already_stripped.components().next().is_some();
@@ -422,10 +420,10 @@ impl Snapshot {
               let files: Vec<_> = dir.get_files().iter().map(|file| file.get_name().to_owned()).collect();
 
               match (saw_matching_dir, extra_directories.is_empty() && files.is_empty()) {
-                (false, true) => futures::future::ok(futures::future::Loop::Break(bazel_protos::remote_execution::Directory::new())).to_boxed(),
+                (false, true) => future::ok(future::Loop::Break(bazel_protos::remote_execution::Directory::new())).to_boxed(),
                 (false, false) => {
                   // Prefer "No subdirectory found" error to "had extra files" error.
-                  futures::future::err(format!(
+                  future::err(format!(
                     "Cannot strip prefix {} from root directory {:?} - {}directory{} didn't contain a directory named {}{}",
                     already_stripped.join(&prefix).display(),
                     root_digest,
@@ -436,7 +434,7 @@ impl Snapshot {
                   )).to_boxed()
                 },
                 (true, false) => {
-                  futures::future::err(format!(
+                  future::err(format!(
                     "Cannot strip prefix {} from root directory {:?} - {}directory{} contained non-matching {}",
                     already_stripped.join(&prefix).display(),
                     root_digest,
@@ -454,13 +452,13 @@ impl Snapshot {
                   let dir = Self::get_directory_or_err(store.clone(), try_future!(maybe_digest), workunit_store.clone());
                   dir
                       .map(|dir| {
-                        futures::future::Loop::Continue((dir, next_already_stripped, remaining_prefix))
+                        future::Loop::Continue((dir, next_already_stripped, remaining_prefix))
                       })
                       .to_boxed()
                 }
               }
             } else {
-              futures::future::ok(futures::future::Loop::Break(dir)).to_boxed()
+              future::ok(future::Loop::Break(dir)).to_boxed()
             }
           },
         )

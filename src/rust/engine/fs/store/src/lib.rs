@@ -37,7 +37,7 @@ use bytes::Bytes;
 use concrete_time::TimeSpan;
 use dirs;
 use fs::FileContent;
-use futures::{future, Future};
+use futures01::{future, Future};
 use hashing::Digest;
 use protobuf::Message;
 use serde_derive::Serialize;
@@ -819,7 +819,7 @@ impl Store {
           })
           .map_err(|e| format!("Error writing file {:?}: {:?}", destination, e))
         },
-        workunit_store.clone(),
+        workunit_store,
       )
       .and_then(move |write_result| match write_result {
         Some((Ok(()), metadata)) => Ok(metadata),

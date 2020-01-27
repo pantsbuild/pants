@@ -32,7 +32,7 @@ pub use crate::glob_matching::GlobMatching;
 use ::ignore::gitignore::{Gitignore, GitignoreBuilder};
 use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
-use futures::{future, Future};
+use futures01::{future, Future};
 use glob::{MatchOptions, Pattern};
 use lazy_static::lazy_static;
 use std::cmp::min;
@@ -613,11 +613,9 @@ impl PosixFS {
     dir_relative_to_root: Dir,
   ) -> impl Future<Item = DirectoryListing, Error = io::Error> {
     let vfs = self.clone();
-    self
-      .executor
-      .spawn_on_io_pool(futures::future::lazy(move || {
-        vfs.scandir_sync(&dir_relative_to_root)
-      }))
+    self.executor.spawn_on_io_pool(future::lazy(move || {
+      vfs.scandir_sync(&dir_relative_to_root)
+    }))
   }
 
   fn scandir_sync(&self, dir_relative_to_root: &Dir) -> Result<DirectoryListing, io::Error> {
@@ -673,61 +671,57 @@ impl PosixFS {
   pub fn read_file(&self, file: &File) -> impl Future<Item = FileContent, Error = io::Error> {
     let path = file.path.clone();
     let path_abs = self.root.0.join(&file.path);
-    self
-      .executor
-      .spawn_on_io_pool(futures::future::lazy(move || {
-        let is_executable = path_abs.metadata()?.permissions().mode() & 0o100 == 0o100;
-        std::fs::File::open(&path_abs)
-          .and_then(|mut f| {
-            let mut content = Vec::new();
-            f.read_to_end(&mut content)?;
-            Ok(FileContent {
-              path: path,
-              content: Bytes::from(content),
-              is_executable,
-            })
+    self.executor.spawn_on_io_pool(future::lazy(move || {
+      let is_executable = path_abs.metadata()?.permissions().mode() & 0o100 == 0o100;
+      std::fs::File::open(&path_abs)
+        .and_then(|mut f| {
+          let mut content = Vec::new();
+          f.read_to_end(&mut content)?;
+          Ok(FileContent {
+            path: path,
+            content: Bytes::from(content),
+            is_executable,
           })
-          .map_err(|e| {
-            io::Error::new(
-              e.kind(),
-              format!("Failed to read file {:?}: {}", path_abs, e),
-            )
-          })
-      }))
+        })
+        .map_err(|e| {
+          io::Error::new(
+            e.kind(),
+            format!("Failed to read file {:?}: {}", path_abs, e),
+          )
+        })
+    }))
   }
 
   pub fn read_link(&self, link: &Link) -> impl Future<Item = PathBuf, Error = io::Error> {
     let link_parent = link.0.parent().map(Path::to_owned);
     let link_abs = self.root.0.join(link.0.as_path());
-    self
-      .executor
-      .spawn_on_io_pool(futures::future::lazy(move || {
-        link_abs
-          .read_link()
-          .and_then(|path_buf| {
-            if path_buf.is_absolute() {
-              Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Absolute symlink: {:?}", link_abs),
-              ))
-            } else {
-              link_parent
-                .map(|parent| parent.join(path_buf))
-                .ok_or_else(|| {
-                  io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!("Symlink without a parent?: {:?}", link_abs),
-                  )
-                })
-            }
-          })
-          .map_err(|e| {
-            io::Error::new(
-              e.kind(),
-              format!("Failed to read link {:?}: {}", link_abs, e),
-            )
-          })
-      }))
+    self.executor.spawn_on_io_pool(future::lazy(move || {
+      link_abs
+        .read_link()
+        .and_then(|path_buf| {
+          if path_buf.is_absolute() {
+            Err(io::Error::new(
+              io::ErrorKind::InvalidData,
+              format!("Absolute symlink: {:?}", link_abs),
+            ))
+          } else {
+            link_parent
+              .map(|parent| parent.join(path_buf))
+              .ok_or_else(|| {
+                io::Error::new(
+                  io::ErrorKind::InvalidData,
+                  format!("Symlink without a parent?: {:?}", link_abs),
+                )
+              })
+          }
+        })
+        .map_err(|e| {
+          io::Error::new(
+            e.kind(),
+            format!("Failed to read link {:?}: {}", link_abs, e),
+          )
+        })
+    }))
   }
 
   ///
@@ -831,7 +825,7 @@ impl PathStatGetter<io::Error> for Arc<PosixFS> {
           let fs2 = self.clone();
           self
             .executor
-            .spawn_on_io_pool(futures::future::lazy(move || fs2.stat_sync(path)))
+            .spawn_on_io_pool(future::lazy(move || fs2.stat_sync(path)))
             .then(|stat_result| match stat_result {
               Ok(v) => Ok(Some(v)),
               Err(err) => match err.kind() {
