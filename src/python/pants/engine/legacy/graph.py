@@ -727,7 +727,7 @@ async def sources_snapshots_from_filesystem_specs(
       glob_match_error_behavior=glob_match_error_behavior,
       # We validate that _every_ filesystem spec is valid.
       conjunction=GlobExpansionConjunction.all_match,
-      description_of_origin="file specs",
+      description_of_origin="file arguments",
     )
   )
   return SourcesSnapshots([SourcesSnapshot(snapshot)])
