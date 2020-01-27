@@ -42,6 +42,15 @@ class GlobMatchErrorBehavior(Enum):
   error = "error"
 
 
+class FileNotFoundBehavior(Enum):
+  """What to do when globs do not match in BUILD files or filesystem specs."""
+  warn = "warn"
+  error = "error"
+
+  def to_glob_match_error_behavior(self) -> GlobMatchErrorBehavior:
+    return GlobMatchErrorBehavior(self.value)
+
+
 @dataclass(frozen=True)
 class ExecutionOptions:
   """A collection of all options related to (remote) execution of processes.
@@ -293,8 +302,20 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                   '(e.g. BUILD file scanning, glob matching, etc). '
                   'Patterns use the gitignore syntax (https://git-scm.com/docs/gitignore). '
                   'The `--pants-distdir` and `--pants-workdir` locations are inherently ignored.')
+    register("--files-not-found-behavior", advanced=True,
+             type=FileNotFoundBehavior, default=FileNotFoundBehavior.warn,
+             help="What to do when files specified on the command line or in BUILD files cannot be "
+                  "found. This happens when the files do not exist on your machine or when they "
+                  "are ignored by the `--pants-ignore` option.")
     register('--glob-expansion-failure', advanced=True,
-             default=GlobMatchErrorBehavior.warn, type=GlobMatchErrorBehavior,
+             type=GlobMatchErrorBehavior, default=GlobMatchErrorBehavior.warn,
+             removal_version="1.27.0.dev0",
+             removal_hint="If you currently set `--glob-expansion-failure=error`, instead set "
+                          "`--files-not-found-behavior=error`.\n\n"
+                          "If you currently set `--glob-expansion-failure=ignore`, you will "
+                          "need to instead either set `--files-not-found-behavior=warn` (the "
+                          "default) or `--files-not-found-behavior=error`. Ignoring when files are "
+                          "not found often results in subtle bugs, so we are removing the option.",
              help="What to do when files specified on the command line or in BUILD files cannot be "
                   "found. This happens when the files do not exist on your machine or when they "
                   "are ignored by the `--pants-ignore` option.")
