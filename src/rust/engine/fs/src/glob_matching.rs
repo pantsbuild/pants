@@ -14,7 +14,7 @@ use parking_lot::Mutex;
 
 use crate::{
   Dir, GitignoreStyleExcludes, GlobExpansionConjunction, Link, PathGlob, PathGlobs, PathStat, Stat,
-  VFS,
+  StrictGlobMatching, VFS,
 };
 
 pub trait GlobMatching<E: Display + Send + Sync + 'static>: VFS<E> {
@@ -167,13 +167,18 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: VFS<E> {
               .map(|parsed_source| parsed_source.0.clone())
               .collect::<Vec<_>>();
             non_matching_inputs.sort();
-            // TODO(#5427): document where the glob comes from, e.g. fs spec vs. a specific BUILD
-            // file and line number.
             let single_glob = non_matching_inputs.len() == 1;
-            let globs_portion = if single_glob {
-              format!("Unmatched glob: {:?}", non_matching_inputs[0])
+            let prefix = format!("Unmatched glob{}", if single_glob { "" } else { "s" });
+            let origin = match &strict_match_behavior {
+              StrictGlobMatching::Warn(description) | StrictGlobMatching::Error(description) => {
+                format!(" from {}: ", description)
+              }
+              _ => ": ".to_string(),
+            };
+            let unmatched_globs = if single_glob {
+              format!("{:?}", non_matching_inputs[0])
             } else {
-              format!("Unmatched globs: {:?}", non_matching_inputs)
+              format!("{:?}", non_matching_inputs)
             };
             let exclude_patterns = exclude.exclude_patterns();
             let excludes_portion = if exclude_patterns.is_empty() {
@@ -186,12 +191,13 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: VFS<E> {
                 format!(", excludes: {:?}", exclude_patterns)
               }
             };
-            let msg = format!("{}{}", globs_portion, excludes_portion);
+            let msg = format!(
+              "{}{}{}{}",
+              prefix, origin, unmatched_globs, excludes_portion
+            );
             if strict_match_behavior.should_throw_on_error() {
               return future::err(Self::mk_error(&msg));
             } else {
-              // TODO(#5683): this doesn't have any useful context (the stack trace) without
-              // being thrown -- this needs to be provided, otherwise this is far less useful.
               warn!("{}", msg);
             }
           }

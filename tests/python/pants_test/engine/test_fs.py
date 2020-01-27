@@ -477,34 +477,40 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
       self.request_single_product(Snapshot, digest)
 
   def test_glob_match_error(self):
+    test_name = f"{__name__}.{self.test_glob_match_error.__name__}()"
     with self.assertRaises(ValueError) as cm:
       self.assert_walk_files(PathGlobs(
         include=['not-a-file.txt'],
         exclude=[],
         glob_match_error_behavior=GlobMatchErrorBehavior.error,
+        description_of_origin=test_name,
       ), [])
-    assert 'Unmatched glob: "not-a-file.txt"' in str(cm.exception)
+    assert f'Unmatched glob from {test_name}: "not-a-file.txt"' in str(cm.exception)
 
   def test_glob_match_error_with_exclude(self):
+    test_name = f"{__name__}.{self.test_glob_match_error_with_exclude.__name__}()"
     with self.assertRaises(ValueError) as cm:
       self.assert_walk_files(PathGlobs(
         include=['*.txt'],
         exclude=['4.txt'],
         glob_match_error_behavior=GlobMatchErrorBehavior.error,
+        description_of_origin=test_name,
       ), [])
-    assert 'Unmatched glob: "*.txt", exclude: "4.txt"' in str(cm.exception)
+    assert f'Unmatched glob from {test_name}: "*.txt", exclude: "4.txt"' in str(cm.exception)
 
   @unittest.skip('Skipped to expedite landing #5769: see #5863')
   def test_glob_match_warn_logging(self):
+    test_name = f"{__name__}.{self.test_glob_match_warn_logging.__name__}()"
     with self.captured_logging(logging.WARNING) as captured:
       self.assert_walk_files(PathGlobs(
         include=['not-a-file.txt'],
         exclude=[''],
         glob_match_error_behavior=GlobMatchErrorBehavior.warn,
+        description_of_origin=test_name,
       ), [])
       all_warnings = captured.warnings()
       assert len(all_warnings) == 1
-      assert 'Unmatched glob: "not-a-file.txt"' == str(all_warnings[0])
+      assert f'Unmatched glob from {test_name}: "not-a-file.txt"' == str(all_warnings[0])
 
   def test_glob_match_ignore_logging(self):
     with self.captured_logging(logging.WARNING) as captured:

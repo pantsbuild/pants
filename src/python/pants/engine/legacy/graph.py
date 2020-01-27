@@ -632,16 +632,20 @@ async def hydrate_sources(
 ) -> HydratedField:
   """Given a SourcesField, request a Snapshot for its path_globs and create an EagerFilesetWithSpec.
   """
-  # TODO(#5864): merge the target's selection of --glob-expansion-failure (which doesn't exist yet)
-  # with the global default!
+  address = sources_field.address
   path_globs = dataclasses.replace(
-    sources_field.path_globs, glob_match_error_behavior=glob_match_error_behavior
+    sources_field.path_globs,
+    glob_match_error_behavior=glob_match_error_behavior,
+    # TODO(#9012): add line number referring to the sources field.
+    description_of_origin=(
+      f"{address.rel_path} for target {address.relative_spec}'s `{sources_field.arg}` field"
+    ),
   )
   snapshot = await Get[Snapshot](PathGlobs, path_globs)
   fileset_with_spec = _eager_fileset_with_spec(
-    sources_field.address.spec_path,
-    sources_field.filespecs,
-    snapshot,
+    spec_path=address.spec_path,
+    filespec=sources_field.filespecs,
+    snapshot=snapshot,
   )
   sources_field.validate_fn(fileset_with_spec)
   return HydratedField(sources_field.arg, fileset_with_spec)
@@ -652,20 +656,26 @@ async def hydrate_bundles(
   bundles_field: BundlesField, glob_match_error_behavior: GlobMatchErrorBehavior,
 ) -> HydratedField:
   """Given a BundlesField, request Snapshots for each of its filesets and create BundleAdaptors."""
+  address = bundles_field.address
   path_globs_with_match_errors = [
-    dataclasses.replace(pg, glob_match_error_behavior=glob_match_error_behavior)
+    dataclasses.replace(
+      pg,
+      glob_match_error_behavior=glob_match_error_behavior,
+      # TODO(#9012): add line number referring to the bundles field.
+      description_of_origin=f"{address.rel_path} for target {address.relative_spec}'s `bundles` field",
+    )
     for pg in bundles_field.path_globs_list
   ]
-  snapshot_list = await MultiGet(Get[Snapshot](PathGlobs, pg) for pg in path_globs_with_match_errors)
-
-  spec_path = bundles_field.address.spec_path
+  snapshot_list = await MultiGet(
+    Get[Snapshot](PathGlobs, pg) for pg in path_globs_with_match_errors
+  )
 
   bundles = []
   zipped = zip(bundles_field.bundles,
                bundles_field.filespecs_list,
                snapshot_list)
   for bundle, filespecs, snapshot in zipped:
-    rel_spec_path = getattr(bundle, 'rel_path', spec_path)
+    rel_spec_path = getattr(bundle, 'rel_path', address.spec_path)
     kwargs = bundle.kwargs()
     # NB: We `include_dirs=True` because bundle filesets frequently specify directories in order
     # to trigger a (deprecated) default inclusion of their recursive contents. See the related
@@ -717,6 +727,7 @@ async def sources_snapshots_from_filesystem_specs(
       glob_match_error_behavior=glob_match_error_behavior,
       # We validate that _every_ filesystem spec is valid.
       conjunction=GlobExpansionConjunction.all_match,
+      description_of_origin="file arguments",
     )
   )
   return SourcesSnapshots([SourcesSnapshot(snapshot)])

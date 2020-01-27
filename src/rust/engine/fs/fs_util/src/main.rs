@@ -452,8 +452,8 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
                 .map(str::to_string)
                 .collect::<Vec<String>>(),
               &[],
-              // By using `Ignore`, we assume all elements of the globs will definitely expand to
-              // something here, or we don't care. Is that a valid assumption?
+              // By using `Ignore`, we say that we don't care if some globs fail to expand. Is
+              // that a valid assumption?
               fs::StrictGlobMatching::Ignore,
               fs::GlobExpansionConjunction::AllMatch,
             )?)

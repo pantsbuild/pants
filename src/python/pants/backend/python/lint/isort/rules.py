@@ -24,6 +24,8 @@ from pants.engine.isolated_process import (
 from pants.engine.legacy.structs import TargetAdaptor
 from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
+from pants.option.custom_types import GlobExpansionConjunction
+from pants.option.global_options import GlobMatchErrorBehavior
 from pants.rules.core.fmt import FmtResult
 from pants.rules.core.lint import LintResult
 
@@ -45,7 +47,14 @@ class IsortSetup:
 @rule
 async def setup_isort(isort: Isort) -> IsortSetup:
   config_path: Optional[List[str]] = isort.options.config
-  config_snapshot = await Get[Snapshot](PathGlobs(include=config_path or ()))
+  config_snapshot = await Get[Snapshot](
+    PathGlobs(
+      include=config_path or (),
+      glob_match_error_behavior=GlobMatchErrorBehavior.error,
+      conjunction=GlobExpansionConjunction.all_match,
+      description_of_origin="the option `--isort-config`",
+    )
+  )
   requirements_pex = await Get[Pex](
     CreatePex(
       output_filename="isort.pex",
