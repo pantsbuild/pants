@@ -29,7 +29,7 @@
 #[macro_use]
 extern crate derivative;
 
-use boxfuture::BoxFuture;
+use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::TryFrom;
@@ -397,6 +397,7 @@ impl CommandRunner for BoundedCommandRunner {
       .inner
       .1
       .with_acquired(move || inner.0.run(req, context))
+      .to_boxed()
   }
 
   fn extract_compatible_request(

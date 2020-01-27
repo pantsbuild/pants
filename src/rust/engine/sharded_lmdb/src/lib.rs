@@ -27,7 +27,7 @@
 #![allow(clippy::mutex_atomic)]
 
 use bytes::Bytes;
-use futures::Future;
+use futures01::{future, Future};
 use hashing::Fingerprint;
 use lmdb::{
   self, Database, DatabaseFlags, Environment, EnvironmentCopyFlags, EnvironmentFlags,
@@ -179,7 +179,7 @@ impl ShardedLmdb {
     let store = self.clone();
     self
       .executor
-      .spawn_on_io_pool(futures::future::lazy(move || {
+      .spawn_on_io_pool(future::lazy(move || {
         let (env, db, lease_database) = store.get(&key);
         let put_res = env.begin_rw_txn().and_then(|mut txn| {
           txn.put(db, &key, &bytes, WriteFlags::NO_OVERWRITE)?;
@@ -235,7 +235,7 @@ impl ShardedLmdb {
     let store = self.clone();
     self
       .executor
-      .spawn_on_io_pool(futures::future::lazy(move || {
+      .spawn_on_io_pool(future::lazy(move || {
         let (env, db, _) = store.get(&fingerprint);
         let ro_txn = env
           .begin_ro_txn()

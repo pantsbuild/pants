@@ -2,11 +2,10 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use bazel_protos;
-use futures;
 use grpcio;
 
 use bytes::Bytes;
-use futures::{Future, IntoFuture, Stream};
+use futures01::{Future, IntoFuture, Stream};
 use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
 use testutil::data::{TestData, TestDirectory};
@@ -313,7 +312,7 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
       Ok(response) => self.send(
         &ctx,
         sink,
-        futures::stream::iter_ok(
+        futures01::stream::iter_ok(
           response
             .into_iter()
             .map(|chunk| (chunk, grpcio::WriteFlags::default())),

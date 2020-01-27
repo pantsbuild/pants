@@ -7,8 +7,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use boxfuture::{BoxFuture, Boxable};
-use futures::future;
-use futures::Future;
+use futures01::future;
+use futures01::Future;
 use glob::Pattern;
 use log::warn;
 use parking_lot::Mutex;

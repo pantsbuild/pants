@@ -32,7 +32,7 @@ pub use crate::glob_matching::GlobMatching;
 use ::ignore::gitignore::{Gitignore, GitignoreBuilder};
 use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
-use futures::{future, Future};
+use futures01::{future, Future};
 use glob::{MatchOptions, Pattern};
 use lazy_static::lazy_static;
 use std::cmp::min;
@@ -615,7 +615,7 @@ impl PosixFS {
     let vfs = self.clone();
     self
       .executor
-      .spawn_on_io_pool(futures::future::lazy(move || {
+      .spawn_on_io_pool(future::lazy(move || {
         vfs.scandir_sync(&dir_relative_to_root)
       }))
   }
@@ -675,7 +675,7 @@ impl PosixFS {
     let path_abs = self.root.0.join(&file.path);
     self
       .executor
-      .spawn_on_io_pool(futures::future::lazy(move || {
+      .spawn_on_io_pool(future::lazy(move || {
         let is_executable = path_abs.metadata()?.permissions().mode() & 0o100 == 0o100;
         std::fs::File::open(&path_abs)
           .and_then(|mut f| {
@@ -701,7 +701,7 @@ impl PosixFS {
     let link_abs = self.root.0.join(link.0.as_path());
     self
       .executor
-      .spawn_on_io_pool(futures::future::lazy(move || {
+      .spawn_on_io_pool(future::lazy(move || {
         link_abs
           .read_link()
           .and_then(|path_buf| {
@@ -831,7 +831,7 @@ impl PathStatGetter<io::Error> for Arc<PosixFS> {
           let fs2 = self.clone();
           self
             .executor
-            .spawn_on_io_pool(futures::future::lazy(move || fs2.stat_sync(path)))
+            .spawn_on_io_pool(future::lazy(move || fs2.stat_sync(path)))
             .then(|stat_result| match stat_result {
               Ok(v) => Ok(Some(v)),
               Err(err) => match err.kind() {

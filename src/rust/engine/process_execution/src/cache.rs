@@ -5,7 +5,7 @@ use crate::{
 use std::sync::Arc;
 
 use bytes::Bytes;
-use futures::Future;
+use futures01::{future, Future};
 use log::{debug, warn};
 use protobuf::Message;
 
@@ -44,7 +44,7 @@ impl crate::CommandRunner for CommandRunner {
       .lookup(key, context.clone())
       .then(move |maybe_result| {
         match maybe_result {
-          Ok(Some(result)) => return futures::future::ok(result).to_boxed(),
+          Ok(Some(result)) => return future::ok(result).to_boxed(),
           Err(err) => {
             warn!("Error loading process execution result from local cache: {} - continuing to execute", err);
             // Falling through to re-execute.
@@ -67,7 +67,7 @@ impl crate::CommandRunner for CommandRunner {
                   Ok(result)
                 }).to_boxed()
             } else {
-              futures::future::ok(result).to_boxed()
+              future::ok(result).to_boxed()
             }
           })
           .to_boxed()
@@ -104,7 +104,7 @@ impl CommandRunner {
           .map(Some)
           .to_boxed()
         } else {
-          futures::future::ok(None).to_boxed()
+          future::ok(None).to_boxed()
         }
       })
   }

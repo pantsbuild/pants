@@ -26,7 +26,7 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-use futures::Future;
+use futures01::{future, Future};
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 
@@ -94,7 +94,7 @@ impl Executor {
     &self,
     future: F,
   ) -> impl Future<Item = Item, Error = Error> {
-    futures::sync::oneshot::spawn(
+    futures01::sync::oneshot::spawn(
       Self::future_with_correct_context(future),
       &self.runtime.executor(),
     )
@@ -160,7 +160,7 @@ impl Executor {
   ) -> impl Future<Item = Item, Error = Error> {
     let logging_destination = logging::get_destination();
     let workunit_parent_id = workunit_store::get_parent_id();
-    futures::lazy(move || {
+    future::lazy(move || {
       logging::set_destination(logging_destination);
       if let Some(parent_id) = workunit_parent_id {
         workunit_store::set_parent_id(parent_id);

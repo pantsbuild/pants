@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{mpsc, Arc};
 use std::time::Duration;
 
-use futures::future::{self, Future};
+use futures01::future::{self, Future};
 
 use crate::context::{Context, Core};
 use crate::core::{Failure, Params, TypeId, Value};

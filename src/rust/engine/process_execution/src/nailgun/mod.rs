@@ -5,8 +5,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use boxfuture::{try_future, BoxFuture, Boxable};
-use futures::future::Future;
-use futures::stream::Stream;
+use futures01::future::Future;
+use futures01::stream::Stream;
 use log::{debug, trace};
 use nails::execution::{child_channel, ChildInput, ChildOutput, Command};
 use tokio::net::TcpStream;
