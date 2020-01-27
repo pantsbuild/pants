@@ -16,6 +16,6 @@ class StructTest(unittest.TestCase):
 
   def test_excludes_of_wrong_type(self) -> None:
     with self.assertRaises(ValueError) as cm:
-      Files(exclude='*.md', spec_path='')
-    self.assertEqual('Excludes of type `str` are not supported: got "*.md"',
+      Files(exclude='*.md', spec_path='')  # type: ignore[arg-type]
+    self.assertEqual("Excludes should be a list of strings. Got: '*.md'",
                      str(cm.exception))

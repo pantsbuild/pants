@@ -23,7 +23,7 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
 from pants.engine.fs import PathGlobs, PathGlobsAndRoot
 from pants.engine.legacy.graph import HydratedField
-from pants.engine.legacy.structs import SourcesField
+from pants.engine.legacy.structs import Files, SourcesField
 from pants.engine.rules import RootRule
 from pants.engine.scheduler import SchedulerSession
 from pants.engine.selectors import Params
@@ -270,7 +270,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
       ),
       arg='sources',
       filespecs={'globs': package_relative_path_globs},
-      base_globs=None,
+      base_globs=Files(spec_path=package_dir),
       path_globs=PathGlobs(
         tuple(os.path.join(package_dir, path) for path in package_relative_path_globs),
       ),
