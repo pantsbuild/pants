@@ -31,9 +31,9 @@ def load_backends_and_plugins(plugins1, plugins2, working_set, backends1, backen
   :param list<str> backends2: v2 backends to load.
   :param BuildConfiguration build_configuration: The BuildConfiguration (for adding aliases).
   """
+  load_build_configuration_from_source(build_configuration, backends1, backends2)
   load_plugins(build_configuration, plugins1, working_set, is_v1_plugin=True)
   load_plugins(build_configuration, plugins2, working_set, is_v1_plugin=False)
-  load_build_configuration_from_source(build_configuration, backends1, backends2)
   return build_configuration
 
 
