@@ -40,6 +40,9 @@ use std::time::Duration;
 use store::UploadSummary;
 use workunit_store::WorkUnitStore;
 
+use futures::compat::Future01CompatExt;
+use futures::future::{FutureExt, TryFutureExt};
+
 use async_semaphore::AsyncSemaphore;
 use hashing::Digest;
 
@@ -396,7 +399,10 @@ impl CommandRunner for BoundedCommandRunner {
     self
       .inner
       .1
-      .with_acquired(move || inner.0.run(req, context))
+      .clone()
+      .with_acquired(move || inner.0.run(req, context).compat())
+      .boxed()
+      .compat()
       .to_boxed()
   }
 

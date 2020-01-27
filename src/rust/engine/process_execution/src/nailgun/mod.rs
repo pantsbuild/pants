@@ -7,6 +7,8 @@ use std::time::Duration;
 use boxfuture::{try_future, BoxFuture, Boxable};
 use futures01::future::Future;
 use futures01::stream::Stream;
+use futures::compat::Future01CompatExt;
+use futures::future::{FutureExt, TryFutureExt};
 use log::{debug, trace};
 use nails::execution::{child_channel, ChildInput, ChildOutput, Command};
 use tokio::net::TcpStream;
@@ -253,6 +255,7 @@ impl CapturedWorkdir for CommandRunner {
 
     let nails_command = self
       .async_semaphore
+      .clone()
       .with_acquired(move || {
         // Get the port of a running nailgun server (or a new nailgun server if it doesn't exist)
         nailgun_pool.connect(
@@ -264,8 +267,10 @@ impl CapturedWorkdir for CommandRunner {
           store,
           req.input_files,
           workunit_store,
-        )
+        ).compat()
       })
+      .boxed()
+      .compat()
       .map_err(|e| format!("Failed to connect to nailgun! {}", e))
       .inspect(move |_| debug!("Connected to nailgun instance {}", &nailgun_name3))
       .and_then(move |nailgun_port| {
