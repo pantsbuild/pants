@@ -12,7 +12,7 @@ use tokio::time::{delay_for, timeout};
 async fn acquire_and_release() {
   let sema = AsyncSemaphore::new(1);
 
-  sema.with_acquired(|| future::ready::<()>(())).await;
+  sema.with_acquired(|| future::ready(())).await;
 }
 
 #[tokio::test]
@@ -41,7 +41,7 @@ async fn at_most_n_acquisitions() {
 
   tokio::spawn(handle2.with_acquired(move || {
     tx_thread2.send(()).unwrap();
-    future::ok::<_, ()>(())
+    future::ready(())
   }));
 
   // thread2 should not signal until we unblock thread1.

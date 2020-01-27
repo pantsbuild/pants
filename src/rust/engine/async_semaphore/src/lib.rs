@@ -99,7 +99,7 @@ impl Drop for Permit {
     let mut inner = self.inner.lock();
     inner.available_permits += 1;
     if let Some(waiter) = inner.waiters.front() {
-      waiter.waker.clone().wake()
+      waiter.waker.wake_by_ref()
     }
   }
 }
