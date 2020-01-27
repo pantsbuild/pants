@@ -247,19 +247,19 @@ class OptionsBootstrapperTest(unittest.TestCase):
                                                                ScopeInfo('foo', ScopeInfo.TASK)])
       opts2 = bootstrapper.get_full_options(known_scope_infos=[ScopeInfo('foo', ScopeInfo.TASK),
                                                                ScopeInfo('', ScopeInfo.GLOBAL)])
-      self.assertIs(opts1, opts2)
+      assert opts1 is opts2
 
       opts3 = bootstrapper.get_full_options(known_scope_infos=[ScopeInfo('', ScopeInfo.GLOBAL),
                                                                ScopeInfo('foo', ScopeInfo.TASK),
                                                                ScopeInfo('', ScopeInfo.GLOBAL)])
-      self.assertIs(opts1, opts3)
+      assert opts1 is opts3
 
       opts4 = bootstrapper.get_full_options(known_scope_infos=[ScopeInfo('', ScopeInfo.GLOBAL)])
-      self.assertIsNot(opts1, opts4)
+      assert opts1 is not opts4
 
       opts5 = bootstrapper.get_full_options(known_scope_infos=[ScopeInfo('', ScopeInfo.GLOBAL)])
-      self.assertIs(opts4, opts5)
-      self.assertIsNot(opts1, opts5)
+      assert opts4 is opts5
+      assert opts1 is not opts5
 
   def test_bootstrap_short_options(self) -> None:
     def parse_options(*args: str) -> OptionValueContainer:

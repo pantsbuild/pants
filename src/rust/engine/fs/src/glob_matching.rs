@@ -167,18 +167,31 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: VFS<E> {
           };
 
           if match_failed {
-            // TODO(#5684): explain what global and/or target-specific option to set to
-            // modify this behavior!
             let mut non_matching_inputs = non_matching_inputs
               .iter()
               .map(|parsed_source| parsed_source.0.clone())
               .collect::<Vec<_>>();
             non_matching_inputs.sort();
-            let msg = format!(
-              "Globs did not match. Excludes were: {:?}. Unmatched globs were: {:?}.",
-              exclude.exclude_patterns(),
-              non_matching_inputs,
-            );
+            // TODO(#5427): document where the glob comes from, e.g. fs spec vs. a specific BUILD
+            // file and line number.
+            let single_glob = non_matching_inputs.len() == 1;
+            let globs_portion = if single_glob {
+              format!("Unmatched glob: {:?}", non_matching_inputs[0])
+            } else {
+              format!("Unmatched globs: {:?}", non_matching_inputs)
+            };
+            let exclude_patterns = exclude.exclude_patterns();
+            let excludes_portion = if exclude_patterns.is_empty() {
+              "".to_string()
+            } else {
+              let single_exclude = exclude_patterns.len() == 1;
+              if single_exclude {
+                format!(", exclude: {:?}", exclude_patterns[0])
+              } else {
+                format!(", excludes: {:?}", exclude_patterns)
+              }
+            };
+            let msg = format!("{}{}", globs_portion, excludes_portion);
             if strict_match_behavior.should_throw_on_error() {
               return future::err(Self::mk_error(&msg));
             } else {
