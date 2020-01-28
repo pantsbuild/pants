@@ -59,11 +59,6 @@ class Scoverage(CoverageEngine):
              'targets are included, which would be the same as specifying ".*" as a '
              'filter.')
 
-      register(
-        '--output-dir', type=dir_option, default=None, fingerprint=False,
-        help='Directory to copy coverage output to.'
-      )
-
     def create(self, settings, targets, execute_java_for_targets):
       """
       :param settings: Generic code coverage settings.
@@ -81,7 +76,7 @@ class Scoverage(CoverageEngine):
 
       opts = Scoverage.Factory.global_instance().get_options()
       target_filters = opts.target_filters
-      coverage_output_dir = opts.output_dir
+      coverage_output_dir = settings.context.options.for_global_scope().pants_distdir
 
       return Scoverage(report_path, target_filters, settings, targets, execute_java_for_targets,
                        coverage_output_dir=coverage_output_dir)
