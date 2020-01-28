@@ -3,6 +3,7 @@
 
 import os
 import json
+import itertools
 from dataclasses import dataclass
 from textwrap import dedent
 from typing import Optional, Set, Tuple, Dict
@@ -29,7 +30,7 @@ from pants.option.global_options import GlobalOptions
 from pants.rules.core.strip_source_root import SourceRootStrippedSources
 from pants.rules.core.test import TestDebugRequest, TestOptions, TestResult, TestTarget
 from pants.source.source_root import SourceRootConfig
-
+from pants.backend.python.subsystems.pex_build_util import identify_missing_init_files
 
 DEFAULT_COVERAGE_CONFIG = dedent(f"""
   [run]
@@ -73,16 +74,21 @@ def ensure_section(config_parser: configparser.ConfigParser, section: str) -> No
     config_parser.add_section(section)
 
 
-def construct_coverage_config(source_roots, python_files) -> str:
+def construct_coverage_config(source_roots, python_files, test_time=False) -> str:
   # A map from source root stripped source to its source root. eg:
   #  {'pants/testutil/subsystem/util.py': 'src/python'}
   # This is so coverage reports referencing /chroot/path/pants/testutil/subsystem/util.py can be mapped
   # back to the actual sources they reference when merging coverage reports.
-  source_to_target_base: Dict[str, str] = {}
-  for file_name in python_files:
+  init_files = list(identify_missing_init_files(python_files))
+
+  def source_root_stripped_source_and_source_root(file_name):
     source_root = source_roots.find_by_path(file_name)
-    source_root_stripped_path = file_name[len(source_root.path) + 1:]
-    source_to_target_base[source_root_stripped_path] = source_root.path
+    source_root_stripped_path = file_name[len(source_root.path)+1:]
+    return (source_root_stripped_path, source_root.path)
+
+  source_to_target_base = dict(
+    source_root_stripped_source_and_source_root(filename) for filename in list(python_files) + init_files
+  )
 
   config_parser = configparser.ConfigParser()
   config_parser.read_file(StringIO(DEFAULT_COVERAGE_CONFIG))
@@ -90,6 +96,7 @@ def construct_coverage_config(source_roots, python_files) -> str:
   config_parser.set('run', 'plugins', COVERAGE_PLUGIN_MODULE_NAME)
   config_parser.add_section(COVERAGE_PLUGIN_MODULE_NAME)
   config_parser.set(COVERAGE_PLUGIN_MODULE_NAME, 'source_to_target_base', json.dumps(source_to_target_base))
+  config_parser.set(COVERAGE_PLUGIN_MODULE_NAME, 'test_time', json.dumps(test_time))
   config = StringIO()
   config_parser.write(config)
   return config.getvalue()
@@ -126,18 +133,6 @@ class TestTargetSetup:
 
   # Prevent this class from being detected by pytest as a test class.
   __test__ = False
-
-
-def get_packages_to_cover(
-  test_target: PythonTestsAdaptor,
-  source_root_stripped_file_paths: Tuple[str, ...],
-) -> Tuple[str, ...]:
-  if hasattr(test_target, 'coverage'):
-    return tuple(sorted(set(test_target.coverage)))
-  return tuple(sorted({
-    os.path.dirname(source_root_stripped_source_file_path).replace(os.sep, '.') # Turn file paths into package names.
-    for source_root_stripped_source_file_path in source_root_stripped_file_paths
-  }))
 
 
 def get_packages_to_cover(
@@ -202,12 +197,18 @@ async def setup_pytest_for_target(
   coverage_args = []
   test_target_sources_file_names = source_root_stripped_test_target_sources.snapshot.files
   if test_options.values.run_coverage:
+    python_targets = [
+      target for target in all_targets
+      if target.adaptor.type_alias in ('python_library', 'python_tests')
+    ]
+    sources = itertools.chain.from_iterable(target.adaptor.sources.snapshot.files for target in python_targets)
     coveragerc_digest = await Get[Digest](
       InputFilesContent,
       get_coveragerc_input(
         construct_coverage_config(
           source_root_config.get_source_roots(),
-          test_target_sources_file_names,
+          list(sources),
+          test_time=True,
         )
       )
     )
@@ -266,6 +267,7 @@ async def run_python_test(
     env=env,
   )
   result = await Get[FallibleExecuteProcessResult](ExecuteProcessRequest, request)
+  print(result.stdout.decode('utf8'))
   return TestResult.from_fallible_execute_process_result(result)
 
 
