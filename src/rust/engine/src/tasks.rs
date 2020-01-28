@@ -18,6 +18,37 @@ pub enum Rule {
   Task(Task),
 }
 
+impl rule_graph::DisplayForGraph for Rule {
+  fn fmt_for_graph(&self) -> String {
+    match self {
+      Rule::Task(ref task) => {
+        let FormattedTaskRuleElements {
+          rule_type,
+          task_name,
+          clause_portion,
+          product,
+          get_portion,
+        } = Self::extract_task_elements(
+          task,
+          Some(GraphVisualizationParameters {
+            select_clause_threshold: 2,
+            get_clause_threshold: 1,
+          }),
+        );
+
+        format!(
+          "@{}({}) -> {}{}\n{}",
+          rule_type, clause_portion, product, get_portion, task_name,
+        )
+      }
+      Rule::Intrinsic(ref intrinsic) => format!(
+        "@rule(<intrinsic>({}) -> {})",
+        intrinsic.input, intrinsic.product,
+      ),
+    }
+  }
+}
+
 impl rule_graph::Rule for Rule {
   type TypeId = TypeId;
   type DependencyKey = DependencyKey;
@@ -52,35 +83,6 @@ impl rule_graph::Rule for Rule {
       Rule::Intrinsic(_) => Some(rule_graph::Palette::Gray),
     }
   }
-
-  fn fmt_for_graph(&self) -> String {
-    match self {
-      Rule::Task(ref task) => {
-        let FormattedTaskRuleElements {
-          rule_type,
-          task_name,
-          clause_portion,
-          product,
-          get_portion,
-        } = Self::extract_task_elements(
-          task,
-          Some(GraphVisualizationParameters {
-            select_clause_threshold: 2,
-            get_clause_threshold: 1,
-          }),
-        );
-
-        format!(
-          "@{}({}) -> {}{}\n{}",
-          rule_type, clause_portion, product, get_portion, task_name,
-        )
-      }
-      Rule::Intrinsic(ref intrinsic) => format!(
-        "@rule(<intrinsic>({}) -> {})",
-        intrinsic.input, intrinsic.product,
-      ),
-    }
-  }
 }
 
 ///
@@ -94,9 +96,20 @@ struct FormattedTaskRuleElements {
   get_portion: String,
 }
 
+///
+/// A struct to contain display options consumed by Rule::extract_task_elements().
+///
 #[derive(Clone, Copy)]
 struct GraphVisualizationParameters {
+  ///
+  /// The number of params in the rule to keep on the same output line before splitting by line. If
+  /// the rule uses more than this many params, each param will be formatted on its own
+  /// line. Otherwise, all of the params will be formatted on the same line.
+  ///
   select_clause_threshold: usize,
+  ///
+  /// The number of Get clauses to keep on the same output line before splitting by line.
+  ///
   get_clause_threshold: usize,
 }
 

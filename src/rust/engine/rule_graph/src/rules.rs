@@ -35,7 +35,14 @@ pub trait DependencyKey: Clone + Copy + Debug + Display + Hash + Eq + Sized + 's
   fn provided_param(&self) -> Option<Self::TypeId>;
 }
 
-pub trait Rule: Clone + Debug + Display + Hash + Eq + Sized + 'static {
+pub trait DisplayForGraph {
+  ///
+  /// Return a pretty-printed representation of this Rule's graph node, suitable for graphviz.
+  ///
+  fn fmt_for_graph(&self) -> String;
+}
+
+pub trait Rule: Clone + Debug + Display + Hash + Eq + Sized + DisplayForGraph + 'static {
   type TypeId: TypeId;
   type DependencyKey: DependencyKey<TypeId = Self::TypeId>;
 
@@ -54,9 +61,4 @@ pub trait Rule: Clone + Debug + Display + Hash + Eq + Sized + 'static {
   /// this coloration setting may be superseded by other factors.
   ///
   fn color(&self) -> Option<Palette>;
-
-  ///
-  /// Return a pretty-printed representation of this Rule's graph node, suitable for graphviz.
-  ///
-  fn fmt_for_graph(&self) -> String;
 }

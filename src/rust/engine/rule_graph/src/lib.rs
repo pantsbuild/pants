@@ -31,7 +31,7 @@ mod rules;
 use std::collections::{hash_map, BTreeSet, HashMap, HashSet};
 use std::io;
 
-pub use crate::rules::{DependencyKey, Rule, TypeId};
+pub use crate::rules::{DependencyKey, DisplayForGraph, Rule, TypeId};
 
 // TODO: Consider switching to HashSet and dropping the Ord bound from TypeId.
 type ParamTypes<T> = BTreeSet<T>;
@@ -825,8 +825,10 @@ impl Palette {
       Self::Blue => "0.5,1,0.9".to_string(),
     }
   }
+}
 
-  pub fn color_format_string(&self) -> String {
+impl DisplayForGraph for Palette {
+  fn fmt_for_graph(&self) -> String {
     format!("[color=\"{}\",style=filled]", self.color_string())
   }
 }
@@ -837,20 +839,20 @@ pub fn entry_node_str_with_attrs<R: Rule>(entry: &Entry<R>) -> GraphVizEntryWith
   let (entry_str, attrs_str) = match entry {
     &Entry::WithDeps(ref e) => (
       entry_with_deps_str(e),
-      // Color "singleton" entries (with no params) as a nice olive green!
+      // Color "singleton" entries (with no params)!
       if e.params().is_empty() {
-        Some(Palette::Olive.color_format_string())
+        Some(Palette::Olive.fmt_for_graph())
       } else if let Some(color) = e.rule().and_then(|r| r.color()) {
-        // Color "intrinsic" entries (provided by the rust codebase) with a steely gray!
-        Some(color.color_format_string())
+        // Color "intrinsic" entries (provided by the rust codebase)!
+        Some(color.fmt_for_graph())
       } else {
         None
       },
     ),
     &Entry::Param(type_id) => (
       format!("Param({})", type_id),
-      // Color "Param"s with a laid-back orange!
-      Some(Palette::Orange.color_format_string()),
+      // Color "Param"s!
+      Some(Palette::Orange.fmt_for_graph()),
     ),
   };
   GraphVizEntryWithAttrs {
@@ -1084,7 +1086,7 @@ impl<R: Rule> RuleGraph<R> {
           Some(format!(
             "    \"{}\" {}\n{}    \"{}\" -> {{{}}}",
             root_str,
-            Palette::Blue.color_format_string(),
+            Palette::Blue.fmt_for_graph(),
             deps_with_attrs,
             root_str,
             dep_entries

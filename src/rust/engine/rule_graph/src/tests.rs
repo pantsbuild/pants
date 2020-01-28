@@ -55,7 +55,9 @@ impl super::Rule for Rule {
   fn color(&self) -> Option<Palette> {
     None
   }
+}
 
+impl super::DisplayForGraph for Rule {
   fn fmt_for_graph(&self) -> String {
     "???".to_string()
   }
