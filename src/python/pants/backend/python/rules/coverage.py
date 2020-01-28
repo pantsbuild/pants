@@ -5,11 +5,13 @@ import configparser
 import itertools
 import json
 from dataclasses import dataclass
-from io import StringIO
-from typing import Dict, Tuple, List, Optional
-from textwrap import dedent
-import pkg_resources
 from enum import Enum
+from io import StringIO
+from textwrap import dedent
+from typing import Dict, List, Optional, Tuple
+
+import pkg_resources
+
 from pants.backend.python.rules.inject_init import InjectedInitDigest
 from pants.backend.python.rules.pex import (
   CreatePex,
@@ -17,9 +19,8 @@ from pants.backend.python.rules.pex import (
   PexInterpreterConstraints,
   PexRequirements,
 )
-from pants.backend.python.subsystems.pex_build_util import identify_missing_init_files
-
 from pants.backend.python.rules.prepare_chrooted_python_sources import ChrootedPythonSources
+from pants.backend.python.subsystems.pex_build_util import identify_missing_init_files
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase

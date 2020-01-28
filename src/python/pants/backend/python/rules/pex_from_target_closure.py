@@ -13,10 +13,10 @@ from pants.backend.python.rules.pex import (
 from pants.backend.python.rules.prepare_chrooted_python_sources import ChrootedPythonSources
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.engine.addressable import BuildFileAddresses
+from pants.engine.fs import Digest, DirectoriesToMerge
 from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
 from pants.engine.rules import rule
 from pants.engine.selectors import Get
-from pants.engine.fs import Digest, DirectoriesToMerge
 
 
 @dataclass(frozen=True)

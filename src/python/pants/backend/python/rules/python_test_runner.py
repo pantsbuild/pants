@@ -1,12 +1,20 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import os
-import json
 import itertools
+import json
+import os
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import Optional, Set, Tuple, Dict
+from typing import Dict, Optional, Set, Tuple
+
+from pants.backend.python.rules.coverage import (
+  COVERAGE_PLUGIN_MODULE_NAME,
+  DEFAULT_COVERAGE_CONFIG,
+  construct_coverage_config,
+  get_coverage_plugin_input,
+  get_coveragerc_input,
+)
 from pants.backend.python.rules.inject_init import InjectedInitDigest
 from pants.backend.python.rules.pex import Pex
 from pants.backend.python.rules.pex_from_target_closure import CreatePexFromTargetClosure
@@ -27,13 +35,6 @@ from pants.option.global_options import GlobalOptions
 from pants.rules.core.strip_source_root import SourceRootStrippedSources
 from pants.rules.core.test import TestDebugRequest, TestOptions, TestResult, TestTarget
 from pants.source.source_root import SourceRootConfig, SourceRoots
-from pants.backend.python.rules.coverage import (
-  DEFAULT_COVERAGE_CONFIG,
-  get_coveragerc_input,
-  get_coverage_plugin_input,
-  COVERAGE_PLUGIN_MODULE_NAME,
-  construct_coverage_config,
-)
 
 
 def calculate_timeout_seconds(
