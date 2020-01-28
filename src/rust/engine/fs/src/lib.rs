@@ -548,20 +548,6 @@ impl PathGlobs {
     pattern.matches_path_with(path, &PATTERN_MATCH_OPTIONS)
       && !self.exclude.is_ignored_path(path, false)
   }
-
-  pub fn filter(&self, paths: Vec<PathBuf>) -> Result<Vec<PathBuf>, String> {
-    let mut output = vec![];
-    for path in paths.into_iter() {
-      match self.matches(&[path.clone()]) {
-        Ok(true) => {
-          output.push(path);
-        }
-        Ok(false) => (),
-        Err(e) => return Err(e),
-      }
-    }
-    Ok(output)
-  }
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]

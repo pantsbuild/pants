@@ -189,7 +189,7 @@ class Snapshot:
 class SnapshotSubset:
   """A request to create a subset of a snapshot."""
   directory_digest: Digest
-  includes: PathGlobs
+  globs: PathGlobs
 
 
 @dataclass(frozen=True)

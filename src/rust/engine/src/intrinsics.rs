@@ -196,10 +196,10 @@ fn input_files_content_to_digest(context: Context, files_content: Value) -> Node
 
 fn snapshot_subset_to_snapshot(context: Context, value: Value) -> NodeFuture<Value> {
   let workunit_store = context.session.workunit_store();
-  let includes = externs::project_ignoring_type(&value, "includes");
+  let globs = externs::project_ignoring_type(&value, "globs");
   let store = context.core.store();
 
-  let path_globs = future::result(Snapshot::lift_path_globs(&includes));
+  let path_globs = future::result(Snapshot::lift_path_globs(&globs));
   let original_digest = future::result(lift_digest(&externs::project_ignoring_type(
     &value,
     "directory_digest",
