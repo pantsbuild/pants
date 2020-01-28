@@ -9,7 +9,6 @@
   clippy::expl_impl_clone_on_copy,
   clippy::if_not_else,
   clippy::needless_continue,
-  clippy::single_match_else,
   clippy::unseparated_literal_suffix,
   clippy::used_underscore_binding
 )]
@@ -49,26 +48,26 @@ use build_utils::BuildRoot;
 
 #[derive(Debug)]
 enum CffiBuildError {
-  IoError(io::Error),
-  EnvError(env::VarError),
-  CbindgenError(cbindgen::Error),
+  Io(io::Error),
+  Env(env::VarError),
+  Cbindgen(cbindgen::Error),
 }
 
 impl From<env::VarError> for CffiBuildError {
   fn from(err: env::VarError) -> Self {
-    CffiBuildError::EnvError(err)
+    CffiBuildError::Env(err)
   }
 }
 
 impl From<io::Error> for CffiBuildError {
   fn from(err: io::Error) -> Self {
-    CffiBuildError::IoError(err)
+    CffiBuildError::Io(err)
   }
 }
 
 impl From<cbindgen::Error> for CffiBuildError {
   fn from(err: cbindgen::Error) -> Self {
-    CffiBuildError::CbindgenError(err)
+    CffiBuildError::Cbindgen(err)
   }
 }
 
@@ -185,11 +184,11 @@ fn make_flags(env_script_path: &Path) -> Result<Vec<String>, io::Error> {
   fs::File::open(env_script_path)?.read_to_string(&mut contents)?;
   // It would be a shame if someone were to include a space in an actual quoted value.
   // If they did that, I guess we'd need to implement shell tokenization or something.
-  return Ok(
+  Ok(
     contents
       .trim()
       .split_whitespace()
       .map(str::to_owned)
       .collect(),
-  );
+  )
 }
