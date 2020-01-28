@@ -30,45 +30,28 @@ class SimpleFileTracer(FileTracer):
     else:
       return self.filename
 
-  # def dynamic_source_filename(self, filename, frame):
-  #   return self._filename
-
-  # def has_dynamic_source_filename(self):
-  #   return True
-
 
 class SimpleFileReporter(PythonFileReporter):
   """Report support for a Python file."""
 
   def __init__(self, relative_source_root, source_root_stripped_filename, test_time, coverage=None):
-    print('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', relative_source_root, source_root_stripped_filename, test_time)
     self.coverage = coverage
     self.relative_source_root = relative_source_root
     self.source_root_stripped_filename = source_root_stripped_filename
     self.filename_with_source_root = os.path.join(relative_source_root, source_root_stripped_filename)
-    self.relname = source_root_stripped_filename
+    self.filename = source_root_stripped_filename
     self.test_time = test_time
-
     self._excluded = None
 
-  @property
-  def filename(self):
-    # if self.test_time:
-    return self.relname
-    # return self.filename_with_source_root
-
   def relative_filename(self):
-    if self.test_time:
-      return self.relname
-    else:
-      return self.filename
+    return self.filename_with_source_root
 
   _parser = None
   @property
   def parser(self):
     if self._parser is None:
       if self.test_time:
-        self._parser = PythonParser(filename=self.relname)
+        self._parser = PythonParser(filename=self.filename)
       else:
         self._parser = PythonParser(filename=self.filename_with_source_root)
 
@@ -85,7 +68,7 @@ class SimpleFileReporter(PythonFileReporter):
   def source(self):
     if self._source is None:
       if self.test_time:
-        self._source = get_python_source(self.relname)
+        self._source = get_python_source(self.filename)
       else:
         self._source = get_python_source(self.filename_with_source_root)
     return self._source
@@ -100,26 +83,15 @@ class ChrootRemappingPlugin(CoveragePlugin):
     self._src_to_target_base = src_to_target_base
     self.test_time = test_time
 
-  def _find_executable_files(self, top):
+  def find_executable_files(self, top):
     # coverage uses this to associate files with this plugin.
     # We only want to be associated with the sources we know about.
-    print('find_executable_files', top)
     if top.startswith(self._src_chroot_path):
-      print('find_executable_files', top, self._src_chroot_path)
       for dirname, _, filenames in os.walk(top):
-        print('fef: in loop' , dirname, filenames)
         reldir = os.path.relpath(dirname, self._src_chroot_path)
         for filename in filenames:
           if os.path.join(reldir, filename) in self._src_to_target_base:
-            print('src in map: ', filename)
             yield os.path.join(dirname, filename)
-          # else:
-          #   print('src not in map', reldir, filename)
-
-  def find_executable_files(self, top):
-    res = list(self._find_executable_files(top))
-    print(res)
-    return res
 
   def file_tracer(self, filename):
     # Note that coverage will only call this on files that we yielded from find_executable_files(),
@@ -127,20 +99,15 @@ class ChrootRemappingPlugin(CoveragePlugin):
     # Note also that you cannot exclude .py files from tracing or reporting by returning None here.
     # All that does is register this plugin's disinterest in the file, but coverage will still
     # trace and report it using the standard tracer and reporter.
-    print('file_tracer', filename)
     if filename.startswith(self._src_chroot_path):
       src = os.path.relpath(filename, self._src_chroot_path)
       target_base = self._src_to_target_base.get(src)
       if target_base is not None:
-        print('Target_base is not None.', src)
         return SimpleFileTracer(filename=os.path.join([target_base, src]), relname=src, test_time=self.test_time)
-      # else:
-        # print('Target_base is None.', src)
 
   def file_reporter(self, filename):
     src = os.path.relpath(filename, self._src_chroot_path)
     target_base = self._src_to_target_base.get(src)
-    print('FILE REPORTER', filename)
     return SimpleFileReporter(relative_source_root=target_base, source_root_stripped_filename=src, test_time=self.test_time)
 
 
@@ -148,11 +115,4 @@ def coverage_init(reg, options):
   src_chroot_path = os.getcwd()
   src_to_target_base = json.loads(options['source_to_target_base'])
   test_time = json.loads(options['test_time'])
-  print("TEST TIME: ", test_time)
-
-  if test_time:
-    print('really test time.')
-    # return
-  # print(src_to_target_base)
-  print('Initing coverage')
   reg.add_file_tracer(ChrootRemappingPlugin(src_chroot_path, src_to_target_base, test_time))
