@@ -6,6 +6,7 @@
     "3rdparty_py": "dist/markdown/html/examples/src/python/example/3rdparty_py.html",
     "announce_201409": "dist/markdown/html/src/docs/announce_201409.html",
     "coursier_migration": "dist/markdown/html/src/docs/blog/coursier_migration.html",
+    "thoughts_on_linting": "dist/markdown/html/src/docs/blog/thoughts_on_linting.html",
     "build_dictionary": "dist/reference/build_dictionary_body.html",
     "build_files": "dist/markdown/html/src/docs/build_files.html",
     "alias": "dist/markdown/html/src/docs/common_tasks/alias.html",
@@ -239,7 +240,8 @@
        },
        {"heading": "Blogs"},
        {"pages" : [
-                    "coursier_migration"
+                    "coursier_migration",
+                    "thoughts_on_linting"
                 ]
        }
 
