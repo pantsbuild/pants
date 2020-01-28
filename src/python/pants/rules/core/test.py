@@ -5,7 +5,7 @@ import logging
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
-from typing import Optional, Tuple
+from typing import Optional
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.build_graph.address import Address, BuildFileAddress
@@ -160,20 +160,23 @@ async def run_tests(
 
   results = await MultiGet(Get[AddressAndTestResult](Address, addr.to_address()) for addr in addresses)
   did_any_fail = False
-  filtered_results = tuple((x.address, x.test_result) for x in results if x.test_result is not None)
+  filtered_address_and_test_results = tuple(x for x in results if x.test_result is not None)
   if options.values.run_coverage:
     # TODO(#8915) Make a generic interface for collecting coverage reports. This class shouldn't have to know about
     # PytestCoverageReport and JunitCoverageReport etc. It should only know about CoverageReport.
     pytest_coverage_report = await Get[PytestCoverageReport](
       AddressAndTestResults,
-      AddressAndTestResults(filtered_results)
+      AddressAndTestResults(filtered_address_and_test_results)
     )
     workspace.materialize_directory(DirectoryToMaterialize(
       pytest_coverage_report.report_directory_digest,
       path_prefix=str(pytest_coverage_report.directory_to_materialize_to)
     ))
     console.print_stdout(f"Wrote coverage report to `{pytest_coverage_report.directory_to_materialize_to}`")
+
+  filtered_results = tuple((x.address, x.test_result) for x in filtered_address_and_test_results)
   for address, test_result in filtered_results:
+    assert test_result is not None
     if test_result.status == Status.FAILURE:
       did_any_fail = True
     if test_result.stdout:
@@ -186,6 +189,7 @@ async def run_tests(
   console.write_stdout("\n")
 
   for address, test_result in filtered_results:
+    assert test_result is not None
     console.print_stdout(f'{address.reference():80}.....{test_result.status.value:>10}')
 
   if did_any_fail:

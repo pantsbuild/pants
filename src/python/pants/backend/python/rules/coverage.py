@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from enum import Enum
 from io import StringIO
 from textwrap import dedent
-from typing import Dict, List, Optional, Tuple
+from typing import List, Optional
 
 import pkg_resources
 
@@ -19,15 +19,10 @@ from pants.backend.python.rules.pex import (
   PexInterpreterConstraints,
   PexRequirements,
 )
-from pants.backend.python.rules.prepare_chrooted_python_sources import ChrootedPythonSources
 from pants.backend.python.subsystems.pex_build_util import identify_missing_init_files
-from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
-from pants.base.specs import AddressSpecs
-from pants.build_graph.address import Address
-from pants.engine.addressable import BuildFileAddresses
 from pants.engine.fs import (
   Digest,
   DirectoriesToMerge,
@@ -36,12 +31,10 @@ from pants.engine.fs import (
   FilesContent,
   InputFilesContent,
 )
-from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
-from pants.engine.legacy.graph import HydratedTarget, HydratedTargets, TransitiveHydratedTargets
-from pants.engine.rules import goal_rule, rule, subsystem_rule
+from pants.engine.legacy.graph import TransitiveHydratedTargets
+from pants.engine.rules import rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
-from pants.rules.core.strip_source_root import SourceRootStrippedSources
 from pants.rules.core.test import AddressAndTestResults, PytestCoverageReport
 from pants.source.source_root import SourceRootConfig, SourceRoots
 
@@ -66,6 +59,7 @@ def get_coverage_plugin_input():
     )
   )
 
+
 def get_coveragerc_input(coveragerc_content: str) -> InputFilesContent:
   return InputFilesContent(
     [
@@ -76,6 +70,7 @@ def get_coveragerc_input(coveragerc_content: str) -> InputFilesContent:
       ),
     ]
   )
+
 
 COVERAGE_PLUGIN_MODULE_NAME = '__coverage_coverage_plugin__'
 
@@ -95,7 +90,7 @@ def construct_coverage_config(
   #  {'pants/testutil/subsystem/util.py': 'src/python'}
   # This is so coverage reports referencing /chroot/path/pants/testutil/subsystem/util.py can be mapped
   # back to the actual sources they reference when merging coverage reports.
-  init_files = list(identify_missing_init_files(python_files))
+  init_files = list(identify_missing_init_files(list(python_files)))
 
   def source_root_stripped_source_and_source_root(file_name):
     source_root = source_roots.find_by_path(file_name)
@@ -103,7 +98,7 @@ def construct_coverage_config(
     return (source_root_stripped_path, source_root.path)
 
   source_to_target_base = dict(
-    source_root_stripped_source_and_source_root(filename) for filename in list(python_files) + init_files
+    source_root_stripped_source_and_source_root(filename) for filename in python_files + init_files
   )
   config_parser = configparser.ConfigParser()
   config_parser.read_file(StringIO(DEFAULT_COVERAGE_CONFIG))
@@ -121,12 +116,12 @@ class ReportType(Enum):
   XML = "xml"
   HTML = "html"
 
+
 class PytestCoverage(PythonToolBase):
   options_scope = 'pytest-coverage'
   default_version = 'coverage==5.0.3'
   default_entry_point = 'coverage'
   default_interpreter_constraints = ["CPython>=3.6"]
-
 
   @classmethod
   def register_options(cls, register):
@@ -187,14 +182,15 @@ async def merge_coverage_reports(
   coveragerc_digest = await Get[Digest](InputFilesContent, get_coveragerc_input(DEFAULT_COVERAGE_CONFIG))
 
   coverage_directory_digests = await MultiGet(
-    Get(
-      Digest,
+    Get[Digest](
       DirectoryWithPrefixToAdd(
-        directory_digest=test_result._python_sqlite_coverage_file,
-        prefix=address.to_address().path_safe_spec,
+        directory_digest=result.test_result._python_sqlite_coverage_file,
+        prefix=result.address.to_address().path_safe_spec,
       )
     )
-    for address, test_result in test_results if test_result._python_sqlite_coverage_file is not None
+    for result in test_results
+    if result.test_result is not None
+    and result.test_result._python_sqlite_coverage_file is not None
   )
   sources_digests = [
     hydrated_target.adaptor.sources.snapshot.directory_digest
@@ -212,7 +208,7 @@ async def merge_coverage_reports(
     )),
   )
 
-  prefixes = [f'{address.to_address().path_safe_spec}/.coverage' for address, _ in test_results]
+  prefixes = [f'{result.address.to_address().path_safe_spec}/.coverage' for result in test_results]
   coverage_args = ['combine', *prefixes]
   request = coverage_setup.requirements_pex.create_execute_request(
     python_setup=python_setup,
@@ -266,7 +262,7 @@ async def generate_coverage_report(
   python_files = frozenset(itertools.chain.from_iterable(
     target.adaptor.sources.snapshot.files for target in python_targets
   ))
-  coverage_config_content = construct_coverage_config(source_roots, python_files)
+  coverage_config_content = construct_coverage_config(source_roots, list(python_files))
 
   coveragerc_digest = await Get[Digest](InputFilesContent, get_coveragerc_input(coverage_config_content))
   # chrooted_sources = await Get[ChrootedPythonSources](HydratedTargets(transitive_targets.closure))

@@ -2,20 +2,15 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import itertools
-import json
 import os
 from dataclasses import dataclass
-from textwrap import dedent
-from typing import Dict, Optional, Set, Tuple
+from typing import Optional, Tuple
 
 from pants.backend.python.rules.coverage import (
-  COVERAGE_PLUGIN_MODULE_NAME,
-  DEFAULT_COVERAGE_CONFIG,
   construct_coverage_config,
   get_coverage_plugin_input,
   get_coveragerc_input,
 )
-from pants.backend.python.rules.inject_init import InjectedInitDigest
 from pants.backend.python.rules.pex import Pex
 from pants.backend.python.rules.pex_from_target_closure import CreatePexFromTargetClosure
 from pants.backend.python.rules.prepare_chrooted_python_sources import ChrootedPythonSources
@@ -24,7 +19,7 @@ from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.build_graph.address import Address
 from pants.engine.addressable import BuildFileAddresses
-from pants.engine.fs import Digest, DirectoriesToMerge, FileContent, FilesContent, InputFilesContent
+from pants.engine.fs import Digest, DirectoriesToMerge, InputFilesContent
 from pants.engine.interactive_runner import InteractiveProcessRequest
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
@@ -34,7 +29,7 @@ from pants.engine.selectors import Get
 from pants.option.global_options import GlobalOptions
 from pants.rules.core.strip_source_root import SourceRootStrippedSources
 from pants.rules.core.test import TestDebugRequest, TestOptions, TestResult, TestTarget
-from pants.source.source_root import SourceRootConfig, SourceRoots
+from pants.source.source_root import SourceRootConfig
 
 
 def calculate_timeout_seconds(
@@ -166,8 +161,6 @@ async def setup_pytest_for_target(
     timeout_default=pytest.options.timeout_default,
     timeout_maximum=pytest.options.timeout_maximum,
   )
-
-  merged_input_files: Digest = await Get[Digest](DirectoriesToMerge(directories=tuple(directories_to_merge)))
 
   return TestTargetSetup(
     requirements_pex=resolved_requirements_pex,

@@ -32,10 +32,14 @@ class CreatePexFromTargetClosure:
 
 
 @rule(name="Create PEX from targets")
-async def create_pex_from_target_closure(request: CreatePexFromTargetClosure,
-                                         python_setup: PythonSetup) -> Pex:
-  transitive_hydrated_targets = await Get[TransitiveHydratedTargets](BuildFileAddresses,
-                                                                     request.build_file_addresses)
+async def create_pex_from_target_closure(
+  request: CreatePexFromTargetClosure,
+  python_setup: PythonSetup,
+) -> Pex:
+  transitive_hydrated_targets = await Get[TransitiveHydratedTargets](
+    BuildFileAddresses,
+    request.build_file_addresses,
+  )
   all_targets = transitive_hydrated_targets.closure
   all_target_adaptors = [t.adaptor for t in all_targets]
 
@@ -44,21 +48,20 @@ async def create_pex_from_target_closure(request: CreatePexFromTargetClosure,
     python_setup=python_setup
   )
   input_files = []
+  merged_input_files: Optional[Digest] = None
   if request.additional_input_files:
     input_files.append(request.additional_input_files)
   if request.include_source_files:
     chrooted_sources = await Get[ChrootedPythonSources](HydratedTargets(all_targets))
-    input_files.append(chrooted_sources)
-  merged_input_files = None
+    input_files.append(chrooted_sources.digest)
   if input_files:
-    merged_input_files: Digest = await Get[Digest](
+    merged_input_files = await Get[Digest](
       DirectoriesToMerge(directories=tuple(input_files)),
     )
   requirements = PexRequirements.create_from_adaptors(
     adaptors=all_target_adaptors,
     additional_requirements=request.additional_requirements
   )
-
 
   create_pex_request = CreatePex(
     output_filename=request.output_filename,
