@@ -60,7 +60,7 @@ class Scoverage(CoverageEngine):
              'filter.')
 
       register(
-        '--coverage-output-dir', type=dir_option, default=None, fingerprint=False,
+        '--output-dir', type=dir_option, default=None, fingerprint=False,
         help='Directory to copy coverage output to.'
       )
 
@@ -81,7 +81,7 @@ class Scoverage(CoverageEngine):
 
       opts = Scoverage.Factory.global_instance().get_options()
       target_filters = opts.target_filters
-      coverage_output_dir = opts.coverage_output_dir
+      coverage_output_dir = opts.output_dir
 
       return Scoverage(report_path, target_filters, settings, targets, execute_java_for_targets,
                        coverage_output_dir=coverage_output_dir)
@@ -163,15 +163,6 @@ class Scoverage(CoverageEngine):
     safe_mkdir(html_report_path, clean=True)
     safe_mkdir(xml_report_path, clean=True)
 
-    self._settings.log.info(f'output dir: {self._coverage_output_dir}')
-    if self._coverage_output_dir:
-      self._settings.log.debug(f'Scoverage output also written to: {self._coverage_output_dir}!')
-      mergetree(output_dir, self._coverage_output_dir)
-
-    import glob
-    dir_globbed = glob.glob(os.path.join(output_dir, '**'))
-    self._settings.log.debug(f'output_dir: {output_dir}, /**: {dir_globbed}')
-
     final_target_dirs = []
     for parent_measurements_dir in self._iter_datadirs(output_dir):
       final_target_dirs += self.filter_scoverage_targets(parent_measurements_dir)
@@ -194,6 +185,10 @@ class Scoverage(CoverageEngine):
 
     self._settings.log.info(f"Scoverage html reports available at {html_report_path}")
     self._settings.log.info(f"Scoverage xml reports available at {xml_report_path}")
+
+    if self._coverage_output_dir:
+      self._settings.log.debug(f'Scoverage output also written to: {self._coverage_output_dir}!')
+      mergetree(output_dir, self._coverage_output_dir)
 
     if self._settings.coverage_open:
       return os.path.join(html_report_path, 'index.html')
