@@ -140,8 +140,8 @@ class AddressAndDebugRequest:
 
 @dataclass(frozen=True)
 class PytestCoverageReport:
-  digest: Digest
-  output_path: PurePath
+  report_directory_digest: Digest
+  directory_to_materialize_to: PurePath
 
 
 @goal_rule
@@ -160,19 +160,19 @@ async def run_tests(
 
   results = await MultiGet(Get[AddressAndTestResult](Address, addr.to_address()) for addr in addresses)
   did_any_fail = False
-  filtered_results = [(x.address, x.test_result) for x in results if x.test_result is not None]
+  filtered_results = tuple((x.address, x.test_result) for x in results if x.test_result is not None)
   if options.values.run_coverage:
     # TODO(#8915) Make a generic interface for collecting coverage reports. This class shouldn't have to know about
     # PytestCoverageReport and JunitCoverageReport etc. It should only know about CoverageReport.
     pytest_coverage_report = await Get[PytestCoverageReport](
       AddressAndTestResults,
-      AddressAndTestResults(tuple(sorted(filtered_results)))
+      AddressAndTestResults(filtered_results)
     )
     workspace.materialize_directory(DirectoryToMaterialize(
-      pytest_coverage_report.digest,
-      path_prefix=str(pytest_coverage_report.output_path)
+      pytest_coverage_report.report_directory_digest,
+      path_prefix=str(pytest_coverage_report.directory_to_materialize_to)
     ))
-    console.print_stdout(f"Wrote coverage report to `{pytest_coverage_report.output_path}`")
+    console.print_stdout(f"Wrote coverage report to `{pytest_coverage_report.directory_to_materialize_to}`")
   for address, test_result in filtered_results:
     if test_result.status == Status.FAILURE:
       did_any_fail = True

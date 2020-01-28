@@ -6,10 +6,7 @@ import json
 import itertools
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import Optional, Set, Tuple, Dict, List
-import pkg_resources
-import configparser
-from io import StringIO
+from typing import Optional, Set, Tuple, Dict
 from pants.backend.python.rules.inject_init import InjectedInitDigest
 from pants.backend.python.rules.pex import Pex
 from pants.backend.python.rules.pex_from_target_closure import CreatePexFromTargetClosure
@@ -30,78 +27,13 @@ from pants.option.global_options import GlobalOptions
 from pants.rules.core.strip_source_root import SourceRootStrippedSources
 from pants.rules.core.test import TestDebugRequest, TestOptions, TestResult, TestTarget
 from pants.source.source_root import SourceRootConfig, SourceRoots
-from pants.backend.python.subsystems.pex_build_util import identify_missing_init_files
-
-DEFAULT_COVERAGE_CONFIG = dedent(f"""
-  [run]
-  branch = True
-  timid = False
-  relative_files = True
-  """)
-
-
-def get_coveragerc_input(coveragerc_content: str) -> InputFilesContent:
-  return InputFilesContent(
-    [
-      FileContent(
-        path='.coveragerc',
-        content=coveragerc_content.encode(),
-        is_executable=False,
-      ),
-    ]
-  )
-
-COVERAGE_PLUGIN_MODULE_NAME = '__coverage_coverage_plugin__'
-
-
-def get_coverage_plugin_input():
-  return InputFilesContent(
-    FilesContent(
-      (
-        FileContent(
-          path=f'{COVERAGE_PLUGIN_MODULE_NAME}.py',
-          content=pkg_resources.resource_string(__name__, 'coverage/plugin.py'),
-        ),
-      )
-    )
-  )
-
-
-def ensure_section(config_parser: configparser.ConfigParser, section: str) -> None:
-  """Ensure a section exists in a ConfigParser."""
-  if not config_parser.has_section(section):
-    config_parser.add_section(section)
-
-
-def construct_coverage_config(
-  source_roots: SourceRoots,
-  python_files: List[str],
-  test_time: Optional[bool] = False,
-) -> str:
-  # A map from source root stripped source to its source root. eg:
-  #  {'pants/testutil/subsystem/util.py': 'src/python'}
-  # This is so coverage reports referencing /chroot/path/pants/testutil/subsystem/util.py can be mapped
-  # back to the actual sources they reference when merging coverage reports.
-  init_files = list(identify_missing_init_files(python_files))
-
-  def source_root_stripped_source_and_source_root(file_name):
-    source_root = source_roots.find_by_path(file_name)
-    source_root_stripped_path = file_name[len(source_root.path)+1:]
-    return (source_root_stripped_path, source_root.path)
-
-  source_to_target_base = dict(
-    source_root_stripped_source_and_source_root(filename) for filename in list(python_files) + init_files
-  )
-  config_parser = configparser.ConfigParser()
-  config_parser.read_file(StringIO(DEFAULT_COVERAGE_CONFIG))
-  ensure_section(config_parser, 'run')
-  config_parser.set('run', 'plugins', COVERAGE_PLUGIN_MODULE_NAME)
-  config_parser.add_section(COVERAGE_PLUGIN_MODULE_NAME)
-  config_parser.set(COVERAGE_PLUGIN_MODULE_NAME, 'source_to_target_base', json.dumps(source_to_target_base))
-  config_parser.set(COVERAGE_PLUGIN_MODULE_NAME, 'test_time', json.dumps(test_time))
-  config = StringIO()
-  config_parser.write(config)
-  return config.getvalue()
+from pants.backend.python.rules.coverage import (
+  DEFAULT_COVERAGE_CONFIG,
+  get_coveragerc_input,
+  get_coverage_plugin_input,
+  COVERAGE_PLUGIN_MODULE_NAME,
+  construct_coverage_config,
+)
 
 
 def calculate_timeout_seconds(

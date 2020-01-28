@@ -6,7 +6,9 @@ import itertools
 import json
 from dataclasses import dataclass
 from io import StringIO
-from typing import Dict, Tuple
+from typing import Dict, Tuple, List, Optional
+from textwrap import dedent
+import pkg_resources
 from enum import Enum
 from pants.backend.python.rules.inject_init import InjectedInitDigest
 from pants.backend.python.rules.pex import (
@@ -15,14 +17,9 @@ from pants.backend.python.rules.pex import (
   PexInterpreterConstraints,
   PexRequirements,
 )
+from pants.backend.python.subsystems.pex_build_util import identify_missing_init_files
+
 from pants.backend.python.rules.prepare_chrooted_python_sources import ChrootedPythonSources
-from pants.backend.python.rules.python_test_runner import (
-  DEFAULT_COVERAGE_CONFIG,
-  get_coveragerc_input,
-  get_coverage_plugin_input,
-  COVERAGE_PLUGIN_MODULE_NAME,
-  construct_coverage_config,
-)
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
@@ -45,7 +42,79 @@ from pants.engine.rules import goal_rule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.rules.core.strip_source_root import SourceRootStrippedSources
 from pants.rules.core.test import AddressAndTestResults, PytestCoverageReport
-from pants.source.source_root import SourceRootConfig
+from pants.source.source_root import SourceRootConfig, SourceRoots
+
+
+DEFAULT_COVERAGE_CONFIG = dedent(f"""
+  [run]
+  branch = True
+  timid = False
+  relative_files = True
+  """)
+
+
+def get_coverage_plugin_input():
+  return InputFilesContent(
+    FilesContent(
+      (
+        FileContent(
+          path=f'{COVERAGE_PLUGIN_MODULE_NAME}.py',
+          content=pkg_resources.resource_string(__name__, 'coverage/plugin.py'),
+        ),
+      )
+    )
+  )
+
+def get_coveragerc_input(coveragerc_content: str) -> InputFilesContent:
+  return InputFilesContent(
+    [
+      FileContent(
+        path='.coveragerc',
+        content=coveragerc_content.encode(),
+        is_executable=False,
+      ),
+    ]
+  )
+
+COVERAGE_PLUGIN_MODULE_NAME = '__coverage_coverage_plugin__'
+
+
+def ensure_section(config_parser: configparser.ConfigParser, section: str) -> None:
+  """Ensure a section exists in a ConfigParser."""
+  if not config_parser.has_section(section):
+    config_parser.add_section(section)
+
+
+def construct_coverage_config(
+  source_roots: SourceRoots,
+  python_files: List[str],
+  test_time: Optional[bool] = False,
+) -> str:
+  # A map from source root stripped source to its source root. eg:
+  #  {'pants/testutil/subsystem/util.py': 'src/python'}
+  # This is so coverage reports referencing /chroot/path/pants/testutil/subsystem/util.py can be mapped
+  # back to the actual sources they reference when merging coverage reports.
+  init_files = list(identify_missing_init_files(python_files))
+
+  def source_root_stripped_source_and_source_root(file_name):
+    source_root = source_roots.find_by_path(file_name)
+    source_root_stripped_path = file_name[len(source_root.path)+1:]
+    return (source_root_stripped_path, source_root.path)
+
+  source_to_target_base = dict(
+    source_root_stripped_source_and_source_root(filename) for filename in list(python_files) + init_files
+  )
+  config_parser = configparser.ConfigParser()
+  config_parser.read_file(StringIO(DEFAULT_COVERAGE_CONFIG))
+  ensure_section(config_parser, 'run')
+  config_parser.set('run', 'plugins', COVERAGE_PLUGIN_MODULE_NAME)
+  config_parser.add_section(COVERAGE_PLUGIN_MODULE_NAME)
+  config_parser.set(COVERAGE_PLUGIN_MODULE_NAME, 'source_to_target_base', json.dumps(source_to_target_base))
+  config_parser.set(COVERAGE_PLUGIN_MODULE_NAME, 'test_time', json.dumps(test_time))
+  config = StringIO()
+  config_parser.write(config)
+  return config.getvalue()
+
 
 class ReportType(Enum):
   XML = "xml"
@@ -64,7 +133,7 @@ class PytestCoverage(PythonToolBase):
     register(
       '--report-output-path',
       type=str,
-      default='coverage/python',
+      default='dist/coverage/python',
       help='Path to write pytest coverage report to. Must be relative to build root.',
     )
     register(
@@ -187,7 +256,6 @@ async def generate_coverage_report(
 ) -> PytestCoverageReport:
   """Takes all python test results and generates a single coverage report."""
   requirements_pex = coverage_setup.requirements_pex
-  # merged_coverage_data = await Get[MergedCoverageData](AddressAndTestResults, test_results)
   python_targets = [
     target for target in transitive_targets.closure
     if target.adaptor.type_alias == 'python_library' or target.adaptor.type_alias == 'python_tests'
