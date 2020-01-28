@@ -3,15 +3,15 @@
 
 files(
   name = 'hello_directory',
-  sources = rglobs('hello/*'),
+  sources = ['hello/**/*'],
 )
 
 files(
   name = 'jaxb_directory',
-  sources = rglobs('jaxb/*'),
+  sources = ['jaxb/**/*'],
 )
 
 files(
   name = 'names_directory',
-  sources = rglobs('names/*'),
+  sources = ['names/**/*'],
 )

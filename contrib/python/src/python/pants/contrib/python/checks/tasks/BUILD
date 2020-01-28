@@ -22,5 +22,5 @@ python_library(
 
 resources(
   name='resources',
-  sources=globs('templates/python_eval/*.mustache'),
+  sources=['templates/python_eval/*.mustache'],
 )

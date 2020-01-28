@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
-  sources=globs('test_*.py', exclude=[globs('*_integration.py')]),
+  sources=['test_*.py', '!*_integration.py'],
   dependencies=[
     'src/python/pants/backend/native',
     'src/python/pants/backend/python/subsystems',
@@ -33,7 +33,7 @@ python_tests(
 
 python_tests(
   name='integration',
-  sources=globs('*_integration.py'),
+  sources=['*_integration.py'],
   dependencies=[
     'src/python/pants/backend/native',
     'src/python/pants/backend/native/targets',

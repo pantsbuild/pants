@@ -18,7 +18,7 @@ python_library(
 
 python_tests(
   name='tests',
-  sources=globs('*_test.py', exclude=[globs('*_integration_test.py')]),
+  sources=['*_test.py', '!*_integration_test.py'],
   dependencies=[
     'src/python/pants/build_graph',
     'src/python/pants/help',
@@ -31,7 +31,7 @@ python_tests(
 
 python_tests(
   name='integration',
-  sources=globs('*_integration_test.py'),
+  sources=['*_integration_test.py'],
   dependencies=[
     'src/python/pants/testutil:int-test',
   ],

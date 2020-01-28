@@ -1,6 +1,6 @@
 node_module(
   name='yarnpkg-path-injection',
-  sources=globs('package.json', 'yarn.lock', '.babelrc', 'test/*.js'),
+  sources=['package.json', 'yarn.lock', '.babelrc', 'test/*.js'],
   package_manager='yarn',
 )
 

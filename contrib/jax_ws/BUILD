@@ -3,5 +3,5 @@
 
 files(
   name='wsdl_tests_directory',
-  sources=rglobs('tests/wsdl/*'),
+  sources=['tests/wsdl/**/*'],
 )

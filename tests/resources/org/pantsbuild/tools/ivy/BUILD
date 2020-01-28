@@ -2,5 +2,5 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 files(
-  sources=rglobs('*.jar', '*.properties', '*.xml'),
+  sources=['**/*.jar', '**/*.properties', '**/*.xml'],
 )
