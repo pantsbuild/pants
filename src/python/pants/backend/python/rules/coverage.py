@@ -235,7 +235,6 @@ async def generate_coverage_report(
     ExecuteProcessRequest,
     request
   )
-  print(result.stdout.decode('utf8'))
   return PytestCoverageReport(result.output_directory_digest, coverage_toolbase.options.output_path)
 
 

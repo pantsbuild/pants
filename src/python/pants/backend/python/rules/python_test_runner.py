@@ -267,7 +267,6 @@ async def run_python_test(
     env=env,
   )
   result = await Get[FallibleExecuteProcessResult](ExecuteProcessRequest, request)
-  # print(result.stdout.decode('utf8'))
   return TestResult.from_fallible_execute_process_result(result)
 
 
