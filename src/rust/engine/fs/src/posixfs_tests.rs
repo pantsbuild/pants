@@ -38,7 +38,7 @@ fn read_file() {
     0o600,
   );
   let fs = new_posixfs(&dir.path());
-  let mut rt = tokio::runtime::Runtime::new().unwrap();
+  let mut rt = tokio_compat::runtime::Runtime::new().unwrap();
   let file_content = rt
     .block_on(fs.read_file(&File {
       path: path.clone(),
@@ -159,7 +159,7 @@ fn scandir_empty() {
   let posix_fs = new_posixfs(&dir.path());
   let path = PathBuf::from("empty_enclosure");
   std::fs::create_dir(dir.path().join(&path)).unwrap();
-  let mut runtime = tokio::runtime::Runtime::new().unwrap();
+  let mut runtime = tokio_compat::runtime::Runtime::new().unwrap();
   assert_eq!(
     runtime.block_on(posix_fs.scandir(Dir(path))).unwrap(),
     DirectoryListing(vec![])
@@ -195,7 +195,7 @@ fn scandir() {
     0o600,
   );
 
-  let mut runtime = tokio::runtime::Runtime::new().unwrap();
+  let mut runtime = tokio_compat::runtime::Runtime::new().unwrap();
 
   // Symlink aware.
   assert_eq!(
@@ -284,7 +284,7 @@ fn path_stats_for_paths() {
   std::os::unix::fs::symlink("doesnotexist", &root_path.join("symlink_to_nothing")).unwrap();
 
   let posix_fs = Arc::new(new_posixfs(&root_path));
-  let mut runtime = tokio::runtime::Runtime::new().unwrap();
+  let mut runtime = tokio_compat::runtime::Runtime::new().unwrap();
   let path_stats = runtime
     .block_on(posix_fs.path_stats(vec![
       PathBuf::from("executable_file"),
@@ -370,7 +370,7 @@ fn memfs_expand_basic() {
 
 fn assert_only_file_is_executable(path: &Path, want_is_executable: bool) {
   let fs = new_posixfs(path);
-  let mut runtime = tokio::runtime::Runtime::new().unwrap();
+  let mut runtime = tokio_compat::runtime::Runtime::new().unwrap();
   let stats = runtime
     .block_on(fs.scandir(Dir(PathBuf::from("."))))
     .unwrap();

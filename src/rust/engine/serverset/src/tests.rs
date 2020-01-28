@@ -168,7 +168,11 @@ fn waits_if_all_unhealthy() {
   );
 }
 
-fn expect_both(runtime: &mut tokio::runtime::Runtime, s: &Serverset<String>, repetitions: usize) {
+fn expect_both(
+  runtime: &mut tokio::runtime::Runtime,
+  s: &Serverset<String>,
+  repetitions: usize,
+) {
   let visited = Arc::new(Mutex::new(HashSet::new()));
 
   runtime
@@ -191,7 +195,11 @@ fn expect_both(runtime: &mut tokio::runtime::Runtime, s: &Serverset<String>, rep
   assert_eq!(unwrap(visited), expect);
 }
 
-fn mark_bad_as_bad(runtime: &mut tokio::runtime::Runtime, s: &Serverset<String>, health: Health) {
+fn mark_bad_as_bad(
+  runtime: &mut tokio::runtime::Runtime,
+  s: &Serverset<String>,
+  health: Health,
+) {
   let mark_bad_as_baded_bad = Arc::new(Mutex::new(false));
   for _ in 0..2 {
     let s = s.clone();

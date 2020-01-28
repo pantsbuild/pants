@@ -20,3 +20,4 @@ tempfile = "3"
 [dev-dependencies]
 testutil = { path = "../testutil" }
 tokio = "0.1"
+tokio-compat = "0.1"

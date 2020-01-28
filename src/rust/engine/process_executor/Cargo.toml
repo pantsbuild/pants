@@ -12,5 +12,5 @@ hashing = { path = "../hashing" }
 process_execution = { path = "../process_execution" }
 store = { path = "../fs/store" }
 task_executor = { path = "../task_executor" }
-tokio = "0.1"
+tokio = { version = "0.2", features = ["rt-threaded"] }
 workunit_store = { path = "../workunit_store"}
