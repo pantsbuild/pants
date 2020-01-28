@@ -3,6 +3,11 @@
 
 This document describes releases leading up to the ``1.24.x`` ``stable`` series.
 
+1.24.0 (01/28/2020)
+-------------------
+
+The first stable release of the `1.24.x` series!
+
 1.24.0rc1 (01/23/2020)
 ----------------------
 
