@@ -27,6 +27,7 @@ python_tests(
   name="tests",
   sources=globs('*_test.py', exclude=[globs('*_integration_test.py')]),
   dependencies=[
+    '3rdparty/python/twitter/commons:twitter.common.collections',
     ':option',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:hash_utils',
