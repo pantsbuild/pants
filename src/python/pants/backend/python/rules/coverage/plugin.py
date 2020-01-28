@@ -19,35 +19,49 @@ from coverage.python import PythonFileReporter, get_python_source
 
 
 class SimpleFileTracer(FileTracer):
-  def __init__(self, filename):
+  def __init__(self, filename, relname, test_time):
     super(SimpleFileTracer, self).__init__()
     self._filename = filename
+    self._relname = relname
 
   def source_filename(self):
-    return self._filename
+    if self.test_time:
+      return self.relname
+    else:
+      return self.filename
 
-  def dynamic_source_filename(self, filename, frame):
-    return self._filename
+  # def dynamic_source_filename(self, filename, frame):
+  #   return self._filename
 
-  def has_dynamic_source_filename(self):
-    return True
+  # def has_dynamic_source_filename(self):
+  #   return True
 
 
 class SimpleFileReporter(PythonFileReporter):
   """Report support for a Python file."""
 
   def __init__(self, relative_source_root, source_root_stripped_filename, test_time, coverage=None):
+    print('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', relative_source_root, source_root_stripped_filename, test_time)
     self.coverage = coverage
     self.relative_source_root = relative_source_root
     self.source_root_stripped_filename = source_root_stripped_filename
-    self.filename = os.path.join(relative_source_root, source_root_stripped_filename)
+    self.filename_with_source_root = os.path.join(relative_source_root, source_root_stripped_filename)
     self.relname = source_root_stripped_filename
     self.test_time = test_time
 
     self._excluded = None
 
+  @property
+  def filename(self):
+    # if self.test_time:
+    return self.relname
+    # return self.filename_with_source_root
+
   def relative_filename(self):
-    return self.filename
+    if self.test_time:
+      return self.relname
+    else:
+      return self.filename
 
   _parser = None
   @property
@@ -56,7 +70,7 @@ class SimpleFileReporter(PythonFileReporter):
       if self.test_time:
         self._parser = PythonParser(filename=self.relname)
       else:
-        self._parser = PythonParser(filename=self.filename)
+        self._parser = PythonParser(filename=self.filename_with_source_root)
 
       self._parser.parse_source()
     return self._parser
@@ -73,8 +87,7 @@ class SimpleFileReporter(PythonFileReporter):
       if self.test_time:
         self._source = get_python_source(self.relname)
       else:
-        self._source = get_python_source(self.filename)
-    self._source = "something"
+        self._source = get_python_source(self.filename_with_source_root)
     return self._source
 
 
@@ -90,7 +103,7 @@ class ChrootRemappingPlugin(CoveragePlugin):
   def _find_executable_files(self, top):
     # coverage uses this to associate files with this plugin.
     # We only want to be associated with the sources we know about.
-    # print('find_executable_files', top)
+    print('find_executable_files', top)
     if top.startswith(self._src_chroot_path):
       print('find_executable_files', top, self._src_chroot_path)
       for dirname, _, filenames in os.walk(top):
@@ -120,7 +133,7 @@ class ChrootRemappingPlugin(CoveragePlugin):
       target_base = self._src_to_target_base.get(src)
       if target_base is not None:
         print('Target_base is not None.', src)
-        return SimpleFileTracer(os.path.join([target_base, src]))
+        return SimpleFileTracer(filename=os.path.join([target_base, src]), relname=src, test_time=self.test_time)
       # else:
         # print('Target_base is None.', src)
 
@@ -136,6 +149,7 @@ def coverage_init(reg, options):
   src_to_target_base = json.loads(options['source_to_target_base'])
   test_time = json.loads(options['test_time'])
   print("TEST TIME: ", test_time)
+
   if test_time:
     print('really test time.')
     # return
