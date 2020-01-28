@@ -18,30 +18,15 @@ from coverage.python import PythonFileReporter, get_python_source
 # NB: This file must keep Python 2 support because it is a resource that may be run with Python 2.
 
 
-class SimpleFileTracer(FileTracer):
-  def __init__(self, filename, relname, test_time):
-    super(SimpleFileTracer, self).__init__()
-    self._filename = filename
-    self._relname = relname
-
-  def source_filename(self):
-    if self.test_time:
-      return self.relname
-    else:
-      return self.filename
-
-
 class SimpleFileReporter(PythonFileReporter):
   """Report support for a Python file."""
 
   def __init__(self, relative_source_root, source_root_stripped_filename, test_time, coverage=None):
+    # TODO(tansy): Note why calling super on this class will break all the things.
     self.coverage = coverage
-    self.relative_source_root = relative_source_root
-    self.source_root_stripped_filename = source_root_stripped_filename
     self.filename_with_source_root = os.path.join(relative_source_root, source_root_stripped_filename)
     self.filename = source_root_stripped_filename
     self.test_time = test_time
-    self._excluded = None
 
   def relative_filename(self):
     return self.filename_with_source_root
@@ -54,7 +39,6 @@ class SimpleFileReporter(PythonFileReporter):
         self._parser = PythonParser(filename=self.filename)
       else:
         self._parser = PythonParser(filename=self.filename_with_source_root)
-
       self._parser.parse_source()
     return self._parser
 
@@ -67,10 +51,7 @@ class SimpleFileReporter(PythonFileReporter):
   _source = None
   def source(self):
     if self._source is None:
-      if self.test_time:
-        self._source = get_python_source(self.filename)
-      else:
-        self._source = get_python_source(self.filename_with_source_root)
+      self._source = get_python_source(self.filename_with_source_root)
     return self._source
 
 
@@ -92,18 +73,6 @@ class ChrootRemappingPlugin(CoveragePlugin):
         for filename in filenames:
           if os.path.join(reldir, filename) in self._src_to_target_base:
             yield os.path.join(dirname, filename)
-
-  def file_tracer(self, filename):
-    # Note that coverage will only call this on files that we yielded from find_executable_files(),
-    # so they should all pass this check anyway, but it doesn't hurt to check again.
-    # Note also that you cannot exclude .py files from tracing or reporting by returning None here.
-    # All that does is register this plugin's disinterest in the file, but coverage will still
-    # trace and report it using the standard tracer and reporter.
-    if filename.startswith(self._src_chroot_path):
-      src = os.path.relpath(filename, self._src_chroot_path)
-      target_base = self._src_to_target_base.get(src)
-      if target_base is not None:
-        return SimpleFileTracer(filename=os.path.join([target_base, src]), relname=src, test_time=self.test_time)
 
   def file_reporter(self, filename):
     src = os.path.relpath(filename, self._src_chroot_path)
