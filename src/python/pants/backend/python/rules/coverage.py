@@ -127,16 +127,19 @@ async def merge_coverage_reports(
     )
     for address, test_result in test_results if test_result._python_sqlite_coverage_file is not None
   )
-
-  chrooted_sources = await Get[ChrootedPythonSources](HydratedTargets(transitive_targets.closure))
+  sources_digests = [
+    hydrated_target.adaptor.sources.snapshot.directory_digest
+    for hydrated_target in transitive_targets.closure
+    if hasattr(hydrated_target.adaptor, 'sources')
+  ]
 
   merged_input_files: Digest = await Get(
     Digest,
     DirectoriesToMerge(directories=(
       *coverage_directory_digests,
+      *sources_digests,
       coveragerc_digest,
       coverage_setup.requirements_pex.directory_digest,
-      chrooted_sources.digest,
     )),
   )
 
@@ -196,7 +199,15 @@ async def generate_coverage_report(
   coverage_config_content = construct_coverage_config(source_roots, python_files)
 
   coveragerc_digest = await Get[Digest](InputFilesContent, get_coveragerc_input(coverage_config_content))
-  chrooted_sources = await Get[ChrootedPythonSources](HydratedTargets(transitive_targets.closure))
+  # chrooted_sources = await Get[ChrootedPythonSources](HydratedTargets(transitive_targets.closure))
+  sources_digests = [
+    hydrated_target.adaptor.sources.snapshot.directory_digest
+    for hydrated_target in transitive_targets.closure
+    if hasattr(hydrated_target.adaptor, 'sources')
+  ]
+  sources_digest = await Get[Digest](DirectoriesToMerge(directories=tuple(sources_digests)))
+  inits_digest = await Get[InjectedInitDigest](Digest, sources_digest)
+
 
   merged_input_files: Digest = await Get(
     Digest,
@@ -204,7 +215,8 @@ async def generate_coverage_report(
       merged_coverage_data.coverage_data,
       coveragerc_digest,
       requirements_pex.directory_digest,
-      chrooted_sources.digest,
+      *sources_digests,
+      inits_digest.directory_digest,
     )),
   )
   coverage_args = [coverage_toolbase.options.report]
@@ -223,7 +235,7 @@ async def generate_coverage_report(
     ExecuteProcessRequest,
     request
   )
-
+  print(result)
   return PytestCoverageReport(result.output_directory_digest, coverage_toolbase.options.output_path)
 
 

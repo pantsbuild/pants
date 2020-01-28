@@ -58,7 +58,7 @@ def get_coverage_plugin_input():
     FilesContent(
       (
         FileContent(
-          path=f'pex_root/{COVERAGE_PLUGIN_MODULE_NAME}.py',
+          path=f'{COVERAGE_PLUGIN_MODULE_NAME}.py',
           content=pkg_resources.resource_string(__name__, 'coverage/plugin.py'),
           is_executable=False,
         ),
@@ -179,7 +179,7 @@ async def setup_pytest_for_target(
       # and then by Pytest). See https://github.com/jaraco/zipp/pull/26.
       additional_args=("--not-zip-safe",),
       include_source_files=False,
-      # additional_input_files=plugin_file_digest,
+      additional_input_files=plugin_file_digest,
     )
   )
 
