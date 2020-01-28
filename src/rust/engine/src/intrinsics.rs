@@ -5,11 +5,10 @@ use crate::nodes::MultiPlatformExecuteProcess;
 use crate::nodes::{lift_digest, DownloadedFile, NodeFuture, Snapshot};
 use boxfuture::{try_future, Boxable};
 use bytes;
+use fs::PathGlobs;
 use futures01::{future, Future};
 use hashing;
 use std::path::PathBuf;
-use fs::PathGlobs;
-
 
 pub fn run_intrinsic(
   input: TypeId,
@@ -197,29 +196,23 @@ fn input_files_content_to_digest(context: Context, files_content: Value) -> Node
 
 fn snapshot_subset_to_snapshot(context: Context, value: Value) -> NodeFuture<Value> {
   let workunit_store = context.session.workunit_store();
-  let include_files = externs::project_multi_strs(&value, "include_files").into_iter();
-  let include_dirs = externs::project_multi_strs(&value, "include_dirs").into_iter();
   let includes = externs::project_ignoring_type(&value, "includes");
   let store = context.core.store();
 
   let path_globs = future::result(Snapshot::lift_path_globs(&includes));
   let original_digest = future::result(lift_digest(&externs::project_ignoring_type(
-        &value,
-        "directory_digest",
+    &value,
+    "directory_digest",
   )));
 
-  path_globs.join(original_digest)
-  .and_then(move |(path_globs, original_digest): (PathGlobs, hashing::Digest) | {
-    store::Snapshot::get_snapshot_subset(
-      store,
-      original_digest,
-      path_globs,
-      include_files.collect(),
-      include_dirs.collect(),
-      workunit_store,
+  path_globs
+    .join(original_digest)
+    .and_then(
+      move |(path_globs, original_digest): (PathGlobs, hashing::Digest)| {
+        store::Snapshot::get_snapshot_subset(store, original_digest, path_globs, workunit_store)
+      },
     )
-  })
-  .map(move |snapshot: store::Snapshot| Snapshot::store_snapshot(&context.core, &snapshot))
-  .map_err(|err| throw(&err))
-  .to_boxed()
+    .map(move |snapshot: store::Snapshot| Snapshot::store_snapshot(&context.core, &snapshot))
+    .map_err(|err| throw(&err))
+    .to_boxed()
 }

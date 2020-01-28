@@ -611,8 +611,6 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
   def test_empty_snapshot_subset(self) -> None:
     ss = SnapshotSubset(directory_digest=self.generate_original_digest(),
         includes = PathGlobs((), ()),
-        include_files=(),
-        include_dirs=(),
     )
     subset_snapshot = self.request_single_product(Snapshot, ss)
     assert subset_snapshot.directory_digest == EMPTY_DIRECTORY_DIGEST
@@ -622,8 +620,6 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
   def test_snapshot_subset_files_dirs(self) -> None:
     ss1 = SnapshotSubset(directory_digest=self.generate_original_digest(),
         includes=PathGlobs(("a.txt", "c.txt", "subdir2/**"), ()),
-        include_files=("a.txt", "c.txt"),
-        include_dirs=('subdir2',),
     )
 
     subset_snapshot = self.request_single_product(Snapshot, ss1)
@@ -631,14 +627,10 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
 
     ss2 = SnapshotSubset(directory_digest=self.generate_original_digest(),
         includes=PathGlobs(("a.txt", "c.txt", "subdir2/*"), ()),
-        include_files=("a.txt", "c.txt"),
-        include_dirs=('subdir2',),
     )
 
     subset_snapshot = self.request_single_product(Snapshot, ss2)
     assert set(subset_snapshot.files) == {'a.txt', 'c.txt', 'subdir2/a.txt'} 
-
-
 
 
 class StubHandler(BaseHTTPRequestHandler):

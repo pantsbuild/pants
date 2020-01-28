@@ -514,7 +514,6 @@ impl PathGlobs {
   /// traversal in expand is (currently) too expensive to use for that in-memory matching (such as
   /// via MemFS).
   ///
-  //TODO I think this can be &[&PathBuf]
   pub fn matches(&self, paths: &[PathBuf]) -> Result<bool, String> {
     let patterns = self
       .include
@@ -541,9 +540,9 @@ impl PathGlobs {
       match self.matches(&[path.clone()]) {
         Ok(true) => {
           output.push(path);
-        },
+        }
         Ok(false) => (),
-        Err(e) => return Err(e)
+        Err(e) => return Err(e),
       }
     }
     Ok(output)
