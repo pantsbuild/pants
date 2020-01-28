@@ -1,4 +1,4 @@
-# Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import configparser
@@ -7,9 +7,7 @@ import json
 from dataclasses import dataclass
 from io import StringIO
 from typing import Dict, Tuple
-
-import pkg_resources
-
+from enum import Enum
 from pants.backend.python.rules.inject_init import InjectedInitDigest
 from pants.backend.python.rules.pex import (
   CreatePex,
@@ -49,10 +47,13 @@ from pants.rules.core.strip_source_root import SourceRootStrippedSources
 from pants.rules.core.test import AddressAndTestResults, PytestCoverageReport
 from pants.source.source_root import SourceRootConfig
 
+class ReportType(Enum):
+  XML = "xml"
+  HTML = "html"
 
-class CoverageToolBase(PythonToolBase):
+class PytestCoverage(PythonToolBase):
   options_scope = 'pytest-coverage'
-  default_version = 'coverage==5.0.0'
+  default_version = 'coverage==5.0.3'
   default_entry_point = 'coverage'
   default_interpreter_constraints = ["CPython>=3.6"]
 
@@ -61,16 +62,15 @@ class CoverageToolBase(PythonToolBase):
   def register_options(cls, register):
     super().register_options(register)
     register(
-      '--output-path',
+      '--report-output-path',
       type=str,
       default='coverage/python',
       help='Path to write pytest coverage report to. Must be relative to build root.',
     )
     register(
       '--report',
-      type=str,
-      choices=('xml', 'html'),
-      default='html',
+      type=ReportType,
+      default=ReportType.HTML,
       help='Which coverage reports to emit.',
     )
 
@@ -78,14 +78,13 @@ class CoverageToolBase(PythonToolBase):
 @dataclass(frozen=True)
 class CoverageSetup:
   requirements_pex: Pex
-  filename: str
 
 
 @rule
 async def setup_coverage(
-  coverage: CoverageToolBase,
+  coverage: PytestCoverage,
 ) -> CoverageSetup:
-  plugin_file_digest: Digest = await Get[Digest](InputFilesContent, get_coverage_plugin_input())
+  plugin_file_digest = await Get[Digest](InputFilesContent, get_coverage_plugin_input())
   output_pex_filename = "coverage.pex"
   requirements_pex = await Get[Pex](
     CreatePex(
@@ -98,7 +97,7 @@ async def setup_coverage(
       input_files_digest=plugin_file_digest,
     )
   )
-  return CoverageSetup(requirements_pex, output_pex_filename)
+  return CoverageSetup(requirements_pex)
 
 
 @dataclass(frozen=True)
@@ -117,7 +116,7 @@ async def merge_coverage_reports(
 
   coveragerc_digest = await Get[Digest](InputFilesContent, get_coveragerc_input(DEFAULT_COVERAGE_CONFIG))
 
-  coverage_directory_digests: Tuple[Digest, ...] = await MultiGet(
+  coverage_directory_digests = await MultiGet(
     Get(
       Digest,
       DirectoryWithPrefixToAdd(
@@ -148,7 +147,7 @@ async def merge_coverage_reports(
   request = coverage_setup.requirements_pex.create_execute_request(
     python_setup=python_setup,
     subprocess_encoding_environment=subprocess_encoding_environment,
-    pex_path=f'./{coverage_setup.filename}',
+    pex_path=f'./{coverage_setup.requirements_pex.output_filename}',
     pex_args=coverage_args,
     input_files=merged_input_files,
     output_files=('.coverage',),
@@ -163,6 +162,7 @@ async def merge_coverage_reports(
 
 
 def get_file_names(all_target_adaptors):
+  # TODO(#4535): This functionality should be provided.
   def iter_files():
     for adaptor in all_target_adaptors:
       if hasattr(adaptor, 'sources'):
@@ -180,13 +180,14 @@ async def generate_coverage_report(
   transitive_targets: TransitiveHydratedTargets,
   python_setup: PythonSetup,
   coverage_setup: CoverageSetup,
-  coverage_toolbase: CoverageToolBase,
+  merged_coverage_data: MergedCoverageData,
+  coverage_toolbase: PytestCoverage,
   source_root_config: SourceRootConfig,
   subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> PytestCoverageReport:
-  """Takes all python test results and generates a single coverage report in dist/coverage."""
+  """Takes all python test results and generates a single coverage report."""
   requirements_pex = coverage_setup.requirements_pex
-  merged_coverage_data = await Get[MergedCoverageData](AddressAndTestResults, test_results)
+  # merged_coverage_data = await Get[MergedCoverageData](AddressAndTestResults, test_results)
   python_targets = [
     target for target in transitive_targets.closure
     if target.adaptor.type_alias == 'python_library' or target.adaptor.type_alias == 'python_tests'
@@ -219,11 +220,11 @@ async def generate_coverage_report(
       inits_digest.directory_digest,
     )),
   )
-  coverage_args = [coverage_toolbase.options.report]
+  coverage_args = [coverage_toolbase.options.report.value]
   request = requirements_pex.create_execute_request(
     python_setup=python_setup,
     subprocess_encoding_environment=subprocess_encoding_environment,
-    pex_path=f'./{coverage_setup.filename}',
+    pex_path=f'./{coverage_setup.requirements_pex.output_filename}',
     pex_args=coverage_args,
     input_files=merged_input_files,
     output_directories=('htmlcov',),
@@ -235,12 +236,12 @@ async def generate_coverage_report(
     ExecuteProcessRequest,
     request
   )
-  return PytestCoverageReport(result.output_directory_digest, coverage_toolbase.options.output_path)
+  return PytestCoverageReport(result.output_directory_digest, coverage_toolbase.options.report_output_path)
 
 
 def rules():
   return [
-    subsystem_rule(CoverageToolBase),
+    subsystem_rule(PytestCoverage),
     generate_coverage_report,
     merge_coverage_reports,
     setup_coverage,

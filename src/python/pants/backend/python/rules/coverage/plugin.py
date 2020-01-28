@@ -2,8 +2,6 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import json
 import os
 import sys
@@ -15,10 +13,10 @@ from coverage.parser import PythonParser
 from coverage.python import PythonFileReporter, get_python_source
 
 
-# NB: This file must keep Python 2 support because it is a resource that may be run with Python 2.
+# TODO(Tansy): Document the insanity. coverage is loading these classes from class name strings stored in its database.
 
 
-class SimpleFileReporter(PythonFileReporter):
+class PantsPythonFileReporter(PythonFileReporter):
   """Report support for a Python file."""
 
   def __init__(self, relative_source_root, source_root_stripped_filename, test_time, coverage=None):
@@ -55,18 +53,19 @@ class SimpleFileReporter(PythonFileReporter):
     return self._source
 
 
-class ChrootRemappingPlugin(CoveragePlugin):
-  """A plugin that knows how to map Pants PEX chroots back to repo source code when reporting."""
+class SourceRootRemappingPlugin(CoveragePlugin):
+  """A plugin that knows how to map the source root stripped sources used in tests back to sources with source
+  roots for reporting."""
 
   def __init__(self, src_chroot_path, src_to_target_base, test_time):
-    super(ChrootRemappingPlugin, self).__init__()
+    super().__init__()
     self._src_chroot_path = src_chroot_path
     self._src_to_target_base = src_to_target_base
     self.test_time = test_time
 
-  def find_executable_files(self, top):
-    # coverage uses this to associate files with this plugin.
-    # We only want to be associated with the sources we know about.
+  def find_executable_files(self, top: str):
+    # Coverage uses this to associate files with this plugin. We only want to be associated with the sources we
+    # know about.
     if top.startswith(self._src_chroot_path):
       for dirname, _, filenames in os.walk(top):
         reldir = os.path.relpath(dirname, self._src_chroot_path)
@@ -74,14 +73,14 @@ class ChrootRemappingPlugin(CoveragePlugin):
           if os.path.join(reldir, filename) in self._src_to_target_base:
             yield os.path.join(dirname, filename)
 
-  def file_reporter(self, filename):
+  def file_reporter(self, filename: str):
     src = os.path.relpath(filename, self._src_chroot_path)
     target_base = self._src_to_target_base.get(src)
-    return SimpleFileReporter(relative_source_root=target_base, source_root_stripped_filename=src, test_time=self.test_time)
+    return PantsPythonFileReporter(relative_source_root=target_base, source_root_stripped_filename=src, test_time=self.test_time)
 
 
 def coverage_init(reg, options):
   src_chroot_path = os.getcwd()
   src_to_target_base = json.loads(options['source_to_target_base'])
   test_time = json.loads(options['test_time'])
-  reg.add_file_tracer(ChrootRemappingPlugin(src_chroot_path, src_to_target_base, test_time))
+  reg.add_file_tracer(SourceRootRemappingPlugin(src_chroot_path, src_to_target_base, test_time))

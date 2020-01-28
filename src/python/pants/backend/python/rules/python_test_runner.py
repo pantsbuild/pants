@@ -6,7 +6,7 @@ import json
 import itertools
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import Optional, Set, Tuple, Dict
+from typing import Optional, Set, Tuple, Dict, List
 import pkg_resources
 import configparser
 from io import StringIO
@@ -29,7 +29,7 @@ from pants.engine.selectors import Get
 from pants.option.global_options import GlobalOptions
 from pants.rules.core.strip_source_root import SourceRootStrippedSources
 from pants.rules.core.test import TestDebugRequest, TestOptions, TestResult, TestTarget
-from pants.source.source_root import SourceRootConfig
+from pants.source.source_root import SourceRootConfig, SourceRoots
 from pants.backend.python.subsystems.pex_build_util import identify_missing_init_files
 
 DEFAULT_COVERAGE_CONFIG = dedent(f"""
@@ -61,7 +61,6 @@ def get_coverage_plugin_input():
         FileContent(
           path=f'{COVERAGE_PLUGIN_MODULE_NAME}.py',
           content=pkg_resources.resource_string(__name__, 'coverage/plugin.py'),
-          is_executable=False,
         ),
       )
     )
@@ -74,7 +73,11 @@ def ensure_section(config_parser: configparser.ConfigParser, section: str) -> No
     config_parser.add_section(section)
 
 
-def construct_coverage_config(source_roots, python_files, test_time=False) -> str:
+def construct_coverage_config(
+  source_roots: SourceRoots,
+  python_files: List[str],
+  test_time: Optional[bool] = False,
+) -> str:
   # A map from source root stripped source to its source root. eg:
   #  {'pants/testutil/subsystem/util.py': 'src/python'}
   # This is so coverage reports referencing /chroot/path/pants/testutil/subsystem/util.py can be mapped
@@ -89,7 +92,6 @@ def construct_coverage_config(source_roots, python_files, test_time=False) -> st
   source_to_target_base = dict(
     source_root_stripped_source_and_source_root(filename) for filename in list(python_files) + init_files
   )
-
   config_parser = configparser.ConfigParser()
   config_parser.read_file(StringIO(DEFAULT_COVERAGE_CONFIG))
   ensure_section(config_parser, 'run')
