@@ -281,12 +281,12 @@ class SimpleCodegenTask(Task):
       results_dir_relpath = fast_relpath(synthetic_target_dir, get_buildroot())
       buildroot_relative_globs = tuple(os.path.join(results_dir_relpath, file) for file in files)
       buildroot_relative_excludes = tuple(
-        os.path.join(results_dir_relpath, file)
-          for file in self.sources_exclude_globs
+        f"!{os.path.join(results_dir_relpath, file)}"
+        for file in self.sources_exclude_globs
       )
       to_capture.append(
         PathGlobsAndRoot(
-          PathGlobs(buildroot_relative_globs, buildroot_relative_excludes),
+          PathGlobs(globs=(*buildroot_relative_globs, *buildroot_relative_excludes)),
           get_buildroot(),
           # The digest is stored adjacent to the hash-versioned `vt.current_results_dir`.
           Digest.load(vt.current_results_dir),
