@@ -12,14 +12,29 @@ from coverage.parser import PythonParser
 from coverage.python import PythonFileReporter, get_python_source
 
 
-# TODO(Tansy): Document the insanity. coverage is loading these classes from class name strings stored in its database.
+# Note: This plugin will appear to do nothing at all at test time. This is the correct behavior. The *only* thing
+# coverage does with this plugin at test time is storing the class name in its sql data (see the `tracer` table.)
+# eg: `__coverage_coverage_plugin__.ChrootRemappingPlugin`
+# It will then hot load this plugin from the class name string in its sql data when generate_coverage_report is run.
+# If this data is missing, this plugin will not be used at report time, meaning the reports will fail to be generated
+# as coverage will go looking for `foo/bar.py` instead of `src/python/foo/bar.py`.
 
 
 class PantsPythonFileReporter(PythonFileReporter):
-  """Report support for a Python file."""
+  """Report support for a Python file.
+
+  At test time we run coverage in an environment where all source roots have been stripped from source files.
+  When we read the coverage report, we would like to see the buildroot relative file names.
+
+  This class handles mapping from the coverage data stored at test time, which references source root stripped sources
+  to the actual file names we want to see in the reports. In order for this to work, the environment in which we run
+  `coverage html` (to generate a report) must include all of the source files with their source roots still present.
+  """
 
   def __init__(self, relative_source_root, source_root_stripped_filename, test_time, coverage=None):
-    # TODO(tansy): Note why calling super on this class will break all the things.
+    # Note: Do not call `super()` on this class. The __init__ of the super class goes to a lot of effort to
+    # manufacture absolute paths which will break things when the tests are run in one chroot and the report
+    # generation in another.
     self.coverage = coverage
     self.filename_with_source_root = os.path.join(relative_source_root, source_root_stripped_filename)
     self.filename = source_root_stripped_filename
