@@ -308,7 +308,7 @@ class IsolatedProcessTest(TestBase, unittest.TestCase):
 
     cat_exe_req = CatExecutionRequest(
       ShellCat(BinaryLocation('/bin/cat')),
-      PathGlobs(include=['f*']),
+      PathGlobs(['f*']),
     )
 
     concatted = self.request_single_product(Concatted, cat_exe_req)
