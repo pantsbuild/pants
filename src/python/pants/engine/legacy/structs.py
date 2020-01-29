@@ -359,8 +359,10 @@ class BaseGlobs(Locatable, metaclass=ABCMeta):
   def to_path_globs(self, relpath: str, conjunction: GlobExpansionConjunction) -> PathGlobs:
     """Return a PathGlobs representing the included and excluded Files for these patterns."""
     return PathGlobs(
-      include=tuple(os.path.join(relpath, glob) for glob in self._parsed_include),
-      exclude=tuple(os.path.join(relpath, exclude) for exclude in self._parsed_exclude),
+      globs=(
+        *(os.path.join(relpath, glob) for glob in self._parsed_include),
+        *(f"!{os.path.join(relpath, glob)}" for glob in self._parsed_exclude)
+      ),
       conjunction=conjunction,
     )
 

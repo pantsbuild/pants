@@ -60,7 +60,7 @@ async def lint(
   config_path: Optional[str] = flake8.options.config
   config_snapshot = await Get[Snapshot](
     PathGlobs(
-      include=tuple([config_path] if config_path else []),
+      globs=tuple([config_path] if config_path else []),
       glob_match_error_behavior=GlobMatchErrorBehavior.error,
       description_of_origin="the option `--flake8-config`",
     )

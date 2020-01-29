@@ -236,7 +236,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
       with open(os.path.join(temp_dir, "roland"), "w") as f:
         f.write("European Burmese")
       scheduler = self.mk_scheduler(rules=create_fs_rules())
-      globs = PathGlobs(("*",), ())
+      globs = PathGlobs(["*"])
       snapshot = scheduler.capture_snapshots((PathGlobsAndRoot(globs, temp_dir),))[0]
       self.assert_snapshot_equals(snapshot, ["roland"], Digest(
         "63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16",
@@ -251,9 +251,9 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
         f.write("I don't know")
       scheduler = self.mk_scheduler(rules=create_fs_rules())
       snapshots = scheduler.capture_snapshots((
-        PathGlobsAndRoot(PathGlobs(("roland",), ()), temp_dir),
-        PathGlobsAndRoot(PathGlobs(("susannah",), ()), temp_dir),
-        PathGlobsAndRoot(PathGlobs(("doesnotexist",), ()), temp_dir),
+        PathGlobsAndRoot(PathGlobs(["roland"]), temp_dir),
+        PathGlobsAndRoot(PathGlobs(["susannah"]), temp_dir),
+        PathGlobsAndRoot(PathGlobs(["doesnotexist"]), temp_dir),
       ))
       self.assertEqual(3, len(snapshots))
       self.assert_snapshot_equals(snapshots[0], ["roland"], Digest(
@@ -269,7 +269,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
   def test_snapshot_from_outside_buildroot_failure(self):
     with temporary_dir() as temp_dir:
       scheduler = self.mk_scheduler(rules=create_fs_rules())
-      globs = PathGlobs(("*",), ())
+      globs = PathGlobs(["*"])
       with self.assertRaises(Exception) as cm:
         scheduler.capture_snapshots((PathGlobsAndRoot(globs, os.path.join(temp_dir, "doesnotexist")),))
       self.assertIn("doesnotexist", str(cm.exception))
@@ -291,10 +291,10 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
         f.write("Not sure actually")
       (empty_snapshot, roland_snapshot, susannah_snapshot, both_snapshot) = (
         self.scheduler.capture_snapshots((
-          PathGlobsAndRoot(PathGlobs(("doesnotmatch",), ()), temp_dir),
-          PathGlobsAndRoot(PathGlobs(("roland",), ()), temp_dir),
-          PathGlobsAndRoot(PathGlobs(("susannah",), ()), temp_dir),
-          PathGlobsAndRoot(PathGlobs(("*",), ()), temp_dir),
+          PathGlobsAndRoot(PathGlobs(["doesnotmatch"]), temp_dir),
+          PathGlobsAndRoot(PathGlobs(["roland"]), temp_dir),
+          PathGlobsAndRoot(PathGlobs(["susannah"]), temp_dir),
+          PathGlobsAndRoot(PathGlobs(["*"]), temp_dir),
         ))
       )
 
@@ -328,10 +328,10 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
         f.write("Not sure actually")
       (empty_snapshot, roland_snapshot, susannah_snapshot, both_snapshot) = (
         self.scheduler.capture_snapshots((
-          PathGlobsAndRoot(PathGlobs(("doesnotmatch",), ()), temp_dir),
-          PathGlobsAndRoot(PathGlobs(("roland",), ()), temp_dir),
-          PathGlobsAndRoot(PathGlobs(("susannah",), ()), temp_dir),
-          PathGlobsAndRoot(PathGlobs(("*",), ()), temp_dir),
+          PathGlobsAndRoot(PathGlobs(["doesnotmatch"]), temp_dir),
+          PathGlobsAndRoot(PathGlobs(["roland"]), temp_dir),
+          PathGlobsAndRoot(PathGlobs(["susannah"]), temp_dir),
+          PathGlobsAndRoot(PathGlobs(["*"]), temp_dir),
         ))
       )
 
@@ -412,8 +412,8 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
       )
 
       snapshot, snapshot_with_extra_files = self.scheduler.capture_snapshots((
-        PathGlobsAndRoot(PathGlobs(("characters/dark_tower/*",)), temp_dir),
-        PathGlobsAndRoot(PathGlobs(("**",)), temp_dir),
+        PathGlobsAndRoot(PathGlobs(["characters/dark_tower/*"]), temp_dir),
+        PathGlobsAndRoot(PathGlobs(["**"]), temp_dir),
       ))
       # Check that we got the full snapshots that we expect
       self.assertEquals(snapshot.files, relevant_files)
@@ -437,7 +437,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
         )
       )
       expected_snapshot = assert_single_element(self.scheduler.capture_snapshots((
-        PathGlobsAndRoot(PathGlobs(("*",)), tower_dir),
+        PathGlobsAndRoot(PathGlobs(["*"]), tower_dir),
       )))
       self.assertEquals(expected_snapshot.files, ('roland', 'susannah'))
       self.assertEquals(stripped_digest, expected_snapshot.directory_digest)
@@ -479,8 +479,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
     test_name = f"{__name__}.{self.test_glob_match_error.__name__}()"
     with self.assertRaises(ValueError) as cm:
       self.assert_walk_files(PathGlobs(
-        include=['not-a-file.txt'],
-        exclude=[],
+        globs=['not-a-file.txt'],
         glob_match_error_behavior=GlobMatchErrorBehavior.error,
         description_of_origin=test_name,
       ), [])
@@ -490,8 +489,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
     test_name = f"{__name__}.{self.test_glob_match_error_with_exclude.__name__}()"
     with self.assertRaises(ValueError) as cm:
       self.assert_walk_files(PathGlobs(
-        include=['*.txt'],
-        exclude=['4.txt'],
+        globs=['*.txt', '!4.txt'],
         glob_match_error_behavior=GlobMatchErrorBehavior.error,
         description_of_origin=test_name,
       ), [])
@@ -502,8 +500,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
     test_name = f"{__name__}.{self.test_glob_match_warn_logging.__name__}()"
     with self.captured_logging(logging.WARNING) as captured:
       self.assert_walk_files(PathGlobs(
-        include=['not-a-file.txt'],
-        exclude=[''],
+        globs=['not-a-file.txt'],
         glob_match_error_behavior=GlobMatchErrorBehavior.warn,
         description_of_origin=test_name,
       ), [])
@@ -514,8 +511,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
   def test_glob_match_ignore_logging(self):
     with self.captured_logging(logging.WARNING) as captured:
       self.assert_walk_files(PathGlobs(
-        include=['not-a-file.txt'],
-        exclude=[''],
+        globs=['not-a-file.txt'],
         glob_match_error_behavior=GlobMatchErrorBehavior.ignore,
       ), [])
       assert len(captured.warnings()) == 0
@@ -525,7 +521,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
     with temporary_dir() as temp_dir:
       with open(os.path.join(temp_dir, "roland"), "w") as f:
         f.write("European Burmese")
-      globs = PathGlobs(("*",), ())
+      globs = PathGlobs(["*"])
       snapshot = self.scheduler.capture_snapshots((PathGlobsAndRoot(globs, temp_dir),))[0]
 
       expected_digest = Digest("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16", 80)
