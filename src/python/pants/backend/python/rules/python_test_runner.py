@@ -89,7 +89,7 @@ async def setup_pytest_for_target(
     BuildFileAddresses((test_target.address,))
   )
   all_targets = transitive_hydrated_targets.closure
-  plugin_file_digest: Digest = await Get[Digest](InputFilesContent, get_coverage_plugin_input())
+  plugin_file_digest = await Get[Digest](InputFilesContent, get_coverage_plugin_input())
   resolved_requirements_pex = await Get[Pex](
     CreatePexFromTargetClosure(
       build_file_addresses=BuildFileAddresses((test_target.address,)),
