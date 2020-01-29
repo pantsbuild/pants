@@ -43,8 +43,10 @@ async def parse_address_family(address_mapper: AddressMapper, directory: Dir) ->
 
   The AddressFamily may be empty, but it will not be None.
   """
-  patterns = (os.path.join(directory.path, p) for p in address_mapper.build_patterns)
-  path_globs = PathGlobs(include=patterns, exclude=address_mapper.build_ignore_patterns)
+  path_globs = PathGlobs(
+    include=(os.path.join(directory.path, p) for p in address_mapper.build_patterns),
+    exclude=address_mapper.build_ignore_patterns,
+  )
   snapshot = await Get[Snapshot](PathGlobs, path_globs)
   files_content = await Get[FilesContent](Digest, snapshot.directory_digest)
 
