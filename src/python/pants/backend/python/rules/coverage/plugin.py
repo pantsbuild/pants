@@ -47,10 +47,8 @@ class PantsPythonFileReporter(PythonFileReporter):
   @property
   def parser(self):
     if self._parser is None:
-      if self.test_time:
-        self._parser = PythonParser(filename=self.filename)
-      else:
-        self._parser = PythonParser(filename=self.filename_with_source_root)
+      filename = self.filename if self.test_time else self.filename_with_source_root
+      self._parser = PythonParser(filename=filename)
       self._parser.parse_source()
     return self._parser
 

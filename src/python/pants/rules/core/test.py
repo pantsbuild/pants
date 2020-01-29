@@ -174,9 +174,8 @@ async def run_tests(
     ))
     console.print_stdout(f"Wrote coverage report to `{pytest_coverage_report.directory_to_materialize_to}`")
 
-  filtered_results = tuple((x.address, x.test_result) for x in filtered_address_and_test_results)
+  filtered_results = tuple((x.address, x.test_result) for x in filtered_address_and_test_results if x.test_result is not None)
   for address, test_result in filtered_results:
-    assert test_result is not None
     if test_result.status == Status.FAILURE:
       did_any_fail = True
     if test_result.stdout:

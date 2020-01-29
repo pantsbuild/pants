@@ -48,12 +48,13 @@ async def create_pex_from_target_closure(
     python_setup=python_setup
   )
   input_files = []
-  merged_input_files: Optional[Digest] = None
   if request.additional_input_files:
     input_files.append(request.additional_input_files)
   if request.include_source_files:
     chrooted_sources = await Get[ChrootedPythonSources](HydratedTargets(all_targets))
     input_files.append(chrooted_sources.digest)
+
+  merged_input_files: Optional[Digest] = None
   if input_files:
     merged_input_files = await Get[Digest](
       DirectoriesToMerge(directories=tuple(input_files)),
