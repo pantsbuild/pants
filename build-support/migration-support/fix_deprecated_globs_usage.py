@@ -2,10 +2,10 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-"""A script to modernize the `sources` and `bundles` fields of BUILD files to use the new...
-instead of the deprecated `globs`, `rglobs`, and `zglobs` style.
+"""A script to replace deprecated uses of `globs`, `rglobs`, and `zglobs` in BUILD files with a
+direct list of files and globs.
 
-Run `python3 modernize_sources.py --help`.
+Run `python3 fix_deprecated_globs_usage.py --help`.
 """
 
 import argparse

@@ -6,7 +6,7 @@ from pathlib import Path
 from textwrap import dedent
 from typing import List, Optional, Tuple
 
-from modernize_sources import SCRIPT_RESTRICTIONS, generate_possibly_new_build, warning_msg
+from fix_deprecated_globs_usage import SCRIPT_RESTRICTIONS, generate_possibly_new_build, warning_msg
 
 from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir
