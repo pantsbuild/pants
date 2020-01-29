@@ -121,7 +121,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         build_config
       )
 
-      v2_ui = options.for_global_scope().v2_ui
+      v2_ui = options.for_global_scope().get('v2_ui', False)
       zipkin_trace_v2 = options.for_scope('reporting').zipkin_trace_v2
       #TODO(#8658) This should_report_workunits flag must be set to True for
       # StreamingWorkunitHandler to receive WorkUnits. It should eventually

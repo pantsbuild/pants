@@ -150,16 +150,25 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('-q', '--quiet', type=bool, recursive=True, daemon=False,
              help='Squelches most console output. NOTE: Some tasks default to behaving quietly: '
                   'inverting this option supports making them noisier than they would be otherwise.')
+    # Not really needed in bootstrap options, but putting it here means it displays right
+    # after -l and -q in help output, which is conveniently contextual.
+    # TODO: This is not true. `./pants help` output appears to be alphabetical.
+    register('--colors', type=bool, default=sys.stdout.isatty(), recursive=True, daemon=False,
+             help='Set whether log messages are displayed in color.')
+
     register('--log-show-rust-3rdparty', type=bool, default=False, advanced=True,
              help='Whether to show/hide logging done by 3rdparty rust crates used by the pants '
                   'engine.')
 
-    # Not really needed in bootstrap options, but putting it here means it displays right
-    # after -l and -q in help output, which is conveniently contextual.
-    register('--colors', type=bool, default=sys.stdout.isatty(), recursive=True, daemon=False,
-             help='Set whether log messages are displayed in color.')
+    # Toggles v1/v2 `Task` vs `@rule` pipelines on/off.
+    # Having these in bootstrap options allows them to affect registration of non-bootstrap options.
+    register('--v1', advanced=True, type=bool, default=True,
+             help='Enables execution of v1 Tasks.')
+    register('--v2', advanced=True, type=bool, default=False,
+             help='Enables execution of v2 @goal_rules.')
+
     # TODO(#7203): make a regexp option type!
-    register('--ignore-pants-warnings', type=list, member_type=str, default=[],
+    register('--ignore-pants-warnings', type=list, member_type=str, default=[], advanced=True,
              help='Regexps matching warning strings to ignore, e.g. '
                   '["DEPRECATED: scope some_scope will be removed"]. The regexps will be matched '
                   'from the start of the warning string, and will always be case-insensitive. '
@@ -499,49 +508,44 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     # global-scope options, for convenience.
     cls.register_bootstrap_options(register)
 
-    register('-x', '--time', type=bool,
-             help='Output a timing report at the end of the run.')
-    register('-e', '--explain', type=bool,
-             help='Explain the execution of goals.')
     register('--tag', type=list, metavar='[+-]tag1,tag2,...',
              help="Include only targets with these tags (optional '+' prefix) or without these "
                   "tags ('-' prefix).  Useful with ::, to find subsets of targets "
                   "(e.g., integration tests.)")
 
-    # Toggles v1/v2 `Task` vs `@rule` pipelines on/off.
-    register('--v1', advanced=True, type=bool, default=True,
-             help='Enables execution of v1 Tasks.')
-    register('--v2', advanced=True, type=bool, default=False,
-             help='Enables execution of v2 @goal_rules.')
-    register('--v2-ui', default=False, type=bool, daemon=False,
-             help='Whether to show v2 engine execution progress. '
-                  'This requires the --v2 flag to take effect.')
+    if register.bootstrap.v2:
+      register('--v2-ui', default=False, type=bool, daemon=False,
+               help='Whether to show v2 engine execution progress.')
+      if not register.bootstrap.v1:
+        loop_flag = '--loop'
+        register(loop_flag, type=bool,
+                 help='Run v2 @goal_rules continuously as file changes are detected.')
+        register('--loop-max', type=int, default=2**32, advanced=True,
+                 help=f'The maximum number of times to loop when `{loop_flag}` is specified.')
 
-    loop_flag = '--loop'
-    register(loop_flag, type=bool,
-             help='Run v2 @goal_rules continuously as file changes are detected. Requires '
-                  '`--v2`, and is best utilized with `--v2 --no-v1`.')
-    register('--loop-max', type=int, default=2**32, advanced=True,
-             help=f'The maximum number of times to loop when `{loop_flag}` is specified.')
-
-    register('-t', '--timeout', advanced=True, type=int, metavar='<seconds>',
-            removal_version="1.26.0.dev1",
-            removal_hint="This option is not used and may be removed with no change in behavior. ",
-            help='Number of seconds to wait for http connections.')
-    # TODO: After moving to the new options system these abstraction leaks can go away.
-    register('-k', '--kill-nailguns', advanced=True, type=bool,
-             help='Kill nailguns before exiting')
-    register('--fail-fast', advanced=True, type=bool, recursive=True,
-             help='Exit as quickly as possible on error, rather than attempting to continue '
-                  'to process the non-erroneous subset of the input.')
-    register('--cache-key-gen-version', advanced=True, default='200', recursive=True,
-             help='The cache key generation. Bump this to invalidate every artifact for a scope.')
-    register('--workdir-max-build-entries', advanced=True, type=int, default=8,
-             help='Maximum number of previous builds to keep per task target pair in workdir. '
-             'If set, minimum 2 will always be kept to support incremental compilation.')
-    register('--max-subprocess-args', advanced=True, type=int, default=100, recursive=True,
-             help='Used to limit the number of arguments passed to some subprocesses by breaking '
-             'the command up into multiple invocations.')
+    if register.bootstrap.v1:
+      register('-x', '--time', type=bool,
+               help='Output a timing report at the end of the run.')
+      register('-e', '--explain', type=bool,
+               help='Explain the execution of goals.')
+      register('-t', '--timeout', advanced=True, type=int, metavar='<seconds>',
+               removal_version="1.26.0.dev1",
+               removal_hint="This option is not used and may be removed with no change in behavior. ",
+               help='Number of seconds to wait for http connections.')
+      # TODO: After moving to the new options system these abstraction leaks can go away.
+      register('-k', '--kill-nailguns', advanced=True, type=bool,
+               help='Kill nailguns before exiting')
+      register('--fail-fast', advanced=True, type=bool, recursive=True,
+               help='Exit as quickly as possible on error, rather than attempting to continue '
+                    'to process the non-erroneous subset of the input.')
+      register('--cache-key-gen-version', advanced=True, default='200', recursive=True,
+               help='The cache key generation. Bump this to invalidate every artifact for a scope.')
+      register('--workdir-max-build-entries', advanced=True, type=int, default=8,
+               help='Maximum number of previous builds to keep per task target pair in workdir. '
+               'If set, minimum 2 will always be kept to support incremental compilation.')
+      register('--max-subprocess-args', advanced=True, type=int, default=100, recursive=True,
+               help='Used to limit the number of arguments passed to some subprocesses by breaking '
+               'the command up into multiple invocations.')
     register('--lock', advanced=True, type=bool, default=True,
              help='Use a global lock to exclude other versions of pants from running during '
                   'critical operations.')
@@ -565,14 +569,8 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
 
     Raises pants.option.errors.OptionsError on validation failure.
     """
-    if opts.loop and (not opts.v2 or opts.v1):
-      raise OptionsError('The `--loop` option only works with @goal_rules, and thus requires '
-                         '`--v2 --no-v1` to function as expected.')
-    if opts.loop and not opts.enable_pantsd:
+    if opts.get('loop') and not opts.enable_pantsd:
       raise OptionsError('The `--loop` option requires `--enable-pantsd`, in order to watch files.')
-
-    if opts.v2_ui and not opts.v2:
-      raise OptionsError('The `--v2-ui` option requires `--v2` to be enabled together.')
 
     if opts.remote_execution and not opts.remote_execution_server:
       raise OptionsError("The `--remote-execution` option requires also setting "

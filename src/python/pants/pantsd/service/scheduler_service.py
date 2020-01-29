@@ -185,11 +185,11 @@ class SchedulerService(PantsService):
       self._logger.debug('graph len was {}, waiting for initial watchman event'.format(graph_len))
       self._watchman_is_running.wait()
     build_id = RunTracker.global_instance().run_id
-    v2_ui = options.for_global_scope().v2_ui
+    v2_ui = options.for_global_scope().get('v2_ui', False)
     zipkin_trace_v2 = options.for_scope('reporting').zipkin_trace_v2
     session = self._graph_helper.new_session(zipkin_trace_v2, build_id, v2_ui)
 
-    if options.for_global_scope().loop:
+    if options.for_global_scope().get('loop', False):
       fn = self._loop
     else:
       fn = self._body
