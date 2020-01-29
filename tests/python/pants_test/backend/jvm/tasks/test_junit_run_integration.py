@@ -37,23 +37,25 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
   def report_file_path(self, relpath):
     return os.path.join(get_buildroot(), 'dist', relpath)
 
-  def cucumber_coverage(self, processor, xml_path, html_path, tests=(), args=()):
+  def cucumber_coverage(self, processor, xml_path, html_path, pre_args=(), tests=(), args=()):
     return self.coverage(
       processor,
       xml_path,
       html_path,
       'testprojects/tests/java/org/pantsbuild/testproject/unicode/cucumber',
       'org.pantsbuild.testproject.unicode.cucumber.CucumberTest',
+      pre_args,
       tests,
       args
     )
 
   @contextmanager
-  def coverage(self, processor, xml_path, html_path, test_project, test_class='', tests=(), args=()):
+  def coverage(self, processor, xml_path, html_path, test_project, test_class='',
+               pre_args=(), tests=(), args=()):
     def test_specifier_arg(test):
       return f'--test={test_class}#{test}'
 
-    with self.pants_results(['clean-all', 'test.junit'] + list(args) +
+    with self.pants_results(list(pre_args) + ['clean-all', 'test.junit'] + list(args) +
                             [test_specifier_arg(name) for name in tests] +
                             [test_project,
                              f'--test-junit-coverage-processor={processor}',
@@ -71,6 +73,28 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
           return fp.read()
 
       yield ET.parse(coverage_xml).getroot(), read_utf8(coverage_html)
+
+  def do_test_junit_run_with_coverage_succeeds_scoverage(self, tests=(), args=()):
+    with self.coverage(
+        processor='scoverage',
+        xml_path='scoverage/reports/xml/scoverage.xml',
+        html_path='scoverage/reports/html/org.pantsbuild.example.hello.welcome.html',
+        test_project='examples/tests/scala/org/pantsbuild/example/hello/welcome',
+        test_class='org.pantsbuild.example.hello.welcome',
+        pre_args=['--scoverage-enable-scoverage'],
+        tests=tests,
+        args=args) as (xml_report, html_report_string):
+
+      # Validate 100% coverage; ie a line coverage rate of 1.
+      self.assertEqual('scoverage', xml_report.tag)
+      self.assertEqual(100.0, float(xml_report.attrib['statement-rate']))
+
+      # Validate that the html report was able to find sources for annotation.
+      self.assertIn('WelcomeEverybody', html_report_string)
+      self.assertIn('Welcome.scala', html_report_string)
+
+  def test_junit_run_with_coverage_succeeds_scoverage(self):
+    self.do_test_junit_run_with_coverage_succeeds_scoverage(args=['--no-chroot', '--fast'])
 
   def do_test_junit_run_with_coverage_succeeds_cobertura(self, tests=(), args=()):
     html_path = ('test/junit/coverage/reports/html/'

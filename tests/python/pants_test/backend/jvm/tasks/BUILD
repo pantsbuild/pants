@@ -444,6 +444,7 @@ python_tests(
   sources = ['test_junit_run_integration.py'],
   dependencies = [
     ':missing_jvm_check',
+    'examples/tests/scala/org/pantsbuild/example:hello_directory',
     'src/python/pants/base:build_environment',
     'src/python/pants/testutil:int-test',
     'testprojects/tests/java/org/pantsbuild/testproject:coverage_directory',
