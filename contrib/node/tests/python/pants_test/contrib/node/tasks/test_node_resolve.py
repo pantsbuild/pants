@@ -4,6 +4,7 @@
 import json
 import os
 import unittest.mock
+from contextlib import contextmanager
 from textwrap import dedent
 
 from pants.base.exceptions import TaskError
@@ -255,6 +256,73 @@ class NodeResolveTest(TaskTestBase):
       self.assertNotIn('peerDependencies', package)
       self.assertNotIn('optionalDependencies', package)
 
+  @contextmanager
+  def _mock_successful_package_manager_run_command(self, package_manager_obj):
+    with unittest.mock.patch.object(package_manager_obj, 'run_command') as exec_call:
+      exec_call.return_value.run.return_value.wait.return_value = 0
+      yield exec_call
+
+  def _make_context_for_target(self, target,
+                               install_optional=False, force_option_override=False,
+                               install_production=False, force=False, frozen_lockfile=False):
+    context = self.context(target_roots=[target], options={
+      'npm-resolver': dict(
+        install_optional=install_optional,
+        force_option_override=force_option_override,
+        install_production=install_production,
+        force=force,
+        frozen_lockfile=frozen_lockfile,
+      )
+    })
+    self.wrap_context(context, [NodePaths])
+    return context
+
+  def test_node_resolve_invalidation(self):
+    self.create_file('src/node/util/package.json', contents=dedent("""\
+    {
+      "name": "util",
+      "version": "0.0.1"
+    }
+    """))
+    self.create_file('src/node/util/util.js', contents=dedent("""\
+    console.log('2 + 2 = 4');
+    """))
+    target = self.make_target(spec='src/node/util',
+                              target_type=NodeModule,
+                              sources=['util.js', 'package.json'])
+    initial_fingerprint = target.transitive_invalidation_hash()
+
+    context = self._make_context_for_target(target)
+    task = self.create_task(context)
+
+    package_manager_obj = task.get_package_manager(target=target)
+    with self._mock_successful_package_manager_run_command(package_manager_obj) as exec_call:
+      task.execute()
+      exec_call.assert_called_once()
+
+    # Allow target state, including fingerprints, to be reset. This does *not* invalidate the target
+    # itself, but editing the source file will do that, causing the task to be re-run.
+    self.reset_build_graph()
+
+    self.create_file('src/node/util/util.js', contents=dedent("""\
+    console.log('2 + 2 = 5');
+    """))
+
+    target = self.make_target(spec='src/node/util',
+                              target_type=NodeModule,
+                              sources=['util.js', 'package.json'])
+    next_fingerprint = target.transitive_invalidation_hash()
+    self.assertNotEqual(initial_fingerprint, next_fingerprint)
+
+    context = self._make_context_for_target(target)
+    task = self.create_task(context)
+
+    package_manager_obj = task.get_package_manager(target=target)
+    with self._mock_successful_package_manager_run_command(package_manager_obj) as exec_call:
+      task.execute()
+      # Because the target was modified, the task should re-run.
+      exec_call.assert_called_once()
+
   def _test_resolve_options_helper(
       self, install_optional, force_option_override, install_production, force, frozen_lockfile,
       package_manager, product_types, has_lock_file, expected_params):
@@ -291,8 +359,7 @@ class NodeResolveTest(TaskTestBase):
     task = self.create_task(context)
 
     package_manager_obj = task.get_package_manager(target=target)
-    with unittest.mock.patch.object(package_manager_obj, 'run_command') as exec_call:
-      exec_call.return_value.run.return_value.wait.return_value = 0
+    with self._mock_successful_package_manager_run_command(package_manager_obj) as exec_call:
       task.execute()
       exec_call.assert_called_once_with(
         args=expected_params,
