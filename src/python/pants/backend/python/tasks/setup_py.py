@@ -603,7 +603,8 @@ class SetupPy(Task):
     def is_exported_python_target(t):
       return t.is_original and self.has_provides(t) and not is_local_python_dist(t)
 
-    exported_python_targets = OrderedSet(t for t in self.context.target_roots
+    targets_to_check = self.context.targets() if self._recursive else self.context.target_roots
+    exported_python_targets = OrderedSet(t for t in targets_to_check
                                          if is_exported_python_target(t))
     if not exported_python_targets:
       raise TaskError('setup-py target(s) must provide an artifact.')
