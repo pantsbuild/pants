@@ -81,12 +81,14 @@ default-members = [
 ]
 
 [dependencies]
+async-trait = "0.1"
 boxfuture = { path = "boxfuture" }
 bytes = "0.4.5"
 concrete_time = { path = "concrete_time" }
 fnv = "1.0.5"
 fs = { path = "fs" }
 futures01 = { package = "futures", version = "0.1" }
+futures = { version = "0.3", features = ["compat"] }
 graph = { path = "graph" }
 hashing = { path = "hashing" }
 indexmap = "1.0.2"
@@ -109,6 +111,7 @@ ui = { path = "ui" }
 url = "1.7.1"
 uuid = { version = "0.7", features = ["v4"] }
 task_executor = { path = "task_executor" }
+tokio = { version = "0.2", features = ["rt-threaded"] }
 workunit_store = { path = "workunit_store" }
 
 [patch.crates-io]

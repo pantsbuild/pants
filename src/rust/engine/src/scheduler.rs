@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{mpsc, Arc};
 use std::time::Duration;
 
+use futures::compat::Future01CompatExt;
 use futures01::future::{self, Future};
 
 use crate::context::{Context, Core};
@@ -341,14 +342,15 @@ impl Scheduler {
 
     // If the join failed (due to `Invalidated`, since that is the only error we propagate), retry
     // the entire set of roots.
-    core.executor.spawn_and_ignore(roots_res.then(move |res| {
+    core.executor.spawn_and_ignore(async move {
+      let res = roots_res.compat().await;
       if let Ok(res) = res {
-        sender.send(res).map_err(|_| ())
+        let _ = sender.send(res);
       } else {
         Scheduler::execute_helper(context, sender, roots, count - 1);
-        Ok(())
       }
-    }));
+      ()
+    });
   }
 
   ///

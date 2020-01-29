@@ -6,8 +6,7 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
 [dependencies]
-futures01 = { package = "futures", version = "0.1" }
-futures-cpupool = "0.1"
+futures = "0.3"
 logging = { path = "../logging" }
-tokio = { version = "0.2", features = ["rt-threaded"] }
+tokio = { version = "0.2", features = ["blocking", "rt-threaded"] }
 workunit_store = { path = "../workunit_store" }

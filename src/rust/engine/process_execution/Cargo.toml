@@ -21,7 +21,7 @@ grpcio = { git = "https://github.com/pantsbuild/grpc-rs.git", rev = "b582ef3dc4e
 hashing = { path = "../hashing" }
 libc = "0.2.39"
 log = "0.4"
-nails = "0.3"
+nails = "0.4"
 protobuf = { version = "2.0.6", features = ["with-bytes"] }
 sha2 = "0.8"
 sharded_lmdb = {  path = "../sharded_lmdb" }
@@ -29,7 +29,7 @@ store = { path = "../fs/store" }
 task_executor = { path = "../task_executor" }
 tempfile = "3"
 concrete_time = { path = "../concrete_time" }
-tokio = { version = "0.2", features = ["process", "rt-threaded", "time"] }
+tokio = { version = "0.2", features = ["process", "rt-threaded", "tcp", "time"] }
 tokio-util = { version = "0.2", features = ["codec"] }
 uname = "0.1.1"
 workunit_store = { path = "../workunit_store" }

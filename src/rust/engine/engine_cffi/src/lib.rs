@@ -43,6 +43,7 @@ use engine::{
   externs, nodes, Core, ExecutionRequest, ExecutionTermination, Function, Handle, Key, Params,
   RootResult, Rule, Scheduler, Session, Tasks, TypeId, Types, Value,
 };
+use futures::compat::Future01CompatExt;
 use futures01::{future, Future};
 use hashing::{Digest, EMPTY_DIGEST};
 use log::{error, warn, Log};
@@ -896,7 +897,8 @@ pub extern "C" fn capture_snapshots(
           })
           .collect::<Vec<_>>(),
       )
-      .map(|values| externs::store_tuple(&values)),
+      .map(|values| externs::store_tuple(&values))
+      .compat(),
     )
   })
   .into()
@@ -926,11 +928,10 @@ pub extern "C" fn merge_directories(
     scheduler
       .core
       .executor
-      .block_on(store::Snapshot::merge_directories(
-        scheduler.core.store(),
-        digests,
-        workunit_store,
-      ))
+      .block_on(
+        store::Snapshot::merge_directories(scheduler.core.store(), digests, workunit_store)
+          .compat(),
+      )
       .map(|dir| nodes::Snapshot::store_directory(&scheduler.core, &dir))
       .into()
   })
@@ -975,13 +976,11 @@ pub extern "C" fn run_local_interactive_process(
               None => unreachable!()
             };
 
-            let write_operation = scheduler.core.store().materialize_directory(
+            scheduler.core.store().materialize_directory(
               destination,
               digest,
               session.workunit_store(),
-            );
-
-            scheduler.core.executor.spawn_on_io_pool(write_operation).wait()?;
+            ).wait()?;
           }
         }
 
@@ -1058,7 +1057,7 @@ pub extern "C" fn materialize_directories(
     let types = &scheduler.core.types;
     let construct_materialize_directories_results = types.construct_materialize_directories_results;
     let construct_materialize_directory_result = types.construct_materialize_directory_result;
-    let work_future = future::join_all(
+    future::join_all(
       digests_and_path_prefixes
         .into_iter()
         .map(|(digest, path_prefix)| {
@@ -1105,9 +1104,8 @@ pub extern "C" fn materialize_directories(
         &[externs::store_tuple(&entries)],
       );
       output
-    });
-
-    scheduler.core.executor.spawn_on_io_pool(work_future).wait()
+    })
+    .wait()
   })
   .into()
 }
@@ -1202,7 +1200,7 @@ where
   F: FnOnce(&Scheduler) -> T,
 {
   let scheduler = unsafe { Box::from_raw(scheduler_ptr) };
-  let t = f(&scheduler);
+  let t = scheduler.core.runtime.enter(|| f(&scheduler));
   mem::forget(scheduler);
   t
 }

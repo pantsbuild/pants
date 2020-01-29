@@ -13,6 +13,7 @@ digest = "0.8"
 dirs = "1"
 fs = { path = ".." }
 futures01 = { package = "futures", version = "0.1" }
+futures = { version = "0.3", features = ["compat"] }
 grpcio = { git = "https://github.com/pantsbuild/grpc-rs.git", rev = "b582ef3dc4e8c7289093c8febff8dadf0997b532", default_features = false, features = ["protobuf-codec", "secure"] }
 hashing = { path = "../../hashing" }
 indexmap = "1.0.2"

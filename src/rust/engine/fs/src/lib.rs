@@ -29,9 +29,9 @@ mod glob_matching;
 pub use crate::glob_matching::GlobMatching;
 
 use ::ignore::gitignore::{Gitignore, GitignoreBuilder};
-use boxfuture::{BoxFuture, Boxable};
+use async_trait::async_trait;
 use bytes::Bytes;
-use futures01::{future, Future};
+use futures::future::{self, BoxFuture, TryFutureExt};
 use glob::{MatchOptions, Pattern};
 use lazy_static::lazy_static;
 use std::cmp::min;
@@ -630,14 +630,17 @@ impl PosixFS {
     })
   }
 
-  pub fn scandir(
-    &self,
+  ///
+  /// TODO: See the note on references in ASYNC.md.
+  ///
+  pub fn scandir<'a, 'b>(
+    &'a self,
     dir_relative_to_root: Dir,
-  ) -> impl Future<Item = DirectoryListing, Error = io::Error> {
+  ) -> BoxFuture<'b, Result<DirectoryListing, io::Error>> {
     let vfs = self.clone();
-    self.executor.spawn_on_io_pool(future::lazy(move || {
-      vfs.scandir_sync(&dir_relative_to_root)
-    }))
+    self
+      .executor
+      .spawn_blocking(move || vfs.scandir_sync(&dir_relative_to_root))
   }
 
   fn scandir_sync(&self, dir_relative_to_root: &Dir) -> Result<DirectoryListing, io::Error> {
@@ -690,34 +693,51 @@ impl PosixFS {
     self.ignore.is_ignored(stat)
   }
 
-  pub fn read_file(&self, file: &File) -> impl Future<Item = FileContent, Error = io::Error> {
+  ///
+  /// TODO: See the note on references in ASYNC.md.
+  ///
+  pub fn read_file<'a, 'b, 'c>(
+    &'a self,
+    file: &'b File,
+  ) -> BoxFuture<'c, Result<FileContent, io::Error>> {
     let path = file.path.clone();
     let path_abs = self.root.0.join(&file.path);
-    self.executor.spawn_on_io_pool(future::lazy(move || {
-      let is_executable = path_abs.metadata()?.permissions().mode() & 0o100 == 0o100;
-      std::fs::File::open(&path_abs)
-        .and_then(|mut f| {
-          let mut content = Vec::new();
-          f.read_to_end(&mut content)?;
-          Ok(FileContent {
-            path: path,
-            content: Bytes::from(content),
-            is_executable,
-          })
+    let executor = self.executor.clone();
+    Box::pin(async move {
+      executor
+        .spawn_blocking(move || {
+          let is_executable = path_abs.metadata()?.permissions().mode() & 0o100 == 0o100;
+          std::fs::File::open(&path_abs)
+            .and_then(|mut f| {
+              let mut content = Vec::new();
+              f.read_to_end(&mut content)?;
+              Ok(FileContent {
+                path: path,
+                content: Bytes::from(content),
+                is_executable,
+              })
+            })
+            .map_err(|e| {
+              io::Error::new(
+                e.kind(),
+                format!("Failed to read file {:?}: {}", path_abs, e),
+              )
+            })
         })
-        .map_err(|e| {
-          io::Error::new(
-            e.kind(),
-            format!("Failed to read file {:?}: {}", path_abs, e),
-          )
-        })
-    }))
+        .await
+    })
   }
 
-  pub fn read_link(&self, link: &Link) -> impl Future<Item = PathBuf, Error = io::Error> {
+  ///
+  /// TODO: See the note on references in ASYNC.md.
+  ///
+  pub fn read_link<'a, 'b, 'c>(
+    &'a self,
+    link: &'b Link,
+  ) -> BoxFuture<'c, Result<PathBuf, io::Error>> {
     let link_parent = link.0.parent().map(Path::to_owned);
     let link_abs = self.root.0.join(link.0.as_path());
-    self.executor.spawn_on_io_pool(future::lazy(move || {
+    self.executor.spawn_blocking(move || {
       link_abs
         .read_link()
         .and_then(|path_buf| {
@@ -743,7 +763,7 @@ impl PosixFS {
             format!("Failed to read link {:?}: {}", link_abs, e),
           )
         })
-    }))
+    })
   }
 
   ///
@@ -803,25 +823,35 @@ impl PosixFS {
     }
   }
 
-  pub fn stat_sync(&self, relative_path: PathBuf) -> Result<Stat, io::Error> {
+  pub fn stat_sync(&self, relative_path: PathBuf) -> Result<Option<Stat>, io::Error> {
     let abs_path = self.root.0.join(&relative_path);
     let metadata = match self.symlink_behavior {
-      SymlinkBehavior::Aware => fs::symlink_metadata(abs_path)?,
-      SymlinkBehavior::Oblivious => fs::metadata(abs_path)?,
+      SymlinkBehavior::Aware => fs::symlink_metadata(abs_path),
+      SymlinkBehavior::Oblivious => fs::metadata(abs_path),
     };
-    PosixFS::stat_internal(&self.root.0, relative_path, metadata.file_type(), || {
-      Ok(metadata)
-    })
+    let stat_result = metadata.and_then(|metadata| {
+      PosixFS::stat_internal(&self.root.0, relative_path, metadata.file_type(), || {
+        Ok(metadata)
+      })
+    });
+    match stat_result {
+      Ok(v) => Ok(Some(v)),
+      Err(err) => match err.kind() {
+        io::ErrorKind::NotFound => Ok(None),
+        _ => Err(err),
+      },
+    }
   }
 }
 
+#[async_trait]
 impl VFS<io::Error> for Arc<PosixFS> {
-  fn read_link(&self, link: &Link) -> BoxFuture<PathBuf, io::Error> {
-    PosixFS::read_link(self, link).to_boxed()
+  async fn read_link(&self, link: &Link) -> Result<PathBuf, io::Error> {
+    PosixFS::read_link(self, link).await
   }
 
-  fn scandir(&self, dir: Dir) -> BoxFuture<Arc<DirectoryListing>, io::Error> {
-    PosixFS::scandir(self, dir).map(Arc::new).to_boxed()
+  async fn scandir(&self, dir: Dir) -> Result<Arc<DirectoryListing>, io::Error> {
+    Ok(Arc::new(PosixFS::scandir(self, dir).await?))
   }
 
   fn is_ignored(&self, stat: &Stat) -> bool {
@@ -833,13 +863,15 @@ impl VFS<io::Error> for Arc<PosixFS> {
   }
 }
 
+#[async_trait]
 pub trait PathStatGetter<E> {
-  fn path_stats(&self, paths: Vec<PathBuf>) -> BoxFuture<Vec<Option<PathStat>>, E>;
+  async fn path_stats(&self, paths: Vec<PathBuf>) -> Result<Vec<Option<PathStat>>, E>;
 }
 
+#[async_trait]
 impl PathStatGetter<io::Error> for Arc<PosixFS> {
-  fn path_stats(&self, paths: Vec<PathBuf>) -> BoxFuture<Vec<Option<PathStat>>, io::Error> {
-    future::join_all(
+  async fn path_stats(&self, paths: Vec<PathBuf>) -> Result<Vec<Option<PathStat>>, io::Error> {
+    future::try_join_all(
       paths
         .into_iter()
         .map(|path| {
@@ -847,40 +879,32 @@ impl PathStatGetter<io::Error> for Arc<PosixFS> {
           let fs2 = self.clone();
           self
             .executor
-            .spawn_on_io_pool(future::lazy(move || fs2.stat_sync(path)))
-            .then(|stat_result| match stat_result {
-              Ok(v) => Ok(Some(v)),
-              Err(err) => match err.kind() {
-                io::ErrorKind::NotFound => Ok(None),
-                _ => Err(err),
-              },
-            })
+            .spawn_blocking(move || fs2.stat_sync(path))
             .and_then(move |maybe_stat| {
-              match maybe_stat {
-                // Note: This will drop PathStats for symlinks which don't point anywhere.
-                Some(Stat::Link(link)) => fs.canonicalize(link.0.clone(), link),
-                Some(Stat::Dir(dir)) => {
-                  future::ok(Some(PathStat::dir(dir.0.clone(), dir))).to_boxed()
+              async move {
+                match maybe_stat {
+                  // Note: This will drop PathStats for symlinks which don't point anywhere.
+                  Some(Stat::Link(link)) => fs.canonicalize(link.0.clone(), link).await,
+                  Some(Stat::Dir(dir)) => Ok(Some(PathStat::dir(dir.0.clone(), dir))),
+                  Some(Stat::File(file)) => Ok(Some(PathStat::file(file.path.clone(), file))),
+                  None => Ok(None),
                 }
-                Some(Stat::File(file)) => {
-                  future::ok(Some(PathStat::file(file.path.clone(), file))).to_boxed()
-                }
-                None => future::ok(None).to_boxed(),
               }
             })
         })
         .collect::<Vec<_>>(),
     )
-    .to_boxed()
+    .await
   }
 }
 
 ///
 /// A context for filesystem operations parameterized on an error type 'E'.
 ///
+#[async_trait]
 pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
-  fn read_link(&self, link: &Link) -> BoxFuture<PathBuf, E>;
-  fn scandir(&self, dir: Dir) -> BoxFuture<Arc<DirectoryListing>, E>;
+  async fn read_link(&self, link: &Link) -> Result<PathBuf, E>;
+  async fn scandir(&self, dir: Dir) -> Result<Arc<DirectoryListing>, E>;
   fn is_ignored(&self, stat: &Stat) -> bool;
   fn mk_error(msg: &str) -> E;
 }

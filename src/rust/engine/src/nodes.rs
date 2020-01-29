@@ -10,6 +10,9 @@ use std::sync::Arc;
 use std::time::Duration;
 use std::{self, fmt};
 
+use async_trait::async_trait;
+use futures::compat::Future01CompatExt;
+use futures::future::{FutureExt, TryFutureExt};
 use futures01::future::{self, Future};
 use futures01::Stream;
 use url::Url;
@@ -48,13 +51,14 @@ fn err<O: Send + 'static>(failure: Failure) -> NodeFuture<O> {
   future::err(failure).to_boxed()
 }
 
+#[async_trait]
 impl VFS<Failure> for Context {
-  fn read_link(&self, link: &Link) -> NodeFuture<PathBuf> {
-    self.get(ReadLink(link.clone())).map(|res| res.0).to_boxed()
+  async fn read_link(&self, link: &Link) -> Result<PathBuf, Failure> {
+    Ok(self.get(ReadLink(link.clone())).compat().await?.0)
   }
 
-  fn scandir(&self, dir: Dir) -> NodeFuture<Arc<DirectoryListing>> {
-    self.get(Scandir(dir))
+  async fn scandir(&self, dir: Dir) -> Result<Arc<DirectoryListing>, Failure> {
+    self.get(Scandir(dir)).compat().await
   }
 
   fn is_ignored(&self, stat: &fs::Stat) -> bool {
@@ -383,6 +387,8 @@ impl WrappedNode for ReadLink {
       .core
       .vfs
       .read_link(&self.0)
+      .boxed()
+      .compat()
       .map(LinkDest)
       .map_err(|e| throw(&format!("{}", e)))
       .to_boxed()
@@ -409,6 +415,8 @@ impl WrappedNode for DigestFile {
       .core
       .vfs
       .read_file(&self.0)
+      .boxed()
+      .compat()
       .map_err(|e| throw(&format!("{}", e)))
       .and_then(move |c| {
         context
@@ -442,6 +450,8 @@ impl WrappedNode for Scandir {
       .core
       .vfs
       .scandir(self.0)
+      .boxed()
+      .compat()
       .map(Arc::new)
       .map_err(|e| throw(&format!("{}", e)))
       .to_boxed()
@@ -467,6 +477,7 @@ impl Snapshot {
     // and store::Snapshot::from_path_stats tracking dependencies for file digests.
     context
       .expand(path_globs)
+      .compat()
       .map_err(|e| format!("{}", e))
       .and_then(move |path_stats| {
         store::Snapshot::from_path_stats(

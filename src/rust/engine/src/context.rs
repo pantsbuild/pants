@@ -2,11 +2,13 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std;
+use std::collections::BTreeMap;
 use std::convert::{Into, TryInto};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
+use futures::compat::Future01CompatExt;
 use futures01::Future;
 
 use crate::core::{Failure, TypeId};
@@ -27,8 +29,8 @@ use rand::seq::SliceRandom;
 use reqwest;
 use rule_graph::RuleGraph;
 use sharded_lmdb::ShardedLmdb;
-use std::collections::BTreeMap;
 use store::Store;
+use tokio::runtime::Runtime;
 
 const GIGABYTES: usize = 1024 * 1024 * 1024;
 
@@ -45,6 +47,7 @@ pub struct Core {
   pub tasks: Tasks,
   pub rule_graph: RuleGraph<Rule>,
   pub types: Types,
+  pub runtime: Runtime,
   pub executor: task_executor::Executor,
   store: Store,
   pub command_runner: Box<dyn process_execution::CommandRunner>,
@@ -87,7 +90,8 @@ impl Core {
     let mut remote_store_servers = remote_store_servers;
     remote_store_servers.shuffle(&mut rand::thread_rng());
 
-    let executor = task_executor::Executor::new();
+    let runtime = Runtime::new().map_err(|e| format!("Failed to start the runtime: {}", e))?;
+    let executor = task_executor::Executor::new(runtime.handle().clone());
     // We re-use these certs for both the execution and store service; they're generally tied together.
     let root_ca_certs = if let Some(path) = remote_root_ca_certs_path {
       Some(
@@ -227,6 +231,7 @@ impl Core {
       tasks: tasks,
       rule_graph: rule_graph,
       types: types,
+      runtime,
       executor: executor.clone(),
       store,
       command_runner,
@@ -309,6 +314,9 @@ impl NodeContext for Context {
   where
     F: Future<Item = (), Error = ()> + Send + 'static,
   {
-    self.core.executor.spawn_and_ignore(future);
+    self.core.executor.spawn_and_ignore(async move {
+      let _ = future.compat().await;
+      ()
+    });
   }
 }

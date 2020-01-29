@@ -25,29 +25,26 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-use futures01::{future, Future};
-use std::sync::Arc;
-use tokio::runtime::Runtime;
+use std::future::Future;
 
-// TODO: It's strange that this is an exposed interface from the logging crate, rather than an
-// implementation of a trait that lives elsewhere. This can't currently be a trait because its
-// methods have generic types, which isn't allowed on traits. If we can move the API somewhere else
-// in the future, that could be nice.
+use futures::future;
+use futures::future::{BoxFuture, FutureExt};
 
+use tokio::runtime::{Handle, Runtime};
+
+///
+/// NB: This struct does not currently hold any state (because tokio's runtime is thread-local),
+/// but it has in the past, and it might in the future. We leave it here to minimize refactoring
+/// churn until we're fully ported to stdlib Future.
+///
 #[derive(Clone)]
-pub struct Executor {
-  runtime: Arc<Runtime>,
-  io_pool: futures_cpupool::CpuPool,
-}
+pub struct Executor;
 
 impl Executor {
-  pub fn new() -> Executor {
-    Executor {
-      runtime: Arc::new(
-        Runtime::new().unwrap_or_else(|e| panic!("Could not initialize Runtime: {:?}", e)),
-      ),
-      io_pool: futures_cpupool::CpuPool::new_num_cpus(),
-    }
+  pub fn new(_handle: Handle) -> Executor {
+    // We don't actually hold a Handle: we just request one to ensure that a Runtime has been
+    // started, and push error handling to callers.
+    Executor
   }
 
   ///
@@ -58,18 +55,15 @@ impl Executor {
   /// This may be useful e.g. if you want to kick off a potentially long-running task, which will
   /// notify dependees of its completion over an mpsc channel.
   ///
-  pub fn spawn_and_ignore<F: Future<Item = (), Error = ()> + Send + 'static>(&self, future: F) {
-    self
-      .runtime
-      .executor()
-      .spawn(Self::future_with_correct_context(future))
+  pub fn spawn_and_ignore<F: Future<Output = ()> + Send + 'static>(&self, future: F) {
+    tokio::spawn(Self::future_with_correct_context(future));
   }
 
   ///
   /// Run a Future on a tokio Runtime as a new Task, and return a Future handle to it.
   ///
-  /// The future will only be driven to completion if something drives the returned Future. If the
-  /// returned Future is dropped, the computation may be cancelled.
+  /// If the returned Future is dropped, the computation will still continue to completion: see the
+  /// tokio::task::JoinHandle docs.
   ///
   /// This may be useful for tokio tasks which use the tokio blocking feature (unrelated to the
   /// Executor::block_on method). When tokio blocking tasks run, they prevent progress on any
@@ -85,18 +79,15 @@ impl Executor {
   /// See https://docs.rs/tokio-threadpool/0.1.15/tokio_threadpool/fn.blocking.html for details of
   /// tokio blocking.
   ///
-  pub fn spawn_oneshot<
-    Item: Send + 'static,
-    Error: Send + 'static,
-    F: Future<Item = Item, Error = Error> + Send + 'static,
-  >(
+  pub async fn spawn_oneshot<O: Send + 'static, F: Future<Output = O> + Send + 'static>(
     &self,
     future: F,
-  ) -> impl Future<Item = Item, Error = Error> {
-    futures01::sync::oneshot::spawn(
-      Self::future_with_correct_context(future),
-      &self.runtime.executor(),
-    )
+  ) -> O {
+    // NB: We unwrap here because the only thing that should cause an error in a spawned task is a
+    // panic, in which case we want to propagate that.
+    tokio::spawn(Self::future_with_correct_context(future))
+      .await
+      .unwrap()
   }
 
   ///
@@ -110,14 +101,7 @@ impl Executor {
   /// Executor::spawn_and_ignore or Executor::spawn_oneshot. Because it should be used only in very
   /// limited situations, this overhead is viewed to be acceptable.
   ///
-  pub fn block_on<
-    Item: Send + 'static,
-    Error: Send + 'static,
-    F: Future<Item = Item, Error = Error> + Send + 'static,
-  >(
-    &self,
-    future: F,
-  ) -> Result<Item, Error> {
+  pub fn block_on<F: Future + Send + 'static>(&self, future: F) -> F::Output {
     // Make sure to copy our (thread-local) logging destination into the task.
     // When a daemon thread kicks off a future, it should log like a daemon thread (and similarly
     // for a user-facing thread).
@@ -135,17 +119,25 @@ impl Executor {
   /// it has caused significant performance regressions, so for how we continue to use our legacy
   /// I/O CpuPool. Hopefully we can delete this method at some point.
   ///
-  pub fn spawn_on_io_pool<
-    Item: Send + 'static,
-    Error: Send + 'static,
-    F: Future<Item = Item, Error = Error> + Send + 'static,
-  >(
-    &self,
-    future: F,
-  ) -> impl Future<Item = Item, Error = Error> {
-    self
-      .io_pool
-      .spawn(Self::future_with_correct_context(future))
+  /// TODO: See the note on references in ASYNC.md.
+  ///
+  pub fn spawn_blocking<'a, 'b, F: FnOnce() -> R + Send + 'static, R: Send + 'static>(
+    &'a self,
+    f: F,
+  ) -> BoxFuture<'b, R> {
+    let logging_destination = logging::get_destination();
+    let workunit_parent_id = workunit_store::get_parent_id();
+    // NB: We unwrap here because the only thing that should cause an error in a spawned task is a
+    // panic, in which case we want to propagate that.
+    tokio::task::spawn_blocking(move || {
+      logging::set_destination(logging_destination);
+      if let Some(parent_id) = workunit_parent_id {
+        workunit_store::set_parent_id(parent_id);
+      }
+      f()
+    })
+    .map(|res| res.unwrap())
+    .boxed()
   }
 
   ///
@@ -154,17 +146,16 @@ impl Executor {
   /// by it ends up in the pantsd log as we expect. The latter ensures that when a new workunit
   /// is created it has an accurate handle to its parent.
   ///
-  fn future_with_correct_context<Item, Error, F: Future<Item = Item, Error = Error>>(
-    future: F,
-  ) -> impl Future<Item = Item, Error = Error> {
+  fn future_with_correct_context<F: Future>(future: F) -> impl Future<Output = F::Output> {
     let logging_destination = logging::get_destination();
     let workunit_parent_id = workunit_store::get_parent_id();
-    future::lazy(move || {
+    future::lazy(move |_| {
       logging::set_destination(logging_destination);
       if let Some(parent_id) = workunit_parent_id {
         workunit_store::set_parent_id(parent_id);
       }
       future
     })
+    .then(|f| f)
   }
 }
