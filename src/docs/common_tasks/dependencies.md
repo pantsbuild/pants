@@ -16,8 +16,9 @@ Below is an example `scala_library` definition that specifies dependencies on ot
 
     ::python
     # myproject/src/main/scala/BUILD
-    scala_library(name='scala',
-      sources=rglobs('\*.scala'),
+    scala_library(
+      name='scala',
+      sources=['*.scala'],
       dependencies=[
         'myproject/library-a',
         'myproject/library-b:some-target'
@@ -36,7 +37,8 @@ NOTE: In many cases, you can specify a library target path without specifying a 
     ::python
     # myproject/library-a/BUILD
 
-    target(name='library-a',
+    target(
+      name='library-a',
       dependencies=[
         # ...
       ]
