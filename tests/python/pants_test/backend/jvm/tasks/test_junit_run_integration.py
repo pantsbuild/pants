@@ -9,7 +9,6 @@ from contextlib import contextmanager
 
 from pants.base.build_environment import get_buildroot
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
-from pants.util.contextutil import temporary_dir
 
 
 class JunitRunIntegrationTest(PantsRunIntegrationTest):
@@ -72,24 +71,23 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
       yield ET.parse(coverage_xml).getroot(), read_utf8(coverage_html)
 
   def do_test_junit_run_with_coverage_succeeds_scoverage(self, tests=(), args=()):
-    with temporary_dir() as tmp_dir:
-      with self.coverage(
-          processor='scoverage',
-          xml_path='scoverage/reports/xml/scoverage.xml',
-          html_path='scoverage/reports/html/org.pantsbuild.example.hello.welcome.html',
-          test_project='examples/tests/scala/org/pantsbuild/example/hello/welcome',
-          test_class='org.pantsbuild.example.hello.welcome',
-          pre_args=['--scoverage-enable-scoverage'],
-          tests=tests,
-          args=args) as (xml_report, html_report_string):
+    with self.coverage(
+        processor='scoverage',
+        xml_path='scoverage/reports/xml/scoverage.xml',
+        html_path='scoverage/reports/html/org.pantsbuild.example.hello.welcome.html',
+        test_project='examples/tests/scala/org/pantsbuild/example/hello/welcome',
+        test_class='org.pantsbuild.example.hello.welcome',
+        pre_args=['--scoverage-enable-scoverage'],
+        tests=tests,
+        args=args) as (xml_report, html_report_string):
 
-        # Validate 100% coverage; ie a line coverage rate of 1.
-        self.assertEqual('scoverage', xml_report.tag)
-        self.assertEqual(100.0, float(xml_report.attrib['statement-rate']))
+      # Validate 100% coverage; ie a line coverage rate of 1.
+      self.assertEqual('scoverage', xml_report.tag)
+      self.assertEqual(100.0, float(xml_report.attrib['statement-rate']))
 
-        # Validate that the html report was able to find sources for annotation.
-        self.assertIn('WelcomeEverybody', html_report_string)
-        self.assertIn('Welcome.scala', html_report_string)
+      # Validate that the html report was able to find sources for annotation.
+      self.assertIn('WelcomeEverybody', html_report_string)
+      self.assertIn('Welcome.scala', html_report_string)
 
   def test_junit_run_with_coverage_succeeds_scoverage(self):
     self.do_test_junit_run_with_coverage_succeeds_scoverage(args=['--no-chroot', '--fast'])
