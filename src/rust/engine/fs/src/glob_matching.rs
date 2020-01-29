@@ -113,6 +113,7 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: VFS<E> {
       exclude,
       strict_match_behavior,
       conjunction,
+      ..
     } = path_globs;
 
     if include.is_empty() {

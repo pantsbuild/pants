@@ -459,9 +459,25 @@ pub struct PathGlobs {
   exclude: Arc<GitignoreStyleExcludes>,
   strict_match_behavior: StrictGlobMatching,
   conjunction: GlobExpansionConjunction,
+  patterns: Vec<glob::Pattern>,
 }
 
 impl PathGlobs {
+  fn parse_patterns_from_include(
+    include: &[PathGlobIncludeEntry],
+  ) -> Result<Vec<glob::Pattern>, String> {
+    include
+      .iter()
+      .map(|pattern| {
+        PathGlob::normalize_pattern(&pattern.input.0).and_then(|components| {
+          let normalized_pattern: PathBuf = components.into_iter().collect();
+          Pattern::new(normalized_pattern.to_str().unwrap())
+            .map_err(|e| format!("Could not parse {:?} as a glob: {:?}", pattern.input.0, e))
+        })
+      })
+      .collect::<Result<Vec<_>, String>>()
+  }
+
   pub fn create(
     globs: &[String],
     strict_match_behavior: StrictGlobMatching,
@@ -480,28 +496,34 @@ impl PathGlobs {
     }
     let include = PathGlob::spread_filespecs(include_globs.as_slice())?;
     let exclude = GitignoreStyleExcludes::create(exclude_globs.as_slice())?;
+    let patterns = PathGlobs::parse_patterns_from_include(&include)?;
+
     Ok(PathGlobs {
       include,
       exclude,
       strict_match_behavior,
       conjunction,
+      patterns,
     })
   }
 
   pub fn from_globs(include: Vec<PathGlob>) -> Result<PathGlobs, String> {
-    let include = include
+    let include: Vec<PathGlobIncludeEntry> = include
       .into_iter()
       .map(|glob| PathGlobIncludeEntry {
         input: MISSING_GLOB_SOURCE.clone(),
         globs: vec![glob],
       })
       .collect();
+
+    let patterns = PathGlobs::parse_patterns_from_include(&include.as_slice())?;
     Ok(PathGlobs {
       include,
       // An empty exclude becomes EMPTY_IGNORE.
       exclude: GitignoreStyleExcludes::create(&[])?,
       strict_match_behavior: StrictGlobMatching::Ignore,
       conjunction: GlobExpansionConjunction::AllMatch,
+      patterns,
     })
   }
 
@@ -514,24 +536,17 @@ impl PathGlobs {
   /// traversal in expand is (currently) too expensive to use for that in-memory matching (such as
   /// via MemFS).
   ///
-  pub fn matches(&self, paths: &[PathBuf]) -> Result<bool, String> {
-    let patterns = self
-      .include
-      .iter()
-      .map(|pattern| {
-        PathGlob::normalize_pattern(&pattern.input.0).and_then(|components| {
-          let normalized_pattern: PathBuf = components.into_iter().collect();
-          Pattern::new(normalized_pattern.to_str().unwrap())
-            .map_err(|e| format!("Could not parse {:?} as a glob: {:?}", pattern.input.0, e))
-        })
-      })
-      .collect::<Result<Vec<_>, String>>()?;
-    Ok(patterns.iter().any(|pattern| {
-      paths.iter().any(|path| {
-        pattern.matches_path_with(path, &PATTERN_MATCH_OPTIONS)
-          && !self.exclude.is_ignored_path(path, false)
-      })
-    }))
+  pub fn matches(&self, paths: &[PathBuf]) -> bool {
+    self.patterns.iter().any(|pattern| {
+      paths
+        .iter()
+        .any(|path| self.pattern_matches_single_path(&pattern, path))
+    })
+  }
+
+  fn pattern_matches_single_path(&self, pattern: &glob::Pattern, path: &PathBuf) -> bool {
+    pattern.matches_path_with(path, &PATTERN_MATCH_OPTIONS)
+      && !self.exclude.is_ignored_path(path, false)
   }
 
   pub fn filter(&self, paths: Vec<PathBuf>) -> Result<Vec<PathBuf>, String> {

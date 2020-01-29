@@ -830,7 +830,7 @@ pub extern "C" fn match_path_globs(path_globs: Handle, paths_buf: BufferBuffer) 
     .into_iter()
     .map(PathBuf::from)
     .collect::<Vec<_>>();
-  path_globs.matches(&paths).map(externs::store_bool).into()
+  externs::store_bool(path_globs.matches(&paths)).into()
 }
 
 #[no_mangle]
