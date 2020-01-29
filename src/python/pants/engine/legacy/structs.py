@@ -61,9 +61,11 @@ class TargetAdaptor(StructWithDeps):
       if self.default_sources_globs is None:
         return None
       default_globs = Files(
-        *self.default_sources_globs,
+        *(
+          *self.default_sources_globs,
+          *(f"!{glob}" for glob in self.default_sources_exclude_globs or []),
+        ),
         spec_path=self.address.spec_path,
-        exclude=self.default_sources_exclude_globs or [],
       )
       return GlobsWithConjunction(default_globs, GlobExpansionConjunction.any_match)
 
@@ -302,6 +304,8 @@ class PantsPluginAdaptor(PythonTargetAdaptor):
     return GlobsWithConjunction.for_literal_files(['register.py'], self.address.spec_path)
 
 
+# TODO: Remove all the subclasses once we remove globs et al. The only remaining subclass would be
+# Files, which should simply be unified into BaseGlobs.
 class BaseGlobs(Locatable, metaclass=ABCMeta):
   """An adaptor class to allow BUILD file parsing from ContextAwareObjectFactories."""
 
@@ -333,6 +337,7 @@ class BaseGlobs(Locatable, metaclass=ABCMeta):
   def legacy_globs_class(self) -> Type[wrapped_globs.FilesetRelPathWrapper]:
     """The corresponding `wrapped_globs` class for this BaseGlobs."""
 
+  # TODO: stop accepting an `exclude` argument once we remove `globs` et al.
   def __init__(
     self, *patterns: str, spec_path: str, exclude: Optional[List[str]] = None, **kwargs,
   ) -> None:
@@ -345,8 +350,28 @@ class BaseGlobs(Locatable, metaclass=ABCMeta):
     if kwargs:
       raise ValueError(f'kwargs not supported. Got: {kwargs}')
 
-    self._parsed_include = self.legacy_globs_class.to_filespec(patterns)['globs']
-    self._parsed_exclude = self._parse_exclude(exclude or [])
+    # TODO: once we remove `globs`, `rglobs`, and `zglobs`, we should change as follows:
+    #  * Stop setting `self._parsed_include` and `self._parsed_exclude`. Only save `self._patterns`.
+    #    All the below code should be deleted. For now, we must have these values to ensure that we
+    #    properly parse the `globs()` function.
+    #  * `to_path_globs()` will still need to strip the leading `!` from the exclude pattern, call
+    #    `os.path.join`, and then prepend it back with `!`. But, it will do that when traversing
+    #     over `self._patterns`, rather than `self._parsed_exclude`. We have a new unit test to
+    #     ensure that we don't break this.
+    #  * `filespecs()` must still need to split out the includes from excludes to maintain backwards
+    #     compatibility. The below for loop splitting out the `self._patterns` should be moved
+    #     into `filespecs()`. We have a new unit test to ensure that we don't break this.
+    self._parsed_include: List[str] = []
+    self._parsed_exclude: List[str] = []
+    if isinstance(self, Files):
+      for glob in self._patterns:
+        if glob.startswith("!"):
+          self._parsed_exclude.append(glob[1:])
+        else:
+          self._parsed_include.append(glob)
+    else:
+      self._parsed_include = self.legacy_globs_class.to_filespec(patterns)['globs']
+      self._parsed_exclude = self._parse_exclude(exclude or [])
 
   @property
   def filespecs(self) -> wrapped_globs.Filespec:
