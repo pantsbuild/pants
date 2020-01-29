@@ -72,7 +72,7 @@ class CmdLineSpecParser:
       spec_parts = spec.rsplit(':', 1)
       spec_path = self._normalize_spec_path(spec_parts[0])
       return SingleAddress(directory=spec_path, name=spec_parts[1])
-    if '*' in spec:
+    if spec.startswith('!') or '*' in spec:
       return FilesystemSpec(glob=spec)
     if PurePath(spec).suffix:
       return FilesystemSpec(glob=self._normalize_spec_path(spec))

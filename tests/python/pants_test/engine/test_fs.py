@@ -49,11 +49,10 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
     yield project_tree
 
   @staticmethod
-  def specs(filespecs):
-    if isinstance(filespecs, PathGlobs):
-      return filespecs
-    else:
-      return PathGlobs(include=filespecs)
+  def path_globs(globs) -> PathGlobs:
+    if isinstance(globs, PathGlobs):
+      return globs
+    return PathGlobs(globs)
 
   def assert_walk_dirs(self, filespecs_or_globs, paths, **kwargs):
     self.assert_walk_snapshot('dirs', filespecs_or_globs, paths, **kwargs)
@@ -66,13 +65,13 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
       scheduler = self.mk_scheduler(rules=create_fs_rules(), project_tree=project_tree)
       if prepare:
         prepare(project_tree)
-      result = self.execute(scheduler, Snapshot, self.specs(filespecs_or_globs))[0]
+      result = self.execute(scheduler, Snapshot, self.path_globs(filespecs_or_globs))[0]
       self.assertEqual(sorted(getattr(result, field)), sorted(paths))
 
   def assert_content(self, filespecs_or_globs, expected_content):
     with self.mk_project_tree() as project_tree:
       scheduler = self.mk_scheduler(rules=create_fs_rules(), project_tree=project_tree)
-      snapshot = self.execute_expecting_one_result(scheduler, Snapshot, self.specs(filespecs_or_globs)).value
+      snapshot = self.execute_expecting_one_result(scheduler, Snapshot, self.path_globs(filespecs_or_globs)).value
       result = self.execute_expecting_one_result(scheduler, FilesContent, snapshot.directory_digest).value
       actual_content = {f.path: f.content for f in result.dependencies}
       self.assertEqual(expected_content, actual_content)
@@ -80,7 +79,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
   def assert_digest(self, filespecs_or_globs, expected_files):
     with self.mk_project_tree() as project_tree:
       scheduler = self.mk_scheduler(rules=create_fs_rules(), project_tree=project_tree)
-      result = self.execute(scheduler, Snapshot, self.specs(filespecs_or_globs))[0]
+      result = self.execute(scheduler, Snapshot, self.path_globs(filespecs_or_globs))[0]
       # Confirm all expected files were digested.
       self.assertEqual(set(expected_files), set(result.files))
       self.assertTrue(result.directory_digest.fingerprint is not None)

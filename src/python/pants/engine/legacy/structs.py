@@ -60,7 +60,7 @@ class TargetAdaptor(StructWithDeps):
     if sources is None:
       if self.default_sources_globs is None:
         return None
-      default_globs = Globs(
+      default_globs = Files(
         *self.default_sources_globs,
         spec_path=self.address.spec_path,
         exclude=self.default_sources_exclude_globs or [],
@@ -323,21 +323,6 @@ class BaseGlobs(Locatable, metaclass=ABCMeta):
       return Files(*sources, spec_path=spec_path)
     raise ValueError(f'Expected either a glob or list of literal sources. Got: {sources}')
 
-  @staticmethod
-  def _filespec_for_exclude(raw_exclude: List[str], spec_path: str) -> wrapped_globs._GlobsDict:
-    if isinstance(raw_exclude, str):
-      raise ValueError(
-        f'Excludes should be a list of strings. Got: {raw_exclude!r}'
-      )
-
-    excluded_patterns: List[str] = []
-    for raw_element in raw_exclude:
-      exclude_filespecs = BaseGlobs.from_sources_field(raw_element, spec_path).filespecs
-      if exclude_filespecs.get('exclude', []):
-        raise ValueError('Nested excludes are not supported: got {}'.format(raw_element))
-      excluded_patterns.extend(exclude_filespecs.get('globs', []))
-    return {'globs': excluded_patterns}
-
   @property
   @abstractmethod
   def path_globs_kwarg(self) -> str:
@@ -354,36 +339,39 @@ class BaseGlobs(Locatable, metaclass=ABCMeta):
     self._patterns = patterns
     self._spec_path = spec_path
     self._raw_exclude = exclude
+
+    if isinstance(exclude, str):
+      raise ValueError(f'Excludes should be a list of strings. Got: {exclude!r}')
     if kwargs:
       raise ValueError(f'kwargs not supported. Got: {kwargs}')
 
-    self._file_globs = self.legacy_globs_class.to_filespec(patterns).get('globs', [])
-    self._excluded_file_globs = self._filespec_for_exclude(
-      exclude or [], spec_path
-    ).get('globs', [])
+    self._parsed_include = self.legacy_globs_class.to_filespec(patterns)['globs']
+    self._parsed_exclude = self._parse_exclude(exclude or [])
 
   @property
   def filespecs(self) -> wrapped_globs.Filespec:
     """Return a filespecs dict representing both globs and excludes."""
-    filespecs: wrapped_globs.Filespec = {'globs': self._file_globs}
-    exclude_filespecs = self._exclude_filespecs
-    if exclude_filespecs:
-      filespecs['exclude'] = exclude_filespecs
+    filespecs: wrapped_globs.Filespec = {'globs': self._parsed_include}
+    if self._parsed_exclude:
+      filespecs['exclude'] = [{'globs': self._parsed_exclude}]
     return filespecs
-
-  @property
-  def _exclude_filespecs(self) -> List[wrapped_globs._GlobsDict]:
-    if self._excluded_file_globs:
-      return [{'globs': self._excluded_file_globs}]
-    return []
 
   def to_path_globs(self, relpath: str, conjunction: GlobExpansionConjunction) -> PathGlobs:
     """Return a PathGlobs representing the included and excluded Files for these patterns."""
     return PathGlobs(
-      include=tuple(os.path.join(relpath, glob) for glob in self._file_globs),
-      exclude=tuple(os.path.join(relpath, exclude) for exclude in self._excluded_file_globs),
+      include=tuple(os.path.join(relpath, glob) for glob in self._parsed_include),
+      exclude=tuple(os.path.join(relpath, exclude) for exclude in self._parsed_exclude),
       conjunction=conjunction,
     )
+
+  def _parse_exclude(self, raw_exclude: List[str]) -> List[str]:
+    excluded_patterns: List[str] = []
+    for raw_element in raw_exclude:
+      exclude_filespecs = BaseGlobs.from_sources_field(raw_element, self._spec_path).filespecs
+      if exclude_filespecs.get('exclude'):
+        raise ValueError('Nested excludes are not supported: got {}'.format(raw_element))
+      excluded_patterns.extend(exclude_filespecs['globs'])
+    return excluded_patterns
 
   def _gen_init_args_str(self) -> str:
     all_arg_strs = []
@@ -396,6 +384,7 @@ class BaseGlobs(Locatable, metaclass=ABCMeta):
     return ', '.join(all_arg_strs)
 
   def __repr__(self) -> str:
+    # TODO: remove this once we finish deprecating `globs` et al. Use the __str__ implementation.
     return f'{type(self).__name__}({self._gen_init_args_str()})'
 
   def __str__(self) -> str:

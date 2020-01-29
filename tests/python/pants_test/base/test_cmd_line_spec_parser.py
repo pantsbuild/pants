@@ -76,6 +76,10 @@ class CmdLineSpecParserTest(TestBase):
     for glob in ["*", "**/*", "a/b/*", "a/b/test_*.py", "a/b/**/test_*"]:
       self.assert_filesystem_spec_parsed(glob)
 
+  def test_excludes(self) -> None:
+    for glob in ["!", "!a/b/", "!/a/b/*"]:
+      self.assert_filesystem_spec_parsed(glob)
+
   def test_ambiguous_files(self) -> None:
     # These could either be files or the shorthand for single addresses. We check if they exist on
     # the file system to disambiguate.

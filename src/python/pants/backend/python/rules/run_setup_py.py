@@ -447,7 +447,7 @@ async def get_ancestor_init_py(
   # we match each result to its originating glob (see use of zip below).
   ancestor_init_py_snapshots = await MultiGet[Snapshot](
     Get[Snapshot](PathGlobs,
-                  PathGlobs(include=(os.path.join(source_dir_ancestor[1], '__init__.py'),)))
+                  PathGlobs([os.path.join(source_dir_ancestor[1], '__init__.py')]))
     for source_dir_ancestor in source_dir_ancestors_list
   )
 
