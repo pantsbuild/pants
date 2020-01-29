@@ -53,7 +53,7 @@ def get_coverage_plugin_input():
       (
         FileContent(
           path=f'{COVERAGE_PLUGIN_MODULE_NAME}.py',
-          content=pkg_resources.resource_string(__name__, 'coverage/plugin.py'),
+          content=pkg_resources.resource_string(__name__, 'coverage_plugin/plugin.py'),
         ),
       )
     )
