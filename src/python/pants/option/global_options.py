@@ -43,7 +43,7 @@ class GlobMatchErrorBehavior(Enum):
 
 
 class FileNotFoundBehavior(Enum):
-  """What to do when globs do not match in BUILD files or filesystem specs."""
+  """What to do when globs do not match in BUILD files."""
   warn = "warn"
   error = "error"
 
@@ -304,9 +304,9 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                   'The `--pants-distdir` and `--pants-workdir` locations are inherently ignored.')
     register("--files-not-found-behavior", advanced=True,
              type=FileNotFoundBehavior, default=FileNotFoundBehavior.warn,
-             help="What to do when files specified on the command line or in BUILD files cannot be "
-                  "found. This happens when the files do not exist on your machine or when they "
-                  "are ignored by the `--pants-ignore` option.")
+             help="What to do when files and globs specified in BUILD files, such as in the "
+                  "`sources` field, cannot be found. This happens when the files do not exist on "
+                  "your machine or when they are ignored by the `--pants-ignore` option.")
     register('--glob-expansion-failure', advanced=True,
              type=GlobMatchErrorBehavior, default=GlobMatchErrorBehavior.warn,
              removal_version="1.27.0.dev0",
@@ -316,9 +316,9 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                           "need to instead either set `--files-not-found-behavior=warn` (the "
                           "default) or `--files-not-found-behavior=error`. Ignoring when files are "
                           "not found often results in subtle bugs, so we are removing the option.",
-             help="What to do when files specified on the command line or in BUILD files cannot be "
-                  "found. This happens when the files do not exist on your machine or when they "
-                  "are ignored by the `--pants-ignore` option.")
+             help="What to do when files and globs specified in BUILD files, such as in the "
+                  "`sources` field, cannot be found. This happens when the files do not exist on "
+                  "your machine or when they are ignored by the `--pants-ignore` option.")
 
     # TODO(#7203): make a regexp option type!
     register('--exclude-target-regexp', advanced=True, type=list, default=[], daemon=False,
