@@ -12,7 +12,7 @@ from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.build_files import AddressProvenanceMap
 from pants.engine.console import Console
-from pants.engine.fs import Digest, Workspace
+from pants.engine.fs import Digest
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
 from pants.engine.isolated_process import FallibleExecuteProcessResult
@@ -150,7 +150,6 @@ async def run_tests(
   options: TestOptions,
   runner: InteractiveRunner,
   addresses: BuildFileAddresses,
-  workspace: Workspace,
 ) -> Test:
   if options.values.debug:
     address = await Get[BuildFileAddress](BuildFileAddresses, addresses)

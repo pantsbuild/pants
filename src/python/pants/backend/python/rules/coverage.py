@@ -7,6 +7,7 @@ import json
 from dataclasses import dataclass
 from enum import Enum
 from io import StringIO
+from pathlib import PurePath
 from textwrap import dedent
 from typing import List, Optional
 
@@ -123,7 +124,8 @@ class ReportType(Enum):
   HTML = "html"
 
 
-class PytestCoverageSubsystem(GoalSubsystem):
+class CoverageOptions(GoalSubsystem):
+  """Runs pytest coverage."""
   name = 'coverage2'
 
 
@@ -251,11 +253,13 @@ def get_file_names(all_target_adaptors):
   return list(iter_files())
 
 
-class PytestCoverageReport(Goal):
-  subsystem_cls = PytestCoverageSubsystem
+@dataclass(frozen=True)
+class PytestCoverageReport():
+  report_directory_digest: Digest
+  directory_to_materialize_to: PurePath
 
 
-@goal_rule(name="Generate coverage report")
+@rule(name="Generate coverage report")
 async def generate_coverage_report(
   transitive_targets: TransitiveHydratedTargets,
   python_setup: PythonSetup,
@@ -264,8 +268,6 @@ async def generate_coverage_report(
   coverage_toolbase: PytestCoverage,
   source_root_config: SourceRootConfig,
   subprocess_encoding_environment: SubprocessEncodingEnvironment,
-  workspace: Workspace,
-  console: Console,
 ) -> PytestCoverageReport:
   """Takes all python test results and generates a single coverage report."""
   requirements_pex = coverage_setup.requirements_pex
@@ -316,14 +318,27 @@ async def generate_coverage_report(
     ExecuteProcessRequest,
     request
   )
+  return PytestCoverageReport(result.output_directory_digest, coverage_toolbase.options.report_output_path)
 
+
+class PytestCoverageResult(Goal):
+  subsystem_cls = CoverageOptions
+
+
+@goal_rule(name="Materialize coverage report")
+async def materialize_coverage_report(
+  coverage_report: PytestCoverageReport,
+  workspace: Workspace,
+  console: Console,
+) -> PytestCoverageResult:
+  # Note: This goal is a temporary fix until we figure out some generic solution to use in core/test.py.
   workspace.materialize_directory(DirectoryToMaterialize(
-    result.output_directory_digest,
-    path_prefix=str(coverage_toolbase.options.report_output_path)
+    coverage_report.report_directory_digest,
+    path_prefix=str(coverage_report.directory_to_materialize_to)
   ))
-  console.print_stdout(f"Wrote coverage report to `{coverage_toolbase.options.report_output_path}`")
+  console.print_stdout(f"Wrote coverage report to `{coverage_report.directory_to_materialize_to}`")
 
-  return PytestCoverageReport(exit_code=0)
+  return PytestCoverageResult(exit_code=0)
 
 
 def rules():
@@ -332,4 +347,5 @@ def rules():
     generate_coverage_report,
     merge_coverage_reports,
     setup_coverage,
+    materialize_coverage_report,
   ]
