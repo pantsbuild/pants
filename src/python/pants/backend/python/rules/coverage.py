@@ -23,19 +23,25 @@ from pants.backend.python.subsystems.pex_build_util import identify_missing_init
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
+from pants.build_graph.address import Address
+from pants.engine.addressable import BuildFileAddresses
+from pants.engine.console import Console
 from pants.engine.fs import (
   Digest,
   DirectoriesToMerge,
+  DirectoryToMaterialize,
   DirectoryWithPrefixToAdd,
   FileContent,
   FilesContent,
   InputFilesContent,
+  Workspace,
 )
+from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
 from pants.engine.legacy.graph import TransitiveHydratedTargets
-from pants.engine.rules import rule, subsystem_rule
+from pants.engine.rules import goal_rule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
-from pants.rules.core.test import AddressAndTestResults, PytestCoverageReport
+from pants.rules.core.test import AddressAndTestResult
 from pants.source.source_root import SourceRootConfig, SourceRoots
 
 
@@ -117,6 +123,10 @@ class ReportType(Enum):
   HTML = "html"
 
 
+class PytestCoverageSubsystem(GoalSubsystem):
+  name = 'coverage2'
+
+
 class PytestCoverage(PythonToolBase):
   options_scope = 'pytest-coverage'
   default_version = 'coverage==5.0.3'
@@ -171,13 +181,15 @@ class MergedCoverageData:
 
 @rule(name="Merge coverage reports")
 async def merge_coverage_reports(
-  test_results: AddressAndTestResults,
   transitive_targets: TransitiveHydratedTargets,
   python_setup: PythonSetup,
   coverage_setup: CoverageSetup,
   subprocess_encoding_environment: SubprocessEncodingEnvironment,
+  addresses: BuildFileAddresses,
+
 ) -> MergedCoverageData:
   """Takes all python test results and merges their coverage data into a single sql file."""
+  test_results = await MultiGet(Get[AddressAndTestResult](Address, addr.to_address()) for addr in addresses)
 
   coveragerc_digest = await Get[Digest](InputFilesContent, get_coveragerc_input(DEFAULT_COVERAGE_CONFIG))
 
@@ -239,10 +251,12 @@ def get_file_names(all_target_adaptors):
   return list(iter_files())
 
 
+class PytestCoverageReport(Goal):
+  subsystem_cls = PytestCoverageSubsystem
 
-@rule(name="Generate coverage report")
+
+@goal_rule(name="Generate coverage report")
 async def generate_coverage_report(
-  test_results: AddressAndTestResults,
   transitive_targets: TransitiveHydratedTargets,
   python_setup: PythonSetup,
   coverage_setup: CoverageSetup,
@@ -250,6 +264,8 @@ async def generate_coverage_report(
   coverage_toolbase: PytestCoverage,
   source_root_config: SourceRootConfig,
   subprocess_encoding_environment: SubprocessEncodingEnvironment,
+  workspace: Workspace,
+  console: Console,
 ) -> PytestCoverageReport:
   """Takes all python test results and generates a single coverage report."""
   requirements_pex = coverage_setup.requirements_pex
@@ -265,7 +281,6 @@ async def generate_coverage_report(
   coverage_config_content = construct_coverage_config(source_roots, list(python_files))
 
   coveragerc_digest = await Get[Digest](InputFilesContent, get_coveragerc_input(coverage_config_content))
-  # chrooted_sources = await Get[ChrootedPythonSources](HydratedTargets(transitive_targets.closure))
   sources_digests = [
     hydrated_target.adaptor.sources.snapshot.directory_digest
     for hydrated_target in transitive_targets.closure
@@ -301,7 +316,14 @@ async def generate_coverage_report(
     ExecuteProcessRequest,
     request
   )
-  return PytestCoverageReport(result.output_directory_digest, coverage_toolbase.options.report_output_path)
+
+  workspace.materialize_directory(DirectoryToMaterialize(
+    result.output_directory_digest,
+    path_prefix=str(coverage_toolbase.options.report_output_path)
+  ))
+  console.print_stdout(f"Wrote coverage report to `{coverage_toolbase.options.report_output_path}`")
+
+  return PytestCoverageReport(exit_code=0)
 
 
 def rules():

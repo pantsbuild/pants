@@ -12,7 +12,7 @@ from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.build_files import AddressProvenanceMap
 from pants.engine.console import Console
-from pants.engine.fs import Digest, DirectoryToMaterialize, Workspace
+from pants.engine.fs import Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
 from pants.engine.isolated_process import FallibleExecuteProcessResult
@@ -161,18 +161,7 @@ async def run_tests(
   results = await MultiGet(Get[AddressAndTestResult](Address, addr.to_address()) for addr in addresses)
   did_any_fail = False
   filtered_address_and_test_results = tuple(x for x in results if x.test_result is not None)
-  if options.values.run_coverage:
-    # TODO(#8915) Make a generic interface for collecting coverage reports. This class shouldn't have to know about
-    # PytestCoverageReport and JunitCoverageReport etc. It should only know about CoverageReport.
-    pytest_coverage_report = await Get[PytestCoverageReport](
-      AddressAndTestResults,
-      AddressAndTestResults(filtered_address_and_test_results)
-    )
-    workspace.materialize_directory(DirectoryToMaterialize(
-      pytest_coverage_report.report_directory_digest,
-      path_prefix=str(pytest_coverage_report.directory_to_materialize_to)
-    ))
-    console.print_stdout(f"Wrote coverage report to `{pytest_coverage_report.directory_to_materialize_to}`")
+
 
   filtered_results = tuple((x.address, x.test_result) for x in filtered_address_and_test_results if x.test_result is not None)
   for address, test_result in filtered_results:
