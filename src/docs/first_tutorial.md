@@ -125,7 +125,7 @@ tell Pants to "fail fast" on the first `junit` test failure instead of running a
 `junit` tests like so:
 
     :::bash
-    $ ./pants test.junit --fail-fast src/java/myproject/example/hello:tests
+    $ ./pants test.junit --fail-fast src/java/com/myorg/myproject/example/hello:tests
 
 Here, `test` has become `test.junit`. The `test` goal is made up of parts, or *tasks*: `test.junit`,
 `test.pytest`, and `test.specs`. We want to specify a flag to the `test.junit` task, so we
@@ -262,7 +262,7 @@ A target definition in a `BUILD` file looks something like
       dependencies = [
         '3rdparty:commons-math',
         '3rdparty:thrift',
-        'src/java/org/pantsbuild/auth',
+        'src/java/com/myorg/myproject/example',
         ':base',
       ],
       sources=['*.java'],
@@ -306,13 +306,13 @@ will still compile them since it knows it must compile before it can
 test.
 
     :::bash
-    $ ./pants test src/python/myproject:: src/java/myproject::
+    $ ./pants test src/python:: src/java::
 
 **Run a binary**<br>
-Use pants to execute a binary target.  Compiles the code first if it is not up to date.
+Use pants to execute a binary target. Compiles the code first if it is not up to date.
 
     :::bash
-    $ ./pants run src/java/myproject/example/hello/simple
+    $ ./pants run src/python/myproject/example:my_script
 
 **Get Help**<br>
 Get the list of goals:

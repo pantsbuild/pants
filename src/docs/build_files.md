@@ -143,8 +143,8 @@ techniques can be especially helpful:
 *What targets does a BUILD file define?* Use the `list` goal:
 
     :::bash
-    $ ./pants list src/java/myproject/example/hello/greet
-    src/java/myproject/example/hello/greet:greet
+    $ ./pants list src/python/myproject/example
+    src/python/myproject/example:example
 
 *Are any BUILD files broken?*
 List **every** target to see if there are any errors:

@@ -42,7 +42,7 @@ Add an `archive` parameter to your `jvm_app` target. Here's an example:
 Add a `--bundle-jvm-archive` option when invoking the Pants executable. Here's an example:
 
     ::bash
-    $ ./pants bundle src/java/myproject:bundle --bundle-jvm-archive=zip
+    $ ./pants bundle src/java/com/myorg/myproject:bundle --bundle-jvm-archive=zip
 
 **Note**: If you perform *neither* of the steps explained in #1 and #2, no bundle will be created.
 

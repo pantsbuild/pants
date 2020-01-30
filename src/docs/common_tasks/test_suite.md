@@ -20,7 +20,7 @@ Below is an example `junit_tests` definition followed by a `python_tests` defini
       name='tests',
       sources=['test_*.scala'],
       dependencies=[
-        'src/scala/myproject/example:lib',
+        'src/scala/com/myorg/myproject/example:lib',
       ],
     )
 

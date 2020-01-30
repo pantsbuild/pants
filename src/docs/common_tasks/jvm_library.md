@@ -11,7 +11,7 @@ You need to define a new Scala or Java **library target** that other projects ca
 Add a `scala_library` or `java_library` target to a `BUILD` file in the appropriate directory. A `scala_library` or `java_library` target will enable you to compile the library using Pants' `compile` goal. Here's an example:
 
     ::bash
-    $ ./pants compile src/scala/myproject/example:hello
+    $ ./pants compile src/scala/com/myorg/myproject/example:hello
 
 ## Discussion
 
@@ -24,13 +24,13 @@ A `scala_library` or `java_library` target should specify the following:
 Here's an example target definition:
 
     ::python
-    # src/scala/myproject/example/BUILD
+    # src/scala/com/myorg/myproject/example/BUILD
     scala_library(
       name='scala',
       sources=['*.scala'],
       dependencies=[
-        'src/scala/myproject/client-lib',
-        'src/scala/myproject/analytics-lib',
+        'src/scala/com/myorg/myproject/client-lib',
+        'src/scala/com/myorg/myproject/analytics-lib',
         'static/resources/json:config',
       ],
     )
@@ -38,7 +38,7 @@ Here's an example target definition:
 That library can then be compiled with:
 
     ::python
-    $ ./pants compile src/scala/myproject/example
+    $ ./pants compile src/scala/com/myorg/myproject/example
 
 You can combine library targets together into a single target using a **target aggregate**. More info can be found in [[Create a Target Aggregate|pants('src/docs/common_tasks:target_aggregate')]].
 

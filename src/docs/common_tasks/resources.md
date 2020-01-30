@@ -49,7 +49,7 @@ Once your resource bundle has been specified, you can depend on it from the targ
       name='server',
       sources=['*.java'],
       dependencies=[
-        'myproject/src/main/resources:config',
+        'src/resources:config',
       ]
     )
 

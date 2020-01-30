@@ -11,7 +11,7 @@ For more info on running tests, see [[Run Tests for Your Project|pants('src/docs
 Create a `junit_tests` target definition for your library. With the test target definition in place, you can run the tests using the `test` goal:
 
     ::bash
-    $ ./pants test src/java/myproject/example:tests
+    $ ./pants test src/java/com/myorg/myproject/example:tests
 
 ## Discussion
 
@@ -29,14 +29,14 @@ Here's an example:
       name='tests',
       sources=['*.java'],
       dependencies=[
-        'src/java/myproject/example:lib',
+        'src/java/com/myorg/myproject/example:lib',
       ],
     )
 
 With that target definition, you can then run the test using Pants:
 
     ::bash
-    $ ./pants test src/java/myproject/example:tests
+    $ ./pants test src/java/com/myorg/myproject/example:tests
 
 When you run a test, Pants will compile any libraries being tested and then run the actual tests. You should see many lines of Pants-specific output followed by the test results. Here's an example:
 

@@ -15,7 +15,7 @@ Here's an example `target` definition that creates a target names `agg` dependen
       name='agg',
       dependencies=[
         'src/python/myproject/dep:lib',
-        'src/java/org/myproject/dep:lib',
+        'src/java/com/myorg/myproject/dep:lib',
       ],
     )
 

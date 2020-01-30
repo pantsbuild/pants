@@ -9,7 +9,7 @@ You want to run a test or test suite that you've written for your project (or se
 The `test` goal will run any tests contained in the specified target. Here's an example:
 
     ::bash
-    $ ./pants test src/test/scala/example:tests
+    $ ./pants test src/python/myproject/example:tests
 
 For Scala and Java, test suites are defined in `junit_tests` target definitions, while Python test suites are defined in `python_tests` definitions. More on these target types can be found in [[Specify a Test Suite|pants('src/docs/common_tasks:test_suite')]].
 

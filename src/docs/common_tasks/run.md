@@ -29,7 +29,7 @@ The `run` goal will both compile *and* execute a binary target. For Scala and Ja
 You can also run a Scala or Java binary target without compiling it first, using the `run-dirty` goal:
 
     :::bash
-    $ ./pants run-dirty src/scala/myproject/example:bin
+    $ ./pants run-dirty src/scala/com/myorg/myproject/example:bin
 
 ### Python
 

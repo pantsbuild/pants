@@ -28,8 +28,8 @@ Here's an example `jvm_binary` definition:
       basename='myproject-bin',
       main='com.acme.myproject.Main',
       dependencies=[
-        'src/java/myproject/server',
-        'src/java/myproject/analytics',
+        'src/java/com/myorg/myproject/server',
+        'src/java/com/myorg/myproject/analytics',
       ],
       bundles=[
         bundle(fileset=['assets/*']),

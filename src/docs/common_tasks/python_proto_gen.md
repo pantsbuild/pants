@@ -25,7 +25,7 @@ Then, you can add a dependency on this target in your python binary's `BUILD` fi
 python_binary(
   source='server.py',
   dependencies=[
-    'examples/src/protobuf/org/pantsbuild/example/grpcio/service',
+    'src/protobuf/org/pantsbuild/example/grpcio/service',
   ],
 )
 ```
@@ -35,12 +35,12 @@ An example Python gRPC client/server can be found in [/examples/src/python/examp
 
 to create a gRPC server execute
 ```bash
-./pants run examples/src/python/example/grpcio/server
+./pants run src/python/example/grpcio/server
 ```
 
 and when server is running, run client example:
 ```bash
-./pants run examples/src/python/example/grpcio/client
+./pants run src/python/example/grpcio/client
 ```
 
 generated code can be found as usual in pants output directory:
