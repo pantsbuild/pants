@@ -3,20 +3,20 @@
 
 files(
   name = 'buildfile_path_directory',
-  sources = rglobs('buildfile_path/*'),
+  sources = ['buildfile_path/**/*'],
 )
 
 files(
   name = 'bundleresources_directory',
-  sources = rglobs('bundleresources/*'),
+  sources = ['bundleresources/**/*'],
 )
 
 files(
   name = 'ideacodeandresources_directory',
-  sources = rglobs('ideacodeandresources/*'),
+  sources = ['ideacodeandresources/**/*'],
 )
 
 files(
   name = 'idearesourcesonly_directory',
-  sources = rglobs('idearesourcesonly/*'),
+  sources = ['idearesourcesonly/**/*'],
 )

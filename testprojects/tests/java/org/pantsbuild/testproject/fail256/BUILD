@@ -3,7 +3,7 @@
 
 
 junit_tests(name='fail256',
-  sources=globs('*'),
+  sources=['*'],
   dependencies=[
     '3rdparty:junit'
   ],
