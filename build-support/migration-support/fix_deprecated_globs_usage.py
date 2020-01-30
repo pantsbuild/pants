@@ -24,7 +24,9 @@ from typing import Dict, List, NamedTuple, Optional, Set, Union
 def main() -> None:
   args = create_parser().parse_args()
   build_files: Set[Path] = set(
-    itertools.chain.from_iterable(folder.rglob("BUILD*") for folder in args.folders)
+    itertools.chain.from_iterable(
+      [*folder.rglob("BUILD"), *folder.rglob("BUILD.*")]
+      for folder in args.folders)
   )
   updates: Dict[Path, List[str]] = {}
   for build in build_files:
