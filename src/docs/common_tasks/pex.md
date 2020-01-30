@@ -13,7 +13,7 @@ If you need to create a Python library target instead, see [[Define a Python Lib
 Define a `python_binary` target that you can build as a PEX using the `binary` goal:
 
     ::bash
-    $ ./pants binary myproject/src/python:my-python-binary
+    $ ./pants binary src/python/myproject/example:my-python-binary
 
 ## Discussion
 
@@ -28,15 +28,17 @@ In a `python_ binary` target, you should specify:
 Here's an example `python_binary` target:
 
     ::python
-    python_library(name='myproject-lib',
+    python_library(
+      name='myproject-lib',
       # Other parameters
     )
 
-    python_binary(name='myproject-bin',
+    python_binary(
+      name='myproject-bin',
       source='main.py',
       dependencies=[
-        ':myproject-lib'
-      ]
+        ':myproject-lib',
+      ],
     )
 
 ## See Also

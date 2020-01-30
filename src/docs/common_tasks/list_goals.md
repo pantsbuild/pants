@@ -14,19 +14,20 @@ Invoke the `goals` goal:
 The resulting list should look something like this:
 
     :::
-    Installed goals:
-                   autoblame: Finds the responsible individuals, group, JIRA project and BUILD file for a given target,
-                   bash-completion: Generate a Bash shell script that teaches Bash how to autocomplete pants command lines.
-                   bench: Run benchmarks.
-                   binary: Create a runnable binary.
+    Use `./pants help $goal` to get help for a particular goal.
+
+        bash-completion: Generate a Bash shell script that teaches Bash how to autocomplete pants command lines.
+                  bench: Run benchmarks.
+                 binary: Create a runnable binary.
+              bootstrap: Bootstrap tools needed by subsequent build steps.
                    # etc.
 
 You can get help output for each Pants goal (including all the available flags for that goal) by appending the `-h` or `--help` flags or the `help` command. Here are three equivalent examples:
 
     :::bash
-    $ ./pants goals -h
-    $ ./pants goals --help
-    $ ./pants goals help
+    $ ./pants test -h
+    $ ./pants test --help
+    $ ./pants help test
 
 ## See Also
 
