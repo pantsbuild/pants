@@ -5,10 +5,10 @@ python_library(
   dependencies=[
     ':text',
   ],
-  sources=globs('*.py'),
+  sources=['*.py'],
 )
 
 resources(
   name='text',
-  sources=globs('*.txt'),
+  sources=['*.txt'],
 )

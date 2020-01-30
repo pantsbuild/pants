@@ -53,5 +53,5 @@ java_library(
 
 resources(
   name='readme',
-  sources=globs('*.txt'),
+  sources=['*.txt'],
 )

@@ -4,7 +4,7 @@
 #  annotation_processor() target to test resource mapping
 
 annotation_processor(
-  sources=globs('*.java'),
+  sources=['*.java'],
   processors=['org.pantsbuild.testproject.annotation.processor.ResourceMappingProcessor'],
   dependencies=[
     # NB: We use the oldest guava we can stomach here, in order to flush out classpath

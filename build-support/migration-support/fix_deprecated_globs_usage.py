@@ -92,9 +92,18 @@ class GlobFunction(NamedTuple):
     return os.path.join(*out)
 
   @classmethod
-  def parse(cls, glob_func: ast.Call) -> "GlobFunction":
-    glob_type = GlobType(glob_func.func.id)
-    include_globs: List[str] = [arg.s for arg in glob_func.args]
+  def parse(cls, glob_func: ast.Call, *, build_file: Path) -> Optional["GlobFunction"]:
+    # NB: technically, glob arguments can be different than `globs`, `rglobs`, and `zglobs`, such
+    # as using `set()` in an `exclude` clause. We don't try to handle this edge case.
+    try:
+      glob_type = GlobType(glob_func.func.id)
+    except ValueError:
+      logging.warning(
+        f"Could not parse the glob type `{glob_func.func.id}` in {build_file} at line "
+        f"{glob_func.lineno}. Please manually update."
+      )
+      return None
+    include_globs: List[str] = [arg.s for arg in glob_func.args if isinstance(arg, ast.Str)]
 
     # Excludes are tricky...The optional `exclude` keyword is guaranteed to have a list as its
     # value, but that list can have any of these elements:
@@ -116,10 +125,12 @@ class GlobFunction(NamedTuple):
       ]
       exclude_globs = [arg.s for arg in combined_exclude_elements if isinstance(arg, ast.Str)]
       exclude_glob_functions = (
-        cls.parse(glob) for glob in combined_exclude_elements if isinstance(glob, ast.Call)
+        cls.parse(glob, build_file=build_file)
+        for glob in combined_exclude_elements if isinstance(glob, ast.Call)
       )
       for exclude_glob_function in exclude_glob_functions:
-        exclude_globs.extend(exclude_glob_function.includes)
+        if exclude_glob_function is not None:
+          exclude_globs.extend(exclude_glob_function.includes)
       # We sort because of how we use recursion to evaluate `globs` within the `exclude` clause.
       # Without sorting, the results would appear out of order. Given this difficulty, it's not
       # worth trying to preserve the original order.
@@ -177,7 +188,7 @@ def generate_possibly_new_build(build_file: Path) -> Optional[List[str]]:
 
   targets: List[ast.Call] = [
     target.value for target in ast.parse(original_text).body
-    if isinstance(target.value, ast.Call)
+    if isinstance(target, ast.Expr) and isinstance(target.value, ast.Call)
   ]
   for target in targets:
     bundles_arg: Optional[ast.keyword] = next(
@@ -196,7 +207,10 @@ def generate_possibly_new_build(build_file: Path) -> Optional[List[str]]:
         if not isinstance(fileset_arg.value, ast.Call):
           continue
 
-        parsed_glob_function = GlobFunction.parse(fileset_arg.value)
+        parsed_glob_function = GlobFunction.parse(fileset_arg.value, build_file=build_file)
+        if parsed_glob_function is None:
+          continue
+
         lineno = fileset_arg.value.lineno
         original_line = updated_text_lines[lineno - 1].rstrip()
         formatted_replacement = parsed_glob_function.convert_to_sources_list(
@@ -217,7 +231,10 @@ def generate_possibly_new_build(build_file: Path) -> Optional[List[str]]:
     if not sources_arg or not isinstance(sources_arg.value, ast.Call):
       continue
 
-    parsed_glob_function = GlobFunction.parse(sources_arg.value)
+    parsed_glob_function = GlobFunction.parse(sources_arg.value, build_file=build_file)
+    if parsed_glob_function is None:
+      continue
+
     lineno: int = sources_arg.value.lineno
     original_line = updated_text_lines[lineno - 1].rstrip()
     formatted_replacement = parsed_glob_function.convert_to_sources_list(
