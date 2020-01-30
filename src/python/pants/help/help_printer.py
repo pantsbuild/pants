@@ -7,6 +7,7 @@ from typing import Dict, Optional, cast
 from typing_extensions import Literal
 
 from pants.base.build_environment import pants_release, pants_version
+from pants.engine.goal import GoalSubsystem
 from pants.engine.rules import UnionMembership
 from pants.goal.goal import Goal
 from pants.help.help_formatter import HelpFormatter
@@ -71,7 +72,8 @@ class HelpPrinter:
       goal_scope_infos = [
         scope_info
         for scope_info in self._options.known_scope_to_info.values()
-        if scope_info.category == ScopeInfo.GOAL
+        if scope_info.optionable_cls is not None
+        and issubclass(scope_info.optionable_cls, GoalSubsystem)
         and scope_info.optionable_cls.is_implemented(union_membership=self._union_membership)
       ]
       for scope_info in goal_scope_infos:
