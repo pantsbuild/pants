@@ -1,6 +1,6 @@
 node_module(
   name='npm-path-injection',
-  sources=globs('package.json', 'npm-shrinkwrap.json', '.babelrc', 'test/*.js'),
+  sources=['package.json', 'npm-shrinkwrap.json', '.babelrc', 'test/*.js'],
   package_manager='npm',
 )
 

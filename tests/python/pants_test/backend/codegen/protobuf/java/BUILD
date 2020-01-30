@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
-  sources = globs('*.py', exclude=[globs('*_integration.py')]),
+  sources = ['*.py', '!*_integration.py'],
   dependencies = [
     'src/python/pants/backend/codegen/protobuf/java',
     'src/python/pants/java/jar',
@@ -20,7 +20,7 @@ python_tests(
 
 python_tests(
   name = 'integration',
-  sources = globs('*_integration.py'),
+  sources = ['*_integration.py'],
   dependencies = [
     'src/python/pants/testutil:int-test',
     'examples/src/java/org/pantsbuild/example:protobuf_directory',

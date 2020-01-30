@@ -3,5 +3,5 @@
 
 files(
   name='avro_tests_directory',
-  sources=rglobs('tests/avro/*'),
+  sources=['tests/avro/**/*'],
 )

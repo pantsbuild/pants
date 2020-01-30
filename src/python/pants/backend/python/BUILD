@@ -20,7 +20,7 @@ python_library(
 
 python_library(
   name = 'all_utils',
-  sources = globs('*.py', exclude=[['__init__.py', 'register.py']]),
+  sources = ['*.py', '!__init__.py', '!register.py'],
   dependencies = [
     ':interpreter_cache',
     ':python_artifact',

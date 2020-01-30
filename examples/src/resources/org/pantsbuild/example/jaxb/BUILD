@@ -2,6 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 jaxb_library(
-  sources=globs('*.xsd'),
+  sources=['*.xsd'],
   package='org.pantsbuild.example.jaxb.api',
 )

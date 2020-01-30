@@ -17,6 +17,6 @@ python_app(
   name='hello-app',
   binary=':main',
   bundles=[
-    bundle(fileset=globs('BUILD')),
+    bundle(fileset=['BUILD']),
   ],
 )

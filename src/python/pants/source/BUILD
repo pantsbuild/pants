@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  sources = globs('*.py', exclude=[globs('payload_fields.py')]),
+  sources = ['*.py', '!payload_fields.py'],
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
     '3rdparty/python:dataclasses',

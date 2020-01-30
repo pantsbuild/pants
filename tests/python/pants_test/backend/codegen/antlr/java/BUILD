@@ -3,7 +3,7 @@
 
 
 python_tests(
-  sources = globs('*.py', exclude=[globs('*_integration.py')]),
+  sources = ['*.py', '!*_integration.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
     '3rdparty/python:dataclasses',
@@ -19,7 +19,7 @@ python_tests(
 
 python_tests(
   name = 'integration',
-  sources = globs('*_integration.py'),
+  sources = ['*_integration.py'],
   dependencies = [
     'src/python/pants/fs',
     'src/python/pants/util:contextutil',
