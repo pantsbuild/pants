@@ -69,10 +69,6 @@ script fail:
         password: <fill me in>
         EOF
 
-  - Note that the release script expects your pantsbuild/pants git remote to be named `origin`.
-    If you have another name for it, you should `git remote rename othername origin` before running
-    the release script, and rename it back afterwards.
-
 1. Prepare Release
 ------------------
 
