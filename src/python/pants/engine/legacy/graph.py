@@ -724,11 +724,10 @@ async def sources_snapshots_from_filesystem_specs(
   snapshot = await Get[Snapshot](
     PathGlobs(
       globs=(fs_spec.glob for fs_spec in filesystem_specs),
-      # We unconditionally warn when globs do not match, rather than ignoring or erroring. We
-      # should not error because we can still do meaningful work with the globs that do match, and
-      # the warning will be very obvious to the user. Warning is less hostile than erroring.
-      glob_match_error_behavior=GlobMatchErrorBehavior.warn,
-      # We validate that _every_ glob is valid.
+      # We error on unmatched globs for consistency with unmatched address specs. This also
+      # ensures that scripts don't silently do the wrong thing.
+      glob_match_error_behavior=GlobMatchErrorBehavior.error,
+      # We check that _every_ glob is valid.
       conjunction=GlobExpansionConjunction.all_match,
       description_of_origin="file arguments",
     )
