@@ -436,7 +436,7 @@ class InvalidOwnersOfArgs(Exception):
 class OwnersRequest:
   """A request for the owners (and optionally, transitive dependees) of a set of file paths."""
   sources: Tuple[str, ...]
-  include_dependees: IncludeDependeesOption
+  include_dependees: IncludeDependeesOption = IncludeDependeesOption.NONE
 
   def validate(self, *, pants_bin_name: str) -> None:
     """Ensure that users are passing valid args."""

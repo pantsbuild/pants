@@ -8,20 +8,12 @@ from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
-from pants.base.specs import (
-  AddressSpec,
-  AddressSpecs,
-  FilesystemSpec,
-  FilesystemSpecs,
-  SingleAddress,
-  Specs,
-)
+from pants.base.specs import AddressSpec, AddressSpecs, FilesystemSpecs, SingleAddress, Specs
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.legacy.graph import OwnersRequest
 from pants.engine.scheduler import SchedulerSession
-from pants.goal.workspace import ScmWorkspace
 from pants.option.options import Options
-from pants.scm.subsystems.changed import ChangedRequest, IncludeDependeesOption
+from pants.scm.subsystems.changed import ChangedRequest
 
 
 logger = logging.getLogger(__name__)
@@ -45,26 +37,25 @@ class SpecsCalculator:
     """Parse raw string specs into a Specs object."""
     build_root = build_root or get_buildroot()
     spec_parser = CmdLineSpecParser(build_root)
-    specs = OrderedSet(spec_parser.parse_spec(spec_str) for spec_str in raw_specs)
-    address_specs = AddressSpecs(
-      dependencies=(spec for spec in specs if isinstance(spec, AddressSpec)),
+
+    address_specs: OrderedSet = OrderedSet()
+    filesystem_specs: OrderedSet = OrderedSet()
+    for spec_str in raw_specs:
+      parsed_spec = spec_parser.parse_spec(spec_str)
+      if isinstance(parsed_spec, AddressSpec):
+        address_specs.add(parsed_spec)
+      else:
+        filesystem_specs.add(parsed_spec)
+
+    address_specs_collection = AddressSpecs(
+      dependencies=address_specs,
       exclude_patterns=exclude_patterns if exclude_patterns else tuple(),
       tags=tags,
     )
-    filesystem_specs = FilesystemSpecs(
-      spec for spec in specs if isinstance(spec, FilesystemSpec)
+    filesystem_specs_collection = FilesystemSpecs(filesystem_specs)
+    return Specs(
+      address_specs=address_specs_collection, filesystem_specs=filesystem_specs_collection,
     )
-    return Specs(address_specs=address_specs, filesystem_specs=filesystem_specs)
-
-  @classmethod
-  def changed_files(cls, scm, changes_since=None, diffspec=None):
-    """Determines the files changed according to SCM/workspace and options."""
-    workspace = ScmWorkspace(scm)
-    if diffspec:
-      return workspace.changes_in(diffspec)
-
-    changes_since = changes_since or scm.current_rev_identifier()
-    return workspace.touched_files(changes_since)
 
   @classmethod
   def create(
@@ -104,23 +95,18 @@ class SpecsCalculator:
       # We've been provided more than one of: a change request, an owner request, or specs.
       raise InvalidSpecConstraint(
         'Multiple target selection methods provided. Please use only one of '
-        '--changed-*, --owner-of, address specs, or filesystem specs.'
+        '`--changed-*`, `--owner-of`, address specs, or filesystem specs.'
       )
 
     if changed_request.is_actionable():
       scm = get_scm()
       if not scm:
         raise InvalidSpecConstraint(
-          'The --changed-* options are not available without a recognized SCM (usually git).'
+          'The `--changed-*` options are not available without a recognized SCM (usually git).'
         )
-      changed_files = cls.changed_files(
-          scm,
-          changes_since=changed_request.changes_since,
-          diffspec=changed_request.diffspec)
-      # We've been provided no spec roots (e.g. `./pants list`) AND a changed request. Compute
-      # alternate target roots.
       request = OwnersRequest(
-        sources=tuple(changed_files), include_dependees=changed_request.include_dependees,
+        sources=tuple(changed_request.changed_files(scm=scm)),
+        include_dependees=changed_request.include_dependees,
       )
       changed_addresses, = session.product_request(BuildFileAddresses, [request])
       logger.debug('changed addresses: %s', changed_addresses)
@@ -133,11 +119,7 @@ class SpecsCalculator:
       )
 
     if owned_files:
-      # We've been provided no spec roots (e.g. `./pants list`) AND a owner request. Compute
-      # alternate target roots.
-      request = OwnersRequest(
-        sources=tuple(owned_files), include_dependees=IncludeDependeesOption.NONE,
-      )
+      request = OwnersRequest(sources=tuple(owned_files))
       request.validate(pants_bin_name=options.for_global_scope().pants_bin_name)
       owner_addresses, = session.product_request(BuildFileAddresses, [request])
       logger.debug('owner addresses: %s', owner_addresses)
