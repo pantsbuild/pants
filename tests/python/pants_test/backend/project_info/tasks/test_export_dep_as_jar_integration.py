@@ -1,8 +1,12 @@
+# Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 import json
 import re
 
-from pants_test.backend.jvm.tasks.jvm_compile.scala.base_scalac_plugin_integration_test import \
-  ScalacPluginIntegrationTestBase
+from pants_test.backend.jvm.tasks.jvm_compile.scala.base_scalac_plugin_integration_test import (
+  ScalacPluginIntegrationTestBase,
+)
 
 
 class ExportDepAsJarIntegrationTest(ScalacPluginIntegrationTestBase):

@@ -1,6 +1,9 @@
+# Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.util.collections import recursively_update
 from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test import BaseCompileIT
+
 
 class ScalacPluginIntegrationTestBase(BaseCompileIT):
 
