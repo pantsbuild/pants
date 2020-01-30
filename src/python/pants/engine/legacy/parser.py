@@ -5,10 +5,11 @@ import logging
 import os
 import tokenize
 from io import StringIO
+from pathlib import PurePath
 from typing import Dict, Tuple
 
 from pants.base.build_file_target_factory import BuildFileTargetFactory
-from pants.base.deprecated import deprecated_conditional
+from pants.base.deprecated import warn_or_error
 from pants.base.parse_context import ParseContext
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.legacy.structs import BundleAdaptor, Globs, RGlobs, TargetAdaptor, ZGlobs
@@ -149,16 +150,24 @@ class LegacyPythonCallbacksParser(Parser):
 
         # We have this deprecation here, rather than in `engine/legacy/structs.py` where the
         # `sources` field is parsed, so that we can refer to the line number and filename as that
-        # information is not preserved.
-        deprecated_conditional(
-          lambda: token_str in ["globs", "rglobs", "zglobs"],
-          entity_description="Using `globs`, `rglobs`, and `zglobs`",
-          removal_version="1.27.0.dev0",
-          hint_message=f"Using deprecated `{token_str}` in {filepath} at line {lineno}. Instead, "
-                       f"use a list of files and globs, like `sources=['f1.py', '*.java']`. "
-                       f"Specify excludes by putting an `!` at the start of the value, like "
-                       f"`!ignore.py`."
-        )
+        # information is not passed to `structs.py`.
+        if token_str in ["globs", "rglobs", "zglobs"]:
+          script_instructions = (
+            "curl -L -o fix_deprecated_globs_usage.py 'https://git.io/JvOKD' && chmod +x "
+            "fix_deprecated_globs_usage.py && ./fix_deprecated_globs_usage.py "
+            f"{PurePath(filepath).parent}"
+          )
+          warning = (
+            f"Using deprecated `{token_str}` in {filepath} at line {lineno}. Instead, use a list "
+            f"of files and globs, like `sources=['f1.py', '*.java']`. Specify excludes by putting "
+            f"an `!` at the start of the value, like `!ignore.py`.\n\nWe recommend using our "
+            f"migration script by running `{script_instructions}`"
+          )
+          warn_or_error(
+            removal_version="1.27.0.dev0",
+            deprecated_entity_description="Using `globs`, `rglobs`, and `zglobs`",
+            hint=warning,
+          )
 
         if token_str == 'import':
           if self._build_file_imports_behavior == "allow":
@@ -166,13 +175,17 @@ class LegacyPythonCallbacksParser(Parser):
           elif self._build_file_imports_behavior == 'warn':
             logger.warning(
               f'Import used in {filepath} at line {lineno}. Import statements should '
-              f'be avoided in BUILD files because TODO... Instead, consider TODO...'
+              f'be avoided in BUILD files because they can easily break Pants caching and lead to '
+              f'stale results. Instead, consider rewriting your code into a Pants plugin: '
+              f'https://www.pantsbuild.org/howto_plugin.html'
             )
           else:
             raise ParseError(
               f'Import used in {filepath} at line {lineno}. Import statements are banned in '
-              f'BUILD files in this repository and should generally be avoided because TODO...'
-              f'Instead, consider TODO...'
+              f'BUILD files in this repository and should generally be avoided because because '
+              f'they can easily break Pants caching and lead to stale results. Instead, consider '
+              f'rewriting your code into a Pants plugin: '
+              f'https://www.pantsbuild.org/howto_plugin.html'
             )
 
     return list(self._parse_context._storage.objects)
