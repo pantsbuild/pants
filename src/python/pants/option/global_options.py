@@ -51,6 +51,12 @@ class FileNotFoundBehavior(Enum):
     return GlobMatchErrorBehavior(self.value)
 
 
+class BuildFileImportsBehavior(Enum):
+  allow = "allow"
+  warn = "warn"
+  error = "error"
+
+
 @dataclass(frozen=True)
 class ExecutionOptions:
   """A collection of all options related to (remote) execution of processes.
@@ -434,8 +440,8 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
 
     # This option changes the parser behavior in a fundamental way (which currently invalidates
     # all caches), and needs to be parsed out early, so we make it a bootstrap option.
-    register('--build-file-imports', choices=['allow', 'warn', 'error'], default='warn',
-             advanced=True,
+    register('--build-file-imports', type=BuildFileImportsBehavior,
+             default=BuildFileImportsBehavior.warn, advanced=True,
              help='Whether to allow import statements in BUILD files')
 
     register('--local-store-dir', advanced=True,
