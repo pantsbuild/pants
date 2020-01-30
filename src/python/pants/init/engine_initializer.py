@@ -291,7 +291,7 @@ class EngineInitializer:
     files_not_found_behavior_configured = not bootstrap_options.is_default("files_not_found_behavior")
     if glob_expansion_failure_configured and files_not_found_behavior_configured:
       raise ValueError(
-        "Conflicting options used. You uses the new, preferred `--files-not-found-behavior`, but "
+        "Conflicting options used. You used the new, preferred `--files-not-found-behavior`, but "
         "also used the deprecated `--glob-expansion-failure`.\n\nPlease "
         "specify only one of these (preferably `--files-not-found-behavior`).")
     glob_match_error_behavior = (
