@@ -8,6 +8,7 @@ from io import StringIO
 from typing import Dict, Tuple
 
 from pants.base.build_file_target_factory import BuildFileTargetFactory
+from pants.base.deprecated import deprecated_conditional
 from pants.base.parse_context import ParseContext
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.legacy.structs import BundleAdaptor, Globs, RGlobs, TargetAdaptor, ZGlobs
@@ -140,27 +141,38 @@ class LegacyPythonCallbacksParser(Parser):
     # Note that this is incredibly poor sandboxing. There are many ways to get around it.
     # But it's sufficient to tell most users who aren't being actively malicious that they're doing
     # something wrong, and it has a low performance overhead.
-    if self._build_file_imports_behavior != 'allow' and 'import' in python:
+    if "globs" in python or (self._build_file_imports_behavior != 'allow' and 'import' in python):
       io_wrapped_python = StringIO(python)
       for token in tokenize.generate_tokens(io_wrapped_python.readline):
-        if token[1] == 'import':
-          line_being_tokenized = token[4]
-          if self._build_file_imports_behavior == 'warn':
-            logger.warning('{} tried to import - import statements should be avoided ({})'.format(
-              filepath,
-              line_being_tokenized
-            ))
-          elif self._build_file_imports_behavior == 'error':
-            raise ParseError(
-              'import statements have been banned, but tried to import: {}'.format(
-                line_being_tokenized
-              )
+        token_str = token[1]
+        lineno, _ = token[2]
+
+        # We have this deprecation here, rather than in `engine/legacy/structs.py` where the
+        # `sources` field is parsed, so that we can refer to the line number and filename as that
+        # information is not preserved.
+        deprecated_conditional(
+          lambda: token_str in ["globs", "rglobs", "zglobs"],
+          entity_description="Using `globs`, `rglobs`, and `zglobs`",
+          removal_version="1.27.0.dev0",
+          hint_message=f"Using deprecated `{token_str}` in {filepath} at line {lineno}. Instead, "
+                       f"use a list of files and globs, like `sources=['f1.py', '*.java']`. "
+                       f"Specify excludes by putting an `!` at the start of the value, like "
+                       f"`!ignore.py`."
+        )
+
+        if token_str == 'import':
+          if self._build_file_imports_behavior == "allow":
+            continue
+          elif self._build_file_imports_behavior == 'warn':
+            logger.warning(
+              f'Import used in {filepath} at line {lineno}. Import statements should '
+              f'be avoided in BUILD files because TODO... Instead, consider TODO...'
             )
           else:
             raise ParseError(
-              "Didn't know what to do for build_file_imports_behavior value {}".format(
-                self._build_file_imports_behavior
-              )
+              f'Import used in {filepath} at line {lineno}. Import statements are banned in '
+              f'BUILD files in this repository and should generally be avoided because TODO...'
+              f'Instead, consider TODO...'
             )
 
     return list(self._parse_context._storage.objects)
