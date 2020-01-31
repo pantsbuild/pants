@@ -10,6 +10,7 @@ from pants.build_graph.address import Address
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.legacy.graph import (
+  Owners,
   OwnersRequest,
   _DependentGraph,
   target_types_from_build_file_aliases,
@@ -52,11 +53,11 @@ async def find_owners(
   address_mapper: AddressMapper,
   changed_request: ChangedRequest,
 ) -> ChangedAddresses:
-  direct_owners = await Get[BuildFileAddresses](OwnersRequest(sources=changed_request.sources))
+  direct_owners = await Get[Owners](OwnersRequest(sources=changed_request.sources))
 
   # If the ChangedRequest does not require dependees, then we're done.
   if changed_request.include_dependees == IncludeDependeesOption.NONE:
-    return ChangedAddresses(direct_owners)
+    return ChangedAddresses(direct_owners.addresses)
 
   # Otherwise: find dependees.
   all_addresses = await Get[BuildFileAddresses](AddressSpecs((DescendantAddresses(''),)))
@@ -71,10 +72,10 @@ async def find_owners(
   )
   if changed_request.include_dependees == IncludeDependeesOption.DIRECT:
     return ChangedAddresses(
-      BuildFileAddresses(graph.dependents_of_addresses(direct_owners))
+      BuildFileAddresses(graph.dependents_of_addresses(direct_owners.addresses))
     )
   return ChangedAddresses(
-    BuildFileAddresses(graph.transitive_dependents_of_addresses(direct_owners))
+    BuildFileAddresses(graph.transitive_dependents_of_addresses(direct_owners.addresses))
   )
 
 
