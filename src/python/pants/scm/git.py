@@ -117,6 +117,7 @@ class Git(Scm):
     self._remote = remote
     self._branch = branch
 
+  @property
   def current_rev_identifier(self):
     return 'HEAD'
 
