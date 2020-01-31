@@ -18,7 +18,7 @@ class FilemapIntegrationTest(PantsRunIntegrationTest):
   def setUp(self):
     super().setUp()
 
-    project_tree = FileSystemProjectTree(os.path.abspath(self.PATH_PREFIX), ['BUILD', '.*'])
+    project_tree = FileSystemProjectTree(os.path.abspath(self.PATH_PREFIX), ['TEST_BUILD', '.*'])
     scan_set = set()
 
     def should_ignore(file):
@@ -33,14 +33,15 @@ class FilemapIntegrationTest(PantsRunIntegrationTest):
     return f'{self.PATH_PREFIX}:{test_name}'
 
   def _extract_exclude_output(self, test_name):
-    stdout_data = self.do_command(
-      'filemap', self._mk_target(test_name), success=True
-    ).stdout_data
-    return {
-      s.split(' ')[0].replace(self.PATH_PREFIX, '')
-      for s in stdout_data.split('\n')
-      if s.startswith(self.PATH_PREFIX) and '__init__.py' not in s
-    }
+    with self.file_renamed(self.PATH_PREFIX, test_name="TEST_BUILD", real_name="BUILD"):
+      stdout_data = self.do_command(
+        'filemap', self._mk_target(test_name), success=True
+      ).stdout_data
+      return {
+        s.split(' ')[0].replace(self.PATH_PREFIX, '')
+        for s in stdout_data.split('\n')
+        if s.startswith(self.PATH_PREFIX) and '__init__.py' not in s
+      }
 
   def test_python_sources(self):
     run = self.do_command('filemap',
