@@ -24,6 +24,7 @@ from pants.engine.fs import (
   PathGlobs,
   PathGlobsAndRoot,
   Snapshot,
+  SnapshotSubset,
   UrlToFetch,
   create_fs_rules,
 )
@@ -592,6 +593,73 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
           "9341f76bef74170bedffe51e4f2e233f61786b7752d21c2339f8ee6070eba819",
           82
         ))
+
+  def generate_original_digest(self) -> Digest:
+    content = b'dummy content'
+    input_files_content = InputFilesContent((
+      FileContent(path='a.txt', content=content),
+      FileContent(path='b.txt', content=content),
+      FileContent(path='c.txt', content=content),
+      FileContent(path='subdir/a.txt', content=content),
+      FileContent(path='subdir/b.txt', content=content),
+      FileContent(path='subdir2/a.txt', content=content),
+      FileContent(path='subdir2/nested_subdir/x.txt', content=content),
+    ))
+    return self.request_single_product(Digest, input_files_content)
+
+  def test_empty_snapshot_subset(self) -> None:
+    ss = SnapshotSubset(directory_digest=self.generate_original_digest(),
+        globs = PathGlobs(()),
+    )
+    subset_snapshot = self.request_single_product(Snapshot, ss)
+    assert subset_snapshot.directory_digest == EMPTY_DIRECTORY_DIGEST
+    assert subset_snapshot.files == ()
+    assert subset_snapshot.dirs == ()
+
+  def test_snapshot_subset_globs(self) -> None:
+    ss = SnapshotSubset(directory_digest=self.generate_original_digest(),
+        globs=PathGlobs(("a.txt", "c.txt", "subdir2/**")),
+    )
+
+    subset_snapshot = self.request_single_product(Snapshot, ss)
+    assert set(subset_snapshot.files) == {'a.txt', 'c.txt', 'subdir2/a.txt', 'subdir2/nested_subdir/x.txt'}
+    assert set(subset_snapshot.dirs) == {'subdir2/nested_subdir'}
+
+    content = b'dummy content'
+    subset_input = InputFilesContent((
+      FileContent(path='a.txt', content=content),
+      FileContent(path='c.txt', content=content),
+      FileContent(path='subdir2/a.txt', content=content),
+      FileContent(path='subdir2/nested_subdir/x.txt', content=content),
+    ))
+    subset_digest = self.request_single_product(Digest, subset_input)
+    assert subset_snapshot.directory_digest == subset_digest
+
+  def test_snapshot_subset_globs_2(self) -> None:
+    ss = SnapshotSubset(directory_digest=self.generate_original_digest(),
+        globs=PathGlobs(("a.txt", "c.txt", "subdir2/*")),
+    )
+
+    subset_snapshot = self.request_single_product(Snapshot, ss)
+    assert set(subset_snapshot.files) == {'a.txt', 'c.txt', 'subdir2/a.txt'} 
+    assert set(subset_snapshot.dirs) == {'subdir2/nested_subdir'}
+
+  def test_nonexistent_filename_globs(self) -> None:
+    # We expect to ignore, rather than error, on files that don't exist in the original snapshot.
+    ss = SnapshotSubset(directory_digest=self.generate_original_digest(),
+        globs=PathGlobs(("some_file_not_in_snapshot.txt", "a.txt"))
+    )
+
+    subset_snapshot = self.request_single_product(Snapshot, ss)
+    assert set(subset_snapshot.files) == {"a.txt"}
+
+    content = b'dummy content'
+    subset_input = InputFilesContent((
+      FileContent(path='a.txt', content=content),
+    ))
+
+    subset_digest = self.request_single_product(Digest, subset_input)
+    assert subset_snapshot.directory_digest == subset_digest
 
 
 class StubHandler(BaseHTTPRequestHandler):
