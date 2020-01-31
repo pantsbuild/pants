@@ -182,7 +182,7 @@ class LegacyPythonCallbacksParser(Parser):
           else:
             raise ParseError(
               f'Import used in {filepath} at line {lineno}. Import statements are banned in '
-              f'BUILD files in this repository and should generally be avoided because because '
+              f'BUILD files in this repository and should generally be avoided because '
               f'they can easily break Pants caching and lead to stale results. Instead, consider '
               f'rewriting your code into a Pants plugin: '
               f'https://www.pantsbuild.org/howto_plugin.html'
