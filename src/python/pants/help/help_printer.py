@@ -72,11 +72,17 @@ class HelpPrinter:
       goal_scope_infos = [
         scope_info
         for scope_info in self._options.known_scope_to_info.values()
-        if scope_info.optionable_cls is not None
-        and issubclass(scope_info.optionable_cls, GoalSubsystem)
-        and scope_info.optionable_cls.is_implemented(union_membership=self._union_membership)
+        if scope_info.category == ScopeInfo.GOAL
       ]
       for scope_info in goal_scope_infos:
+        if scope_info.optionable_cls is None or not issubclass(scope_info.optionable_cls, GoalSubsystem):
+          continue
+        is_unimplemented = any(
+          self._union_membership.union_rules.get(union_type) is None
+          for union_type in scope_info.optionable_cls.required_union_implementations
+        )
+        if is_unimplemented:
+          continue
         description = scope_info.description or "<no description>"
         goal_descriptions[scope_info.scope] = description
     if global_options.v1:

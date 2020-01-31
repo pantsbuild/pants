@@ -76,9 +76,7 @@ class FmtOptions(GoalSubsystem):
   # Blocked on https://github.com/pantsbuild/pants/issues/8351
   name = 'fmt2'
 
-  @classmethod
-  def is_implemented(cls, *, union_membership: UnionMembership) -> bool:
-    return union_membership.union_rules.get(FormatTarget) is not None
+  required_union_implementations = [FormatTarget]
 
 
 class Fmt(Goal):

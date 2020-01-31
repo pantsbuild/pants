@@ -10,7 +10,7 @@ from pants.engine.fs import Digest, DirectoriesToMerge, DirectoryToMaterialize, 
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.legacy.graph import HydratedTarget
 from pants.engine.objects import union
-from pants.engine.rules import UnionMembership, goal_rule, rule
+from pants.engine.rules import goal_rule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.rules.core.distdir import DistDir
 
@@ -31,9 +31,7 @@ class BinaryOptions(LineOriented, GoalSubsystem):
   """Create a runnable binary."""
   name = 'binary'
 
-  @classmethod
-  def is_implemented(cls, *, union_membership: UnionMembership) -> bool:
-    return union_membership.union_rules.get(BinaryTarget) is not None
+  required_union_implementations = [BinaryTarget]
 
 
 class Binary(Goal):

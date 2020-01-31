@@ -80,6 +80,8 @@ class TestOptions(GoalSubsystem):
   """Runs tests."""
   name = "test"
 
+  required_union_implementations = [TestTarget]
+
   # Prevent this class from being detected by pytest as a test class.
   __test__ = False
 
@@ -99,10 +101,6 @@ class TestOptions(GoalSubsystem):
       default=False,
       help='Generate a coverage report for this test run.',
     )
-
-  @classmethod
-  def is_implemented(cls, *, union_membership: UnionMembership) -> bool:
-    return union_membership.union_rules.get(TestTarget) is not None
 
 
 class Test(Goal):
