@@ -1,10 +1,13 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test import BaseCompileIT
+
+from pants_test.backend.jvm.tasks.jvm_compile.scala.base_scalac_plugin_integration_test import (
+  ScalacPluginIntegrationTestBase,
+)
 
 
-class ScalacPluginIntegrationTest(BaseCompileIT):
+class ScalacPluginIntegrationTest(ScalacPluginIntegrationTestBase):
   example_dir = 'examples/src/scala/org/pantsbuild/example/scalac/plugin'
 
   def _do_test(self, expected_args, config, target):
@@ -18,26 +21,14 @@ class ScalacPluginIntegrationTest(BaseCompileIT):
   # Note that in the terminology of this test, "global" means specified via options for
   # all targets, and "local" means specified on an individual target.
   def _do_test_global(self, args, extra_config={}, expected_args=None):
-    config = {
-      'scala': {
-        'scalac_plugins': ['simple_scalac_plugin'],
-        'scalac_plugin_args': {
-          'simple_scalac_plugin': args
-        },
-      },
-      **extra_config
-    }
+    config = self.with_global_plugin_enabled(
+              self.with_global_plugin_args(args, extra_config)
+            )
     # Must compile the plugin explicitly, since there's no dep.
     self._do_test((expected_args or args), config, 'global')
 
   def _do_test_local_with_global_args(self, args):
-    config = {
-      'scala': {
-        'scalac_plugin_args': {
-          'simple_scalac_plugin': args
-        }
-      }
-    } if args is not None else {}
+    config = self.with_global_plugin_args(args, {})
     self._do_test(args, config, 'local_with_global_args')
 
   def test_global(self):
@@ -47,11 +38,7 @@ class ScalacPluginIntegrationTest(BaseCompileIT):
 
   def test_global_with_local_args(self):
     self._do_test(['args', 'from', 'target', 'global_with_local_args'],
-                  {
-                    'scala': {
-                      'scalac_plugins': ['simple_scalac_plugin'],
-                    },
-                  },
+                  self.with_global_plugin_enabled(),
                   'global_with_local_args')
 
   def test_local_with_global_args(self):
@@ -66,31 +53,18 @@ class ScalacPluginIntegrationTest(BaseCompileIT):
     # Test that a plugin can use another plugin:  While compiling simple_scalac_plugin
     # we will use other_simple_scalac_plugin (because it's globally specified).
     # This is a regression test for https://github.com/pantsbuild/pants/issues/4475.
-    config = {
+    config = self.with_other_global_plugin_enabled({
       'scala': {
-        'scalac_plugins': ['other_simple_scalac_plugin'],
         'scalac_plugin_args': {
           'other_simple_scalac_plugin': ['foo']
         }
       }
-    }
+    })
     self._do_test(['args', 'from', 'target', 'local'], config, 'local')
 
   def test_compiler_option_sets_enabled_scalac_plugins(self):
     self._do_test_global(
       args=[],
-      extra_config={
-        'compile.rsc': {
-          'compiler_option_sets_enabled_args': {
-            'option-set-requiring-scalac-plugin': [
-              '-S-P:simple_scalac_plugin:abc',
-              '-S-P:simple_scalac_plugin:def',
-            ],
-          },
-          'compiler_option_sets_enabled_scalac_plugins': {
-            'option-set-requiring-scalac-plugin': ['simple_scalac_plugin'],
-          },
-        }
-      },
+      extra_config=self.with_compiler_option_sets_enabled_scalac_plugins(),
       expected_args=['abc', 'def'],
     )
