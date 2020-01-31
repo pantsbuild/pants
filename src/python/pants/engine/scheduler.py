@@ -271,6 +271,9 @@ class Scheduler:
 
   def _run_and_return_roots(self, session, execution_request):
     raw_roots = self._native.lib.scheduler_execute(self._scheduler, session, execution_request)
+    if raw_roots == self._native.ffi.NULL:
+      raise KeyboardInterrupt
+
     remaining_runtime_exceptions_to_capture = list(self._native.consume_cffi_extern_method_runtime_exceptions())
     try:
       roots = []

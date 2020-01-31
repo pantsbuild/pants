@@ -40,8 +40,8 @@ mod cffi_externs;
 
 use engine::externs::*;
 use engine::{
-  externs, nodes, Core, ExecutionRequest, Function, Handle, Key, Params, RootResult, Rule,
-  Scheduler, Session, Tasks, TypeId, Types, Value,
+  externs, nodes, Core, ExecutionRequest, ExecutionTermination, Function, Handle, Key, Params,
+  RootResult, Rule, Scheduler, Session, Tasks, TypeId, Types, Value,
 };
 use futures01::{future, Future};
 use hashing::{Digest, EMPTY_DIGEST};
@@ -500,9 +500,10 @@ pub extern "C" fn scheduler_execute(
   with_scheduler(scheduler_ptr, |scheduler| {
     with_execution_request(execution_request_ptr, |execution_request| {
       with_session(session_ptr, |session| {
-        Box::into_raw(RawNodes::create(
-          scheduler.execute(execution_request, session),
-        ))
+        match scheduler.execute(execution_request, session) {
+          Ok(raw_results) => Box::into_raw(RawNodes::create(raw_results)),
+          Err(ExecutionTermination::KeyboardInterrupt) => std::ptr::null(),
+        }
       })
     })
   })
