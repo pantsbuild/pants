@@ -411,8 +411,9 @@ async def get_sources(request: SetupPySourcesRequest,
   ancestor_init_pys = await Get[AncestorInitPyFiles](HydratedTargets, targets)
   sources_digest = await Get[Digest](
     DirectoriesToMerge(directories=tuple([*stripped_srcs_digests, *ancestor_init_pys.digests])))
-  init_pys_digest = await Get[Digest](SnapshotSubset(sources_digest, PathGlobs('**/__init__.py')))
-  init_py_contents = await Get[FilesContent](Digest, init_pys_digest)
+  init_pys_snapshot = await Get[Snapshot](
+    SnapshotSubset(sources_digest, PathGlobs(['**/__init__.py'])))
+  init_py_contents = await Get[FilesContent](Digest, init_pys_snapshot.directory_digest)
 
   packages, namespace_packages, package_data = find_packages(
     source_roots=source_root_config.get_source_roots(),
