@@ -3,10 +3,10 @@
 
 import dataclasses
 import logging
+import os.path
 from collections import defaultdict, deque
 from contextlib import contextmanager
 from dataclasses import dataclass
-from os.path import dirname
 from typing import Any, Dict, Iterable, List, Tuple, cast
 
 from twitter.common.collections import OrderedSet
@@ -17,14 +17,12 @@ from pants.base.specs import (
   AddressSpec,
   AddressSpecs,
   AscendantAddresses,
-  DescendantAddresses,
   FilesystemSpecs,
   SingleAddress,
 )
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.app_base import AppBase, Bundle
-from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.remote_sources import RemoteSources
 from pants.engine.addressable import BuildFileAddresses
@@ -37,14 +35,12 @@ from pants.engine.legacy.structs import (
   SourcesField,
   TargetAdaptor,
 )
-from pants.engine.mapper import AddressMapper
 from pants.engine.objects import Collection
 from pants.engine.parser import HydratedStruct
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.option.custom_types import GlobExpansionConjunction
 from pants.option.global_options import GlobMatchErrorBehavior
-from pants.scm.subsystems.changed import IncludeDependeesOption
 from pants.source.filespec import any_matches_filespec
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper, Filespec
 
@@ -434,9 +430,8 @@ class InvalidOwnersOfArgs(Exception):
 
 @dataclass(frozen=True)
 class OwnersRequest:
-  """A request for the owners (and optionally, transitive dependees) of a set of file paths."""
+  """A request for the owners of a set of file paths."""
   sources: Tuple[str, ...]
-  include_dependees: IncludeDependeesOption = IncludeDependeesOption.NONE
 
   def validate(self, *, pants_bin_name: str) -> None:
     """Ensure that users are passing valid args."""
@@ -463,20 +458,16 @@ class OwnersRequest:
 
 
 @rule
-async def find_owners(
-  build_configuration: BuildConfiguration,
-  address_mapper: AddressMapper,
-  owners_request: OwnersRequest
-) -> BuildFileAddresses:
+async def find_owners(owners_request: OwnersRequest) -> BuildFileAddresses:
   sources_set = OrderedSet(owners_request.sources)
-  dirs_set = OrderedSet(dirname(source) for source in sources_set)
+  dirs_set = OrderedSet(os.path.dirname(source) for source in sources_set)
 
   # Walk up the buildroot looking for targets that would conceivably claim changed sources.
   candidate_specs = tuple(AscendantAddresses(directory=d) for d in dirs_set)
   candidate_targets = await Get[HydratedTargets](AddressSpecs(candidate_specs))
 
   # Match the source globs against the expanded candidate targets.
-  def owns_any_source(legacy_target):
+  def owns_any_source(legacy_target: HydratedTarget) -> bool:
     """Given a `HydratedTarget` instance, check if it owns the given source file."""
     target_kwargs = legacy_target.adaptor.kwargs()
 
@@ -487,34 +478,14 @@ async def find_owners(
     #  1) having two implementations isn't great
     #  2) we're expanding sources via HydratedTarget, but it isn't necessary to do that to match
     target_sources = target_kwargs.get('sources', None)
-    if target_sources and any_matches_filespec(paths=sources_set, spec=target_sources.filespec):
-      return True
-    return False
+    return target_sources and any_matches_filespec(paths=sources_set, spec=target_sources.filespec)
 
-  direct_owners = tuple(ht.adaptor.address
-                        for ht in candidate_targets
-                        if LegacyAddressMapper.any_is_declaring_file(ht.adaptor.address, sources_set) or
-                           owns_any_source(ht))
-
-  # If the OwnersRequest does not require dependees, then we're done.
-  if owners_request.include_dependees == IncludeDependeesOption.NONE:
-    return BuildFileAddresses(direct_owners)
-
-  # Otherwise: find dependees.
-  all_addresses = await Get[BuildFileAddresses](AddressSpecs((DescendantAddresses(''),)))
-  all_structs = [
-    s.value for s in
-    await MultiGet(Get[HydratedStruct](Address, a.to_address()) for a in all_addresses)
-  ]
-
-  bfa = build_configuration.registered_aliases()
-  graph = _DependentGraph.from_iterable(target_types_from_build_file_aliases(bfa),
-                                        address_mapper,
-                                        all_structs)
-  if owners_request.include_dependees == IncludeDependeesOption.DIRECT:
-    return BuildFileAddresses(tuple(graph.dependents_of_addresses(direct_owners)))
-  assert owners_request.include_dependees == IncludeDependeesOption.TRANSITIVE
-  return BuildFileAddresses(tuple(graph.transitive_dependents_of_addresses(direct_owners)))
+  return BuildFileAddresses(
+    ht.adaptor.address
+    for ht in candidate_targets
+    if LegacyAddressMapper.any_is_declaring_file(ht.adaptor.address, sources_set)
+    or owns_any_source(ht)
+  )
 
 
 @rule

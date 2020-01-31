@@ -13,7 +13,7 @@ from pants.engine.addressable import BuildFileAddresses
 from pants.engine.legacy.graph import OwnersRequest
 from pants.engine.scheduler import SchedulerSession
 from pants.option.options import Options
-from pants.scm.subsystems.changed import ChangedRequest
+from pants.scm.subsystems.changed import ChangedAddresses, ChangedOptions, ChangedRequest
 
 
 logger = logging.getLogger(__name__)
@@ -66,7 +66,6 @@ class SpecsCalculator:
     exclude_patterns: Optional[Iterable[str]] = None,
     tags: Optional[Iterable[str]] = None,
   ) -> Specs:
-    # Determine the literal specs.
     specs = cls.parse_specs(
       raw_specs=options.specs,
       build_root=build_root,
@@ -74,20 +73,15 @@ class SpecsCalculator:
       tags=tags,
     )
 
-    # Determine `Changed` arguments directly from options to support pre-`Subsystem`
-    # initialization paths.
-    changed_options = options.for_scope('changed')
-    changed_request = ChangedRequest.from_options(changed_options)
-
-    # Determine the `--owner-of=` arguments provided from the global options
+    changed_options = ChangedOptions.from_options(options.for_scope('changed'))
     owned_files = options.for_global_scope().owner_of
 
     logger.debug('specs are: %s', specs)
-    logger.debug('changed_request is: %s', changed_request)
+    logger.debug('changed_options are: %s', changed_options)
     logger.debug('owned_files are: %s', owned_files)
     targets_specified = sum(
       1 for item
-      in (changed_request.is_actionable(), owned_files, specs.provided_specs.dependencies)
+      in (changed_options.is_actionable(), owned_files, specs.provided_specs.dependencies)
       if item
     )
 
@@ -98,19 +92,21 @@ class SpecsCalculator:
         '`--changed-*`, `--owner-of`, address specs, or filesystem specs.'
       )
 
-    if changed_request.is_actionable():
+    if changed_options.is_actionable():
       scm = get_scm()
       if not scm:
         raise InvalidSpecConstraint(
           'The `--changed-*` options are not available without a recognized SCM (usually git).'
         )
-      request = OwnersRequest(
-        sources=tuple(changed_request.changed_files(scm=scm)),
-        include_dependees=changed_request.include_dependees,
+      changed_request = ChangedRequest(
+        sources=tuple(changed_options.changed_files(scm=scm)),
+        include_dependees=changed_options.include_dependees,
       )
-      changed_addresses, = session.product_request(BuildFileAddresses, [request])
-      logger.debug('changed addresses: %s', changed_addresses)
-      dependencies = tuple(SingleAddress(a.spec_path, a.target_name) for a in changed_addresses)
+      changed_addresses, = session.product_request(ChangedAddresses, [changed_request])
+      logger.debug('changed addresses: %s', changed_addresses.addresses)
+      dependencies = tuple(
+        SingleAddress(a.spec_path, a.target_name) for a in changed_addresses.addresses
+      )
       return Specs(
         address_specs=AddressSpecs(
           dependencies=dependencies, exclude_patterns=exclude_patterns, tags=tags,
@@ -119,9 +115,9 @@ class SpecsCalculator:
       )
 
     if owned_files:
-      request = OwnersRequest(sources=tuple(owned_files))
-      request.validate(pants_bin_name=options.for_global_scope().pants_bin_name)
-      owner_addresses, = session.product_request(BuildFileAddresses, [request])
+      owner_request = OwnersRequest(sources=tuple(owned_files))
+      owner_request.validate(pants_bin_name=options.for_global_scope().pants_bin_name)
+      owner_addresses, = session.product_request(BuildFileAddresses, [owner_request])
       logger.debug('owner addresses: %s', owner_addresses)
       dependencies = tuple(SingleAddress(a.spec_path, a.target_name) for a in owner_addresses)
       return Specs(

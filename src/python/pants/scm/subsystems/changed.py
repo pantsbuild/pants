@@ -3,9 +3,23 @@
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Optional, cast
+from typing import List, Optional, Tuple, cast
 
+from pants.base.specs import AddressSpecs, DescendantAddresses
+from pants.build_graph.address import Address
+from pants.build_graph.build_configuration import BuildConfiguration
+from pants.engine.addressable import BuildFileAddresses
+from pants.engine.legacy.graph import (
+  OwnersRequest,
+  _DependentGraph,
+  target_types_from_build_file_aliases,
+)
+from pants.engine.mapper import AddressMapper
+from pants.engine.parser import HydratedStruct
+from pants.engine.rules import RootRule, rule
+from pants.engine.selectors import Get, MultiGet
 from pants.goal.workspace import ScmWorkspace
+from pants.option.option_value_container import OptionValueContainer
 from pants.scm.scm import Scm
 from pants.subsystem.subsystem import Subsystem
 
@@ -18,15 +32,65 @@ class IncludeDependeesOption(Enum):
 
 @dataclass(frozen=True)
 class ChangedRequest:
-  """Parameters required to compute a changed file/target set."""
+  sources: Tuple[str, ...]
+  include_dependees: IncludeDependeesOption
+
+
+@dataclass(frozen=True)
+class ChangedAddresses:
+  """Light wrapper around the build file addresses referring to the changed targets.
+
+  This is necessary to disambiguate the graph, as the rule `changed.find_owners` uses
+  `OwnersRequest` to `await Get[BuildFileAddresses]`, so cannot also directly return
+  `BuildFileAddresses.`"""
+  addresses: BuildFileAddresses
+
+
+@rule
+async def find_owners(
+  build_configuration: BuildConfiguration,
+  address_mapper: AddressMapper,
+  changed_request: ChangedRequest,
+) -> ChangedAddresses:
+  direct_owners = await Get[BuildFileAddresses](OwnersRequest(sources=changed_request.sources))
+
+  # If the ChangedRequest does not require dependees, then we're done.
+  if changed_request.include_dependees == IncludeDependeesOption.NONE:
+    return ChangedAddresses(direct_owners)
+
+  # Otherwise: find dependees.
+  all_addresses = await Get[BuildFileAddresses](AddressSpecs((DescendantAddresses(''),)))
+  all_structs = [
+    s.value for s in
+    await MultiGet(Get[HydratedStruct](Address, a.to_address()) for a in all_addresses)
+  ]
+
+  bfa = build_configuration.registered_aliases()
+  graph = _DependentGraph.from_iterable(
+    target_types_from_build_file_aliases(bfa), address_mapper, all_structs
+  )
+  if changed_request.include_dependees == IncludeDependeesOption.DIRECT:
+    return ChangedAddresses(
+      BuildFileAddresses(graph.dependents_of_addresses(direct_owners))
+    )
+  return ChangedAddresses(
+    BuildFileAddresses(graph.transitive_dependents_of_addresses(direct_owners))
+  )
+
+
+@dataclass(frozen=True)
+class ChangedOptions:
+  """A wrapper for the options from the `Changed` Subsystem.
+
+  This is necessary because parsing of these options happens before conventional subsystems are
+  configured, so the normal mechanisms like `subsystem_rule` would not work properly."""
   changes_since: Optional[str]
   diffspec: Optional[str]
   include_dependees: IncludeDependeesOption
   fast: bool
 
   @classmethod
-  def from_options(cls, options) -> "ChangedRequest":
-    """Given an `Options` object, produce a `ChangedRequest`."""
+  def from_options(cls, options: OptionValueContainer) -> "ChangedOptions":
     return cls(options.changes_since, options.diffspec, options.include_dependees, options.fast)
 
   def is_actionable(self) -> bool:
@@ -60,3 +124,10 @@ class Changed(Subsystem):
              help='Include direct or transitive dependees of changed targets.')
     register('--fast', type=bool, default=False,
              help='Stop searching for owners once a source is mapped to at least one owning target.')
+
+
+def rules():
+  return [
+    find_owners,
+    RootRule(ChangedRequest),
+  ]

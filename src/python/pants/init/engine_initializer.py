@@ -63,6 +63,7 @@ from pants.option.global_options import (
 )
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.scm.subsystems.changed import rules as changed_rules
 
 
 logger = logging.getLogger(__name__)
@@ -418,7 +419,7 @@ class EngineInitializer:
     # Create a Scheduler containing graph and filesystem rules, with no installed goals. The
     # LegacyBuildGraph will explicitly request the products it needs.
     rules = (
-      [
+      *(
         RootRule(Console),
         glob_match_error_behavior_singleton,
         build_configuration_singleton,
@@ -426,16 +427,17 @@ class EngineInitializer:
         union_membership_singleton,
         build_root_singleton,
         single_build_file_address,
-      ] +
-      create_legacy_graph_tasks() +
-      create_fs_rules() +
-      create_interactive_runner_rules() +
-      create_process_rules() +
-      create_platform_rules() +
-      create_graph_rules(address_mapper) +
-      create_options_parsing_rules() +
-      structs_rules() +
-      rules
+      ),
+      *create_legacy_graph_tasks(),
+      *create_fs_rules(),
+      *create_interactive_runner_rules(),
+      *create_process_rules(),
+      *create_platform_rules(),
+      *create_graph_rules(address_mapper),
+      *create_options_parsing_rules(),
+      *structs_rules(),
+      *changed_rules(),
+      *rules,
     )
 
     goal_map = EngineInitializer._make_goal_map_from_rules(rules)
