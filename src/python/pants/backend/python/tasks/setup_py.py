@@ -306,6 +306,7 @@ class SetupPy(Task):
   SOURCE_ROOT = 'src'
 
   PYTHON_DISTS_PRODUCT = 'python_dists'
+  PYTHON_DISTS_RECURSIVE_PRODUCT = 'python_dists_recursive'
 
   @staticmethod
   def is_requirements(target):
@@ -325,7 +326,7 @@ class SetupPy(Task):
 
   @classmethod
   def product_types(cls):
-    return [cls.PYTHON_DISTS_PRODUCT]
+    return [cls.PYTHON_DISTS_PRODUCT, cls.PYTHON_DISTS_RECURSIVE_PRODUCT]
 
   class DependencyCalculator(ExportedTargetDependencyCalculator):
     """Calculates reduced dependencies for exported python targets."""
@@ -597,14 +598,19 @@ class SetupPy(Task):
     shutil.move(chroot.path(), setup_dir)
     return setup_dir, reduced_deps
 
+  def _get_exported_targets(self):
+      if self.context.products.is_required_data(self.PYTHON_DISTS_RECURSIVE_PRODUCT):
+          return self.context.targets()
+
+      return self.context.target_roots
+
   def execute(self):
     # We drive creation of setup.py distributions from the original target graph, grabbing codegen'd
     # sources when needed. We ignore PythonDistribution targets.
     def is_exported_python_target(t):
       return t.is_original and self.has_provides(t) and not is_local_python_dist(t)
 
-    targets_to_check = self.context.targets() if self._recursive else self.context.target_roots
-    exported_python_targets = OrderedSet(t for t in targets_to_check
+    exported_python_targets = OrderedSet(t for t in self._get_exported_targets()
                                          if is_exported_python_target(t))
     if not exported_python_targets:
       raise TaskError('setup-py target(s) must provide an artifact.')
