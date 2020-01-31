@@ -27,6 +27,7 @@
 
 use termion;
 
+use std::os::unix::io::AsRawFd;
 use std::collections::{BTreeMap, VecDeque};
 use std::io::Write;
 use std::io::{stdout, Result, Stdout};
@@ -126,10 +127,19 @@ impl EngineDisplay {
   }
 
   fn start_raw_mode(&mut self) -> Result<()> {
+    use termios::*;
+
     match self.terminal {
       Console::Terminal(ref mut t) => t.activate_raw_mode(),
       _ => Ok(()),
-    }
+    }.and_then(|_| {
+      let stdout = stdout();
+      let raw_fd = stdout.as_raw_fd();
+      let mut termios = Termios::from_fd(raw_fd)?;
+      termios.c_lflag &= ISIG;
+      tcsetattr(raw_fd, TCSANOW, &termios)?;
+      Ok(())
+    })
   }
 
   // Gets the current terminal's width and height, if applicable.
