@@ -9,7 +9,6 @@
   clippy::expl_impl_clone_on_copy,
   clippy::if_not_else,
   clippy::needless_continue,
-  clippy::single_match_else,
   clippy::unseparated_literal_suffix,
   clippy::used_underscore_binding
 )]
@@ -29,7 +28,6 @@
 use clap;
 use env_logger;
 use fs;
-use futures;
 
 use rand;
 
@@ -39,7 +37,7 @@ use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::Bytes;
 use clap::{value_t, App, Arg, SubCommand};
 use fs::GlobMatching;
-use futures::future::Future;
+use futures01::{future, Future};
 use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
 use protobuf::Message;
@@ -452,9 +450,8 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
                 .unwrap()
                 .map(str::to_string)
                 .collect::<Vec<String>>(),
-              &[],
-              // By using `Ignore`, we assume all elements of the globs will definitely expand to
-              // something here, or we don't care. Is that a valid assumption?
+              // By using `Ignore`, we say that we don't care if some globs fail to expand. Is
+              // that a valid assumption?
               fs::StrictGlobMatching::Ignore,
               fs::GlobExpansionConjunction::AllMatch,
             )?)
@@ -629,7 +626,7 @@ fn expand_files_helper(
             files_unlocked.push((format!("{}{}", prefix, file.name), try_future!(file_digest)));
           }
         }
-        futures::future::join_all(
+        future::join_all(
           dir
             .get_directories()
             .iter()
@@ -647,7 +644,7 @@ fn expand_files_helper(
         .map(|_| Some(()))
         .to_boxed()
       }
-      None => futures::future::ok(None).to_boxed(),
+      None => future::ok(None).to_boxed(),
     })
     .to_boxed()
 }
@@ -667,7 +664,7 @@ fn ensure_uploaded_to_remote(
       .map(Some)
       .to_boxed()
   } else {
-    futures::future::ok(None).to_boxed()
+    future::ok(None).to_boxed()
   };
   summary.map(move |summary| SummaryWithDigest { digest, summary })
 }

@@ -18,9 +18,9 @@ from pants.base.specs import (
   AddressSpecs,
   AscendantAddresses,
   DescendantAddresses,
+  FilesystemSpecs,
   SingleAddress,
 )
-from pants.base.target_roots import TargetRoots
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.app_base import AppBase, Bundle
@@ -28,7 +28,7 @@ from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.remote_sources import RemoteSources
 from pants.engine.addressable import BuildFileAddresses
-from pants.engine.fs import PathGlobs, Snapshot
+from pants.engine.fs import EMPTY_SNAPSHOT, PathGlobs, Snapshot
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.structs import (
   BundleAdaptor,
@@ -42,7 +42,9 @@ from pants.engine.objects import Collection
 from pants.engine.parser import HydratedStruct
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
+from pants.option.custom_types import GlobExpansionConjunction
 from pants.option.global_options import GlobMatchErrorBehavior
+from pants.scm.subsystems.changed import IncludeDependeesOption
 from pants.source.filespec import any_matches_filespec
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper, Filespec
 
@@ -203,8 +205,8 @@ class LegacyBuildGraph(BuildGraph):
     for _ in self._inject_address_specs(AddressSpecs(dependencies)):
       pass
 
-  def inject_roots_closure(self, target_roots: TargetRoots, fail_fast=None):
-    for address in self._inject_address_specs(target_roots.specs):
+  def inject_roots_closure(self, address_specs: AddressSpecs, fail_fast=None):
+    for address in self._inject_address_specs(address_specs):
       yield address
 
   def inject_address_specs_closure(self, address_specs: Iterable[AddressSpec], fail_fast=None):
@@ -395,19 +397,21 @@ class TransitiveHydratedTargets:
 
 @dataclass(frozen=True)
 class SourcesSnapshot:
-  """A light wrapper around source files for Pants to operate on.
+  """Sources matched by command line specs, either directly via FilesystemSpecs or indirectly via
+  AddressSpecs.
 
-  This corresponds 1-to-1 with the `sources` field of a target. When given filesystem specs, ...
-  TODO: what is the mapping for filesystem specs? Should each individual spec -> SourcesSnapshot?
-  Decide this once implementing the hydration of FilesystemSpecs to SourcesSnapshots."""
+  Note that the resolved sources do not need an owning target. Any source resolvable by
+  `PathGlobs` is valid here.
+  """
   snapshot: Snapshot
 
 
 class SourcesSnapshots(Collection[SourcesSnapshot]):
-  """A set of SourceSnapshots, with each representing the sources for individual targets.
+  """A collection of sources matched by command line specs.
 
   `@goal_rule`s may request this when they only need source files to operate and do not need
-  any target information."""
+  any target information.
+  """
 
 
 @dataclass(frozen=True)
@@ -424,13 +428,38 @@ class TopologicallyOrderedTargets:
   hydrated_targets: HydratedTargets
 
 
+class InvalidOwnersOfArgs(Exception):
+  pass
+
+
 @dataclass(frozen=True)
 class OwnersRequest:
   """A request for the owners (and optionally, transitive dependees) of a set of file paths."""
-  sources: Tuple
-  # TODO: `include_dependees` should become an `enum` of the choices from the
-  # `--changed-include-dependees` global option.
-  include_dependees: str
+  sources: Tuple[str, ...]
+  include_dependees: IncludeDependeesOption
+
+  def validate(self, *, pants_bin_name: str) -> None:
+    """Ensure that users are passing valid args."""
+    # Check for improperly trying to use commas to run against multiple files.
+    sources_with_commas = [source for source in self.sources if "," in source]
+    if sources_with_commas:
+      offenders = ', '.join(f"`{source}`" for source in sources_with_commas)
+      raise InvalidOwnersOfArgs(
+        "Rather than using a comma with `--owner-of` to specify multiple files, use "
+        "Pants list syntax: https://www.pantsbuild.org/options.html#list-options. For example, "
+        f"`{pants_bin_name} --owner-of=src/python/example/foo.py --owner-of=src/python/example/test.py list`."
+        f"\n\n(You used commas in these arguments: {offenders})"
+      )
+    # Validate that users aren't using globs. FilesystemSpecs _do_ support globs via PathGlobs,
+    # so it's feasible that a user will then try to also use globs with `--owner-of`.
+    sources_with_globs = [source for source in self.sources if '*' in source]
+    if sources_with_globs:
+      offenders = ', '.join(f"`{source}`" for source in sources_with_globs)
+      raise InvalidOwnersOfArgs(
+        "`--owner-of` does not allow globs. Instead, please directly specify the files you want "
+        f"to operate on, e.g. `{pants_bin_name} --owner-of=src/python/example/foo.py.\n\n"
+        f"(You used globs in these arguments: {offenders})"
+      )
 
 
 @rule
@@ -460,7 +489,6 @@ async def find_owners(
     target_sources = target_kwargs.get('sources', None)
     if target_sources and any_matches_filespec(paths=sources_set, spec=target_sources.filespec):
       return True
-
     return False
 
   direct_owners = tuple(ht.adaptor.address
@@ -469,25 +497,24 @@ async def find_owners(
                            owns_any_source(ht))
 
   # If the OwnersRequest does not require dependees, then we're done.
-  if owners_request.include_dependees == 'none':
+  if owners_request.include_dependees == IncludeDependeesOption.NONE:
     return BuildFileAddresses(direct_owners)
-  else:
-    # Otherwise: find dependees.
-    all_addresses = await Get[BuildFileAddresses](AddressSpecs((DescendantAddresses(''),)))
-    all_structs = [
-      s.value for s in
-      await MultiGet(Get[HydratedStruct](Address, a.to_address()) for a in all_addresses)
-    ]
 
-    bfa = build_configuration.registered_aliases()
-    graph = _DependentGraph.from_iterable(target_types_from_build_file_aliases(bfa),
-                                          address_mapper,
-                                          all_structs)
-    if owners_request.include_dependees == 'direct':
-      return BuildFileAddresses(tuple(graph.dependents_of_addresses(direct_owners)))
-    else:
-      assert owners_request.include_dependees == 'transitive'
-      return BuildFileAddresses(tuple(graph.transitive_dependents_of_addresses(direct_owners)))
+  # Otherwise: find dependees.
+  all_addresses = await Get[BuildFileAddresses](AddressSpecs((DescendantAddresses(''),)))
+  all_structs = [
+    s.value for s in
+    await MultiGet(Get[HydratedStruct](Address, a.to_address()) for a in all_addresses)
+  ]
+
+  bfa = build_configuration.registered_aliases()
+  graph = _DependentGraph.from_iterable(target_types_from_build_file_aliases(bfa),
+                                        address_mapper,
+                                        all_structs)
+  if owners_request.include_dependees == IncludeDependeesOption.DIRECT:
+    return BuildFileAddresses(tuple(graph.dependents_of_addresses(direct_owners)))
+  assert owners_request.include_dependees == IncludeDependeesOption.TRANSITIVE
+  return BuildFileAddresses(tuple(graph.transitive_dependents_of_addresses(direct_owners)))
 
 
 @rule
@@ -605,16 +632,20 @@ async def hydrate_sources(
 ) -> HydratedField:
   """Given a SourcesField, request a Snapshot for its path_globs and create an EagerFilesetWithSpec.
   """
-  # TODO(#5864): merge the target's selection of --glob-expansion-failure (which doesn't exist yet)
-  # with the global default!
+  address = sources_field.address
   path_globs = dataclasses.replace(
-    sources_field.path_globs, glob_match_error_behavior=glob_match_error_behavior
+    sources_field.path_globs,
+    glob_match_error_behavior=glob_match_error_behavior,
+    # TODO(#9012): add line number referring to the sources field.
+    description_of_origin=(
+      f"{address.rel_path} for target {address.relative_spec}'s `{sources_field.arg}` field"
+    ),
   )
   snapshot = await Get[Snapshot](PathGlobs, path_globs)
   fileset_with_spec = _eager_fileset_with_spec(
-    sources_field.address.spec_path,
-    sources_field.filespecs,
-    snapshot,
+    spec_path=address.spec_path,
+    filespec=sources_field.filespecs,
+    snapshot=snapshot,
   )
   sources_field.validate_fn(fileset_with_spec)
   return HydratedField(sources_field.arg, fileset_with_spec)
@@ -625,20 +656,26 @@ async def hydrate_bundles(
   bundles_field: BundlesField, glob_match_error_behavior: GlobMatchErrorBehavior,
 ) -> HydratedField:
   """Given a BundlesField, request Snapshots for each of its filesets and create BundleAdaptors."""
+  address = bundles_field.address
   path_globs_with_match_errors = [
-    dataclasses.replace(pg, glob_match_error_behavior=glob_match_error_behavior)
+    dataclasses.replace(
+      pg,
+      glob_match_error_behavior=glob_match_error_behavior,
+      # TODO(#9012): add line number referring to the bundles field.
+      description_of_origin=f"{address.rel_path} for target {address.relative_spec}'s `bundles` field",
+    )
     for pg in bundles_field.path_globs_list
   ]
-  snapshot_list = await MultiGet(Get[Snapshot](PathGlobs, pg) for pg in path_globs_with_match_errors)
-
-  spec_path = bundles_field.address.spec_path
+  snapshot_list = await MultiGet(
+    Get[Snapshot](PathGlobs, pg) for pg in path_globs_with_match_errors
+  )
 
   bundles = []
   zipped = zip(bundles_field.bundles,
                bundles_field.filespecs_list,
                snapshot_list)
   for bundle, filespecs, snapshot in zipped:
-    rel_spec_path = getattr(bundle, 'rel_path', spec_path)
+    rel_spec_path = getattr(bundle, 'rel_path', address.spec_path)
     kwargs = bundle.kwargs()
     # NB: We `include_dirs=True` because bundle filesets frequently specify directories in order
     # to trigger a (deprecated) default inclusion of their recursive contents. See the related
@@ -652,12 +689,14 @@ async def hydrate_bundles(
 
 
 @rule
-async def hydrate_sources_snapshot(
-  hydrated_struct: HydratedStruct,
-) -> SourcesSnapshot:
+async def hydrate_sources_snapshot(hydrated_struct: HydratedStruct) -> SourcesSnapshot:
   """Construct a SourcesSnapshot from a TargetAdaptor without hydrating any other fields."""
   target_adaptor = cast(TargetAdaptor, hydrated_struct.value)
-  sources_field = next(fa for fa in target_adaptor.field_adaptors if isinstance(fa, SourcesField))
+  sources_field = next(
+    (fa for fa in target_adaptor.field_adaptors if isinstance(fa, SourcesField)), None
+  )
+  if sources_field is None:
+    return SourcesSnapshot(EMPTY_SNAPSHOT)
   hydrated_sources_field = await Get[HydratedField](HydrateableField, sources_field)
   efws = cast(EagerFilesetWithSpec, hydrated_sources_field.value)
   return SourcesSnapshot(efws.snapshot)
@@ -677,6 +716,25 @@ async def sources_snapshots_from_build_file_addresses(
   return SourcesSnapshots(snapshots)
 
 
+@rule
+async def sources_snapshots_from_filesystem_specs(
+  filesystem_specs: FilesystemSpecs,
+) -> SourcesSnapshots:
+  """Resolve the snapshot associated with the provided filesystem specs."""
+  snapshot = await Get[Snapshot](
+    PathGlobs(
+      globs=(fs_spec.glob for fs_spec in filesystem_specs),
+      # We error on unmatched globs for consistency with unmatched address specs. This also
+      # ensures that scripts don't silently do the wrong thing.
+      glob_match_error_behavior=GlobMatchErrorBehavior.error,
+      # We check that _every_ glob is valid.
+      conjunction=GlobExpansionConjunction.all_match,
+      description_of_origin="file arguments",
+    )
+  )
+  return SourcesSnapshots([SourcesSnapshot(snapshot)])
+
+
 def create_legacy_graph_tasks():
   """Create tasks to recursively parse the legacy graph."""
   return [
@@ -690,5 +748,7 @@ def create_legacy_graph_tasks():
     sort_targets,
     hydrate_sources_snapshot,
     sources_snapshots_from_build_file_addresses,
+    sources_snapshots_from_filesystem_specs,
+    RootRule(FilesystemSpecs),
     RootRule(OwnersRequest),
   ]

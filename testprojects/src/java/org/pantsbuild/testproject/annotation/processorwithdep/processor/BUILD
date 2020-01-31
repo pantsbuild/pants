@@ -4,7 +4,7 @@
 #  annotation_processor() target to test generating java code
 
 annotation_processor(
-  sources = globs('*.java'),
+  sources = ['*.java'],
   processors = ['org.pantsbuild.testproject.annotation.processorwithdep.processor.ProcessorWithDep'],
   dependencies = [
     'testprojects/src/java/org/pantsbuild/testproject/annotation/processorwithdep/hellomaker',

@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 junit_tests(
-  sources=globs('ParallelTest*.java'),
+  sources=['ParallelTest*.java'],
   dependencies=[
     '3rdparty:junit',
   ],
@@ -13,8 +13,9 @@ junit_tests(
 # This target runs the same tests as the one above, but doesn't have the concurrency settings.
 # Relies on the test.junit options being set as follows:
 #   --test-junit-default-parallel --test-junit-parallel-threads=2
-junit_tests(name='cmdline',
-  sources=globs('ParallelTest*.java'),
+junit_tests(
+  name='cmdline',
+  sources=['ParallelTest*.java'],
   dependencies=[
     '3rdparty:junit',
   ],
@@ -22,8 +23,9 @@ junit_tests(name='cmdline',
 
 # These tests are annotated with @TestParallel so should be able to run
 # in parallel even when --test-junit-default-concurrency=SERIAL is set.
-junit_tests(name='annotated-parallel',
-  sources=globs('AnnotatedParallelTest*.java'),
+junit_tests(
+  name='annotated-parallel',
+  sources=['AnnotatedParallelTest*.java'],
   dependencies=[
     '3rdparty:junit',
     ':junit-runner-annotations'
@@ -35,8 +37,9 @@ junit_tests(name='annotated-parallel',
 # with @TestSerial, so they should run serially, even when even when
 # --test-junit-default-concurrency={PARALLEL_CLASSES, PARALLEL_METHODS, PARALLEL_CLASSES_AND_METHODS} is set
 # See: https://github.com/pantsbuild/pants/issues/3209
-junit_tests(name='annotated-serial',
-  sources=globs('AnnotatedSerialTest*.java'),
+junit_tests(
+  name='annotated-serial',
+  sources=['AnnotatedSerialTest*.java'],
   dependencies=[
     '3rdparty:junit',
     ':junit-runner-annotations'

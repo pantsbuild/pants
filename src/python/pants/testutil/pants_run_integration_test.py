@@ -302,9 +302,12 @@ class PantsRunIntegrationTest(unittest.TestCase):
     args = [
       '--no-pantsrc',
       f'--pants-workdir={workdir}',
-      '--kill-nailguns',
       f'--print-exception-stacktrace={print_exception_stacktrace}',
     ]
+    # TODO: If the default value for `--v1` changes to False then this check will
+    # Have to change to `if '--v1' in command:`.
+    if '--no-v1' not in command:
+      args.append('--kill-nailguns')
 
     if self.hermetic():
       args.extend(['--pants-config-files=[]',

@@ -57,7 +57,7 @@ class ScaladocGen(JvmdocGen):
 
     args.extend(sources)
 
-    java_executor = SubprocessExecutor(DistributionLocator.cached())
+    java_executor = SubprocessExecutor(self.preferred_jvm_distribution_for_targets(targets))
     runner = java_executor.runner(jvm_options=self.jvm_options,
                                   classpath=tool_classpath,
                                   main='scala.tools.nsc.ScalaDoc',

@@ -14,14 +14,14 @@ The following target addresses all specify the same single target.
 -   The fully qualified target address is `//` plus the BUILD file's directory path plus target name:
 
         :::bash
-        $ ./pants list //examples/src/java/org/pantsbuild/example/hello/main:main
-        examples/src/java/org/pantsbuild/example/hello/main:main
+        $ ./pants list //src/python/myproject/example/hello/main:main
+        src/python/myproject/example/hello/main:main
 
 -   The starting double-slash is optional if the target isn't in the build root directory:
 
         :::bash
-        $ ./pants list examples/src/java/org/pantsbuild/example/hello/main:main
-        examples/src/java/org/pantsbuild/example/hello/main:main
+        $ ./pants list src/python/myproject/example/hello/main:main
+        src/python/myproject/example/hello/main:main
 
     It's idiomatic to omit the double-slash when possible.  However it's required when referencing
     targets in the build root, so that the command-line parser can distinguish such targets from
@@ -32,8 +32,8 @@ The following target addresses all specify the same single target.
 -   The target name is optional if it is the same as the parent directory name:
 
         :::bash
-        $ ./pants list examples/src/java/org/pantsbuild/example/hello/main
-        examples/src/java/org/pantsbuild/example/hello/main:main
+        $ ./pants list src/python/myproject/example/hello/main
+        src/python/myproject/example/hello/main:main
 
     It's idiomatic to omit the repetition of the target name in this case.
 
@@ -41,8 +41,8 @@ The following target addresses all specify the same single target.
     option can be passed to run the goal on the target which own that file.
 
         ::::bash
-        $ ./pants --owner-of=examples/src/java/org/pantsbuild/example/hello/main/HelloMain.java list
-        examples/src/java/org/pantsbuild/example/hello/main:main
+        $ ./pants --owner-of=src/python/myproject/example/hello.py list
+        src/python/myproject/example/hello:app
     
     It's also worth noting that multiple instances of `--owner-of=` are accepted in order to work with multiple
     files and pants will execute the goal on all the targets that own those files. Additionally, `fromfile`
@@ -53,14 +53,14 @@ The following target addresses all specify the same single target.
     command-line to accommodate tab completion:
 
         :::bash
-        $ ./pants list ./examples/src/java/org/pantsbuild/example/hello/main/
-        examples/src/java/org/pantsbuild/example/hello/main:main
+        $ ./pants list ./src/python/myproject/example/hello/
+        src/python/myproject/example/hello:app
 
     Absolute paths are also allowed on the command-line, to support flexibility in scripting:
 
         :::bash
-        $ pants goal list $REPO_ROOT/src/java/org/pantsbuild/example/hello/main
-        src/java/org/pantsbuild/example/hello/main:main
+        $ pants list $REPO_ROOT/src/python/myproject/example/hello
+        src/python/myproject/example/hello:app
 
 These last two forms are not allowed in target addresses in `BUILD` files.
 They are just for command-line convenience.
@@ -69,9 +69,16 @@ You can reference another target in the same BUILD file by starting with a
 colon ``:targetname`` instead of specifying the whole path:
 
     :::python
-    java_library(name='application', ...)
-    java_library(name='mybird',
-      dependencies=[':application'],
+    java_library(
+      name='application',
+      ...,
+     )
+     
+    java_library(
+      name='mybird',
+      dependencies=[
+        ':application',
+      ],
     )
 
 Note that, apart from this shorthand, addresses in BUILD files are always relative to the buildroot,
@@ -83,7 +90,7 @@ are not allowed in BUILD files.
 A trailing single colon specifies a glob of targets at the specified location:
 
     :::bash
-    $ ./pants list tests/python/pants_test/:
+    $ ./pants list tests/python/pants_test:
     src/python/pants/testutil:int-test
     tests/python/pants_test:base_test
     tests/python/pants_test:test_infra
@@ -92,7 +99,7 @@ A trailing single colon specifies a glob of targets at the specified location:
 A trailing double colon specifies a recursive glob of targets at the specified location:
 
     :::bash
-    $ ./pants list tests/python/pants_test/::
+    $ ./pants list tests/python/pants_test::
     src/python/pants/testutil:int-test
     tests/python/pants_test:base_test
     tests/python/pants_test:test_infra

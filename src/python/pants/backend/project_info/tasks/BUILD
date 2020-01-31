@@ -126,5 +126,5 @@ python_library(
 
 resources(
   name = 'idea_resources',
-  sources = globs('templates/idea/*.mustache'),
+  sources = ['templates/idea/*.mustache'],
 )

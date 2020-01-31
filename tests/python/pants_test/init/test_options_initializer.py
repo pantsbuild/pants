@@ -21,8 +21,9 @@ class OptionsInitializerTest(unittest.TestCase):
   def test_global_options_validation(self):
     # Specify an invalid combination of options.
     ob = OptionsBootstrapper.create(
-      args=['--backend-packages=[]', '--backend-packages2=[]', '--loop', '--v1'])
+      args=['--backend-packages=[]', '--backend-packages2=[]',
+            '--v2', '--no-v1', '--loop', '--no-enable-pantsd'])
     build_config = BuildConfigInitializer.get(ob)
     with self.assertRaises(OptionsError) as exc:
       OptionsInitializer.create(ob, build_config)
-    self.assertIn('The `--loop` option only works with', str(exc.exception))
+    self.assertIn('The `--loop` option requires `--enable-pantsd`', str(exc.exception))

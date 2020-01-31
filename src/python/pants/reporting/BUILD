@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  sources=globs('*.py', exclude=[['report.py']]),
+  sources=['*.py', '!report.py'],
   dependencies=[
     '3rdparty/python:ansicolors',
     '3rdparty/python:dataclasses',
@@ -29,7 +29,7 @@ python_library(
 
 resources(
   name='reporting_resources',
-  sources=rglobs('assets/*', 'templates/*.mustache')
+  sources=['assets/**/*', 'templates/**/*.mustache'],
 )
 
 python_library(

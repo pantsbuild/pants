@@ -10,7 +10,12 @@ from pants.engine.rules import RootRule, rule
 from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Get, MultiGet
 from pants.reporting.streaming_workunit_handler import StreamingWorkunitHandler
-from pants.testutil.engine.util import assert_equal_with_printing, remove_locations_from_traceback
+from pants.testutil.engine.util import (
+  assert_equal_with_printing,
+  fmt_rule,
+  fmt_rust_function,
+  remove_locations_from_traceback,
+)
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
 
 
@@ -65,6 +70,58 @@ class MyFloat:
 @rule
 def upcast(n: MyInt) -> MyFloat:
   return MyFloat(float(n.val))
+
+# This set of dummy types and the following `@rule`s are intended to test that workunits are
+# being generated correctly and with the correct parent-child relationships.
+
+class Input:
+  pass
+
+
+class Alpha:
+  pass
+
+
+class Beta:
+  pass
+
+
+class Gamma:
+  pass
+
+
+class Omega:
+  pass
+
+
+@rule(name="rule_one")
+async def rule_one(i: Input) -> Beta:
+  """This rule should be the first one executed by the engine, and
+  thus have no parent."""
+  a = Alpha()
+  o = await Get[Omega](Alpha, a)
+  b = await Get[Beta](Omega, o)
+  return b
+
+@rule(name="rule_two")
+async def rule_two(a: Alpha) -> Omega:
+  """This rule should be invoked in the body of `rule_one` and
+  therefore its workunit should be a child of `rule_one`'s workunit."""
+  await Get[Gamma](Alpha, a)
+  return Omega()
+
+@rule(name="rule_three")
+async def rule_three(o: Omega) -> Beta:
+  """This rule should be invoked in the body of `rule_one` and
+  therefore its workunit should be a child of `rule_one`'s workunit."""
+  return Beta()
+
+
+@rule(name="rule_four")
+def rule_four(a: Alpha) -> Gamma:
+  """This rule should be invoked in the body of `rule_two` and
+  therefore its workunit should be a child of `rule_two`'s workunit."""
+  return Gamma()
 
 
 class EngineTest(unittest.TestCase, SchedulerTestBase):
@@ -125,10 +182,10 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
     with self.assertRaises(ExecutionError) as cm:
       list(scheduler.product_request(A, subjects=[(B())]))
 
-    self.assert_equal_with_printing(dedent('''
+    self.assert_equal_with_printing(dedent(f'''
       1 Exception encountered:
-      Computing Select(<pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, A)
-        Computing Task(nested_raise(), <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, A, true)
+      Computing Select(<{__name__}.B object at 0xEEEEEEEEE>, A)
+        Computing Task({fmt_rust_function(nested_raise)}(), <{__name__}.B object at 0xEEEEEEEEE>, A, true)
           Throw(An exception for B)
             Traceback (most recent call last):
               File LOCATION-INFO, in call
@@ -136,7 +193,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
               File LOCATION-INFO, in nested_raise
                 fn_raises(x)
               File LOCATION-INFO, in fn_raises
-                raise Exception(f'An exception for {type(x).__name__}')
+                raise Exception(f'An exception for {{type(x).__name__}}')
             Exception: An exception for B
       ''').lstrip()+'\n',
       remove_locations_from_traceback(str(cm.exception)))
@@ -177,11 +234,11 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
     with self.assertRaises(ExecutionError) as cm:
       list(scheduler.product_request(A, subjects=[(B())]))
 
-    self.assert_equal_with_printing(dedent('''
+    self.assert_equal_with_printing(dedent(f'''
       1 Exception encountered:
-      Computing Select(<pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, A)
-        Computing Task(a_from_c_and_d(), <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, A, true)
-          Computing Task(d_from_b_nested_raise(), <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =D, true)
+      Computing Select(<{__name__}..B object at 0xEEEEEEEEE>, A)
+        Computing Task(a_from_c_and_d(), <{__name__}..B object at 0xEEEEEEEEE>, A, true)
+          Computing Task(d_from_b_nested_raise(), <{__name__}..B object at 0xEEEEEEEEE>, =D, true)
             Throw(An exception for B)
               Traceback (most recent call last):
                 File LOCATION-INFO, in call
@@ -189,13 +246,13 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
                 File LOCATION-INFO, in d_from_b_nested_raise
                   fn_raises(b)
                 File LOCATION-INFO, in fn_raises
-                  raise Exception('An exception for {}'.format(type(x).__name__))
+                  raise Exception('An exception for {{}}'.format(type(x).__name__))
               Exception: An exception for B
 
 
-      Computing Select(<pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, A)
-        Computing Task(a_from_c_and_d(), <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, A, true)
-          Computing Task(c_from_b_nested_raise(), <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =C, true)
+      Computing Select(<{__name__}..B object at 0xEEEEEEEEE>, A)
+        Computing Task(a_from_c_and_d(), <{__name__}..B object at 0xEEEEEEEEE>, A, true)
+          Computing Task(c_from_b_nested_raise(), <{__name__}..B object at 0xEEEEEEEEE>, =C, true)
             Throw(An exception for B)
               Traceback (most recent call last):
                 File LOCATION-INFO, in call
@@ -203,7 +260,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
                 File LOCATION-INFO, in c_from_b_nested_raise
                   fn_raises(b)
                 File LOCATION-INFO, in fn_raises
-                  raise Exception('An exception for {}'.format(type(x).__name__))
+                  raise Exception('An exception for {{}}'.format(type(x).__name__))
               Exception: An exception for B
       ''').lstrip()+'\n',
       remove_locations_from_traceback(str(cm.exception)))
@@ -229,41 +286,64 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
     with self.assertRaises(Exception) as cm:
       list(self.mk_scheduler(rules=rules, include_trace_on_error=False))
 
-    self.assert_equal_with_printing(dedent('''
+    self.assert_equal_with_printing(dedent(f'''
       Rules with errors: 1
-        (MyFloat, [MyInt], upcast()):
-          No rule was available to compute MyInt. Maybe declare it as a RootRule(MyInt)?
+        {fmt_rule(upcast)}:
+          No rule was available to compute MyInt. Maybe declare RootRule(MyInt)?
         ''').strip(),
       str(cm.exception)
     )
 
-  def test_async_reporting(self):
+
+  @dataclass
+  class WorkunitTracker:
+    workunits: List[dict] = field(default_factory=list)
+    finished: bool = False
+
+    def add(self, workunits, **kwargs) -> None:
+      if kwargs['finished'] == True:
+        self.finished = True
+      self.workunits.extend(workunits)
+
+  def test_streaming_workunits_reporting(self):
     rules = [ fib, RootRule(int)]
     scheduler = self.mk_scheduler(rules, include_trace_on_error=False, should_report_workunits=True)
 
-    @dataclass
-    class Tracker:
-      workunits: List[dict] = field(default_factory=list)
-      finished: bool = False
-
-      def add(self, workunits, **kwargs) -> None:
-        if kwargs['finished'] == True:
-          self.finished = True
-        self.workunits.extend(workunits)
-
-    tracker = Tracker()
-    async_reporter = StreamingWorkunitHandler(scheduler, callbacks=[tracker.add], report_interval_seconds=0.01)
-    with async_reporter.session():
+    tracker = self.WorkunitTracker()
+    handler = StreamingWorkunitHandler(scheduler, callbacks=[tracker.add], report_interval_seconds=0.01)
+    with handler.session():
       scheduler.product_request(Fib, subjects=[0])
 
     # The execution of the single named @rule "fib" should be providing this one workunit.
     self.assertEquals(len(tracker.workunits), 1)
 
     tracker.workunits = []
-    with async_reporter.session():
+    with handler.session():
       scheduler.product_request(Fib, subjects=[10])
 
     # Requesting a bigger fibonacci number will result in more rule executions and thus more reported workunits.
     # In this case, we expect 10 invocations of the `fib` rule.
     assert len(tracker.workunits) ==  10
     assert tracker.finished
+
+  def test_streaming_workunits_parent_id(self):
+    rules = [RootRule(Input), rule_one, rule_two, rule_three, rule_four]
+    scheduler = self.mk_scheduler(rules, include_trace_on_error=False, should_report_workunits=True)
+    tracker = self.WorkunitTracker()
+    handler = StreamingWorkunitHandler(scheduler, callbacks=[tracker.add], report_interval_seconds=0.01)
+
+    with handler.session():
+      i = Input()
+      scheduler.product_request(Beta, subjects=[i])
+
+    assert tracker.finished
+
+    r1 = next(item for item in tracker.workunits if item['name'] == 'rule_one')
+    r2 = next(item for item in tracker.workunits if item['name'] == 'rule_two')
+    r3 = next(item for item in tracker.workunits if item['name'] == 'rule_three')
+    r4 = next(item for item in tracker.workunits if item['name'] == 'rule_four')
+
+    assert r1.get('parent_id', None) is None
+    assert r2['parent_id'] == r1['span_id']
+    assert r3['parent_id'] == r1['span_id']
+    assert r4['parent_id'] == r2['span_id']

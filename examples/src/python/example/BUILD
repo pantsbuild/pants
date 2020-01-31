@@ -30,7 +30,7 @@ page(
 
 files(
   name='grpcio_directory',
-  sources=rglobs('grpcio/*'),
+  sources=['grpcio/**/*'],
   dependencies = [
     'examples/3rdparty:python_directory',
     'examples/src/protobuf/org/pantsbuild/example:grpcio_directory',
@@ -39,17 +39,17 @@ files(
 
 files(
   name='hello_directory',
-  sources=rglobs('hello/*'),
+  sources=['hello/**/*'],
 )
 
 files(
   name='pants_publish_plugin_directory',
-  sources=rglobs('pants_publish_plugin/*'),
+  sources=['pants_publish_plugin/**/*'],
 )
 
 files(
   name='tensorflow_custom_op_directory',
-  sources=rglobs('tensorflow_custom_op/*'),
+  sources=['tensorflow_custom_op/**/*'],
   dependencies = [
     'examples/3rdparty:python_directory',
   ],

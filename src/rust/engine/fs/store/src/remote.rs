@@ -5,7 +5,7 @@ use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::{Bytes, BytesMut};
 use concrete_time::TimeSpan;
 use digest::{Digest as DigestTrait, FixedOutput};
-use futures::{self, future, Future, IntoFuture, Sink, Stream};
+use futures01::{future, Future, IntoFuture, Sink, Stream};
 use grpcio;
 use hashing::{Digest, Fingerprint};
 use serverset::{Retry, Serverset};
@@ -132,7 +132,7 @@ impl ByteStore {
       digest.1,
     );
     let workunit_name = format!("store_bytes({})", resource_name.clone());
-    let workunit_store = workunit_store.clone();
+    let workunit_store = workunit_store;
     let store = self.clone();
     self
       .with_byte_stream_client(move |client| {
@@ -150,7 +150,7 @@ impl ByteStore {
             let resource_name = resource_name.clone();
             let bytes = bytes.clone();
             let stream =
-              futures::stream::unfold::<_, _, futures::future::FutureResult<_, grpcio::Error>, _>(
+              futures01::stream::unfold::<_, _, future::FutureResult<_, grpcio::Error>, _>(
                 (0, false),
                 move |(offset, has_sent_any)| {
                   if offset >= bytes.len() && has_sent_any {
@@ -246,7 +246,7 @@ impl ByteStore {
       digest.1
     );
     let workunit_name = format!("load_bytes_with({})", resource_name.clone());
-    let workunit_store = workunit_store.clone();
+    let workunit_store = workunit_store;
     self
       .with_byte_stream_client(move |client| {
         match client
@@ -323,7 +323,7 @@ impl ByteStore {
       "list_missing_digests({})",
       store.instance_name.clone().unwrap_or_default()
     );
-    let workunit_store = workunit_store.clone();
+    let workunit_store = workunit_store;
     self
       .with_cas_client(move |client| {
         client

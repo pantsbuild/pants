@@ -6,11 +6,9 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
 [dependencies]
-futures = "^0.1.16"
+futures = "0.3"
 log = "0.4"
 parking_lot = "0.6"
 
-
 [dev-dependencies]
-tokio-timer = "0.2"
-tokio = "0.1"
+tokio = { version = "0.2", features = ["rt-core", "macros", "time"] }

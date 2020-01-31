@@ -52,35 +52,42 @@ impl fmt::Display for Rule {
     match self {
       &Rule::Task(ref task) => {
         let product = format!("{}", task.product);
-        let mut clause_portion = task
+        let params = task
           .clause
           .iter()
           .map(|c| c.product.to_string())
           .collect::<Vec<_>>()
           .join(", ");
-        clause_portion = format!("[{}]", clause_portion);
-        let mut get_portion = task
-          .gets
-          .iter()
-          .map(::std::string::ToString::to_string)
-          .collect::<Vec<_>>()
-          .join(", ");
-        get_portion = if task.gets.is_empty() {
+        let get_portion = if task.gets.is_empty() {
           "".to_string()
         } else {
-          format!("[{}], ", get_portion)
+          let get_members = task
+            .gets
+            .iter()
+            .map(::std::string::ToString::to_string)
+            .collect::<Vec<_>>()
+            .join(", ");
+          format!(", gets=[{}]", get_members)
         };
-
+        let rule_type = if task.cacheable {
+          "rule".to_string()
+        } else {
+          "goal_rule".to_string()
+        };
         write!(
           f,
-          "({}, {}, {}{})",
-          product, clause_portion, get_portion, task.func,
+          "@{}({}({}) -> {}{})",
+          rule_type,
+          task.func.name(),
+          params,
+          product,
+          get_portion,
         )
       }
       &Rule::Intrinsic(ref intrinsic) => write!(
         f,
-        "({}, [{}], <intrinsic>)",
-        intrinsic.product, intrinsic.input,
+        "@rule(<intrinsic>({}) -> {})",
+        intrinsic.input, intrinsic.product,
       ),
     }
   }
@@ -166,6 +173,10 @@ impl Tasks {
       Intrinsic {
         product: types.process_result,
         input: types.multi_platform_process_request,
+      },
+      Intrinsic {
+        product: types.snapshot,
+        input: types.snapshot_subset,
       },
     ];
 

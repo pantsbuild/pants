@@ -22,7 +22,6 @@ from pants.option.errors import (
   BooleanConversionError,
   BooleanOptionNameWithNo,
   FromfileError,
-  FrozenRegistration,
   ImplicitValIsNone,
   InvalidKwarg,
   InvalidMemberType,
@@ -97,7 +96,7 @@ class OptionsTest(TestBase):
       bootstrap_option_values=bootstrap_option_values,
     )
     self._register(options)
-    return cast(Options, options)
+    return options
 
   _known_scope_infos = [intermediate('compile'),
                         task('compile.java'),
@@ -726,13 +725,6 @@ class OptionsTest(TestBase):
     assertError(InvalidMemberType, '--foo', type=list, member_type=list)
     assertError(InvalidMemberType, '--foo', type=list, member_type=list)
 
-  def test_frozen_registration(self) -> None:
-    options = Options.create(args=[], env={}, config=self._create_config(),
-                             known_scope_infos=[task('foo')])
-    options.register('foo', '--arg1')
-    with self.assertRaises(FrozenRegistration):
-      options.register(GLOBAL_SCOPE, '--arg2')
-
   def test_implicit_value(self) -> None:
     def check(*, flag: str = "", expected: str) -> None:
       options = self._parse(flags=flag)
@@ -746,7 +738,7 @@ class OptionsTest(TestBase):
     options = Options.create(env={},
                              config=self._create_config(),
                              known_scope_infos=[task('bar'), intermediate('foo'), task('foo.bar')],
-                             args='./pants')
+                             args=['./pants'])
     options.register('', '--opt1')
     options.register('foo', '-o', '--opt2')
 
@@ -754,6 +746,7 @@ class OptionsTest(TestBase):
       with self.assertRaises(Shadowing):
         options.register(scope, *args)
 
+    assert_raises_shadowing(scope='', args=['--opt2'])
     assert_raises_shadowing(scope='bar', args=['--opt1'])
     assert_raises_shadowing(scope='foo.bar', args=['--opt1'])
     assert_raises_shadowing(scope='foo.bar', args=['--opt2'])
@@ -777,7 +770,7 @@ class OptionsTest(TestBase):
     options = Options.create(env={},
                              config=self._create_config(),
                              known_scope_infos=[subsystem('foo')],
-                             args='./pants')
+                             args=['./pants'])
     # All subsystem options are implicitly recursive (a subscope of subsystem scope represents
     # a separate instance of the subsystem, so it needs all the options).
     # We disallow explicit specification of recursive (even if set to True), to avoid confusion.
@@ -1523,6 +1516,48 @@ class OptionsTest(TestBase):
 
     # Check values.
     self.assertEqual('uu', vals2.qux)
+
+  def test_scope_deprecation_parent(self) -> None:
+    # Note: This test demonstrates that a scope can mark itself as deprecating a subscope of
+    # another scope.
+    class DummyOptionable1(Optionable):
+      options_scope = 'test'
+      options_scope_category = ScopeInfo.SUBSYSTEM
+
+      @classmethod
+      def register_options(cls, register):
+        super().register_options(register)
+        register('--bar')
+
+    class DummyOptionable2(Optionable):
+      options_scope = 'lint'
+      options_scope_category = ScopeInfo.SUBSYSTEM
+      deprecated_options_scope = 'test.a-bit-linty'
+      deprecated_options_scope_removal_version = '9999.9.9.dev0'
+
+      @classmethod
+      def register_options(cls, register):
+        super().register_options(register)
+        register('--foo')
+
+    known_scope_infos = list(DummyOptionable1.known_scope_infos()) +list(DummyOptionable2.known_scope_infos())
+
+    options = Options.create(env={},
+                             config=self._create_config(),
+                             known_scope_infos=known_scope_infos,
+                             args=shlex.split('./pants --test-a-bit-linty-foo=vv'))
+
+    # NB: Order matters here, because Optionables are typically registered in sorted order.
+    DummyOptionable2.register_options_on_scope(options)
+    DummyOptionable1.register_options_on_scope(options)
+
+    with self.warnings_catcher() as w:
+      vals = options.for_scope(DummyOptionable2.options_scope)
+
+    # Check that we got a warning, but also the correct value.
+    single_warning_dummy1 = assert_single_element(w)
+    self.assertEqual(single_warning_dummy1.category, DeprecationWarning)
+    self.assertEqual('vv', vals.foo)
 
   def test_scope_deprecation_defaults(self) -> None:
     # Confirms that a DEFAULT option does not trigger deprecation warnings for a deprecated scope.

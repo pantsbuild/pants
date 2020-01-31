@@ -3,7 +3,7 @@
 
 files(
   name = 'junit_xml',
-  sources = rglobs('junit_xml/*.xml'),
+  sources = ['junit_xml/**/*.xml'],
 )
 
 python_tests(

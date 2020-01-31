@@ -43,7 +43,7 @@ python_tests(
 
 python_tests(
   name='integration',
-  sources=globs('*_integration.py'),
+  sources=['*_integration.py'],
   dependencies=[
     ':pants_requirement_integration_test_base',
     'src/python/pants/base:build_environment',

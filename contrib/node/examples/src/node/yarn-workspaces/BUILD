@@ -1,5 +1,5 @@
 node_module(
-  sources=globs('package.json', 'yarn.lock', 'adder/**', 'add-two/**'),
+  sources=['package.json', 'yarn.lock', 'adder/**', 'add-two/**'],
   package_manager='yarn',
   dependencies=[
     'contrib/node/examples/src/node/yarn-workspaces/add-one',

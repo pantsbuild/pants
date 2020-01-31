@@ -30,7 +30,7 @@ from pants.build_graph.build_graph import sort_targets
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy import Ivy
 from pants.task.scm_publish_mixin import Namedver, ScmPublishMixin, Semver
-from pants.task.target_restriction_mixins import HasTransitiveOptionMixin, TransitiveOptionRegistrar
+from pants.task.target_restriction_mixins import HasTransitiveOptionMixin
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
 from pants.util.strutil import ensure_text
 
@@ -231,7 +231,7 @@ def target_internal_dependencies(target):
         yield childdep
 
 
-class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublishMixin, JarTask):
+class JarPublish(HasTransitiveOptionMixin, ScmPublishMixin, JarTask):
   """Publish jars to a maven repository.
 
   At a high-level, pants uses `Apache Ivy <http://ant.apache.org/ivy/>`_ to
@@ -349,6 +349,8 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
                   'artifact published')
     register('--prompt', default=True, type=bool,
              help='Interactively prompt user before publishing each artifact.')
+    register('--transitive', default=True, type=bool,
+             help='Publish the specified targets and all their internal dependencies transitively.')
 
   @classmethod
   def prepare(cls, options, round_manager):

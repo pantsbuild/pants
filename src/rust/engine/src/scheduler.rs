@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{mpsc, Arc};
 use std::time::Duration;
 
-use futures::future::{self, Future};
+use futures01::future::{self, Future};
 
 use crate::context::{Context, Core};
 use crate::core::{Failure, Params, TypeId, Value};
@@ -139,6 +139,10 @@ impl Session {
     } else {
       f()
     }
+  }
+
+  pub fn should_handle_workunits(&self) -> bool {
+    self.should_report_workunits() || self.should_record_zipkin_spans()
   }
 }
 

@@ -3,7 +3,7 @@
 
 files(
   name = '3rdparty_directory',
-  sources = rglobs('3rdparty/*'),
+  sources = ['3rdparty/**/*'],
 )
 
 files(

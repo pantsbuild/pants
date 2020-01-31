@@ -131,7 +131,7 @@ class Outputting:
 
     The passed options instance will generally be the `Goal.Options` of an `Outputting` `Goal`.
     """
-    with self.output_sink(self, console) as output_sink:
+    with self.output_sink(console) as output_sink:
       yield lambda msg: output_sink.write(msg)
 
   @contextmanager

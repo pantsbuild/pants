@@ -1,3 +1,3 @@
 scala_library(
-  sources=globs('*'),
+  sources=['*'],
 )

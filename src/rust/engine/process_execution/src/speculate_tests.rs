@@ -6,7 +6,7 @@ use crate::{
 };
 use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
-use futures::future::Future;
+use futures01::future::Future;
 use hashing::EMPTY_DIGEST;
 use parking_lot::Mutex;
 use std::sync::Arc;

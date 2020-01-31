@@ -19,6 +19,7 @@ from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecute
 from pants.engine.legacy.structs import PythonTargetAdaptor, TargetAdaptor
 from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
+from pants.option.global_options import GlobMatchErrorBehavior
 from pants.rules.core.lint import LintResult
 
 
@@ -58,7 +59,11 @@ async def lint(
 
   config_path: Optional[str] = flake8.options.config
   config_snapshot = await Get[Snapshot](
-    PathGlobs(include=tuple([config_path] if config_path else []))
+    PathGlobs(
+      globs=tuple([config_path] if config_path else []),
+      glob_match_error_behavior=GlobMatchErrorBehavior.error,
+      description_of_origin="the option `--flake8-config`",
+    )
   )
   requirements_pex = await Get[Pex](
     CreatePex(

@@ -3,6 +3,8 @@
 
 from collections import defaultdict, namedtuple
 
+from twitter.common.collections import OrderedSet
+
 from pants.goal.goal import Goal
 
 
@@ -20,7 +22,7 @@ class RoundManager:
 
   @staticmethod
   def _index_products():
-    producer_info_by_product_type = defaultdict(set)
+    producer_info_by_product_type = defaultdict(OrderedSet)
     for goal in Goal.all():
       for task_type in goal.task_types():
         for product_type in task_type.product_types():
@@ -29,8 +31,8 @@ class RoundManager:
     return producer_info_by_product_type
 
   def __init__(self, context):
-    self._dependencies = set()
-    self._optional_dependencies = set()
+    self._dependencies = OrderedSet()
+    self._optional_dependencies = OrderedSet()
     self._context = context
     self._producer_infos_by_product_type = None
 
@@ -80,7 +82,7 @@ class RoundManager:
 
   def get_dependencies(self):
     """Returns the set of data dependencies as producer infos corresponding to data requirements."""
-    producer_infos = set()
+    producer_infos = OrderedSet()
     for product_type in self._dependencies:
       producer_infos.update(self._get_producer_infos_by_product_type(product_type))
     return producer_infos

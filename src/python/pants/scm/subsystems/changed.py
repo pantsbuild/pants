@@ -2,9 +2,16 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any
 
 from pants.subsystem.subsystem import Subsystem
+
+
+class IncludeDependeesOption(Enum):
+  NONE = "none"
+  DIRECT = "direct"
+  TRANSITIVE = "transitive"
 
 
 @dataclass(frozen=True)
@@ -12,11 +19,11 @@ class ChangedRequest:
   """Parameters required to compute a changed file/target set."""
   changes_since: Any
   diffspec: Any
-  include_dependees: Any
+  include_dependees: IncludeDependeesOption
   fast: Any
 
   @classmethod
-  def from_options(cls, options):
+  def from_options(cls, options) -> "ChangedRequest":
     """Given an `Options` object, produce a `ChangedRequest`."""
     return cls(options.changes_since,
                options.diffspec,
@@ -42,7 +49,7 @@ class Changed(Subsystem):
              help='Calculate changes since this tree-ish/scm ref (defaults to current HEAD/tip).')
     register('--diffspec',
              help='Calculate changes contained within given scm spec (commit range/sha/ref/etc).')
-    register('--include-dependees', choices=['none', 'direct', 'transitive'], default='none',
+    register('--include-dependees', type=IncludeDependeesOption, default=IncludeDependeesOption.NONE,
              help='Include direct or transitive dependees of changed targets.')
     register('--fast', type=bool,
              help='Stop searching for owners once a source is mapped to at least one owning target.')

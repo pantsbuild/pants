@@ -16,21 +16,23 @@ For Scala or Java, create a `junit_tests` target definition that defines your su
 Below is an example `junit_tests` definition followed by a `python_tests` definition:
 
     ::python
-    junit_tests(name='scala-tests',
-      sources=rglobs('*.scala'),
+    junit_tests(
+      name='tests',
+      sources=['test_*.scala'],
       dependencies=[
-        'myproject/src/main/scala',
-      ]
+        'src/scala/com/myorg/myproject/example:lib',
+      ],
     )
 
-    python_tests(name='python-tests',
-      sources=globs('*.py'),
+    python_tests(
+      name='tests',
+      sources=['test_*.py'],
       dependencies=[
-        'myproject/src/python',
-      ]
+        'src/python/myproject/example:lib',
+      ],
     )
 
 Now you can [[run the test|pants('src/docs/common_tasks:test')]] using the Pants `test` goal like this:
 
     ::bash
-    $ ./pants test myproject/src/tests:scala-tests
+    $ ./pants test src/python/myproject/example:tests

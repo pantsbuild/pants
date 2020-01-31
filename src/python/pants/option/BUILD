@@ -25,8 +25,9 @@ python_library(
 
 python_tests(
   name="tests",
-  sources=globs('*_test.py', exclude=[globs('*_integration_test.py')]),
+  sources=['*_test.py', '!*_integration_test.py'],
   dependencies=[
+    '3rdparty/python/twitter/commons:twitter.common.collections',
     ':option',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:hash_utils',
@@ -40,7 +41,7 @@ python_tests(
 
 python_tests(
   name='integration',
-  sources=globs('*_integration_test.py'),
+  sources=['*_integration_test.py'],
   dependencies=[
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil:int-test',

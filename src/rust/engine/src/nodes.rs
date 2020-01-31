@@ -1,4 +1,4 @@
-// Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
+// Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::{BTreeMap, HashMap};
@@ -10,14 +10,14 @@ use std::sync::Arc;
 use std::time::Duration;
 use std::{self, fmt};
 
-use concrete_time::TimeSpan;
-use futures::future::{self, Future};
-use futures::Stream;
+use futures01::future::{self, Future};
+use futures01::Stream;
 use url::Url;
 
 use crate::context::{Context, Core};
 use crate::core::{throw, Failure, Key, Params, TypeId, Value};
 use crate::externs;
+use crate::intrinsics;
 use crate::selectors;
 use crate::tasks::{self, Intrinsic, Rule};
 use boxfuture::{try_future, BoxFuture, Boxable};
@@ -34,7 +34,9 @@ use rule_graph;
 
 use graph::{Entry, Node, NodeError, NodeTracer, NodeVisualizer};
 use store::{self, StoreFileByDigest};
-use workunit_store::{generate_random_64bit_string, set_parent_id, WorkUnit, WorkUnitStore};
+use workunit_store::{
+  generate_random_64bit_string, set_parent_id, StartedWorkUnit, WorkUnit, WorkUnitStore,
+};
 
 pub type NodeFuture<T> = BoxFuture<T, Failure>;
 
@@ -69,7 +71,7 @@ impl VFS<Failure> for Context {
 
 impl StoreFileByDigest<Failure> for Context {
   fn store_by_digest(&self, file: File, _: WorkUnitStore) -> BoxFuture<hashing::Digest, Failure> {
-    self.get(DigestFile(file.clone()))
+    self.get(DigestFile(file))
   }
 }
 
@@ -147,7 +149,7 @@ impl Select {
         ))
       });
     let context = context.clone();
-    Select::new_from_edges(self.params.clone(), product, &try_future!(edges)).run(context.clone())
+    Select::new_from_edges(self.params.clone(), product, &try_future!(edges)).run(context)
   }
 }
 
@@ -157,213 +159,21 @@ impl WrappedNode for Select {
   type Item = Value;
 
   fn run(self, context: Context) -> NodeFuture<Value> {
-    let workunit_store = context.session.workunit_store();
-    let types = &context.core.types;
     match &self.entry {
-      &rule_graph::Entry::WithDeps(rule_graph::EntryWithDeps::Inner(ref inner)) => match inner
-        .rule()
-      {
-        &tasks::Rule::Task(ref task) => context.get(Task {
-          params: self.params.clone(),
-          product: self.product,
-          task: task.clone(),
-          entry: Arc::new(self.entry.clone()),
-        }),
-        &Rule::Intrinsic(Intrinsic { product, input })
-          if product == types.directory_digest && input == types.input_files_content =>
-        {
-          let new_context = context.clone();
-
-          self
-            .select_product(&new_context, types.input_files_content, "intrinsic")
-            .and_then(move |files_content: Value| {
-              let file_values = externs::project_multi(&files_content, "dependencies");
-              let digests: Vec<_> = file_values
-                .iter()
-                .map(|file| {
-                  let filename = externs::project_str(&file, "path");
-                  let path: PathBuf = filename.into();
-                  let bytes = bytes::Bytes::from(externs::project_bytes(&file, "content"));
-                  let is_executable = externs::project_bool(&file, "is_executable");
-
-                  let store = new_context.core.store();
-                  store
-                    .store_file_bytes(bytes, true)
-                    .and_then(move |digest| store.snapshot_of_one_file(path, digest, is_executable))
-                    .map(|snapshot| snapshot.digest)
-                    .map_err(|err| throw(&err))
-                    .to_boxed()
-                })
-                .collect();
-              futures::future::join_all(digests)
-            })
-            .and_then(|digests| {
-              store::Snapshot::merge_directories(context.core.store(), digests, workunit_store)
-                .map_err(|err| throw(&err))
-                .map(move |digest: hashing::Digest| {
-                  Snapshot::store_directory(&context.core, &digest)
-                })
-            })
-            .to_boxed()
+      &rule_graph::Entry::WithDeps(rule_graph::EntryWithDeps::Inner(ref inner)) => {
+        match inner.rule() {
+          &tasks::Rule::Task(ref task) => context.get(Task {
+            params: self.params.clone(),
+            product: self.product,
+            task: task.clone(),
+            entry: Arc::new(self.entry.clone()),
+          }),
+          &Rule::Intrinsic(Intrinsic { product, input }) => self
+            .select_product(&context, input, "intrinsic")
+            .and_then(move |value| intrinsics::run_intrinsic(input, product, context, value))
+            .to_boxed(),
         }
-        &Rule::Intrinsic(Intrinsic { product, input })
-          if product == types.snapshot && input == types.path_globs =>
-        {
-          let context = context.clone();
-          let core = context.core.clone();
-          self
-            .select_product(&context, types.path_globs, "intrinsic")
-            .and_then(move |val| context.get(Snapshot(externs::key_for(val))))
-            .map(move |snapshot| Snapshot::store_snapshot(&core, &snapshot))
-            .to_boxed()
-        }
-        &Rule::Intrinsic(Intrinsic { product, input })
-          if product == types.snapshot && input == types.url_to_fetch =>
-        {
-          let context = context.clone();
-          let core = context.core.clone();
-          self
-            .select_product(&context, types.url_to_fetch, "intrinsic")
-            .and_then(move |val| context.get(DownloadedFile(externs::key_for(val))))
-            .map(move |snapshot| Snapshot::store_snapshot(&core, &snapshot))
-            .to_boxed()
-        }
-        &Rule::Intrinsic(Intrinsic { product, input })
-          if product == types.directory_digest && input == types.directories_to_merge =>
-        {
-          let request = self.select_product(&context, types.directories_to_merge, "intrinsic");
-          let core = context.core.clone();
-          request
-            .and_then(move |request| {
-              let digests: Result<Vec<hashing::Digest>, Failure> =
-                externs::project_multi(&request, "directories")
-                  .into_iter()
-                  .map(|val| lift_digest(&val).map_err(|str| throw(&str)))
-                  .collect();
-              store::Snapshot::merge_directories(core.store(), try_future!(digests), workunit_store)
-                .map_err(|err| throw(&err))
-                .map(move |digest| Snapshot::store_directory(&core, &digest))
-                .to_boxed()
-            })
-            .to_boxed()
-        }
-        &Rule::Intrinsic(Intrinsic { product, input })
-          if product == types.snapshot && input == types.directory_digest =>
-        {
-          let core = context.core.clone();
-          let store = context.core.store();
-          self
-            .select_product(&context, types.directory_digest, "intrinsic")
-            .and_then(|directory_digest_val| {
-              lift_digest(&directory_digest_val).map_err(|str| throw(&str))
-            })
-            .and_then(move |digest| {
-              store::Snapshot::from_digest(store, digest, workunit_store).map_err(|str| throw(&str))
-            })
-            .map(move |snapshot| Snapshot::store_snapshot(&core, &snapshot))
-            .to_boxed()
-        }
-        &Rule::Intrinsic(Intrinsic { product, input })
-          if product == types.directory_digest && input == types.directory_with_prefix_to_add =>
-        {
-          let request =
-            self.select_product(&context, types.directory_with_prefix_to_add, "intrinsic");
-          let core = context.core.clone();
-          request
-            .and_then(move |request| {
-              let digest = lift_digest(&externs::project_ignoring_type(
-                &request,
-                "directory_digest",
-              ))
-              .map_err(|str| throw(&str))?;
-              let prefix = externs::project_str(&request, "prefix");
-              Ok((digest, prefix))
-            })
-            .and_then(|(digest, prefix)| {
-              store::Snapshot::add_prefix(core.store(), digest, PathBuf::from(prefix))
-                .map_err(|err| throw(&err))
-                .map(move |digest| Snapshot::store_directory(&core, &digest))
-            })
-            .to_boxed()
-        }
-        &Rule::Intrinsic(Intrinsic { product, input })
-          if product == types.directory_digest && input == types.directory_with_prefix_to_strip =>
-        {
-          let request =
-            self.select_product(&context, types.directory_with_prefix_to_strip, "intrinsic");
-          let core = context.core.clone();
-          request
-            .and_then(move |request| {
-              let digest = lift_digest(&externs::project_ignoring_type(
-                &request,
-                "directory_digest",
-              ))
-              .map_err(|str| throw(&str))?;
-              let prefix = externs::project_str(&request, "prefix");
-              Ok((digest, prefix))
-            })
-            .and_then(|(digest, prefix)| {
-              store::Snapshot::strip_prefix(
-                core.store(),
-                digest,
-                PathBuf::from(prefix),
-                workunit_store,
-              )
-              .map_err(|err| throw(&err))
-              .map(move |digest| Snapshot::store_directory(&core, &digest))
-            })
-            .to_boxed()
-        }
-        &Rule::Intrinsic(Intrinsic { product, input })
-          if product == types.files_content && input == types.directory_digest =>
-        {
-          let context = context.clone();
-          self
-            .select_product(&context, types.directory_digest, "intrinsic")
-            .and_then(|directory_digest_val| {
-              lift_digest(&directory_digest_val).map_err(|str| throw(&str))
-            })
-            .and_then(move |digest| {
-              context
-                .core
-                .store()
-                .contents_for_directory(digest, workunit_store)
-                .map_err(|str| throw(&str))
-                .map(move |files_content| Snapshot::store_files_content(&context, &files_content))
-            })
-            .to_boxed()
-        }
-        &Rule::Intrinsic(Intrinsic { product, input })
-          if product == types.process_result && input == types.multi_platform_process_request =>
-        {
-          let context = context.clone();
-          let core = context.core.clone();
-          self
-            .select_product(&context, types.multi_platform_process_request, "intrinsic")
-            .and_then(|request| {
-              MultiPlatformExecuteProcess::lift(&request).map_err(|str| {
-                throw(&format!(
-                  "Error lifting MultiPlatformExecuteProcess: {}",
-                  str
-                ))
-              })
-            })
-            .and_then(move |process_request| context.get(process_request))
-            .map(move |result| {
-              externs::unsafe_call(
-                &core.types.construct_process_result,
-                &[
-                  externs::store_bytes(&result.0.stdout),
-                  externs::store_bytes(&result.0.stderr),
-                  externs::store_i64(result.0.exit_code.into()),
-                  Snapshot::store_directory(&core, &result.0.output_directory),
-                ],
-              )
-            })
-            .to_boxed()
-        }
-        &Rule::Intrinsic(i) => panic!("Unrecognized intrinsic: {:?}", i),
-      },
+      }
       &rule_graph::Entry::Param(type_id) => {
         if let Some(key) = self.params.find(type_id) {
           ok(externs::val_for(key))
@@ -478,7 +288,7 @@ impl MultiPlatformExecuteProcess {
     })
   }
 
-  fn lift(value: &Value) -> Result<MultiPlatformExecuteProcess, String> {
+  pub fn lift(value: &Value) -> Result<MultiPlatformExecuteProcess, String> {
     let constraint_parts = externs::project_multi_strs(&value, "platform_constraints");
     if constraint_parts.len() % 2 != 0 {
       return Err("Error parsing platform_constraints: odd number of parts".to_owned());
@@ -552,7 +362,7 @@ impl WrappedNode for MultiPlatformExecuteProcess {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ProcessResult(process_execution::FallibleExecuteProcessResult);
+pub struct ProcessResult(pub process_execution::FallibleExecuteProcessResult);
 
 ///
 /// A Node that represents reading the destination of a symlink (non-recursively).
@@ -646,7 +456,7 @@ impl From<Scandir> for NodeKey {
 /// A Node that captures an store::Snapshot for a PathGlobs subject.
 ///
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct Snapshot(Key);
+pub struct Snapshot(pub Key);
 
 impl Snapshot {
   fn create(context: Context, path_globs: PathGlobs) -> NodeFuture<store::Snapshot> {
@@ -655,7 +465,7 @@ impl Snapshot {
     // and store::Snapshot::from_path_stats tracking dependencies for file digests.
     context
       .expand(path_globs)
-      .map_err(|e| format!("PathGlobs expansion failed: {}", e))
+      .map_err(|e| format!("{}", e))
       .and_then(move |path_stats| {
         store::Snapshot::from_path_stats(
           context.core.store(),
@@ -670,24 +480,27 @@ impl Snapshot {
   }
 
   pub fn lift_path_globs(item: &Value) -> Result<PathGlobs, String> {
-    let include = externs::project_multi_strs(item, "include");
-    let exclude = externs::project_multi_strs(item, "exclude");
+    let globs = externs::project_multi_strs(item, "globs");
+
+    let description_of_origin_field = externs::project_str(item, "description_of_origin");
+    let description_of_origin = if description_of_origin_field.is_empty() {
+      None
+    } else {
+      Some(description_of_origin_field)
+    };
 
     let glob_match_error_behavior =
       externs::project_ignoring_type(item, "glob_match_error_behavior");
     let failure_behavior = externs::project_str(&glob_match_error_behavior, "value");
-    let strict_glob_matching = StrictGlobMatching::create(failure_behavior.as_str())?;
+    let strict_glob_matching =
+      StrictGlobMatching::create(failure_behavior.as_str(), description_of_origin)?;
 
     let conjunction_obj = externs::project_ignoring_type(item, "conjunction");
     let conjunction_string = externs::project_str(&conjunction_obj, "value");
     let conjunction = GlobExpansionConjunction::create(&conjunction_string)?;
 
-    PathGlobs::create(&include, &exclude, strict_glob_matching, conjunction).map_err(|e| {
-      format!(
-        "Failed to parse PathGlobs for include({:?}), exclude({:?}): {}",
-        include, exclude, e
-      )
-    })
+    PathGlobs::create(&globs, strict_glob_matching, conjunction)
+      .map_err(|e| format!("Failed to parse PathGlobs for globs({:?}): {}", globs, e))
   }
 
   pub fn store_directory(core: &Arc<Core>, item: &hashing::Digest) -> Value {
@@ -738,7 +551,7 @@ impl Snapshot {
     )
   }
 
-  fn store_files_content(context: &Context, item: &[FileContent]) -> Value {
+  pub fn store_files_content(context: &Context, item: &[FileContent]) -> Value {
     let entries: Vec<_> = item
       .iter()
       .map(|e| Self::store_file_content(context, e))
@@ -770,7 +583,7 @@ impl From<Snapshot> for NodeKey {
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct DownloadedFile(Key);
+pub struct DownloadedFile(pub Key);
 
 impl DownloadedFile {
   fn load_or_download(
@@ -957,7 +770,7 @@ impl Task {
       .into_iter()
       .map(|get| {
         let context = context.clone();
-        let params = params.clone();
+        let mut params = params.clone();
         let entry = entry.clone();
         let dependency_key = selectors::DependencyKey::JustGet(selectors::Get {
           product: get.product,
@@ -998,7 +811,6 @@ impl Task {
           });
         // The subject of the get is a new parameter that replaces an existing param of the same
         // type.
-        let mut params = params.clone();
         params.put(get.subject);
         future::result(entry)
           .and_then(move |entry| Select::new(params, get.product, entry).run(context.clone()))
@@ -1219,25 +1031,28 @@ impl Node for NodeKey {
   type Error = Failure;
 
   fn run(self, context: Context) -> NodeFuture<NodeResult> {
-    let handle_workunits =
-      context.session.should_report_workunits() || context.session.should_record_zipkin_spans();
-
-    let (node_workunit_params, maybe_span_id) = if handle_workunits {
+    let (maybe_started_workunit, maybe_span_id) = if context.session.should_handle_workunits() {
+      let user_facing_name = self.user_facing_name();
       let span_id = generate_random_64bit_string();
-      let node_workunit_params = match self.user_facing_name() {
-        Some(ref node_name) => {
-          let start_time = std::time::SystemTime::now();
-          Some((node_name.clone(), start_time, span_id.clone()))
-        }
-        _ => None,
+      let parent_id = workunit_store::get_parent_id();
+      let maybe_started_workunit = user_facing_name.as_ref().map(|node_name| StartedWorkUnit {
+        name: node_name.to_string(),
+        start_time: std::time::SystemTime::now(),
+        span_id: span_id.clone(),
+        parent_id,
+      });
+      let maybe_span_id = if user_facing_name.is_some() {
+        Some(span_id)
+      } else {
+        None
       };
-      (node_workunit_params, Some(span_id))
+      (maybe_started_workunit, maybe_span_id)
     } else {
       (None, None)
     };
 
     let context2 = context.clone();
-    futures::future::lazy(|| {
+    future::lazy(|| {
       if let Some(span_id) = maybe_span_id {
         set_parent_id(span_id);
       }
@@ -1253,16 +1068,10 @@ impl Node for NodeKey {
       }
     })
     .inspect(move |_: &NodeResult| {
-      if let Some((name, start_time, span_id)) = node_workunit_params {
-        let workunit = WorkUnit {
-          name,
-          time_span: TimeSpan::since(&start_time),
-          span_id,
-          // TODO: set parent_id with the proper value, issue #7969
-          parent_id: None,
-        };
+      if let Some(started_workunit) = maybe_started_workunit {
+        let workunit: WorkUnit = started_workunit.finish();
         context2.session.workunit_store().add_workunit(workunit)
-      };
+      }
     })
     .to_boxed()
   }
