@@ -104,7 +104,7 @@ async def setup_pytest_for_target(
       # and then by Pytest). See https://github.com/jaraco/zipp/pull/26.
       additional_args=("--not-zip-safe",),
       include_source_files=False,
-      additional_input_files=plugin_file_digest,
+      additional_input_files=plugin_file_digest if test_options.values.run_coverage else None,
     )
   )
 
