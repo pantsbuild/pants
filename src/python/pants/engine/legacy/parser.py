@@ -126,6 +126,29 @@ class LegacyPythonCallbacksParser(Parser):
 
     return symbols, parse_context
 
+  @staticmethod
+  def check_for_deprecated_globs_usage(token: str, filepath: str, lineno: int) -> None:
+    # We have this deprecation here, rather than in `engine/legacy/structs.py` where the
+    # `sources` field is parsed, so that we can refer to the line number and filename as that
+    # information is not passed to `structs.py`.
+    if token in ["globs", "rglobs", "zglobs"]:
+      script_instructions = (
+        "curl -L -o fix_deprecated_globs_usage.py 'https://git.io/JvOKD' && chmod +x "
+        "fix_deprecated_globs_usage.py && ./fix_deprecated_globs_usage.py "
+        f"{PurePath(filepath).parent}"
+      )
+      warning = (
+        f"Using deprecated `{token}` in {filepath} at line {lineno}. Instead, use a list "
+        f"of files and globs, like `sources=['f1.py', '*.java']`. Specify excludes by putting "
+        f"an `!` at the start of the value, like `!ignore.py`.\n\nWe recommend using our "
+        f"migration script by running `{script_instructions}`"
+      )
+      warn_or_error(
+        removal_version="1.27.0.dev0",
+        deprecated_entity_description="Using `globs`, `rglobs`, and `zglobs`",
+        hint=warning,
+      )
+
   def parse(self, filepath: str, filecontent: bytes):
     python = filecontent.decode()
 
@@ -148,26 +171,7 @@ class LegacyPythonCallbacksParser(Parser):
         token_str = token[1]
         lineno, _ = token[2]
 
-        # We have this deprecation here, rather than in `engine/legacy/structs.py` where the
-        # `sources` field is parsed, so that we can refer to the line number and filename as that
-        # information is not passed to `structs.py`.
-        if token_str in ["globs", "rglobs", "zglobs"]:
-          script_instructions = (
-            "curl -L -o fix_deprecated_globs_usage.py 'https://git.io/JvOKD' && chmod +x "
-            "fix_deprecated_globs_usage.py && ./fix_deprecated_globs_usage.py "
-            f"{PurePath(filepath).parent}"
-          )
-          warning = (
-            f"Using deprecated `{token_str}` in {filepath} at line {lineno}. Instead, use a list "
-            f"of files and globs, like `sources=['f1.py', '*.java']`. Specify excludes by putting "
-            f"an `!` at the start of the value, like `!ignore.py`.\n\nWe recommend using our "
-            f"migration script by running `{script_instructions}`"
-          )
-          warn_or_error(
-            removal_version="1.27.0.dev0",
-            deprecated_entity_description="Using `globs`, `rglobs`, and `zglobs`",
-            hint=warning,
-          )
+        self.check_for_deprecated_globs_usage(token_str, filepath, lineno)
 
         if token_str == 'import':
           if self._build_file_imports_behavior == "allow":
