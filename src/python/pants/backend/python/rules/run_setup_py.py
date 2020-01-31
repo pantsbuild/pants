@@ -411,11 +411,7 @@ async def get_sources(request: SetupPySourcesRequest,
   ancestor_init_pys = await Get[AncestorInitPyFiles](HydratedTargets, targets)
   sources_digest = await Get[Digest](
     DirectoriesToMerge(directories=tuple([*stripped_srcs_digests, *ancestor_init_pys.digests])))
-  sources_snapshot = await Get[Snapshot](Digest, sources_digest)
-  init_pys_digest = await Get[Digest](SnapshotSubset(
-    sources_digest,
-    include_files=tuple(f for f in sources_snapshot.files if os.path.basename(f) == '__init__.py'),
-    include_dirs=tuple()))
+  init_pys_digest = await Get[Digest](SnapshotSubset(sources_digest, PathGlobs('**/__init__.py')))
   init_py_contents = await Get[FilesContent](Digest, init_pys_digest)
 
   packages, namespace_packages, package_data = find_packages(
@@ -425,20 +421,6 @@ async def get_sources(request: SetupPySourcesRequest,
     py2=request.py2)
   return SetupPySources(digest=sources_digest, packages=packages,
                         namespace_packages=namespace_packages, package_data=package_data)
-
-
-@rule
-async def get_snapshot_subset(snapshot_subset: SnapshotSubset) -> Digest:
-  # TODO: This is a HACK to compute a SnapshotSubset. Should be replaced with an intrinsic.
-  # See https://github.com/pantsbuild/pants/issues/8986.
-  ep_result = await Get[ExecuteProcessResult](ExecuteProcessRequest(
-    argv=('/usr/bin/true',),
-    description='Create snapshot subset',
-    input_files=snapshot_subset.directory_digest,
-    output_files=snapshot_subset.include_files,
-    output_directories=snapshot_subset.include_dirs
-  ))
-  return ep_result.output_directory_digest
 
 
 @rule
@@ -613,7 +595,6 @@ def rules():
     run_setup_py,
     generate_chroot,
     get_sources,
-    get_snapshot_subset,
     get_requirements,
     get_ancestor_init_py,
     get_owned_dependencies,

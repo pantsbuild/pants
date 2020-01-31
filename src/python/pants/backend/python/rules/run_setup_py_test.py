@@ -29,7 +29,6 @@ from pants.backend.python.rules.run_setup_py import (
   get_exporting_owner,
   get_owned_dependencies,
   get_requirements,
-  get_snapshot_subset,
   get_sources,
   validate_args,
 )
@@ -68,7 +67,6 @@ class TestGenerateChroot(TestSetupPyBase):
     return super().rules() + [
       generate_chroot,
       get_sources,
-      get_snapshot_subset,
       get_requirements,
       strip_source_root,
       get_ancestor_init_py,
@@ -160,7 +158,6 @@ class TestGetSources(TestSetupPyBase):
   def rules(cls):
     return super().rules() + [
       get_sources,
-      get_snapshot_subset,
       strip_source_root,
       get_ancestor_init_py,
       RootRule(SetupPySourcesRequest),
