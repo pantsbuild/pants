@@ -63,9 +63,8 @@ pub enum KeyboardCommand {
 }
 
 pub struct EngineDisplay {
-  sigil: char,
+  sigil: &'static str,
   divider: String,
-  padding: String,
   terminal: Console,
   action_map: BTreeMap<String, String>,
   logs: VecDeque<String>,
@@ -81,11 +80,10 @@ pub struct EngineDisplay {
 // TODO: Permit scrollback in the terminal - both at exit and during the live run.
 impl EngineDisplay {
   /// Create a new EngineDisplay
-  pub fn new(indent_level: u16) -> EngineDisplay {
+  pub fn new() -> EngineDisplay {
     EngineDisplay {
-      sigil: '⚡',
+      sigil: "⚡",
       divider: "▵".to_string(),
-      padding: " ".repeat(indent_level.into()),
       terminal: Console::Uninitialized,
       action_map: BTreeMap::new(),
       // This is arbitrary based on a guesstimated peak terminal row size for modern displays.
@@ -153,13 +151,6 @@ impl EngineDisplay {
     self.terminal_size = EngineDisplay::get_size();
   }
 
-  // Sets the terminal size for signal-free resize detection.
-  fn get_max_log_rows(&self) -> usize {
-    // TODO: If the terminal size is smaller than the action map, we should fall back
-    // to non-tty mode output to avoid.
-    self.terminal_size.1 as usize - self.action_map.len() - 1
-  }
-
   // Prep the screen for painting by clearing it from the cursor start position.
   fn clear(&mut self) {
     let cursor_start = self.cursor_start;
@@ -195,15 +186,13 @@ impl EngineDisplay {
   // Renders a divider between the logs and action output.
   fn render_divider(&mut self, offset: u16) {
     let cursor_start = self.cursor_start;
-    let padding = self.padding.clone();
     let divider = self.divider.clone();
 
     self
       .write(&format!(
-        "{pos}{clear_line}{padding}{blue}{divider}{reset}",
+        "{pos}{clear_line}{blue}{divider}{reset}",
         pos = cursor::Goto(1, cursor_start.1 + offset),
         clear_line = clear::CurrentLine,
-        padding = padding,
         blue = color::Fg(color::Blue),
         divider = divider,
         reset = color::Fg(color::Reset)
@@ -219,14 +208,10 @@ impl EngineDisplay {
     let mut counter: usize = 0;
     for (n, log_entry) in printable_logs.iter().rev().enumerate() {
       counter += 1;
-      let line_shortened_log_entry: String = format!(
-        "{padding}{log_entry}",
-        padding = self.padding,
-        log_entry = log_entry
-      )
-      .graphemes(true)
-      .take(self.terminal_size.0 as usize)
-      .collect();
+      let line_shortened_log_entry: String = log_entry
+        .graphemes(true)
+        .take(self.terminal_size.0 as usize)
+        .collect();
 
       self
         .write(&format!(
@@ -254,8 +239,7 @@ impl EngineDisplay {
     // representing the swimlane for this worker and lay down a text label.
     for (n, (_worker_id, action)) in worker_states.iter().enumerate() {
       let line_shortened_output: String = format!(
-        "{padding}{blue}{sigil}{reset}{action}",
-        padding = self.padding,
+        "{blue}{sigil}{reset}{action}",
         blue = color::Fg(color::LightBlue),
         sigil = self.sigil,
         reset = color::Fg(color::Reset),
@@ -283,7 +267,9 @@ impl EngineDisplay {
     }
     self.set_size();
     self.clear();
-    let max_log_rows = self.get_max_log_rows();
+    // TODO: If the terminal size is smaller than the action map, we should fall back
+    // to non-tty mode output to avoid.
+    let max_log_rows = self.terminal_size.1 as usize - self.action_map.len() - 1;
     let rendered_count = self.render_logs(max_log_rows);
     self.render_actions(rendered_count);
     if let Err(err) = self.flush() {
@@ -351,11 +337,6 @@ impl EngineDisplay {
   // Updates the status of a worker/thread.
   pub fn update(&mut self, worker_name: String, action: String) {
     self.action_map.insert(worker_name, action);
-  }
-
-  // Removes a worker/thread from the visual representation.
-  pub fn remove_worker(&mut self, worker_id: &str) {
-    self.action_map.remove(worker_id);
   }
 
   // Adds a log entry for display.
