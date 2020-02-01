@@ -16,6 +16,7 @@ from pants.engine.legacy.structs import BundleAdaptor, Globs, RGlobs, TargetAdap
 from pants.engine.mapper import UnaddressableObjectError
 from pants.engine.objects import Serializable
 from pants.engine.parser import ParseError, Parser, SymbolTable
+from pants.option.global_options import BuildFileImportsBehavior
 from pants.util.memo import memoized_property
 
 
@@ -33,15 +34,17 @@ class LegacyPythonCallbacksParser(Parser):
   """
 
   def __init__(
-    self, symbol_table: SymbolTable, aliases: BuildFileAliases, build_file_imports_behavior: str,
+    self,
+    symbol_table:SymbolTable,
+    aliases: BuildFileAliases,
+    build_file_imports_behavior: BuildFileImportsBehavior,
   ) -> None:
     """
     :param symbol_table: A SymbolTable for this parser, which will be overlaid with the given
       additional aliases.
     :param aliases: Additional BuildFileAliases to register.
     :param build_file_imports_behavior: How to behave if a BUILD file being parsed tries to use
-      import statements. Valid values: "allow", "warn", "error".
-    :type build_file_imports_behavior: string
+      import statements.
     """
     super().__init__()
     self._symbols, self._parse_context = self._generate_symbols(symbol_table, aliases)
@@ -165,7 +168,7 @@ class LegacyPythonCallbacksParser(Parser):
     # Note that this is incredibly poor sandboxing. There are many ways to get around it.
     # But it's sufficient to tell most users who aren't being actively malicious that they're doing
     # something wrong, and it has a low performance overhead.
-    if "globs" in python or (self._build_file_imports_behavior != 'allow' and 'import' in python):
+    if "globs" in python or (self._build_file_imports_behavior != BuildFileImportsBehavior.allow and 'import' in python):
       io_wrapped_python = StringIO(python)
       for token in tokenize.generate_tokens(io_wrapped_python.readline):
         token_str = token[1]
@@ -174,9 +177,9 @@ class LegacyPythonCallbacksParser(Parser):
         self.check_for_deprecated_globs_usage(token_str, filepath, lineno)
 
         if token_str == 'import':
-          if self._build_file_imports_behavior == "allow":
+          if self._build_file_imports_behavior == BuildFileImportsBehavior.allow:
             continue
-          elif self._build_file_imports_behavior == 'warn':
+          elif self._build_file_imports_behavior == BuildFileImportsBehavior.warn:
             logger.warning(
               f'Import used in {filepath} at line {lineno}. Import statements should '
               f'be avoided in BUILD files because they can easily break Pants caching and lead to '
