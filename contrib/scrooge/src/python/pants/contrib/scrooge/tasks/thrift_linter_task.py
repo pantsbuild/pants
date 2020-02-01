@@ -48,6 +48,9 @@ class ThriftLinterTask(LintTaskMixin, NailgunTask):
              removal_hint="Use `--scrooge-linter-strict-default` instead",
              help='Sets the default strictness for targets. The `strict` option overrides '
                   'this value if it is set.')
+    register('--ignore-errors', default=False, advanced=True, type=bool,
+             fingerprint=True,
+             help='Ignore any error so thrift-linter always exit 0.')
     register('--linter-args', default=[], advanced=True, type=list, fingerprint=True,
              removal_version='1.27.0.dev0',
              removal_hint='Use `--scrooge-linter-args` instead. Unlike this argument, you can pass '
@@ -116,11 +119,13 @@ class ThriftLinterTask(LintTaskMixin, NailgunTask):
     config_args.extend(self.get_options().linter_args)
     config_args.extend(ScroogeLinter.global_instance().options.args)
 
-    # N.B. We always set --fatal-warnings to make sure errors like missing-namespace are at least printed.
-    # If --no-strict is turned on, the return code will be 0 instead of 1, but the errors/warnings
-    # need to always be printed.
-    config_args.append('--fatal-warnings')
-    if not self._is_strict(target):
+    if self._is_strict(target):
+      config_args.append('--fatal-warnings')
+    else:
+      # Make sure errors like missing-namespace are at least printed.
+      config_args.append('--warnings')
+
+    if self.get_options().ignore_errors:
       config_args.append('--ignore-errors')
 
     paths = list(target.sources_relative_to_buildroot())
