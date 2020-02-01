@@ -328,10 +328,9 @@ class FilesystemSpecs(Collection[FilesystemSpec]):
   def to_path_globs(self) -> PathGlobs:
     return PathGlobs(
       globs=(fs_spec.glob for fs_spec in self.dependencies),
-      # We unconditionally warn when globs do not match, rather than ignoring or erroring. We
-      # should not error because we can still do meaningful work with the globs that do match, and
-      # the warning will be very obvious to the user. Warning is less hostile than erroring.
-      glob_match_error_behavior=GlobMatchErrorBehavior.warn,
+      # We error on unmatched globs for consistency with unmatched address specs. This also
+      # ensures that scripts don't silently do the wrong thing.
+      glob_match_error_behavior=GlobMatchErrorBehavior.error,
       # We validate that _every_ glob is valid.
       conjunction=GlobExpansionConjunction.all_match,
       description_of_origin="file arguments",
