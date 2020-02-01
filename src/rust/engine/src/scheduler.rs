@@ -65,7 +65,7 @@ impl Session {
     should_report_workunits: bool,
   ) -> Session {
     let display = if should_render_ui && EngineDisplay::stdout_is_tty() {
-      let mut display = EngineDisplay::new(0);
+      let mut display = EngineDisplay::new();
       display.initialize(ui_worker_count);
       Some(Arc::new(Mutex::new(display)))
     } else {
