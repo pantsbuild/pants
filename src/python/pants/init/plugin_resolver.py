@@ -12,8 +12,8 @@ from pex.interpreter import PythonInterpreter
 from pkg_resources import working_set as global_working_set
 from wheel.install import WheelFile
 
-from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.option.global_options import GlobalOptionsRegistrar
+from pants.python.python_repos import PythonRepos
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_delete, safe_mkdir, safe_open
 from pants.util.memo import memoized_property
