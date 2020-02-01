@@ -37,18 +37,6 @@ The following target addresses all specify the same single target.
 
     It's idiomatic to omit the repetition of the target name in this case.
 
--   If the address of the target that owns a certain file is not known, the `--owner-of=` global
-    option can be passed to run the goal on the target which own that file.
-
-        ::::bash
-        $ ./pants --owner-of=src/python/myproject/example/hello.py list
-        src/python/myproject/example/hello:app
-    
-    It's also worth noting that multiple instances of `--owner-of=` are accepted in order to work with multiple
-    files and pants will execute the goal on all the targets that own those files. Additionally, `fromfile`
-    support is enabled for this option, so passing `--owner-of=@file` (where "file" is a filename
-    containing a list of filenames to look up owners for) is supported.
-
 -   Relative paths and trailing forward slashes are ignored on the
     command-line to accommodate tab completion:
 
@@ -108,3 +96,26 @@ A trailing double colon specifies a recursive glob of targets at the specified l
     ...
     tests/python/pants_test/tasks:sort_targets
     src/python/pants/testutil:testutils
+
+Alternative: File args
+======================
+
+Instead of specifying the address, you may instead simply specify the file you want Pants to operate on. Pants will find all owner(s) and operate over those owning targets.
+
+    :::bash
+    $ ./pants list src/python/myproject/example.py
+    src/python/myproject:lib
+
+You may pass multiple files and even use globs, with the same syntax as the `sources` field in BUILD files (see ...):
+
+    :::bash
+    # This will format every `.py` file under `src/python/myproject`, except for `ignore.py`
+    $ ./pants fmt 'src/python/myproject/**/*.py' '!src/python/myproject/ignore.py'
+
+You may use the `--spec-file` option to pass a text file with a list of all the files you'd like Pants to operate on (with a newline separating each file):
+
+    :::bash
+    $ echo 'src/python/myproject/f1.py
+      src/python/myproject/f2.py
+      src/python/myproject/example/*.py' > to_be_formatted.txt
+    $ ./pants --spec-file=to_be_formatted.txt fmt
