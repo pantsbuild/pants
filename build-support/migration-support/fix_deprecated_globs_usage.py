@@ -45,7 +45,7 @@ def create_parser() -> argparse.ArgumentParser:
     description='Modernize BUILD files to no longer use globs, rglobs, and zglobs.',
   )
   parser.add_argument(
-    'folders', type=Path, nargs='*',
+    'folders', type=Path, nargs='+',
     help="Folders to recursively search for `BUILD` files",
   )
   parser.add_argument(
