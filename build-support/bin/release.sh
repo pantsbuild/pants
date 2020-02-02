@@ -339,35 +339,6 @@ function dry_run_install() {
     -f "${DEPLOY_3RDPARTY_WHEEL_DIR}/${VERSION}" -f "${DEPLOY_PANTS_WHEEL_DIR}/${VERSION}"
 }
 
-ALLOWED_ORIGIN_URLS=(
-  git@github.com:pantsbuild/pants.git
-  git@github.com:pantsbuild/pants
-  https://github.com/pantsbuild/pants.git
-  https://github.com/pantsbuild/pants
-)
-
-function check_origin() {
-  banner "Checking for a valid git origin"
-
-  origin_url="$(git remote -v | grep origin | grep "\(push\)" | cut -f2 | cut -d' ' -f1)"
-  for url in "${ALLOWED_ORIGIN_URLS[@]}"
-  do
-    if [[ "${origin_url}" == "${url}" ]]
-    then
-      return
-    fi
-  done
-  msg=$(cat << EOM
-Your origin url is not valid for releasing:
-  ${origin_url}
-
-It must be one of:
-$(echo "${ALLOWED_ORIGIN_URLS[@]}" | tr ' ' '\n' | sed -E "s|^|  |")
-EOM
-)
-  die "$msg"
-}
-
 function get_branch() {
   git branch | grep -E '^\* ' | cut -d' ' -f2-
 }
@@ -771,7 +742,7 @@ elif [[ "${test_release}" == "true" ]]; then
 else
   banner "Releasing packages to PyPI"
   (
-    check_origin && check_clean_branch && check_pgp && check_owners && \
+    check_clean_branch && check_pgp && check_owners && \
       publish_packages && tag_release && publish_docs_if_master && \
       banner "Successfully released packages to PyPI"
   ) || die "Failed to release packages to PyPI."
