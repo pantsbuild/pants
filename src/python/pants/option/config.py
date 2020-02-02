@@ -193,8 +193,8 @@ class Config(ABC):
 class _ConfigValues(ABC):
   """Encapsulates resolving the actual config values specified by the user's config file.
 
-  Beyond providing better encapsulation, this allows us to support alternative config file formats
-  in the future if we ever decide to support formats other than INI.
+  Due to encapsulation, this allows us to support both TOML and INI config files without any of
+  the rest of the Pants codebase knowing whether the config came from TOML or INI.
   """
 
   @property
