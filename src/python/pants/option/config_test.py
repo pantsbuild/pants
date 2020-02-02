@@ -28,7 +28,6 @@ FILE1_INI = dedent(
   list: [1, 2, 3, %(answer)s]
   list2: +[7, 8, 9]
   list3: -["x", "y", "z"]
-  list4: +[0, 1],-[8, 9]
 
   [b]
   preempt: True
@@ -64,8 +63,6 @@ FILE1_TOML = dedent(
   list = ["1", "2", "3", "%(answer)s"]
   list2.append = [7, 8, 9]
   list3.filter = ["x", "y", "z"]
-  list4.append = [0, 1]
-  list4.filter = [8, 9]
 
   [b]
   preempt = true
@@ -93,6 +90,9 @@ FILE2_INI = dedent(
   
   [c.child]
   no_values_in_parent: True
+  
+  [d]
+  list: +[0, 1],-[8, 9]
 
   [defined_section]
   """
@@ -108,6 +108,10 @@ FILE2_TOML = dedent(
 
   [c.child]
   no_values_in_parent = true
+  
+  [d]
+  list.append = [0, 1]
+  list.filter = [8, 9]
 
   [defined_section]
   """
@@ -160,7 +164,6 @@ class ConfigBaseTest(TestBase):
         "list": "[1, 2, 3, 42]",
         "list2": "+[7, 8, 9]",
         "list3": '-["x", "y", "z"]',
-        "list4": "+[0, 1],-[8, 9]",
       },
       "b": {
         "preempt": "True",
@@ -184,6 +187,9 @@ class ConfigBaseTest(TestBase):
       },
       "c.child": {
         "no_values_in_parent": "True",
+      },
+      "d": {
+        "list": "+[0, 1],-[8, 9]",
       },
       "defined_section": {},
     }

@@ -258,14 +258,30 @@ class _TomlValues(_ConfigValues):
   values: Dict[str, Any]
 
   @staticmethod
-  def _section_explicitly_defined(section_values: Dict) -> bool:
-    """Because of the way TOML stores the config as a nested dictionary, it naively appears that
-    certain sections are defined when really only a subscope is defined.
+  def _is_an_option(option_value: Union[_TomlValue, Dict]) -> bool:
+    """Determine if the value is actually an option belonging to that section.
 
-    For example, the user may have specified `cache.java` but not `cache`.
+    A value that looks like an option might actually be a subscope, e.g. the option value
+    `java` belonging to the section `cache` could actually be the section `cache.java`, rather
+    than the option `--cache-java`.
+
+    We must also handle the special syntax of `my_list_option.append` and `my_list_option.filter`.
+    """
+    return (
+      not isinstance(option_value, dict) or "append" in option_value or "filter" in option_value
+    )
+
+  @staticmethod
+  def _section_explicitly_defined(section_values: Dict) -> bool:
+    """Determine if the section is truly a defined section, meaning that the user explicitly wrote
+    the section in their config file.
+
+    For example, the user may have explicitly defined `cache.java` but never defined `cache`. Due
+    to TOML's representation of the config as a nested dictionary, naively, it would appear that
+    `cache` was defined even though the user never explicitly added it to their config.
     """
     at_least_one_option_defined = any(
-      not isinstance(section_value, dict) for section_value in section_values.values()
+      _TomlValues._is_an_option(section_value) for section_value in section_values.values()
     )
     blank_section = len(section_values.values()) == 0
     return at_least_one_option_defined or blank_section
@@ -396,8 +412,7 @@ class _TomlValues(_ConfigValues):
     options = [
       option
       for option, option_value in section_values.items()
-      if not isinstance(option_value, dict)
-      or "filter" in option_value or "append" in option_value
+      if self._is_an_option(option_value)
     ]
     options.extend(self.defaults.keys())
     return options
