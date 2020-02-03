@@ -9,15 +9,7 @@ from typing import Dict
 from twitter.common.collections import OrderedSet
 
 from pants.base.project_tree import Dir
-from pants.base.specs import (
-  AddressSpec,
-  AddressSpecs,
-  FilesystemSpec,
-  FilesystemSpecs,
-  SingleAddress,
-  Spec,
-  more_specific,
-)
+from pants.base.specs import AddressSpec, AddressSpecs, SingleAddress, Spec, more_specific
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.engine.addressable import (
@@ -27,7 +19,6 @@ from pants.engine.addressable import (
   ProvenancedBuildFileAddresses,
 )
 from pants.engine.fs import Digest, FilesContent, PathGlobs, Snapshot
-from pants.engine.legacy.graph import Owners, OwnersRequest
 from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
 from pants.engine.objects import Locatable, SerializableFactory, Validatable
 from pants.engine.parser import HydratedStruct
@@ -268,20 +259,6 @@ async def provenanced_addresses_from_address_families(
 
 
 @rule
-async def provenanced_addresses_from_filesystem_specs(
-  filesystem_specs: FilesystemSpecs,
-) -> ProvenancedBuildFileAddresses:
-  snapshot = await Get[Snapshot](PathGlobs, filesystem_specs.to_path_globs())
-  owners = await Get[Owners](OwnersRequest(sources=snapshot.files))
-  # TODO(#9055): do we care about preserving the original provenance? This would be tricky to
-  # implement. For now, we use a no-op `FilesystemSpec("")`.
-  return ProvenancedBuildFileAddresses(
-    ProvenancedBuildFileAddress(build_file_address=bfa, provenance=FilesystemSpec(""))
-    for bfa in owners.addresses
-  )
-
-
-@rule
 def remove_provenance(pbfas: ProvenancedBuildFileAddresses) -> BuildFileAddresses:
   return BuildFileAddresses(pbfa.build_file_address for pbfa in pbfas)
 
@@ -324,7 +301,6 @@ def create_graph_rules(address_mapper: AddressMapper):
     # AddressSpec handling: locate directories that contain build files, and request
     # AddressFamilies for each of them.
     provenanced_addresses_from_address_families,
-    provenanced_addresses_from_filesystem_specs,
     remove_provenance,
     address_provenance_map,
     # Root rules representing parameters that might be provided via root subjects.
