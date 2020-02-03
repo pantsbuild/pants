@@ -4,7 +4,7 @@
 from abc import abstractmethod
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import ClassVar, List, Type
+from typing import ClassVar, Tuple, Type
 
 from pants.cache.cache_setup import CacheSetup
 from pants.option.optionable import Optionable
@@ -35,7 +35,7 @@ class GoalSubsystem(SubsystemClientMixin, Optionable):
 
   # If the goal requires downstream implementations to work properly, such as `test` and `run`,
   # it should declare the union types that must have members.
-  required_union_implementations: List[Type] = []
+  required_union_implementations: Tuple[Type, ...] = ()
 
   @classproperty
   @abstractmethod

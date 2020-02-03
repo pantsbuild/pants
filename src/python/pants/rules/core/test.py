@@ -80,7 +80,7 @@ class TestOptions(GoalSubsystem):
   """Runs tests."""
   name = "test"
 
-  required_union_implementations = [TestTarget]
+  required_union_implementations = (TestTarget,)
 
   # Prevent this class from being detected by pytest as a test class.
   __test__ = False

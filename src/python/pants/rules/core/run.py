@@ -20,7 +20,7 @@ class RunOptions(GoalSubsystem):
   name = 'run'
 
   # NB: To be runnable, you must be a BinaryTarget.
-  required_union_implementations = [BinaryTarget]
+  required_union_implementations = (BinaryTarget,)
 
 
 class Run(Goal):

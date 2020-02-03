@@ -62,7 +62,7 @@ class LintOptions(GoalSubsystem):
   # Blocked on https://github.com/pantsbuild/pants/issues/8351
   name = 'lint2'
 
-  required_union_implementations = [LintTarget]
+  required_union_implementations = (LintTarget,)
 
 
 class Lint(Goal):

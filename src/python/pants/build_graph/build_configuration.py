@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
-from collections import namedtuple
+from collections import OrderedDict, namedtuple
 from collections.abc import Iterable
 
 from twitter.common.collections import OrderedSet
@@ -34,7 +34,7 @@ class BuildConfiguration:
     self._exposed_context_aware_object_factory_by_alias = {}
     self._optionables = OrderedSet()
     self._rules = OrderedSet()
-    self._union_rules = {}
+    self._union_rules = OrderedDict()
 
   def registered_aliases(self):
     """Return the registered aliases exposed in BUILD files.
@@ -175,7 +175,10 @@ class BuildConfiguration:
     return list(self._rules)
 
   def union_rules(self):
-    """Returns a mapping of registered union base types -> [OrderedSet of union member types]."""
+    """Returns a mapping of registered union base types -> [OrderedSet of union member types].
+
+    :rtype: OrderedDict
+    """
     return self._union_rules
 
   @memoized_method

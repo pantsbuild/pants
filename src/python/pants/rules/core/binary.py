@@ -31,7 +31,7 @@ class BinaryOptions(LineOriented, GoalSubsystem):
   """Create a runnable binary."""
   name = 'binary'
 
-  required_union_implementations = [BinaryTarget]
+  required_union_implementations = (BinaryTarget,)
 
 
 class Binary(Goal):
