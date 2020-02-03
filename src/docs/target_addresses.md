@@ -106,7 +106,7 @@ Instead of specifying the address, you may instead simply specify the file you w
     $ ./pants list src/python/myproject/example.py
     src/python/myproject:lib
 
-You may pass multiple files and even use globs, with the same syntax as the `sources` field in BUILD files (see ...):
+You may pass multiple files and even use globs, with the same syntax as the `sources` field in BUILD files (see [[Use globs to group files|pants('src/docs/common_tasks:globs')]]):
 
     :::bash
     # This will format every `.py` file under `src/python/myproject`, except for `ignore.py`
