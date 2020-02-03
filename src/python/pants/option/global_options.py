@@ -51,6 +51,12 @@ class FileNotFoundBehavior(Enum):
     return GlobMatchErrorBehavior(self.value)
 
 
+class BuildFileImportsBehavior(Enum):
+  allow = "allow"
+  warn = "warn"
+  error = "error"
+
+
 @dataclass(frozen=True)
 class ExecutionOptions:
   """A collection of all options related to (remote) execution of processes.
@@ -327,6 +333,14 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              help='Paths that correspond with build roots for any subproject that this '
                   'project depends on.')
     register('--owner-of', type=list, member_type=file_option, default=[], daemon=False, metavar='<path>',
+             removal_version="1.27.0.dev0",
+             removal_hint=(
+               "Use direct file arguments instead, such as "
+               "`./pants list src/python/f1.py src/python/f2.py` or even "
+               "`./pants fmt 'src/python/**/*.py'`.\n\nInstead of `--owner-of=@my_file`, use "
+               "`--spec-file=my_file`.\n\nJust like with `--owner-of`, Pants will "
+               "try to find the owner(s) of the file and then operate on those owning targets."
+             ),
              help='Select the targets that own these files. '
                   'This is the third target calculation strategy along with the --changed-* '
                   'options and specifying the targets directly. These three types of target '
@@ -434,8 +448,8 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
 
     # This option changes the parser behavior in a fundamental way (which currently invalidates
     # all caches), and needs to be parsed out early, so we make it a bootstrap option.
-    register('--build-file-imports', choices=['allow', 'warn', 'error'], default='warn',
-             advanced=True,
+    register('--build-file-imports', type=BuildFileImportsBehavior,
+             default=BuildFileImportsBehavior.warn, advanced=True,
              help='Whether to allow import statements in BUILD files')
 
     register('--local-store-dir', advanced=True,

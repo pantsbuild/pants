@@ -4,6 +4,7 @@
 python_library(
   dependencies=[
     '3rdparty/python:dataclasses',
+    '3rdparty/python:setuptools',
     'src/python/pants/backend/python/subsystems',
     'src/python/pants/build_graph',
     'src/python/pants/engine/legacy:graph',
@@ -33,6 +34,7 @@ python_tests(
     'src/python/pants/engine/legacy:graph',
     'src/python/pants/engine/legacy:structs',
     'src/python/pants/rules/core',
+    'src/python/pants/testutil:interpreter_selection_utils',
     'src/python/pants/testutil:test_base',
     'src/python/pants/testutil/engine:util',
     'src/python/pants/testutil/option',

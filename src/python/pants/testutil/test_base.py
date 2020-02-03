@@ -29,6 +29,7 @@ from pants.engine.scheduler import SchedulerSession
 from pants.engine.selectors import Params
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.util import clean_global_runtime_state
+from pants.option.global_options import BuildFileImportsBehavior
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source.source_root import SourceRootConfig
 from pants.source.wrapped_globs import EagerFilesetWithSpec
@@ -401,7 +402,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     graph_session = EngineInitializer.setup_legacy_graph_extended(
       pants_ignore_patterns=None,
       local_store_dir=local_store_dir,
-      build_file_imports_behavior='allow',
+      build_file_imports_behavior=BuildFileImportsBehavior.error,
       native=init_native(),
       options_bootstrapper=options_bootstrapper,
       build_root=self.build_root,

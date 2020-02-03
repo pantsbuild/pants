@@ -18,7 +18,10 @@ from typing import (
   cast,
 )
 
+from pants.engine.fs import PathGlobs
 from pants.engine.objects import Collection
+from pants.option.custom_types import GlobExpansionConjunction
+from pants.option.global_options import GlobMatchErrorBehavior
 from pants.util.collections import assert_single_element
 from pants.util.dirutil import fast_relpath_optional, recursive_dirname
 from pants.util.filtering import create_filters, wrap_filters
@@ -321,7 +324,17 @@ class FilesystemSpec:
 
 
 class FilesystemSpecs(Collection[FilesystemSpec]):
-  pass
+
+  def to_path_globs(self) -> PathGlobs:
+    return PathGlobs(
+      globs=(fs_spec.glob for fs_spec in self.dependencies),
+      # We error on unmatched globs for consistency with unmatched address specs. This also
+      # ensures that scripts don't silently do the wrong thing.
+      glob_match_error_behavior=GlobMatchErrorBehavior.error,
+      # We validate that _every_ glob is valid.
+      conjunction=GlobExpansionConjunction.all_match,
+      description_of_origin="file arguments",
+    )
 
 
 class AmbiguousSpecs(Exception):
