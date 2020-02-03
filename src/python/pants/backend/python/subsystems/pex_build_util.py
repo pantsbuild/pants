@@ -14,7 +14,6 @@ from pex.util import DistributionHelper
 from twitter.common.collections import OrderedSet
 
 from pants.backend.python.python_requirement import PythonRequirement
-from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_distribution import PythonDistribution
@@ -25,6 +24,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.files import Files
 from pants.build_graph.target import Target
+from pants.python.python_repos import PythonRepos
 from pants.subsystem.subsystem import Subsystem
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_file
