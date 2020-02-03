@@ -28,4 +28,4 @@ Here is an example `jvm_app` definition that shows different possibilities for d
 ## See Also
 
 * [[Create a Bundled zip or Other Archive|pants('src/docs/common_tasks:bundle')]]
-* [[Use globs and rglobs to Group Files|pants('src/docs/common_tasks:globs')]]
+* [[Use globs to group files|pants('src/docs/common_tasks:globs')]]

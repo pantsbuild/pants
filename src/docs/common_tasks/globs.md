@@ -1,4 +1,4 @@
-# Use globs and rglobs to Group Files
+# Use globs to group files
 
 ## Problem
 
