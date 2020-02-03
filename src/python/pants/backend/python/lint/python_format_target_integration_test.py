@@ -11,8 +11,6 @@ from pants.backend.python.lint.python_format_target import (
   _ConcretePythonFormatTarget,
   format_python_target,
 )
-from pants.backend.python.rules import download_pex_bin, pex
-from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.build_graph.address import Address
 from pants.engine.fs import Digest, FileContent, InputFilesContent, Snapshot
 from pants.engine.legacy.structs import TargetAdaptor
@@ -33,10 +31,6 @@ class PythonFormatTargetIntegrationTest(TestBase):
       format_python_target,
       *black_rules(),
       *isort_rules(),
-      *download_pex_bin.rules(),
-      *pex.rules(),
-      *python_native_code.rules(),
-      *subprocess_environment.rules(),
       RootRule(_ConcretePythonFormatTarget),
       RootRule(BlackTarget),
       RootRule(IsortTarget),

@@ -7,8 +7,6 @@ import pytest
 
 from pants.backend.python.lint.bandit.rules import BanditTarget
 from pants.backend.python.lint.bandit.rules import rules as bandit_rules
-from pants.backend.python.rules import download_pex_bin, pex
-from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
@@ -33,15 +31,7 @@ class BanditIntegrationTest(TestBase):
 
   @classmethod
   def rules(cls):
-    return (
-      *super().rules(),
-      *bandit_rules(),
-      *download_pex_bin.rules(),
-      *pex.rules(),
-      *python_native_code.rules(),
-      *subprocess_environment.rules(),
-      RootRule(BanditTarget),
-    )
+    return (*super().rules(), *bandit_rules(), RootRule(BanditTarget))
 
   def run_bandit(
     self,
