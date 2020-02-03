@@ -262,6 +262,7 @@ class TestTargetSets(NamedTuple):
         f"--tag={'-' if test_type == TestType.unit else '+'}integration",
         "filter",
         "--type=python_tests",
+        "build-support::",
         "src/python::",
         "tests/python::",
         "contrib::",
