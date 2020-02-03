@@ -189,7 +189,9 @@ class ExportDepAsJar(ConsoleTask):
       'is_target_root': current_target in modulizable_target_set,
       'transitive': current_target.transitive,
       'scope': str(current_target.scope),
-      'scalac_args': self._extract_arguments_with_prefix_from_zinc_args(zinc_args_for_target, '-S')
+      'scalac_args': self._extract_arguments_with_prefix_from_zinc_args(zinc_args_for_target, '-S'),
+      'javac_args': self._extract_arguments_with_prefix_from_zinc_args(zinc_args_for_target, '-C'),
+      'extra_jvm_options': current_target.payload.get_field_value('extra_jvm_options', [])
     }
 
     if not current_target.is_synthetic:
