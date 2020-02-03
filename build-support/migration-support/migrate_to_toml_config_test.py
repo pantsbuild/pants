@@ -150,6 +150,8 @@ def test_list_options() -> None:
       l7: -["x", "y"]
       l8: +["a", "b"],-["x", "y"]
       l9: [[0], [1]]
+      l10: [0, 1]  # comment
+      l11: [0, 1]  ; comment
       """
     ),
     expected=dedent(
@@ -164,6 +166,8 @@ def test_list_options() -> None:
       l7.filter = ["x", "y"]
       l8: +["a", "b"],-["x", "y"]
       l9: [[0], [1]]
+      l10: [0, 1]  # comment
+      l11: [0, 1]  ; comment
       """
     )
   )
@@ -182,6 +186,8 @@ def test_dict_options() -> None:
       d3: {'a': 0}
       d4: { "a": 0, "b: 0" }
       d5: {"a": {"nested": 0}}
+      d6: {"a": 0}  # comment
+      d7: {"a": 0}  ; comment
       """
     ),
     expected=dedent(
@@ -192,6 +198,8 @@ def test_dict_options() -> None:
       d3 = \"""{'a': 0}\"""
       d4 = \"""{ "a": 0, "b: 0" }\"""
       d5: {"a": {"nested": 0}}
+      d6: {"a": 0}  # comment
+      d7: {"a": 0}  ; comment
       """
     )
   )
