@@ -30,6 +30,9 @@ class ExportDepAsJar(ConsoleTask):
 
   This is an experimental task that mimics export but uses the jars for
   jvm dependencies instead of sources.
+
+  This goal effects the contents of the runtime_classpath, and should not be
+  combined with any other goals on the command line.
   """
 
   _register_console_transitivity_option = False
@@ -62,8 +65,9 @@ class ExportDepAsJar(ConsoleTask):
   @classmethod
   def prepare(cls, options, round_manager):
     super().prepare(options, round_manager)
-    round_manager.require_data('export_dep_as_jar_classpath')
     round_manager.require_data('zinc_args')
+    round_manager.require_data('runtime_classpath')
+    round_manager.require_data('export_dep_as_jar_signal')
 
   @property
   def _output_folder(self):
@@ -309,7 +313,7 @@ class ExportDepAsJar(ConsoleTask):
 
   def _get_targets_to_make_into_modules(self, target_roots_set):
     target_root_addresses = [t.address for t in target_roots_set]
-    dependees_of_target_roots = self.context.build_graph.transitive_dependees_of_addresses(target_root_addresses)
+    dependees_of_target_roots = [t for t in self.context.build_graph.transitive_dependees_of_addresses(target_root_addresses) if isinstance(t, JvmTarget)]
     return dependees_of_target_roots
 
   def _make_libraries_entry(self, target, resource_target_map, runtime_classpath):
@@ -384,14 +388,13 @@ class ExportDepAsJar(ConsoleTask):
     return graph_info
 
   def console_output(self, targets):
-
     zinc_args_for_all_targets = self.context.products.get_data('zinc_args')
     if zinc_args_for_all_targets is None:
       raise TaskError("There was an error compiling the targets - There there are no zing argument entries")
 
-    runtime_classpath = self.context.products.get_data('export_dep_as_jar_classpath')
+    runtime_classpath = self.context.products.get_data('runtime_classpath')
     if runtime_classpath is None:
-      raise TaskError("There was an error compiling the targets - There is no export_dep_as_jar classpath")
+      raise TaskError("There was an error compiling the targets - There is no runtime_classpath classpath")
     graph_info = self.generate_targets_map(targets, runtime_classpath=runtime_classpath, zinc_args_for_all_targets=zinc_args_for_all_targets)
 
     if self.get_options().formatted:

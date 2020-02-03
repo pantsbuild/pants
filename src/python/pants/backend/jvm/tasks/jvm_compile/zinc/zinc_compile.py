@@ -717,7 +717,7 @@ class ZincCompile(BaseZincCompile):
 
   @classmethod
   def product_types(cls):
-    return ['runtime_classpath', 'export_dep_as_jar_classpath', 'zinc_analysis', 'zinc_args']
+    return ['runtime_classpath', 'export_dep_as_jar_signal', 'zinc_analysis', 'zinc_args']
 
   def select(self, target):
     # Require that targets are marked for JVM compilation, to differentiate from

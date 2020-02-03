@@ -429,10 +429,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     relevant_targets = list(self.context.targets(predicate=self.select))
 
     # If we are only exporting jars then we can omit some targets from the runtime_classpath.
-    if (
-        self.context.products.is_required_data("export_dep_as_jar_classpath") and
-        not self.context.products.is_required_data("runtime_classpath")
-    ):
+    if self.context.products.is_required_data("export_dep_as_jar_signal"):
       # Filter modulized targets from invalid targets list.
       target_root_addresses = [t.address for t in set(self.context.target_roots)]
       dependees_of_target_roots = self.context.build_graph.transitive_dependees_of_addresses(target_root_addresses)
@@ -471,12 +468,6 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
           for conf in self._confs:
             classpath_product.remove_for_target(cc.target, [(conf, cc.classes_dir)])
             classpath_product.add_for_target(cc.target, [(conf, cc.jar_file)])
-
-      # The runtime classpath will always be a superset of the export_dep_as_jar_classpath
-      # so however we compute runtime_classpath it will contain all the nescessary jars for
-      # the export_dep_as_jar_classpath.export_dep_as_jar_classpath.
-      if self.context.products.is_required_data('export_dep_as_jar_classpath'):
-        self.context.products.get_data('export_dep_as_jar_classpath', classpath_product.copy)
 
   def _classpath_for_context(self, context):
     if self.get_options().use_classpath_jars:
