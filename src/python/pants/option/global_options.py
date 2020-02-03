@@ -331,7 +331,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              removal_hint=(
                "Use direct file arguments instead, such as "
                "`./pants list src/python/f1.py src/python/f2.py` or even "
-               "`./pants fmt 'src/python/**/*.py'`. Instead of `--owner-of=@my_file`, use "
+               "`./pants fmt 'src/python/**/*.py'`.\n\nInstead of `--owner-of=@my_file`, use "
                "`--spec-file=my_file`.\n\nJust like with `--owner-of`, Pants will "
                "try to find the owner(s) of the file and then operate on those owning targets."
              ),
