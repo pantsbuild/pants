@@ -10,7 +10,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, Exiter
-from pants.base.specs import AddressSpec, Specs
+from pants.base.specs import Specs
 from pants.base.workunit import WorkUnit
 from pants.bin.goal_runner import GoalRunner
 from pants.build_graph.build_configuration import BuildConfiguration
@@ -270,16 +270,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     self._reporting.initialize(self._run_tracker, self._options, start_time=self._run_start_time)
 
     spec_parser = CmdLineSpecParser(get_buildroot())
-    specs: List[str] = []
-    for spec in self._options.specs:
-      parsed_spec = spec_parser.parse_spec(spec)
-      # NB: we parse the spec so that we may normalize the target shorthand, e.g.
-      # `src/python/pants/util` -> `src/python/pants/util:util`.
-      if isinstance(parsed_spec, AddressSpec):
-        specs.append(parsed_spec.to_spec_string())
-      # In contrast, filesystem specs need no normalization so we use the raw spec.
-      else:
-        specs.append(spec)
+    specs = [spec_parser.parse_spec(spec).to_spec_string() for spec in self._options.specs]
     # Note: This will not include values from `--owner-of` or `--changed-*` flags.
     self._run_tracker.run_info.add_info("specs_from_command_line", specs, stringify=False)
 

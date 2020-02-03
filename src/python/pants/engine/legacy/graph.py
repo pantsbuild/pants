@@ -710,13 +710,6 @@ async def sources_snapshots_from_filesystem_specs(
   return SourcesSnapshots([SourcesSnapshot(snapshot)])
 
 
-@rule
-async def owners_from_filesystem_specs(filesystem_specs: FilesystemSpecs) -> BuildFileAddresses:
-  snapshot = await Get[Snapshot](PathGlobs, filesystem_specs.to_path_globs())
-  owners = await Get[Owners](OwnersRequest(sources=snapshot.files))
-  return owners.addresses
-
-
 def create_legacy_graph_tasks():
   """Create tasks to recursively parse the legacy graph."""
   return [
@@ -727,7 +720,6 @@ def create_legacy_graph_tasks():
     find_owners,
     hydrate_sources,
     hydrate_bundles,
-    owners_from_filesystem_specs,
     sort_targets,
     hydrate_sources_snapshot,
     sources_snapshots_from_build_file_addresses,
