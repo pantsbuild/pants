@@ -7,6 +7,7 @@ import os.path
 from collections import defaultdict, deque
 from contextlib import contextmanager
 from dataclasses import dataclass
+from pathlib import PurePath
 from typing import Any, Dict, Iterable, List, Tuple, cast
 
 from twitter.common.collections import OrderedSet
@@ -17,6 +18,7 @@ from pants.base.specs import (
   AddressSpec,
   AddressSpecs,
   AscendantAddresses,
+  FilesystemLiteralSpec,
   FilesystemSpecs,
   SingleAddress,
 )
@@ -39,6 +41,7 @@ from pants.engine.legacy.structs import (
   SourcesField,
   TargetAdaptor,
 )
+from pants.engine.mapper import ResolveError
 from pants.engine.objects import Collection
 from pants.engine.parser import HydratedStruct
 from pants.engine.rules import RootRule, rule
@@ -732,6 +735,13 @@ async def provenanced_addresses_from_filesystem_specs(
   )
   result: List[ProvenancedBuildFileAddress] = []
   for spec, owners in zip(filesystem_specs.includes, owners_per_include):
+    if isinstance(spec, FilesystemLiteralSpec) and not owners.addresses:
+      file_path = PurePath(spec.to_spec_string())
+      raise ResolveError(
+        f"No owning targets could be found for the file `{file_path}`.\n\nPlease check "
+        f"that there is a BUILD file in `{file_path.parent}` with a target whose `sources` field "
+        f"includes `{file_path}`. See https://www.pantsbuild.org/build_files.html."
+      )
     result.extend(
       ProvenancedBuildFileAddress(build_file_address=bfa, provenance=spec)
       for bfa in owners.addresses

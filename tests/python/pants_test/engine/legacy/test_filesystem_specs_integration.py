@@ -27,10 +27,17 @@ class FilesystemSpecsIntegrationTest(PantsRunIntegrationTest):
     )
 
   def test_no_owner(self) -> None:
-    no_owning_file = 'testprojects/tests/python/pants/nonexistent/test_nonexistent.py'
+    """Literal file args should fail when there is no owner, but globs should be fine."""
+    nonexistent_folder = "testprojects/tests/python/pants/nonexistent"
+    no_owning_file = f'{nonexistent_folder}/test_nonexistent.py'
     touch(no_owning_file)
     try:
       pants_run = self.run_pants(['list', no_owning_file])
+      self.assert_failure(pants_run)
+      assert f"No owning targets could be found for the file `{no_owning_file}`." in pants_run.stderr_data
+
+      pants_run = self.run_pants(['list', f"{nonexistent_folder}/*.py"])
       assert 'WARNING: No targets were matched in' in pants_run.stderr_data
+      self.assert_success(pants_run)
     finally:
       rm_rf(os.path.dirname(no_owning_file))
