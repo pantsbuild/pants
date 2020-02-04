@@ -24,13 +24,21 @@ from typing import Dict, List, NamedTuple, Optional, Set, Union
 def main() -> None:
   args = create_parser().parse_args()
   build_files: Set[Path] = set(
-    itertools.chain.from_iterable(
-      [*folder.rglob("BUILD"), *folder.rglob("BUILD.*")]
-      for folder in args.folders)
+    fp
+    for folder in args.folders
+    for fp in [*folder.rglob("BUILD"), *folder.rglob("BUILD.*")]
+    # Check that it really is a BUILD file
+    if fp.is_file() and fp.stem == "BUILD"
   )
   updates: Dict[Path, List[str]] = {}
   for build in build_files:
-    possibly_new_build = generate_possibly_new_build(build)
+    try:
+      possibly_new_build = generate_possibly_new_build(build)
+    except Exception:
+      logging.warning(
+        f"Could not parse the BUILD file {build}. Skipping."
+      )
+      continue
     if possibly_new_build is not None:
       updates[build] = possibly_new_build
   for build, new_content in updates.items():
