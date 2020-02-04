@@ -367,6 +367,13 @@ class ExportDepAsJar(ConsoleTask):
 
     for target in modulizable_targets:
       zinc_args_for_target = zinc_args_for_all_targets.get(target)
+      if zinc_args_for_target is None:
+        if not isinstance(target, JvmTarget):
+          # non-JvmTarget targets (JvmApp, PythonLibrary, Page...) are not compiled with the jvm.
+          # Therefore, they don't need compiler args.
+          zinc_args_for_target = []
+        else:
+          raise TaskError(f"There was an error exporting target {target} - There were no zinc arguments registered for it")
       info = self._process_target(target, modulizable_targets, resource_target_map, runtime_classpath, zinc_args_for_target)
       targets_map[target.address.spec] = info
 
