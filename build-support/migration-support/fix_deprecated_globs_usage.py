@@ -45,7 +45,7 @@ def create_parser() -> argparse.ArgumentParser:
     description='Modernize BUILD files to no longer use globs, rglobs, and zglobs.',
   )
   parser.add_argument(
-    'folders', type=Path, nargs='*',
+    'folders', type=Path, nargs='+',
     help="Folders to recursively search for `BUILD` files",
   )
   parser.add_argument(
@@ -114,7 +114,7 @@ class GlobFunction(NamedTuple):
     #  * list of either of the above options
     exclude_globs: Optional[List[str]] = None
     exclude_arg: Optional[ast.keyword] = next(iter(glob_func.keywords), None)
-    if exclude_arg is not None:
+    if exclude_arg is not None and isinstance(exclude_arg.value, ast.List):
       exclude_elements: List[Union[ast.Call, ast.Str, ast.List]] = exclude_arg.value.elts
       nested_exclude_elements: List[Union[ast.Call, ast.Str]] = list(
         itertools.chain.from_iterable(
@@ -194,7 +194,10 @@ def generate_possibly_new_build(build_file: Path) -> Optional[List[str]]:
   ]
   for target in targets:
     bundles_arg: Optional[ast.keyword] = next(
-      (kwarg for kwarg in target.keywords if kwarg.arg == "bundles"), None,
+      (
+        kwarg for kwarg in target.keywords
+        if kwarg.arg == "bundles" and isinstance(kwarg.value, ast.List)
+      ), None,
     )
     if bundles_arg is not None:
       bundle_funcs: List[ast.Call] = [
