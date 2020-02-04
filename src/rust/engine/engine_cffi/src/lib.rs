@@ -502,6 +502,9 @@ pub extern "C" fn scheduler_execute(
       with_session(session_ptr, |session| {
         match scheduler.execute(execution_request, session) {
           Ok(raw_results) => Box::into_raw(RawNodes::create(raw_results)),
+          //TODO: Passing a raw null pointer to Python is a less-than-ideal way
+          //of noting an error condition. When we have a better way to send complicated
+          //error-signaling values over the FFI boundary, we should revisit this.
           Err(ExecutionTermination::KeyboardInterrupt) => std::ptr::null(),
         }
       })
