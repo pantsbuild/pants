@@ -339,7 +339,8 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                "`./pants list src/python/f1.py src/python/f2.py` or even "
                "`./pants fmt 'src/python/**/*.py'`.\n\nInstead of `--owner-of=@my_file`, use "
                "`--spec-file=my_file`.\n\nJust like with `--owner-of`, Pants will "
-               "try to find the owner(s) of the file and then operate on those owning targets."
+               "try to find the owner(s) of the file and then operate on those owning targets. "
+               "Unlike `--owner-of`, Pants will fail if there is no owning target for that file."
              ),
              help='Select the targets that own these files. '
                   'This is the third target calculation strategy along with the --changed-* '
