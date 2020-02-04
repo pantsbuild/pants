@@ -61,8 +61,8 @@ FILE1_TOML = dedent(
   # able to rewrite this to `[1, 2, 3, "%(answer)s"`. See 
   # https://github.com/toml-lang/toml/issues/665. 
   list = ["1", "2", "3", "%(answer)s"]
-  list2.append = [7, 8, 9]
-  list3.filter = ["x", "y", "z"]
+  list2.add = [7, 8, 9]
+  list3.remove = ["x", "y", "z"]
 
   [b]
   preempt = true
@@ -110,8 +110,8 @@ FILE2_TOML = dedent(
   no_values_in_parent = true
   
   [d]
-  list.append = [0, 1]
-  list.filter = [8, 9]
+  list.add = [0, 1]
+  list.remove = [8, 9]
 
   [defined_section]
   """

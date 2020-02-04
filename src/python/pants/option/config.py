@@ -265,10 +265,10 @@ class _TomlValues(_ConfigValues):
     `java` belonging to the section `cache` could actually be the section `cache.java`, rather
     than the option `--cache-java`.
 
-    We must also handle the special syntax of `my_list_option.append` and `my_list_option.filter`.
+    We must also handle the special syntax of `my_list_option.add` and `my_list_option.filter`.
     """
     return (
-      not isinstance(option_value, dict) or "append" in option_value or "filter" in option_value
+      not isinstance(option_value, dict) or "add" in option_value or "filter" in option_value
     )
 
   @staticmethod
@@ -354,9 +354,9 @@ class _TomlValues(_ConfigValues):
       for section, section_values in mapping.items():
         if not isinstance(section_values, dict):
           continue
-        # We filter out "DEFAULT" and also check for the special `my_list_option.append` and
+        # We filter out "DEFAULT" and also check for the special `my_list_option.add` and
         # `my_list_option.filter` syntax.
-        if section == "DEFAULT" or "append" in section_values or "filter" in section_values:
+        if section == "DEFAULT" or "add" in section_values or "filter" in section_values:
           continue
         section_name = section if not parent_section else f"{parent_section}.{section}"
         if self._section_explicitly_defined(section_values):
@@ -386,23 +386,23 @@ class _TomlValues(_ConfigValues):
     if option not in section_values:
       raise configparser.NoOptionError(option, section)
     option_value = section_values[option]
-    # Handle the special `my_list_option.append` and `my_list_option.filter` syntax.
+    # Handle the special `my_list_option.add` and `my_list_option.remove` syntax.
     if isinstance(option_value, dict):
-      has_append = "append" in option_value
-      has_filter = "filter" in option_value
-      if not has_append and not has_filter:
+      has_add = "add" in option_value
+      has_remove = "remove" in option_value
+      if not has_add and not has_remove:
         raise configparser.NoOptionError(option, section)
-      append_val = (
-        self._stringify_val(option_value["append"], list_prefix="+") if has_append else None
+      add_val = (
+        self._stringify_val(option_value["add"], list_prefix="+") if has_add else None
       )
-      filter_val = (
-        self._stringify_val(option_value["filter"], list_prefix="-") if has_filter else None
+      remove_val = (
+        self._stringify_val(option_value["remove"], list_prefix="-") if has_remove else None
       )
-      if has_append and has_filter:
-        return f"{append_val},{filter_val}"
-      if has_append:
-        return append_val
-      return filter_val
+      if has_add and has_remove:
+        return f"{add_val},{remove_val}"
+      if has_add:
+        return add_val
+      return remove_val
     return self._stringify_val(option_value)
 
   def options(self, section: str) -> List[str]:
