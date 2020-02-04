@@ -7,12 +7,14 @@ from typing import List, Optional, Tuple
 from pants.backend.python.lint.isort.subsystem import Isort
 from pants.backend.python.lint.python_format_target import PythonFormatTarget
 from pants.backend.python.lint.python_lint_target import PythonLintTarget
+from pants.backend.python.rules import download_pex_bin, pex
 from pants.backend.python.rules.pex import (
   CreatePex,
   Pex,
   PexInterpreterConstraints,
   PexRequirements,
 )
+from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
@@ -152,4 +154,8 @@ def rules():
     subsystem_rule(Isort),
     UnionRule(PythonFormatTarget, IsortTarget),
     UnionRule(PythonLintTarget, IsortTarget),
+    *download_pex_bin.rules(),
+    *pex.rules(),
+    *python_native_code.rules(),
+    *subprocess_environment.rules(),
   ]
