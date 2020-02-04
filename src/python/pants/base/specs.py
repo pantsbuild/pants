@@ -319,22 +319,58 @@ class AddressSpecs:
     return iter(self.dependencies)
 
 
-@dataclass(frozen=True)
-class FilesystemSpec(Spec):
-  """The glob may be anything understood by `PathGlobs`.
+class FilesystemSpec(Spec, metaclass=ABCMeta):
+  pass
 
-  The syntax supported is roughly Git's glob syntax."""
+
+@dataclass(frozen=True)
+class FilesystemLiteralSpec(FilesystemSpec):
+  """A literal file name, e.g. `foo.py`."""
+  file: str
+
+  def to_spec_string(self) -> str:
+    return self.file
+
+
+@dataclass(frozen=True)
+class FilesystemGlobSpec(FilesystemSpec):
+  """A spec with a glob or globs, e.g. `*.py` and `**/*.java`."""
   glob: str
 
   def to_spec_string(self) -> str:
     return self.glob
 
 
+@dataclass(frozen=True)
+class FilesystemIgnoreSpec(FilesystemSpec):
+  """A spec to ignore certain files or globs."""
+  glob: str
+
+  def __post_init__(self) -> None:
+    if self.glob.startswith("!"):
+      raise ValueError(f"The `glob` for {self} should not start with `!`.")
+
+  def to_spec_string(self) -> str:
+    return f"!{self.glob}"
+
+
 class FilesystemSpecs(Collection[FilesystemSpec]):
 
-  def to_path_globs(self) -> PathGlobs:
+  @memoized_property
+  def includes(self) -> Tuple[Union[FilesystemLiteralSpec, FilesystemGlobSpec], ...]:
+    return tuple(
+      spec for spec in self.dependencies
+      if isinstance(spec, (FilesystemGlobSpec, FilesystemLiteralSpec))
+    )
+
+  @memoized_property
+  def ignores(self) -> Tuple[FilesystemIgnoreSpec, ...]:
+    return tuple(spec for spec in self.dependencies if isinstance(spec, FilesystemIgnoreSpec))
+
+  @staticmethod
+  def _generate_path_globs(specs: Iterable[FilesystemSpec]) -> PathGlobs:
     return PathGlobs(
-      globs=(fs_spec.glob for fs_spec in self.dependencies),
+      globs=(s.to_spec_string() for s in specs),
       # We error on unmatched globs for consistency with unmatched address specs. This also
       # ensures that scripts don't silently do the wrong thing.
       glob_match_error_behavior=GlobMatchErrorBehavior.error,
@@ -342,6 +378,18 @@ class FilesystemSpecs(Collection[FilesystemSpec]):
       conjunction=GlobExpansionConjunction.all_match,
       description_of_origin="file arguments",
     )
+
+  def path_globs_for_spec(
+    self, spec: Union[FilesystemLiteralSpec, FilesystemGlobSpec]
+  ) -> PathGlobs:
+    """Generate PathGlobs for the specific spec, automatically including the instance's
+    FilesystemIgnoreSpecs.
+    """
+    return self._generate_path_globs(specs=(spec, *self.ignores))
+
+  def to_path_globs(self) -> PathGlobs:
+    """Generate a single PathGlobs for the instance."""
+    return self._generate_path_globs(specs=(*self.includes, *self.ignores))
 
 
 class AmbiguousSpecs(Exception):

@@ -17,7 +17,6 @@ from pants.base.specs import (
   AddressSpec,
   AddressSpecs,
   AscendantAddresses,
-  FilesystemSpec,
   FilesystemSpecs,
   SingleAddress,
 )
@@ -719,14 +718,23 @@ async def sources_snapshots_from_filesystem_specs(
 async def provenanced_addresses_from_filesystem_specs(
   filesystem_specs: FilesystemSpecs,
 ) -> ProvenancedBuildFileAddresses:
-  snapshot = await Get[Snapshot](PathGlobs, filesystem_specs.to_path_globs())
-  owners = await Get[Owners](OwnersRequest(sources=snapshot.files))
-  # TODO(#9055): do we care about preserving the original provenance? This would be tricky to
-  # implement. For now, we use a no-op `FilesystemSpec("")`.
-  return ProvenancedBuildFileAddresses(
-    ProvenancedBuildFileAddress(build_file_address=bfa, provenance=FilesystemSpec(""))
-    for bfa in owners.addresses
+  """Find the owner(s) for each FilesystemSpec."""
+  pathglobs_per_include = (
+    filesystem_specs.path_globs_for_spec(spec) for spec in filesystem_specs.includes
   )
+  snapshot_per_include = await MultiGet(
+    Get[Snapshot](PathGlobs, pg) for pg in pathglobs_per_include
+  )
+  owners_per_include = await MultiGet(
+    Get[Owners](OwnersRequest(sources=snapshot.files)) for snapshot in snapshot_per_include
+  )
+  result: List[ProvenancedBuildFileAddress] = []
+  for spec, owners in zip(filesystem_specs.includes, owners_per_include):
+    result.extend(
+      ProvenancedBuildFileAddress(build_file_address=bfa, provenance=spec)
+      for bfa in owners.addresses
+    )
+  return ProvenancedBuildFileAddresses(result)
 
 
 def create_legacy_graph_tasks():
