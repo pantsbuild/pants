@@ -633,7 +633,9 @@ class RunTracker(Subsystem):
     """
     scope_to_look_up = scope if scope != 'GLOBAL' else ''
     try:
-      value = self._all_options.for_scope(scope_to_look_up, inherit_from_enclosing_scope=False).as_dict()
+      value = self._all_options.for_scope(
+        scope_to_look_up, inherit_from_enclosing_scope=False,
+        include_passive_options=True).as_dict()
       if option is None:
         return value
       else:
