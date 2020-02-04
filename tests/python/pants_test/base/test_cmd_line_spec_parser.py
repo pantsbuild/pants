@@ -8,6 +8,9 @@ from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.specs import (
   AddressSpec,
   DescendantAddresses,
+  FilesystemGlobSpec,
+  FilesystemIgnoreSpec,
+  FilesystemLiteralSpec,
   FilesystemSpec,
   SiblingAddresses,
   SingleAddress,
@@ -26,6 +29,18 @@ def desc(directory: str) -> DescendantAddresses:
 
 def sib(directory: str) -> SiblingAddresses:
   return SiblingAddresses(directory)
+
+
+def literal(file: str) -> FilesystemLiteralSpec:
+  return FilesystemLiteralSpec(file)
+
+
+def glob(val: str) -> FilesystemGlobSpec:
+  return FilesystemGlobSpec(val)
+
+
+def ignore(val: str) -> FilesystemIgnoreSpec:
+  return FilesystemIgnoreSpec(val)
 
 
 class CmdLineSpecParserTest(TestBase):
@@ -68,17 +83,17 @@ class CmdLineSpecParserTest(TestBase):
   def test_files(self) -> None:
     # We assume that specs with an extension are meant to be interpreted as filesystem specs.
     for f in ["a.txt", "a.tmp.cache.txt.bak", "a/b/c.txt", ".a.txt"]:
-      self.assert_filesystem_spec_parsed(f)
-    self.assert_filesystem_spec_parsed("./a.txt", expected_glob="a.txt")
-    self.assert_filesystem_spec_parsed("//./a.txt", expected_glob="a.txt")
+      self.assert_filesystem_spec_parsed(f, literal(f))
+    self.assert_filesystem_spec_parsed("./a.txt", literal("a.txt"))
+    self.assert_filesystem_spec_parsed("//./a.txt", literal("a.txt"))
 
   def test_globs(self) -> None:
-    for glob in ["*", "**/*", "a/b/*", "a/b/test_*.py", "a/b/**/test_*"]:
-      self.assert_filesystem_spec_parsed(glob)
+    for glob_str in ["*", "**/*", "a/b/*", "a/b/test_*.py", "a/b/**/test_*"]:
+      self.assert_filesystem_spec_parsed(glob_str, glob(glob_str))
 
   def test_excludes(self) -> None:
-    for glob in ["!", "!a/b/", "!/a/b/*"]:
-      self.assert_filesystem_spec_parsed(glob)
+    for glob_str in ["!", "!a/b/", "!/a/b/*"]:
+      self.assert_filesystem_spec_parsed(glob_str, ignore(glob_str[1:]))
 
   def test_ambiguous_files(self) -> None:
     # These could either be files or the shorthand for single addresses. We check if they exist on
@@ -86,18 +101,18 @@ class CmdLineSpecParserTest(TestBase):
     for spec in ["a", "b/c"]:
       self.assert_address_spec_parsed(spec, single(spec))
       self.create_file(spec)
-      self.assert_filesystem_spec_parsed(spec)
+      self.assert_filesystem_spec_parsed(spec, literal(spec))
 
   def test_absolute(self) -> None:
     self.assert_address_spec_parsed(os.path.join(self.build_root, 'a'), single('a'))
     self.assert_address_spec_parsed(os.path.join(self.build_root, 'a:a'), single('a', 'a'))
     self.assert_address_spec_parsed(os.path.join(self.build_root, 'a:'), sib('a'))
     self.assert_address_spec_parsed(os.path.join(self.build_root, 'a::'), desc('a'))
-    self.assert_filesystem_spec_parsed(os.path.join(self.build_root, 'a.txt'), expected_glob='a.txt')
+    self.assert_filesystem_spec_parsed(os.path.join(self.build_root, 'a.txt'), literal('a.txt'))
 
     with self.assertRaises(CmdLineSpecParser.BadSpecError):
       self.assert_address_spec_parsed('/not/the/buildroot/a', sib('a'))
-      self.assert_filesystem_spec_parsed('/not/the/buildroot/a.txt', expected_glob='a.txt')
+      self.assert_filesystem_spec_parsed('/not/the/buildroot/a.txt', literal('a.txt'))
 
   def test_absolute_double_slashed(self) -> None:
     # By adding a double slash, we are insisting that this absolute path is actually
@@ -107,7 +122,7 @@ class CmdLineSpecParserTest(TestBase):
     for spec in [double_absolute_address, double_absolute_file]:
       assert '//' == spec[:2], 'A sanity check that we have a leading-// absolute spec'
     self.assert_address_spec_parsed(double_absolute_address, single(double_absolute_address[2:]))
-    self.assert_filesystem_spec_parsed(double_absolute_file, expected_glob=double_absolute_file[2:])
+    self.assert_filesystem_spec_parsed(double_absolute_file, literal(double_absolute_file[2:]))
 
   def test_cmd_line_affordances(self) -> None:
     self.assert_address_spec_parsed('./:root', single('', 'root'))
@@ -128,9 +143,7 @@ class CmdLineSpecParserTest(TestBase):
     assert isinstance(spec, AddressSpec)
     assert spec == expected_spec
 
-  def assert_filesystem_spec_parsed(
-    self, spec_str: str, *, expected_glob: Optional[str] = None,
-  ) -> None:
+  def assert_filesystem_spec_parsed(self, spec_str: str, expected_spec: FilesystemSpec) -> None:
     spec = self._spec_parser.parse_spec(spec_str)
     assert isinstance(spec, FilesystemSpec)
-    assert spec == FilesystemSpec(expected_glob or spec_str)
+    assert spec == expected_spec

@@ -48,5 +48,5 @@ python_tests(
     'testprojects/src/python:plugins_directory',
   ],
   tags = {'integration', 'partially_type_checked'},
-  timeout=90,
+  timeout=120,
 )

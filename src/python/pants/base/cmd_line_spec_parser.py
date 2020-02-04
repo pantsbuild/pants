@@ -8,6 +8,9 @@ from typing import Union
 from pants.base.specs import (
   AddressSpec,
   DescendantAddresses,
+  FilesystemGlobSpec,
+  FilesystemIgnoreSpec,
+  FilesystemLiteralSpec,
   FilesystemSpec,
   SiblingAddresses,
   SingleAddress,
@@ -72,13 +75,15 @@ class CmdLineSpecParser:
       spec_parts = spec.rsplit(':', 1)
       spec_path = self._normalize_spec_path(spec_parts[0])
       return SingleAddress(directory=spec_path, name=spec_parts[1])
-    if spec.startswith('!') or '*' in spec:
-      return FilesystemSpec(glob=spec)
+    if spec.startswith('!'):
+      return FilesystemIgnoreSpec(spec[1:])
+    if '*' in spec:
+      return FilesystemGlobSpec(spec)
     if PurePath(spec).suffix:
-      return FilesystemSpec(glob=self._normalize_spec_path(spec))
+      return FilesystemLiteralSpec(self._normalize_spec_path(spec))
     spec_path = self._normalize_spec_path(spec)
     if Path(self._root_dir, spec_path).is_file():
-      return FilesystemSpec(glob=spec_path)
+      return FilesystemLiteralSpec(spec_path)
     # Else we apply address shorthand, i.e. `src/python/pants/util` -> `src/python/pants/util:util`
     # TODO: Figure out what this should look like if (once?) filesystem specs allow directories.
     # Should this shorthand be removed so that directories may be unambiguously resolved to a
