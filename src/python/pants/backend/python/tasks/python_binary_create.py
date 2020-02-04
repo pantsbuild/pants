@@ -56,10 +56,12 @@ class PythonBinaryCreate(Task):
 
   @classmethod
   def implementation_version(cls):
-    return super().implementation_version() + [('PythonBinaryCreate', 2)]
+    return super().implementation_version() + [('PythonBinaryCreate', 3)]
 
   @property
-  def cache_target_dirs(self):
+  def create_target_dirs(self):
+    # The pex files produced by this task are (often) platform-specific, and should not be sent to a
+    # remote cache where a pants from another platform might pick it up and fail to execute it.
     return True
 
   @classmethod
