@@ -4,6 +4,96 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.25.0rc0 (02/4/2020)
+------------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Deprecate `globs`, `rglobs`, and `zglobs` (#9040)
+  `PR #9040 <https://github.com/pantsbuild/pants/pull/9040>`_
+
+* Deprecate `--owner-of` in favor of file arguments (#9050)
+  `PR #9050 <https://github.com/pantsbuild/pants/pull/9050>`_
+
+* Deprecate `--build-file-imports` defaulting to `warn` and having the option `allow` (#9047)
+  `PR #9047 <https://github.com/pantsbuild/pants/pull/9047>`_
+
+* Deprecate `--glob-expansion-failure` in favor of `--files-not-found-behavior` (#9022)
+  `PR #9022 <https://github.com/pantsbuild/pants/pull/9022>`_
+
+* [IntelliJ] Add compiler options and plugins to the output of `export-dep-as-jar` (#9036)
+  `PR #9036 <https://github.com/pantsbuild/pants/pull/9036>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Allow using file args with every goal (#9048)
+  `PR #9048 <https://github.com/pantsbuild/pants/pull/9048>`_
+
+* Support python2 in the setup.py rule. (#8956)
+  `PR #8956 <https://github.com/pantsbuild/pants/pull/8956>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix Python linters to work without `pants.backend.python` registered (#9059)
+  `PR #9059 <https://github.com/pantsbuild/pants/pull/9059>`_
+
+* [thrift linter] use non-zero exit on warning when strict and zero exit warning when not strict (#9051)
+  `PR #9051 <https://github.com/pantsbuild/pants/pull/9051>`_
+
+* Fix V2 `test` and `setup-py2` to work with file args (#9056)
+  `PR #9056 <https://github.com/pantsbuild/pants/pull/9056>`_
+
+* Fix race condition with deprecation warnings (#9060)
+  `PR #9060 <https://github.com/pantsbuild/pants/pull/9060>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Error when literal file args do not have any owners (#9068)
+  `PR #9068 <https://github.com/pantsbuild/pants/pull/9068>`_
+
+* Change invalid file args to error instead of warn (#9041)
+  `PR #9041 <https://github.com/pantsbuild/pants/pull/9041>`_
+
+* Preserve the filesystem spec used to find owning targets (#9063)
+  `PR #9063 <https://github.com/pantsbuild/pants/pull/9063>`_
+
+* Decouple `--owner-of` implementation from` --changed-*` (#9046)
+  `PR #9046 <https://github.com/pantsbuild/pants/pull/9046>`_
+
+* Remove deps from the core into the Python backend's subsystems (#9049)
+  `PR #9049 <https://github.com/pantsbuild/pants/pull/9049>`_
+
+* Allow options to be registered passively. (#9061)
+  `PR #9061 <https://github.com/pantsbuild/pants/pull/9061>`_
+
+* Don't show core goals like `binary` and `test` when they have no implementation (#9002)
+  `PR #9002 <https://github.com/pantsbuild/pants/pull/9002>`_
+
+* Remove origin check from release.sh script (#9042)
+  `PR #9042 <https://github.com/pantsbuild/pants/pull/9042>`_
+
+* Snapshot subset intrinsic (#9006)
+  `PR #9006 <https://github.com/pantsbuild/pants/pull/9006>`_
+
+* No longer use `globs`, `rglobs`, and `zglobs` internally (#9029)
+  `PR #9029 <https://github.com/pantsbuild/pants/pull/9029>`_
+
+* Stop using `globs` in testprojects/ (#9039)
+  `PR #9039 <https://github.com/pantsbuild/pants/pull/9039>`_
+
+* Make `fix_deprecated_globs_usage.py` more robust (#9067)
+  `PR #9067 <https://github.com/pantsbuild/pants/pull/9067>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Update docs to use the new `!` exclude syntax for BUILD files (#9037)
+  `PR #9037 <https://github.com/pantsbuild/pants/pull/9037>`_
+
 1.25.0.dev3 (01/29/2020)
 ------------------------
 
@@ -36,7 +126,6 @@ New Features
 
 * Allow excludes in BUILD files via new `!` syntax (#9025)
   `PR #9025 <https://github.com/pantsbuild/pants/pull/9025>`_
-
 
 Bugfixes
 ~~~~~~~~
@@ -197,7 +286,6 @@ Refactoring, Improvements, and Tooling
 * Port V2 `python_test_runner.py` integration tests to V2 style (#8924)
   `PR #8924 <https://github.com/pantsbuild/pants/pull/8924>`_
 
-
 1.25.0.dev1 (01/14/2020)
 ------------------------
 
@@ -341,7 +429,6 @@ Documentation
 
 * Fix typo in export docs (#8936)
   `PR #8936 <https://github.com/pantsbuild/pants/pull/8936>`_
-
 
 1.25.0.dev0 (01/06/2020)
 ------------------------
