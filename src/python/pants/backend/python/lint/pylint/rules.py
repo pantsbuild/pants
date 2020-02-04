@@ -14,11 +14,15 @@ from pants.backend.python.rules.pex import (
 )
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
+from pants.build_graph.address import Address
+from pants.engine.addressable import Addresses
 from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
+from pants.engine.legacy.graph import HydratedTarget, HydratedTargets
 from pants.engine.legacy.structs import PythonTargetAdaptor, TargetAdaptor
 from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
+from pants.option.global_options import GlobMatchErrorBehavior
 from pants.rules.core.lint import LintResult
 
 
@@ -48,6 +52,12 @@ async def lint(
 
   target = wrapped_target.target
 
+  hydrated_target = await Get[HydratedTarget](Address, target.address)
+  dependencies = await Get[HydratedTargets](Addresses, hydrated_target.addresses)
+  sources_digest = await Get[Digest](
+    DirectoriesToMerge(directories=tuple(hydrated_target.adaptor.sources.snapshot.directory_digest for hydrated_target in (hydrated_target, *dependencies)))
+  )
+
   # NB: Pylint output depends upon which Python interpreter version it's run with. We ensure that
   # each target runs with its own interpreter constraints. See
   # http://pylint.pycqa.org/en/latest/faq.html#what-versions-of-python-is-pylint-supporting.
@@ -58,7 +68,11 @@ async def lint(
 
   config_path: Optional[str] = pylint.options.config
   config_snapshot = await Get[Snapshot](
-    PathGlobs(include=tuple([config_path] if config_path else []))
+    PathGlobs(
+      globs=tuple([config_path] if config_path else []),
+      glob_match_error_behavior=GlobMatchErrorBehavior.error,
+      description_of_origin="the option `--pylint-config`",
+    )
   )
   requirements_pex = await Get[Pex](
     CreatePex(
@@ -75,6 +89,7 @@ async def lint(
         target.sources.snapshot.directory_digest,
         requirements_pex.directory_digest,
         config_snapshot.directory_digest,
+        sources_digest,
       )
     ),
   )
