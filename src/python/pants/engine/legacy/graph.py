@@ -718,7 +718,9 @@ async def sources_snapshots_from_filesystem_specs(
 async def provenanced_addresses_from_filesystem_specs(
   filesystem_specs: FilesystemSpecs,
 ) -> ProvenancedBuildFileAddresses:
-  """Find the owner(s) for each FilesystemSpec."""
+  """Find the owner(s) for each FilesystemSpec while preserving the original FilesystemSpec those
+  owners come from (i.e., preserving the "provenance").
+  """
   pathglobs_per_include = (
     filesystem_specs.path_globs_for_spec(spec) for spec in filesystem_specs.includes
   )

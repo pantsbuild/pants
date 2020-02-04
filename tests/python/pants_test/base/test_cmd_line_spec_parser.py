@@ -88,12 +88,12 @@ class CmdLineSpecParserTest(TestBase):
     self.assert_filesystem_spec_parsed("//./a.txt", literal("a.txt"))
 
   def test_globs(self) -> None:
-    for val in ["*", "**/*", "a/b/*", "a/b/test_*.py", "a/b/**/test_*"]:
-      self.assert_filesystem_spec_parsed(val, glob(val))
+    for glob_str in ["*", "**/*", "a/b/*", "a/b/test_*.py", "a/b/**/test_*"]:
+      self.assert_filesystem_spec_parsed(glob_str, glob(glob_str))
 
   def test_excludes(self) -> None:
-    for val in ["!", "!a/b/", "!/a/b/*"]:
-      self.assert_filesystem_spec_parsed(val, ignore(val[1:]))
+    for glob_str in ["!", "!a/b/", "!/a/b/*"]:
+      self.assert_filesystem_spec_parsed(glob_str, ignore(glob_str[1:]))
 
   def test_ambiguous_files(self) -> None:
     # These could either be files or the shorthand for single addresses. We check if they exist on
