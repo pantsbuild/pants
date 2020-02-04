@@ -45,7 +45,7 @@ class ThriftLinterTest(TaskTestBase):
     self._run_java_mock.assert_called_once_with(
       classpath='foo_classpath',
       main='com.twitter.scrooge.linter.Main',
-      args=['--fatal-warnings', '--ignore-errors', '--include-path', 'src/thrift/users',
+      args=['--warnings', '--include-path', 'src/thrift/users',
             '--include-path', 'src/thrift/tweet', 'src/thrift/tweet/A.thrift'],
       jvm_options=get_default_jvm_options(),
       workunit_labels=[WorkUnitLabel.COMPILER, WorkUnitLabel.SUPPRESS_LABEL])
@@ -69,7 +69,7 @@ class ThriftLinterTest(TaskTestBase):
     self._run_java_mock.assert_called_once_with(
       classpath='foo_classpath',
       main='com.twitter.scrooge.linter.Main',
-      args=['--fatal-warnings', '--ignore-errors',
+      args=['--warnings',
             '--include-path', 'src/thrift/tweet', 'src/thrift/tweet/B.thrift'],
       jvm_options=get_default_jvm_options(),
       workunit_labels=[WorkUnitLabel.COMPILER, WorkUnitLabel.SUPPRESS_LABEL])

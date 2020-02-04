@@ -13,6 +13,7 @@ F = TypeVar("F", bound=FuncType)
 
 class ThriftLinterTest(PantsRunIntegrationTest):
 
+  lint_warn_token = "LINT-WARN"
   lint_error_token = "LINT-ERROR"
   thrift_folder_root = 'contrib/scrooge/tests/thrift/org/pantsbuild/contrib/scrooge/thrift_linter'
 
@@ -66,7 +67,7 @@ class ThriftLinterTest(PantsRunIntegrationTest):
     cmd = ['lint.thrift', self.thrift_test_target('bad-thrift-default')]
     pants_run = self.run_pants(cmd)
     self.assert_success(pants_run)
-    self.assertIn(self.lint_error_token, pants_run.stdout_data)
+    self.assertIn(self.lint_warn_token, pants_run.stdout_data)
 
   @rename_build_file
   def test_bad_strict(self):
@@ -82,7 +83,7 @@ class ThriftLinterTest(PantsRunIntegrationTest):
     cmd = ['lint.thrift', self.thrift_test_target('bad-thrift-non-strict')]
     pants_run = self.run_pants(cmd)
     self.assert_success(pants_run)
-    self.assertIn(self.lint_error_token, pants_run.stdout_data)
+    self.assertIn(self.lint_warn_token, pants_run.stdout_data)
 
   @rename_build_file
   def test_bad_default_override(self):
@@ -116,7 +117,7 @@ class ThriftLinterTest(PantsRunIntegrationTest):
     cmd = ['--no-scrooge-linter-strict', 'lint.thrift', self.thrift_test_target('bad-thrift-strict')]
     pants_run = self.run_pants(cmd)
     self.assert_success(pants_run)
-    self.assertIn(self.lint_error_token, pants_run.stdout_data)
+    self.assertIn(self.lint_warn_token, pants_run.stdout_data)
 
   @rename_build_file
   def test_bad_non_strict_override(self):
@@ -143,4 +144,4 @@ class ThriftLinterTest(PantsRunIntegrationTest):
     pants_ini_config = {'scrooge-linter': {'strict': True}}
     pants_run = self.run_pants(cmd, config=pants_ini_config)
     self.assert_success(pants_run)
-    self.assertIn(self.lint_error_token, pants_run.stdout_data)
+    self.assertIn(self.lint_warn_token, pants_run.stdout_data)
