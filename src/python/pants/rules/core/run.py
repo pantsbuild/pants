@@ -11,6 +11,7 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
 from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get
+from pants.option.global_options import GlobalOptions
 from pants.rules.core.binary import BinaryTarget, CreatedBinary
 from pants.util.contextutil import temporary_dir
 
@@ -34,11 +35,12 @@ async def run(
   runner: InteractiveRunner,
   build_root: BuildRoot,
   bfa: BuildFileAddress,
+  global_options: GlobalOptions,
 ) -> Run:
   target = bfa.to_address()
   binary = await Get[CreatedBinary](Address, target)
 
-  with temporary_dir(root_dir=str(Path(build_root.path, ".pants.d")), cleanup=True) as tmpdir:
+  with temporary_dir(root_dir=global_options.pants_workdir, cleanup=True) as tmpdir:
     path_relative_to_build_root = str(Path(tmpdir).relative_to(build_root.path))
     workspace.materialize_directory(
       DirectoryToMaterialize(binary.digest, path_prefix=path_relative_to_build_root)
