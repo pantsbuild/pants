@@ -15,8 +15,8 @@ class ExportDepAsJarIntegrationTest(ScalacPluginIntegrationTestBase):
   javac_test_targets_dir = 'examples/src/java/org/pantsbuild/example/javac'
   commonly_expected_options = {
     'scalac_args':  ['-encoding', 'UTF-8', '-g:vars', '-target:jvm-1.8', '-deprecation', '-unchecked', '-feature'],
-    'javac_args': ['-encoding', 'UTF-8', '-g:vars', '-target:jvm-1.8', '-deprecation', '-unchecked', '-feature'],
-    'extra_jvm_args': [],
+    'javac_args': ['-encoding', 'UTF-8', '-source', '1.8', '-target', '1.8'],
+    'extra_jvm_options': [],
   }
 
   def _do_test_compiler_options_in_export_output(self, config, target):
@@ -107,4 +107,18 @@ class ExportDepAsJarIntegrationTest(ScalacPluginIntegrationTestBase):
       '-P:simple_scalac_plugin:target',
       '-P:simple_scalac_plugin:local',
     ]}
+    self._check_compiler_options_for_target_are(target_to_test, expected_options, config)
+
+  def test_javac_options(self):
+    target_to_test = f'{self.javac_test_targets_dir}/plugin:local'
+    config = {}
+    expected_options = {'javac_args': [
+      '-Xplugin:simple_javac_plugin args from target local',
+    ]}
+    self._check_compiler_options_for_target_are(target_to_test, expected_options, config)
+
+  def test_extra_jvm_options(self):
+    target_to_test = f'testprojects/src/java/org/pantsbuild/testproject/extra_jvm_options:opts'
+    config = {}
+    expected_options = {'extra_jvm_options': ['-Dproperty.color=orange', '-Dproperty.size=2', '-DMyFlag', '-Xmx1m']}
     self._check_compiler_options_for_target_are(target_to_test, expected_options, config)
