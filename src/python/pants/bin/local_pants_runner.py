@@ -15,6 +15,7 @@ from pants.base.workunit import WorkUnit
 from pants.bin.goal_runner import GoalRunner
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.native import Native
+from pants.engine.rules import UnionMembership
 from pants.engine.scheduler import SchedulerSession
 from pants.goal.run_tracker import RunTracker
 from pants.help.help_printer import HelpPrinter
@@ -129,7 +130,12 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
       # of the same engine functionality, but for now is separate to avoid
       # breaking functionality associated with zipkin tracing while iterating on streaming workunit reporting.
       stream_workunits = len(options.for_global_scope().streaming_workunits_handlers) != 0
-      graph_session = graph_scheduler_helper.new_session(zipkin_trace_v2, RunTracker.global_instance().run_id, v2_ui, should_report_workunits=stream_workunits)
+      graph_session = graph_scheduler_helper.new_session(
+        zipkin_trace_v2,
+        RunTracker.global_instance().run_id,
+        v2_ui,
+        should_report_workunits=stream_workunits,
+      )
     return graph_session, graph_session.scheduler_session
 
   @staticmethod
@@ -189,6 +195,8 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     if global_options.verify_config:
       options_bootstrapper.verify_configs_against_options(options)
 
+    union_membership = UnionMembership(build_config.union_rules())
+
     # If we're running with the daemon, we'll be handed a session from the
     # resident graph helper - otherwise initialize a new one here.
     graph_session, scheduler_session = cls._maybe_init_graph_session(
@@ -208,15 +216,16 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     profile_path = env.get('PANTS_PROFILE')
 
     return cls(
-      build_root,
-      options,
-      options_bootstrapper,
-      build_config,
-      specs,
-      graph_session,
-      scheduler_session,
-      daemon_graph_session is not None,
-      profile_path
+      build_root=build_root,
+      options=options,
+      options_bootstrapper=options_bootstrapper,
+      build_config=build_config,
+      specs=specs,
+      graph_session=graph_session,
+      scheduler_session=scheduler_session,
+      union_membership=union_membership,
+      is_daemon=daemon_graph_session is not None,
+      profile_path=profile_path,
     )
 
   def __init__(
@@ -228,6 +237,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     specs: Specs,
     graph_session: LegacyGraphSession,
     scheduler_session: SchedulerSession,
+    union_membership: UnionMembership,
     is_daemon: bool,
     profile_path: Optional[str],
   ) -> None:
@@ -248,6 +258,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     self._specs = specs
     self._graph_session = graph_session
     self._scheduler_session = scheduler_session
+    self._union_membership = union_membership
     self._is_daemon = is_daemon
     self._profile_path = profile_path
 
@@ -287,7 +298,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
   def _maybe_handle_help(self):
     """Handle requests for `help` information."""
     if self._options.help_request:
-      help_printer = HelpPrinter(self._options)
+      help_printer = HelpPrinter(options=self._options, union_membership=self._union_membership)
       result = help_printer.print_help()
       return result
 
@@ -295,7 +306,11 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     v1_goals, ambiguous_goals, _ = self._options.goals_by_version
     if not self._global_options.v1:
       if v1_goals:
-        HelpPrinter(self._options, help_request=UnknownGoalHelp(v1_goals)).print_help()
+        HelpPrinter(
+          options=self._options,
+          help_request=UnknownGoalHelp(v1_goals),
+          union_membership=self._union_membership,
+        ).print_help()
         return PANTS_FAILED_EXIT_CODE
       return PANTS_SUCCEEDED_EXIT_CODE
 

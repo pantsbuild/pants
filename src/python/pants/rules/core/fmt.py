@@ -76,6 +76,8 @@ class FmtOptions(GoalSubsystem):
   # Blocked on https://github.com/pantsbuild/pants/issues/8351
   name = 'fmt2'
 
+  required_union_implementations = (FormatTarget,)
+
 
 class Fmt(Goal):
   subsystem_cls = FmtOptions
