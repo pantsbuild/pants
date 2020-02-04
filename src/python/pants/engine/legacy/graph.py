@@ -17,6 +17,7 @@ from pants.base.specs import (
   AddressSpec,
   AddressSpecs,
   AscendantAddresses,
+  FilesystemSpec,
   FilesystemSpecs,
   SingleAddress,
 )
@@ -25,7 +26,11 @@ from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.app_base import AppBase, Bundle
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.remote_sources import RemoteSources
-from pants.engine.addressable import BuildFileAddresses
+from pants.engine.addressable import (
+  BuildFileAddresses,
+  ProvenancedBuildFileAddress,
+  ProvenancedBuildFileAddresses,
+)
 from pants.engine.fs import EMPTY_SNAPSHOT, PathGlobs, Snapshot
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.structs import (
@@ -711,10 +716,17 @@ async def sources_snapshots_from_filesystem_specs(
 
 
 @rule
-async def owners_from_filesystem_specs(filesystem_specs: FilesystemSpecs) -> BuildFileAddresses:
+async def provenanced_addresses_from_filesystem_specs(
+  filesystem_specs: FilesystemSpecs,
+) -> ProvenancedBuildFileAddresses:
   snapshot = await Get[Snapshot](PathGlobs, filesystem_specs.to_path_globs())
   owners = await Get[Owners](OwnersRequest(sources=snapshot.files))
-  return owners.addresses
+  # TODO(#9055): do we care about preserving the original provenance? This would be tricky to
+  # implement. For now, we use a no-op `FilesystemSpec("")`.
+  return ProvenancedBuildFileAddresses(
+    ProvenancedBuildFileAddress(build_file_address=bfa, provenance=FilesystemSpec(""))
+    for bfa in owners.addresses
+  )
 
 
 def create_legacy_graph_tasks():
@@ -727,9 +739,9 @@ def create_legacy_graph_tasks():
     find_owners,
     hydrate_sources,
     hydrate_bundles,
-    owners_from_filesystem_specs,
     sort_targets,
     hydrate_sources_snapshot,
+    provenanced_addresses_from_filesystem_specs,
     sources_snapshots_from_build_file_addresses,
     sources_snapshots_from_filesystem_specs,
     RootRule(FilesystemSpecs),

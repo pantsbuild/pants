@@ -3,7 +3,7 @@
 
 import os
 import re
-from abc import ABC, abstractmethod
+from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
 from typing import (
   TYPE_CHECKING,
@@ -33,7 +33,15 @@ if TYPE_CHECKING:
   from pants.engine.mapper import AddressFamily, AddressMapper
 
 
-class AddressSpec(ABC):
+class Spec(ABC):
+  """A specification for what Pants should operate on."""
+
+  @abstractmethod
+  def to_spec_string(self) -> str:
+    """Return the normalized string representation of this spec."""
+
+
+class AddressSpec(Spec, metaclass=ABCMeta):
   """Represents address selectors as passed from the command line.
 
   Supports `Single` target addresses as well as `Sibling` (:) and `Descendant` (::) selector forms.
@@ -42,10 +50,6 @@ class AddressSpec(ABC):
   substitute 'address' for a spec resolved to an address, or 'address selector' if you are
   referring to an unresolved spec string.
   """
-
-  @abstractmethod
-  def to_spec_string(self) -> str:
-    """Returns the normalized string representation of this address spec."""
 
   class AddressFamilyResolutionError(Exception):
     pass
@@ -316,11 +320,14 @@ class AddressSpecs:
 
 
 @dataclass(frozen=True)
-class FilesystemSpec:
+class FilesystemSpec(Spec):
   """The glob may be anything understood by `PathGlobs`.
 
   The syntax supported is roughly Git's glob syntax."""
   glob: str
+
+  def to_spec_string(self) -> str:
+    return self.glob
 
 
 class FilesystemSpecs(Collection[FilesystemSpec]):
@@ -351,7 +358,7 @@ class Specs:
       raise AmbiguousSpecs(
         "Both address specs and filesystem specs given. Please use only one type of spec.\n\n"
         f"Address specs: {', '.join(spec.to_spec_string() for spec in self.address_specs)}\n"
-        f"Filesystem specs: {', '.join(spec.glob for spec in self.filesystem_specs)}"
+        f"Filesystem specs: {', '.join(spec.to_spec_string() for spec in self.filesystem_specs)}"
       )
 
   @property
