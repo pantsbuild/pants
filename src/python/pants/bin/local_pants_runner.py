@@ -320,6 +320,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     # Setup and run GoalRunner.
     return GoalRunner.Factory(
       self._build_root,
+      self._options_bootstrapper,
       self._options,
       self._build_config,
       self._run_tracker,

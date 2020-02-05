@@ -46,7 +46,11 @@ from pants.engine.objects import Collection
 from pants.engine.parser import HydratedStruct
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
-from pants.option.global_options import GlobMatchErrorBehavior, OwnersNotFoundBehavior, GlobalOptions
+from pants.option.global_options import (
+  GlobalOptions,
+  GlobMatchErrorBehavior,
+  OwnersNotFoundBehavior,
+)
 from pants.source.filespec import any_matches_filespec
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper, Filespec
 

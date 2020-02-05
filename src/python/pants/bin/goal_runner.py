@@ -12,12 +12,14 @@ from pants.build_graph.build_file_parser import BuildFileParser
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.legacy.graph import LegacyBuildGraph
 from pants.engine.round_engine import RoundEngine
+from pants.engine.selectors import Params
 from pants.goal.context import Context
 from pants.goal.goal import Goal
 from pants.goal.run_tracker import RunTracker
 from pants.init.engine_initializer import LegacyGraphSession
 from pants.java.nailgun_executor import NailgunProcessGroup
 from pants.option.options import Options
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.ranked_value import RankedValue
 from pants.reporting.reporting import Reporting
 from pants.task.task import QuietTaskMixin
@@ -30,6 +32,7 @@ class GoalRunnerFactory:
   def __init__(
     self,
     root_dir: str,
+    options_bootstrapper: OptionsBootstrapper,
     options: Options,
     build_config: BuildConfiguration,
     run_tracker: RunTracker,
@@ -49,6 +52,7 @@ class GoalRunnerFactory:
     :param func exiter: A function that accepts an exit code value and exits. (for tests, Optional)
     """
     self._root_dir = root_dir
+    self._options_bootstrapper = options_bootstrapper
     self._options = options
     self._build_config = build_config
     self._run_tracker = run_tracker
@@ -65,7 +69,7 @@ class GoalRunnerFactory:
     # V1 tasks do not understand FilesystemSpecs, so we eagerly convert them into AddressSpecs.
     if self._specs.filesystem_specs.dependencies:
       owned_addresses, = self._graph_session.scheduler_session.product_request(
-        BuildFileAddresses, [self._specs.filesystem_specs]
+        BuildFileAddresses, [Params(self._specs.filesystem_specs, self._options_bootstrapper)]
       )
       updated_address_specs = AddressSpecs(
         dependencies=tuple(

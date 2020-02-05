@@ -319,7 +319,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
       "--owners-not-found-behavior", advanced=True,
       type=OwnersNotFoundBehavior, default=OwnersNotFoundBehavior.error,
       help="What to do when file arguments do not have any owning target. This happens when there "
-           "are no targets with the file argument included in their `sources` field."
+           "are no targets whose `sources` fields include the file argument."
     )
     register("--files-not-found-behavior", advanced=True,
              type=FileNotFoundBehavior, default=FileNotFoundBehavior.warn,
@@ -352,8 +352,10 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                "`./pants list src/python/f1.py src/python/f2.py` or even "
                "`./pants fmt 'src/python/**/*.py'`.\n\nInstead of `--owner-of=@my_file`, use "
                "`--spec-file=my_file`.\n\nJust like with `--owner-of`, Pants will "
-               "try to find the owner(s) of the file and then operate on those owning targets. "
-               "Unlike `--owner-of`, Pants will fail if there is no owning target for that file."
+               "try to find the owner(s) of the file and then operate on those owning targets.\n\n"
+               "Unlike `--owner-of`, Pants defaults to failing if there is no owning target for "
+               "that file. You may change this through `--owners-not-found-behavior=ignore` or "
+               "`--owners-not-found-behavior=warn`."
              ),
              help='Select the targets that own these files. '
                   'This is the third target calculation strategy along with the --changed-* '
