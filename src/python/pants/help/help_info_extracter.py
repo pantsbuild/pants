@@ -130,6 +130,8 @@ class HelpInfoExtracter:
     advanced_options = []
     # Sort the arguments, so we display the help in alphabetical order.
     for args, kwargs in sorted(option_registrations_iter):
+      if kwargs.get('passive'):
+        continue
       ohi = self.get_option_help_info(args, kwargs)
       if kwargs.get('advanced'):
         advanced_options.append(ohi)

@@ -9,7 +9,6 @@
   clippy::expl_impl_clone_on_copy,
   clippy::if_not_else,
   clippy::needless_continue,
-  clippy::single_match_else,
   clippy::unseparated_literal_suffix,
   clippy::used_underscore_binding
 )]
@@ -35,6 +34,7 @@ mod core;
 pub mod externs;
 mod handles;
 mod interning;
+mod intrinsics;
 pub mod nodes;
 mod scheduler;
 mod selectors;

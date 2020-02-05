@@ -17,6 +17,7 @@ from pants.backend.python.rules.setup_py_util import (
   PackageDatum,
   distutils_repr,
   find_packages,
+  is_python2,
   source_root_or_raise,
 )
 from pants.backend.python.rules.setuptools import Setuptools
@@ -34,9 +35,11 @@ from pants.engine.fs import (
   DirectoryWithPrefixToAdd,
   DirectoryWithPrefixToStrip,
   FileContent,
+  FilesContent,
   InputFilesContent,
   PathGlobs,
   Snapshot,
+  SnapshotSubset,
   Workspace,
 )
 from pants.engine.goal import Goal, GoalSubsystem
@@ -135,6 +138,7 @@ class AncestorInitPyFiles:
 @dataclass(frozen=True)
 class SetupPySourcesRequest:
   hydrated_targets: HydratedTargets
+  py2: bool  # Whether to use py2 or py3 package semantics.
 
 
 @dataclass(frozen=True)
@@ -154,7 +158,7 @@ class SetupPySources:
 class SetupPyChrootRequest:
   """A request to create a chroot containing a setup.py and the sources it operates on."""
   exported_target: ExportedTarget
-  py2: bool = False  # Whether to use py2 or py3 namespace package semantics.
+  py2: bool  # Whether to use py2 or py3 package semantics.
 
 
 @dataclass(frozen=True)
@@ -230,7 +234,7 @@ def validate_args(args: Tuple[str, ...]):
 
 @goal_rule
 async def run_setup_pys(targets: HydratedTargets, options: SetupPyOptions, console: Console,
-                        provenance_map: AddressProvenanceMap,
+                        provenance_map: AddressProvenanceMap, python_setup: PythonSetup,
                         distdir: DistDir, workspace: Workspace) -> SetupPy:
   """Run setup.py commands on all exported targets addressed."""
   args = tuple(options.values.args)
@@ -261,9 +265,12 @@ async def run_setup_pys(targets: HydratedTargets, options: SetupPyOptions, conso
     )
     exported_targets = list(set(owners))
 
-  chroots = await MultiGet(Get[SetupPyChroot](SetupPyChrootRequest(target))
-                           for target in exported_targets)
+  py2 = is_python2((getattr(target.adaptor, 'compatibility', None) for target in targets),
+                   python_setup)
+  chroots = await MultiGet(Get[SetupPyChroot](
+    SetupPyChrootRequest(target, py2)) for target in exported_targets)
 
+  # If args were provided, run setup.py with them; Otherwise just dump chroots.
   if args:
     setup_py_results = await MultiGet(
       Get[RunSetupPyResult](RunSetupPyRequest(exported_target, chroot, tuple(args)))
@@ -272,7 +279,7 @@ async def run_setup_pys(targets: HydratedTargets, options: SetupPyOptions, conso
 
     for exported_target, setup_py_result in zip(exported_targets, setup_py_results):
       addr = exported_target.hydrated_target.address.reference()
-      console.print_stderr(f'Writing contents of dist dir for {addr} to {distdir.relpath}')
+      console.print_stderr(f'Writing dist for {addr} under {distdir.relpath}/.')
       workspace.materialize_directory(
         DirectoryToMaterialize(setup_py_result.output, path_prefix=str(distdir.relpath))
       )
@@ -319,8 +326,6 @@ async def run_setup_py(
   )
   # The setuptools dist dir, created by it under the chroot (not to be confused with
   # pants's own dist dir, at the buildroot).
-  # TODO: The user can change this with the --dist-dir flag to the sdist and bdist_wheel commands.
-  #  See https://github.com/pantsbuild/pants/issues/8912.
   dist_dir = 'dist/'
   request = setuptools_setup.requirements_pex.create_execute_request(
     python_setup=python_setup,
@@ -341,15 +346,9 @@ async def run_setup_py(
 
 @rule
 async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
-  if request.py2:
-    # TODO: Implement Python 2 support.  This will involve, among other things: merging ancestor
-    # __init__.py files into the chroot, detecting packages based on the presence of __init__.py,
-    # and inspecting all __init__.py files for the namespace package incantation.
-    raise UnsupportedPythonVersion('Running setup.py commands not supported for Python 2.')
-
   owned_deps = await Get[OwnedDependencies](DependencyOwner(request.exported_target))
   targets = HydratedTargets(od.hydrated_target for od in owned_deps)
-  sources = await Get[SetupPySources](SetupPySourcesRequest(targets))
+  sources = await Get[SetupPySources](SetupPySourcesRequest(targets, py2=request.py2))
   requirements = await Get[ExportedTargetRequirements](DependencyOwner(request.exported_target))
 
   # Nest the sources under the src/ prefix.
@@ -412,9 +411,15 @@ async def get_sources(request: SetupPySourcesRequest,
   ancestor_init_pys = await Get[AncestorInitPyFiles](HydratedTargets, targets)
   sources_digest = await Get[Digest](
     DirectoriesToMerge(directories=tuple([*stripped_srcs_digests, *ancestor_init_pys.digests])))
-  sources_snapshot = await Get[Snapshot](Digest, sources_digest)
+  init_pys_snapshot = await Get[Snapshot](
+    SnapshotSubset(sources_digest, PathGlobs(['**/__init__.py'])))
+  init_py_contents = await Get[FilesContent](Digest, init_pys_snapshot.directory_digest)
+
   packages, namespace_packages, package_data = find_packages(
-    source_root_config.get_source_roots(), zip(targets, stripped_srcs_list), sources_snapshot)
+    source_roots=source_root_config.get_source_roots(),
+    tgts_and_stripped_srcs=list(zip(targets, stripped_srcs_list)),
+    init_py_contents=init_py_contents,
+    py2=request.py2)
   return SetupPySources(digest=sources_digest, packages=packages,
                         namespace_packages=namespace_packages, package_data=package_data)
 
@@ -447,7 +452,7 @@ async def get_ancestor_init_py(
   # we match each result to its originating glob (see use of zip below).
   ancestor_init_py_snapshots = await MultiGet[Snapshot](
     Get[Snapshot](PathGlobs,
-                  PathGlobs(include=(os.path.join(source_dir_ancestor[1], '__init__.py'),)))
+                  PathGlobs([os.path.join(source_dir_ancestor[1], '__init__.py')]))
     for source_dir_ancestor in source_dir_ancestors_list
   )
 

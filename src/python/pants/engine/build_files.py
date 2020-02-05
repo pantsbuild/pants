@@ -1,15 +1,15 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import os.path
 from collections.abc import MutableMapping, MutableSequence
 from dataclasses import dataclass
-from os.path import dirname, join
 from typing import Dict
 
 from twitter.common.collections import OrderedSet
 
 from pants.base.project_tree import Dir
-from pants.base.specs import AddressSpec, AddressSpecs, SingleAddress, more_specific
+from pants.base.specs import AddressSpec, AddressSpecs, SingleAddress, Spec, more_specific
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.engine.addressable import (
@@ -43,8 +43,12 @@ async def parse_address_family(address_mapper: AddressMapper, directory: Dir) ->
 
   The AddressFamily may be empty, but it will not be None.
   """
-  patterns = tuple(join(directory.path, p) for p in address_mapper.build_patterns)
-  path_globs = PathGlobs(include=patterns, exclude=address_mapper.build_ignore_patterns)
+  path_globs = PathGlobs(
+    globs=(
+      *(os.path.join(directory.path, p) for p in address_mapper.build_patterns),
+      *(f"!{p}" for p in address_mapper.build_ignore_patterns),
+    )
+  )
   snapshot = await Get[Snapshot](PathGlobs, path_globs)
   files_content = await Get[FilesContent](Digest, snapshot.directory_digest)
 
@@ -212,7 +216,7 @@ async def provenanced_addresses_from_address_families(
   """
   # Capture a Snapshot covering all paths for these AddressSpecs, then group by directory.
   snapshot = await Get[Snapshot](PathGlobs, _address_spec_to_globs(address_mapper, address_specs))
-  dirnames = {dirname(f) for f in snapshot.files}
+  dirnames = {os.path.dirname(f) for f in snapshot.files}
   address_families = await MultiGet(Get[AddressFamily](Dir(d)) for d in dirnames)
   address_family_by_directory = {af.namespace: af for af in address_families}
 
@@ -249,32 +253,28 @@ async def provenanced_addresses_from_address_families(
 
   # NB: This may be empty, as the result of filtering by tag and exclude patterns!
   return ProvenancedBuildFileAddresses(
-    tuple(
-      ProvenancedBuildFileAddress(
-        build_file_address=addr, provenance=addr_to_provenance[addr]
-      )
-      for addr in matched_addresses
-    )
+    ProvenancedBuildFileAddress(build_file_address=addr, provenance=addr_to_provenance[addr])
+    for addr in matched_addresses
   )
 
 
 @rule
 def remove_provenance(pbfas: ProvenancedBuildFileAddresses) -> BuildFileAddresses:
-  return BuildFileAddresses(tuple(pbfa.build_file_address for pbfa in pbfas))
+  return BuildFileAddresses(pbfa.build_file_address for pbfa in pbfas)
 
 
 @dataclass(frozen=True)
 class AddressProvenanceMap:
-  bfaddr_to_address_spec: Dict[BuildFileAddress, AddressSpec]
+  bfaddr_to_spec: Dict[BuildFileAddress, Spec]
 
-  def is_single_address(self, address: BuildFileAddress):
-    return isinstance(self.bfaddr_to_address_spec.get(address), SingleAddress)
+  def is_single_address(self, address: BuildFileAddress) -> bool:
+    return isinstance(self.bfaddr_to_spec.get(address), SingleAddress)
 
 
 @rule
 def address_provenance_map(pbfas: ProvenancedBuildFileAddresses) -> AddressProvenanceMap:
   return AddressProvenanceMap(
-    bfaddr_to_address_spec={pbfa.build_file_address: pbfa.provenance for pbfa in pbfas.dependencies}
+    bfaddr_to_spec={pbfa.build_file_address: pbfa.provenance for pbfa in pbfas.dependencies}
   )
 
 
@@ -283,7 +283,7 @@ def _address_spec_to_globs(address_mapper: AddressMapper, address_specs: Address
   patterns = set()
   for address_spec in address_specs:
     patterns.update(address_spec.make_glob_patterns(address_mapper))
-  return PathGlobs(include=patterns, exclude=address_mapper.build_ignore_patterns)
+  return PathGlobs(globs=(*patterns, *(f"!{p}" for p in address_mapper.build_ignore_patterns)))
 
 
 def create_graph_rules(address_mapper: AddressMapper):

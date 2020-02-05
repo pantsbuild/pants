@@ -54,27 +54,55 @@ class InputFilesContent(FilesContent):
 class PathGlobs:
   """A wrapper around sets of filespecs to include and exclude.
 
-  The syntax supported is roughly git's glob syntax.
+  The syntax supported is roughly Git's glob syntax.
 
   NB: this object is interpreted from within Snapshot::lift_path_globs() -- that method will need to
   be aware of any changes to this object's definition.
   """
-  include: Tuple[str, ...]
-  exclude: Tuple[str, ...]
+  globs: Tuple[str, ...]
   glob_match_error_behavior: GlobMatchErrorBehavior
   conjunction: GlobExpansionConjunction
+  description_of_origin: str
 
   def __init__(
     self,
-    include: Iterable[str],
-    exclude: Iterable[str] = (),
+    globs: Iterable[str],
     glob_match_error_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.ignore,
-    conjunction: GlobExpansionConjunction = GlobExpansionConjunction.any_match
+    conjunction: GlobExpansionConjunction = GlobExpansionConjunction.any_match,
+    description_of_origin: Optional[str] = None,
   ) -> None:
-    self.include = tuple(include)
-    self.exclude = tuple(exclude)
+    """
+    :param globs: globs to match, e.g. `foo.txt` or `**/*.txt`. To exclude something, prefix it
+                  with `!`, e.g. `!ignore.py`.
+    :param glob_match_error_behavior: whether to warn or error upon match failures
+    :param conjunction: whether all `include`s must match or only at least one must match
+    :param description_of_origin: a human-friendly description of where this PathGlobs request is
+                                  coming from, used to improve the error message for unmatched
+                                  globs. For example, this might be
+                                  "the option `--isort-config`".
+    """
+    self.globs = tuple(globs)
     self.glob_match_error_behavior = glob_match_error_behavior
     self.conjunction = conjunction
+    self.description_of_origin = description_of_origin or ""
+    self.__post_init__()
+
+  def __post_init__(self) -> None:
+    if self.glob_match_error_behavior == GlobMatchErrorBehavior.ignore:
+      if self.description_of_origin:
+        raise ValueError(
+          "You provided a `description_of_origin` value when `glob_match_error_behavior` is set to "
+          "`ignore`. The `ignore` value means that the engine will never generate an error when "
+          "the globs are generated, so `description_of_origin` won't end up ever being used. "
+          "Please either change `glob_match_error_behavior` to `warn` or `error`, or remove "
+          "`description_of_origin`."
+        )
+    else:
+      if not self.description_of_origin:
+        raise ValueError(
+          "Please provide a `description_of_origin` so that the error message is more helpful to "
+          "users when their globs fail to match."
+        )
 
 
 @dataclass(frozen=True)
@@ -155,6 +183,13 @@ class Snapshot:
   @property
   def is_empty(self):
     return self == EMPTY_SNAPSHOT
+
+
+@dataclass(frozen=True)
+class SnapshotSubset:
+  """A request to create a subset of a snapshot."""
+  directory_digest: Digest
+  globs: PathGlobs
 
 
 @dataclass(frozen=True)
@@ -289,4 +324,5 @@ def create_fs_rules():
     RootRule(DirectoryWithPrefixToStrip),
     RootRule(DirectoryWithPrefixToAdd),
     RootRule(UrlToFetch),
+    RootRule(SnapshotSubset),
   ]

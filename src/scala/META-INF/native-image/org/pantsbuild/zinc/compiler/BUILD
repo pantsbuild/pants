@@ -3,5 +3,5 @@
 
 resources(
   name='zinc-native-image-configuration',
-  sources=rglobs('*'),
+  sources=['**/*'],
 )

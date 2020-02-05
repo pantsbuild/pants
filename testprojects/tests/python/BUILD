@@ -11,7 +11,7 @@ target(
 
 files(
   name = 'example_test_directory',
-  sources = rglobs('example_test/*'),
+  sources = ['example_test/**/*'],
   dependencies = [
     'testprojects/src/python:python_distribution_directory',
   ],

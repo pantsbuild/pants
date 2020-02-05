@@ -6,8 +6,7 @@ from textwrap import dedent
 # TODO: Create a dummy target type in this test and remove this dep.
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.engine.addressable import BuildFileAddresses
-from pants.engine.legacy.graph import OwnersRequest
+from pants.engine.legacy.graph import Owners, OwnersRequest
 from pants.testutil.test_base import TestBase
 
 
@@ -21,9 +20,9 @@ class SourceMapperTest(TestBase):
     )
 
   def owner(self, owner, f):
-    request = OwnersRequest(sources=(f,), include_dependees='none')
-    addresses = self.request_single_product(BuildFileAddresses, request)
-    self.assertEqual(set(owner), {i.spec for i in addresses})
+    request = OwnersRequest(sources=(f,))
+    owners = self.request_single_product(Owners, request)
+    self.assertEqual(set(owner), {i.spec for i in owners.addresses})
 
   def test_target_address_for_source_yields_unique_addresses(self):
     # NB If the mapper returns more than one copy of an address, it may cause other code to do

@@ -9,7 +9,6 @@
   clippy::expl_impl_clone_on_copy,
   clippy::if_not_else,
   clippy::needless_continue,
-  clippy::single_match_else,
   clippy::unseparated_literal_suffix,
   clippy::used_underscore_binding
 )]
@@ -32,7 +31,7 @@ pub use crate::glob_matching::GlobMatching;
 use ::ignore::gitignore::{Gitignore, GitignoreBuilder};
 use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
-use futures::{future, Future};
+use futures01::{future, Future};
 use glob::{MatchOptions, Pattern};
 use lazy_static::lazy_static;
 use std::cmp::min;
@@ -208,7 +207,7 @@ pub enum PathGlob {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct GlobParsedSource(String);
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct PathGlobIncludeEntry {
   pub input: GlobParsedSource,
   pub globs: Vec<PathGlob>,
@@ -396,19 +395,26 @@ impl PathGlob {
 
 #[derive(Debug)]
 pub enum StrictGlobMatching {
-  Error,
-  Warn,
+  // NB: the Error and Warn variants store a description of the origin of the PathGlob
+  // request so that we can make the error message more helpful to users when globs fail to match.
+  Error(String),
+  Warn(String),
   Ignore,
 }
 
 impl StrictGlobMatching {
-  // TODO: match this up with the allowed values for the GlobMatchErrorBehavior type in python
-  // somehow!
-  pub fn create(behavior: &str) -> Result<Self, String> {
-    match behavior {
-      "ignore" => Ok(StrictGlobMatching::Ignore),
-      "warn" => Ok(StrictGlobMatching::Warn),
-      "error" => Ok(StrictGlobMatching::Error),
+  pub fn create(behavior: &str, description_of_origin: Option<String>) -> Result<Self, String> {
+    match (behavior, description_of_origin) {
+      ("ignore", None) => Ok(StrictGlobMatching::Ignore),
+      ("warn", Some(origin)) => Ok(StrictGlobMatching::Warn(origin)),
+      ("error", Some(origin)) => Ok(StrictGlobMatching::Error(origin)),
+      ("ignore", Some(_)) => {
+        Err("Provided description_of_origin while ignoring glob match errors".to_string())
+      }
+      ("warn", None) | ("error", None) => Err(
+        "Must provide a description_of_origin when warning or erroring on glob match errors"
+          .to_string(),
+      ),
       _ => Err(format!(
         "Unrecognized strict glob matching behavior: {}.",
         behavior,
@@ -425,7 +431,7 @@ impl StrictGlobMatching {
 
   pub fn should_throw_on_error(&self) -> bool {
     match self {
-      &StrictGlobMatching::Error => true,
+      &StrictGlobMatching::Error(_) => true,
       _ => false,
     }
   }
@@ -453,49 +459,72 @@ pub struct PathGlobs {
   exclude: Arc<GitignoreStyleExcludes>,
   strict_match_behavior: StrictGlobMatching,
   conjunction: GlobExpansionConjunction,
+  patterns: Vec<glob::Pattern>,
 }
 
 impl PathGlobs {
-  pub fn create(
-    include: &[String],
-    exclude: &[String],
-    strict_match_behavior: StrictGlobMatching,
-    conjunction: GlobExpansionConjunction,
-  ) -> Result<PathGlobs, String> {
-    let include = PathGlob::spread_filespecs(include)?;
-    Self::create_with_globs_and_match_behavior(include, exclude, strict_match_behavior, conjunction)
+  fn parse_patterns_from_include(
+    include: &[PathGlobIncludeEntry],
+  ) -> Result<Vec<glob::Pattern>, String> {
+    include
+      .iter()
+      .map(|pattern| {
+        PathGlob::normalize_pattern(&pattern.input.0).and_then(|components| {
+          let normalized_pattern: PathBuf = components.into_iter().collect();
+          Pattern::new(normalized_pattern.to_str().unwrap())
+            .map_err(|e| format!("Could not parse {:?} as a glob: {:?}", pattern.input.0, e))
+        })
+      })
+      .collect::<Result<Vec<_>, String>>()
   }
 
-  fn create_with_globs_and_match_behavior(
-    include: Vec<PathGlobIncludeEntry>,
-    exclude: &[String],
+  pub fn create(
+    globs: &[String],
     strict_match_behavior: StrictGlobMatching,
     conjunction: GlobExpansionConjunction,
   ) -> Result<PathGlobs, String> {
-    let gitignore_excludes = GitignoreStyleExcludes::create(exclude)?;
+    // NB: We use a loop, rather than `.filter()`, to avoid traversing the globs twice.
+    let mut include_globs: Vec<String> = vec![];
+    let mut exclude_globs: Vec<String> = vec![];
+    for glob in globs {
+      if glob.starts_with('!') {
+        let normalized_exclude: String = glob.chars().skip(1).collect();
+        exclude_globs.push(normalized_exclude.clone());
+      } else {
+        include_globs.push(glob.clone());
+      }
+    }
+    let include = PathGlob::spread_filespecs(include_globs.as_slice())?;
+    let exclude = GitignoreStyleExcludes::create(exclude_globs.as_slice())?;
+    let patterns = PathGlobs::parse_patterns_from_include(&include)?;
+
     Ok(PathGlobs {
       include,
-      exclude: gitignore_excludes,
+      exclude,
       strict_match_behavior,
       conjunction,
+      patterns,
     })
   }
 
   pub fn from_globs(include: Vec<PathGlob>) -> Result<PathGlobs, String> {
-    let include = include
+    let include: Vec<PathGlobIncludeEntry> = include
       .into_iter()
       .map(|glob| PathGlobIncludeEntry {
         input: MISSING_GLOB_SOURCE.clone(),
         globs: vec![glob],
       })
       .collect();
-    // An empty exclude becomes EMPTY_IGNORE.
-    PathGlobs::create_with_globs_and_match_behavior(
+
+    let patterns = PathGlobs::parse_patterns_from_include(&include.as_slice())?;
+    Ok(PathGlobs {
       include,
-      &[],
-      StrictGlobMatching::Ignore,
-      GlobExpansionConjunction::AllMatch,
-    )
+      // An empty exclude becomes EMPTY_IGNORE.
+      exclude: GitignoreStyleExcludes::create(&[])?,
+      strict_match_behavior: StrictGlobMatching::Ignore,
+      conjunction: GlobExpansionConjunction::AllMatch,
+      patterns,
+    })
   }
 
   ///
@@ -507,24 +536,17 @@ impl PathGlobs {
   /// traversal in expand is (currently) too expensive to use for that in-memory matching (such as
   /// via MemFS).
   ///
-  pub fn matches(&self, paths: &[PathBuf]) -> Result<bool, String> {
-    let patterns = self
-      .include
-      .iter()
-      .map(|pattern| {
-        PathGlob::normalize_pattern(&pattern.input.0).and_then(|components| {
-          let normalized_pattern: PathBuf = components.into_iter().collect();
-          Pattern::new(normalized_pattern.to_str().unwrap())
-            .map_err(|e| format!("Could not parse {:?} as a glob: {:?}", pattern.input.0, e))
-        })
-      })
-      .collect::<Result<Vec<_>, String>>()?;
-    Ok(patterns.iter().any(|pattern| {
-      paths.iter().any(|path| {
-        pattern.matches_path_with(path, &PATTERN_MATCH_OPTIONS)
-          && !self.exclude.is_ignored_path(path, false)
-      })
-    }))
+  pub fn matches(&self, paths: &[PathBuf]) -> bool {
+    self.patterns.iter().any(|pattern| {
+      paths
+        .iter()
+        .any(|path| self.pattern_matches_single_path(&pattern, path))
+    })
+  }
+
+  fn pattern_matches_single_path(&self, pattern: &glob::Pattern, path: &PathBuf) -> bool {
+    pattern.matches_path_with(path, &PATTERN_MATCH_OPTIONS)
+      && !self.exclude.is_ignored_path(path, false)
   }
 }
 
@@ -613,11 +635,9 @@ impl PosixFS {
     dir_relative_to_root: Dir,
   ) -> impl Future<Item = DirectoryListing, Error = io::Error> {
     let vfs = self.clone();
-    self
-      .executor
-      .spawn_on_io_pool(futures::future::lazy(move || {
-        vfs.scandir_sync(&dir_relative_to_root)
-      }))
+    self.executor.spawn_on_io_pool(future::lazy(move || {
+      vfs.scandir_sync(&dir_relative_to_root)
+    }))
   }
 
   fn scandir_sync(&self, dir_relative_to_root: &Dir) -> Result<DirectoryListing, io::Error> {
@@ -673,61 +693,57 @@ impl PosixFS {
   pub fn read_file(&self, file: &File) -> impl Future<Item = FileContent, Error = io::Error> {
     let path = file.path.clone();
     let path_abs = self.root.0.join(&file.path);
-    self
-      .executor
-      .spawn_on_io_pool(futures::future::lazy(move || {
-        let is_executable = path_abs.metadata()?.permissions().mode() & 0o100 == 0o100;
-        std::fs::File::open(&path_abs)
-          .and_then(|mut f| {
-            let mut content = Vec::new();
-            f.read_to_end(&mut content)?;
-            Ok(FileContent {
-              path: path,
-              content: Bytes::from(content),
-              is_executable,
-            })
+    self.executor.spawn_on_io_pool(future::lazy(move || {
+      let is_executable = path_abs.metadata()?.permissions().mode() & 0o100 == 0o100;
+      std::fs::File::open(&path_abs)
+        .and_then(|mut f| {
+          let mut content = Vec::new();
+          f.read_to_end(&mut content)?;
+          Ok(FileContent {
+            path: path,
+            content: Bytes::from(content),
+            is_executable,
           })
-          .map_err(|e| {
-            io::Error::new(
-              e.kind(),
-              format!("Failed to read file {:?}: {}", path_abs, e),
-            )
-          })
-      }))
+        })
+        .map_err(|e| {
+          io::Error::new(
+            e.kind(),
+            format!("Failed to read file {:?}: {}", path_abs, e),
+          )
+        })
+    }))
   }
 
   pub fn read_link(&self, link: &Link) -> impl Future<Item = PathBuf, Error = io::Error> {
     let link_parent = link.0.parent().map(Path::to_owned);
     let link_abs = self.root.0.join(link.0.as_path());
-    self
-      .executor
-      .spawn_on_io_pool(futures::future::lazy(move || {
-        link_abs
-          .read_link()
-          .and_then(|path_buf| {
-            if path_buf.is_absolute() {
-              Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Absolute symlink: {:?}", link_abs),
-              ))
-            } else {
-              link_parent
-                .map(|parent| parent.join(path_buf))
-                .ok_or_else(|| {
-                  io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!("Symlink without a parent?: {:?}", link_abs),
-                  )
-                })
-            }
-          })
-          .map_err(|e| {
-            io::Error::new(
-              e.kind(),
-              format!("Failed to read link {:?}: {}", link_abs, e),
-            )
-          })
-      }))
+    self.executor.spawn_on_io_pool(future::lazy(move || {
+      link_abs
+        .read_link()
+        .and_then(|path_buf| {
+          if path_buf.is_absolute() {
+            Err(io::Error::new(
+              io::ErrorKind::InvalidData,
+              format!("Absolute symlink: {:?}", link_abs),
+            ))
+          } else {
+            link_parent
+              .map(|parent| parent.join(path_buf))
+              .ok_or_else(|| {
+                io::Error::new(
+                  io::ErrorKind::InvalidData,
+                  format!("Symlink without a parent?: {:?}", link_abs),
+                )
+              })
+          }
+        })
+        .map_err(|e| {
+          io::Error::new(
+            e.kind(),
+            format!("Failed to read link {:?}: {}", link_abs, e),
+          )
+        })
+    }))
   }
 
   ///
@@ -831,7 +847,7 @@ impl PathStatGetter<io::Error> for Arc<PosixFS> {
           let fs2 = self.clone();
           self
             .executor
-            .spawn_on_io_pool(futures::future::lazy(move || fs2.stat_sync(path)))
+            .spawn_on_io_pool(future::lazy(move || fs2.stat_sync(path)))
             .then(|stat_result| match stat_result {
               Ok(v) => Ok(Some(v)),
               Err(err) => match err.kind() {
@@ -926,6 +942,9 @@ pub fn safe_create_dir(path: &Path) -> Result<(), String> {
     Err(err) => Err(format!("{}", err)),
   }
 }
+
+#[cfg(test)]
+mod fs_tests;
 
 #[cfg(test)]
 mod posixfs_tests;

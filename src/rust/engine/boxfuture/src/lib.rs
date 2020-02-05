@@ -9,7 +9,6 @@
   clippy::expl_impl_clone_on_copy,
   clippy::if_not_else,
   clippy::needless_continue,
-  clippy::single_match_else,
   clippy::unseparated_literal_suffix,
   clippy::used_underscore_binding
 )]
@@ -30,7 +29,7 @@
 // https://github.com/alexcrichton/futures-rs/issues/228 has background for its removal.
 // This avoids needing to call Box::new() around every future that we produce.
 
-use futures::future::Future;
+use futures01::future::Future;
 
 pub type BoxFuture<T, E> = Box<dyn Future<Item = T, Error = E> + Send>;
 
@@ -60,7 +59,7 @@ macro_rules! try_future {
     match $x {
       Ok(value) => value,
       Err(error) => {
-        use futures::future::err;
+        use futures01::future::err;
         return err(error).to_boxed();
       }
     }

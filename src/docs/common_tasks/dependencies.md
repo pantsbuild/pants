@@ -12,34 +12,33 @@ your target. Dependencies to other targets are typically added to
 
 ## Discussion
 
-Below is an example `scala_library` definition that specifies dependencies on other targets:
+Below is an example `python_library` definition that specifies dependencies on other targets:
 
     ::python
-    # myproject/src/main/scala/BUILD
-    scala_library(name='scala',
-      sources=rglobs('\*.scala'),
+    # src/python/myproject/example/BUILD
+    python_library(
       dependencies=[
-        'myproject/library-a',
-        'myproject/library-b:some-target'
-      ]
+        'src/python/myproject/library-a',
+        'src/python/myproject/library-b:some-target',
+      ],
     )
 
 In this example, we have two dependencies, both of which reside in the same repository as our code. They are referenced by the relative path from the root of the repository, to the location of the `BUILD` file that defines the buildable target you wish to depend on.
 
-You should always target dependencies through their `scala_library` or
-other library target definition. Many projects have set up aliases that
+You should always target dependencies through their library target definition (e.g. `scala_library` or `python_library`). Many projects have set up aliases that
 are shorter. For more info, see
 [[Create an Alias for a Target|pants('src/docs/common_tasks:alias')]].
 
-NOTE: In many cases, you can specify a library target path without specifying a target name. In the example above, the `myproject/library-a` library is targeted without a target name. That's because the target name, in this case, is the same as that of the directory. Here's what that `BUILD` file might look like:
+NOTE: In many cases, you can specify a library target path without specifying a target name. In the example above, the `src/python/myproject/library-a` library is targeted without a target name. That's because the target name, in this case, is the same as that of the directory. Here's what that `BUILD` file might look like:
 
     ::python
-    # myproject/library-a/BUILD
+    # src/python/myproject/library-a
 
-    target(name='library-a',
+    target(
+      name='library-a',
       dependencies=[
         # ...
-      ]
+      ],
     )
 
 This is called a **default target name** and can be used whenever the target and directory names match.

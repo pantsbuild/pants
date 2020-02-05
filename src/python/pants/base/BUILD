@@ -147,6 +147,8 @@ python_library(
   sources = ['specs.py'],
   dependencies = [
     '3rdparty/python:dataclasses',
+    'src/python/pants/engine:fs',
+    'src/python/pants/engine:objects',
     'src/python/pants/util:collections',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:filtering',
@@ -183,15 +185,6 @@ python_library(
     'src/python/pants/build_graph',
   ],
   tags = {"partially_type_checked"},
-)
-
-python_library(
-  name = 'target_roots',
-  sources = ['target_roots.py'],
-  dependencies = [
-    '3rdparty/python:dataclasses',
-  ],
-  tags = {'partially_type_checked'},
 )
 
 python_library(

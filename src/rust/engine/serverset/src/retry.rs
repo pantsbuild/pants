@@ -1,5 +1,5 @@
 use crate::{Health, Serverset};
-use futures::{self, Future, IntoFuture};
+use futures01::{future, Future, IntoFuture};
 
 pub struct Retry<T: Clone>(pub Serverset<T>);
 
@@ -21,13 +21,13 @@ impl<T: Clone + Send + Sync + 'static> Retry<T> {
     times: usize,
   ) -> impl Future<Item = Value, Error = String> {
     let serverset = self.0.clone();
-    futures::future::loop_fn(0_usize, move |i| {
+    future::loop_fn(0_usize, move |i| {
       let serverset = serverset.clone();
       let f = f.clone();
       serverset
         .next()
         .and_then(move |(server, token)| {
-          futures::future::ok(server).and_then(f).then(move |result| {
+          future::ok(server).and_then(f).then(move |result| {
             let health = match &result {
               &Ok(_) => Health::Healthy,
               &Err(_) => Health::Unhealthy,
@@ -36,12 +36,12 @@ impl<T: Clone + Send + Sync + 'static> Retry<T> {
             result
           })
         })
-        .map(futures::future::Loop::Break)
+        .map(future::Loop::Break)
         .or_else(move |err| {
           if i >= times {
             Err(format!("Failed after {} retries; last failure: {}", i, err))
           } else {
-            Ok(futures::future::Loop::Continue(i + 1))
+            Ok(future::Loop::Continue(i + 1))
           }
         })
     })

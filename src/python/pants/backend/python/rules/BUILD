@@ -4,6 +4,7 @@
 python_library(
   dependencies=[
     '3rdparty/python:dataclasses',
+    '3rdparty/python:setuptools',
     'src/python/pants/backend/python/subsystems',
     'src/python/pants/build_graph',
     'src/python/pants/engine/legacy:graph',
@@ -21,7 +22,7 @@ python_library(
 
 python_tests(
   name='tests',
-  sources=globs('*_test.py', exclude=[globs('*_integration_test.py')]),
+  sources=['*_test.py', '!*_integration_test.py'],
   dependencies=[
     ':rules',
     'src/python/pants/backend/python/subsystems',
@@ -33,6 +34,7 @@ python_tests(
     'src/python/pants/engine/legacy:graph',
     'src/python/pants/engine/legacy:structs',
     'src/python/pants/rules/core',
+    'src/python/pants/testutil:interpreter_selection_utils',
     'src/python/pants/testutil:test_base',
     'src/python/pants/testutil/engine:util',
     'src/python/pants/testutil/option',
@@ -46,7 +48,7 @@ python_tests(
 
 python_tests(
   name='integration',
-  sources=globs('*_integration_test.py'),
+  sources=['*_integration_test.py'],
   dependencies=[
     ':rules',
     'src/python/pants/backend/python/subsystems',

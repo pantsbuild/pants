@@ -477,7 +477,7 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
     # actually does is delete the key file created at the end of the last successful task run.
     # This is necessary to avoid the following scenario:
     #
-    # 1) In state A: Task suceeds and writes some output.  Key is recorded by the invalidator.
+    # 1) In state A: Task succeeds and writes some output.  Key is recorded by the invalidator.
     # 2) In state B: Task fails, but writes some output.  Key is not recorded.
     # 3) After reverting back to state A: The current key is the same as the one recorded at the
     #    end of step 1), so it looks like no work needs to be done, but actually the task

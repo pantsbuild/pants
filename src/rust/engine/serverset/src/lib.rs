@@ -9,7 +9,6 @@
   clippy::expl_impl_clone_on_copy,
   clippy::if_not_else,
   clippy::needless_continue,
-  clippy::single_match_else,
   clippy::unseparated_literal_suffix,
   clippy::used_underscore_binding
 )]
@@ -26,10 +25,8 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-use futures;
-
 use boxfuture::{BoxFuture, Boxable};
-use futures::Future;
+use futures01::{future, Future};
 use parking_lot::Mutex;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -294,7 +291,7 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
     if inner.can_make_more_connections() {
       // Find a healthy server without a connection, connect to it.
       if let Some(ret) = inner.connect() {
-        return futures::future::ok(ret).to_boxed();
+        return future::ok(ret).to_boxed();
       }
     }
 
@@ -302,7 +299,7 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
       let next_connection = inner.next_connection;
       inner.next_connection = inner.next_connection.wrapping_add(1);
       let connection = &inner.connections[next_connection % inner.connections.len()];
-      return futures::future::ok((
+      return future::ok((
         connection.connection.clone(),
         HealthReportToken {
           server_index: connection.server_index,

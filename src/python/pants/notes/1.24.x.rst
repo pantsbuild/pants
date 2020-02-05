@@ -3,6 +3,20 @@
 
 This document describes releases leading up to the ``1.24.x`` ``stable`` series.
 
+1.24.0 (01/28/2020)
+-------------------
+
+The first stable release of the `1.24.x` series!
+
+1.24.0rc1 (01/23/2020)
+----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Only compile non-module exports for `export-dep-as-jar` goal (#8914)
+  `PR #8914 <https://github.com/pantsbuild/pants/pull/8914>`_
+
 1.24.0rc1 (01/08/2020)
 ----------------------
 

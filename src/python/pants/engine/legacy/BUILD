@@ -82,6 +82,7 @@ python_library(
     'src/python/pants/engine:parser',
     'src/python/pants/engine:selectors',
     'src/python/pants/option',
+    'src/python/pants/scm/subsystems:changed',
     'src/python/pants/source',
     'src/python/pants/util:dirutil',
   ],

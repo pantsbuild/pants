@@ -339,35 +339,6 @@ function dry_run_install() {
     -f "${DEPLOY_3RDPARTY_WHEEL_DIR}/${VERSION}" -f "${DEPLOY_PANTS_WHEEL_DIR}/${VERSION}"
 }
 
-ALLOWED_ORIGIN_URLS=(
-  git@github.com:pantsbuild/pants.git
-  git@github.com:pantsbuild/pants
-  https://github.com/pantsbuild/pants.git
-  https://github.com/pantsbuild/pants
-)
-
-function check_origin() {
-  banner "Checking for a valid git origin"
-
-  origin_url="$(git remote -v | grep origin | grep "\(push\)" | cut -f2 | cut -d' ' -f1)"
-  for url in "${ALLOWED_ORIGIN_URLS[@]}"
-  do
-    if [[ "${origin_url}" == "${url}" ]]
-    then
-      return
-    fi
-  done
-  msg=$(cat << EOM
-Your origin url is not valid for releasing:
-  ${origin_url}
-
-It must be one of:
-$(echo "${ALLOWED_ORIGIN_URLS[@]}" | tr ' ' '\n' | sed -E "s|^|  |")
-EOM
-)
-  die "$msg"
-}
-
 function get_branch() {
   git branch | grep -E '^\* ' | cut -d' ' -f2-
 }
@@ -702,7 +673,7 @@ _OPTS="dhnftlowepq"
 
 function usage() {
   echo "With no options all packages are built, smoke tested and published to"
-  echo "PyPi.  Credentials are needed for this as described in the"
+  echo "PyPI.  Credentials are needed for this as described in the"
   echo "release docs: http://pantsbuild.org/release.html"
   echo
   echo "Usage: $0 [-d] (-h|-n|-f|-t|-l|-o|-w|-e|-p|-q)"
@@ -714,7 +685,7 @@ function usage() {
   echo "       functioning."
   echo " -f  Build the fs_util binary."
   echo " -t  Tests a live release."
-  echo "       Ensures the latest packages have been propagated to PyPi"
+  echo "       Ensures the latest packages have been propagated to PyPI"
   echo "       and can be installed in an ephemeral virtualenv."
   echo " -l  Lists all pantsbuild packages that this script releases."
   echo " -o  Lists all pantsbuild package owners."
@@ -769,10 +740,10 @@ elif [[ "${test_release}" == "true" ]]; then
     banner "Successfully installed and tested the latest released packages"
   ) || die "Failed to install and test the latest released packages."
 else
-  banner "Releasing packages to PyPi"
+  banner "Releasing packages to PyPI"
   (
-    check_origin && check_clean_branch && check_pgp && check_owners && \
+    check_clean_branch && check_pgp && check_owners && \
       publish_packages && tag_release && publish_docs_if_master && \
-      banner "Successfully released packages to PyPi"
-  ) || die "Failed to release packages to PyPi."
+      banner "Successfully released packages to PyPI"
+  ) || die "Failed to release packages to PyPI."
 fi

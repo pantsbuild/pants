@@ -5,5 +5,5 @@ java_library(
   dependencies = [
     'testprojects/src/scala/org/pantsbuild/testproject/javadepsonscala'
   ],
-  sources=rglobs('*.java')
+  sources=['**/*.java'],
 )

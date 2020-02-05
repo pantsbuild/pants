@@ -3,5 +3,5 @@
 
 files(
   name='python_directory',
-  sources=rglobs('python/*'),
+  sources=['python/**/*'],
 )

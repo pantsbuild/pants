@@ -8,7 +8,7 @@ use std::time::Duration;
 use std::time::Instant;
 
 use bazel_protos;
-use futures::{Future, Sink};
+use futures01::{Future, Sink};
 use grpcio;
 use parking_lot::Mutex;
 use protobuf;
@@ -207,7 +207,7 @@ impl MockResponder {
       }
       if let Ok(Some(op)) = op {
         // Complete the channel with the op.
-        sink.success(op.clone());
+        sink.success(op);
       } else if let Err(status) = op {
         sink.fail(status);
       } else {
@@ -235,7 +235,7 @@ impl MockResponder {
         if let Ok(Some(op)) = op {
           ctx.spawn(
             sink
-              .send((op.clone(), grpcio::WriteFlags::default()))
+              .send((op, grpcio::WriteFlags::default()))
               .map(|mut stream| stream.close())
               .map(|_| ())
               .map_err(|_| ()),
@@ -306,7 +306,7 @@ impl bazel_protos::operations_grpc::Operations for MockResponder {
     req: bazel_protos::operations::GetOperationRequest,
     sink: grpcio::UnarySink<bazel_protos::operations::Operation>,
   ) {
-    self.log(&ctx, req.clone());
+    self.log(&ctx, req);
 
     self.send_next_operation_unary(sink)
   }

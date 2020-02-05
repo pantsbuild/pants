@@ -17,6 +17,7 @@ from typing import (
   Dict,
   Iterable,
   List,
+  Mapping,
   Optional,
   Set,
   Tuple,
@@ -44,7 +45,6 @@ from pants.option.errors import (
   BooleanConversionError,
   BooleanOptionNameWithNo,
   FromfileError,
-  FrozenRegistration,
   ImplicitValIsNone,
   InvalidKwarg,
   InvalidKwargNonGlobalScope,
@@ -76,10 +76,8 @@ class Parser:
   a child of the 'compile' scope, which is a child of the global scope.
 
   Options registered on a parser are also registered transitively on all the scopes it encloses.
-  Registration must be in outside-in order: we forbid registering options on an outer scope if
-  we've already registered an option on one of its inner scopes. This is to ensure that
-  re-registering the same option name on an inner scope correctly replaces the identically-named
-  option from the outer scope.
+  We forbid registering options that shadow other options, and registration walks up and down the
+  hierarchy to enforce that.
   """
 
   @staticmethod
@@ -102,9 +100,18 @@ class Parser:
     b = cls._ensure_bool(s)
     return not b
 
+  @classmethod
+  def scope_str(cls, scope: str) -> str:
+    return 'global scope' if scope == GLOBAL_SCOPE else f"scope '{scope}'"
+
+  @classmethod
+  def _check_shadowing(cls, parent_scope, parent_known_args, child_scope, child_known_args):
+    for arg in (parent_known_args & child_known_args):
+      raise Shadowing(child_scope, arg, outer_scope=cls.scope_str(parent_scope))
+
   def __init__(
     self,
-    env: Dict[str, str],
+    env: Mapping[str, str],
     config: Config,
     scope_info: ScopeInfo,
     parent_parser: Optional["Parser"],
@@ -124,9 +131,6 @@ class Parser:
     self._scope_info = scope_info
     self._scope = self._scope_info.scope
     self._option_tracker = option_tracker
-
-    # If True, no more registration is allowed on this parser.
-    self._frozen = False
 
     # All option args registered with this parser.  Used to prevent shadowing args in inner scopes.
     self._known_args: Set[str] = set()
@@ -161,6 +165,12 @@ class Parser:
     namespace: OptionValueContainer
     get_all_scoped_flag_names: Callable[["Parser.ParseArgsRequest"], Iterable]
     levenshtein_max_distance: int
+    # A passive option is one that doesn't affect functionality, or appear in help messages, but
+    # can be provided without failing validation. This allows us to conditionally register options
+    # (e.g., v1 only or v2 only) without having to remove usages when the condition changes.
+    # TODO: This is currently only used for the v1/v2 switch. When everything is v2 we'll probably
+    #  want to get rid of this concept.
+    include_passive_options: bool
 
     def __init__(
       self,
@@ -168,6 +178,7 @@ class Parser:
       namespace: OptionValueContainer,
       get_all_scoped_flag_names: Callable[[], Iterable],
       levenshtein_max_distance: int,
+      include_passive_options: bool = False
     ) -> None:
       """
       :param flags_in_scope: Iterable of arg strings to parse into flag values.
@@ -184,6 +195,7 @@ class Parser:
       self.namespace = namespace
       self.get_all_scoped_flag_names = get_all_scoped_flag_names  # type: ignore[assignment]  # cannot assign a method
       self.levenshtein_max_distance = levenshtein_max_distance
+      self.include_passive_options = include_passive_options
 
     @staticmethod
     def _create_flag_value_map(flags: Iterable[str]) -> DefaultDict[str, List[Optional[str]]]:
@@ -222,6 +234,9 @@ class Parser:
 
     mutex_map: DefaultDict[str, List[str]] = defaultdict(list)
     for args, kwargs in self._unnormalized_option_registrations_iter():
+      if kwargs.get('passive') and not parse_args_request.include_passive_options:
+        continue
+
       self._validate(args, kwargs)
       name, dest = self.parse_name_and_dest(*args, **kwargs)
 
@@ -434,18 +449,9 @@ class Parser:
 
   def register(self, *args, **kwargs) -> None:
     """Register an option."""
-    if self._frozen:
-      raise FrozenRegistration(self.scope, args[0])
-
     if args:
       name, dest = self.parse_name_and_dest(*args, **kwargs)
       self._check_deprecated(name, kwargs, print_warning=False)
-    
-    # Prevent further registration in enclosing scopes.
-    ancestor = self._parent_parser
-    while ancestor:
-      ancestor._freeze()
-      ancestor = ancestor._parent_parser
 
     if kwargs.get('type') == bool:
       default = kwargs.get('default')
@@ -459,11 +465,15 @@ class Parser:
 
     # Record the args. We'll do the underlying parsing on-demand.
     self._option_registrations.append((args, kwargs))
-    if self._parent_parser:
-      for arg in args:
-        existing_scope = self._parent_parser._existing_scope(arg)
-        if existing_scope is not None:
-          raise Shadowing(self.scope, arg, outer_scope=self._scope_str(existing_scope))
+
+    # Look for shadowing options up and down the hierarchy.
+    args_set = set(args)
+    for parent in self._parents_transitive():
+      self._check_shadowing(parent.scope, parent._known_args, self.scope, args_set)
+    for child in self._children_transitive():
+      self._check_shadowing(self.scope, args_set, child.scope, child._known_args)
+
+    # And look for direct conflicts
     for arg in args:
       if arg in self._known_args:
         raise OptionAlreadyRegistered(self.scope, arg)
@@ -486,7 +496,7 @@ class Parser:
     'type', 'member_type', 'choices', 'dest', 'default', 'implicit_value', 'metavar',
     'help', 'advanced', 'recursive', 'recursive_root', 'registering_class',
     'fingerprint', 'removal_version', 'removal_hint', 'deprecation_start_version', 'fromfile',
-    'mutually_exclusive_group', 'daemon'
+    'mutually_exclusive_group', 'daemon', 'passive'
   }
 
   # TODO: Remove dict_option from here after deprecation is complete.
@@ -537,13 +547,16 @@ class Parser:
     if removal_version is not None:
       validate_deprecation_semver(removal_version, 'removal version')
 
-  def _existing_scope(self, arg: str) -> Optional[str]:
-    if arg in self._known_args:
-      return self._scope
-    elif self._parent_parser:
-      return self._parent_parser._existing_scope(arg)
-    else:
-      return None
+  def _parents_transitive(self):
+    ancestor = self._parent_parser
+    while ancestor:
+      yield ancestor
+      ancestor = ancestor._parent_parser
+
+  def _children_transitive(self):
+    for child in self._child_parsers:
+      yield child
+      yield from child._children_transitive()
 
   _ENV_SANITIZER_RE = re.compile(r'[.-]')
 
@@ -623,8 +636,10 @@ class Parser:
     config_section = GLOBAL_SCOPE_CONFIG_SECTION if self._scope == GLOBAL_SCOPE else self._scope
     config_default_val_or_str = expand(self._config.get(Config.DEFAULT_SECTION, dest, default=None))
     config_val_or_str = expand(self._config.get(config_section, dest, default=None))
-    config_source_file = (self._config.get_source_for_option(config_section, dest) or
-        self._config.get_source_for_option(Config.DEFAULT_SECTION, dest))
+    config_source_file = (
+      self._config.get_source_for_option(config_section, dest) or
+      self._config.get_source_for_option(Config.DEFAULT_SECTION, dest)
+    )
     if config_source_file is not None:
       config_source_file = os.path.relpath(config_source_file)
       config_details = f'in {config_source_file}'
@@ -767,12 +782,8 @@ class Parser:
   def _register_child_parser(self, child: "Parser") -> None:
     self._child_parsers.append(child)
 
-  def _freeze(self) -> None:
-    self._frozen = True
-
   def _scope_str(self, scope: Optional[str] = None) -> str:
-    scope = scope or self.scope
-    return 'global scope' if scope == GLOBAL_SCOPE else f"scope '{scope}'"
+    return self.scope_str(scope if scope is not None else self.scope)
 
   def __str__(self) -> str:
     return f'Parser({self._scope})'

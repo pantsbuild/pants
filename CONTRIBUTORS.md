@@ -138,6 +138,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Matt Olsen
 + Matthew Jeffryes
 + Maxim Khutornenko
++ Maxim Popenko
 + Michael Doherty
 + Michal Bryc
 + Mike Cripps
@@ -180,6 +181,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Shane Delmore
 + Shuo Li
 + Simeon Franklin
++ Srikanth Kotagiri
 + Stefan Sauer
 + Stephan Erb
 + Stu Hood

@@ -30,6 +30,7 @@ from pants.engine.fs import (
   MaterializeDirectoryResult,
   PathGlobs,
   Snapshot,
+  SnapshotSubset,
   UrlToFetch,
 )
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveProcessResult
@@ -580,6 +581,7 @@ class EngineTypes(NamedTuple):
   construct_interactive_process_result: Function
   interactive_process_request: TypeId
   interactive_process_result: TypeId
+  snapshot_subset: TypeId
 
 
 class PyResult(NamedTuple):
@@ -943,6 +945,7 @@ class Native(metaclass=SingletonMetaclass):
         construct_interactive_process_result=func(InteractiveProcessResult),
         interactive_process_request=ti(InteractiveProcessRequest),
         interactive_process_result=ti(InteractiveProcessResult),
+        snapshot_subset=ti(SnapshotSubset),
     )
 
     scheduler_result = self.lib.scheduler_create(

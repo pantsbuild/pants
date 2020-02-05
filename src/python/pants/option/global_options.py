@@ -42,6 +42,28 @@ class GlobMatchErrorBehavior(Enum):
   error = "error"
 
 
+class FileNotFoundBehavior(Enum):
+  """What to do when globs do not match in BUILD files."""
+  warn = "warn"
+  error = "error"
+
+  def to_glob_match_error_behavior(self) -> GlobMatchErrorBehavior:
+    return GlobMatchErrorBehavior(self.value)
+
+
+class OwnersNotFoundBehavior(Enum):
+  """What to do when a file argument cannot be mapped to an owning target."""
+  ignore = "ignore"
+  warn = "warn"
+  error = "error"
+
+
+class BuildFileImportsBehavior(Enum):
+  allow = "allow"
+  warn = "warn"
+  error = "error"
+
+
 @dataclass(frozen=True)
 class ExecutionOptions:
   """A collection of all options related to (remote) execution of processes.
@@ -150,16 +172,25 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('-q', '--quiet', type=bool, recursive=True, daemon=False,
              help='Squelches most console output. NOTE: Some tasks default to behaving quietly: '
                   'inverting this option supports making them noisier than they would be otherwise.')
+    # Not really needed in bootstrap options, but putting it here means it displays right
+    # after -l and -q in help output, which is conveniently contextual.
+    # TODO: This is not true. `./pants help` output appears to be alphabetical.
+    register('--colors', type=bool, default=sys.stdout.isatty(), recursive=True, daemon=False,
+             help='Set whether log messages are displayed in color.')
+
     register('--log-show-rust-3rdparty', type=bool, default=False, advanced=True,
              help='Whether to show/hide logging done by 3rdparty rust crates used by the pants '
                   'engine.')
 
-    # Not really needed in bootstrap options, but putting it here means it displays right
-    # after -l and -q in help output, which is conveniently contextual.
-    register('--colors', type=bool, default=sys.stdout.isatty(), recursive=True, daemon=False,
-             help='Set whether log messages are displayed in color.')
+    # Toggles v1/v2 `Task` vs `@rule` pipelines on/off.
+    # Having these in bootstrap options allows them to affect registration of non-bootstrap options.
+    register('--v1', advanced=True, type=bool, default=True,
+             help='Enables execution of v1 Tasks.')
+    register('--v2', advanced=True, type=bool, default=False,
+             help='Enables execution of v2 @goal_rules.')
+
     # TODO(#7203): make a regexp option type!
-    register('--ignore-pants-warnings', type=list, member_type=str, default=[],
+    register('--ignore-pants-warnings', type=list, member_type=str, default=[], advanced=True,
              help='Regexps matching warning strings to ignore, e.g. '
                   '["DEPRECATED: scope some_scope will be removed"]. The regexps will be matched '
                   'from the start of the warning string, and will always be case-insensitive. '
@@ -284,10 +315,29 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                   '(e.g. BUILD file scanning, glob matching, etc). '
                   'Patterns use the gitignore syntax (https://git-scm.com/docs/gitignore). '
                   'The `--pants-distdir` and `--pants-workdir` locations are inherently ignored.')
+    register(
+      "--owners-not-found-behavior", advanced=True,
+      type=OwnersNotFoundBehavior, default=OwnersNotFoundBehavior.error,
+      help="What to do when file arguments do not have any owning target. This happens when there "
+           "are no targets whose `sources` fields include the file argument."
+    )
+    register("--files-not-found-behavior", advanced=True,
+             type=FileNotFoundBehavior, default=FileNotFoundBehavior.warn,
+             help="What to do when files and globs specified in BUILD files, such as in the "
+                  "`sources` field, cannot be found. This happens when the files do not exist on "
+                  "your machine or when they are ignored by the `--pants-ignore` option.")
     register('--glob-expansion-failure', advanced=True,
-             default=GlobMatchErrorBehavior.warn, type=GlobMatchErrorBehavior,
-             help="Raise an exception if any targets declaring source files "
-                  "fail to match any glob provided in the 'sources' argument.")
+             type=GlobMatchErrorBehavior, default=GlobMatchErrorBehavior.warn,
+             removal_version="1.27.0.dev0",
+             removal_hint="If you currently set `--glob-expansion-failure=error`, instead set "
+                          "`--files-not-found-behavior=error`.\n\n"
+                          "If you currently set `--glob-expansion-failure=ignore`, you will "
+                          "need to instead either set `--files-not-found-behavior=warn` (the "
+                          "default) or `--files-not-found-behavior=error`. Ignoring when files are "
+                          "not found often results in subtle bugs, so we are removing the option.",
+             help="What to do when files and globs specified in BUILD files, such as in the "
+                  "`sources` field, cannot be found. This happens when the files do not exist on "
+                  "your machine or when they are ignored by the `--pants-ignore` option.")
 
     # TODO(#7203): make a regexp option type!
     register('--exclude-target-regexp', advanced=True, type=list, default=[], daemon=False,
@@ -296,6 +346,17 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              help='Paths that correspond with build roots for any subproject that this '
                   'project depends on.')
     register('--owner-of', type=list, member_type=file_option, default=[], daemon=False, metavar='<path>',
+             removal_version="1.27.0.dev0",
+             removal_hint=(
+               "Use direct file arguments instead, such as "
+               "`./pants list src/python/f1.py src/python/f2.py` or even "
+               "`./pants fmt 'src/python/**/*.py'`.\n\nInstead of `--owner-of=@my_file`, use "
+               "`--spec-file=my_file`.\n\nJust like with `--owner-of`, Pants will "
+               "try to find the owner(s) of the file and then operate on those owning targets.\n\n"
+               "Unlike `--owner-of`, Pants defaults to failing if there is no owning target for "
+               "that file. You may change this through `--owners-not-found-behavior=ignore` or "
+               "`--owners-not-found-behavior=warn`."
+             ),
              help='Select the targets that own these files. '
                   'This is the third target calculation strategy along with the --changed-* '
                   'options and specifying the targets directly. These three types of target '
@@ -403,8 +464,8 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
 
     # This option changes the parser behavior in a fundamental way (which currently invalidates
     # all caches), and needs to be parsed out early, so we make it a bootstrap option.
-    register('--build-file-imports', choices=['allow', 'warn', 'error'], default='warn',
-             advanced=True,
+    register('--build-file-imports', type=BuildFileImportsBehavior,
+             default=BuildFileImportsBehavior.warn, advanced=True,
              help='Whether to allow import statements in BUILD files')
 
     register('--local-store-dir', advanced=True,
@@ -498,47 +559,46 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     # global-scope options, for convenience.
     cls.register_bootstrap_options(register)
 
-    register('-x', '--time', type=bool,
-             help='Output a timing report at the end of the run.')
-    register('-e', '--explain', type=bool,
-             help='Explain the execution of goals.')
     register('--tag', type=list, metavar='[+-]tag1,tag2,...',
              help="Include only targets with these tags (optional '+' prefix) or without these "
                   "tags ('-' prefix).  Useful with ::, to find subsets of targets "
                   "(e.g., integration tests.)")
 
-    # Toggles v1/v2 `Task` vs `@rule` pipelines on/off.
-    register('--v1', advanced=True, type=bool, default=True,
-             help='Enables execution of v1 Tasks.')
-    register('--v2', advanced=True, type=bool, default=False,
-             help='Enables execution of v2 @goal_rules.')
     register('--v2-ui', default=False, type=bool, daemon=False,
-             help='Whether to show v2 engine execution progress. '
-                  'This requires the --v2 flag to take effect.')
+             passive=not register.bootstrap.v2,
+             help='Whether to show v2 engine execution progress.')
 
     loop_flag = '--loop'
+    loop_passive = register.bootstrap.v1 or not register.bootstrap.v2
     register(loop_flag, type=bool,
-             help='Run v2 @goal_rules continuously as file changes are detected. Requires '
-                  '`--v2`, and is best utilized with `--v2 --no-v1`.')
+             passive=loop_passive,
+             help='Run v2 @goal_rules continuously as file changes are detected.')
     register('--loop-max', type=int, default=2**32, advanced=True,
+             passive=loop_passive,
              help=f'The maximum number of times to loop when `{loop_flag}` is specified.')
 
-    register('-t', '--timeout', advanced=True, type=int, metavar='<seconds>',
-            removal_version="1.26.0.dev1",
-            removal_hint="This option is not used and may be removed with no change in behavior. ",
-            help='Number of seconds to wait for http connections.')
+    no_v1 = not register.bootstrap.v1
+    register('-x', '--time', type=bool, passive=no_v1,
+             help='Output a timing report at the end of the run.')
+    register('-e', '--explain', type=bool, passive=no_v1,
+             help='Explain the execution of goals.')
+    register('-t', '--timeout', advanced=True, type=int, metavar='<seconds>', passive=no_v1,
+             removal_version="1.26.0.dev1",
+             removal_hint="This option is not used and may be removed with no change in behavior. ",
+             help='Number of seconds to wait for http connections.')
     # TODO: After moving to the new options system these abstraction leaks can go away.
-    register('-k', '--kill-nailguns', advanced=True, type=bool,
+    register('-k', '--kill-nailguns', advanced=True, type=bool, passive=no_v1,
              help='Kill nailguns before exiting')
-    register('--fail-fast', advanced=True, type=bool, recursive=True,
+    register('--fail-fast', advanced=True, type=bool, recursive=True, passive=no_v1,
              help='Exit as quickly as possible on error, rather than attempting to continue '
                   'to process the non-erroneous subset of the input.')
-    register('--cache-key-gen-version', advanced=True, default='200', recursive=True,
+    register('--cache-key-gen-version', advanced=True, default='200', recursive=True, passive=no_v1,
              help='The cache key generation. Bump this to invalidate every artifact for a scope.')
-    register('--workdir-max-build-entries', advanced=True, type=int, default=8,
+    register('--workdir-max-build-entries', advanced=True, type=int, default=8, passive=no_v1,
              help='Maximum number of previous builds to keep per task target pair in workdir. '
              'If set, minimum 2 will always be kept to support incremental compilation.')
     register('--max-subprocess-args', advanced=True, type=int, default=100, recursive=True,
+             passive=no_v1,
              help='Used to limit the number of arguments passed to some subprocesses by breaking '
              'the command up into multiple invocations.')
     register('--lock', advanced=True, type=bool, default=True,
@@ -564,14 +624,8 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
 
     Raises pants.option.errors.OptionsError on validation failure.
     """
-    if opts.loop and (not opts.v2 or opts.v1):
-      raise OptionsError('The `--loop` option only works with @goal_rules, and thus requires '
-                         '`--v2 --no-v1` to function as expected.')
-    if opts.loop and not opts.enable_pantsd:
+    if opts.get('loop') and not opts.enable_pantsd:
       raise OptionsError('The `--loop` option requires `--enable-pantsd`, in order to watch files.')
-
-    if opts.v2_ui and not opts.v2:
-      raise OptionsError('The `--v2-ui` option requires `--v2` to be enabled together.')
 
     if opts.remote_execution and not opts.remote_execution_server:
       raise OptionsError("The `--remote-execution` option requires also setting "

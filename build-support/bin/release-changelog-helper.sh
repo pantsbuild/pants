@@ -28,12 +28,12 @@ then
   help "Too many arguments."
 elif (( $# == 0 ))
 then
- read -rp "What sha was the last release made from?: " LAST_RELEASE_SHA
+ read -rp "What git commit hash or tag was the last release made from?: " LAST_RELEASE_IDENTIFIER
 elif [[ "$1" == "-h" ]]
 then
   help
 else
-  LAST_RELEASE_SHA="$1"
+  LAST_RELEASE_IDENTIFIER="$1"
 fi
 
 echo
@@ -57,6 +57,10 @@ Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
+Testing
+~~~~~~~
+
+
 Documentation
 ~~~~~~~~~~~~~
 
@@ -64,11 +68,11 @@ Documentation
 EOF
 
 echo
-echo "Changes since ${LAST_RELEASE_SHA}:"
+echo "Changes since ${LAST_RELEASE_IDENTIFIER}:"
 echo "----------------------------------------------------------------------------------------------------"
 echo
 
-for sha in $(git log --format="format:%H" HEAD "^${LAST_RELEASE_SHA}")
+for sha in $(git log --format="format:%H" HEAD "^${LAST_RELEASE_IDENTIFIER}")
 do
   subject=$(git log -1 --format="format:%s" "$sha")
   echo "* ${subject}"

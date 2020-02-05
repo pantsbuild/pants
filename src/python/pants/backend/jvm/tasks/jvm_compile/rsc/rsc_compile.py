@@ -175,7 +175,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     register('--workflow', type=cls.JvmCompileWorkflowType,
       choices=list(cls.JvmCompileWorkflowType),
       default=cls.JvmCompileWorkflowType.zinc_only, metavar='<workflow>',
-      help='The default workflow to use to compile JVM targets. This is overriden on a per-target basis with the force-compiler-tag-prefix tag.', fingerprint=True)
+      help='The default workflow to use to compile JVM targets. This is overridden on a per-target basis with the force-compiler-tag-prefix tag.', fingerprint=True)
 
     register('--scala-workflow-override', type=cls.JvmCompileWorkflowType,
       choices=list(cls.JvmCompileWorkflowType),

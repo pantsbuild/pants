@@ -13,20 +13,20 @@ target(
 
 files(
   name = 'distance_directory',
-  sources = rglobs('distance/*'),
+  sources = ['distance/**/*'],
 )
 
 files(
   name = 'import_from_buildroot_directory',
-  sources = rglobs('import_from_buildroot/*'),
+  sources = ['import_from_buildroot/**/*'],
 )
 
 files(
   name = 'proto-ordering_directory',
-  sources = rglobs('proto-ordering/*'),
+  sources = ['proto-ordering/**/*'],
 )
 
 files(
   name = 'utf8proto_directory',
-  sources = rglobs('utf8proto/*'),
+  sources = ['utf8proto/**/*'],
 )

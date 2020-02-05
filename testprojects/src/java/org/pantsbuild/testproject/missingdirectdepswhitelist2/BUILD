@@ -2,6 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 java_library(
-  sources=rglobs('*.java'),
+  sources=['**/*.java'],
   dependencies=['testprojects/src/java/org/pantsbuild/testproject/publish/hello/greet']
 )

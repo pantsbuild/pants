@@ -45,3 +45,12 @@ python_tests(
   timeout = 900,
   tags = {'integration', 'partially_type_checked'},
 )
+
+python_tests(
+  name='zinc_compile',
+  sources=['test_zinc_compile.py'],
+  dependencies=[
+    'tests/python/pants_test/backend/python/tasks:python_task_test_base',
+    'src/python/pants/testutil/jvm:jvm_tool_task_test_base',
+  ]
+)

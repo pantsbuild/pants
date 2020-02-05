@@ -445,13 +445,19 @@ impl PyResult {
   }
 }
 
+impl From<Value> for PyResult {
+  fn from(val: Value) -> Self {
+    PyResult {
+      is_throw: false,
+      handle: val.into(),
+    }
+  }
+}
+
 impl From<Result<Value, Failure>> for PyResult {
   fn from(result: Result<Value, Failure>) -> Self {
     match result {
-      Ok(val) => PyResult {
-        is_throw: false,
-        handle: val.into(),
-      },
+      Ok(val) => val.into(),
       Err(f) => {
         let val = match f {
           f @ Failure::Invalidated => create_exception(&format!("{}", f)),

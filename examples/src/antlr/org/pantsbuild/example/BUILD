@@ -10,5 +10,5 @@ target(
 
 files(
   name = 'exp_directory',
-  sources = rglobs('exp/*'),
+  sources = ['exp/**/*'],
 )

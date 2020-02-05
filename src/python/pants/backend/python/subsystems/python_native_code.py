@@ -10,6 +10,7 @@ from typing import Tuple
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.python.subsystems import pex_build_util
+from pants.backend.python.subsystems.executable_pex_tool import ExecutablePexTool
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.base.exceptions import IncompatiblePlatformsError
@@ -92,7 +93,7 @@ class PythonNativeCode(Subsystem):
     Performs a check of whether the current target closure has native sources and if so, ensures
     that Pants is only targeting the current platform.
 
-    :param tgts: a list of :class:`Target` objects.
+    :param targets: a list of :class:`Target` objects.
     :return: a boolean value indicating whether the current target closure has native sources.
     :raises: :class:`pants.base.exceptions.IncompatiblePlatformsError`
     """

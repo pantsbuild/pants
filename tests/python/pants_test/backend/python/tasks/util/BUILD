@@ -6,6 +6,7 @@ python_library(
     '3rdparty/python:wheel',
     'src/python/pants/backend/native',
     'src/python/pants/backend/python/tasks',
+    'src/python/pants/python',
     'src/python/pants/util:collections',
     'src/python/pants/util:enums',
     'src/python/pants/util:meta',

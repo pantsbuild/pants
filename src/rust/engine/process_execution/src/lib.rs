@@ -9,7 +9,6 @@
   clippy::expl_impl_clone_on_copy,
   clippy::if_not_else,
   clippy::needless_continue,
-  clippy::single_match_else,
   clippy::unseparated_literal_suffix,
   clippy::used_underscore_binding
 )]
@@ -29,7 +28,7 @@
 #[macro_use]
 extern crate derivative;
 
-use boxfuture::BoxFuture;
+use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::TryFrom;
@@ -39,6 +38,9 @@ use std::sync::Arc;
 use std::time::Duration;
 use store::UploadSummary;
 use workunit_store::WorkUnitStore;
+
+use futures::compat::Future01CompatExt;
+use futures::future::{FutureExt, TryFutureExt};
 
 use async_semaphore::AsyncSemaphore;
 use hashing::Digest;
@@ -396,7 +398,11 @@ impl CommandRunner for BoundedCommandRunner {
     self
       .inner
       .1
-      .with_acquired(move || inner.0.run(req, context))
+      .clone()
+      .with_acquired(move || inner.0.run(req, context).compat())
+      .boxed()
+      .compat()
+      .to_boxed()
   }
 
   fn extract_compatible_request(

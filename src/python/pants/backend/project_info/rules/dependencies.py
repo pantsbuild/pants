@@ -1,6 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from enum import Enum
 from typing import Set
 
 from pants.engine.addressable import BuildFileAddresses
@@ -11,8 +12,15 @@ from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get
 
 
+class DependencyType(Enum):
+  SOURCE = "source"
+  THIRD_PARTY = "3rdparty"
+  SOURCE_AND_THIRD_PARTY = "source-and-3rdparty"
+
+
 # TODO(#8762) Get this rule to feature parity with the dependencies task.
 class DependenciesOptions(LineOriented, GoalSubsystem):
+  """Print the target's dependencies."""
   name = 'dependencies2'
 
   @classmethod
@@ -20,9 +28,15 @@ class DependenciesOptions(LineOriented, GoalSubsystem):
     super().register_options(register)
     register(
       '--transitive',
-      default=True,
+      default=False,
       type=bool,
       help='Run dependencies against transitive dependencies of targets specified on the command line.',
+    )
+    # TODO(#8762): Wire this up. Currently we only support `internal`.
+    register(
+      '--type', type=DependencyType, default=DependencyType.SOURCE,
+      help="Which types of dependencies to find, where `source` means source code dependencies "
+           "and `3rdparty` means third-party requirements and JARs."
     )
 
 

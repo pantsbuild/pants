@@ -21,12 +21,13 @@ A `python_library` target definition should specify the following:
 Here is an example target definition:
 
     ::python
-    python_library(name='my-python-lib',
-      sources=globs('*.py'),
+    python_library(
+      name='my-python-lib',
+      sources=['*.py'],
       dependencies=[
-        'server/src/python:server-lib',
-        'client/src/python:client-lib',
-        'static/json:config'
+        'src/python/myproject/server:server-lib',
+        'src/python/myproject/client:client-lib',
+        'src/static/json:config',
       ],
     )
 
@@ -34,7 +35,7 @@ Now, another library or binary can depend on the target you created:
 
     ::python
     dependencies=[
-      'myproject/src/python:my-python-lib'
+      'src/python/myproject/example:my-python-lib',
     ]
 
 ## See Also

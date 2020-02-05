@@ -10,7 +10,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 engine = { path = ".." }
-futures = "0.1.27"
+futures01 = { package = "futures", version = "0.1" }
 hashing = { path = "../hashing" }
 log = "0.4"
 logging = { path = "../logging" }

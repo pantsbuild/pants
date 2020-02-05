@@ -5,6 +5,7 @@ import os
 from contextlib import contextmanager
 from textwrap import dedent
 
+from pants.backend.python.subsystems.ipython import IPython
 from pants.backend.python.tasks.gather_sources import GatherSources
 from pants.backend.python.tasks.python_repl import PythonRepl
 from pants.backend.python.tasks.resolve_requirements import ResolveRequirements
@@ -14,6 +15,7 @@ from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
 from pants.task.repl_task_mixin import ReplTaskMixin
+from pants.testutil.subsystem.util import init_subsystem
 from pants.util.contextutil import environment_as, stdio_as, temporary_dir
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 
@@ -42,6 +44,7 @@ class PythonReplTest(PythonTaskTestBase):
 
   def setUp(self):
     super().setUp()
+    init_subsystem(IPython)
     self.six = self.create_python_requirement_library('3rdparty/python/six', 'six',
                                                       requirements=['six==1.13.0'])
     self.requests = self.create_python_requirement_library('3rdparty/python/requests', 'requests',
@@ -76,9 +79,7 @@ class PythonReplTest(PythonTaskTestBase):
         with stdio_as(stdin_fd=inp.fileno(), stdout_fd=out.fileno(), stderr_fd=err.fileno()):
           yield (stdin, stdout, stderr)
 
-  def do_test_repl(self, code, expected, targets, options=None):
-    if options:
-      self.set_options(**options)
+  def do_test_repl(self, code, expected, targets):
 
     class JvmRepl(ReplTaskMixin):
       options_scope = 'test_scope_jvm_repl'
@@ -169,9 +170,9 @@ class PythonReplTest(PythonTaskTestBase):
   def test_ipython(self):
     # IPython supports shelling out with a leading !, so indirectly test its presence by reading
     # the head of this very file.
+    self.set_options(ipython=True)
     with open(__file__, 'r') as fp:
       me = fp.readline()
       self.do_test_repl(code=[f'!head -1 {__file__}'],
                         expected=[me],
-                        targets=[self.six],  # Just to get the repl to pop up.
-                        options={'ipython': True})
+                        targets=[self.six])  # Just to get the repl to pop up.

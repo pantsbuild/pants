@@ -21,9 +21,12 @@ pub struct Handle(pub RawHandle);
 
 impl Handle {
   ///
-  /// An escape hatch to allow for cloning a Handle without cloning the value it points to. You
-  /// should generally not do this unless you are certain the input Handle has been mem::forgotten
-  /// (otherwise it will be `Drop`ed twice).
+  /// An escape hatch to allow for cloning a Handle without cloning the value it points to.
+  ///
+  /// # Safety
+  ///
+  /// You should not call this method unless you are certain the input Handle has been
+  /// mem::forgotten (otherwise it will be `Drop`ed twice).
   ///
   pub unsafe fn clone_shallow(&self) -> Handle {
     Handle(self.0)

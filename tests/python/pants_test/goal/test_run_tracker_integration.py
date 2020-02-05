@@ -23,7 +23,7 @@ class RunTrackerIntegrationTest(PantsRunIntegrationTest):
         f'--run-tracker-stats-local-json-file={tmpfile}',
         '--run-tracker-stats-version=1',
         '--reporting-zipkin-trace-v2',
-        '--run-tracker-stats-option-scopes-to-record=["GLOBAL", "GLOBAL^v2_ui", "compile.rsc^capture_classpath"]',
+        '--run-tracker-stats-option-scopes-to-record=["GLOBAL", "GLOBAL^time", "compile.rsc^capture_classpath"]',
         'testprojects/src/java/org/pantsbuild/testproject/extra_jvm_options::',
         'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
       ])
@@ -61,9 +61,9 @@ class RunTrackerIntegrationTest(PantsRunIntegrationTest):
         self.assertIn('recorded_options', stats_json)
         self.assertIn('GLOBAL', stats_json['recorded_options'])
         self.assertNotIn('engine_workunits', stats_json['pantsd_stats'])
-        self.assertIs(stats_json['recorded_options']['GLOBAL']['v2_ui'], False)
+        self.assertIs(stats_json['recorded_options']['GLOBAL']['time'], False)
         self.assertEqual(stats_json['recorded_options']['GLOBAL']['level'], 'info')
-        self.assertIs(stats_json['recorded_options']['GLOBAL^v2_ui'], False)
+        self.assertIs(stats_json['recorded_options']['GLOBAL^time'], False)
         self.assertEqual(stats_json['recorded_options']['compile.rsc^capture_classpath'], True)
 
   def test_stats_local_json_file_v2(self):

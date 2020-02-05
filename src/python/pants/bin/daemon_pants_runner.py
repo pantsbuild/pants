@@ -250,7 +250,9 @@ class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         clean_global_runtime_state(reset_subsystem=True)
 
         options, _, options_bootstrapper = LocalPantsRunner.parse_options(self._args, self._env)
-        graph_helper, target_roots, exit_code = self._scheduler_service.prepare_v1_graph_run_v2(options, options_bootstrapper)
+        graph_helper, specs, exit_code = self._scheduler_service.prepare_v1_graph_run_v2(
+          options, options_bootstrapper,
+        )
         self.exit_code = exit_code
 
         # Otherwise, conduct a normal run.
@@ -258,7 +260,7 @@ class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
           runner = LocalPantsRunner.create(
             self._args,
             self._env,
-            target_roots,
+            specs,
             graph_helper,
             options_bootstrapper,
           )
