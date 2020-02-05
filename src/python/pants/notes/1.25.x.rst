@@ -67,7 +67,7 @@ Refactoring, Improvements, and Tooling
 * Preserve the filesystem spec used to find owning targets (#9063)
   `PR #9063 <https://github.com/pantsbuild/pants/pull/9063>`_
 
-* Decouple `--owner-of` implementation from` --changed-*` (#9046)
+* Decouple `--owner-of` implementation from `--changed-*` (#9046)
   `PR #9046 <https://github.com/pantsbuild/pants/pull/9046>`_
 
 * Remove deps from the core into the Python backend's subsystems (#9049)
