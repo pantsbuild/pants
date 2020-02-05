@@ -51,6 +51,13 @@ class FileNotFoundBehavior(Enum):
     return GlobMatchErrorBehavior(self.value)
 
 
+class OwnersNotFoundBehavior(Enum):
+  """What to do when a file argument cannot be mapped to an owning target."""
+  ignore = "ignore"
+  warn = "warn"
+  error = "error"
+
+
 class BuildFileImportsBehavior(Enum):
   allow = "allow"
   warn = "warn"
@@ -308,6 +315,12 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                   '(e.g. BUILD file scanning, glob matching, etc). '
                   'Patterns use the gitignore syntax (https://git-scm.com/docs/gitignore). '
                   'The `--pants-distdir` and `--pants-workdir` locations are inherently ignored.')
+    register(
+      "--owners-not-found-behavior", advanced=True,
+      type=OwnersNotFoundBehavior, default=OwnersNotFoundBehavior.error,
+      help="What to do when file arguments do not have any owning target. This happens when there "
+           "are no targets whose `sources` fields include the file argument."
+    )
     register("--files-not-found-behavior", advanced=True,
              type=FileNotFoundBehavior, default=FileNotFoundBehavior.warn,
              help="What to do when files and globs specified in BUILD files, such as in the "
@@ -339,7 +352,10 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                "`./pants list src/python/f1.py src/python/f2.py` or even "
                "`./pants fmt 'src/python/**/*.py'`.\n\nInstead of `--owner-of=@my_file`, use "
                "`--spec-file=my_file`.\n\nJust like with `--owner-of`, Pants will "
-               "try to find the owner(s) of the file and then operate on those owning targets."
+               "try to find the owner(s) of the file and then operate on those owning targets.\n\n"
+               "Unlike `--owner-of`, Pants defaults to failing if there is no owning target for "
+               "that file. You may change this through `--owners-not-found-behavior=ignore` or "
+               "`--owners-not-found-behavior=warn`."
              ),
              help='Select the targets that own these files. '
                   'This is the third target calculation strategy along with the --changed-* '
