@@ -73,7 +73,6 @@ class NodeBuild(NodeTask):
 
   def execute(self):
     targets = self.context.targets(predicate=self.is_node_module)
-    print(f"node_build targets: {targets}")
     if not targets:
       return
 
@@ -107,7 +106,6 @@ class NodeBuild(NodeTask):
             absolute_symlink(output_dir, os.path.join(vt.results_dir, target.address.target_name))
             bundleable_js_product[target].add_abs_paths(output_dir, [output_dir])
 
-            print(f"Target {vt.target} has result dir {vt.results_dir} and classpath snapshot {self._snapshotted_classpath(vt.results_dir)}")
             runtime_classpath.add_for_target(
               target,
               [('default', self._snapshotted_classpath(vt.results_dir))])

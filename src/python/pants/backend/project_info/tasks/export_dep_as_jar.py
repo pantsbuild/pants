@@ -122,7 +122,7 @@ class ExportDepAsJar(ConsoleTask):
     return '{0}:{1}'.format(jar.org, jar.name) if jar.name else jar.org
 
   @staticmethod
-  def _get_target_type(tgt, resource_target_map):
+  def _get_target_type(tgt, resource_target_map, runtime_classpath):
     def is_test(t):
       return isinstance(t, JUnitTests)
 
@@ -135,6 +135,10 @@ class ExportDepAsJar(ConsoleTask):
         return SourceRootTypes.TEST_RESOURCE
       elif isinstance(tgt, Resources):
         return SourceRootTypes.RESOURCE
+      elif not isinstance(tgt, JvmTarget) and runtime_classpath.get_for_target(tgt):
+        # It's not a resource, but it also isn't Jvm source code, but it has a entry on the classpath
+        # so the classpath entry should be added to
+        return SourceRootTypes.RESOURCE_GENERATED
       else:
         return SourceRootTypes.SOURCE
 
@@ -159,7 +163,8 @@ class ExportDepAsJar(ConsoleTask):
   def _zip_sources(target, location, suffix='.jar'):
     with temporary_file(root_dir=location, cleanup=False, suffix=suffix) as f:
       with zipfile.ZipFile(f, 'a') as zip_file:
-        for src_from_source_root, src_from_build_root in zip(target.sources_relative_to_source_root(), target.sources_relative_to_buildroot()):
+        for src_from_source_root, src_from_build_root in zip(
+          target.sources_relative_to_source_root(), target.sources_relative_to_buildroot()):
           zip_file.write(os.path.join(get_buildroot(), src_from_build_root), src_from_source_root)
     return f
 
@@ -187,7 +192,7 @@ class ExportDepAsJar(ConsoleTask):
       'libraries': [],
       'roots': [],
       'id': current_target.id,
-      'target_type': ExportDepAsJar._get_target_type(current_target, resource_target_map),
+      'target_type': ExportDepAsJar._get_target_type(current_target, resource_target_map, runtime_classpath),
       'is_synthetic': current_target.is_synthetic,
       'pants_target_type': self._get_pants_target_alias(type(current_target)),
       'is_target_root': current_target in modulizable_target_set,
@@ -236,11 +241,10 @@ class ExportDepAsJar(ConsoleTask):
       libraries_for_target.update(_full_library_set_for_target(dep))
     info['libraries'].extend(libraries_for_target)
 
-    if current_target in modulizable_target_set:
-      info['roots'] = [{
-        'source_root': os.path.realpath(source_root_package_prefix[0]),
-        'package_prefix': source_root_package_prefix[1]
-      } for source_root_package_prefix in self._source_roots_for_target(current_target)]
+    info['roots'] = [{
+      'source_root': os.path.realpath(source_root_package_prefix[0]),
+      'package_prefix': source_root_package_prefix[1]
+    } for source_root_package_prefix in self._source_roots_for_target(current_target)]
 
     for dep in current_target.dependencies:
       if dep in modulizable_target_set:
@@ -311,21 +315,26 @@ class ExportDepAsJar(ConsoleTask):
     targets.extend(additional_java_targets)
     return set(targets)
 
-  def _get_targets_to_make_into_modules(self, target_roots_set):
+  def _get_targets_to_make_into_modules(self, target_roots_set, resource_target_map, runtime_classpath):
     target_root_addresses = [t.address for t in target_roots_set]
-    dependees_of_target_roots = [t for t in self.context.build_graph.transitive_dependees_of_addresses(target_root_addresses) if isinstance(t, JvmTarget)]
+    dependees_of_target_roots = [
+      t for t in self.context.build_graph.transitive_dependees_of_addresses(target_root_addresses)
+      if self._get_target_type(t, resource_target_map, runtime_classpath) is not SourceRootTypes.RESOURCE_GENERATED
+    ]
     return dependees_of_target_roots
 
   def _make_libraries_entry(self, target, resource_target_map, runtime_classpath):
     # Using resolved path in preparation for VCFS.
     resource_jar_root = os.path.realpath(self.versioned_workdir)
     library_entry = {}
-    target_type = ExportDepAsJar._get_target_type(target, resource_target_map)
+    target_type = ExportDepAsJar._get_target_type(target, resource_target_map, runtime_classpath)
     if target_type == SourceRootTypes.RESOURCE or target_type == SourceRootTypes.TEST_RESOURCE:
       # yic assumed that the cost to fingerprint the target may not be that lower than
       # just zipping up the resources anyway.
       jarred_resources = ExportDepAsJar._zip_sources(target, resource_jar_root)
       library_entry['default'] = jarred_resources.name
+    elif target_type == SourceRootTypes.RESOURCE_GENERATED:
+      library_entry.update(runtime_classpath.get_for_target(target))
     else:
       jar_products = runtime_classpath.get_for_target(target)
       for conf, jar_entry in jar_products:
@@ -363,7 +372,9 @@ class ExportDepAsJar(ConsoleTask):
         if isinstance(dep, Resources):
           resource_target_map[dep] = t
 
-    modulizable_targets = self._get_targets_to_make_into_modules(target_roots_set)
+    modulizable_targets = self._get_targets_to_make_into_modules(
+      target_roots_set, resource_target_map, runtime_classpath
+    )
     non_modulizable_targets = all_targets.difference(modulizable_targets)
 
     for t in non_modulizable_targets:
