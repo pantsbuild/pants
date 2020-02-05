@@ -28,8 +28,8 @@ API Changes
 * Deprecate `--glob-expansion-failure` in favor of `--files-not-found-behavior` (#9022)
   `PR #9022 <https://github.com/pantsbuild/pants/pull/9022>`_
 
-* [IntelliJ] Add compiler options and plugins to the output of `export-dep-as-jar` (#9036)
-  `PR #9036 <https://github.com/pantsbuild/pants/pull/9036>`_
+* [thrift linter] use non-zero exit on warning when strict and zero exit warning when not strict (#9051)
+  `PR #9051 <https://github.com/pantsbuild/pants/pull/9051>`_
 
 New Features
 ~~~~~~~~~~~~
@@ -40,14 +40,14 @@ New Features
 * Support python2 in the setup.py rule. (#8956)
   `PR #8956 <https://github.com/pantsbuild/pants/pull/8956>`_
 
+* [IntelliJ] Add compiler options and plugins to the output of `export-dep-as-jar` (#9036)
+  `PR #9036 <https://github.com/pantsbuild/pants/pull/9036>`_
+
 Bugfixes
 ~~~~~~~~
 
 * Fix Python linters to work without `pants.backend.python` registered (#9059)
   `PR #9059 <https://github.com/pantsbuild/pants/pull/9059>`_
-
-* [thrift linter] use non-zero exit on warning when strict and zero exit warning when not strict (#9051)
-  `PR #9051 <https://github.com/pantsbuild/pants/pull/9051>`_
 
 * Fix V2 `test` and `setup-py2` to work with file args (#9056)
   `PR #9056 <https://github.com/pantsbuild/pants/pull/9056>`_
