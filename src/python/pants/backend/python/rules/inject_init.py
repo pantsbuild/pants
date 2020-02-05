@@ -3,11 +3,11 @@
 
 from dataclasses import dataclass
 
-from pants.backend.python.subsystems.pex_build_util import identify_missing_init_files
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, Digest, Snapshot
 from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
 from pants.engine.rules import rule
 from pants.engine.selectors import Get
+from pants.python.pex_build_util import identify_missing_init_files
 
 
 # TODO(#7710): Once this gets fixed, rename this to InitInjectedDigest.

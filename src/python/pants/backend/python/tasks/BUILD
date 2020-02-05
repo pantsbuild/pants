@@ -28,6 +28,7 @@ python_library(
     'src/python/pants/engine:rules',
     'src/python/pants/engine:selectors',
     'src/python/pants/invalidation',
+    'src/python/pants/python',
     'src/python/pants/task',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',

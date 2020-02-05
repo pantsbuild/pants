@@ -8,7 +8,6 @@ from pex.pex_builder import PEXBuilder
 from pex.pex_info import PexInfo
 
 from pants.backend.python.subsystems.pex_build_util import (
-  PexBuilderWrapper,
   has_python_requirements,
   has_python_sources,
   has_resources,
@@ -20,6 +19,7 @@ from pants.backend.python.targets.python_requirement_library import PythonRequir
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.target_scopes import Scopes
+from pants.python.pex_build_util import PexBuilderWrapper
 from pants.task.task import Task
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir_for

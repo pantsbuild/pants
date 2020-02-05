@@ -8,8 +8,8 @@ from contextlib import contextmanager
 
 from pex.pex_builder import PEXBuilder
 
-from pants.backend.python.subsystems.pex_build_util import PexBuilderWrapper
 from pants.backend.python.targets.python_library import PythonLibrary
+from pants.python.pex_build_util import PexBuilderWrapper
 from pants.source.source_root import SourceRootConfig
 from pants.testutil.subsystem.util import init_subsystem
 from pants.testutil.test_base import TestBase
