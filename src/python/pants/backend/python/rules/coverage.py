@@ -105,7 +105,7 @@ def construct_coverage_config(
     return (source_root_stripped_path, source_root.path)
 
   source_to_target_base = dict(
-    source_root_stripped_source_and_source_root(filename) for filename in python_files + init_files
+    source_root_stripped_source_and_source_root(filename) for filename in sorted(python_files) + init_files
   )
   config_parser = configparser.ConfigParser()
   config_parser.read_file(StringIO(DEFAULT_COVERAGE_CONFIG))
@@ -271,16 +271,17 @@ async def generate_coverage_report(
 ) -> PytestCoverageReport:
   """Takes all python test results and generates a single coverage report."""
   requirements_pex = coverage_setup.requirements_pex
+  # TODO(#4535) We need a better way to do this kind of check that covers synthetic targets and rules extensibility.
   python_targets = [
     target for target in transitive_targets.closure
     if target.adaptor.type_alias == 'python_library' or target.adaptor.type_alias == 'python_tests'
   ]
 
   source_roots = source_root_config.get_source_roots()
-  python_files = frozenset(itertools.chain.from_iterable(
+  python_files = set(itertools.chain.from_iterable(
     target.adaptor.sources.snapshot.files for target in python_targets
   ))
-  coverage_config_content = construct_coverage_config(source_roots, list(python_files))
+  coverage_config_content = construct_coverage_config(source_roots, sorted(python_files))
 
   coveragerc_digest = await Get[Digest](InputFilesContent, get_coveragerc_input(coverage_config_content))
   sources_digests = [

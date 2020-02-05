@@ -127,6 +127,7 @@ async def setup_pytest_for_target(
   coverage_args = []
   test_target_sources_file_names = source_root_stripped_test_target_sources.snapshot.files
   if test_options.values.run_coverage:
+  # TODO(#4535) We need a better way to do this kind of check that covers synthetic targets and rules extensibility.
     python_targets = [
       target for target in all_targets
       if target.adaptor.type_alias in ('python_library', 'python_tests')
