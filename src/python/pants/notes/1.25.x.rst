@@ -37,11 +37,17 @@ New Features
 * Allow using file args with every goal (#9048)
   `PR #9048 <https://github.com/pantsbuild/pants/pull/9048>`_
 
+* Add `--owners-not-found-behavior` option for when file args do not have any owning targets (#9068)
+  `PR #9068 <https://github.com/pantsbuild/pants/pull/9068>`_
+
 * Support python2 in the setup.py rule. (#8956)
   `PR #8956 <https://github.com/pantsbuild/pants/pull/8956>`_
 
 * [IntelliJ] Add compiler options and plugins to the output of `export-dep-as-jar` (#9036)
   `PR #9036 <https://github.com/pantsbuild/pants/pull/9036>`_
+
+* [IntelliJ] Add `javac_options` and `extra_jvm_options` to the output of `export-dep-as-jar` (#9053)
+  `PR #9053 <https://github.com/pantsbuild/pants/pull/9053>`_
 
 Bugfixes
 ~~~~~~~~
@@ -52,14 +58,14 @@ Bugfixes
 * Fix V2 `test` and `setup-py2` to work with file args (#9056)
   `PR #9056 <https://github.com/pantsbuild/pants/pull/9056>`_
 
+* Split Zinc argfile by newline instead of space (#9065)
+  `PR #9065 <https://github.com/pantsbuild/pants/pull/9065>`_
+
 * Fix race condition with deprecation warnings (#9060)
   `PR #9060 <https://github.com/pantsbuild/pants/pull/9060>`_
 
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-* Error when literal file args do not have any owners (#9068)
-  `PR #9068 <https://github.com/pantsbuild/pants/pull/9068>`_
 
 * Change invalid file args to error instead of warn (#9041)
   `PR #9041 <https://github.com/pantsbuild/pants/pull/9041>`_
