@@ -1,6 +1,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from pants.base.deprecated import deprecated_conditional
 from pants.base.workunit import WorkUnitLabel
 
 from pants.contrib.cpp.targets.cpp_binary import CppBinary
@@ -8,15 +9,7 @@ from pants.contrib.cpp.tasks.cpp_task import CppTask
 
 
 class CppRun(CppTask):
-  """Runs a cpp binary"""
-
-  @classmethod
-  def register_options(cls, register):
-    super().register_options(register)
-    register(
-      '--args', type=list, help='Append these options to the executable command line.',
-      removal_version="1.26.0.dev0", removal_hint="Use `--passthrough-args` instead of `--args`."
-    )
+  """Runs a C++ binary."""
 
   @classmethod
   def supports_passthru_args(cls):
@@ -30,12 +23,23 @@ class CppRun(CppTask):
 
   def execute(self):
     binary_target = self.require_single_root_target()
+    deprecated_conditional(
+      lambda: self.get_passthru_args(),
+      removal_version='1.28.0.dev0',
+      entity_description='Using the old style of passthrough args for `run.cpp``',
+      hint_message="You passed arguments to the C++ executable through either the "
+                   "`--run-cpp-passthrough-args` option or the style "
+                   "`./pants run.cpp -- arg1 --arg2`. Instead, "
+                   "pass any arguments to the C++ executable like this: "
+                   "`./pants run --args='arg1 --arg2' src/cpp/path/to:target`.\n\n"
+                   "This change is meant to reduce confusion in how option scopes work with "
+                   "passthrough args and for parity with the V2 implementation of the `run` goal.",
+    )
     if isinstance(binary_target, CppBinary):
       with self.context.new_workunit(name='cpp-run', labels=[WorkUnitLabel.RUN]) as workunit:
-        cmd = [self.context.products.get_only('exe', binary_target)]
-
-        args = self.get_options().args + self.get_passthru_args()
-        if args != None:
-          cmd.extend(args)
-
+        cmd = [
+          self.context.products.get_only('exe', binary_target),
+          *self.get_passthru_args(),
+          *self.get_options().args,
+        ]
         self.run_command(cmd, workunit)
