@@ -49,6 +49,7 @@ class Dependencies(Goal):
 
 @goal_rule
 async def dependencies(
+<<<<<<< HEAD
     console: Console, addresses: Addresses, options: DependenciesOptions,
 ) -> Dependencies:
     address_strings: Set[str] = set()
@@ -71,6 +72,45 @@ async def dependencies(
             print_stdout(address)
 
     return Dependencies(exit_code=0)
+=======
+  console: Console,
+  build_file_addresses: BuildFileAddresses,
+  options: DependenciesOptions,
+) -> Dependencies:
+  addresses: Set[str] = set()
+  if options.values.transitive:
+    transitive_targets = await Get[TransitiveHydratedTargets](
+      BuildFileAddresses, build_file_addresses,
+    )
+    transitive_dependencies = transitive_targets.closure - set(transitive_targets.roots)
+    addresses.update(hydrated_target.address.spec for hydrated_target in transitive_dependencies)
+  else:
+    hydrated_targets = await Get[HydratedTargets](BuildFileAddresses, build_file_addresses)
+    addresses.update(
+      dep.spec
+      for hydrated_target in hydrated_targets
+      for dep in hydrated_target.dependencies
+    )
+
+  if options.values.type in [DependencyType.SOURCE, DependencyType.SOURCE_AND_THIRD_PARTY]:
+    with options.line_oriented(console) as print_stdout:
+      for address in sorted(addresses):
+        print_stdout(address)
+  if options.values.type in [DependencyType.THIRD_PARTY, DependencyType.SOURCE_AND_THIRD_PARTY]:
+    # TODO(John Sirois): We need an external payload abstraction at which point knowledge
+    # of jar and requirement payloads can go and this hairball will be untangled.
+    import pdb; pdb.set_trace()
+    # if isinstance(tgt.payload.get_field('requirements'), PythonRequirementsField):
+    #   for requirement in tgt.payload.requirements:
+    #     yield str(requirement.requirement)
+    # elif isinstance(tgt.payload.get_field('jars'), JarsField):
+    #   for jar in tgt.payload.jars:
+    #     data = dict(org=jar.org, name=jar.name, rev=jar.rev)
+    #     yield (f'{jar.org}:{jar.name}:{jar.rev}' if jar.rev else f'{jar.org}:{jar.name}')
+
+
+  return Dependencies(exit_code=0)
+>>>>>>> begin external deps
 
 
 def rules():
