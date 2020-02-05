@@ -170,11 +170,10 @@ class ExportDepAsJar(ConsoleTask):
     )
     return dependencies_to_include
 
-  def _extract_compiler_args_from_zinc_args(self, args):
-    scalac_option_prefix = '-S'
-    return [option[len(scalac_option_prefix):] for option in args if option.startswith(scalac_option_prefix)]
+  def _extract_arguments_with_prefix_from_zinc_args(self, args, prefix):
+    return [option[len(prefix):] for option in args if option.startswith(prefix)]
 
-  def _process_target(self, current_target, modulizable_target_set, resource_target_map, runtime_classpath, compiler_options_and_plugins):
+  def _process_target(self, current_target, modulizable_target_set, resource_target_map, runtime_classpath, zinc_args_for_target):
     """
     :type current_target:pants.build_graph.target.Target
     """
@@ -190,7 +189,9 @@ class ExportDepAsJar(ConsoleTask):
       'is_target_root': current_target in modulizable_target_set,
       'transitive': current_target.transitive,
       'scope': str(current_target.scope),
-      'compiler_options': self._extract_compiler_args_from_zinc_args(compiler_options_and_plugins.get(current_target))
+      'scalac_args': self._extract_arguments_with_prefix_from_zinc_args(zinc_args_for_target, '-S'),
+      'javac_args': self._extract_arguments_with_prefix_from_zinc_args(zinc_args_for_target, '-C'),
+      'extra_jvm_options': current_target.payload.get_field_value('extra_jvm_options', [])
     }
 
     if not current_target.is_synthetic:
@@ -337,7 +338,7 @@ class ExportDepAsJar(ConsoleTask):
         library_entry['sources'] = jarred_sources.name
     return library_entry
 
-  def generate_targets_map(self, targets, runtime_classpath, compiler_options_and_plugins):
+  def generate_targets_map(self, targets, runtime_classpath, zinc_args_for_all_targets):
     """Generates a dictionary containing all pertinent information about the target graph.
 
     The return dictionary is suitable for serialization by json.dumps.
@@ -365,7 +366,15 @@ class ExportDepAsJar(ConsoleTask):
       libraries_map[t.id] = self._make_libraries_entry(t, resource_target_map, runtime_classpath)
 
     for target in modulizable_targets:
-      info = self._process_target(target, modulizable_targets, resource_target_map, runtime_classpath, compiler_options_and_plugins)
+      zinc_args_for_target = zinc_args_for_all_targets.get(target)
+      if zinc_args_for_target is None:
+        if not isinstance(target, JvmTarget):
+          # non-JvmTarget targets (JvmApp, PythonLibrary, Page...) are not compiled with the jvm.
+          # Therefore, they don't need compiler args.
+          zinc_args_for_target = []
+        else:
+          raise TaskError(f"There was an error exporting target {target} - There were no zinc arguments registered for it")
+      info = self._process_target(target, modulizable_targets, resource_target_map, runtime_classpath, zinc_args_for_target)
       targets_map[target.address.spec] = info
 
     graph_info = self.initialize_graph_info()
@@ -376,14 +385,14 @@ class ExportDepAsJar(ConsoleTask):
 
   def console_output(self, targets):
 
-    compiler_options_and_plugins = self.context.products.get_data('zinc_args')
-    if compiler_options_and_plugins is None:
+    zinc_args_for_all_targets = self.context.products.get_data('zinc_args')
+    if zinc_args_for_all_targets is None:
       raise TaskError("There was an error compiling the targets - There there are no zing argument entries")
 
     runtime_classpath = self.context.products.get_data('export_dep_as_jar_classpath')
     if runtime_classpath is None:
       raise TaskError("There was an error compiling the targets - There is no export_dep_as_jar classpath")
-    graph_info = self.generate_targets_map(targets, runtime_classpath=runtime_classpath, compiler_options_and_plugins=compiler_options_and_plugins)
+    graph_info = self.generate_targets_map(targets, runtime_classpath=runtime_classpath, zinc_args_for_all_targets=zinc_args_for_all_targets)
 
     if self.get_options().formatted:
       return json.dumps(graph_info, indent=4, separators=(',', ': ')).splitlines()
