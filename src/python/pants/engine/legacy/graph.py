@@ -46,7 +46,7 @@ from pants.engine.objects import Collection
 from pants.engine.parser import HydratedStruct
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
-from pants.option.global_options import GlobMatchErrorBehavior
+from pants.option.global_options import GlobMatchErrorBehavior, OwnersNotFoundBehavior, GlobalOptions
 from pants.source.filespec import any_matches_filespec
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper, Filespec
 
@@ -719,7 +719,7 @@ async def sources_snapshots_from_filesystem_specs(
 
 @rule
 async def provenanced_addresses_from_filesystem_specs(
-  filesystem_specs: FilesystemSpecs,
+  filesystem_specs: FilesystemSpecs, global_options: GlobalOptions,
 ) -> ProvenancedBuildFileAddresses:
   """Find the owner(s) for each FilesystemSpec while preserving the original FilesystemSpec those
   owners come from (i.e., preserving the "provenance").
@@ -735,13 +735,20 @@ async def provenanced_addresses_from_filesystem_specs(
   )
   result: List[ProvenancedBuildFileAddress] = []
   for spec, owners in zip(filesystem_specs.includes, owners_per_include):
-    if isinstance(spec, FilesystemLiteralSpec) and not owners.addresses:
+    if (
+      global_options.owners_not_found_behavior != OwnersNotFoundBehavior.ignore
+      and isinstance(spec, FilesystemLiteralSpec) and not owners.addresses
+    ):
       file_path = PurePath(spec.to_spec_string())
-      raise ResolveError(
+      msg = (
         f"No owning targets could be found for the file `{file_path}`.\n\nPlease check "
         f"that there is a BUILD file in `{file_path.parent}` with a target whose `sources` field "
         f"includes `{file_path}`. See https://www.pantsbuild.org/build_files.html."
       )
+      if global_options.owners_not_found_behavior == OwnersNotFoundBehavior.warn:
+        logger.warning(msg)
+      else:
+        raise ResolveError(msg)
     result.extend(
       ProvenancedBuildFileAddress(build_file_address=bfa, provenance=spec)
       for bfa in owners.addresses

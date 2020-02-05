@@ -51,6 +51,13 @@ class FileNotFoundBehavior(Enum):
     return GlobMatchErrorBehavior(self.value)
 
 
+class OwnersNotFoundBehavior(Enum):
+  """What to do when a file argument cannot be mapped to an owning target."""
+  ignore = "ignore"
+  warn = "warn"
+  error = "error"
+
+
 class BuildFileImportsBehavior(Enum):
   allow = "allow"
   warn = "warn"
@@ -308,6 +315,12 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                   '(e.g. BUILD file scanning, glob matching, etc). '
                   'Patterns use the gitignore syntax (https://git-scm.com/docs/gitignore). '
                   'The `--pants-distdir` and `--pants-workdir` locations are inherently ignored.')
+    register(
+      "--owners-not-found-behavior", advanced=True,
+      type=OwnersNotFoundBehavior, default=OwnersNotFoundBehavior.error,
+      help="What to do when file arguments do not have any owning target. This happens when there "
+           "are no targets with the file argument included in their `sources` field."
+    )
     register("--files-not-found-behavior", advanced=True,
              type=FileNotFoundBehavior, default=FileNotFoundBehavior.warn,
              help="What to do when files and globs specified in BUILD files, such as in the "
