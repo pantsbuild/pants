@@ -3,10 +3,10 @@
 
 import os
 
-from pants.backend.python.python_requirement import PythonRequirement
 from pants.base.build_environment import pants_version
 from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.address import Address
+from pants.python.python_requirement import PythonRequirement
 from pants.util.meta import classproperty
 
 

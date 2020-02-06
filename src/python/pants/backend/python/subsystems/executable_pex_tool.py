@@ -13,7 +13,7 @@ from pants.util.dirutil import is_executable, safe_concurrent_creation
 
 
 if TYPE_CHECKING:
-  from pants.backend.python.python_requirement import PythonRequirement  # noqa
+  from pants.python.python_requirement import PythonRequirement  # noqa
 
 
 class ExecutablePexTool(Subsystem):

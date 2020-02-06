@@ -1,11 +1,11 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.python.python_requirement import PythonRequirement
 from pants.base.payload import Payload
 from pants.base.payload_field import PythonRequirementsField
 from pants.base.validation import assert_list
 from pants.build_graph.target import Target
+from pants.python.python_requirement import PythonRequirement
 
 
 class PythonRequirementLibrary(Target):

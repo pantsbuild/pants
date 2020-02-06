@@ -148,8 +148,8 @@ python_tests(
   sources = ['test_payload_field.py'],
   dependencies = [
     'src/python/pants/java/jar',
-    'src/python/pants/backend/python:python_requirement',
     'src/python/pants/base:payload_field',
+    'src/python/pants/python',
     'src/python/pants/testutil:test_base',
   ],
   tags = {"partially_type_checked"},

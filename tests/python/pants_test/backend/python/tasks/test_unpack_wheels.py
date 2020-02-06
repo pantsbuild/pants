@@ -4,7 +4,7 @@
 import functools
 import re
 
-from pants.backend.python.python_requirement import PythonRequirement
+from pants.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.unpacked_whls import UnpackedWheels
 from pants.backend.python.tasks.unpack_wheels import UnpackWheels, UnpackWheelsFingerprintStrategy

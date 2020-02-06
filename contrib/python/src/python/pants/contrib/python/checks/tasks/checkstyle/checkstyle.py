@@ -6,7 +6,7 @@ import sys
 
 from packaging import version
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
-from pants.backend.python.python_requirement import PythonRequirement
+from pants.python.python_requirement import PythonRequirement
 from pants.python.python_setup import PythonSetup
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget

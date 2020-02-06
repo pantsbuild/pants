@@ -3,7 +3,7 @@
 
 from hashlib import sha1
 
-from pants.backend.python.python_requirement import PythonRequirement
+from pants.python.python_requirement import PythonRequirement
 from pants.base.payload_field import (
   ExcludesField,
   FingerprintedField,

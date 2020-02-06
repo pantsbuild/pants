@@ -7,7 +7,6 @@ python_library(
     'contrib/python/src/python/pants/contrib/python/checks/checker',
     'src/python/pants/backend/python/targets',
     'src/python/pants/backend/python/tasks',
-    'src/python/pants/backend/python:python_requirement',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:hash_utils',

@@ -20,8 +20,8 @@ python_tests(
   sources = ['test_build_local_python_distributions.py'],
   dependencies = [
     '3rdparty/python:pex',
-    'src/python/pants/backend/python:python_requirement',
     'src/python/pants/backend/python/targets',
+    'src/python/pants/python',
     'tests/python/pants_test/backend/python/tasks/util',
   ],
   tags = {"partially_type_checked"},
@@ -221,7 +221,6 @@ python_tests(
   dependencies = [
     '3rdparty/python:pex',
     'src/python/pants/backend/python:interpreter_cache',
-    'src/python/pants/backend/python:python_requirement',
     'src/python/pants/backend/python/targets',
     'src/python/pants/backend/python/tasks',
     'src/python/pants/base:build_environment',
@@ -290,9 +289,9 @@ python_tests(
   name = 'unpack_wheels',
   sources = ['test_unpack_wheels.py'],
   dependencies = [
-    'src/python/pants/backend/python:python_requirement',
     'src/python/pants/backend/python/targets',
     'src/python/pants/backend/python/tasks',
+    'src/python/pants/python',
     'src/python/pants/task',
     'src/python/pants/util:collections',
     'src/python/pants/testutil:task_test_base',

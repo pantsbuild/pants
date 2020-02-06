@@ -6,7 +6,7 @@ from collections import OrderedDict
 
 import pex.resolver
 
-from pants.backend.python.python_requirement import PythonRequirement
+from pants.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary

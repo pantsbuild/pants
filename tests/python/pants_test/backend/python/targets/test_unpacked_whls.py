@@ -3,7 +3,7 @@
 
 from textwrap import dedent
 
-from pants.backend.python.python_requirement import PythonRequirement
+from pants.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.import_wheels_mixin import ImportWheelsMixin
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.unpacked_whls import UnpackedWheels

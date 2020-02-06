@@ -1,7 +1,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.python.python_requirement import PythonRequirement
+from pants.python.python_requirement import PythonRequirement
 from pants.backend.python.register import build_file_aliases
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.base.build_environment import pants_version
