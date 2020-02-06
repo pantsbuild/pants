@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Tuple
 
 from pants.engine.platform import Platform
+from pants.util.enums import match
 from pants.util.memo import memoized_classproperty
 from pants.util.strutil import create_path_env_var
 
@@ -161,8 +162,6 @@ class _Executable(_ExtensibleAlgebraic):
     :rtype: list of str
     """
 
-  _platform = Platform.current
-
   @property
   def invocation_environment_dict(self):
     """A dict to use as this _Executable's execution environment.
@@ -173,9 +172,14 @@ class _Executable(_ExtensibleAlgebraic):
 
     :rtype: dict of string -> string
     """
+    lib_path_env_var: str = match(Platform.current, {
+      Platform.darwin: "DYLD_LIBRARY_PATH",
+      Platform.linux: "LD_LIBRARY_PATH",
+    })
+
     return {
       'PATH': create_path_env_var(self.path_entries),
-      self._platform.runtime_lib_path_env_var: create_path_env_var(self.runtime_library_dirs),
+      lib_path_env_var: create_path_env_var(self.runtime_library_dirs),
     }
 
 
