@@ -6,7 +6,7 @@ import os.path
 from abc import ABCMeta, abstractmethod
 from collections.abc import MutableSequence, MutableSet
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable, List, Optional, Sequence, Tuple, Type, Union
+from typing import Any, Callable, Iterable, List, Optional, Sequence, Tuple, Type, Union, cast
 
 from pants.build_graph.address import BuildFileAddress
 from pants.build_graph.target import Target
@@ -29,6 +29,10 @@ class TargetAdaptor(StructWithDeps):
 
   Extends StructWithDeps to add a `dependencies` field marked Addressable.
   """
+
+  @property
+  def address(self) -> BuildFileAddress:
+    return cast(BuildFileAddress, super().address)
 
   def get_sources(self) -> Optional["GlobsWithConjunction"]:
     """Returns target's non-deferred sources if exists or the default sources if defined.
