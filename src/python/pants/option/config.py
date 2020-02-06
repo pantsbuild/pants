@@ -265,10 +265,10 @@ class _TomlValues(_ConfigValues):
     `java` belonging to the section `cache` could actually be the section `cache.java`, rather
     than the option `--cache-java`.
 
-    We must also handle the special syntax of `my_list_option.add` and `my_list_option.filter`.
+    We must also handle the special syntax of `my_list_option.add` and `my_list_option.remove`.
     """
     return (
-      not isinstance(option_value, dict) or "add" in option_value or "filter" in option_value
+      not isinstance(option_value, dict) or "add" in option_value or "remove" in option_value
     )
 
   @staticmethod
@@ -355,8 +355,8 @@ class _TomlValues(_ConfigValues):
         if not isinstance(section_values, dict):
           continue
         # We filter out "DEFAULT" and also check for the special `my_list_option.add` and
-        # `my_list_option.filter` syntax.
-        if section == "DEFAULT" or "add" in section_values or "filter" in section_values:
+        # `my_list_option.remove` syntax.
+        if section == "DEFAULT" or "add" in section_values or "remove" in section_values:
           continue
         section_name = section if not parent_section else f"{parent_section}.{section}"
         if self._section_explicitly_defined(section_values):
