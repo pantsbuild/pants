@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from typing import cast
+from unittest.mock import Mock
 
 from pants.base.build_root import BuildRoot
 from pants.build_graph.address import Address, BuildFileAddress
@@ -11,6 +12,12 @@ from pants.rules.core.binary import CreatedBinary
 from pants.rules.core.run import Run, run
 from pants.testutil.engine.util import MockConsole, MockGet, run_rule
 from pants.testutil.goal_rule_test_base import GoalRuleTestBase
+
+
+# TODO: Create a utility to mock GoalSubsystems.
+class MockOptions:
+  def __init__(self, **values):
+    self.values = Mock(**values)
 
 
 class RunTest(GoalRuleTestBase):
@@ -40,7 +47,7 @@ class RunTest(GoalRuleTestBase):
     BuildRoot().path = self.build_root
     res = run_rule(
       run,
-      rule_args=[console, workspace, interactive_runner, BuildRoot(), bfa],
+      rule_args=[console, workspace, interactive_runner, BuildRoot(), bfa, MockOptions(args=[])],
       mock_gets=[
         MockGet(
           product_type=CreatedBinary,
@@ -60,8 +67,8 @@ class RunTest(GoalRuleTestBase):
       address_spec='some/addr',
     )
     self.assertEqual(res.exit_code, 0)
-    self.assertEquals(console.stdout.getvalue(), "Running target: some/addr:addr\nsome/addr:addr ran successfully.\n")
-    self.assertEquals(console.stderr.getvalue(), "")
+    self.assertEqual(console.stdout.getvalue(), "Running target: some/addr:addr\nsome/addr:addr ran successfully.\n")
+    self.assertEqual(console.stderr.getvalue(), "")
 
   def test_materialize_input_files(self) -> None:
     program_text = b'#!/usr/bin/python\nprint("hello")'
@@ -94,5 +101,5 @@ class RunTest(GoalRuleTestBase):
       address_spec='some/addr'
     )
     self.assertEqual(res.exit_code, 1)
-    self.assertEquals(console.stdout.getvalue(), "Running target: some/addr:addr\n")
-    self.assertEquals(console.stderr.getvalue(), "some/addr:addr failed with code 1!\n")
+    self.assertEqual(console.stdout.getvalue(), "Running target: some/addr:addr\n")
+    self.assertEqual(console.stderr.getvalue(), "some/addr:addr failed with code 1!\n")

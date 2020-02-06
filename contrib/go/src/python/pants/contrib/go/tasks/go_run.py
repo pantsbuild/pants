@@ -26,6 +26,8 @@ class GoRun(GoTask):
     if self.is_binary(target):
       binary_path = self.context.products.get_data('exec_binary')[target]
       # TODO(cgibb): Wrap with workunit and stdout/stderr plumbing.
-      res = Xargs.subprocess([binary_path]).execute(self.get_passthru_args())
+      res = Xargs.subprocess(
+        [binary_path]
+      ).execute([*self.get_passthru_args(), *self.get_options().args])
       if res != 0:
         raise TaskError(f'{os.path.basename(binary_path)} exited non-zero ({res})')
