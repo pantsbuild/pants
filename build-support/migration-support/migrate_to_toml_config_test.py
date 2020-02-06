@@ -135,7 +135,7 @@ def test_list_options() -> None:
   """We can safely update one-line lists.
 
   The list members will already be correctly quoted for us. All that we need to update is the
-  option->key symbol and simple `+` appends and `-` filters.
+  option->key symbol and simple `+` adds and `-` removes.
   """
   assert_rewrite(
     original=dedent(
@@ -162,8 +162,8 @@ def test_list_options() -> None:
       l3 = ["a", "b"]
       l4 = ['a', 'b']
       l5 = [ "a", 'b' ]
-      l6.append = ["a", "b"]
-      l7.filter = ["x", "y"]
+      l6.add = ["a", "b"]
+      l7.remove = ["x", "y"]
       l8: +["a", "b"],-["x", "y"]
       l9: [[0], [1]]
       l10: [0, 1]  # comment

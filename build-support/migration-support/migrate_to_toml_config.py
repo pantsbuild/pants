@@ -100,9 +100,9 @@ def generate_new_config(config: Path) -> List[str]:
     if parsed_list_line:
       option, value = parsed_list_line.groups()
       if value.startswith("+"):
-        updated_line = f"{option}.append = {value[1:]}"
+        updated_line = f"{option}.add = {value[1:]}"
       elif value.startswith("-"):
-        updated_line = f"{option}.filter = {value[1:]}"
+        updated_line = f"{option}.remove = {value[1:]}"
       else:
         updated_line = f"{option} = {value}"
       updated_text_lines[i] = updated_line
