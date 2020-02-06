@@ -18,13 +18,13 @@ class Addresses(Collection[Address]):
 
 
 @dataclass(frozen=True)
-class ProvenancedAddress:
+class AddressWithOrigin:
   """A BuildFileAddress along with the cmd-line spec it was generated from."""
   address: BuildFileAddress
-  provenance: Spec
+  origin: Spec
 
 
-class ProvenancedAddresses(Collection[ProvenancedAddress]):
+class AddressesWithOrigins(Collection[AddressWithOrigin]):
   pass
 
 

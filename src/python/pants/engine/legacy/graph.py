@@ -27,7 +27,7 @@ from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.app_base import AppBase, Bundle
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.remote_sources import RemoteSources
-from pants.engine.addressable import BuildFileAddresses, ProvenancedAddress, ProvenancedAddresses
+from pants.engine.addressable import AddressesWithOrigins, AddressWithOrigin, BuildFileAddresses
 from pants.engine.fs import EMPTY_SNAPSHOT, PathGlobs, Snapshot
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.structs import (
@@ -718,11 +718,11 @@ async def sources_snapshots_from_filesystem_specs(
 
 
 @rule
-async def provenanced_addresses_from_filesystem_specs(
+async def addresses_with_origins_from_filesystem_specs(
   filesystem_specs: FilesystemSpecs, global_options: GlobalOptions,
-) -> ProvenancedAddresses:
+) -> AddressesWithOrigins:
   """Find the owner(s) for each FilesystemSpec while preserving the original FilesystemSpec those
-  owners come from (i.e., preserving the "provenance").
+  owners come from.
   """
   pathglobs_per_include = (
     filesystem_specs.path_globs_for_spec(spec) for spec in filesystem_specs.includes
@@ -733,7 +733,7 @@ async def provenanced_addresses_from_filesystem_specs(
   owners_per_include = await MultiGet(
     Get[Owners](OwnersRequest(sources=snapshot.files)) for snapshot in snapshot_per_include
   )
-  result: List[ProvenancedAddress] = []
+  result: List[AddressWithOrigin] = []
   for spec, owners in zip(filesystem_specs.includes, owners_per_include):
     if (
       global_options.owners_not_found_behavior != OwnersNotFoundBehavior.ignore
@@ -750,10 +750,10 @@ async def provenanced_addresses_from_filesystem_specs(
       else:
         raise ResolveError(msg)
     result.extend(
-      ProvenancedAddress(address=bfa, provenance=spec)
+      AddressWithOrigin(address=bfa, origin=spec)
       for bfa in owners.addresses
     )
-  return ProvenancedAddresses(result)
+  return AddressesWithOrigins(result)
 
 
 def create_legacy_graph_tasks():
@@ -768,7 +768,7 @@ def create_legacy_graph_tasks():
     hydrate_bundles,
     sort_targets,
     hydrate_sources_snapshot,
-    provenanced_addresses_from_filesystem_specs,
+    addresses_with_origins_from_filesystem_specs,
     sources_snapshots_from_build_file_addresses,
     sources_snapshots_from_filesystem_specs,
     RootRule(FilesystemSpecs),

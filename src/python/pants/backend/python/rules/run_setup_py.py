@@ -26,7 +26,7 @@ from pants.backend.python.subsystems.subprocess_environment import SubprocessEnc
 from pants.base.specs import AddressSpecs, AscendantAddresses
 from pants.build_graph.address import Address
 from pants.engine.addressable import BuildFileAddresses
-from pants.engine.build_files import AddressProvenanceMap
+from pants.engine.build_files import AddressOriginMap
 from pants.engine.console import Console
 from pants.engine.fs import (
   Digest,
@@ -234,7 +234,7 @@ def validate_args(args: Tuple[str, ...]):
 
 @goal_rule
 async def run_setup_pys(targets: HydratedTargets, options: SetupPyOptions, console: Console,
-                        provenance_map: AddressProvenanceMap, python_setup: PythonSetup,
+                        address_origin_map: AddressOriginMap, python_setup: PythonSetup,
                         distdir: DistDir, workspace: Workspace) -> SetupPy:
   """Run setup.py commands on all exported targets addressed."""
   args = tuple(options.values.args)
@@ -249,7 +249,7 @@ async def run_setup_pys(targets: HydratedTargets, options: SetupPyOptions, conso
   for hydrated_target in targets:
     if _is_exported(hydrated_target):
       exported_targets.append(ExportedTarget(hydrated_target))
-    elif provenance_map.is_single_address(hydrated_target.address):
+    elif address_origin_map.is_single_address(hydrated_target.address):
       explicit_nonexported_targets.append(hydrated_target)
   if explicit_nonexported_targets:
     raise TargetNotExported(
