@@ -6,7 +6,6 @@ import logging
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.jvm_task import JvmTask
-from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.fs.fs import expand_path
@@ -60,19 +59,6 @@ class JvmRun(JvmTask):
     # execution engine.  I do not want task code to learn the lock location.
     # http://jira.local.twitter.com/browse/AWESOME-1317
     target = self.require_single_root_target()
-
-    deprecated_conditional(
-      lambda: self.get_passthru_args(),
-      removal_version='1.28.0.dev0',
-      entity_description='Using the old style of passthrough args for `run.jvm`',
-      hint_message="You passed arguments to the JVM program through either the "
-                   "`--run-jvm-passthrough-args` option or the style "
-                   "`./pants run.jvm -- arg1 --arg2`. Instead, "
-                   "pass any arguments to the JVM program like this: "
-                   "`./pants run --args='arg1 --arg2' src/java/path/to:target`.\n\n"
-                   "This change is meant to reduce confusion in how option scopes work with "
-                   "passthrough args and for parity with the V2 implementation of the `run` goal.",
-    )
 
     working_dir = None
     cwd_opt = self.get_options().cwd

@@ -5,7 +5,6 @@ import signal
 
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.tasks.python_execution_task_base import PythonExecutionTaskBase
-from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.util.osutil import safe_kill
@@ -20,20 +19,6 @@ class PythonRun(PythonExecutionTaskBase):
 
   def execute(self):
     binary = self.require_single_root_target()
-
-    deprecated_conditional(
-      lambda: self.get_passthru_args(),
-      removal_version='1.28.0.dev0',
-      entity_description='Using the old style of passthrough args for `run.py`',
-      hint_message="You passed arguments to the Python program through either the "
-                   "`--run-py-passthrough-args` option or the style "
-                   "`./pants run.py -- arg1 --arg2`. Instead, "
-                   "pass any arguments to the Python program like this: "
-                   "`./pants run --args='arg1 --arg2' src/python/path/to:target`.\n\n"
-                   "This change is meant to reduce confusion in how option scopes work with "
-                   "passthrough args and for parity with the V2 implementation of the `run` goal.",
-    )
-
     if isinstance(binary, PythonBinary):
       # We can't throw if binary isn't a PythonBinary, because perhaps we were called on a
       # jvm_binary, in which case we have to no-op and let jvm_run do its thing.
