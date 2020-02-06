@@ -85,7 +85,6 @@ impl Drop for CancelRemoteExecutionToken {
               Ok(_) => debug!("Canceled operation {} successfully", operation_name),
               Err(err) => debug!("Failed to cancel operation {}, err {}", operation_name, err),
             }
-            ()
           });
         }
         Err(err) => debug!(

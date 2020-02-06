@@ -29,7 +29,6 @@ serde_derive = "1.0"
 sharded_lmdb = { path = "../../sharded_lmdb" }
 task_executor = { path = "../../task_executor" }
 tempfile = "3"
-tokio-threadpool = "0.1.12"
 uuid = { version = "0.7.1", features = ["v4"] }
 workunit_store = {path = "../../workunit_store" }
 
@@ -37,5 +36,5 @@ workunit_store = {path = "../../workunit_store" }
 maplit = "*"
 mock = { path = "../../testutil/mock" }
 testutil = { path = "../../testutil" }
-tokio = { version = "0.2", features = ["rt-core"] }
+tokio = { version = "0.2", features = ["rt-core", "macros"] }
 walkdir = "2"

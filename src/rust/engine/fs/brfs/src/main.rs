@@ -38,6 +38,7 @@ use serverset;
 
 use time;
 
+use futures::compat::Future01CompatExt;
 use hashing::{Digest, Fingerprint};
 use log::{debug, error, warn};
 use parking_lot::Mutex;
@@ -47,6 +48,7 @@ use std::ffi::{CString, OsStr, OsString};
 use std::path::Path;
 use std::sync::Arc;
 use store::Store;
+use tokio::runtime::Handle;
 use workunit_store::WorkUnitStore;
 
 const TTL: time::Timespec = time::Timespec { sec: 0, nsec: 0 };
@@ -177,11 +179,12 @@ impl BuildResultFS {
           non_executable_inode
         }))
       }
-      Vacant(entry) => match self.runtime.block_on(self.store.load_file_bytes_with(
-        digest,
-        |_| (),
-        WorkUnitStore::new(),
-      )) {
+      Vacant(entry) => match self.runtime.block_on(
+        self
+          .store
+          .load_file_bytes_with(digest, |_| (), WorkUnitStore::new())
+          .compat(),
+      ) {
         Ok(Some(((), _metadata))) => {
           let executable_inode = self.next_inode;
           self.next_inode += 1;
@@ -219,10 +222,12 @@ impl BuildResultFS {
   pub fn inode_for_directory(&mut self, digest: Digest) -> Result<Option<Inode>, String> {
     match self.directory_inode_cache.entry(digest) {
       Occupied(entry) => Ok(Some(*entry.get())),
-      Vacant(entry) => match self
-        .runtime
-        .block_on(self.store.load_directory(digest, WorkUnitStore::new()))
-      {
+      Vacant(entry) => match self.runtime.block_on(
+        self
+          .store
+          .load_directory(digest, WorkUnitStore::new())
+          .compat(),
+      ) {
         Ok(Some(_)) => {
           // TODO: Kick off some background futures to pre-load the contents of this Directory into
           // an in-memory cache. Keep a background CPU pool driving those Futures.
@@ -311,9 +316,12 @@ impl BuildResultFS {
           entry_type: EntryType::Directory,
           ..
         }) => {
-          let maybe_directory = self
-            .runtime
-            .block_on(self.store.load_directory(digest, WorkUnitStore::new()));
+          let maybe_directory = self.runtime.block_on(
+            self
+              .store
+              .load_directory(digest, WorkUnitStore::new())
+              .compat(),
+          );
 
           match maybe_directory {
             Ok(Some((directory, _metadata))) => {
@@ -446,7 +454,8 @@ impl fuse::Filesystem for BuildResultFS {
               .block_on(
                 self
                   .store
-                  .load_directory(parent_digest, WorkUnitStore::new()),
+                  .load_directory(parent_digest, WorkUnitStore::new())
+                  .compat(),
               )
               .map_err(|err| {
                 error!("Error reading directory {:?}: {}", parent_digest, err);
@@ -536,16 +545,21 @@ impl fuse::Filesystem for BuildResultFS {
         // requests, rather than reading from the store directly here.
         let result: Result<(), ()> = self
           .runtime
-          .block_on(self.store.load_file_bytes_with(
-            digest,
-            move |bytes| {
-              let begin = std::cmp::min(offset as usize, bytes.len());
-              let end = std::cmp::min(offset as usize + size as usize, bytes.len());
-              let mut reply = reply.lock();
-              reply.take().unwrap().data(&bytes.slice(begin, end));
-            },
-            WorkUnitStore::new(),
-          ))
+          .block_on(
+            self
+              .store
+              .load_file_bytes_with(
+                digest,
+                move |bytes| {
+                  let begin = std::cmp::min(offset as usize, bytes.len());
+                  let end = std::cmp::min(offset as usize + size as usize, bytes.len());
+                  let mut reply = reply.lock();
+                  reply.take().unwrap().data(&bytes.slice(begin, end));
+                },
+                WorkUnitStore::new(),
+              )
+              .compat(),
+          )
           .map(|v| {
             if v.is_none() {
               let maybe_reply = reply2.lock().take();
@@ -630,7 +644,8 @@ pub fn mount<'a, P: AsRef<Path>>(
   fs
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
   let default_store_path = dirs::home_dir()
     .expect("Couldn't find homedir")
     .join(".cache")
@@ -697,7 +712,7 @@ fn main() {
   } else {
     None
   };
-  let runtime = task_executor::Executor::new();
+  let runtime = task_executor::Executor::new(Handle::current());
 
   let store = match args.value_of("server-address") {
     Some(address) => Store::with_remote(

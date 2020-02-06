@@ -299,6 +299,6 @@ impl CapturedWorkdir for CommandRunner {
           .map_ok(ChildOutput::Exit)
       });
 
-    Ok(futures::stream::select(stdio_read.map(|r| Ok(r)), nails_command.into_stream()).boxed())
+    Ok(futures::stream::select(stdio_read.map(Ok), nails_command.into_stream()).boxed())
   }
 }

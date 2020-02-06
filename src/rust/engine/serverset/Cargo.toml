@@ -15,4 +15,4 @@ tokio = { version = "0.2", features = ["time"] }
 [dev-dependencies]
 maplit = "1"
 testutil = { path = "../testutil" }
-tokio = { version = "0.2", features = ["rt-core"] }
+tokio = { version = "0.2", features = ["rt-core", "macros"] }

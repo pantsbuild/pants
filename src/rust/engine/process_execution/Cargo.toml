@@ -47,3 +47,4 @@ parking_lot = "0.6"
 spectral = "0.6.0"
 tempfile = "3"
 testutil = { path = "../testutil" }
+tokio = { version = "0.2", features = ["macros"] }

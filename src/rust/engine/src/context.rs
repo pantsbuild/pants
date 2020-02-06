@@ -316,7 +316,6 @@ impl NodeContext for Context {
   {
     self.core.executor.spawn_and_ignore(async move {
       let _ = future.compat().await;
-      ()
     });
   }
 }

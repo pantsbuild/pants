@@ -27,7 +27,6 @@
 
 use std::future::Future;
 
-use futures::future;
 use futures::future::{BoxFuture, FutureExt};
 
 use tokio::runtime::{Handle, Runtime};
@@ -149,13 +148,12 @@ impl Executor {
   fn future_with_correct_context<F: Future>(future: F) -> impl Future<Output = F::Output> {
     let logging_destination = logging::get_destination();
     let workunit_parent_id = workunit_store::get_parent_id();
-    future::lazy(move |_| {
+    async move {
       logging::set_destination(logging_destination);
       if let Some(parent_id) = workunit_parent_id {
         workunit_store::set_parent_id(parent_id);
       }
-      future
-    })
-    .then(|f| f)
+      future.await
+    }
   }
 }

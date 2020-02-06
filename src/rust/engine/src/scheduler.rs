@@ -349,7 +349,6 @@ impl Scheduler {
       } else {
         Scheduler::execute_helper(context, sender, roots, count - 1);
       }
-      ()
     });
   }
 
