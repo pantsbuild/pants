@@ -8,8 +8,8 @@ from pants.backend.python.rules.setup_py_util import (
   distutils_repr,
   is_python2,
 )
-from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.option.ranked_value import RankedValue
+from pants.python.python_setup import PythonSetup
 from pants.subsystem.subsystem import Subsystem
 from pants.testutil.subsystem.util import init_subsystem
 

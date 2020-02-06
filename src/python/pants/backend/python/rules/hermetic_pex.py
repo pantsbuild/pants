@@ -3,10 +3,10 @@
 
 from typing import Any, Dict, Iterable, Optional
 
-from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.fs import Digest
 from pants.engine.isolated_process import ExecuteProcessRequest
+from pants.python.python_setup import PythonSetup
 from pants.util.strutil import create_path_env_var
 
 

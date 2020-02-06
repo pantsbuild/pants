@@ -15,11 +15,11 @@ from pants.backend.python.rules.pex import (
 )
 from pants.backend.python.rules.pex import rules as pex_rules
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
-from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.engine.fs import Digest, DirectoryToMaterialize, FileContent, InputFilesContent
 from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
+from pants.python.python_setup import PythonSetup
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.subsystem.util import init_subsystem
 from pants.testutil.test_base import TestBase

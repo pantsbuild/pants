@@ -6,12 +6,12 @@ from typing import Any, Iterable, Optional
 
 from pants.backend.python.rules.hermetic_pex import HermeticPex
 from pants.backend.python.subsystems.python_native_code import PexBuildEnvironment
-from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.fs import Digest, SingleFileExecutable, Snapshot, UrlToFetch
 from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.engine.rules import rule
 from pants.engine.selectors import Get
+from pants.python.python_setup import PythonSetup
 
 
 @dataclass(frozen=True)

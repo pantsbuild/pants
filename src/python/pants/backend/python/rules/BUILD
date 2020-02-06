@@ -34,6 +34,7 @@ python_tests(
     'src/python/pants/engine:selectors',
     'src/python/pants/engine/legacy:graph',
     'src/python/pants/engine/legacy:structs',
+    'src/python/pants/python',
     'src/python/pants/rules/core',
     'src/python/pants/testutil:interpreter_selection_utils',
     'src/python/pants/testutil:test_base',

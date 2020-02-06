@@ -9,10 +9,10 @@ from textwrap import dedent
 
 from pex.interpreter import PythonInterpreter
 
-from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.exceptions import TaskError
 from pants.process.lock import OwnerPrintingInterProcessFileLock
+from pants.python.python_setup import PythonSetup
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import safe_concurrent_creation, safe_mkdir
 from pants.util.memo import memoized_property
