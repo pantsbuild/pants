@@ -372,3 +372,28 @@ class ModernizeSourcesTest(TestBase):
       ),
       replacements_and_line_numbers=[("['foo.java']", 2), ("['bar.java']", 2)]
     )
+
+  def test_warns_on_variables(self) -> None:
+    result, build, warnings = self.capture_warnings(
+      build_file_content=dedent(
+        """\
+        files(
+          sources=globs(VARIABLE, VAR2),
+        )
+        """
+      )
+    )
+    assert result is None
+    assert f"Could not parse the globs in {build} at line 2." in warnings[0]
+
+    result, build, warnings = self.capture_warnings(
+      build_file_content=dedent(
+        """\
+        files(
+          sources=globs('foo.py', exclude=[VAR1, [VAR2], glob(VAR3)]),
+        )
+        """
+      )
+    )
+    assert result is None
+    assert f"Could not parse the exclude globs in {build} at line 2." in warnings[0]
