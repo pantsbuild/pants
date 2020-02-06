@@ -15,8 +15,8 @@ from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.engine.addressable import (
   AddressableDescriptor,
   BuildFileAddresses,
-  ProvenancedBuildFileAddress,
-  ProvenancedBuildFileAddresses,
+  ProvenancedAddress,
+  ProvenancedAddresses,
 )
 from pants.engine.fs import Digest, FilesContent, PathGlobs, Snapshot
 from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
@@ -206,8 +206,8 @@ def _hydrate(item_type, spec_path, **kwargs):
 @rule
 async def provenanced_addresses_from_address_families(
   address_mapper: AddressMapper, address_specs: AddressSpecs,
-) -> ProvenancedBuildFileAddresses:
-  """Given an AddressMapper and list of AddressSpecs, return matching ProvenancedBuildFileAddresses.
+) -> ProvenancedAddresses:
+  """Given an AddressMapper and list of AddressSpecs, return matching ProvenancedAddresses.
 
   :raises: :class:`ResolveError` if:
      - there were no matching AddressFamilies, or
@@ -252,15 +252,17 @@ async def provenanced_addresses_from_address_families(
     )
 
   # NB: This may be empty, as the result of filtering by tag and exclude patterns!
-  return ProvenancedBuildFileAddresses(
-    ProvenancedBuildFileAddress(build_file_address=addr, provenance=addr_to_provenance[addr])
+  return ProvenancedAddresses(
+    ProvenancedAddress(address=addr, provenance=addr_to_provenance[addr])
     for addr in matched_addresses
   )
 
 
 @rule
-def remove_provenance(pbfas: ProvenancedBuildFileAddresses) -> BuildFileAddresses:
-  return BuildFileAddresses(pbfa.build_file_address for pbfa in pbfas)
+def remove_provenance(provenanced_addresses: ProvenancedAddresses) -> BuildFileAddresses:
+  return BuildFileAddresses(
+    provenanced_address.address for provenanced_address in provenanced_addresses
+  )
 
 
 @dataclass(frozen=True)
@@ -272,9 +274,12 @@ class AddressProvenanceMap:
 
 
 @rule
-def address_provenance_map(pbfas: ProvenancedBuildFileAddresses) -> AddressProvenanceMap:
+def address_provenance_map(provenanced_addresses: ProvenancedAddresses) -> AddressProvenanceMap:
   return AddressProvenanceMap(
-    bfaddr_to_spec={pbfa.build_file_address: pbfa.provenance for pbfa in pbfas.dependencies}
+    bfaddr_to_spec={
+      provenanced_address.address: provenanced_address.provenance
+      for provenanced_address in provenanced_addresses
+    }
   )
 
 
