@@ -27,7 +27,12 @@ from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.app_base import AppBase, Bundle
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.remote_sources import RemoteSources
-from pants.engine.addressable import AddressesWithOrigins, AddressWithOrigin, BuildFileAddresses
+from pants.engine.addressable import (
+  Addresses,
+  AddressesWithOrigins,
+  AddressWithOrigin,
+  BuildFileAddresses,
+)
 from pants.engine.fs import EMPTY_SNAPSHOT, PathGlobs, Snapshot
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.structs import (
@@ -562,11 +567,9 @@ def topo_sort(targets: Iterable[HydratedTarget]) -> Tuple[HydratedTarget, ...]:
   return tuple(tgt for tgt in res if tgt in input_set)
 
 
-
 @rule
-async def hydrated_targets(build_file_addresses: BuildFileAddresses) -> HydratedTargets:
-  """Requests HydratedTarget instances for BuildFileAddresses."""
-  targets = await MultiGet(Get[HydratedTarget](Address, a) for a in build_file_addresses.addresses)
+async def hydrated_targets(addresses: Addresses) -> HydratedTargets:
+  targets = await MultiGet(Get[HydratedTarget](Address, a) for a in addresses)
   return HydratedTargets(targets)
 
 

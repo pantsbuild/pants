@@ -434,19 +434,17 @@ class EngineInitializer:
 
     @rule
     async def single_build_file_address(
-      build_file_addresses: BuildFileAddresses,
+      addresses: BuildFileAddresses,
     ) -> BuildFileAddress:
-      if len(build_file_addresses.dependencies) == 0:
+      if len(addresses.dependencies) == 0:
         raise ResolveError("No targets were matched")
-      if len(build_file_addresses.dependencies) > 1:
-        targets = [bfa.to_address() for bfa in build_file_addresses]
-        output = '\n '.join(str(target) for target in targets)
-
+      if len(addresses.dependencies) > 1:
+        output = '\n '.join(address.spec for address in addresses)
         raise ResolveError(
           "Expected a single target, but was given multiple targets:\n"
           f"Did you mean one of:\n {output}"
         )
-      return build_file_addresses.dependencies[0]
+      return addresses.dependencies[0]
 
     # Create a Scheduler containing graph and filesystem rules, with no installed goals. The
     # LegacyBuildGraph will explicitly request the products it needs.

@@ -14,6 +14,7 @@ from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.engine.addressable import (
   AddressableDescriptor,
+  Addresses,
   AddressesWithOrigins,
   AddressWithOrigin,
   BuildFileAddresses,
@@ -283,6 +284,12 @@ def address_origin_map(addresses_with_origins: AddressesWithOrigins) -> AddressO
   )
 
 
+# TODO(#6657): Remove this once BFA is removed.
+@rule
+def bfas_to_addresses(build_file_addresses: BuildFileAddresses) -> Addresses:
+  return Addresses(bfa.to_address() for bfa in build_file_addresses)
+
+
 def _address_spec_to_globs(address_mapper: AddressMapper, address_specs: AddressSpecs) -> PathGlobs:
   """Given an AddressSpecs object, return a PathGlobs object for the build files that it matches."""
   patterns = set()
@@ -308,6 +315,7 @@ def create_graph_rules(address_mapper: AddressMapper):
     addresses_with_origins_from_address_families,
     remove_origins,
     address_origin_map,
+    bfas_to_addresses,
     # Root rules representing parameters that might be provided via root subjects.
     RootRule(Address),
     RootRule(BuildFileAddress),

@@ -3,7 +3,7 @@
 
 from typing import Union
 
-from pants.engine.addressable import BuildFileAddresses
+from pants.engine.addressable import Addresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.legacy.graph import HydratedTargets
@@ -33,16 +33,14 @@ class List(Goal):
 
 
 @goal_rule
-async def list_targets(
-  console: Console, list_options: ListOptions, build_file_addresses: BuildFileAddresses,
-) -> List:
+async def list_targets(console: Console, list_options: ListOptions, addresses: Addresses) -> List:
   provides = list_options.values.provides
   provides_columns = list_options.values.provides_columns
   documented = list_options.values.documented
-  collection: Union[HydratedTargets, BuildFileAddresses]
+  collection: Union[HydratedTargets, Addresses]
   if provides or documented:
     # To get provides clauses or documentation, we need hydrated targets.
-    collection = await Get[HydratedTargets](BuildFileAddresses, build_file_addresses)
+    collection = await Get[HydratedTargets](Addresses, addresses)
     if provides:
       extractors = dict(
           address=lambda target: target.address.spec,
@@ -72,7 +70,7 @@ async def list_targets(
       print_fn = print_documented
   else:
     # Otherwise, we can use only addresses.
-    collection = build_file_addresses
+    collection = addresses
     print_fn = lambda address: address.spec
 
   with list_options.line_oriented(console) as print_stdout:
