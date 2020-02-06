@@ -119,11 +119,11 @@ class HelpInfoExtracter:
       values = (str(choice) for choice in kwargs.get('choices', []))
     return ', '.join(values) or None
 
-  def __init__(self, scope):
+  def __init__(self, scope: str) -> None:
     self._scope = scope
     self._scope_prefix = scope.replace('.', '-')
 
-  def get_option_scope_help_info(self, option_registrations_iter):
+  def get_option_scope_help_info(self, option_registrations_iter) -> OptionScopeHelpInfo:
     """Returns an OptionScopeHelpInfo for the options registered with the (args, kwargs) pairs."""
     basic_options = []
     recursive_options = []
@@ -140,10 +140,12 @@ class HelpInfoExtracter:
       else:
         basic_options.append(ohi)
 
-    return OptionScopeHelpInfo(scope=self._scope,
-                               basic=basic_options,
-                               recursive=recursive_options,
-                               advanced=advanced_options)
+    return OptionScopeHelpInfo(
+      scope=self._scope,
+      basic=basic_options,
+      recursive=recursive_options,
+      advanced=advanced_options,
+    )
 
   def get_option_help_info(self, args, kwargs):
     """Returns an OptionHelpInfo for the option registered with the given (args, kwargs)."""

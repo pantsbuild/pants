@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from textwrap import wrap
-from typing import List
+from typing import List, Optional
 
 from colors import cyan, green, magenta, red
 
@@ -32,7 +32,9 @@ class HelpFormatter:
   def _maybe_color(self, color, s):
     return color(s) if self._color else s
 
-  def format_options(self, scope, description, option_registrations_iter):
+  def format_options(
+    self, scope: str, description: Optional[str], option_registrations_iter,
+  ) -> List[str]:
     """Return a help message for the specified options.
 
     :param option_registrations_iter: An iterator over (args, kwargs) pairs, as passed in to
@@ -41,7 +43,7 @@ class HelpFormatter:
     oshi = HelpInfoExtracter(self._scope).get_option_scope_help_info(option_registrations_iter)
     lines = []
 
-    def add_option(ohis, *, category=None):
+    def add_option(ohis, *, category: Optional[str] = None) -> None:
       lines.append('')
       display_scope = scope or 'Global'
       if category:

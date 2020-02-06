@@ -35,7 +35,12 @@ class HelpPrinter:
     union_membership: UnionMembership,
   ) -> None:
     self._options = options
-    self._help_request = help_request or self._options.help_request
+    self._help_request = cast(HelpRequest, help_request or self._options.help_request)
+    if self._help_request is None:
+      raise AssertionError(
+        "HelpPrinter was instantiated without any corresponding `help_request`. This means that "
+        "there would be nothing to print and that there was a mistake from the call site."
+      )
     self._union_membership = union_membership
 
   @property
@@ -133,13 +138,13 @@ class HelpPrinter:
 
       print(self._format_help(ScopeInfo(GLOBAL_SCOPE, ScopeInfo.GLOBAL)))
 
-  def _format_help(self, scope_info):
-    """Return a help message for the options registered on this object.
-
-    Assumes that self._help_request is an instance of OptionsHelp.
-
-    :param scope_info: Scope of the options.
-    """
+  def _format_help(self, scope_info: ScopeInfo) -> str:
+    """Return a help message for the options registered on this object."""
+    if not isinstance(self._help_request, OptionsHelp):
+      raise AssertionError(
+        f"`self._help_request` was expected to have type OptionsHelp but had type "
+        f"{type(self._help_request)}"
+      )
     scope = scope_info.scope
     description = scope_info.description
     help_formatter = HelpFormatter(
