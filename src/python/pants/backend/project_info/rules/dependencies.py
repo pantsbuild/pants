@@ -4,7 +4,7 @@
 from enum import Enum
 from typing import Set
 
-from pants.engine.addressable import BuildFileAddresses
+from pants.engine.addressable import Addresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
@@ -45,25 +45,23 @@ class Dependencies(Goal):
 
 @goal_rule
 async def dependencies(
-  console: Console, build_file_addresses: BuildFileAddresses, options: DependenciesOptions,
+  console: Console, addresses: Addresses, options: DependenciesOptions,
 ) -> Dependencies:
-  addresses: Set[str] = set()
+  address_strings: Set[str] = set()
   if options.values.transitive:
-    transitive_targets = await Get[TransitiveHydratedTargets](
-      BuildFileAddresses, build_file_addresses,
-    )
+    transitive_targets = await Get[TransitiveHydratedTargets](Addresses, addresses)
     transitive_dependencies = transitive_targets.closure - set(transitive_targets.roots)
-    addresses.update(hydrated_target.address.spec for hydrated_target in transitive_dependencies)
+    address_strings.update(hydrated_target.address.spec for hydrated_target in transitive_dependencies)
   else:
-    hydrated_targets = await Get[HydratedTargets](BuildFileAddresses, build_file_addresses)
-    addresses.update(
+    hydrated_targets = await Get[HydratedTargets](Addresses, addresses)
+    address_strings.update(
       dep.spec
       for hydrated_target in hydrated_targets
       for dep in hydrated_target.dependencies
     )
 
   with options.line_oriented(console) as print_stdout:
-    for address in sorted(addresses):
+    for address in sorted(address_strings):
       print_stdout(address)
 
   return Dependencies(exit_code=0)

@@ -71,7 +71,7 @@ async def run(
         console.write_stderr(f"{target} failed with code {result.process_exit_code}!\n")
 
     except Exception as e:
-      console.write_stderr(f"Exception when attempting to run {target} : {e}\n")
+      console.write_stderr(f"Exception when attempting to run {target}: {e!r}\n")
       exit_code = -1
 
   return Run(exit_code)

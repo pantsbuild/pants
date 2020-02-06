@@ -9,7 +9,7 @@ from pants.base.specs import AddressSpecs, FilesystemSpecs, SingleAddress, Specs
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_parser import BuildFileParser
-from pants.engine.addressable import BuildFileAddresses
+from pants.engine.addressable import Addresses
 from pants.engine.legacy.graph import LegacyBuildGraph
 from pants.engine.round_engine import RoundEngine
 from pants.engine.selectors import Params
@@ -69,7 +69,7 @@ class GoalRunnerFactory:
     # V1 tasks do not understand FilesystemSpecs, so we eagerly convert them into AddressSpecs.
     if self._specs.filesystem_specs.dependencies:
       owned_addresses, = self._graph_session.scheduler_session.product_request(
-        BuildFileAddresses, [Params(self._specs.filesystem_specs, self._options_bootstrapper)]
+        Addresses, [Params(self._specs.filesystem_specs, self._options_bootstrapper)]
       )
       updated_address_specs = AddressSpecs(
         dependencies=tuple(

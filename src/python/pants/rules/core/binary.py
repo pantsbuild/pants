@@ -4,7 +4,7 @@
 from dataclasses import dataclass
 
 from pants.build_graph.address import Address
-from pants.engine.addressable import BuildFileAddresses
+from pants.engine.addressable import Addresses
 from pants.engine.console import Console
 from pants.engine.fs import Digest, DirectoriesToMerge, DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
@@ -40,7 +40,7 @@ class Binary(Goal):
 
 @goal_rule
 async def create_binary(
-  addresses: BuildFileAddresses,
+  addresses: Addresses,
   console: Console,
   workspace: Workspace,
   options: BinaryOptions,
@@ -48,7 +48,7 @@ async def create_binary(
 ) -> Binary:
   with options.line_oriented(console) as print_stdout:
     print_stdout(f"Generating binaries in `./{distdir.relpath}`")
-    binaries = await MultiGet(Get[CreatedBinary](Address, address.to_address()) for address in addresses)
+    binaries = await MultiGet(Get[CreatedBinary](Address, address) for address in addresses)
     merged_digest = await Get[Digest](
       DirectoriesToMerge(tuple(binary.digest for binary in binaries))
     )

@@ -506,10 +506,8 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
 
 
 @rule
-async def transitive_hydrated_targets(
-  build_file_addresses: BuildFileAddresses
-) -> TransitiveHydratedTargets:
-  """Given BuildFileAddresses, kicks off recursion on expansion of TransitiveHydratedTargets.
+async def transitive_hydrated_targets(addresses: Addresses) -> TransitiveHydratedTargets:
+  """Given Addresses, kicks off recursion on expansion of TransitiveHydratedTargets.
 
   The TransitiveHydratedTarget struct represents a structure-shared graph, which we walk
   and flatten here. The engine memoizes the computation of TransitiveHydratedTarget, so
@@ -518,7 +516,7 @@ async def transitive_hydrated_targets(
   """
 
   transitive_hydrated_targets = await MultiGet(
-    Get[TransitiveHydratedTarget](Address, a) for a in build_file_addresses.addresses
+    Get[TransitiveHydratedTarget](Address, a) for a in addresses
   )
 
   closure = OrderedSet()
