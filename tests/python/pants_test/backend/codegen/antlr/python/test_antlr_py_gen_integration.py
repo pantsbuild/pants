@@ -9,9 +9,7 @@ class AntlrPyGenIntegrationTest(PantsRunIntegrationTest):
 
   @skip_unless_python27_present
   def test_antlr_py_gen_integration(self):
-    result = self.run_pants(['run',
-                             'testprojects/src/python/antlr:eval-bin',
-                             '--run-py-args="123 * 321"'])
+    result = self.run_pants(['run', '--args="123 * 321"', 'testprojects/src/python/antlr:eval-bin'])
     self.assertEqual(0, result.returncode)
     self.assertIn('39483', result.stdout_data)
 
