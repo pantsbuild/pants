@@ -20,6 +20,7 @@ use crate::core::{throw, Failure, Key, Params, TypeId, Value};
 use crate::externs;
 use crate::selectors;
 use crate::tasks::{self, Intrinsic, Rule};
+use crate::watch::InvalidationWatcher;
 use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::{self, BufMut};
 use fs::{
@@ -1221,7 +1222,9 @@ impl Node for NodeKey {
   fn run(self, context: Context) -> NodeFuture<NodeResult> {
     if let Some(path) = self.fs_subject() {
       let abs_path = context.core.build_root.join(path);
-      try_future!(context.core.watcher.watch(abs_path).map_err(|e| throw(&e)));
+      let watcher = context.core.watcher.internal_watcher();
+      let fut = future::lazy(move || InvalidationWatcher::watch(watcher, abs_path));
+      context.core.executor.spawn_and_ignore(fut);
     }
 
     let handle_workunits =

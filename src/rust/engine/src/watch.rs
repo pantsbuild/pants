@@ -2,8 +2,8 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::HashSet;
-use std::path::Path;
-use std::sync::Weak;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Weak};
 use std::thread;
 use std::time::Duration;
 
@@ -27,17 +27,19 @@ use crate::nodes::NodeKey;
 /// TODO: Need the above polling, and need to make the watch method async.
 ///
 pub struct InvalidationWatcher {
-  watcher: Mutex<RecommendedWatcher>,
+  watcher: Arc<Mutex<RecommendedWatcher>>,
   liveness: Receiver<()>,
 }
 
 impl InvalidationWatcher {
   pub fn new(graph: Weak<Graph<NodeKey>>) -> Result<InvalidationWatcher, String> {
-    let logging_destination = logging::get_destination();
+    // TODO: Get the logging destination properly after it has been setup
+    // let logging_destination = logging::get_destination();
+    let logging_destination = logging::Destination::Pantsd;
     let (watch_sender, watch_receiver) = crossbeam_channel::unbounded();
-    let watcher = Mutex::new(
+    let watcher = Arc::new(Mutex::new(
       Watcher::new(watch_sender, Duration::from_millis(50))
-        .map_err(|e| format!("Failed to begin watching the filesystem: {}", e))?,
+        .map_err(|e| format!("Failed to begin watching the filesystem: {}", e))?),
     );
 
     let (thread_liveness_sender, thread_liveness_receiver) = crossbeam_channel::unbounded();
@@ -80,15 +82,19 @@ impl InvalidationWatcher {
     })
   }
 
+  pub fn internal_watcher(&self) -> Arc<Mutex<RecommendedWatcher>> {
+    Arc::clone(&self.watcher)
+  }
+
   ///
   /// Watch the given path non-recursively.
   ///
-  pub fn watch<P: AsRef<Path> + std::fmt::Debug>(&self, path: P) -> Result<(), String> {
+  pub fn watch(watcher: Arc<Mutex<RecommendedWatcher>>, path : PathBuf) -> Result<(), ()> {
     warn!("watching {:?}", path);
-    let mut watcher = self.watcher.lock();
-    watcher
+    let mut watcher = watcher.lock();
+      watcher
       .watch(&path, RecursiveMode::NonRecursive)
-      .map_err(|e| format!("Failed to begin watching `{:?}`: {}", path, e))
+      .map_err(|_| warn!("watch failed for {:?}", path))
   }
 
   ///
