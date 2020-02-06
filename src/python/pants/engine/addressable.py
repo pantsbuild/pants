@@ -18,10 +18,14 @@ class Addresses(Collection[Address]):
 
 
 @dataclass(frozen=True)
-class ProvenancedBuildFileAddress:
+class AddressWithOrigin:
   """A BuildFileAddress along with the cmd-line spec it was generated from."""
-  build_file_address: BuildFileAddress
-  provenance: Spec
+  address: BuildFileAddress
+  origin: Spec
+
+
+class AddressesWithOrigins(Collection[AddressWithOrigin]):
+  pass
 
 
 class BuildFileAddresses(Collection[BuildFileAddress]):
@@ -29,10 +33,6 @@ class BuildFileAddresses(Collection[BuildFileAddress]):
   def addresses(self) -> List[Address]:
     """Converts the BuildFileAddress objects in this collection to Address objects."""
     return [bfa.to_address() for bfa in self]
-
-
-class ProvenancedBuildFileAddresses(Collection[ProvenancedBuildFileAddress]):
-  pass
 
 
 class NotSerializableError(TypeError):

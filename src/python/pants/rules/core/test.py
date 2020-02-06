@@ -9,7 +9,7 @@ from typing import Optional
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.addressable import BuildFileAddresses
-from pants.engine.build_files import AddressProvenanceMap
+from pants.engine.build_files import AddressOriginMap
 from pants.engine.console import Console
 from pants.engine.fs import Digest
 from pants.engine.goal import Goal, GoalSubsystem
@@ -117,10 +117,10 @@ class AddressAndTestResult:
     target: HydratedTarget,
     *,
     union_membership: UnionMembership,
-    provenance_map: AddressProvenanceMap
+    address_origin_map: AddressOriginMap
   ) -> bool:
     is_valid_target_type = (
-      provenance_map.is_single_address(target.address)
+      address_origin_map.is_single_address(target.address)
       or union_membership.is_member(TestTarget, target.adaptor)
     )
     has_sources = hasattr(target.adaptor, "sources") and target.adaptor.sources.snapshot.files
@@ -175,11 +175,11 @@ async def run_tests(
 async def coordinator_of_tests(
   target: HydratedTarget,
   union_membership: UnionMembership,
-  provenance_map: AddressProvenanceMap
+  address_origin_map: AddressOriginMap
 ) -> AddressAndTestResult:
 
   if not AddressAndTestResult.is_testable(
-    target, union_membership=union_membership, provenance_map=provenance_map
+    target, union_membership=union_membership, address_origin_map=address_origin_map
   ):
     return AddressAndTestResult(target.address, None)
 
