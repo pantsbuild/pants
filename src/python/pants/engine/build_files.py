@@ -9,7 +9,7 @@ from typing import Dict
 from twitter.common.collections import OrderedSet
 
 from pants.base.project_tree import Dir
-from pants.base.specs import AddressSpec, AddressSpecs, SingleAddress, more_specific
+from pants.base.specs import AddressSpec, AddressSpecs, SingleAddress, Spec, more_specific
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.engine.addressable import (
@@ -253,32 +253,28 @@ async def provenanced_addresses_from_address_families(
 
   # NB: This may be empty, as the result of filtering by tag and exclude patterns!
   return ProvenancedBuildFileAddresses(
-    tuple(
-      ProvenancedBuildFileAddress(
-        build_file_address=addr, provenance=addr_to_provenance[addr]
-      )
-      for addr in matched_addresses
-    )
+    ProvenancedBuildFileAddress(build_file_address=addr, provenance=addr_to_provenance[addr])
+    for addr in matched_addresses
   )
 
 
 @rule
 def remove_provenance(pbfas: ProvenancedBuildFileAddresses) -> BuildFileAddresses:
-  return BuildFileAddresses(tuple(pbfa.build_file_address for pbfa in pbfas))
+  return BuildFileAddresses(pbfa.build_file_address for pbfa in pbfas)
 
 
 @dataclass(frozen=True)
 class AddressProvenanceMap:
-  bfaddr_to_address_spec: Dict[BuildFileAddress, AddressSpec]
+  bfaddr_to_spec: Dict[BuildFileAddress, Spec]
 
-  def is_single_address(self, address: BuildFileAddress):
-    return isinstance(self.bfaddr_to_address_spec.get(address), SingleAddress)
+  def is_single_address(self, address: BuildFileAddress) -> bool:
+    return isinstance(self.bfaddr_to_spec.get(address), SingleAddress)
 
 
 @rule
 def address_provenance_map(pbfas: ProvenancedBuildFileAddresses) -> AddressProvenanceMap:
   return AddressProvenanceMap(
-    bfaddr_to_address_spec={pbfa.build_file_address: pbfa.provenance for pbfa in pbfas.dependencies}
+    bfaddr_to_spec={pbfa.build_file_address: pbfa.provenance for pbfa in pbfas.dependencies}
   )
 
 

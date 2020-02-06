@@ -80,6 +80,8 @@ class TestOptions(GoalSubsystem):
   """Runs tests."""
   name = "test"
 
+  required_union_implementations = (TestTarget,)
+
   # Prevent this class from being detected by pytest as a test class.
   __test__ = False
 
@@ -132,7 +134,9 @@ class AddressAndDebugRequest:
 
 
 @goal_rule
-async def run_tests(console: Console, options: TestOptions, runner: InteractiveRunner, addresses: BuildFileAddresses) -> Test:
+async def run_tests(
+  console: Console, options: TestOptions, runner: InteractiveRunner, addresses: BuildFileAddresses,
+) -> Test:
   if options.values.debug:
     address = await Get[BuildFileAddress](BuildFileAddresses, addresses)
     addr_debug_request = await Get[AddressAndDebugRequest](Address, address.to_address())

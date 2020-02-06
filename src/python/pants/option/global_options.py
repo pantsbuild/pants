@@ -51,6 +51,13 @@ class FileNotFoundBehavior(Enum):
     return GlobMatchErrorBehavior(self.value)
 
 
+class OwnersNotFoundBehavior(Enum):
+  """What to do when a file argument cannot be mapped to an owning target."""
+  ignore = "ignore"
+  warn = "warn"
+  error = "error"
+
+
 class BuildFileImportsBehavior(Enum):
   allow = "allow"
   warn = "warn"
@@ -308,6 +315,12 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                   '(e.g. BUILD file scanning, glob matching, etc). '
                   'Patterns use the gitignore syntax (https://git-scm.com/docs/gitignore). '
                   'The `--pants-distdir` and `--pants-workdir` locations are inherently ignored.')
+    register(
+      "--owners-not-found-behavior", advanced=True,
+      type=OwnersNotFoundBehavior, default=OwnersNotFoundBehavior.error,
+      help="What to do when file arguments do not have any owning target. This happens when there "
+           "are no targets whose `sources` fields include the file argument."
+    )
     register("--files-not-found-behavior", advanced=True,
              type=FileNotFoundBehavior, default=FileNotFoundBehavior.warn,
              help="What to do when files and globs specified in BUILD files, such as in the "
@@ -333,6 +346,17 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              help='Paths that correspond with build roots for any subproject that this '
                   'project depends on.')
     register('--owner-of', type=list, member_type=file_option, default=[], daemon=False, metavar='<path>',
+             removal_version="1.27.0.dev0",
+             removal_hint=(
+               "Use direct file arguments instead, such as "
+               "`./pants list src/python/f1.py src/python/f2.py` or even "
+               "`./pants fmt 'src/python/**/*.py'`.\n\nInstead of `--owner-of=@my_file`, use "
+               "`--spec-file=my_file`.\n\nJust like with `--owner-of`, Pants will "
+               "try to find the owner(s) of the file and then operate on those owning targets.\n\n"
+               "Unlike `--owner-of`, Pants defaults to failing if there is no owning target for "
+               "that file. You may change this through `--owners-not-found-behavior=ignore` or "
+               "`--owners-not-found-behavior=warn`."
+             ),
              help='Select the targets that own these files. '
                   'This is the third target calculation strategy along with the --changed-* '
                   'options and specifying the targets directly. These three types of target '
@@ -540,39 +564,43 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                   "tags ('-' prefix).  Useful with ::, to find subsets of targets "
                   "(e.g., integration tests.)")
 
-    if register.bootstrap.v2:
-      register('--v2-ui', default=False, type=bool, daemon=False,
-               help='Whether to show v2 engine execution progress.')
-      if not register.bootstrap.v1:
-        loop_flag = '--loop'
-        register(loop_flag, type=bool,
-                 help='Run v2 @goal_rules continuously as file changes are detected.')
-        register('--loop-max', type=int, default=2**32, advanced=True,
-                 help=f'The maximum number of times to loop when `{loop_flag}` is specified.')
+    register('--v2-ui', default=False, type=bool, daemon=False,
+             passive=not register.bootstrap.v2,
+             help='Whether to show v2 engine execution progress.')
 
-    if register.bootstrap.v1:
-      register('-x', '--time', type=bool,
-               help='Output a timing report at the end of the run.')
-      register('-e', '--explain', type=bool,
-               help='Explain the execution of goals.')
-      register('-t', '--timeout', advanced=True, type=int, metavar='<seconds>',
-               removal_version="1.26.0.dev1",
-               removal_hint="This option is not used and may be removed with no change in behavior. ",
-               help='Number of seconds to wait for http connections.')
-      # TODO: After moving to the new options system these abstraction leaks can go away.
-      register('-k', '--kill-nailguns', advanced=True, type=bool,
-               help='Kill nailguns before exiting')
-      register('--fail-fast', advanced=True, type=bool, recursive=True,
-               help='Exit as quickly as possible on error, rather than attempting to continue '
-                    'to process the non-erroneous subset of the input.')
-      register('--cache-key-gen-version', advanced=True, default='200', recursive=True,
-               help='The cache key generation. Bump this to invalidate every artifact for a scope.')
-      register('--workdir-max-build-entries', advanced=True, type=int, default=8,
-               help='Maximum number of previous builds to keep per task target pair in workdir. '
-               'If set, minimum 2 will always be kept to support incremental compilation.')
-      register('--max-subprocess-args', advanced=True, type=int, default=100, recursive=True,
-               help='Used to limit the number of arguments passed to some subprocesses by breaking '
-               'the command up into multiple invocations.')
+    loop_flag = '--loop'
+    loop_passive = register.bootstrap.v1 or not register.bootstrap.v2
+    register(loop_flag, type=bool,
+             passive=loop_passive,
+             help='Run v2 @goal_rules continuously as file changes are detected.')
+    register('--loop-max', type=int, default=2**32, advanced=True,
+             passive=loop_passive,
+             help=f'The maximum number of times to loop when `{loop_flag}` is specified.')
+
+    no_v1 = not register.bootstrap.v1
+    register('-x', '--time', type=bool, passive=no_v1,
+             help='Output a timing report at the end of the run.')
+    register('-e', '--explain', type=bool, passive=no_v1,
+             help='Explain the execution of goals.')
+    register('-t', '--timeout', advanced=True, type=int, metavar='<seconds>', passive=no_v1,
+             removal_version="1.26.0.dev1",
+             removal_hint="This option is not used and may be removed with no change in behavior. ",
+             help='Number of seconds to wait for http connections.')
+    # TODO: After moving to the new options system these abstraction leaks can go away.
+    register('-k', '--kill-nailguns', advanced=True, type=bool, passive=no_v1,
+             help='Kill nailguns before exiting')
+    register('--fail-fast', advanced=True, type=bool, recursive=True, passive=no_v1,
+             help='Exit as quickly as possible on error, rather than attempting to continue '
+                  'to process the non-erroneous subset of the input.')
+    register('--cache-key-gen-version', advanced=True, default='200', recursive=True, passive=no_v1,
+             help='The cache key generation. Bump this to invalidate every artifact for a scope.')
+    register('--workdir-max-build-entries', advanced=True, type=int, default=8, passive=no_v1,
+             help='Maximum number of previous builds to keep per task target pair in workdir. '
+             'If set, minimum 2 will always be kept to support incremental compilation.')
+    register('--max-subprocess-args', advanced=True, type=int, default=100, recursive=True,
+             passive=no_v1,
+             help='Used to limit the number of arguments passed to some subprocesses by breaking '
+             'the command up into multiple invocations.')
     register('--lock', advanced=True, type=bool, default=True,
              help='Use a global lock to exclude other versions of pants from running during '
                   'critical operations.')

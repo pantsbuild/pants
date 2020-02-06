@@ -217,7 +217,7 @@ class OptionsBootstrapper:
       for section in config.sections():
         scope = GLOBAL_SCOPE if section == GLOBAL_SCOPE_CONFIG_SECTION else section
         try:
-          valid_options_under_scope = set(options.for_scope(scope))
+          valid_options_under_scope = set(options.for_scope(scope, include_passive_options=True))
         # Only catch ConfigValidationError. Other exceptions will be raised directly.
         except Config.ConfigValidationError:
           error_log.append(f"Invalid scope [{section}] in {config.config_path}")

@@ -6,12 +6,14 @@ from typing import Optional, Tuple
 
 from pants.backend.python.lint.bandit.subsystem import Bandit
 from pants.backend.python.lint.python_lint_target import PythonLintTarget
+from pants.backend.python.rules import download_pex_bin, pex
 from pants.backend.python.rules.pex import (
   CreatePex,
   Pex,
   PexInterpreterConstraints,
   PexRequirements,
 )
+from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
@@ -96,4 +98,12 @@ async def lint(
 
 
 def rules():
-  return [lint, subsystem_rule(Bandit), UnionRule(PythonLintTarget, BanditTarget)]
+  return [
+    lint,
+    subsystem_rule(Bandit),
+    UnionRule(PythonLintTarget, BanditTarget),
+    *download_pex_bin.rules(),
+    *pex.rules(),
+    *python_native_code.rules(),
+    *subprocess_environment.rules(),
+  ]

@@ -221,7 +221,7 @@ class BaseZincCompile(JvmCompile):
     if zinc_args is not None:
       for compile_context in compile_contexts:
         with open(compile_context.args_file, 'r') as fp:
-          args = fp.read().split()
+          args = fp.read().strip().split('\n')
         zinc_args[compile_context.target] = args
 
   def create_empty_extra_products(self):

@@ -9,8 +9,7 @@ from twitter.common.collections import OrderedSet
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.specs import AddressSpec, AddressSpecs, FilesystemSpecs, SingleAddress, Specs
-from pants.engine.addressable import BuildFileAddresses
-from pants.engine.legacy.graph import OwnersRequest
+from pants.engine.legacy.graph import Owners, OwnersRequest
 from pants.engine.scheduler import SchedulerSession
 from pants.option.options import Options
 from pants.scm.subsystems.changed import ChangedAddresses, ChangedOptions, ChangedRequest
@@ -117,9 +116,9 @@ class SpecsCalculator:
     if owned_files:
       owner_request = OwnersRequest(sources=tuple(owned_files))
       owner_request.validate(pants_bin_name=options.for_global_scope().pants_bin_name)
-      owner_addresses, = session.product_request(BuildFileAddresses, [owner_request])
-      logger.debug('owner addresses: %s', owner_addresses)
-      dependencies = tuple(SingleAddress(a.spec_path, a.target_name) for a in owner_addresses)
+      owners, = session.product_request(Owners, [owner_request])
+      logger.debug('owner addresses: %s', owners.addresses)
+      dependencies = tuple(SingleAddress(a.spec_path, a.target_name) for a in owners.addresses)
       return Specs(
         address_specs=AddressSpecs(
           dependencies=dependencies, exclude_patterns=exclude_patterns, tags=tags,

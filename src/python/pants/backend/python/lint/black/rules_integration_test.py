@@ -7,8 +7,6 @@ import pytest
 
 from pants.backend.python.lint.black.rules import BlackTarget
 from pants.backend.python.lint.black.rules import rules as black_rules
-from pants.backend.python.rules import download_pex_bin, pex
-from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.build_graph.address import Address
 from pants.engine.fs import Digest, FileContent, InputFilesContent, Snapshot
 from pants.engine.legacy.structs import TargetAdaptor
@@ -32,15 +30,7 @@ class BlackIntegrationTest(TestBase):
 
   @classmethod
   def rules(cls):
-    return (
-      *super().rules(),
-      *black_rules(),
-      *download_pex_bin.rules(),
-      *pex.rules(),
-      *python_native_code.rules(),
-      *subprocess_environment.rules(),
-      RootRule(BlackTarget),
-    )
+    return (*super().rules(), *black_rules(), RootRule(BlackTarget))
 
   def run_black(
     self,

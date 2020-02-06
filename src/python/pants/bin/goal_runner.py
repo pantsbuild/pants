@@ -5,18 +5,21 @@ import logging
 import sys
 from typing import List
 
-from pants.base.specs import AddressSpecs, Specs
+from pants.base.specs import AddressSpecs, FilesystemSpecs, SingleAddress, Specs
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_parser import BuildFileParser
+from pants.engine.addressable import BuildFileAddresses
 from pants.engine.legacy.graph import LegacyBuildGraph
 from pants.engine.round_engine import RoundEngine
+from pants.engine.selectors import Params
 from pants.goal.context import Context
 from pants.goal.goal import Goal
 from pants.goal.run_tracker import RunTracker
 from pants.init.engine_initializer import LegacyGraphSession
 from pants.java.nailgun_executor import NailgunProcessGroup
 from pants.option.options import Options
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.ranked_value import RankedValue
 from pants.reporting.reporting import Reporting
 from pants.task.task import QuietTaskMixin
@@ -25,14 +28,11 @@ from pants.task.task import QuietTaskMixin
 logger = logging.getLogger(__name__)
 
 
-class FilesystemSpecsUnsupported(Exception):
-  """FS specs are not yet backported to V1 (but will be to replace `--owner-of`)."""
-
-
 class GoalRunnerFactory:
   def __init__(
     self,
     root_dir: str,
+    options_bootstrapper: OptionsBootstrapper,
     options: Options,
     build_config: BuildConfiguration,
     run_tracker: RunTracker,
@@ -52,6 +52,7 @@ class GoalRunnerFactory:
     :param func exiter: A function that accepts an exit code value and exits. (for tests, Optional)
     """
     self._root_dir = root_dir
+    self._options_bootstrapper = options_bootstrapper
     self._options = options
     self._build_config = build_config
     self._run_tracker = run_tracker
@@ -65,30 +66,21 @@ class GoalRunnerFactory:
     self._explain = self._global_options.explain
     self._kill_nailguns = self._global_options.kill_nailguns
 
+    # V1 tasks do not understand FilesystemSpecs, so we eagerly convert them into AddressSpecs.
     if self._specs.filesystem_specs.dependencies:
-      pants_bin_name = self._global_options.pants_bin_name
-      v1_goals = ' '.join(repr(goal) for goal in self._determine_v1_goals(options))
-      provided_specs = ' '.join(spec.glob for spec in self._specs.filesystem_specs)
-      approximate_original_command = f"{pants_bin_name} {v1_goals} {provided_specs}"
-      suggested_owners_args = " ".join(
-        f"--owner-of={spec.glob}" for spec in self._specs.filesystem_specs
+      owned_addresses, = self._graph_session.scheduler_session.product_request(
+        BuildFileAddresses, [Params(self._specs.filesystem_specs, self._options_bootstrapper)]
       )
-      suggestion = f"run `{pants_bin_name} {suggested_owners_args} {v1_goals}`."
-      trying_to_use_globs = any("*" in spec.glob for spec in self._specs.filesystem_specs)
-      if trying_to_use_globs:
-        suggestion = (
-          f"run `{pants_bin_name} --owner-of=src/python/f1.py --owner-of=src/python/f2.py "
-          f"{v1_goals}`. (You must explicitly enumerate every file because " f"`--owner-of` does "
-          f"not support globs.)"
-        )
-      raise FilesystemSpecsUnsupported(
-        f"Instead of running `{approximate_original_command}`, {suggestion}\n\n"
-        f"Why? Filesystem specs like `src/python/example.py` and `src/**/*.java` (currently) only "
-        f"work when running goals implemented with the V2 engine. When using V1 goals, either use "
-        f"traditional address specs like `src/python/example:foo` and `::` or use `--owner-of` "
-        f"for Pants to find the file's owning target(s) for you.\n\n"
-        f"(You may find which goals are implemented in V1 by running `{pants_bin_name} --v1 --no-v2 "
-        f"goals` and find V2 goals by running `{pants_bin_name} --no-v1 --v2 goals`.)"
+      updated_address_specs = AddressSpecs(
+        dependencies=tuple(
+          SingleAddress(a.spec_path, a.target_name) for a in owned_addresses
+        ),
+        tags=self._specs.address_specs.matcher.tags,
+        exclude_patterns=self._specs.address_specs.matcher.exclude_patterns,
+      )
+      self._specs = Specs(
+        address_specs=updated_address_specs,
+        filesystem_specs=FilesystemSpecs([]),
       )
 
   def _determine_v1_goals(self, options: Options) -> List[Goal]:

@@ -15,15 +15,6 @@ from pants.engine.selectors import Get, MultiGet
 from pants.rules.core.distdir import DistDir
 
 
-class BinaryOptions(LineOriented, GoalSubsystem):
-  """Create a runnable binary."""
-  name = 'binary'
-
-
-class Binary(Goal):
-  subsystem_cls = BinaryOptions
-
-
 @union
 class BinaryTarget:
   pass
@@ -36,14 +27,25 @@ class CreatedBinary:
   binary_name: str
 
 
+class BinaryOptions(LineOriented, GoalSubsystem):
+  """Create a runnable binary."""
+  name = 'binary'
+
+  required_union_implementations = (BinaryTarget,)
+
+
+class Binary(Goal):
+  subsystem_cls = BinaryOptions
+
+
 @goal_rule
 async def create_binary(
-    addresses: BuildFileAddresses,
-    console: Console,
-    workspace: Workspace,
-    options: BinaryOptions,
-    distdir: DistDir,
-    ) -> Binary:
+  addresses: BuildFileAddresses,
+  console: Console,
+  workspace: Workspace,
+  options: BinaryOptions,
+  distdir: DistDir,
+) -> Binary:
   with options.line_oriented(console) as print_stdout:
     print_stdout(f"Generating binaries in `./{distdir.relpath}`")
     binaries = await MultiGet(Get[CreatedBinary](Address, address.to_address()) for address in addresses)

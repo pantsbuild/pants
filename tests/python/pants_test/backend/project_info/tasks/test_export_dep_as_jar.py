@@ -363,7 +363,9 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
     jvm_target = result['targets']['project_info:jvm_target']
     jvm_target['libraries'] = sorted(jvm_target['libraries'])
     expected_jvm_target = {
-      'compiler_options': [],
+      'scalac_args': [],
+      'javac_args': [],
+      'extra_jvm_options': [],
       'excludes': [],
       'globs': {'globs': ['project_info/this/is/a/source/Foo.scala',
                           'project_info/this/is/a/source/Bar.scala']},

@@ -4,6 +4,7 @@
 from dataclasses import dataclass
 from typing import List
 
+from pants.backend.python.lint.python_lint_target import PYTHON_TARGET_TYPES
 from pants.engine.legacy.structs import (
   PantsPluginAdaptor,
   PythonAppAdaptor,
@@ -13,7 +14,7 @@ from pants.engine.legacy.structs import (
   TargetAdaptor,
 )
 from pants.engine.objects import union
-from pants.engine.rules import UnionMembership, UnionRule, rule
+from pants.engine.rules import RootRule, UnionMembership, UnionRule, rule
 from pants.engine.selectors import Get
 from pants.rules.core.fmt import AggregatedFmtResults, FmtResult, FormatTarget
 
@@ -79,9 +80,6 @@ def rules():
     binary_adaptor,
     tests_adaptor,
     plugin_adaptor,
-    UnionRule(FormatTarget, PythonTargetAdaptor),
-    UnionRule(FormatTarget, PythonAppAdaptor),
-    UnionRule(FormatTarget, PythonBinaryAdaptor),
-    UnionRule(FormatTarget, PythonTestsAdaptor),
-    UnionRule(FormatTarget, PantsPluginAdaptor),
+    *(RootRule(target_type) for target_type in PYTHON_TARGET_TYPES),
+    *(UnionRule(FormatTarget, target_type) for target_type in PYTHON_TARGET_TYPES)
   ]

@@ -24,13 +24,21 @@ from typing import Dict, List, NamedTuple, Optional, Set, Union
 def main() -> None:
   args = create_parser().parse_args()
   build_files: Set[Path] = set(
-    itertools.chain.from_iterable(
-      [*folder.rglob("BUILD"), *folder.rglob("BUILD.*")]
-      for folder in args.folders)
+    fp
+    for folder in args.folders
+    for fp in [*folder.rglob("BUILD"), *folder.rglob("BUILD.*")]
+    # Check that it really is a BUILD file
+    if fp.is_file() and fp.stem == "BUILD"
   )
   updates: Dict[Path, List[str]] = {}
   for build in build_files:
-    possibly_new_build = generate_possibly_new_build(build)
+    try:
+      possibly_new_build = generate_possibly_new_build(build)
+    except Exception:
+      logging.warning(
+        f"Could not parse the BUILD file {build}. Skipping."
+      )
+      continue
     if possibly_new_build is not None:
       updates[build] = possibly_new_build
   for build, new_content in updates.items():
@@ -45,7 +53,7 @@ def create_parser() -> argparse.ArgumentParser:
     description='Modernize BUILD files to no longer use globs, rglobs, and zglobs.',
   )
   parser.add_argument(
-    'folders', type=Path, nargs='*',
+    'folders', type=Path, nargs='+',
     help="Folders to recursively search for `BUILD` files",
   )
   parser.add_argument(
@@ -114,7 +122,7 @@ class GlobFunction(NamedTuple):
     #  * list of either of the above options
     exclude_globs: Optional[List[str]] = None
     exclude_arg: Optional[ast.keyword] = next(iter(glob_func.keywords), None)
-    if exclude_arg is not None:
+    if exclude_arg is not None and isinstance(exclude_arg.value, ast.List):
       exclude_elements: List[Union[ast.Call, ast.Str, ast.List]] = exclude_arg.value.elts
       nested_exclude_elements: List[Union[ast.Call, ast.Str]] = list(
         itertools.chain.from_iterable(
@@ -194,7 +202,10 @@ def generate_possibly_new_build(build_file: Path) -> Optional[List[str]]:
   ]
   for target in targets:
     bundles_arg: Optional[ast.keyword] = next(
-      (kwarg for kwarg in target.keywords if kwarg.arg == "bundles"), None,
+      (
+        kwarg for kwarg in target.keywords
+        if kwarg.arg == "bundles" and isinstance(kwarg.value, ast.List)
+      ), None,
     )
     if bundles_arg is not None:
       bundle_funcs: List[ast.Call] = [

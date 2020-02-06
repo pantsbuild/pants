@@ -466,7 +466,7 @@ class Options:
     self.walk_parsers(register_all_scoped_names)
     return sorted(all_scoped_flag_names, key=lambda flag_info: flag_info.scoped_arg)
 
-  def _make_parse_args_request(self, flags_in_scope, namespace):
+  def _make_parse_args_request(self, flags_in_scope, namespace, include_passive_options=False):
     levenshtein_max_distance = (
       self._bootstrap_option_values.option_name_check_distance
       if self._bootstrap_option_values
@@ -477,12 +477,15 @@ class Options:
       namespace=namespace,
       get_all_scoped_flag_names=lambda: self._all_scoped_flag_names_for_fuzzy_matching,
       levenshtein_max_distance=levenshtein_max_distance,
+      include_passive_options=include_passive_options
     )
 
   # TODO: Eagerly precompute backing data for this?
   @memoized_method
   def for_scope(
-    self, scope: str, inherit_from_enclosing_scope: bool = True,
+      self, scope: str,
+      inherit_from_enclosing_scope: bool = True,
+      include_passive_options: bool = False
   ) -> OptionValueContainer:
     """Return the option values for the given scope.
 
@@ -500,7 +503,7 @@ class Options:
 
     # Now add our values.
     flags_in_scope = self._scope_to_flags.get(scope, [])
-    parse_args_request = self._make_parse_args_request(flags_in_scope, values)
+    parse_args_request = self._make_parse_args_request(flags_in_scope, values, include_passive_options)
     self._parser_hierarchy.get_parser_by_scope(scope).parse_args(parse_args_request)
 
     # Check for any deprecation conditions, which are evaluated using `self._flag_matchers`.
