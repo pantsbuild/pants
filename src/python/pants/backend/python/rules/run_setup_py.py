@@ -249,7 +249,7 @@ async def run_setup_pys(targets: HydratedTargets, options: SetupPyOptions, conso
   for hydrated_target in targets:
     if _is_exported(hydrated_target):
       exported_targets.append(ExportedTarget(hydrated_target))
-    elif address_origin_map.is_single_address(hydrated_target.address):
+    elif address_origin_map.is_single_address(hydrated_target.address.to_address()):
       explicit_nonexported_targets.append(hydrated_target)
   if explicit_nonexported_targets:
     raise TargetNotExported(

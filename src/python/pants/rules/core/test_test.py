@@ -132,7 +132,7 @@ class TestTest(TestBase):
         raise Exception("Unrecognised target")
       return AddressAndTestResult(target, tr)
 
-    def make_debug_request(target):
+    def make_debug_request(target: BuildFileAddress) -> AddressAndDebugRequest:
       request = TestDebugRequest(ipr=self.make_successful_ipr() if target == target1 else self.make_failure_ipr())
       return AddressAndDebugRequest(target, request)
 
@@ -187,7 +187,7 @@ class TestTest(TestBase):
     self,
     *,
     address: BuildFileAddress,
-    bfaddr_to_origin: Optional[Dict[BuildFileAddress, Spec]] = None,
+    addr_to_origin: Optional[Dict[Address, Spec]] = None,
     test_target_type: bool = True,
     include_sources: bool = True,
   ) -> AddressAndTestResult:
@@ -213,7 +213,7 @@ class TestTest(TestBase):
         rule_args=[
           HydratedTarget(address, target_adaptor, ()),
           UnionMembership(union_rules={TestTarget: [PythonTestsAdaptor]}),
-          AddressOriginMap(bfaddr_to_origin=bfaddr_to_origin or {}),
+          AddressOriginMap(addr_to_origin=addr_to_origin or {}),
         ],
         mock_gets=[
           MockGet(
@@ -240,7 +240,7 @@ class TestTest(TestBase):
     with self.assertRaisesRegex(AssertionError, r'Rule requested: .* which cannot be satisfied.'):
       self.run_coordinator_of_tests(
         address=bfaddr,
-        bfaddr_to_origin={bfaddr: SingleAddress(directory='some/dir', name='bin')},
+        addr_to_origin={bfaddr.to_address(): SingleAddress(directory='some/dir', name='bin')},
         test_target_type=False,
       )
 
@@ -253,7 +253,7 @@ class TestTest(TestBase):
     bfaddr = BuildFileAddress(rel_path='some/dir', target_name='tests')
     result = self.run_coordinator_of_tests(
       address=bfaddr,
-      bfaddr_to_origin={bfaddr: DescendantAddresses(directory='some/dir')}
+      addr_to_origin={bfaddr.to_address(): DescendantAddresses(directory='some/dir')}
     )
     assert result == AddressAndTestResult(
       bfaddr, TestResult(status=Status.SUCCESS, stdout='foo', stderr='')
@@ -263,7 +263,7 @@ class TestTest(TestBase):
     bfaddr = BuildFileAddress(rel_path='some/dir', target_name='bin')
     result = self.run_coordinator_of_tests(
       address=bfaddr,
-      bfaddr_to_origin={bfaddr: DescendantAddresses(directory='some/dir')},
+      addr_to_origin={bfaddr.to_address(): DescendantAddresses(directory='some/dir')},
       test_target_type=False,
     )
     assert result == AddressAndTestResult(bfaddr, None)

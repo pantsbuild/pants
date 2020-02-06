@@ -66,7 +66,7 @@ class TestDebugRequest:
 class TestTarget:
   """A union for registration of a testable target type."""
 
-  # Prevent this class from being detected by pytest as a test class.
+  # Prevent this class from being detected by Pytest as a test class.
   __test__ = False
 
   @staticmethod
@@ -120,7 +120,7 @@ class AddressAndTestResult:
     address_origin_map: AddressOriginMap
   ) -> bool:
     is_valid_target_type = (
-      address_origin_map.is_single_address(target.address)
+      address_origin_map.is_single_address(target.address.to_address())
       or union_membership.is_member(TestTarget, target.adaptor)
     )
     has_sources = hasattr(target.adaptor, "sources") and target.adaptor.sources.snapshot.files
@@ -207,7 +207,7 @@ async def coordinator_of_debug_tests(target: HydratedTarget) -> AddressAndDebugR
 
 def rules():
   return [
-      coordinator_of_tests,
-      coordinator_of_debug_tests,
-      run_tests,
-    ]
+    coordinator_of_tests,
+    coordinator_of_debug_tests,
+    run_tests,
+  ]

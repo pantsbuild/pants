@@ -267,17 +267,17 @@ def remove_origins(addresses_with_origins: AddressesWithOrigins) -> BuildFileAdd
 
 @dataclass(frozen=True)
 class AddressOriginMap:
-  bfaddr_to_origin: Dict[BuildFileAddress, Spec]
+  addr_to_origin: Dict[Address, Spec]
 
-  def is_single_address(self, address: BuildFileAddress) -> bool:
-    return isinstance(self.bfaddr_to_origin.get(address), SingleAddress)
+  def is_single_address(self, address: Address) -> bool:
+    return isinstance(self.addr_to_origin.get(address), SingleAddress)
 
 
 @rule
 def address_origin_map(addresses_with_origins: AddressesWithOrigins) -> AddressOriginMap:
   return AddressOriginMap(
-    bfaddr_to_origin={
-      address_with_origin.address: address_with_origin.origin
+    addr_to_origin={
+      address_with_origin.address.to_address(): address_with_origin.origin
       for address_with_origin in addresses_with_origins
     }
   )
