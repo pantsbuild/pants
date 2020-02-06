@@ -4,6 +4,7 @@
 import configparser
 import itertools
 import json
+import os
 from dataclasses import dataclass
 from enum import Enum
 from io import StringIO
@@ -42,6 +43,7 @@ from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessR
 from pants.engine.legacy.graph import TransitiveHydratedTargets
 from pants.engine.rules import goal_rule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
+from pants.rules.core.distdir import DistDir
 from pants.rules.core.test import AddressAndTestResult
 from pants.source.source_root import SourceRootConfig, SourceRoots
 
@@ -141,7 +143,7 @@ class PytestCoverage(PythonToolBase):
     register(
       '--report-output-path',
       type=str,
-      default='dist/coverage/python',
+      default=os.path.join(DistDir(relpath='dist').relpath, 'coverage', 'python'),
       help='Path to write pytest coverage report to. Must be relative to build root.',
     )
     register(
