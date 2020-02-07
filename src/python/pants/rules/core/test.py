@@ -109,7 +109,7 @@ class Test(Goal):
 
 @dataclass(frozen=True)
 class AddressAndTestResult:
-  address: BuildFileAddress
+  address: Address
   test_result: Optional[TestResult]  # If None, target was not a test target.
 
   @staticmethod
@@ -120,7 +120,7 @@ class AddressAndTestResult:
     address_origin_map: AddressOriginMap
   ) -> bool:
     is_valid_target_type = (
-      address_origin_map.is_single_address(target.address.to_address())
+      address_origin_map.is_single_address(target.address)
       or union_membership.is_member(TestTarget, target.adaptor)
     )
     has_sources = hasattr(target.adaptor, "sources") and target.adaptor.sources.snapshot.files
@@ -129,7 +129,7 @@ class AddressAndTestResult:
 
 @dataclass(frozen=True)
 class AddressAndDebugRequest:
-  address: BuildFileAddress
+  address: Address
   request: TestDebugRequest
 
 
@@ -138,8 +138,8 @@ async def run_tests(
   console: Console, options: TestOptions, runner: InteractiveRunner, addresses: BuildFileAddresses,
 ) -> Test:
   if options.values.debug:
-    address = await Get[BuildFileAddress](BuildFileAddresses, addresses)
-    addr_debug_request = await Get[AddressAndDebugRequest](Address, address.to_address())
+    debug_address = await Get[BuildFileAddress](BuildFileAddresses, addresses)
+    addr_debug_request = await Get[AddressAndDebugRequest](Address, debug_address.to_address())
     result = runner.run_local_interactive_process(addr_debug_request.request.ipr)
     return Test(result.process_exit_code)
 

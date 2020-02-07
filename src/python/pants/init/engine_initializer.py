@@ -433,9 +433,7 @@ class EngineInitializer:
       return cast(BuildRoot, BuildRoot.instance)
 
     @rule
-    async def single_build_file_address(
-      addresses: BuildFileAddresses,
-    ) -> BuildFileAddress:
+    async def single_address(addresses: BuildFileAddresses) -> BuildFileAddress:
       if len(addresses.dependencies) == 0:
         raise ResolveError("No targets were matched")
       if len(addresses.dependencies) > 1:
@@ -456,7 +454,7 @@ class EngineInitializer:
         symbol_table_singleton,
         union_membership_singleton,
         build_root_singleton,
-        single_build_file_address,
+        single_address,
       ),
       *create_legacy_graph_tasks(),
       *create_fs_rules(),
