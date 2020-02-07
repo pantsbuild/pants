@@ -203,7 +203,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              help='Use this pants version. Note Pants code only uses this to verify that you are '
                   'using the requested version, as Pants cannot dynamically change the version it '
                   'is using once the program is already running. This option is useful to set in '
-                  'your pants.ini, however, and then you can grep the value to select which '
+                  'your pants.toml, however, and then you can grep the value to select which '
                   'version to use for setup scripts (e.g. `./pants`), runner scripts, IDE plugins, '
                   'etc. For example, the setup script we distribute at https://www.pantsbuild.org/install.html#recommended-installation '
                   'uses this value to determine which Python version to run with. You may find the '

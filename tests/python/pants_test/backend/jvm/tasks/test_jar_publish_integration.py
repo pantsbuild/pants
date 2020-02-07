@@ -24,7 +24,7 @@ def shared_artifacts(version, extra_jar=None):
 def publish_extra_config(unique_config):
   return {
     'GLOBAL': {
-      # Turn off --verify-config as some scopes in pants.ini will not be
+      # Turn off --verify-config as some scopes in pants.toml will not be
       # recognized due to the select few backend packages.
       'verify_config': False,
       'pythonpath': [
@@ -255,7 +255,7 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
     :param artifacts: A map from directories to a list of expected filenames.
     :param pushdb_files: list of pushdb files that would be created if this weren't a local publish
     :param extra_options: Extra command-line options to the pants run.
-    :param extra_config: Extra pants.ini configuration for the pants run.
+    :param extra_config: Extra pants.toml configuration for the pants run.
     :param extra_env: Extra environment variables for the pants run.
     :param assert_publish_config_contents: Test the contents of the generated ivy and pom file.
            If set to True, compares the generated ivy.xml and pom files in

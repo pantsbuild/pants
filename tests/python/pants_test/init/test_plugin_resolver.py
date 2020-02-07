@@ -75,7 +75,7 @@ class PluginResolverTest(unittest.TestCase):
         env['PANTS_PLUGINS'] = f"[{','.join(map(repr, plugin_list))}]"
         env['PANTS_PLUGIN_CACHE_DIR'] = os.path.join(root_dir, 'plugin-cache')
 
-      configpath = os.path.join(root_dir, 'pants.ini')
+      configpath = os.path.join(root_dir, 'pants.toml')
       if create_artifacts:
         touch(configpath)
       args = [f"--pants-config-files=['{configpath}']"]

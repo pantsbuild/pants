@@ -2,7 +2,7 @@
 # an account authorized to run the Pants project (you may need to ask a Pants committer for
 # to authorize your account). Then, point to this config file and provide the oauth token like this:
 #
-#  $ ./pants --pants-config-files=pants.remote.ini
+#  $ ./pants --pants-config-files=pants.remote.toml
 #     --remote-oauth-bearer-token-path=<(gcloud auth application-default print-access-token | perl -p -e 'chomp if eof')
 #     --no-v1 --v2 test tests/python/pants_test/util:strutil
 #

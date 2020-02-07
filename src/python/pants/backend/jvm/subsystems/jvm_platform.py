@@ -36,12 +36,12 @@ class JvmPlatform(Subsystem):
                     .format(platform_name, target.address.spec if target else 'unknown target')]
       if not platforms_by_name:
         messages.append('In fact, no platforms are defined under {0}. These should typically be'
-                        ' specified in [{0}] in pants.ini.'.format(scope_name))
+                        ' specified in [{0}] in pants.toml.'.format(scope_name))
       else:
         messages.append('Perhaps you meant one of:{}'.format(
           ''.join('\n  {}'.format(name) for name in sorted(platforms_by_name.keys()))
         ))
-        messages.append('\nThese are typically defined under [{}] in pants.ini.'
+        messages.append('\nThese are typically defined under [{}] in pants.toml.'
                         .format(scope_name))
       super(JvmPlatform.UndefinedJvmPlatform, self).__init__(' '.join(messages))
 
@@ -112,7 +112,7 @@ class JvmPlatform(Subsystem):
     if name not in platforms_by_name:
       raise self.IllegalDefaultPlatform(
           "The default platform was set to '{0}', but no platform by that name has been "
-          "defined. Typically, this should be defined under [{1}] in pants.ini."
+          "defined. Typically, this should be defined under [{1}] in pants.toml."
           .format(name, self.options_scope)
       )
     return JvmPlatformSettings(*platforms_by_name[name], name=name, by_default=True)

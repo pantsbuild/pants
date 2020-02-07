@@ -63,9 +63,9 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
                    "Pylint. Pants currently provides a wrapper around MyPy and will soon add "
                    "Pylint. (To install MyPy, add "
                    "`pantsbuild.pants.contrib.mypy==%(pants_version)s` to your `plugins` list.)"
-                   "\n\nTo prepare, set `skip: True` in your `pants.ini` under the section "
-                   "`python-eval`. If you still need to use this tool, set `skip: False`. In "
-                   "Pants 1.27.0.dev0, the default will change from `skip: False` to `skip: True`, "
+                   "\n\nTo prepare, set `skip = true` in your `pants.toml` under the section "
+                   "`python-eval`. If you still need to use this tool, set `skip = false`. In "
+                   "Pants 1.27.0.dev0, the default will change from `skip = false` to `skip = true`, "
                    "and in Pants 1.29.0.dev0, the module will be removed."
     )
     return self.resolve_conflicting_skip_options(

@@ -46,7 +46,7 @@ class MirroredTargetOptionDeclaration:
     if target_setting is not None:
       return target_setting
 
-    # Otherwise, retrieve the value from the environment/pants.ini/hardcoded default.
+    # Otherwise, retrieve the value from the environment/pants.toml/hardcoded default.
     return self.option_value
 
 

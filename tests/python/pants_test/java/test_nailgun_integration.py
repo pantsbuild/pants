@@ -17,7 +17,7 @@ class TestNailgunIntegration(PantsRunIntegrationTest):
         'import org.pantsbuild.example.hello.welcome.WelcomeEverybody\n'
         'println(WelcomeEverybody("World" :: Nil).head)\n'
       ),
-      # Override the PANTS_CONFIG_FILES="pants.travis-ci.ini" used within TravisCI to enable
+      # Override the PANTS_CONFIG_FILES="pants.travis-ci.toml" used within TravisCI to enable
       # nailgun usage for the purpose of exercising that stack in the integration test.
       config={'DEFAULT': {'execution_strategy': 'nailgun'}}
     )
@@ -27,7 +27,7 @@ class TestNailgunIntegration(PantsRunIntegrationTest):
   def test_nailgun_connect_timeout(self):
     pants_run = self.run_pants(
       ['compile', self.target],
-      # Override the PANTS_CONFIG_FILES="pants.travis-ci.ini" used within TravisCI to enable
+      # Override the PANTS_CONFIG_FILES="pants.travis-ci.toml" used within TravisCI to enable
       # nailgun usage for the purpose of exercising that stack in the integration test.
       config={'DEFAULT': {'execution_strategy': 'nailgun'},
               'compile.rsc': {'nailgun_timeout_seconds': '0.00002'}}

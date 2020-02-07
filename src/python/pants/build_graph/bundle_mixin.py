@@ -22,7 +22,7 @@ class BundleMixin(TaskBase):
              fingerprint=True,
              help='Create an archive of this type from the bundle. '
                   'This option is also defined in app target. '
-                  'Precedence is CLI option > target option > pants.ini option.')
+                  'Precedence is CLI option > target option > pants.toml option.')
     # `target.id` ensures global uniqueness, this flag is provided primarily for
     # backward compatibility.
     register('--use-basename-prefix', advanced=True, type=bool,
@@ -40,7 +40,7 @@ class BundleMixin(TaskBase):
   def resolved_option(options, target, key):
     """Get value for option "key".
 
-    Resolution precedence is CLI option > target option > pants.ini option.
+    Resolution precedence is CLI option > target option > pants.toml option.
 
     :param options: Options returned by `task.get_option()`
     :param target: Target
