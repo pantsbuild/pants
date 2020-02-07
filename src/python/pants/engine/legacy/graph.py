@@ -19,6 +19,7 @@ from pants.base.specs import (
   AddressSpecs,
   AscendantAddresses,
   FilesystemLiteralSpec,
+  FilesystemResolvedGlobSpec,
   FilesystemSpecs,
   SingleAddress,
 )
@@ -737,7 +738,9 @@ async def addresses_with_origins_from_filesystem_specs(
     Get[Owners](OwnersRequest(sources=snapshot.files)) for snapshot in snapshot_per_include
   )
   result: List[AddressWithOrigin] = []
-  for spec, owners in zip(filesystem_specs.includes, owners_per_include):
+  for spec, snapshot, owners in zip(
+    filesystem_specs.includes, snapshot_per_include, owners_per_include
+  ):
     if (
       global_options.owners_not_found_behavior != OwnersNotFoundBehavior.ignore
       and isinstance(spec, FilesystemLiteralSpec) and not owners.addresses
@@ -752,10 +755,15 @@ async def addresses_with_origins_from_filesystem_specs(
         logger.warning(msg)
       else:
         raise ResolveError(msg)
-    result.extend(
-      AddressWithOrigin(address=bfa, origin=spec)
-      for bfa in owners.addresses
-    )
+    for address in owners.addresses:
+      # We preserve what literal files any globs resolved to. This allows downstream goals to be
+      # more precise in which files they operate on.
+      origin = (
+        spec
+        if isinstance(spec, FilesystemLiteralSpec) else
+        FilesystemResolvedGlobSpec(glob=spec.glob, resolved_files=snapshot.files)
+      )
+      result.append(AddressWithOrigin(address=address, origin=origin))
   return AddressesWithOrigins(result)
 
 
