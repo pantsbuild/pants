@@ -323,10 +323,22 @@ class FilesystemSpec(Spec, metaclass=ABCMeta):
   pass
 
 
+class FilesystemResolvedSpec(FilesystemSpec, metaclass=ABCMeta):
+
+  @property
+  @abstractmethod
+  def resolved_files(self) -> Tuple[str, ...]:
+    """The literal files this spec refers to after resolving all globs and excludes."""
+
+
 @dataclass(frozen=True)
-class FilesystemLiteralSpec(FilesystemSpec):
+class FilesystemLiteralSpec(FilesystemResolvedSpec):
   """A literal file name, e.g. `foo.py`."""
   file: str
+
+  @property
+  def resolved_files(self) -> Tuple[str, ...]:
+    return self.file,
 
   def to_spec_string(self) -> str:
     return self.file
@@ -339,6 +351,12 @@ class FilesystemGlobSpec(FilesystemSpec):
 
   def to_spec_string(self) -> str:
     return self.glob
+
+
+@dataclass(frozen=True)
+class FilesystemResolvedGlobSpec(FilesystemGlobSpec, FilesystemResolvedSpec):
+  """A spec with resolved globs, e.g. `*.py` may resolve to `('f1.py', 'f2.py', '__init__.py')`."""
+  resolved_files: Tuple[str, ...]
 
 
 @dataclass(frozen=True)
