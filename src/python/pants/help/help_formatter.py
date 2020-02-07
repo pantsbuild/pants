@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from textwrap import wrap
-from typing import List, Optional
+from typing import Iterable, List, Optional
 
 from colors import cyan, green, magenta, red
 
@@ -33,7 +33,12 @@ class HelpFormatter:
     return color(s) if self._color else s
 
   def format_options(
-    self, scope: str, description: Optional[str], option_registrations_iter,
+    self,
+    *,
+    scope: str,
+    description: Optional[str],
+    related_subsystem_scopes: Iterable[str],
+    option_registrations_iter,
   ) -> List[str]:
     """Return a help message for the specified options.
 
@@ -52,6 +57,8 @@ class HelpFormatter:
         lines.append(self._maybe_green(f'{display_scope}:'))
         if description:
           lines.append(description)
+        if related_subsystem_scopes:
+          lines.append(f"Related subsystems: {', '.join(sorted(related_subsystem_scopes))}")
       lines.append(' ')
       if not ohis:
         lines.append('No options available.')

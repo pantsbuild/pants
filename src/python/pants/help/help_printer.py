@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import sys
-from typing import Dict, Optional, cast
+from typing import Dict, Optional, Set, cast
 
 from typing_extensions import Literal
 
@@ -22,6 +22,7 @@ from pants.option.arg_splitter import (
 )
 from pants.option.options import Options
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
+from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
 
 
 class HelpPrinter:
@@ -153,7 +154,22 @@ class HelpPrinter:
       show_advanced=self._help_request.advanced,
       color=sys.stdout.isatty(),
     )
+
+    # TODO(#8884): Figure out how to traverse the rule graph to find all `subsystem_rules` used
+    #  transitively by the Optionable in question.
+    related_subsystem_scopes: Set[str] = set()
+    subsystem_cls = scope_info.optionable_cls
+    if subsystem_cls is not None and issubclass(subsystem_cls, SubsystemClientMixin):
+      # NB: MyPy says this condition never evaluates to true, but that's a bug in MyPy.
+      related_subsystem_scopes = {  # type: ignore[misc]
+        subsystem_dep.scope for subsystem_dep in subsystem_cls.subsystem_closure_iter()
+        if subsystem_dep.scope not in [scope, GLOBAL_SCOPE]
+      }
+
     formatted_lines = help_formatter.format_options(
-      scope, description, self._options.get_parser(scope).option_registrations_iter()
+      scope=scope,
+      description=description,
+      related_subsystem_scopes=related_subsystem_scopes,
+      option_registrations_iter=self._options.get_parser(scope).option_registrations_iter(),
     )
     return '\n'.join(formatted_lines)

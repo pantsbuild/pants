@@ -32,12 +32,22 @@ class OptionHelpFormatterTest(unittest.TestCase):
     kwargs = {'advanced': True}
     lines = HelpFormatter(
       scope='', show_recursive=False, show_advanced=False, color=False
-    ).format_options(scope='', description='', option_registrations_iter=[(args, kwargs)])
+    ).format_options(
+      scope='',
+      description='',
+      related_subsystem_scopes=[],
+      option_registrations_iter=[(args, kwargs)],
+    )
     assert len(lines) == 5
     assert not any("--foo" in line for line in lines)
     lines = HelpFormatter(
       scope='', show_recursive=True, show_advanced=True, color=False
-    ).format_options(scope='', description='', option_registrations_iter=[(args, kwargs)])
+    ).format_options(
+      scope='',
+      description='',
+      related_subsystem_scopes=[],
+      option_registrations_iter=[(args, kwargs)],
+    )
     assert len(lines) == 14
 
   def test_format_help_choices(self):
