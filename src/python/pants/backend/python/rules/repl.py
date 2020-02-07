@@ -23,13 +23,13 @@ from pants.util.contextutil import temporary_dir
 logger = logging.getLogger(__name__)
 
 
-class ReplOptions(GoalSubsystem):
+class PythonReplOptions(GoalSubsystem):
   """Opens a REPL."""
   name = 'repl2-python'
 
 
-class Repl(Goal):
-  subsystem_cls = ReplOptions
+class PythonRepl(Goal):
+  subsystem_cls = PythonReplOptions
 
 
 @goal_rule
@@ -39,7 +39,7 @@ async def run_python_repl(
     runner: InteractiveRunner,
     targets: TransitiveHydratedTargets,
     build_root: BuildRoot,
-    global_options: GlobalOptions) -> Repl:
+    global_options: GlobalOptions) -> PythonRepl:
 
   python_build_file_addresses = BuildFileAddresses(
     ht.address for ht in targets.closure if isinstance(ht.adaptor, PythonTargetAdaptor)
@@ -71,7 +71,7 @@ async def run_python_repl(
     console.write_stdout("REPL exited successfully.")
   else:
     console.write_stdout(f"REPL exited with error: {exit_code}.")
-  return Repl(exit_code)
+  return PythonRepl(exit_code)
 
 
 def rules():
