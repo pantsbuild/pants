@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from io import StringIO
 from types import CoroutineType, GeneratorType
 from typing import Any, Callable, List, Optional, Sequence, Tuple, Type, get_type_hints
+from unittest.mock import Mock
 
 from colors import blue, green, red
 
@@ -168,6 +169,13 @@ def remove_locations_from_traceback(trace):
   new_trace = location_pattern.sub('LOCATION-INFO', trace)
   new_trace = address_pattern.sub('0xEEEEEEEEE', new_trace)
   return new_trace
+
+
+class MockOptions:
+  """Test mock for any options type."""
+
+  def __init__(self, **values):
+    self.values = Mock(**values)
 
 
 class MockConsole:
