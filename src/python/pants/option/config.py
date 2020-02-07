@@ -267,9 +267,9 @@ class _TomlValues(_ConfigValues):
 
     We must also handle the special syntax of `my_list_option.add` and `my_list_option.remove`.
     """
-    return (
-      not isinstance(option_value, dict) or "add" in option_value or "remove" in option_value
-    )
+    if isinstance(option_value, dict):
+      return "add" in option_value or "remove" in option_value
+    return True
 
   @staticmethod
   def _section_explicitly_defined(section_values: Dict) -> bool:
@@ -283,10 +283,19 @@ class _TomlValues(_ConfigValues):
     at_least_one_option_defined = any(
       _TomlValues._is_an_option(section_value) for section_value in section_values.values()
     )
+    # We also check if the section was explicitly defined but has no options. We can be confident
+    # that this is not a parent scope (e.g. `cache` when `cache.java` is really what was defined)
+    # because the parent scope would store its child scope in its values, so the values would not
+    # be empty.
     blank_section = len(section_values.values()) == 0
     return at_least_one_option_defined or blank_section
 
-  def _find_section(self, section: str) -> Optional[Dict]:
+  def _find_section_values(self, section: str) -> Optional[Dict]:
+    """Find the values for a section, if any.
+
+    For example, if the config file was `{'GLOBAL': {'foo': 1}}`, this function would return
+    `{'foo': 1}` given `section='GLOBAL'`.
+    """
     def recurse(mapping: Dict, *, remaining_sections: List[str]) -> Optional[Dict]:
       if not remaining_sections:
         return None
@@ -367,7 +376,7 @@ class _TomlValues(_ConfigValues):
     return sections
 
   def has_section(self, section: str) -> bool:
-    return self._find_section(section) is not None
+    return self._find_section_values(section) is not None
 
   def has_option(self, section: str, option: str) -> bool:
     try:
@@ -378,7 +387,7 @@ class _TomlValues(_ConfigValues):
       return True
 
   def get_value(self, section: str, option: str) -> Optional[str]:
-    section_values = self._find_section(section)
+    section_values = self._find_section_values(section)
     if section_values is None:
       raise configparser.NoSectionError(section)
     if option in self.defaults:
@@ -406,7 +415,7 @@ class _TomlValues(_ConfigValues):
     return self._stringify_val(option_value)
 
   def options(self, section: str) -> List[str]:
-    section_values = self._find_section(section)
+    section_values = self._find_section_values(section)
     if section_values is None:
       raise configparser.NoSectionError(section)
     options = [
