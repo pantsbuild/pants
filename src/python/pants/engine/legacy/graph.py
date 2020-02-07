@@ -755,15 +755,14 @@ async def addresses_with_origins_from_filesystem_specs(
         logger.warning(msg)
       else:
         raise ResolveError(msg)
-    for address in owners.addresses:
-      # We preserve what literal files any globs resolved to. This allows downstream goals to be
-      # more precise in which files they operate on.
-      origin = (
-        spec
-        if isinstance(spec, FilesystemLiteralSpec) else
-        FilesystemResolvedGlobSpec(glob=spec.glob, resolved_files=snapshot.files)
-      )
-      result.append(AddressWithOrigin(address=address, origin=origin))
+    # We preserve what literal files any globs resolved to. This allows downstream goals to be
+    # more precise in which files they operate on.
+    origin = (
+      spec
+      if isinstance(spec, FilesystemLiteralSpec) else
+      FilesystemResolvedGlobSpec(glob=spec.glob, resolved_files=snapshot.files)
+    )
+    result.extend(AddressWithOrigin(address, origin) for address in owners.addresses)
   return AddressesWithOrigins(result)
 
 
