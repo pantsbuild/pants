@@ -63,8 +63,7 @@ async def lint(
   source_root_stripped_target_sources = await Get[SourceRootStrippedSources](
     Address, target.address
   )
-  file_names = source_root_stripped_target_sources.snapshot.files \
-    + wrapped_target.target.sources.snapshot.files
+  file_names = source_root_stripped_target_sources.snapshot.files
 
   # NB: Pylint output depends upon which Python interpreter version it's run with. We ensure that
   # each target runs with its own interpreter constraints. See
