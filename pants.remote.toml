@@ -9,41 +9,41 @@
 # Remoting does not work for every goal, so you should not permanently point to this ini file, e.g.
 # via an env var; only point to it when you want to remote a specific invocation.
 
-[DEFAULT]
-remote_execution: True
-remote_execution_server: remotebuildexecution.googleapis.com
-remote_store_server: remotebuildexecution.googleapis.com
+[GLOBAL]
+remote_execution = true
+remote_execution_server = "remotebuildexecution.googleapis.com"
+remote_store_server = "remotebuildexecution.googleapis.com"
 # This file might not exist on your machine. If this default fails, run `find /usr -name '*.pem'`
 # and override this value via the env var PANTS_REMOTE_CA_CERTS_PATH.
-remote_ca_certs_path: /usr/local/etc/openssl/cert.pem
-remote_instance_name: projects/pants-remoting-beta/instances/default_instance
-remote_execution_extra_platform_properties: [
-    # This allows network requests, e.g. to resolve dependencies with Pex.
-    "dockerNetwork=standard",
-    "container-image=docker://gcr.io/pants-remoting-beta/rbe-remote-execution@sha256:5d818cd71c9180d977e16ca7a20e90ced14211621b69fe1d6c3fc4c42c537a14",
-  ]
+remote_ca_certs_path = "/usr/local/etc/openssl/cert.pem"
+remote_instance_name = "projects/pants-remoting-beta/instances/default_instance"
+remote_execution_extra_platform_properties = [
+  # This allows network requests, e.g. to resolve dependencies with Pex.
+  "dockerNetwork=standard",
+  "container-image=docker://gcr.io/pants-remoting-beta/rbe-remote-execution@sha256:5d818cd71c9180d977e16ca7a20e90ced14211621b69fe1d6c3fc4c42c537a14",
+]
 
 # This should correspond to the number of workers running in Google RBE. See
 # https://console.cloud.google.com/apis/api/remotebuildexecution.googleapis.com/quotas?project=pants-remoting-beta&folder&organizationId&duration=PT6H.
-process_execution_remote_parallelism: 32
+process_execution_remote_parallelism = 32
 # TODO: Temporarily disabling speculation until we're able to confirm that it never causes a
 # negative performance impact.
-process_execution_speculation_strategy: none
+process_execution_speculation_strategy = "none"
 # p95 of RBE appears to be ~ 2 seconds, but we need to factor in local queue time which can be much longer, but no metrics yet.
-process_execution_speculation_delay: 15
+process_execution_speculation_delay = 15
 
 [python-setup]
 # TODO(#7735): This config is not ideal, that we must specify the PATH for both local and remote
 # platforms. This should be replaced by a proper mechanism to differentiate between the two.
-interpreter_search_paths: [
-     # We include the host PATH and PEXRC values so that speculation still works.
-     '<PATH>',
-     '<PEXRC>',
-     # This is the $PATH of the docker container, obtained by locally running `$ docker run --tag
-     # rbe-remote-execution sh -c 'echo $PATH'`.
-     "/pyenv-docker-build/versions/3.7.3/bin:/pyenv-docker-build/versions/3.6.8/bin:/pyenv-docker-build/versions/2.7.15/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/go/bin",
-  ]
+interpreter_search_paths = [
+  # We include the host PATH and PEXRC values so that speculation still works.
+  "<PATH>",
+  "<PEXRC>",
+  # This is the $PATH of the docker container, obtained by locally running `$ docker run --tag
+  # rbe-remote-execution sh -c 'echo $PATH'`.
+  "/pyenv-docker-build/versions/3.7.3/bin:/pyenv-docker-build/versions/3.6.8/bin:/pyenv-docker-build/versions/2.7.15/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/go/bin",
+]
 
 [python-native-code]
-ld_flags: []
-cpp_flags: []
+ld_flags = []
+cpp_flags = []
