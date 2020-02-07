@@ -328,7 +328,7 @@ class ModernizeSourcesTest(TestBase):
         )
         """
       ),
-      field_name="bundle(filespec=)",
+      field_name="bundle(fileset=)",
       line_number=3,
       replacement="['foo.java']",
       script_restriction=SCRIPT_RESTRICTIONS["no_bundles"],
@@ -344,7 +344,7 @@ class ModernizeSourcesTest(TestBase):
         assert warning == "root: " + warning_msg(
           build_file=build,
           lineno=line_number,
-          field_name="bundle(filespec=)",
+          field_name="bundle(fileset=)",
           replacement=replacement,
           script_restriction=SCRIPT_RESTRICTIONS["no_bundles"],
         )

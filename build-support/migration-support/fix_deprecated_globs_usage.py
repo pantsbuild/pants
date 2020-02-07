@@ -248,7 +248,7 @@ def generate_possibly_new_build(build_file: Path) -> Optional[List[str]]:
           warning_msg(
             build_file=build_file,
             lineno=lineno,
-            field_name="bundle(filespec=)",
+            field_name="bundle(fileset=)",
             replacement=formatted_replacement,
             script_restriction=SCRIPT_RESTRICTIONS["no_bundles"],
           )
