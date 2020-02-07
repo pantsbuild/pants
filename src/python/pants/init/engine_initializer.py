@@ -18,11 +18,11 @@ from pants.base.deprecated import deprecated_conditional
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.base.specs import Specs
-from pants.build_graph.address import BuildFileAddress
+from pants.build_graph.address import Address
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.remote_sources import RemoteSources
-from pants.engine.addressable import BuildFileAddresses
+from pants.engine.addressable import Addresses
 from pants.engine.build_files import create_graph_rules
 from pants.engine.console import Console
 from pants.engine.fs import Workspace, create_fs_rules
@@ -433,7 +433,7 @@ class EngineInitializer:
       return cast(BuildRoot, BuildRoot.instance)
 
     @rule
-    async def single_address(addresses: BuildFileAddresses) -> BuildFileAddress:
+    async def single_address(addresses: Addresses) -> Address:
       if len(addresses.dependencies) == 0:
         raise ResolveError("No targets were matched")
       if len(addresses.dependencies) > 1:

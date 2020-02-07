@@ -20,7 +20,7 @@ class Addresses(Collection[Address]):
 @dataclass(frozen=True)
 class AddressWithOrigin:
   """A BuildFileAddress along with the cmd-line spec it was generated from."""
-  address: BuildFileAddress
+  address: Address
   origin: Union[AddressSpec, FilesystemResolvedSpec]
 
 

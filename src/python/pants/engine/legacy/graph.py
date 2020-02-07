@@ -23,17 +23,12 @@ from pants.base.specs import (
   FilesystemSpecs,
   SingleAddress,
 )
-from pants.build_graph.address import Address
+from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.app_base import AppBase, Bundle
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.remote_sources import RemoteSources
-from pants.engine.addressable import (
-  Addresses,
-  AddressesWithOrigins,
-  AddressWithOrigin,
-  BuildFileAddresses,
-)
+from pants.engine.addressable import Addresses, AddressesWithOrigins, AddressWithOrigin
 from pants.engine.fs import EMPTY_SNAPSHOT, PathGlobs, Snapshot
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.structs import (
@@ -235,25 +230,6 @@ class LegacyBuildGraph(BuildGraph):
       raise AddressLookupError(
         'Build graph construction failed: {} {}'.format(type(e).__name__, str(e))
       )
-
-  def _inject_addresses(self, subjects):
-    """Injects targets into the graph for each of the given `Address` objects, and then yields them.
-
-    TODO: See #5606 about undoing the split between `_inject_addresses` and `_inject_address_specs`.
-    """
-    logger.debug('Injecting addresses to %s: %s', self, subjects)
-    with self._resolve_context():
-      addresses = tuple(subjects)
-      thts, = self._scheduler.product_request(TransitiveHydratedTargets,
-                                              [BuildFileAddresses(addresses)])
-
-    self._index(thts.closure)
-
-    yielded_addresses = set()
-    for address in subjects:
-      if address not in yielded_addresses:
-        yielded_addresses.add(address)
-        yield address
 
   def _inject_address_specs(self, address_specs: AddressSpecs):
     """Injects targets into the graph for the given `AddressSpecs` object.
@@ -471,7 +447,7 @@ class OwnersRequest:
 
 @dataclass(frozen=True)
 class Owners:
-  addresses: BuildFileAddresses
+  addresses: Addresses
 
 
 @rule
@@ -497,10 +473,13 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
     target_sources = target_kwargs.get('sources', None)
     return target_sources and any_matches_filespec(paths=sources_set, spec=target_sources.filespec)
 
-  owners = BuildFileAddresses(
+  build_file_addresses = await MultiGet(
+    Get[BuildFileAddress](Address, ht.adaptor.address) for ht in candidate_targets
+  )
+  owners = Addresses(
     ht.adaptor.address
-    for ht in candidate_targets
-    if LegacyAddressMapper.any_is_declaring_file(ht.adaptor.address, sources_set)
+    for ht, bfa in zip(candidate_targets, build_file_addresses)
+    if LegacyAddressMapper.any_is_declaring_file(bfa, sources_set)
     or owns_any_source(ht)
   )
   return Owners(owners)
@@ -591,7 +570,7 @@ async def hydrate_target(hydrated_struct: HydratedStruct) -> HydratedTarget:
   for field in hydrated_fields:
     kwargs[field.name] = field.value
   return HydratedTarget(
-    address=target_adaptor.address.to_address(),
+    address=target_adaptor.address,
     adaptor=type(target_adaptor)(**kwargs),
     dependencies=tuple(target_adaptor.dependencies),
   )
@@ -620,12 +599,13 @@ async def hydrate_sources(
   """Given a SourcesField, request a Snapshot for its path_globs and create an EagerFilesetWithSpec.
   """
   address = sources_field.address
+  bfaddr = await Get[BuildFileAddress](Address, address)
   path_globs = dataclasses.replace(
     sources_field.path_globs,
     glob_match_error_behavior=glob_match_error_behavior,
     # TODO(#9012): add line number referring to the sources field.
     description_of_origin=(
-      f"{address.rel_path} for target {address.relative_spec}'s `{sources_field.arg}` field"
+      f"{bfaddr.rel_path} for target {address.relative_spec}'s `{sources_field.arg}` field"
     ),
   )
   snapshot = await Get[Snapshot](PathGlobs, path_globs)
@@ -644,12 +624,13 @@ async def hydrate_bundles(
 ) -> HydratedField:
   """Given a BundlesField, request Snapshots for each of its filesets and create BundleAdaptors."""
   address = bundles_field.address
+  bfaddr = await Get[BuildFileAddress](Address, address)
   path_globs_with_match_errors = [
     dataclasses.replace(
       pg,
       glob_match_error_behavior=glob_match_error_behavior,
       # TODO(#9012): add line number referring to the bundles field.
-      description_of_origin=f"{address.rel_path} for target {address.relative_spec}'s `bundles` field",
+      description_of_origin=f"{bfaddr.rel_path} for target {address.relative_spec}'s `bundles` field",
     )
     for pg in bundles_field.path_globs_list
   ]
@@ -690,9 +671,7 @@ async def hydrate_sources_snapshot(hydrated_struct: HydratedStruct) -> SourcesSn
 
 
 @rule
-async def sources_snapshots_from_build_file_addresses(
-  address_specs: AddressSpecs,
-) -> SourcesSnapshots:
+async def sources_snapshots_from_address_specs(address_specs: AddressSpecs) -> SourcesSnapshots:
   """Request SourcesSnapshots for the given BuildFileAddresses.
 
   Each address will map to a corresponding SourcesSnapshot. This rule avoids hydrating any other
@@ -705,10 +684,8 @@ async def sources_snapshots_from_build_file_addresses(
   # FilesystemSpecs -> SourcesSnapshots directly, so there are now two ways to go from
   # FilesystemSpecs -> SourcesSnapshot and the graph does not like the ambiguity. By having the
   # rule request AddressSpecs instead, we remove the ambiguity.
-  build_file_addresses = await Get[BuildFileAddresses](AddressSpecs, address_specs)
-  snapshots = await MultiGet(
-    Get[SourcesSnapshot](Address, a) for a in build_file_addresses.addresses
-  )
+  addresses = await Get[Addresses](AddressSpecs, address_specs)
+  snapshots = await MultiGet(Get[SourcesSnapshot](Address, a) for a in addresses)
   return SourcesSnapshots(snapshots)
 
 
@@ -779,7 +756,7 @@ def create_legacy_graph_tasks():
     sort_targets,
     hydrate_sources_snapshot,
     addresses_with_origins_from_filesystem_specs,
-    sources_snapshots_from_build_file_addresses,
+    sources_snapshots_from_address_specs,
     sources_snapshots_from_filesystem_specs,
     RootRule(FilesystemSpecs),
     RootRule(OwnersRequest),

@@ -175,13 +175,14 @@ async def run_tests(
 async def coordinator_of_tests(
   target: HydratedTarget,
   union_membership: UnionMembership,
-  address_origin_map: AddressOriginMap
+  # TODO: get this working. Uncommenting it out results in graph ambiguity.
+  # address_origin_map: AddressOriginMap
 ) -> AddressAndTestResult:
 
-  if not AddressAndTestResult.is_testable(
-    target, union_membership=union_membership, address_origin_map=address_origin_map
-  ):
-    return AddressAndTestResult(target.address, None)
+  # if not AddressAndTestResult.is_testable(
+  #   target, union_membership=union_membership, address_origin_map=address_origin_map
+  # ):
+  #   return AddressAndTestResult(target.address, None)
 
   # TODO(#6004): when streaming to live TTY, rely on V2 UI for this information. When not a
   # live TTY, periodically dump heavy hitters to stderr. See

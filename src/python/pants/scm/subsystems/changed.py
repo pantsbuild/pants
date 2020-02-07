@@ -50,7 +50,7 @@ async def find_owners(
   changed_request: ChangedRequest,
 ) -> ChangedAddresses:
   owners = await Get[Owners](OwnersRequest(sources=changed_request.sources))
-  direct_owners = Addresses(bfa.to_address() for bfa in owners.addresses)
+  direct_owners = Addresses(address for address in owners.addresses)
 
   # If the ChangedRequest does not require dependees, then we're done.
   if changed_request.include_dependees == IncludeDependeesOption.NONE:
