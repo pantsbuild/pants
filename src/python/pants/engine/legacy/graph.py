@@ -23,7 +23,7 @@ from pants.base.specs import (
   FilesystemSpecs,
   SingleAddress,
 )
-from pants.build_graph.address import Address, BuildFileAddress
+from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.app_base import AppBase, Bundle
 from pants.build_graph.build_graph import BuildGraph
@@ -373,7 +373,7 @@ class HydratedTarget:
   Transitive graph walks collect ordered sets of TransitiveHydratedTargets which involve a huge amount
   of hashing: we implement eq/hash via direct usage of an Address field to speed that up.
   """
-  address: BuildFileAddress
+  address: Address
   adaptor: TargetAdaptor
   dependencies: Tuple[Address, ...]
 
@@ -591,7 +591,7 @@ async def hydrate_target(hydrated_struct: HydratedStruct) -> HydratedTarget:
   for field in hydrated_fields:
     kwargs[field.name] = field.value
   return HydratedTarget(
-    address=target_adaptor.address,
+    address=target_adaptor.address.to_address(),
     adaptor=type(target_adaptor)(**kwargs),
     dependencies=tuple(target_adaptor.dependencies),
   )

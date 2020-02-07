@@ -4,7 +4,7 @@
 from pathlib import Path
 from typing import List, Tuple, Type
 
-from pants.build_graph.address import BuildFileAddress
+from pants.build_graph.address import Address
 from pants.engine.fs import (
   EMPTY_DIRECTORY_DIGEST,
   Digest,
@@ -43,7 +43,7 @@ class FmtTest(TestBase):
       dirs=()
     )
     return HydratedTarget(
-      address=BuildFileAddress(rel_path="src/BUILD", target_name=name),
+      address=Address.parse(f"src:{name}"),
       adaptor=adaptor_type(
         sources=EagerFilesetWithSpec("src", {"globs": []}, snapshot=mocked_snapshot),
         name=name,

@@ -8,7 +8,7 @@ from textwrap import dedent
 
 from pants.base.specs import AddressSpec, AddressSpecs, SingleAddress
 from pants.build_graph.address import Address
-from pants.engine.addressable import BuildFileAddresses
+from pants.engine.addressable import Addresses
 from pants.engine.build_files import create_graph_rules
 from pants.engine.fs import create_fs_rules
 from pants.engine.mapper import (
@@ -136,8 +136,8 @@ HydratedStructs = Collection[HydratedStruct]
 
 
 @rule
-async def unhydrated_structs(build_file_addresses: BuildFileAddresses) -> HydratedStructs:
-  tacs = await MultiGet(Get[HydratedStruct](Address, a) for a in build_file_addresses.addresses)
+async def unhydrated_structs(addresses: Addresses) -> HydratedStructs:
+  tacs = await MultiGet(Get[HydratedStruct](Address, a) for a in addresses)
   return HydratedStructs(tacs)
 
 
