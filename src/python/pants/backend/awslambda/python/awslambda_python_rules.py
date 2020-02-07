@@ -13,7 +13,7 @@ from pants.backend.python.rules.pex import (
 )
 from pants.backend.python.rules.pex_from_target_closure import CreatePexFromTargetClosure
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
-from pants.engine.addressable import BuildFileAddresses
+from pants.engine.addressable import Addresses
 from pants.engine.fs import Digest, DirectoriesToMerge
 from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
 from pants.engine.legacy.structs import PythonAWSLambdaAdaptor
@@ -36,7 +36,7 @@ async def create_python_awslambda(
   # TODO: We must enforce that everything is built for Linux, no matter the local platform.
   pex_filename = f'{lambda_tgt_adaptor.address.target_name}.pex'
   pex_request = CreatePexFromTargetClosure(
-    build_file_addresses=BuildFileAddresses((lambda_tgt_adaptor.address,)),
+    addresses=Addresses((lambda_tgt_adaptor.address.to_address(),)),
     entry_point=None,
     output_filename=pex_filename
   )

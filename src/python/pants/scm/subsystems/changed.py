@@ -8,7 +8,7 @@ from typing import List, Optional, Tuple, cast
 from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.build_graph.address import Address
 from pants.build_graph.build_configuration import BuildConfiguration
-from pants.engine.addressable import BuildFileAddresses
+from pants.engine.addressable import Addresses
 from pants.engine.legacy.graph import (
   Owners,
   OwnersRequest,
@@ -39,12 +39,8 @@ class ChangedRequest:
 
 @dataclass(frozen=True)
 class ChangedAddresses:
-  """Light wrapper around the build file addresses referring to the changed targets.
-
-  This is necessary to disambiguate the graph, as the rule `changed.find_owners` uses
-  `OwnersRequest` to `await Get[BuildFileAddresses]`, so cannot also directly return
-  `BuildFileAddresses.`"""
-  addresses: BuildFileAddresses
+  """Light wrapper around the addresses referring to the changed targets."""
+  addresses: Addresses
 
 
 @rule
@@ -53,17 +49,18 @@ async def find_owners(
   address_mapper: AddressMapper,
   changed_request: ChangedRequest,
 ) -> ChangedAddresses:
-  direct_owners = await Get[Owners](OwnersRequest(sources=changed_request.sources))
+  owners = await Get[Owners](OwnersRequest(sources=changed_request.sources))
+  direct_owners = Addresses(bfa.to_address() for bfa in owners.addresses)
 
   # If the ChangedRequest does not require dependees, then we're done.
   if changed_request.include_dependees == IncludeDependeesOption.NONE:
-    return ChangedAddresses(direct_owners.addresses)
+    return ChangedAddresses(direct_owners)
 
   # Otherwise: find dependees.
-  all_addresses = await Get[BuildFileAddresses](AddressSpecs((DescendantAddresses(''),)))
+  all_addresses = await Get[Addresses](AddressSpecs((DescendantAddresses(''),)))
   all_structs = [
     s.value for s in
-    await MultiGet(Get[HydratedStruct](Address, a.to_address()) for a in all_addresses)
+    await MultiGet(Get[HydratedStruct](Address, a) for a in all_addresses)
   ]
 
   bfa = build_configuration.registered_aliases()
@@ -71,12 +68,8 @@ async def find_owners(
     target_types_from_build_file_aliases(bfa), address_mapper, all_structs
   )
   if changed_request.include_dependees == IncludeDependeesOption.DIRECT:
-    return ChangedAddresses(
-      BuildFileAddresses(graph.dependents_of_addresses(direct_owners.addresses))
-    )
-  return ChangedAddresses(
-    BuildFileAddresses(graph.transitive_dependents_of_addresses(direct_owners.addresses))
-  )
+    return ChangedAddresses(Addresses(graph.dependents_of_addresses(direct_owners)))
+  return ChangedAddresses(Addresses(graph.transitive_dependents_of_addresses(direct_owners)))
 
 
 @dataclass(frozen=True)

@@ -113,7 +113,13 @@ class GlobFunction(NamedTuple):
         f"{glob_func.lineno}. Please manually update."
       )
       return None
-    include_globs: List[str] = [arg.s for arg in glob_func.args if isinstance(arg, ast.Str)]
+    if not all(isinstance(arg, ast.Str) for arg in glob_func.args):
+      logging.warning(
+        f"Could not parse the globs in {build_file} at line {glob_func.lineno}. Likely, you are "
+        f"using variables instead of raw strings. Please manually update."
+      )
+      return None
+    include_globs: List[str] = [arg.s for arg in glob_func.args]
 
     # Excludes are tricky...The optional `exclude` keyword is guaranteed to have a list as its
     # value, but that list can have any of these elements:
@@ -131,8 +137,17 @@ class GlobFunction(NamedTuple):
         )
       )
       combined_exclude_elements: List[Union[ast.Call, ast.Str]] = [
-        *exclude_elements, *nested_exclude_elements,
+        element for element in
+        (*exclude_elements, *nested_exclude_elements)
+        # Lists are already flattened, so we want to remove them from this collection.
+        if not isinstance(element, ast.List)
       ]
+      if not all(isinstance(arg, (ast.Call, ast.Str)) for arg in combined_exclude_elements):
+        logging.warning(
+          f"Could not parse the exclude globs in {build_file} at line {glob_func.lineno}. Likely, "
+          f"you are using variables instead of raw strings. Please manually update."
+        )
+        return None
       exclude_globs = [arg.s for arg in combined_exclude_elements if isinstance(arg, ast.Str)]
       exclude_glob_functions = (
         cls.parse(glob, build_file=build_file)
@@ -233,7 +248,7 @@ def generate_possibly_new_build(build_file: Path) -> Optional[List[str]]:
           warning_msg(
             build_file=build_file,
             lineno=lineno,
-            field_name="bundle(filespec=)",
+            field_name="bundle(fileset=)",
             replacement=formatted_replacement,
             script_restriction=SCRIPT_RESTRICTIONS["no_bundles"],
           )

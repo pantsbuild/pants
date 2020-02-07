@@ -3,6 +3,21 @@
 
 This document describes releases leading up to the ``1.24.x`` ``stable`` series.
 
+1.24.1rc0 (02/06/2020)
+----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* correctly fingerprint scoverage options and copy output into dist/ (#8705)
+  `PR #8705 <https://github.com/pantsbuild/pants/pull/8705>`_
+
+Bugfixes
+~~~~~~~~
+
+* remove custom NodeResolveFingerprintStrategy (#8398)
+  `PR #8398 <https://github.com/pantsbuild/pants/pull/8398>`_
+
 1.24.0 (01/28/2020)
 -------------------
 
@@ -391,4 +406,3 @@ Version updates
 
 * Bump to latest junit-runner to pull in #8674. (#8692)
   `PR #8692 <https://github.com/pantsbuild/pants/pull/8692>`_
-

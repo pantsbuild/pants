@@ -22,12 +22,17 @@ from pants.base.specs import (
   FilesystemSpecs,
   SingleAddress,
 )
-from pants.build_graph.address import Address
+from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.app_base import AppBase, Bundle
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.remote_sources import RemoteSources
-from pants.engine.addressable import AddressesWithOrigins, AddressWithOrigin, BuildFileAddresses
+from pants.engine.addressable import (
+  Addresses,
+  AddressesWithOrigins,
+  AddressWithOrigin,
+  BuildFileAddresses,
+)
 from pants.engine.fs import EMPTY_SNAPSHOT, PathGlobs, Snapshot
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.structs import (
@@ -367,9 +372,9 @@ class HydratedTarget:
   Transitive graph walks collect ordered sets of TransitiveHydratedTargets which involve a huge amount
   of hashing: we implement eq/hash via direct usage of an Address field to speed that up.
   """
-  address: Any
+  address: BuildFileAddress
   adaptor: TargetAdaptor
-  dependencies: Tuple
+  dependencies: Tuple[Address, ...]
 
   @property
   def addresses(self) -> Tuple:
@@ -501,10 +506,8 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
 
 
 @rule
-async def transitive_hydrated_targets(
-  build_file_addresses: BuildFileAddresses
-) -> TransitiveHydratedTargets:
-  """Given BuildFileAddresses, kicks off recursion on expansion of TransitiveHydratedTargets.
+async def transitive_hydrated_targets(addresses: Addresses) -> TransitiveHydratedTargets:
+  """Given Addresses, kicks off recursion on expansion of TransitiveHydratedTargets.
 
   The TransitiveHydratedTarget struct represents a structure-shared graph, which we walk
   and flatten here. The engine memoizes the computation of TransitiveHydratedTarget, so
@@ -513,7 +516,7 @@ async def transitive_hydrated_targets(
   """
 
   transitive_hydrated_targets = await MultiGet(
-    Get[TransitiveHydratedTarget](Address, a) for a in build_file_addresses.addresses
+    Get[TransitiveHydratedTarget](Address, a) for a in addresses
   )
 
   closure = OrderedSet()
@@ -562,11 +565,9 @@ def topo_sort(targets: Iterable[HydratedTarget]) -> Tuple[HydratedTarget, ...]:
   return tuple(tgt for tgt in res if tgt in input_set)
 
 
-
 @rule
-async def hydrated_targets(build_file_addresses: BuildFileAddresses) -> HydratedTargets:
-  """Requests HydratedTarget instances for BuildFileAddresses."""
-  targets = await MultiGet(Get[HydratedTarget](Address, a) for a in build_file_addresses.addresses)
+async def hydrated_targets(addresses: Addresses) -> HydratedTargets:
+  targets = await MultiGet(Get[HydratedTarget](Address, a) for a in addresses)
   return HydratedTargets(targets)
 
 
@@ -588,9 +589,11 @@ async def hydrate_target(hydrated_struct: HydratedStruct) -> HydratedTarget:
   kwargs = target_adaptor.kwargs()
   for field in hydrated_fields:
     kwargs[field.name] = field.value
-  return HydratedTarget(target_adaptor.address,
-                       type(target_adaptor)(**kwargs),
-                       tuple(target_adaptor.dependencies))
+  return HydratedTarget(
+    address=target_adaptor.address,
+    adaptor=type(target_adaptor)(**kwargs),
+    dependencies=tuple(target_adaptor.dependencies),
+  )
 
 
 def _eager_fileset_with_spec(
