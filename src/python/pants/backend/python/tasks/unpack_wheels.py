@@ -7,11 +7,11 @@ from hashlib import sha1
 from pex.pex_builder import PEXBuilder
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
-from pants.backend.python.subsystems.pex_build_util import PexBuilderWrapper
-from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.unpacked_whls import UnpackedWheels
 from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import DefaultFingerprintHashingMixin, FingerprintStrategy
+from pants.python.pex_build_util import PexBuilderWrapper
+from pants.python.python_setup import PythonSetup
 from pants.task.unpack_remote_sources_base import UnpackRemoteSourcesBase
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import mergetree, safe_concurrent_creation

@@ -11,13 +11,13 @@ from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
-from pants.backend.python.python_requirement import PythonRequirement
-from pants.backend.python.subsystems.pex_build_util import PexBuilderWrapper
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.base.build_environment import get_pants_cachedir
 from pants.base.exceptions import TaskError
 from pants.base.hash_utils import stable_json_sha1
 from pants.base.workunit import WorkUnitLabel
+from pants.python.pex_build_util import PexBuilderWrapper
+from pants.python.python_requirement import PythonRequirement
 from pants.task.task import Task
 from pants.util.dirutil import safe_concurrent_creation
 from pants.util.strutil import ensure_binary, safe_shlex_join

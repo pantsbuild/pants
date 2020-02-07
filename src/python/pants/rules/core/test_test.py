@@ -9,7 +9,7 @@ from unittest.mock import Mock
 from pants.base.specs import DescendantAddresses, SingleAddress, Spec
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.addressable import BuildFileAddresses
-from pants.engine.build_files import AddressProvenanceMap
+from pants.engine.build_files import AddressOriginMap
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, Digest, FileContent, InputFilesContent, Snapshot
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
 from pants.engine.legacy.graph import HydratedTarget
@@ -77,7 +77,7 @@ class TestTest(TestBase):
         MockGet(
           product_type=BuildFileAddress,
           subject_type=BuildFileAddresses,
-          mock=lambda bfas: bfas.dependencies[0],
+          mock=lambda addresses: addresses.dependencies[0],
         ),
       ],
     )
@@ -85,7 +85,7 @@ class TestTest(TestBase):
     assert (0 if success else 1) == res.exit_code
 
   @staticmethod
-  def make_build_target_address(spec):
+  def make_build_target_address(spec: str) -> BuildFileAddress:
     address = Address.parse(spec)
     return BuildFileAddress(
       build_file=None,
@@ -93,7 +93,7 @@ class TestTest(TestBase):
       rel_path=f'{address.spec_path}/BUILD',
     )
 
-  def test_output_success(self):
+  def test_output_success(self) -> None:
     self.single_target_test(
       result=TestResult(status=Status.SUCCESS, stdout='Here is some output from a test', stderr=''),
       expected_console_output=dedent("""\
@@ -104,7 +104,7 @@ class TestTest(TestBase):
       """),
     )
 
-  def test_output_failure(self):
+  def test_output_failure(self) -> None:
     self.single_target_test(
       result=TestResult(status=Status.FAILURE, stdout='Here is some output from a test', stderr=''),
       expected_console_output=dedent("""\
@@ -116,14 +116,14 @@ class TestTest(TestBase):
       success=False,
     )
 
-  def test_output_mixed(self):
+  def test_output_mixed(self) -> None:
     console = MockConsole(use_colors=False)
     options = MockOptions(debug=False)
     runner = InteractiveRunner(self.scheduler)
     target1 = self.make_build_target_address("testprojects/tests/python/pants/passes")
     target2 = self.make_build_target_address("testprojects/tests/python/pants/fails")
 
-    def make_result(target):
+    def make_result(target: BuildFileAddress) -> AddressAndTestResult:
       if target == target1:
         tr = TestResult(status=Status.SUCCESS, stdout='I passed\n', stderr='')
       elif target == target2:
@@ -132,7 +132,7 @@ class TestTest(TestBase):
         raise Exception("Unrecognised target")
       return AddressAndTestResult(target, tr)
 
-    def make_debug_request(target):
+    def make_debug_request(target: BuildFileAddress) -> AddressAndDebugRequest:
       request = TestDebugRequest(ipr=self.make_successful_ipr() if target == target1 else self.make_failure_ipr())
       return AddressAndDebugRequest(target, request)
 
@@ -145,15 +145,13 @@ class TestTest(TestBase):
         MockGet(
           product_type=BuildFileAddress,
           subject_type=BuildFileAddresses,
-          mock=lambda tgt: BuildFileAddress(
-            rel_path=f'{tgt.spec_path}/BUILD', target_name=tgt.target_name,
-          )
+          mock=lambda addresses: addresses.dependencies[0]
         ),
       ],
     )
 
     self.assertEqual(1, res.exit_code)
-    self.assertEquals(console.stdout.getvalue(), dedent("""\
+    self.assertEqual(console.stdout.getvalue(), dedent("""\
       testprojects/tests/python/pants/passes stdout:
       I passed
 
@@ -165,7 +163,7 @@ class TestTest(TestBase):
       testprojects/tests/python/pants/fails                                           .....   FAILURE
       """))
 
-  def test_stderr(self):
+  def test_stderr(self) -> None:
     self.single_target_test(
       result=TestResult(status=Status.FAILURE, stdout='', stderr='Failure running the tests!'),
       expected_console_output=dedent("""\
@@ -177,7 +175,7 @@ class TestTest(TestBase):
       success=False,
     )
 
-  def test_debug_options(self):
+  def test_debug_options(self) -> None:
     self.single_target_test(
       result=None,
       expected_console_output='',
@@ -188,8 +186,8 @@ class TestTest(TestBase):
   def run_coordinator_of_tests(
     self,
     *,
-    address: Address,
-    bfaddr_to_spec: Optional[Dict[BuildFileAddress, Spec]] = None,
+    address: BuildFileAddress,
+    addr_to_origin: Optional[Dict[Address, Spec]] = None,
     test_target_type: bool = True,
     include_sources: bool = True,
   ) -> AddressAndTestResult:
@@ -215,7 +213,7 @@ class TestTest(TestBase):
         rule_args=[
           HydratedTarget(address, target_adaptor, ()),
           UnionMembership(union_rules={TestTarget: [PythonTestsAdaptor]}),
-          AddressProvenanceMap(bfaddr_to_spec=bfaddr_to_spec or {}),
+          AddressOriginMap(addr_to_origin=addr_to_origin or {}),
         ],
         mock_gets=[
           MockGet(
@@ -227,45 +225,45 @@ class TestTest(TestBase):
       )
     return result
 
-  def test_coordinator_single_test_target(self):
-    addr = Address.parse("some/target")
-    result = self.run_coordinator_of_tests(address=addr)
+  def test_coordinator_single_test_target(self) -> None:
+    bfaddr = BuildFileAddress(rel_path='some/dir', target_name='tests')
+    result = self.run_coordinator_of_tests(address=bfaddr)
     assert result == AddressAndTestResult(
-      addr, TestResult(status=Status.SUCCESS, stdout='foo', stderr='')
+      bfaddr, TestResult(status=Status.SUCCESS, stdout='foo', stderr='')
     )
 
-  def test_coordinator_single_non_test_target(self):
-    bfaddr = BuildFileAddress(None, 'bin', 'some/dir')
+  def test_coordinator_single_non_test_target(self) -> None:
+    bfaddr = BuildFileAddress(target_name='bin', rel_path='some/dir')
     # Note that this is not the same error message the end user will see, as we're resolving
     # union Get requests in run_rule, not the real engine.  But this test still asserts that
     # we error when we expect to error.
     with self.assertRaisesRegex(AssertionError, r'Rule requested: .* which cannot be satisfied.'):
       self.run_coordinator_of_tests(
-        address=bfaddr.to_address(),
-        bfaddr_to_spec={bfaddr: SingleAddress(directory='some/dir', name='bin')},
+        address=bfaddr,
+        addr_to_origin={bfaddr.to_address(): SingleAddress(directory='some/dir', name='bin')},
         test_target_type=False,
       )
 
-  def test_coordinator_empty_sources(self):
-    addr = Address.parse("some/target")
-    result = self.run_coordinator_of_tests(address=addr, include_sources=False)
-    assert result == AddressAndTestResult(addr, None)
+  def test_coordinator_empty_sources(self) -> None:
+    bfaddr = BuildFileAddress(rel_path='some/dir', target_name='tests')
+    result = self.run_coordinator_of_tests(address=bfaddr, include_sources=False)
+    assert result == AddressAndTestResult(bfaddr, None)
 
-  def test_coordinator_globbed_test_target(self):
+  def test_coordinator_globbed_test_target(self) -> None:
     bfaddr = BuildFileAddress(rel_path='some/dir', target_name='tests')
     result = self.run_coordinator_of_tests(
-      address=bfaddr.to_address(),
-      bfaddr_to_spec={bfaddr: DescendantAddresses(directory='some/dir')}
+      address=bfaddr,
+      addr_to_origin={bfaddr.to_address(): DescendantAddresses(directory='some/dir')}
     )
     assert result == AddressAndTestResult(
-      bfaddr.to_address(), TestResult(status=Status.SUCCESS, stdout='foo', stderr='')
+      bfaddr, TestResult(status=Status.SUCCESS, stdout='foo', stderr='')
     )
 
-  def test_coordinator_globbed_non_test_target(self):
+  def test_coordinator_globbed_non_test_target(self) -> None:
     bfaddr = BuildFileAddress(rel_path='some/dir', target_name='bin')
     result = self.run_coordinator_of_tests(
-      address=bfaddr.to_address(),
-      bfaddr_to_spec={bfaddr: DescendantAddresses(directory='some/dir')},
+      address=bfaddr,
+      addr_to_origin={bfaddr.to_address(): DescendantAddresses(directory='some/dir')},
       test_target_type=False,
     )
-    assert result == AddressAndTestResult(bfaddr.to_address(), None)
+    assert result == AddressAndTestResult(bfaddr, None)

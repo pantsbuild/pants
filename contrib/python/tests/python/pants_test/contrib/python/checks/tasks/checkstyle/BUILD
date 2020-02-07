@@ -10,7 +10,6 @@ python_tests(
     '//:pants_pex',
     'build-support/regexes',
     'contrib/python/src/python/pants/contrib/python/checks/tasks/checkstyle',
-    'src/python/pants/backend/python/subsystems',
     'src/python/pants/backend/python/targets',
     'src/python/pants/backend/python/tasks',
     'src/python/pants/base:build_environment',

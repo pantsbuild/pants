@@ -11,6 +11,7 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
 from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get
+from pants.option.custom_types import shell_str
 from pants.rules.core.binary import BinaryTarget, CreatedBinary
 from pants.util.contextutil import temporary_dir
 
@@ -21,6 +22,15 @@ class RunOptions(GoalSubsystem):
 
   # NB: To be runnable, you must be a BinaryTarget.
   required_union_implementations = (BinaryTarget,)
+
+  @classmethod
+  def register_options(cls, register) -> None:
+    super().register_options(register)
+    register(
+      '--args', type=list, member_type=shell_str, fingerprint=True,
+      help="Arguments to pass directly to the executed target, e.g. "
+           "`--run-args=\"val1 val2 --debug\"`",
+    )
 
 
 class Run(Goal):
@@ -34,6 +44,7 @@ async def run(
   runner: InteractiveRunner,
   build_root: BuildRoot,
   bfa: BuildFileAddress,
+  options: RunOptions,
 ) -> Run:
   target = bfa.to_address()
   binary = await Get[CreatedBinary](Address, target)
@@ -47,7 +58,7 @@ async def run(
     console.write_stdout(f"Running target: {target}\n")
     full_path = str(Path(tmpdir, binary.binary_name))
     run_request = InteractiveProcessRequest(
-      argv=(full_path,),
+      argv=(full_path, *options.values.args),
       run_in_workspace=True,
     )
 
@@ -60,7 +71,7 @@ async def run(
         console.write_stderr(f"{target} failed with code {result.process_exit_code}!\n")
 
     except Exception as e:
-      console.write_stderr(f"Exception when attempting to run {target} : {e}\n")
+      console.write_stderr(f"Exception when attempting to run {target}: {e!r}\n")
       exit_code = -1
 
   return Run(exit_code)

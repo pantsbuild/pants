@@ -11,7 +11,6 @@ python_tests(
     'src/python/pants/backend/python:interpreter_cache',
     'src/python/pants/backend/python:plugin',
     'src/python/pants/backend/python:python_artifact',
-    'src/python/pants/backend/python:python_requirement',
     'src/python/pants/base:build_root',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:run_info',

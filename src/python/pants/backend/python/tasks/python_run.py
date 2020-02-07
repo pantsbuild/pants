@@ -8,19 +8,10 @@ from pants.backend.python.tasks.python_execution_task_base import PythonExecutio
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.util.osutil import safe_kill
-from pants.util.strutil import safe_shlex_split
 
 
 class PythonRun(PythonExecutionTaskBase):
   """Run a Python executable."""
-
-  @classmethod
-  def register_options(cls, register):
-    super().register_options(register)
-    register(
-      '--args', type=list, help='Run with these extra args to main().',
-      removal_version="1.26.0.dev0", removal_hint="Use `--passthrough-args` instead of `--args`."
-    )
 
   @classmethod
   def supports_passthru_args(cls):
@@ -34,10 +25,7 @@ class PythonRun(PythonExecutionTaskBase):
       # TODO(benjy): Use MutexTask to coordinate this.
 
       pex = self.create_pex(binary.pexinfo)
-      args = []
-      for arg in self.get_options().args:
-        args.extend(safe_shlex_split(arg))
-      args += self.get_passthru_args()
+      args = [*self.get_passthru_args(), *self.get_options().args]
 
       env = self.prepare_pex_env()
 

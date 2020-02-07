@@ -19,18 +19,20 @@ from pants.base.specs import (
   AddressSpecs,
   AscendantAddresses,
   FilesystemLiteralSpec,
+  FilesystemResolvedGlobSpec,
   FilesystemSpecs,
   SingleAddress,
 )
-from pants.build_graph.address import Address
+from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.app_base import AppBase, Bundle
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.remote_sources import RemoteSources
 from pants.engine.addressable import (
+  Addresses,
+  AddressesWithOrigins,
+  AddressWithOrigin,
   BuildFileAddresses,
-  ProvenancedBuildFileAddress,
-  ProvenancedBuildFileAddresses,
 )
 from pants.engine.fs import EMPTY_SNAPSHOT, PathGlobs, Snapshot
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
@@ -371,9 +373,9 @@ class HydratedTarget:
   Transitive graph walks collect ordered sets of TransitiveHydratedTargets which involve a huge amount
   of hashing: we implement eq/hash via direct usage of an Address field to speed that up.
   """
-  address: Any
+  address: BuildFileAddress
   adaptor: TargetAdaptor
-  dependencies: Tuple
+  dependencies: Tuple[Address, ...]
 
   @property
   def addresses(self) -> Tuple:
@@ -505,10 +507,8 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
 
 
 @rule
-async def transitive_hydrated_targets(
-  build_file_addresses: BuildFileAddresses
-) -> TransitiveHydratedTargets:
-  """Given BuildFileAddresses, kicks off recursion on expansion of TransitiveHydratedTargets.
+async def transitive_hydrated_targets(addresses: Addresses) -> TransitiveHydratedTargets:
+  """Given Addresses, kicks off recursion on expansion of TransitiveHydratedTargets.
 
   The TransitiveHydratedTarget struct represents a structure-shared graph, which we walk
   and flatten here. The engine memoizes the computation of TransitiveHydratedTarget, so
@@ -517,7 +517,7 @@ async def transitive_hydrated_targets(
   """
 
   transitive_hydrated_targets = await MultiGet(
-    Get[TransitiveHydratedTarget](Address, a) for a in build_file_addresses.addresses
+    Get[TransitiveHydratedTarget](Address, a) for a in addresses
   )
 
   closure = OrderedSet()
@@ -566,11 +566,9 @@ def topo_sort(targets: Iterable[HydratedTarget]) -> Tuple[HydratedTarget, ...]:
   return tuple(tgt for tgt in res if tgt in input_set)
 
 
-
 @rule
-async def hydrated_targets(build_file_addresses: BuildFileAddresses) -> HydratedTargets:
-  """Requests HydratedTarget instances for BuildFileAddresses."""
-  targets = await MultiGet(Get[HydratedTarget](Address, a) for a in build_file_addresses.addresses)
+async def hydrated_targets(addresses: Addresses) -> HydratedTargets:
+  targets = await MultiGet(Get[HydratedTarget](Address, a) for a in addresses)
   return HydratedTargets(targets)
 
 
@@ -592,9 +590,11 @@ async def hydrate_target(hydrated_struct: HydratedStruct) -> HydratedTarget:
   kwargs = target_adaptor.kwargs()
   for field in hydrated_fields:
     kwargs[field.name] = field.value
-  return HydratedTarget(target_adaptor.address,
-                       type(target_adaptor)(**kwargs),
-                       tuple(target_adaptor.dependencies))
+  return HydratedTarget(
+    address=target_adaptor.address,
+    adaptor=type(target_adaptor)(**kwargs),
+    dependencies=tuple(target_adaptor.dependencies),
+  )
 
 
 def _eager_fileset_with_spec(
@@ -722,11 +722,11 @@ async def sources_snapshots_from_filesystem_specs(
 
 
 @rule
-async def provenanced_addresses_from_filesystem_specs(
+async def addresses_with_origins_from_filesystem_specs(
   filesystem_specs: FilesystemSpecs, global_options: GlobalOptions,
-) -> ProvenancedBuildFileAddresses:
+) -> AddressesWithOrigins:
   """Find the owner(s) for each FilesystemSpec while preserving the original FilesystemSpec those
-  owners come from (i.e., preserving the "provenance").
+  owners come from.
   """
   pathglobs_per_include = (
     filesystem_specs.path_globs_for_spec(spec) for spec in filesystem_specs.includes
@@ -737,8 +737,10 @@ async def provenanced_addresses_from_filesystem_specs(
   owners_per_include = await MultiGet(
     Get[Owners](OwnersRequest(sources=snapshot.files)) for snapshot in snapshot_per_include
   )
-  result: List[ProvenancedBuildFileAddress] = []
-  for spec, owners in zip(filesystem_specs.includes, owners_per_include):
+  result: List[AddressWithOrigin] = []
+  for spec, snapshot, owners in zip(
+    filesystem_specs.includes, snapshot_per_include, owners_per_include
+  ):
     if (
       global_options.owners_not_found_behavior != OwnersNotFoundBehavior.ignore
       and isinstance(spec, FilesystemLiteralSpec) and not owners.addresses
@@ -753,11 +755,16 @@ async def provenanced_addresses_from_filesystem_specs(
         logger.warning(msg)
       else:
         raise ResolveError(msg)
-    result.extend(
-      ProvenancedBuildFileAddress(build_file_address=bfa, provenance=spec)
-      for bfa in owners.addresses
-    )
-  return ProvenancedBuildFileAddresses(result)
+    for address in owners.addresses:
+      # We preserve what literal files any globs resolved to. This allows downstream goals to be
+      # more precise in which files they operate on.
+      origin = (
+        spec
+        if isinstance(spec, FilesystemLiteralSpec) else
+        FilesystemResolvedGlobSpec(glob=spec.glob, resolved_files=snapshot.files)
+      )
+      result.append(AddressWithOrigin(address=address, origin=origin))
+  return AddressesWithOrigins(result)
 
 
 def create_legacy_graph_tasks():
@@ -772,7 +779,7 @@ def create_legacy_graph_tasks():
     hydrate_bundles,
     sort_targets,
     hydrate_sources_snapshot,
-    provenanced_addresses_from_filesystem_specs,
+    addresses_with_origins_from_filesystem_specs,
     sources_snapshots_from_build_file_addresses,
     sources_snapshots_from_filesystem_specs,
     RootRule(FilesystemSpecs),

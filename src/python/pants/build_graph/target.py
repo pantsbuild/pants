@@ -617,6 +617,9 @@ class Target(AbstractTarget):
     :param Payload payload: The post-Target.__init__() Payload object.
     :yields: AddressSpec strings representing dependencies of this target.
     """
+
+    if cls.compute_injectable_specs.__func__ is not Target.compute_injectable_specs.__func__:
+      cls._compute_injectable_specs_warn_or_error()
     cls._validate_target_representation_args(kwargs, payload)
     # N.B. This pattern turns this method into a non-yielding generator, which is helpful for
     # subclassing.
@@ -641,6 +644,8 @@ class Target(AbstractTarget):
     :param Payload payload: The post-Target.__init__() Payload object.
     :yields: AddressSpec strings representing dependencies of this target.
     """
+    if cls.compute_dependency_specs.__func__ is not Target.compute_dependency_specs.__func__:
+      cls._compute_dependency_specs_warn_or_error()
     cls._validate_target_representation_args(kwargs, payload)
     # N.B. This pattern turns this method into a non-yielding generator, which is helpful for
     # subclassing.
@@ -658,6 +663,11 @@ class Target(AbstractTarget):
     :param Payload payload: The post-Target.__init__() Payload object.
     :yields: AddressSpec strings representing dependencies of this target.
     """
+    cls._compute_injectable_specs_warn_or_error()
+    cls.compute_injectable_address_specs(kwargs=kwargs, payload=payload)
+
+  @classmethod
+  def _compute_injectable_specs_warn_or_error(cls):
     warn_or_error(
       removal_version="1.27.0.dev0",
       deprecated_entity_description="Target.compute_injectable_specs()",
@@ -665,7 +675,6 @@ class Target(AbstractTarget):
            "before. This change is to prepare for Pants eventually supporting file system specs, "
            "e.g. `./pants cloc foo.py`. In preparation, we renamed `Spec` to `AddressSpec`."
     )
-    cls.compute_injectable_address_specs(kwargs=kwargs, payload=payload)
 
   @classmethod
   def compute_dependency_specs(cls, kwargs=None, payload=None):
@@ -684,6 +693,11 @@ class Target(AbstractTarget):
     :param Payload payload: The post-Target.__init__() Payload object.
     :yields: AddressSpec strings representing dependencies of this target.
     """
+    cls._compute_dependency_specs_warn_or_error()
+    cls.compute_dependency_address_specs(kwargs=kwargs, payload=payload)
+
+  @classmethod
+  def _compute_dependency_specs_warn_or_error(cls):
     warn_or_error(
       removal_version="1.27.0.dev0",
       deprecated_entity_description="Target.compute_dependency_specs()",
@@ -691,7 +705,6 @@ class Target(AbstractTarget):
            "before. This change is to prepare for Pants eventually supporting file system specs, "
            "e.g. `./pants cloc foo.py`. In preparation, we renamed `Spec` to `AddressSpec`."
     )
-    cls.compute_dependency_address_specs(kwargs=kwargs, payload=payload)
 
   @property
   def dependencies(self):

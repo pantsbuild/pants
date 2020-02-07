@@ -12,6 +12,7 @@ python_library(
     'src/python/pants/engine:rules',
     'src/python/pants/engine:selectors',
     'src/python/pants/engine/legacy:structs',
+    'src/python/pants/python',
   ],
   tags = {"type_checked"},
 )

@@ -12,6 +12,7 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/base:generator',
     'src/python/pants/base:workunit',
+    'src/python/pants/python',
     'src/python/pants/task',
     'src/python/pants/subsystem',
     'src/python/pants/util:dirutil',

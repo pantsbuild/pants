@@ -3,7 +3,6 @@
 
 from pants.backend.python.pants_requirement import PantsRequirement
 from pants.backend.python.python_artifact import PythonArtifact
-from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.python_requirements import PythonRequirements
 from pants.backend.python.rules import (
   download_pex_bin,
@@ -45,6 +44,7 @@ from pants.backend.python.tasks.unpack_wheels import UnpackWheels
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.resources import Resources
 from pants.goal.task_registrar import TaskRegistrar as task
+from pants.python.python_requirement import PythonRequirement
 
 
 def global_subsystems():

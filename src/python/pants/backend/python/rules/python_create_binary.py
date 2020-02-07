@@ -5,7 +5,7 @@ from pants.backend.python.rules.pex import Pex
 from pants.backend.python.rules.pex_from_target_closure import CreatePexFromTargetClosure
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.build_graph.address import Address
-from pants.engine.addressable import BuildFileAddresses
+from pants.engine.addressable import Addresses
 from pants.engine.legacy.graph import HydratedTarget
 from pants.engine.legacy.structs import PythonBinaryAdaptor
 from pants.engine.rules import UnionRule, rule
@@ -29,7 +29,7 @@ async def create_python_binary(python_binary_adaptor: PythonBinaryAdaptor) -> Cr
       entry_point = PythonBinary.translate_source_path_to_py_module_specifier(root_filename)
 
   request = CreatePexFromTargetClosure(
-    build_file_addresses=BuildFileAddresses((python_binary_adaptor.address,)),
+    addresses=Addresses((python_binary_adaptor.address.to_address(),)),
     entry_point=entry_point,
     output_filename=f'{python_binary_adaptor.address.target_name}.pex'
   )

@@ -8,7 +8,6 @@ from typing import Iterable, Type
 import pytest
 
 from pants.backend.python.python_artifact import PythonArtifact
-from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.rules.run_setup_py import (
   AmbiguousOwnerError,
   AncestorInitPyFiles,
@@ -39,6 +38,7 @@ from pants.engine.legacy.graph import HydratedTarget, HydratedTargets
 from pants.engine.rules import RootRule
 from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Params
+from pants.python.python_requirement import PythonRequirement
 from pants.rules.core.strip_source_root import strip_source_root
 from pants.source.source_root import SourceRootConfig
 from pants.testutil.subsystem.util import init_subsystem

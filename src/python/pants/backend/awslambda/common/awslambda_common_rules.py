@@ -4,7 +4,7 @@
 from dataclasses import dataclass
 
 from pants.build_graph.address import Address
-from pants.engine.addressable import BuildFileAddresses
+from pants.engine.addressable import Addresses
 from pants.engine.console import Console
 from pants.engine.fs import Digest, DirectoriesToMerge, DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
@@ -41,14 +41,14 @@ class AWSLambdaGoal(Goal):
 
 @goal_rule
 async def create_awslambda(
-    addresses: BuildFileAddresses,
+    addresses: Addresses,
     console: Console,
     options: AWSLambdaOptions,
     distdir: DistDir,
     workspace: Workspace) -> AWSLambdaGoal:
   with options.line_oriented(console) as print_stdout:
     print_stdout(f"Generating AWS lambdas in `./{distdir.relpath}`")
-    awslambdas = await MultiGet(Get[CreatedAWSLambda](Address, address.to_address())
+    awslambdas = await MultiGet(Get[CreatedAWSLambda](Address, address)
                                 for address in addresses)
     merged_digest = await Get[Digest](
       DirectoriesToMerge(tuple(awslambda.digest for awslambda in awslambdas))

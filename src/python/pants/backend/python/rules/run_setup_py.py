@@ -21,12 +21,11 @@ from pants.backend.python.rules.setup_py_util import (
   source_root_or_raise,
 )
 from pants.backend.python.rules.setuptools import Setuptools
-from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.base.specs import AddressSpecs, AscendantAddresses
 from pants.build_graph.address import Address
-from pants.engine.addressable import BuildFileAddresses
-from pants.engine.build_files import AddressProvenanceMap
+from pants.engine.addressable import Addresses
+from pants.engine.build_files import AddressOriginMap
 from pants.engine.console import Console
 from pants.engine.fs import (
   Digest,
@@ -50,6 +49,7 @@ from pants.engine.objects import Collection
 from pants.engine.rules import goal_rule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.option.custom_types import shell_str
+from pants.python.python_setup import PythonSetup
 from pants.rules.core.distdir import DistDir
 from pants.rules.core.strip_source_root import SourceRootStrippedSources
 from pants.source.source_root import SourceRootConfig
@@ -234,7 +234,7 @@ def validate_args(args: Tuple[str, ...]):
 
 @goal_rule
 async def run_setup_pys(targets: HydratedTargets, options: SetupPyOptions, console: Console,
-                        provenance_map: AddressProvenanceMap, python_setup: PythonSetup,
+                        address_origin_map: AddressOriginMap, python_setup: PythonSetup,
                         distdir: DistDir, workspace: Workspace) -> SetupPy:
   """Run setup.py commands on all exported targets addressed."""
   args = tuple(options.values.args)
@@ -249,7 +249,7 @@ async def run_setup_pys(targets: HydratedTargets, options: SetupPyOptions, conso
   for hydrated_target in targets:
     if _is_exported(hydrated_target):
       exported_targets.append(ExportedTarget(hydrated_target))
-    elif provenance_map.is_single_address(hydrated_target.address):
+    elif address_origin_map.is_single_address(hydrated_target.address.to_address()):
       explicit_nonexported_targets.append(hydrated_target)
   if explicit_nonexported_targets:
     raise TargetNotExported(
@@ -259,7 +259,7 @@ async def run_setup_pys(targets: HydratedTargets, options: SetupPyOptions, conso
   if options.values.transitive:
     # Expand out to all owners of the entire dep closure.
     tht = await Get[TransitiveHydratedTargets](
-      BuildFileAddresses([et.hydrated_target.address for et in exported_targets]))
+      Addresses(et.hydrated_target.address.to_address() for et in exported_targets))
     owners = await MultiGet(
       Get[ExportedTarget](OwnedDependency(ht)) for ht in tht.closure if is_ownable_target(ht)
     )
@@ -471,7 +471,7 @@ def _is_exported(target: HydratedTarget) -> bool:
 @rule(name="Compute distribution's 3rd party requirements")
 async def get_requirements(dep_owner: DependencyOwner) -> ExportedTargetRequirements:
   tht = await Get[TransitiveHydratedTargets](
-    BuildFileAddresses([dep_owner.exported_target.hydrated_target.address]))
+    Addresses([dep_owner.exported_target.hydrated_target.address.to_address()]))
 
   ownable_tgts = [tgt for tgt in tht.closure if is_ownable_target(tgt)]
   owners = await MultiGet(Get[ExportedTarget](OwnedDependency(ht)) for ht in ownable_tgts)
@@ -515,7 +515,7 @@ async def get_owned_dependencies(dependency_owner: DependencyOwner) -> OwnedDepe
   Includes dependency_owner itself.
   """
   tht = await Get[TransitiveHydratedTargets](
-    BuildFileAddresses([dependency_owner.exported_target.hydrated_target.address]))
+    Addresses([dependency_owner.exported_target.hydrated_target.address.to_address()]))
   ownable_targets = [tgt for tgt in tht.closure
                      if isinstance(tgt.adaptor, (PythonTargetAdaptor, ResourcesAdaptor))]
   owners = await MultiGet(Get[ExportedTarget](OwnedDependency(ht)) for ht in ownable_targets)
@@ -547,7 +547,7 @@ async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarg
     [t for t in ancestor_tgts if _is_exported(t)], key=lambda t: t.address, reverse=True)
   exported_ancestor_iter = iter(exported_ancestor_tgts)
   for exported_ancestor in exported_ancestor_iter:
-    tht = await Get[TransitiveHydratedTargets](BuildFileAddresses([exported_ancestor.address]))
+    tht = await Get[TransitiveHydratedTargets](Addresses([exported_ancestor.address.to_address()]))
     if hydrated_target in tht.closure:
       owner = exported_ancestor
       # Find any exported siblings of owner that also depend on hydrated_target. They have the
@@ -555,7 +555,7 @@ async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarg
       sibling_owners = []
       sibling = next(exported_ancestor_iter, None)
       while sibling and sibling.address.spec_path == owner.address.spec_path:
-        tht = await Get[TransitiveHydratedTargets](BuildFileAddresses([sibling.address]))
+        tht = await Get[TransitiveHydratedTargets](Addresses([sibling.address.to_address()]))
         if hydrated_target in tht.closure:
           sibling_owners.append(sibling)
         sibling = next(exported_ancestor_iter, None)

@@ -33,30 +33,18 @@ script fail:
 
   - **Create a pgp signing key** if you don't already have one.
 
-    You might use the gpg implementation of pgp and start here:
-    [www.gnupg.org/gph/en/manual/c14.html](https://www.gnupg.org/gph/en/manual/c14.html)
-
-  - If using gpg, **ensure that the gpg-agent is running** (for OS X, see
-    instructions [here](https://blog.chendry.org/2015/03/13/starting-gpg-agent-in-osx.html)),
-    and ensure that gpg is set up to use it (e.g., set `use-agent` in `~/.gnupg/gpg.conf`).
-
-  - **Configure git to use your pgp key** for signing release tags.
-
-    A description of the configuration can be found here:
+    You likely want to use the [gpg implementation](https://www.gnupg.org) of pgp. On macOS, you can `brew install gpg`. Once `gpg` is installed, generate a new key: [www.gnupg.org/gph/en/manual/c14.html](https://www.gnupg.org/gph/en/manual/c14.html).
+ 
+  - **Configure `git` to use your pgp key** for signing release tags: 
     [help.github.com/articles/telling-git-about-your-gpg-key/](https://help.github.com/articles/telling-git-about-your-gpg-key/)
+    
+    Note: the last step is required on macOS.
 
-  - **Create a pypi account** if you don't already have one.
+  - **Create a PyPI account** if you don't already have one: [pypi.org/account/register](https://pypi.org/account/register/).
 
-    You can register here: [pypi.org/account/register](https://pypi.org/account/register/)
+  - **Get your PyPI account added as a `maintainer` for all pantsbuild.pants packages.** You can ask any one of the current [Owners](#owners) to do this.
 
-  - **Get your pypi account added as an `owner` for all pantsbuild.pants packages.**
-
-    You can ask any one of the current [Owners](#owners) to do this.
-
-  - **Configure your pypi credentials locally in `~/.pypirc`**
-
-    For some versions of python it's necessary to use both a `server-login` and
-    `pypi` section containing the same info. This will do it:
+  - **Configure your PyPI credentials locally in `~/.pypirc`**:
 
         :::bash
         cat << EOF > ~/.pypirc && chmod 600 ~/.pypirc
