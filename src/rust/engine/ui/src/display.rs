@@ -299,6 +299,13 @@ impl EngineDisplay {
       Ok(_) => {
         let initial_byte: u8 = buf[0];
         let mut iter = buf[1..].iter().map(|byte| Ok(*byte));
+        // TODO: calling `parse_event` in this way means that we will potentially miss keyboard
+        // events - a Ctrl-C event has to be the very first event in each `render` frame, or it
+        // won't be handled. In practice, the refresh interval is 100 ms, which is fast enough
+        // on human timescales that hitting Ctrl-C while the program is running will wind up
+        // at the beginning of some frame.  Note that internally termion uses this function
+        // in the context of the `next()` function of an Iterator:
+        // https://github.com/redox-os/termion/blob/master/src/input.rs .
         let event_or_err = parse_event(initial_byte, &mut iter);
         match event_or_err {
           Ok(Event::Key(Key::Ctrl('c'))) => Ok(KeyboardCommand::CtrlC),
