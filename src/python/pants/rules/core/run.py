@@ -4,7 +4,7 @@
 from pathlib import Path
 
 from pants.base.build_root import BuildRoot
-from pants.build_graph.address import Address, BuildFileAddress
+from pants.build_graph.address import Address
 from pants.engine.console import Console
 from pants.engine.fs import DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
@@ -43,11 +43,10 @@ async def run(
   workspace: Workspace,
   runner: InteractiveRunner,
   build_root: BuildRoot,
-  bfa: BuildFileAddress,
+  address: Address,
   options: RunOptions,
 ) -> Run:
-  target = bfa.to_address()
-  binary = await Get[CreatedBinary](Address, target)
+  binary = await Get[CreatedBinary](Address, address)
 
   with temporary_dir(root_dir=str(Path(build_root.path, ".pants.d")), cleanup=True) as tmpdir:
     path_relative_to_build_root = str(Path(tmpdir).relative_to(build_root.path))
@@ -55,7 +54,7 @@ async def run(
       DirectoryToMaterialize(binary.digest, path_prefix=path_relative_to_build_root)
     )
 
-    console.write_stdout(f"Running target: {target}\n")
+    console.write_stdout(f"Running target: {address}\n")
     full_path = str(Path(tmpdir, binary.binary_name))
     run_request = InteractiveProcessRequest(
       argv=(full_path, *options.values.args),
@@ -66,12 +65,12 @@ async def run(
       result = runner.run_local_interactive_process(run_request)
       exit_code = result.process_exit_code
       if result.process_exit_code == 0:
-        console.write_stdout(f"{target} ran successfully.\n")
+        console.write_stdout(f"{address} ran successfully.\n")
       else:
-        console.write_stderr(f"{target} failed with code {result.process_exit_code}!\n")
+        console.write_stderr(f"{address} failed with code {result.process_exit_code}!\n")
 
     except Exception as e:
-      console.write_stderr(f"Exception when attempting to run {target}: {e!r}\n")
+      console.write_stderr(f"Exception when attempting to run {address}: {e!r}\n")
       exit_code = -1
 
   return Run(exit_code)

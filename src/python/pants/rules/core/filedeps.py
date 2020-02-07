@@ -5,10 +5,12 @@ from pathlib import Path
 from typing import Set
 
 from pants.base.build_root import BuildRoot
+from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.legacy.graph import TransitiveHydratedTargets
 from pants.engine.rules import goal_rule
+from pants.engine.selectors import Get
 
 
 class FiledepsOptions(LineOriented, GoalSubsystem):
@@ -37,33 +39,30 @@ class Filedeps(Goal):
 
 
 @goal_rule
-def file_deps(
+async def file_deps(
   console: Console,
-  filedeps_options: FiledepsOptions,
+  options: FiledepsOptions,
   build_root: BuildRoot,
-  transitive_hydrated_targets: TransitiveHydratedTargets
+  transitive_hydrated_targets: TransitiveHydratedTargets,
 ) -> Filedeps:
-
-  absolute = filedeps_options.values.absolute
-  globs = filedeps_options.values.globs
-
   unique_rel_paths: Set[str] = set()
-
   for hydrated_target in transitive_hydrated_targets.closure:
     adaptor = hydrated_target.adaptor
-    if hydrated_target.address.rel_path:
-      unique_rel_paths.add(hydrated_target.address.rel_path)
+
+    bfa = await Get[BuildFileAddress](Address, hydrated_target.address)
+    unique_rel_paths.add(bfa.rel_path)
+
     if hasattr(adaptor, "sources"):
       sources_paths = (
         adaptor.sources.snapshot.files
-        if not globs
+        if not options.values.globs
         else adaptor.sources.filespec["globs"]
       )
       unique_rel_paths.update(sources_paths)
 
-  with filedeps_options.line_oriented(console) as print_stdout:
+  with options.line_oriented(console) as print_stdout:
     for rel_path in sorted(unique_rel_paths):
-      final_path = str(Path(build_root.path, rel_path)) if absolute else rel_path
+      final_path = str(Path(build_root.path, rel_path)) if options.values.absolute else rel_path
       print_stdout(final_path)
 
   return Filedeps(exit_code=0)

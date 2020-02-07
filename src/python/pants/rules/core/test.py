@@ -7,8 +7,8 @@ from enum import Enum
 from typing import Optional
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
-from pants.build_graph.address import Address, BuildFileAddress
-from pants.engine.addressable import BuildFileAddresses
+from pants.build_graph.address import Address
+from pants.engine.addressable import Addresses
 from pants.engine.build_files import AddressOriginMap
 from pants.engine.console import Console
 from pants.engine.fs import Digest
@@ -135,15 +135,15 @@ class AddressAndDebugRequest:
 
 @goal_rule
 async def run_tests(
-  console: Console, options: TestOptions, runner: InteractiveRunner, addresses: BuildFileAddresses,
+  console: Console, options: TestOptions, runner: InteractiveRunner, addresses: Addresses,
 ) -> Test:
   if options.values.debug:
-    debug_address = await Get[BuildFileAddress](BuildFileAddresses, addresses)
-    addr_debug_request = await Get[AddressAndDebugRequest](Address, debug_address.to_address())
+    address = await Get[Address](Addresses, addresses)
+    addr_debug_request = await Get[AddressAndDebugRequest](Address, address)
     result = runner.run_local_interactive_process(addr_debug_request.request.ipr)
     return Test(result.process_exit_code)
 
-  results = await MultiGet(Get[AddressAndTestResult](Address, addr.to_address()) for addr in addresses)
+  results = await MultiGet(Get[AddressAndTestResult](Address, addr) for addr in addresses)
   did_any_fail = False
   filtered_results = [(x.address, x.test_result) for x in results if x.test_result is not None]
 
