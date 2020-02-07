@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pathlib import PurePath
+from textwrap import dedent
 from typing import List, Optional
 
 import pytest
@@ -39,6 +40,28 @@ class PylintIntegrationTest(TestBase):
       relpath=str(PurePath(self.source_root, file_content.path)),
       contents=file_content.content.decode(),
     )
+
+  def create_python_test_target(
+    self,
+    source_files: List[FileContent],
+    *,
+    dependencies: Optional[List[str]] = None,
+    interpreter_constraints: Optional[str] = None,
+  ) -> None:
+    self.add_to_build_file(
+      relpath=self.source_root,
+      target=dedent(
+        f"""\
+        python_tests(
+          name='target',
+          dependencies={dependencies or []},
+          compatibility={[interpreter_constraints] if interpreter_constraints else []},
+        )
+        """
+      )
+    )
+    for source_file in source_files:
+      self.write_file(source_file)
 
   @classmethod
   def alias_groups(cls) -> BuildFileAliases:
@@ -116,7 +139,7 @@ class PylintIntegrationTest(TestBase):
   def test_respects_config_file(self) -> None:
     self.create_library(path=self.source_root, target_type="python_library", name="target")
     self.write_file(self.bad_source)
-    result = self.run_pylint([self.bad_source], config="[pylint]\disable = C0114\n")
+    result = self.run_pylint([self.bad_source], config="[pylint]\ndisable = C0114\n")
     assert result.exit_code == 0
     assert result.stdout.strip() == ""
 
@@ -124,6 +147,38 @@ class PylintIntegrationTest(TestBase):
     self.create_library(path=self.source_root, target_type="python_library", name="target")
     self.write_file(self.bad_source)
     result = self.run_pylint([self.bad_source], passthrough_args="--disable=C0114")
+    assert result.exit_code == 0
+    assert "Your code has been rated at 10.00/10" in result.stdout.strip()
+
+  def test_transitive_dep(self) -> None:
+    self.create_library(path=self.source_root, target_type="python_library", name="library")
+    self.create_library(
+      path=self.source_root, target_type="python_library", name="transitive_dep",
+      sources=["transitive_dep.py"], dependencies=[":library"],
+    )
+    self.write_file(
+      FileContent(
+        path="transitive_dep.py",
+        content=dedent(
+          """\
+          from nonexistent import erroneous
+          VAR = 42
+          """
+        ).encode(),
+      )
+    )
+    source = FileContent(
+      path="test_transitive_dep.py",
+      content=dedent(
+        """\
+        '''Docstring'''
+        from transitive_dep import VAR
+        assert VAR == 42
+        """
+      ).encode(),
+    )
+    self.create_python_test_target([source], dependencies=[":transitive_dep"])
+    result = self.run_pylint([source])
     assert result.exit_code == 0
     assert "Your code has been rated at 10.00/10" in result.stdout.strip()
 
