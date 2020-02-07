@@ -12,18 +12,19 @@ from pants.backend.python.rules.pex import (
   PexInterpreterConstraints,
   PexRequirements,
 )
-from pants.backend.python.subsystems.python_setup import PythonSetup
+from pants.backend.python.rules.prepare_chrooted_python_sources import ChrootedPythonSources
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.build_graph.address import Address
-from pants.engine.addressable import Addresses
 from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTarget, HydratedTargets
 from pants.engine.legacy.structs import PythonTargetAdaptor, TargetAdaptor
 from pants.engine.rules import UnionRule, rule, subsystem_rule
-from pants.engine.selectors import Get
+from pants.engine.selectors import Get, MultiGet
 from pants.option.global_options import GlobMatchErrorBehavior
+from pants.python.python_setup import PythonSetup
 from pants.rules.core.lint import LintResult
+from pants.rules.core.strip_source_root import SourceRootStrippedSources
 
 
 @dataclass(frozen=True)
@@ -31,12 +32,12 @@ class PylintTarget:
   target: TargetAdaptor
 
 
-def generate_args(wrapped_target: PylintTarget, pylint: Pylint) -> Tuple[str, ...]:
+def generate_args(file_names: Tuple[str, ...], pylint: Pylint) -> Tuple[str, ...]:
   args = []
   if pylint.options.config is not None:
     args.append(f"--config={pylint.options.config}")
   args.extend(pylint.options.args)
-  args.extend(sorted(wrapped_target.target.sources.snapshot.files))
+  args.extend(file_names)
   return tuple(args)
 
 
@@ -53,10 +54,17 @@ async def lint(
   target = wrapped_target.target
 
   hydrated_target = await Get[HydratedTarget](Address, target.address)
-  dependencies = await Get[HydratedTargets](Addresses, hydrated_target.addresses)
-  sources_digest = await Get[Digest](
-    DirectoriesToMerge(directories=tuple(hydrated_target.adaptor.sources.snapshot.directory_digest for hydrated_target in (hydrated_target, *dependencies)))
+  dependencies = await MultiGet(
+    Get[HydratedTarget](Address, dependency)
+    for dependency in hydrated_target.dependencies
   )
+  sources_digest = await Get[ChrootedPythonSources](HydratedTargets([hydrated_target, *dependencies]))
+
+  source_root_stripped_target_sources = await Get[SourceRootStrippedSources](
+    Address, target.address
+  )
+  file_names = source_root_stripped_target_sources.snapshot.files \
+    + wrapped_target.target.sources.snapshot.files
 
   # NB: Pylint output depends upon which Python interpreter version it's run with. We ensure that
   # each target runs with its own interpreter constraints. See
@@ -86,10 +94,9 @@ async def lint(
   merged_input_files = await Get[Digest](
     DirectoriesToMerge(
       directories=(
-        target.sources.snapshot.directory_digest,
         requirements_pex.directory_digest,
         config_snapshot.directory_digest,
-        sources_digest,
+        sources_digest.digest,
       )
     ),
   )
@@ -97,7 +104,7 @@ async def lint(
     python_setup=python_setup,
     subprocess_encoding_environment=subprocess_encoding_environment,
     pex_path=f'./pylint.pex',
-    pex_args=generate_args(wrapped_target, pylint),
+    pex_args=generate_args(file_names, pylint),
     input_files=merged_input_files,
     description=f'Run Pylint for {target.address.reference()}',
   )

@@ -19,7 +19,7 @@ python_library(
 
 python_tests(
   name='integration',
-  sources=globs('*_integration_test.py'),
+  sources=['*_integration_test.py'],
   dependencies=[
     ':pylint',
     'src/python/pants/backend/python/lint',
