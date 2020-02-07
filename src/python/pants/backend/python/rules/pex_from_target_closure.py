@@ -11,11 +11,11 @@ from pants.backend.python.rules.pex import (
   PexRequirements,
 )
 from pants.backend.python.rules.prepare_chrooted_python_sources import ChrootedPythonSources
-from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.engine.addressable import Addresses
 from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
 from pants.engine.rules import rule
 from pants.engine.selectors import Get
+from pants.python.python_setup import PythonSetup
 
 
 @dataclass(frozen=True)

@@ -221,7 +221,7 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):  # t
 
       if isinstance(current_target, PythonRequirementLibrary):
         reqs = current_target.payload.get_field_value('requirements', set())
-        """:type : set[pants.backend.python.python_requirement.PythonRequirement]"""
+        """:type : set[pants.python.python_requirement.PythonRequirement]"""
         info['requirements'] = [req.key for req in reqs]
 
       if isinstance(current_target, PythonTarget):

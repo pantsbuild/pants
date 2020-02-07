@@ -21,7 +21,6 @@ from pants.backend.python.rules.setup_py_util import (
   source_root_or_raise,
 )
 from pants.backend.python.rules.setuptools import Setuptools
-from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.base.specs import AddressSpecs, AscendantAddresses
 from pants.build_graph.address import Address
@@ -50,6 +49,7 @@ from pants.engine.objects import Collection
 from pants.engine.rules import goal_rule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.option.custom_types import shell_str
+from pants.python.python_setup import PythonSetup
 from pants.rules.core.distdir import DistDir
 from pants.rules.core.strip_source_root import SourceRootStrippedSources
 from pants.source.source_root import SourceRootConfig

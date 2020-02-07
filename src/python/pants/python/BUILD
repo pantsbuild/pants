@@ -5,7 +5,30 @@
 python_library(
   dependencies=[
     '3rdparty/python:pex',
+    '3rdparty/python:setuptools',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/build_graph',
+    'src/python/pants/option',
     'src/python/pants/subsystem',
+    'src/python/pants/util:collections',
+    'src/python/pants/util:contextutil',
     'src/python/pants/util:memo',
   ]
+)
+
+
+python_tests(
+  name='tests',
+  dependencies=[
+    '3rdparty/python:pex',
+    ':python',
+    'src/python/pants/backend/python/targets',
+    'src/python/pants/build_graph',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/testutil/subsystem',
+    'src/python/pants/testutil:pexrc_util',
+    'src/python/pants/testutil:test_base',
+  ],
+  tags = {'partially_type_checked'},
 )

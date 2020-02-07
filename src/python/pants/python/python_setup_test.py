@@ -4,7 +4,7 @@
 import os
 from contextlib import contextmanager
 
-from pants.backend.python.subsystems.python_setup import PythonSetup
+from pants.python.python_setup import PythonSetup
 from pants.testutil.pexrc_util import setup_pexrc_with_pex_python_path
 from pants.testutil.test_base import TestBase
 from pants.util.contextutil import environment_as, temporary_dir

@@ -6,7 +6,6 @@ from pathlib import Path, PurePath
 from textwrap import dedent
 from typing import List, Optional
 
-from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.rules import (
   download_pex_bin,
   inject_init,
@@ -26,6 +25,7 @@ from pants.engine.interactive_runner import InteractiveRunner
 from pants.engine.legacy.structs import PythonTestsAdaptor
 from pants.engine.rules import RootRule, subsystem_rule
 from pants.engine.selectors import Params
+from pants.python.python_requirement import PythonRequirement
 from pants.rules.core import strip_source_root
 from pants.rules.core.test import Status, TestDebugRequest, TestOptions, TestResult
 from pants.testutil.interpreter_selection_utils import skip_unless_python27_and_python3_present

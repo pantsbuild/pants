@@ -7,13 +7,13 @@ from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 from pex.pex_info import PexInfo
 
-from pants.backend.python.subsystems.pex_build_util import PexBuilderWrapper
+from pants.python.pex_build_util import PexBuilderWrapper
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import is_executable, safe_concurrent_creation
 
 
 if TYPE_CHECKING:
-  from pants.backend.python.python_requirement import PythonRequirement  # noqa
+  from pants.python.python_requirement import PythonRequirement  # noqa
 
 
 class ExecutablePexTool(Subsystem):

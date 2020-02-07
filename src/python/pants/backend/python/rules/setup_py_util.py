@@ -8,10 +8,10 @@ from typing import Dict, Iterable, List, Optional, Set, Tuple, cast
 
 from pkg_resources import Requirement
 
-from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.engine.fs import FilesContent
 from pants.engine.legacy.graph import HydratedTarget
 from pants.engine.legacy.structs import PythonTargetAdaptor, ResourcesAdaptor
+from pants.python.python_setup import PythonSetup
 from pants.rules.core.strip_source_root import SourceRootStrippedSources
 from pants.source.source_root import SourceRoots
 from pants.util.strutil import ensure_text

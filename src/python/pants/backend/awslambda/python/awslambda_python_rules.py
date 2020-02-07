@@ -12,7 +12,6 @@ from pants.backend.python.rules.pex import (
   PexRequirements,
 )
 from pants.backend.python.rules.pex_from_target_closure import CreatePexFromTargetClosure
-from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.addressable import Addresses
 from pants.engine.fs import Digest, DirectoriesToMerge
@@ -20,6 +19,7 @@ from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessR
 from pants.engine.legacy.structs import PythonAWSLambdaAdaptor
 from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
+from pants.python.python_setup import PythonSetup
 
 
 @dataclass(frozen=True)

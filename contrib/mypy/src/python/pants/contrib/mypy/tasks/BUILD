@@ -6,7 +6,6 @@ python_library(
     '3rdparty/python:pex',
     'src/python/pants/util:process_handler',
     'src/python/pants/backend/python:interpreter_cache',
-    'src/python/pants/backend/python:python_requirement',
     'src/python/pants/backend/python/subsystems',
     'src/python/pants/backend/python/targets',
     'src/python/pants/base:build_environment',
