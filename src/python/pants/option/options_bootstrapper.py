@@ -7,6 +7,7 @@ import os
 import stat
 import sys
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Set, Tuple, Type
 
 from pants.base.build_environment import get_default_pants_config_file
@@ -53,8 +54,9 @@ class OptionsBootstrapper:
     evars = ['PANTS_GLOBAL_PANTS_CONFIG_FILES', 'PANTS_PANTS_CONFIG_FILES', 'PANTS_CONFIG_FILES']
 
     path_list_values = []
-    if os.path.isfile(get_default_pants_config_file()):
-      path_list_values.append(ListValueComponent.create(get_default_pants_config_file()))
+    default = get_default_pants_config_file()
+    if Path(default).is_file():
+      path_list_values.append(ListValueComponent.create(default))
     for var in evars:
       if var in env:
         path_list_values.append(ListValueComponent.create(env[var]))
@@ -222,7 +224,7 @@ class OptionsBootstrapper:
         else:
           # All the options specified under [`section`] in `config` excluding bootstrap defaults.
           all_options_under_scope = (
-            set(config.values.options(section)) - set(config.values.defaults())
+            set(config.values.options(section)) - set(config.values.defaults)
           )
           for option in all_options_under_scope:
             if option not in valid_options_under_scope:
