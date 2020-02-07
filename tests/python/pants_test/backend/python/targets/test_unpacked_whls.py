@@ -3,11 +3,11 @@
 
 from textwrap import dedent
 
-from pants.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.import_wheels_mixin import ImportWheelsMixin
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.unpacked_whls import UnpackedWheels
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.python.python_requirement import PythonRequirement
 from pants.testutil.test_base import TestBase
 from pants.util.collections import assert_single_element
 

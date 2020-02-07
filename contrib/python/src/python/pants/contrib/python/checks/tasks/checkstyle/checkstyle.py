@@ -6,8 +6,6 @@ import sys
 
 from packaging import version
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
-from pants.python.python_requirement import PythonRequirement
-from pants.python.python_setup import PythonSetup
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.build_environment import get_buildroot, pants_version
@@ -17,6 +15,8 @@ from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.address import Address
 from pants.option.custom_types import file_option
 from pants.python.pex_build_util import PexBuilderWrapper
+from pants.python.python_requirement import PythonRequirement
+from pants.python.python_setup import PythonSetup
 from pants.task.lint_task_mixin import LintTaskMixin
 from pants.task.task import Task
 from pants.util.collections import factory_dict

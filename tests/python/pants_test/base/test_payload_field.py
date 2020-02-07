@@ -3,7 +3,6 @@
 
 from hashlib import sha1
 
-from pants.python.python_requirement import PythonRequirement
 from pants.base.payload_field import (
   ExcludesField,
   FingerprintedField,
@@ -15,6 +14,7 @@ from pants.base.payload_field import (
 )
 from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency import JarDependency
+from pants.python.python_requirement import PythonRequirement
 from pants.testutil.test_base import TestBase
 from pants.util.strutil import ensure_binary
 
