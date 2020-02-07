@@ -23,6 +23,7 @@ requests[security]>=2.20.1
 responses==0.10.4
 setproctitle==1.1.10
 setuptools==44.0.0
+toml==0.10.0
 typing-extensions==3.7.4
 wheel==0.33.6
 www-authenticate==0.9.2
