@@ -143,7 +143,8 @@ class Target(Struct):
 TARGET_TABLE = SymbolTable({'struct': Struct, 'target': Target})
 
 
-def assert_equal_with_printing(test_case, expected, actual):
+def assert_equal_with_printing(test_case, expected, actual,
+                               uniform_formatter: Optional[Callable[[str], str]] = None):
   """Asserts equality, but also prints the values so they can be compared on failure.
 
   Usage:
@@ -159,6 +160,11 @@ def assert_equal_with_printing(test_case, expected, actual):
   print(expected)
   print('Actual:')
   print(str_actual)
+
+  if uniform_formatter is not None:
+    expected = uniform_formatter(expected)
+    str_actual = uniform_formatter(str_actual)
+
   test_case.assertEqual(expected, str_actual)
 
 
@@ -212,9 +218,7 @@ def fmt_rust_function(func: Callable) -> str:
   return f"{func.__module__}:{func.__code__.co_firstlineno}:{func.__name__}"
 
 
-def fmt_rule(
-  rule: Callable, *, gets: Optional[List[Tuple[str, str]]] = None,
-) -> str:
+def fmt_rule(rule: Callable, *, gets: Optional[List[Tuple[str, str]]] = None) -> str:
   """Generate the str that the engine will use for the rule.
 
   This is useful when comparing strings against engine error messages.
