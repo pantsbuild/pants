@@ -128,9 +128,9 @@ impl Rule {
     let select_clause_threshold = visualization_params.map(|p| p.select_clause_threshold);
 
     let clause_portion = match select_clause_threshold {
-      None => select_clauses.join(", ").to_string(),
+      None => select_clauses.join(", "),
       Some(select_clause_threshold) if select_clauses.len() <= select_clause_threshold => {
-        select_clauses.join(", ").to_string()
+        select_clauses.join(", ")
       }
       Some(_) => format!("\n{},\n", select_clauses.join(",\n")),
     };
