@@ -7,7 +7,7 @@ from pathlib import PurePath
 from pants.backend.python.rules.pex import Pex
 from pants.backend.python.rules.pex_from_target_closure import CreatePexFromTargetClosure
 from pants.base.build_root import BuildRoot
-from pants.engine.addressable import BuildFileAddresses
+from pants.engine.addressable import Addresses
 from pants.engine.console import Console
 from pants.engine.fs import DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
@@ -41,12 +41,13 @@ async def run_python_repl(
     build_root: BuildRoot,
     global_options: GlobalOptions) -> PythonRepl:
 
-  python_build_file_addresses = BuildFileAddresses(
-    ht.address for ht in targets.closure if isinstance(ht.adaptor, PythonTargetAdaptor)
+  # note - when eric's changes are merged, the .to_address() won't be necessary
+  python_addresses = Addresses(
+    ht.address.to_address() for ht in targets.closure if isinstance(ht.adaptor, PythonTargetAdaptor)
   )
 
   create_pex = CreatePexFromTargetClosure(
-    build_file_addresses=python_build_file_addresses,
+    addresses=python_addresses,
     output_filename="python-repl.pex",
     entry_point=None,
   )
