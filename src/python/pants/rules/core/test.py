@@ -138,7 +138,7 @@ async def run_tests(
   console: Console, options: TestOptions, runner: InteractiveRunner, addresses: Addresses,
 ) -> Test:
   if options.values.debug:
-    address = await Get[Address](Addresses, addresses)
+    address = addresses.expect_single()
     addr_debug_request = await Get[AddressAndDebugRequest](Address, address)
     result = runner.run_local_interactive_process(addr_debug_request.request.ipr)
     return Test(result.process_exit_code)
@@ -175,14 +175,13 @@ async def run_tests(
 async def coordinator_of_tests(
   target: HydratedTarget,
   union_membership: UnionMembership,
-  # TODO: get this working. Uncommenting it out results in graph ambiguity.
-  # address_origin_map: AddressOriginMap
+  address_origin_map: AddressOriginMap
 ) -> AddressAndTestResult:
 
-  # if not AddressAndTestResult.is_testable(
-  #   target, union_membership=union_membership, address_origin_map=address_origin_map
-  # ):
-  #   return AddressAndTestResult(target.address, None)
+  if not AddressAndTestResult.is_testable(
+    target, union_membership=union_membership, address_origin_map=address_origin_map
+  ):
+    return AddressAndTestResult(target.address, None)
 
   # TODO(#6004): when streaming to live TTY, rely on V2 UI for this information. When not a
   # live TTY, periodically dump heavy hitters to stderr. See

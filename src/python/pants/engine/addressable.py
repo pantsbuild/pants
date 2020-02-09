@@ -9,12 +9,23 @@ from typing import Any, List, Set, Tuple, Type, Union
 
 from pants.base.specs import AddressSpec, FilesystemResolvedSpec
 from pants.build_graph.address import Address, BuildFileAddress
+from pants.engine.mapper import ResolveError
 from pants.engine.objects import Collection, Resolvable, Serializable
 from pants.util.objects import TypeConstraintError
 
 
 class Addresses(Collection[Address]):
-  pass
+  def expect_single(self) -> Address:
+    """Assert that exactly one Address must be contained in the collection, and return it."""
+    if len(self.dependencies) == 0:
+      raise ResolveError("No targets were matched")
+    if len(self.dependencies) > 1:
+      output = '\n '.join(address.spec for address in self.addresses)
+      raise ResolveError(
+        "Expected a single target, but was given multiple targets:\n"
+        f"Did you mean one of:\n {output}"
+      )
+    return self.addresses.dependencies[0]
 
 
 @dataclass(frozen=True)

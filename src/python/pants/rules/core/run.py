@@ -5,6 +5,7 @@ from pathlib import Path
 
 from pants.base.build_root import BuildRoot
 from pants.build_graph.address import Address
+from pants.engine.addressable import Addresses
 from pants.engine.console import Console
 from pants.engine.fs import DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
@@ -43,9 +44,10 @@ async def run(
   workspace: Workspace,
   runner: InteractiveRunner,
   build_root: BuildRoot,
-  address: Address,
+  addresses: Addresses,
   options: RunOptions,
 ) -> Run:
+  address = addresses.expect_single()
   binary = await Get[CreatedBinary](Address, address)
 
   with temporary_dir(root_dir=str(Path(build_root.path, ".pants.d")), cleanup=True) as tmpdir:
