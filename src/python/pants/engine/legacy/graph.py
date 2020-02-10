@@ -12,7 +12,7 @@ from typing import Any, Dict, Iterable, List, Tuple, cast
 
 from twitter.common.collections import OrderedSet
 
-from pants.base.exceptions import TargetDefinitionException
+from pants.base.exceptions import ResolveError, TargetDefinitionException
 from pants.base.parse_context import ParseContext
 from pants.base.specs import (
   AddressSpec,
@@ -43,7 +43,6 @@ from pants.engine.legacy.structs import (
   SourcesField,
   TargetAdaptor,
 )
-from pants.engine.mapper import ResolveError
 from pants.engine.objects import Collection
 from pants.engine.parser import HydratedStruct
 from pants.engine.rules import RootRule, rule

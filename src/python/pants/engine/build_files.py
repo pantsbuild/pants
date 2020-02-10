@@ -8,6 +8,7 @@ from typing import Dict
 
 from twitter.common.collections import OrderedSet
 
+from pants.base.exceptions import ResolveError
 from pants.base.project_tree import Dir
 from pants.base.specs import AddressSpec, AddressSpecs, SingleAddress, Spec, more_specific
 from pants.build_graph.address import Address, BuildFileAddress
@@ -20,7 +21,7 @@ from pants.engine.addressable import (
   BuildFileAddresses,
 )
 from pants.engine.fs import Digest, FilesContent, PathGlobs, Snapshot
-from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
+from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper
 from pants.engine.objects import Locatable, SerializableFactory, Validatable
 from pants.engine.parser import HydratedStruct
 from pants.engine.rules import RootRule, rule

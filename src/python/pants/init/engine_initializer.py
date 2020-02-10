@@ -15,6 +15,7 @@ from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
 from pants.base.deprecated import deprecated_conditional
+from pants.base.exceptions import ResolveError
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.base.specs import Specs
@@ -49,7 +50,7 @@ from pants.engine.legacy.structs import (
   TargetAdaptor,
 )
 from pants.engine.legacy.structs import rules as structs_rules
-from pants.engine.mapper import AddressMapper, ResolveError
+from pants.engine.mapper import AddressMapper
 from pants.engine.native import Native
 from pants.engine.parser import SymbolTable
 from pants.engine.platform import create_platform_rules

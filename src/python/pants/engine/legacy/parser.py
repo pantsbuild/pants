@@ -10,10 +10,10 @@ from typing import Dict, Tuple
 
 from pants.base.build_file_target_factory import BuildFileTargetFactory
 from pants.base.deprecated import warn_or_error
+from pants.base.exceptions import UnaddressableObjectError
 from pants.base.parse_context import ParseContext
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.legacy.structs import BundleAdaptor, Globs, RGlobs, TargetAdaptor, ZGlobs
-from pants.engine.mapper import UnaddressableObjectError
 from pants.engine.objects import Serializable
 from pants.engine.parser import ParseError, Parser, SymbolTable
 from pants.option.global_options import BuildFileImportsBehavior
