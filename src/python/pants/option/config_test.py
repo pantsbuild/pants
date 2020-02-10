@@ -11,7 +11,7 @@ from typing import Dict
 import pytest
 from twitter.common.collections import OrderedSet
 
-from pants.option.config import Config
+from pants.option.config import Config, TomlSerializer
 from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_file
 from pants.util.enums import match
@@ -414,3 +414,31 @@ class ConfigTomlWithIniTest(ConfigBaseTest):
   __test__ = True
   file1 = File1(ConfigFormat.toml)
   file2 = File2(ConfigFormat.ini)
+
+
+def test_toml_serializer() -> None:
+  original_values: Dict = {
+    "GLOBAL": {
+      "truthy": True,
+      "falsy": False,
+      "int": 0,
+      "float": 0.0,
+      "word": "hello there",
+      "listy": ["a", "b", "c"],
+      "map": {"a": 0, "b": 1},
+    },
+    "cache.java": {
+      "o": "",
+    },
+    "inception.nested.nested-again.one-more": {
+      "o": "",
+    }
+  }
+  assert TomlSerializer(original_values).normalize() == {
+    "GLOBAL": {
+      **original_values["GLOBAL"],
+      "map": "{'a': 0, 'b': 1}",
+    },
+    "cache": {"java": {"o": ""}},
+    "inception": {"nested": {"nested-again": {"one-more": {"o": ""}}}},
+  }

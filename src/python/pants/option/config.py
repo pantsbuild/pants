@@ -554,3 +554,70 @@ class _ChainedConfig(Config):
       if cfg.has_option(section, option):
         return cfg.get_source_for_option(section, option)
     return None
+
+
+@dataclass(frozen=True)
+class TomlSerializer:
+  """Convert a dictionary of option scopes -> Python values into TOML understood by Pants.
+
+  The constructor expects a dictionary of option scopes to their corresponding values as
+  represented in Python. For example:
+
+    {
+      "GLOBAL": {
+        "o1": True,
+        "o2": "hello",
+        "o3": [0, 1, 2],
+      },
+      "cache.java": {
+        "dict_option": {
+          "a": 0,
+          "b": 0,
+        },
+      },
+    }
+
+  """
+  parsed: Dict[str, Dict[str, Union[int, float, str, bool, List, Dict]]]
+
+  def normalize(self) -> Dict:
+    result: Dict = {}
+    for section, section_values in self.parsed.items():
+      # With TOML, we store dict values as strings to avoid ambiguity between sections/option
+      # scopes vs. dict values.
+      section_values = {
+        option: str(option_value) if isinstance(option_value, dict) else option_value
+        for option, option_value in section_values.items()
+      }
+
+      def add_section_values(
+        section_component: str,
+        seen_section_components: List[str],
+        remaining_section_components: List[str],
+      ) -> None:
+        current_scope = result
+        for seen in seen_section_components:
+          current_scope = current_scope[seen]
+        if not remaining_section_components:
+          current_scope[section_component] = section_values
+          return
+        child_section_component = remaining_section_components[0]
+        current_scope[section_component] = {child_section_component: {}}
+        add_section_values(
+          section_component=child_section_component,
+          seen_section_components=[*seen_section_components, section_component],
+          remaining_section_components=remaining_section_components[1:],
+        )
+
+      section_components = section.split(".")
+      add_section_values(
+        section_component=section_components[0],
+        seen_section_components=[],
+        remaining_section_components=section_components[1:],
+      )
+
+    return result
+
+  def serialize(self) -> str:
+    toml_values = self.normalize()
+    return toml.dumps(toml_values)
