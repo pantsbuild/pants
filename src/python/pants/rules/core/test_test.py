@@ -8,7 +8,7 @@ from unittest.mock import Mock
 
 from pants.base.specs import DescendantAddresses, SingleAddress, Spec
 from pants.build_graph.address import Address
-from pants.engine.addressable import Addresses
+from pants.engine.addressable import AddressesWithOrigins, AddressWithOrigin
 from pants.engine.build_files import AddressOriginMap
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, Digest, FileContent, InputFilesContent, Snapshot
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
@@ -55,6 +55,15 @@ class TestTest(TestBase):
     content = b"import sys; sys.exit(1)"
     return self.make_ipr(content)
 
+  @staticmethod
+  def make_addresses_with_origins(*addresses: Address) -> AddressesWithOrigins:
+    return AddressesWithOrigins([
+      AddressWithOrigin(
+        address=address,
+        origin=SingleAddress(directory=address.spec_path, name=address.target_name)
+      ) for address in addresses
+    ])
+
   def single_target_test(self, result, expected_console_output, success=True, debug=False):
     console = MockConsole(use_colors=False)
     options = MockOptions(debug=debug)
@@ -62,7 +71,7 @@ class TestTest(TestBase):
     addr = Address.parse("some/target")
     res = run_rule(
       run_tests,
-      rule_args=[console, options, runner, Addresses([addr])],
+      rule_args=[console, options, runner, self.make_addresses_with_origins(addr)],
       mock_gets=[
         MockGet(
           product_type=AddressAndTestResult,
@@ -129,7 +138,7 @@ class TestTest(TestBase):
 
     res = run_rule(
       run_tests,
-      rule_args=[console, options, runner, Addresses([target1, target2])],
+      rule_args=[console, options, runner, self.make_addresses_with_origins(target1, target2)],
       mock_gets=[
         MockGet(product_type=AddressAndTestResult, subject_type=Address, mock=make_result),
         MockGet(product_type=AddressAndDebugRequest, subject_type=Address, mock=make_debug_request),
