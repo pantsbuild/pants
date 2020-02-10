@@ -252,8 +252,8 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
   def _batched(self):
     return self._batch_size != self._BATCH_ALL
 
-  def run_tests(self, fail_fast, test_targets, output_dir, coverage):
-    test_registry = self._collect_test_targets(test_targets)
+  def run_tests(self, fail_fast, test_targets, output_dir, coverage, complete_test_registry):
+    test_registry = complete_test_registry.filter(test_targets)
     if test_registry.empty:
       return TestResult.successful
 
@@ -452,7 +452,7 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       msg = 'JUnitTests target must include a non-empty set of sources.'
       raise TargetDefinitionException(target, msg)
 
-  def collect_files(self, output_dir, coverage):
+  def collect_files(self, output_dir, coverage, _complete_test_registry):
     def files_iter():
       for dir_path, _, file_names in os.walk(output_dir):
         for filename in file_names:
@@ -461,18 +461,19 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
 
   @contextmanager
   def partitions(self, per_target, all_targets, test_targets):
+    complete_test_registry = self._collect_test_targets(test_targets)
     with self._isolation(per_target, all_targets) as (output_dir, reports, coverage):
       if per_target:
         def iter_partitions():
           for test_target in test_targets:
             partition = (test_target,)
-            args = (os.path.join(output_dir, test_target.id), coverage)
+            args = (os.path.join(output_dir, test_target.id), coverage, complete_test_registry)
             yield partition, args
       else:
         def iter_partitions():
           if test_targets:
             partition = tuple(test_targets)
-            args = (output_dir, coverage)
+            args = (output_dir, coverage, complete_test_registry)
             yield partition, args
 
       try:
