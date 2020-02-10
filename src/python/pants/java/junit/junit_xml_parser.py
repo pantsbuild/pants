@@ -5,10 +5,11 @@ import fnmatch
 import os
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Sequence
 
 from twitter.common.collections import OrderedSet
 
+from pants.build_graph.target import Target
 from pants.util.dirutil import safe_walk
 from pants.util.meta import frozen_after_init
 from pants.util.xml_parser import XmlParser
@@ -70,6 +71,15 @@ class RegistryOfTests:
     :rtype: bool
     """
     return len(self._test_to_target) == 0
+
+  def filter(self, targets: Sequence[Target]) -> 'RegistryOfTests':
+    """Returns a new instance containing only the given test targets."""
+    target_set = set(targets)
+    return RegistryOfTests(
+      (test, target)
+      for test, target in self._test_to_target.items()
+      if target in target_set
+    )
 
   def match_test_spec(self, possible_test_specs):
     """
