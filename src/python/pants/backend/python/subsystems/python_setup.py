@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.base.deprecated import deprecated_module
-from pants.python.python_setup import PythonSetup
+from pants.python.python_setup import PythonSetup as PythonSetup
 
 
 deprecated_module('1.27.0.dev0', 'Import from pants.python.python_setup instead.')
