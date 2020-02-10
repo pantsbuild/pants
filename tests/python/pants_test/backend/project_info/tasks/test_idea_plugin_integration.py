@@ -5,7 +5,7 @@ import json
 import os
 from xml.dom import minidom
 
-from pants.backend.project_info.tasks.idea_plugin_gen import IDEA_PLUGIN_VERSION
+from pants.backend.project_info.tasks.idea_plugin_gen import IDEA_PLUGIN_VERSION, IdeaPluginGen
 from pants.base.build_environment import get_buildroot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
@@ -18,11 +18,11 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
                 incremental_import=None):
     """Check to see that the project contains the expected source folders."""
 
-    workspace_file = os.path.join(
-      project_dir_path, ".idea", 'workspace.xml'
+    iws_file = os.path.join(
+      project_dir_path, f'{IdeaPluginGen.get_project_name(expected_targets)}.iws'
     )
-    self.assertTrue(os.path.exists(workspace_file))
-    dom = minidom.parse(workspace_file)
+    self.assertTrue(os.path.exists(iws_file))
+    dom = minidom.parse(iws_file)
     self.assertEqual(1, len(dom.getElementsByTagName("project")))
     project = dom.getElementsByTagName("project")[0]
 
