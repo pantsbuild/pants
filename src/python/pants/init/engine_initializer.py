@@ -15,15 +15,12 @@ from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
 from pants.base.deprecated import deprecated_conditional
-from pants.base.exceptions import ResolveError
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.base.specs import Specs
-from pants.build_graph.address import BuildFileAddress
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.remote_sources import RemoteSources
-from pants.engine.addressable import BuildFileAddresses
 from pants.engine.build_files import create_graph_rules
 from pants.engine.console import Console
 from pants.engine.fs import Workspace, create_fs_rules
@@ -433,20 +430,6 @@ class EngineInitializer:
     def build_root_singleton() -> BuildRoot:
       return cast(BuildRoot, BuildRoot.instance)
 
-    @rule
-    async def single_build_file_address(
-      addresses: BuildFileAddresses,
-    ) -> BuildFileAddress:
-      if len(addresses.dependencies) == 0:
-        raise ResolveError("No targets were matched")
-      if len(addresses.dependencies) > 1:
-        output = '\n '.join(address.spec for address in addresses)
-        raise ResolveError(
-          "Expected a single target, but was given multiple targets:\n"
-          f"Did you mean one of:\n {output}"
-        )
-      return addresses.dependencies[0]
-
     # Create a Scheduler containing graph and filesystem rules, with no installed goals. The
     # LegacyBuildGraph will explicitly request the products it needs.
     rules = (
@@ -457,7 +440,6 @@ class EngineInitializer:
         symbol_table_singleton,
         union_membership_singleton,
         build_root_singleton,
-        single_build_file_address,
       ),
       *create_legacy_graph_tasks(),
       *create_fs_rules(),
