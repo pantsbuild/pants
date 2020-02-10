@@ -84,6 +84,9 @@ class IdeaPluginGen(ConsoleTask):
       removal_hint="`idea-plugin` should always act transitively, which is the default. This option "
                    "will be going away to ensure that Pants always does the right thing.",
     )
+    register('--possible-paths', type=list, default=['/Applications/IntelliJ IDEA CE.app',
+                                                     '/Applications/IntelliJ IDEA.app'],
+             help='Sets the the list of paths for IntelliJ lookup.')
 
   @property
   def act_transitively(self):
@@ -101,6 +104,7 @@ class IdeaPluginGen(ConsoleTask):
     self.idea_workspace_template = os.path.join(_TEMPLATE_BASEDIR,
                                            'workspace-12.mustache')
     self.java_language_level = self.get_options().java_language_level
+    self.possible_paths = self.get_options().possible_paths
 
     if self.get_options().java_jdk_name:
       self.java_jdk = self.get_options().java_jdk_name
@@ -199,6 +203,6 @@ class IdeaPluginGen(ConsoleTask):
         subprocess.Popen([open_with, ide_file], stdout=null, stderr=null)
       else:
         try:
-          desktop.idea_open(ide_file)
+          desktop.idea_open(ide_file, self.possible_paths[::-1])
         except desktop.OpenError as e:
           raise TaskError(e)
