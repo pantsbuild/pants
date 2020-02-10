@@ -84,14 +84,13 @@ def _raise_did_you_mean(address_family: AddressFamily, name: str, source=None) -
 @rule
 async def find_build_file(address: Address) -> BuildFileAddress:
   address_family = await Get[AddressFamily](Dir(address.spec_path))
-  # NB: `address_family.addressables` is a dictionary of `BuildFileAddress`es and we look it up
-  # with an `Address`. This works because `BuildFileAddress` is a subclass, but MyPy warns that it
-  # could be a bug.
-  struct = address_family.addressables.get(address)  # type: ignore[call-overload]
-  addresses = address_family.addressables
-  if not struct or address not in addresses:
-    _raise_did_you_mean(address_family, address.target_name)
-  return next(build_address for build_address in addresses if build_address == address)
+  if address not in address_family.addressables:
+    _raise_did_you_mean(address_family=address_family, name=address.target_name)
+  return next(
+    build_file_address
+    for build_file_address in address_family.addressables.keys()
+    if build_file_address == address
+  )
 
 
 @rule
@@ -101,13 +100,9 @@ async def hydrate_struct(address_mapper: AddressMapper, address: Address) -> Hyd
   Recursively collects any embedded addressables within the Struct, but will not walk into a
   dependencies field, since those should be requested explicitly by rules.
   """
-  address_family = await Get[AddressFamily](Dir(address.spec_path))
-  struct = address_family.addressables.get(address)  # type: ignore[call-overload]
-
-  # TODO: remove this once we use Address instead of BuildFileAddress for TargetAdaptor. However,
-  # make sure that this codepath will still call `_raise_did_you_mean`. Likely, we should extract
-  # most the logic from the rule `find_build_file` into a top level function.
   build_file_address = await Get[BuildFileAddress](Address, address)
+  address_family = await Get[AddressFamily](Dir(address.spec_path))
+  struct = address_family.addressables.get(build_file_address)
 
   inline_dependencies = []
 
