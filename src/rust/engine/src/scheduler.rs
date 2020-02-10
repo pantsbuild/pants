@@ -14,6 +14,7 @@ use crate::context::{Context, Core};
 use crate::core::{Failure, Params, TypeId, Value};
 use crate::nodes::{NodeKey, Select, Tracer, Visualizer};
 use graph::{Graph, InvalidationResult};
+use hashing;
 use indexmap::IndexMap;
 use log::{debug, info, warn};
 use logging::logger::LOGGER;
@@ -185,17 +186,24 @@ impl Scheduler {
   }
 
   pub fn visualize(&self, session: &Session, path: &Path) -> io::Result<()> {
+    let context = Context::new(self.core.clone(), session.clone());
     self
       .core
       .graph
-      .visualize(Visualizer::default(), &session.root_nodes(), path)
+      .visualize(Visualizer::default(), &session.root_nodes(), path, &context)
   }
 
-  pub fn trace(&self, request: &ExecutionRequest, path: &Path) -> Result<(), String> {
+  pub fn trace(
+    &self,
+    session: &Session,
+    request: &ExecutionRequest,
+    path: &Path,
+  ) -> Result<(), String> {
+    let context = Context::new(self.core.clone(), session.clone());
     self
       .core
       .graph
-      .trace::<Tracer>(&request.root_nodes(), path)?;
+      .trace::<Tracer>(&request.root_nodes(), path, &context)?;
     Ok(())
   }
 
@@ -256,13 +264,14 @@ impl Scheduler {
   /// Return Scheduler and per-Session metrics.
   ///
   pub fn metrics(&self, session: &Session) -> HashMap<&str, i64> {
+    let context = Context::new(self.core.clone(), session.clone());
     let mut m = HashMap::new();
     m.insert(
       "affected_file_count",
       self
         .core
         .graph
-        .reachable_digest_count(&session.root_nodes()) as i64,
+        .reachable_digest_count(&session.root_nodes(), &context) as i64,
     );
     m.insert(
       "preceding_graph_size",
@@ -270,6 +279,14 @@ impl Scheduler {
     );
     m.insert("resulting_graph_size", self.core.graph.len() as i64);
     m
+  }
+
+  ///
+  /// Return all Digests currently in memory in this Scheduler.
+  ///
+  pub fn all_digests(&self, session: &Session) -> Vec<hashing::Digest> {
+    let context = Context::new(self.core.clone(), session.clone());
+    self.core.graph.all_digests(&context)
   }
 
   ///

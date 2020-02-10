@@ -74,7 +74,7 @@ pub trait NodeVisualizer<N: Node> {
   ///
   /// Returns a GraphViz color name/id within Self::color_scheme for the given Entry.
   ///
-  fn color(&mut self, entry: &Entry<N>) -> String;
+  fn color(&mut self, entry: &Entry<N>, context: &N::Context) -> String;
 }
 
 ///

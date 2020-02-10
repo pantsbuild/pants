@@ -923,9 +923,9 @@ impl NodeVisualizer<NodeKey> for Visualizer {
     "set312"
   }
 
-  fn color(&mut self, entry: &Entry<NodeKey>) -> String {
+  fn color(&mut self, entry: &Entry<NodeKey>, context: &<NodeKey as Node>::Context) -> String {
     let max_colors = 12;
-    match entry.peek() {
+    match entry.peek(context) {
       None => "white".to_string(),
       Some(Err(Failure::Throw(..))) => "4".to_string(),
       Some(Err(Failure::Invalidated)) => "12".to_string(),

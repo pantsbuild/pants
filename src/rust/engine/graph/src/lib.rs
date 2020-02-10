@@ -363,6 +363,7 @@ impl<N: Node> InnerGraph<N> {
     mut visualizer: V,
     roots: &[N],
     path: &Path,
+    context: &N::Context,
   ) -> io::Result<()> {
     let file = File::create(path)?;
     let mut f = BufWriter::new(file);
@@ -375,7 +376,7 @@ impl<N: Node> InnerGraph<N> {
     f.write_all(b"  concentrate=true;\n")?;
     f.write_all(b"  rankdir=TB;\n")?;
 
-    let mut format_color = |entry: &Entry<N>| visualizer.color(entry);
+    let mut format_color = |entry: &Entry<N>| visualizer.color(entry, context);
 
     let root_entries = roots
       .iter()
@@ -385,7 +386,7 @@ impl<N: Node> InnerGraph<N> {
 
     for eid in self.walk(root_entries, Direction::Outgoing) {
       let entry = self.unsafe_entry_for_id(eid);
-      let node_str = entry.format();
+      let node_str = entry.format(context);
 
       // Write the node header.
       f.write_fmt(format_args!(
@@ -398,7 +399,7 @@ impl<N: Node> InnerGraph<N> {
         let dep_entry = self.unsafe_entry_for_id(dep_id);
 
         // Write an entry per edge.
-        let dep_str = dep_entry.format();
+        let dep_str = dep_entry.format(context);
         f.write_fmt(format_args!("    \"{}\" -> \"{}\"\n", node_str, dep_str))?;
       }
     }
@@ -407,7 +408,12 @@ impl<N: Node> InnerGraph<N> {
     Ok(())
   }
 
-  fn trace<T: NodeTracer<N>>(&self, roots: &[N], file_path: &Path) -> Result<(), String> {
+  fn trace<T: NodeTracer<N>>(
+    &self,
+    roots: &[N],
+    file_path: &Path,
+    context: &N::Context,
+  ) -> Result<(), String> {
     let root_ids: IndexSet<EntryId, FNV> = roots
       .iter()
       .filter_map(|nk| self.entry_id(nk))
@@ -428,7 +434,7 @@ impl<N: Node> InnerGraph<N> {
         let mut non_bottom_deps = self
           .pg
           .neighbors_directed(id, Direction::Outgoing)
-          .filter(|dep_id| !T::is_bottom(self.unsafe_entry_for_id(*dep_id).peek()))
+          .filter(|dep_id| !T::is_bottom(self.unsafe_entry_for_id(*dep_id).peek(context)))
           .peekable();
 
         if non_bottom_deps.peek().is_none() {
@@ -485,7 +491,7 @@ impl<N: Node> InnerGraph<N> {
 
       // Render the path.
       self
-        .trace_render_path_to_file::<T>(&path, file_path)
+        .trace_render_path_to_file::<T>(&path, file_path, context)
         .map_err(|e| format!("Failed to render trace to {:?}: {}", file_path, e))?;
     }
 
@@ -499,6 +505,7 @@ impl<N: Node> InnerGraph<N> {
     &self,
     path: &[EntryId],
     file_path: &Path,
+    context: &N::Context,
   ) -> io::Result<()> {
     let file = OpenOptions::new().append(true).open(file_path)?;
     let mut f = BufWriter::new(file);
@@ -512,7 +519,7 @@ impl<N: Node> InnerGraph<N> {
           "{}\n{}  {}",
           output,
           indent,
-          T::state_str(&indent, entry.peek())
+          T::state_str(&indent, entry.peek(context))
         )
       } else {
         output
@@ -583,31 +590,37 @@ impl<N: Node> InnerGraph<N> {
     res
   }
 
-  fn reachable_digest_count(&self, roots: &[N]) -> usize {
+  fn reachable_digest_count(&self, roots: &[N], context: &N::Context) -> usize {
+    // TODO: This is a surprisingly expensive method, because it will clone all reachable values by
+    // calling `peek` on them.
     let root_ids = roots
       .iter()
       .filter_map(|node| self.entry_id(node))
       .cloned()
       .collect();
     self
-      .digests_internal(self.walk(root_ids, Direction::Outgoing).collect())
+      .digests_internal(
+        self.walk(root_ids, Direction::Outgoing).collect(),
+        context.clone(),
+      )
       .count()
   }
 
-  fn all_digests(&self) -> Vec<hashing::Digest> {
+  fn all_digests(&self, context: &N::Context) -> Vec<hashing::Digest> {
     self
-      .digests_internal(self.pg.node_indices().collect())
+      .digests_internal(self.pg.node_indices().collect(), context.clone())
       .collect()
   }
 
   fn digests_internal<'g>(
     &'g self,
     entryids: Vec<EntryId>,
+    context: N::Context,
   ) -> impl Iterator<Item = hashing::Digest> + 'g {
     entryids
       .into_iter()
       .filter_map(move |eid| self.entry_for_id(eid))
-      .filter_map(|entry| match entry.peek() {
+      .filter_map(move |entry| match entry.peek(&context) {
         Some(Ok(item)) => N::digest(item),
         _ => None,
       })
@@ -928,9 +941,14 @@ impl<N: Node> Graph<N> {
     inner.invalidate_from_roots(predicate)
   }
 
-  pub fn trace<T: NodeTracer<N>>(&self, roots: &[N], path: &Path) -> Result<(), String> {
+  pub fn trace<T: NodeTracer<N>>(
+    &self,
+    roots: &[N],
+    path: &Path,
+    context: &N::Context,
+  ) -> Result<(), String> {
     let inner = self.inner.lock();
-    inner.trace::<T>(roots, path)
+    inner.trace::<T>(roots, path, context)
   }
 
   pub fn visualize<V: NodeVisualizer<N>>(
@@ -938,9 +956,10 @@ impl<N: Node> Graph<N> {
     visualizer: V,
     roots: &[N],
     path: &Path,
+    context: &N::Context,
   ) -> io::Result<()> {
     let inner = self.inner.lock();
-    inner.visualize(visualizer, roots, path)
+    inner.visualize(visualizer, roots, path, context)
   }
 
   pub fn heavy_hitters(&self, roots: &[N], k: usize) -> HashMap<String, Duration> {
@@ -948,14 +967,14 @@ impl<N: Node> Graph<N> {
     inner.heavy_hitters(roots, k)
   }
 
-  pub fn reachable_digest_count(&self, roots: &[N]) -> usize {
+  pub fn reachable_digest_count(&self, roots: &[N], context: &N::Context) -> usize {
     let inner = self.inner.lock();
-    inner.reachable_digest_count(roots)
+    inner.reachable_digest_count(roots, context)
   }
 
-  pub fn all_digests(&self) -> Vec<hashing::Digest> {
+  pub fn all_digests(&self, context: &N::Context) -> Vec<hashing::Digest> {
     let inner = self.inner.lock();
-    inner.all_digests()
+    inner.all_digests(context)
   }
 
   ///

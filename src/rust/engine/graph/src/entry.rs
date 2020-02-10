@@ -83,6 +83,14 @@ impl<N: Node> EntryResult<N> {
     }
   }
 
+  fn peek(&self, context: &N::Context) -> Option<Result<N::Item, N::Error>> {
+    if self.is_clean(context) {
+      Some(self.as_ref().clone())
+    } else {
+      None
+    }
+  }
+
   /// Iff the value is Clean, mark it Dirty.
   fn dirty(&mut self) {
     if let EntryResult::Clean(value) = self {
@@ -189,13 +197,10 @@ impl<N: Node> Entry<N> {
   ///
   /// If the Future for this Node has already completed, returns a clone of its result.
   ///
-  pub fn peek(&self) -> Option<Result<N::Item, N::Error>> {
+  pub fn peek(&self, context: &N::Context) -> Option<Result<N::Item, N::Error>> {
     let state = self.state.lock();
     match *state {
-      EntryState::Completed {
-        result: EntryResult::Clean(ref result),
-        ..
-      } => Some(result.clone()),
+      EntryState::Completed { ref result, .. } => result.peek(context),
       _ => None,
     }
   }
@@ -498,10 +503,11 @@ impl<N: Node> Entry<N> {
           // due to failure of another Future in a `join` or `join_all`, or due to a timeout at the
           // root of a request.
           trace!(
-            "Completing node {:?} (generation {:?}) with {} waiters.",
+            "Completing node {:?} (generation {:?}) with {} waiters: {:?}",
             self.node,
             generation,
-            waiters.len()
+            waiters.len(),
+            next_result,
           );
           for waiter in waiters {
             let _ = waiter.send(next_result.as_ref().clone().map(|res| (res, generation)));
@@ -656,8 +662,8 @@ impl<N: Node> Entry<N> {
     }
   }
 
-  pub(crate) fn format(&self) -> String {
-    let state = match self.peek() {
+  pub(crate) fn format(&self, context: &N::Context) -> String {
+    let state = match self.peek(context) {
       Some(Ok(ref nr)) => format!("{:?}", nr),
       Some(Err(ref x)) => format!("{:?}", x),
       None => "<None>".to_string(),
