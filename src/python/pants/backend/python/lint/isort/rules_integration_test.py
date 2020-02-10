@@ -5,6 +5,8 @@ from typing import List, Optional, Tuple
 
 from pants.backend.python.lint.isort.rules import IsortTarget
 from pants.backend.python.lint.isort.rules import rules as isort_rules
+from pants.backend.python.rules import download_pex_bin, pex
+from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.build_graph.address import Address
 from pants.engine.fs import Digest, FileContent, InputFilesContent, Snapshot
 from pants.engine.legacy.structs import TargetAdaptor

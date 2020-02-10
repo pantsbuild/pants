@@ -7,6 +7,8 @@ import pytest
 
 from pants.backend.python.lint.black.rules import BlackTarget
 from pants.backend.python.lint.black.rules import rules as black_rules
+from pants.backend.python.rules import download_pex_bin, pex
+from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.build_graph.address import Address
 from pants.engine.fs import Digest, FileContent, InputFilesContent, Snapshot
 from pants.engine.legacy.structs import TargetAdaptor

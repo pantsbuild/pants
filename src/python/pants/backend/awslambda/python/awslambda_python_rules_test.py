@@ -24,10 +24,15 @@ from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.rules.core import strip_source_root
 from pants.testutil.option.util import create_options_bootstrapper
+from pants.testutil.subsystem.util import init_subsystems
 from pants.testutil.test_base import TestBase
 
 
 class TestPythonAWSLambdaCreation(TestBase):
+
+  def setUp(self):
+    super().setUp()
+    init_subsystems([download_pex_bin.DownloadedPexBin.Factory])
 
   @classmethod
   def rules(cls):
