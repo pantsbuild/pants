@@ -1,4 +1,4 @@
-use crate::RuleGraph;
+use crate::{Palette, RuleGraph};
 use std::fmt;
 
 #[test]
@@ -50,6 +50,16 @@ impl super::Rule for Rule {
 
   fn require_reachable(&self) -> bool {
     true
+  }
+
+  fn color(&self) -> Option<Palette> {
+    None
+  }
+}
+
+impl super::DisplayForGraph for Rule {
+  fn fmt_for_graph(&self) -> String {
+    "???".to_string()
   }
 }
 
