@@ -36,7 +36,7 @@ class TestPythonAWSLambdaCreation(TestBase):
       *awslambda_python_rules(),
       # If we pull in the subsystem_rule() as well from this file, we get an error saying the scope
       # 'download-pex-bin' was not found when trying to fetch the appropriate scope.
-      *[download_pex_bin.download_pex_bin],
+      download_pex_bin.download_pex_bin,
       *inject_init.rules(),
       *pex.rules(),
       *pex_from_target_closure.rules(),

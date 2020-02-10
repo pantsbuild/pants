@@ -35,20 +35,16 @@ class BlackIntegrationTest(TestBase):
 
   @classmethod
   def rules(cls):
-<<<<<<< df00bcce1397af2feb5ab43f03d4c03417fca98b
-    return (*super().rules(), *black_rules(), RootRule(BlackTarget))
-=======
     return (
       *super().rules(),
       *black_rules(),
-      *[download_pex_bin.download_pex_bin],
+      download_pex_bin.download_pex_bin,
       *pex.rules(),
       *python_native_code.rules(),
       *subprocess_environment.rules(),
       RootRule(BlackTarget),
       RootRule(download_pex_bin.DownloadedPexBin.Factory),
     )
->>>>>>> make python lint integration tests work
 
   def run_black(
     self,

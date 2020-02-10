@@ -40,7 +40,7 @@ class BanditIntegrationTest(TestBase):
     return (
       *super().rules(),
       *bandit_rules(),
-      *[download_pex_bin.download_pex_bin],
+      download_pex_bin.download_pex_bin,
       *pex.rules(),
       *python_native_code.rules(),
       *subprocess_environment.rules(),

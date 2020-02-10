@@ -41,7 +41,7 @@ class Flake8IntegrationTest(TestBase):
     return (
       *super().rules(),
       *flake8_rules(),
-      *[download_pex_bin.download_pex_bin],
+      download_pex_bin.download_pex_bin,
       *pex.rules(),
       *python_native_code.rules(),
       *subprocess_environment.rules(),

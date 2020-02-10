@@ -44,7 +44,7 @@ class IsortIntegrationTest(TestBase):
     return (
       *super().rules(),
       *isort_rules(),
-      *[download_pex_bin.download_pex_bin],
+      download_pex_bin.download_pex_bin,
       *pex.rules(),
       *python_native_code.rules(),
       *subprocess_environment.rules(),
