@@ -342,6 +342,10 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     The runtime_classpath is constructed by default.
     """
 
+  def create_extra_products_for_targets(self, targets):
+    """Allows subclasses to provide a method which creates extra products directly.
+    """
+
   def register_extra_products_from_contexts(self, targets, compile_contexts):
     """Allows subclasses to register additional products for targets.
 
@@ -428,21 +432,23 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
 
     relevant_targets = list(self.context.targets(predicate=self.select))
 
+    # Clone the compile_classpath to the runtime_classpath.
+    classpath_product = self.create_classpath_product()
+
+    fingerprint_strategy = DependencyContext.global_instance().create_fingerprint_strategy(
+        classpath_product)
+
     # If we are only exporting jars then we can omit some targets from the runtime_classpath.
     if self.context.products.is_required_data("export_dep_as_jar_signal"):
       # Filter modulized targets from invalid targets list.
       target_root_addresses = [t.address for t in set(self.context.target_roots)]
       dependees_of_target_roots = self.context.build_graph.transitive_dependees_of_addresses(target_root_addresses)
       relevant_targets = list(set(relevant_targets) - dependees_of_target_roots)
+      self.create_extra_products_for_targets(dependees_of_target_roots)
 
     if not relevant_targets:
       return
 
-    # Clone the compile_classpath to the runtime_classpath.
-    classpath_product = self.create_classpath_product()
-
-    fingerprint_strategy = DependencyContext.global_instance().create_fingerprint_strategy(
-        classpath_product)
     # Note, JVM targets are validated (`vts.update()`) as they succeed.  As a result,
     # we begin writing artifacts out to the cache immediately instead of waiting for
     # all targets to finish.
