@@ -104,6 +104,11 @@ async def hydrate_struct(address_mapper: AddressMapper, address: Address) -> Hyd
   address_family = await Get[AddressFamily](Dir(address.spec_path))
   struct = address_family.addressables.get(address)  # type: ignore[call-overload]
 
+  # TODO: remove this once we use Address instead of BuildFileAddress for TargetAdaptor. However,
+  # make sure that this codepath will still call `_raise_did_you_mean`. Likely, we should extract
+  # most the logic from the rule `find_build_file` into a top level function.
+  build_file_address = await Get[BuildFileAddress](Address, address)
+
   inline_dependencies = []
 
   def maybe_append(outer_key, value):
@@ -183,10 +188,6 @@ async def hydrate_struct(address_mapper: AddressMapper, address: Address) -> Hyd
         hydrated_args[key] = maybe_consume(key, value)
     return _hydrate(type(item), address.spec_path, **hydrated_args)
 
-  # TODO: remove this once we use Address instead of BuildFileAddress for TargetAdaptor. However,
-  # make sure that this codepath will still call `_raise_did_you_mean`. Likely, we should extract
-  # most the logic from the rule `find_build_file` into a top level function.
-  build_file_address = await Get[BuildFileAddress](Address, address)
   return HydratedStruct(consume_dependencies(struct, args={"address": build_file_address}))
 
 
