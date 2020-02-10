@@ -72,6 +72,7 @@ class File1(ConfigFile):
           list3: -["x", "y", "z"]
         
           [b]
+          name: overridden_from_default
           preempt: True
           
           [b.nested]
@@ -106,6 +107,7 @@ class File1(ConfigFile):
           list3.remove = ["x", "y", "z"]
         
           [b]
+          name = "overridden_from_default"
           preempt = true
         
           [b.nested]
@@ -149,6 +151,7 @@ class File1(ConfigFile):
         "list3": '-["x", "y", "z"]',
       },
       "b": {
+        "name": "overridden_from_default",
         "preempt": "True",
       },
       "b.nested": {
@@ -328,12 +331,17 @@ class ConfigBaseTest(TestBase):
     file1_config = self.config.configs()[1]
     file2_config = self.config.configs()[0]
     for section, options in self.file1.expected_options.items():
-      assert file1_config.values.options(section=section) == [
-        *options.keys(), *self.default_seed_values.keys(), *self.file1.default_values.keys(),
-      ]
+      expected = list(options.keys())
+      expected.extend(
+        default_option
+        for default_option in (*self.default_seed_values.keys(), *self.file1.default_values.keys())
+        if default_option not in expected
+      )
+      assert file1_config.values.options(section=section) == expected
     for section, options in self.file2.expected_options.items():
       assert file2_config.values.options(section=section) == [
-        *options.keys(), *self.default_seed_values.keys()]
+        *options.keys(), *self.default_seed_values.keys()
+      ]
     # Check non-existent section
     for config in file1_config, file2_config:
       with pytest.raises(configparser.NoSectionError):
@@ -361,10 +369,12 @@ class ConfigBaseTest(TestBase):
     for section, section_values in self.expected_combined_values.items():
       for option, value in {**section_values, **self.default_seed_values}.items():
         assert self.config.get(section=section, option=option) == value
-    # Check that each section from file1 also has file1's default values
-    for section in self.file1.expected_options:
-      for option, value in self.file1.default_values.items():
-        assert self.config.get(section=section, option=option) == value
+    # Check that each section from file1 also has file1's default values, unless that section
+    # explicitly overrides the default
+    for section, section_values in self.file1.expected_options.items():
+      for option, default_value in self.file1.default_values.items():
+        expected = default_value if option not in section_values else section_values[option]
+        assert self.config.get(section=section, option=option) == expected
 
     def check_defaults(default: str) -> None:
       assert self.config.get(section='c', option='fast') is None
