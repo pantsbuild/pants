@@ -18,6 +18,15 @@ class FilesystemSpecsIntegrationTest(PantsRunIntegrationTest):
       'testprojects/tests/python/pants:secondary_source_file_owner',
     } == set(pants_run.stdout_data.splitlines())
 
+  def test_valid_glob(self) -> None:
+    pants_run = self.run_pants(["list", "testprojects/tests/python/pants/dummies/*pass.py"])
+    self.assert_success(pants_run)
+    assert {
+      'testprojects/tests/python/pants:dummies_directory',
+      'testprojects/tests/python/pants/dummies:passing_target',
+      'testprojects/tests/python/pants:secondary_source_file_owner',
+    } == set(pants_run.stdout_data.splitlines())
+
   def test_nonexistent_file(self) -> None:
     pants_run = self.run_pants(["list", "src/fake.py"])
     self.assert_failure(pants_run)

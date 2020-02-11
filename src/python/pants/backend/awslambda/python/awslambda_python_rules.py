@@ -36,7 +36,7 @@ async def create_python_awslambda(
   # TODO: We must enforce that everything is built for Linux, no matter the local platform.
   pex_filename = f'{lambda_tgt_adaptor.address.target_name}.pex'
   pex_request = CreatePexFromTargetClosure(
-    addresses=Addresses((lambda_tgt_adaptor.address.to_address(),)),
+    addresses=Addresses([lambda_tgt_adaptor.address]),
     entry_point=None,
     output_filename=pex_filename
   )

@@ -24,17 +24,24 @@ from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.rules.core import strip_source_root
 from pants.testutil.option.util import create_options_bootstrapper
+from pants.testutil.subsystem.util import init_subsystems
 from pants.testutil.test_base import TestBase
 
 
 class TestPythonAWSLambdaCreation(TestBase):
+
+  def setUp(self):
+    super().setUp()
+    init_subsystems([download_pex_bin.DownloadedPexBin.Factory])
 
   @classmethod
   def rules(cls):
     return (
       *super().rules(),
       *awslambda_python_rules(),
-      *download_pex_bin.rules(),
+      # If we pull in the subsystem_rule() as well from this file, we get an error saying the scope
+      # 'download-pex-bin' was not found when trying to fetch the appropriate scope.
+      download_pex_bin.download_pex_bin,
       *inject_init.rules(),
       *pex.rules(),
       *pex_from_target_closure.rules(),
@@ -43,6 +50,7 @@ class TestPythonAWSLambdaCreation(TestBase):
       *strip_source_root.rules(),
       *subprocess_environment.rules(),
       RootRule(PythonAWSLambdaAdaptor),
+      RootRule(download_pex_bin.DownloadedPexBin.Factory),
     )
 
   def create_python_awslambda(self, addr: str) -> Tuple[str, bytes]:
@@ -52,6 +60,7 @@ class TestPythonAWSLambdaCreation(TestBase):
       Params(
         target.adaptor,
         create_options_bootstrapper(args=["--backend-packages2=pants.backend.awslambda.python"]),
+        download_pex_bin.DownloadedPexBin.Factory.global_instance(),
       ),
     )
     files_content = list(self.request_single_product(FilesContent,

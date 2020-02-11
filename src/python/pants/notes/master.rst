@@ -4,6 +4,93 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.26.0.dev0 (02/11/2020)
+------------------------
+
+New Features
+~~~~~~~~~~~~
+
+* Add support for TOML config files (`pants.toml`) (#9052)
+  `PR #9052 <https://github.com/pantsbuild/pants/pull/9052>`_
+
+* Add `migrate_to_toml_config.py` script to automatically update INI config files to TOML (#9054)
+  `PR #9054 <https://github.com/pantsbuild/pants/pull/9054>`_
+
+* Add `--run-args` to allow passing arguments in V2 (#9075)
+  `PR #9075 <https://github.com/pantsbuild/pants/pull/9075>`_
+
+Bugfixes
+~~~~~~~~
+
+* Re-pin pytest, and add a pin for zipp. (#9095)
+  `PR #9095 <https://github.com/pantsbuild/pants/pull/9095>`_
+
+* remove hardcoded toolchain variant and fix fingerprinting (#9085)
+  `PR #9085 <https://github.com/pantsbuild/pants/pull/9085>`_
+
+* Allow test specs to be used with --no-fast for junit (#9093)
+  `PR #9093 <https://github.com/pantsbuild/pants/pull/9093>`_
+
+* Revert "Switch to dot idea project type (#8745)" (#9096)
+  `PR #9096 <https://github.com/pantsbuild/pants/pull/9096>`_
+
+* Fix deprecation warning for `--transitive` for goals that ignore the option (#9076)
+  `PR #9076 <https://github.com/pantsbuild/pants/pull/9076>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Nicer rule graph viz (#7024)
+  `PR #7024 <https://github.com/pantsbuild/pants/pull/7024>`_
+
+* Handle Ctrl-C in the V2 UI (#9043)
+  `PR #9043 <https://github.com/pantsbuild/pants/pull/9043>`_
+
+* expose a v2 ruleset for BinaryToolBase (#8859)
+  `PR #8859 <https://github.com/pantsbuild/pants/pull/8859>`_
+
+* Move more python utils to core (#9082)
+  `PR #9082 <https://github.com/pantsbuild/pants/pull/9082>`_
+
+* Use `Addresses` instead of `BuildFileAddresses` in most rules (#9083)
+  `PR #9083 <https://github.com/pantsbuild/pants/pull/9083>`_
+
+* Allow going from `Addresses -> Address` (#9097)
+  `PR #9097 <https://github.com/pantsbuild/pants/pull/9097>`_
+
+* Replace `BuildFileAddress` with `Address` for `HydratedTarget` and `TargetAdaptor` (#9100)
+  `PR #9100 <https://github.com/pantsbuild/pants/pull/9100>`_
+
+* Rename `ProvenancedBuildFileAddress` to `AddressWithOrigin` (#9078)
+  `PR #9078 <https://github.com/pantsbuild/pants/pull/9078>`_
+
+* Add `FilesystemResolvedGlobSpec` to preserve which specific files to operate on (#9081)
+  `PR #9081 <https://github.com/pantsbuild/pants/pull/9081>`_
+
+* Fix file args working with globs (#9098)
+  `PR #9098 <https://github.com/pantsbuild/pants/pull/9098>`_
+
+* Use `pants.toml` internally (#9090)
+  `PR #9090 <https://github.com/pantsbuild/pants/pull/9090>`_
+
+* Warn when `fix_deprecated_globs_usage.py` encounters variables (#9080)
+  `PR #9080 <https://github.com/pantsbuild/pants/pull/9080>`_
+
+* Trigger warning/error for deprecated Target method overrides. (#9073)
+  `PR #9073 <https://github.com/pantsbuild/pants/pull/9073>`_
+
+* Add type hints to `build_graph` (#9099)
+  `PR #9099 <https://github.com/pantsbuild/pants/pull/9099>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Update release instructions for modern macOS (#9072)
+  `PR #9072 <https://github.com/pantsbuild/pants/pull/9072>`_
+
+* Prepare 1.24.1rc0 (#9079)
+  `PR #9079 <https://github.com/pantsbuild/pants/pull/9079>`_
+
 1.25.0rc0 (02/4/2020)
 ---------------------
 

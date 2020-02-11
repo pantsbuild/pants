@@ -50,7 +50,7 @@ class OsutilTest(TestBase):
       ('darwin', '17'): ('mac', '10.13'),
     }
 
-    def get_macos_version(darwin_version: str) -> Optional[str]:
+    def get_macos_version(darwin_version: Optional[str]) -> Optional[str]:
       host, version = get_closest_mac_host_platform_pair(
         darwin_version, platform_name_map=platform_name_map)
       if host is not None:
@@ -68,3 +68,7 @@ class OsutilTest(TestBase):
     self.assertEqual('10.6', get_macos_version('11'))
     self.assertEqual('10.6', get_macos_version('10'))
     self.assertEqual(None, get_macos_version('9'))
+
+    # When a version bound of `None` is provided, it should select the most recent OSX platform
+    # available.
+    self.assertEqual('10.13', get_macos_version(None))

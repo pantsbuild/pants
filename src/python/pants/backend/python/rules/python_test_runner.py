@@ -99,13 +99,13 @@ async def setup_pytest_for_target(
   # TODO: Rather than consuming the TestOptions subsystem, the TestRunner should pass on coverage
   # configuration via #7490.
   transitive_hydrated_targets = await Get[TransitiveHydratedTargets](
-    Addresses((test_target.address.to_address(),))
+    Addresses((test_target.address,))
   )
   all_targets = transitive_hydrated_targets.closure
 
   resolved_requirements_pex = await Get[Pex](
     CreatePexFromTargetClosure(
-      addresses=Addresses((test_target.address.to_address(),)),
+      addresses=Addresses((test_target.address,)),
       output_filename='pytest-with-requirements.pex',
       entry_point="pytest:main",
       additional_requirements=pytest.get_requirement_strings(),
@@ -132,7 +132,7 @@ async def setup_pytest_for_target(
   # optimization, this ensures that any transitive sources, such as a test project file named
   # test_fail.py, do not unintentionally end up being run as tests.
   source_root_stripped_test_target_sources = await Get[SourceRootStrippedSources](
-    Address, test_target.address.to_address()
+    Address, test_target.address
   )
 
   coverage_args = []

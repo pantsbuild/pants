@@ -14,6 +14,9 @@ def make_graph(name_to_deps: Dict[str, Tuple[str, ...]]) -> Dict[str, HydratedTa
   name_to_ht: Dict[str, HydratedTarget] = {}
 
   def make_ht(nm: str) -> HydratedTarget:
+    # NB: The HydratedTargets are not valid HydratedTargets, such as using a str instead of
+    # Address for the .address field. This is okay because it makes the tests much easier to work
+    # with and the topo_sort rule does not actually care about the HydratedTarget fields.
     if nm not in name_to_ht:
       dep_hts = tuple(make_ht(dep) for dep in name_to_deps[nm])
       name_to_ht[nm] = HydratedTarget(

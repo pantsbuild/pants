@@ -4,7 +4,7 @@
 from collections.abc import MutableMapping, MutableSequence
 from typing import Any, Dict, Iterable, Optional, cast
 
-from pants.build_graph.address import BuildFileAddress
+from pants.build_graph.address import Address
 from pants.engine.addressable import addressable, addressable_list
 from pants.engine.objects import Serializable, SerializableFactory, Validatable, ValidationError
 from pants.util.objects import SubclassesOf, SuperclassesOf
@@ -108,14 +108,14 @@ class Struct(Serializable, SerializableFactory, Validatable):
     return self._kwargs.get('name')
 
   @property
-  def address(self) -> Optional[BuildFileAddress]:
+  def address(self) -> Optional[Address]:
     """Return the address of this object, if any.
 
     In general structs need not be identified by an address, in which case they are
     generally embedded objects; ie: attributes values of enclosing named structs.
     Any top-level struct, though, will be identifiable via a unique address.
     """
-    return cast(Optional[BuildFileAddress], self._kwargs.get('address'))
+    return cast(Optional[Address], self._kwargs.get('address'))
 
   @property
   def type_alias(self) -> str:

@@ -23,7 +23,7 @@ class PantsRequirementIntegrationTestBase(PantsRunIntegrationTest):
     # In pants-plugins/src/python/internal_backend/utilities/register.py see
     # PantsReleases.notes_for_version.
     with environment_as(_PANTS_VERSION_OVERRIDE=unstable_version,
-                        PANTS_PANTS_RELEASES_BRANCH_NOTES="{'0.0.x': 'pants.ini'}"):
+                        PANTS_PANTS_RELEASES_BRANCH_NOTES="{'0.0.x': 'pants.toml'}"):
       pants_run = self.run_pants(['--version'])
       self.assert_success(pants_run)
       self.assertEqual(unstable_version, pants_run.stdout_data.strip())

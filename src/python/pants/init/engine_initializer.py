@@ -18,11 +18,11 @@ from pants.base.deprecated import deprecated_conditional
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.base.specs import Specs
-from pants.build_graph.address import BuildFileAddress
+from pants.binaries.binary_tool import rules as binary_tool_rules
+from pants.binaries.binary_util import rules as binary_util_rules
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.remote_sources import RemoteSources
-from pants.engine.addressable import BuildFileAddresses
 from pants.engine.build_files import create_graph_rules
 from pants.engine.console import Console
 from pants.engine.fs import Workspace, create_fs_rules
@@ -49,7 +49,7 @@ from pants.engine.legacy.structs import (
   TargetAdaptor,
 )
 from pants.engine.legacy.structs import rules as structs_rules
-from pants.engine.mapper import AddressMapper, ResolveError
+from pants.engine.mapper import AddressMapper
 from pants.engine.native import Native
 from pants.engine.parser import SymbolTable
 from pants.engine.platform import create_platform_rules
@@ -432,20 +432,6 @@ class EngineInitializer:
     def build_root_singleton() -> BuildRoot:
       return cast(BuildRoot, BuildRoot.instance)
 
-    @rule
-    async def single_build_file_address(
-      addresses: BuildFileAddresses,
-    ) -> BuildFileAddress:
-      if len(addresses.dependencies) == 0:
-        raise ResolveError("No targets were matched")
-      if len(addresses.dependencies) > 1:
-        output = '\n '.join(address.spec for address in addresses)
-        raise ResolveError(
-          "Expected a single target, but was given multiple targets:\n"
-          f"Did you mean one of:\n {output}"
-        )
-      return addresses.dependencies[0]
-
     # Create a Scheduler containing graph and filesystem rules, with no installed goals. The
     # LegacyBuildGraph will explicitly request the products it needs.
     rules = (
@@ -456,7 +442,6 @@ class EngineInitializer:
         symbol_table_singleton,
         union_membership_singleton,
         build_root_singleton,
-        single_build_file_address,
       ),
       *create_legacy_graph_tasks(),
       *create_fs_rules(),
@@ -467,6 +452,8 @@ class EngineInitializer:
       *create_options_parsing_rules(),
       *structs_rules(),
       *changed_rules(),
+      *binary_tool_rules(),
+      *binary_util_rules(),
       *rules,
     )
 

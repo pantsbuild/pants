@@ -70,7 +70,7 @@ class BinaryUtilTest(TestBase):
     supportdir, version, name = binaries[binary_key]
     binary_request = binary_util._make_deprecated_binary_request(supportdir, version, name)
 
-    binary_path = binary_request.get_download_path(binary_util._host_platform())
+    binary_path = binary_request.get_download_path(binary_util.host_platform())
     return f'{base}/{binary_path}'
 
   @classmethod
@@ -148,7 +148,7 @@ class BinaryUtilTest(TestBase):
         version='2.4.1',
         name='protoc')
 
-      binary_path = binary_request.get_download_path(binary_util._host_platform())
+      binary_path = binary_request.get_download_path(binary_util.host_platform())
       contents = b'proof'
       with safe_open(os.path.join(valid_local_files, binary_path), 'wb') as fp:
         fp.write(contents)
@@ -344,12 +344,12 @@ class BinaryUtilTest(TestBase):
   def test_select_argv(self):
     """Test invoking binary_util.py as a standalone script."""
     with temporary_dir() as tmp_dir:
-      config_file_loc = os.path.join(tmp_dir, 'pants.ini')
-      safe_file_dump(config_file_loc, payload="""\
+      config_file_loc = os.path.join(tmp_dir, 'pants.toml')
+      safe_file_dump(config_file_loc, payload=f"""\
 [GLOBAL]
-allow_external_binary_tool_downloads: True
-pants_bootstrapdir: {}
-""".format(tmp_dir))
+allow_external_binary_tool_downloads = true
+pants_bootstrapdir = "{tmp_dir}"
+""")
       expected_output_glob = os.path.join(
         tmp_dir, 'bin', 'cmake', '*', '*', '3.9.5', 'cmake')
       with environment_as(PANTS_CONFIG_FILES=f'[{config_file_loc!r}]'):

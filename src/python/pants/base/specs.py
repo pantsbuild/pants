@@ -18,7 +18,7 @@ from typing import (
   cast,
 )
 
-from pants.engine.fs import PathGlobs
+from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.objects import Collection
 from pants.option.custom_types import GlobExpansionConjunction
 from pants.option.global_options import GlobMatchErrorBehavior
@@ -356,7 +356,11 @@ class FilesystemGlobSpec(FilesystemSpec):
 @dataclass(frozen=True)
 class FilesystemResolvedGlobSpec(FilesystemGlobSpec, FilesystemResolvedSpec):
   """A spec with resolved globs, e.g. `*.py` may resolve to `('f1.py', 'f2.py', '__init__.py')`."""
-  resolved_files: Tuple[str, ...]
+  _snapshot: Snapshot
+
+  @property
+  def resolved_files(self) -> Tuple[str, ...]:
+    return self._snapshot.files
 
 
 @dataclass(frozen=True)

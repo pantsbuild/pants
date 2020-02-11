@@ -82,8 +82,8 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
     with temporary_dir() as interpreters_cache:
       pants_ini_config = {'python-setup': {
         'interpreter_constraints': [
-          f'"{self.py2_interpreter_constraint}"',
-          f'"{self.py3_interpreter_constraint}"'
+          f'{self.py2_interpreter_constraint}',
+          f'{self.py3_interpreter_constraint}'
         ],
         'interpreter_cache_dir': interpreters_cache
         }}
@@ -99,8 +99,8 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
     with temporary_dir() as interpreters_cache:
       pants_ini_config = {'python-setup': {
         'interpreter_constraints': [
-          f'"{self.py2_interpreter_constraint}"',
-          f'"{self.py3_interpreter_constraint}"'
+          f'{self.py2_interpreter_constraint}',
+          f'{self.py3_interpreter_constraint}'
         ],
         'interpreter_cache_dir': interpreters_cache
         }}

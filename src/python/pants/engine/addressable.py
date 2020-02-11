@@ -5,8 +5,9 @@ import inspect
 from collections.abc import MutableMapping, MutableSequence
 from dataclasses import dataclass
 from functools import update_wrapper
-from typing import Any, List, Set, Tuple, Type, Union
+from typing import Any, Set, Tuple, Type, Union
 
+from pants.base.exceptions import ResolveError
 from pants.base.specs import AddressSpec, FilesystemResolvedSpec
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.objects import Collection, Resolvable, Serializable
@@ -14,13 +15,23 @@ from pants.util.objects import TypeConstraintError
 
 
 class Addresses(Collection[Address]):
-  pass
+  def expect_single(self) -> Address:
+    """Assert that exactly one Address must be contained in the collection, then return it."""
+    if len(self.dependencies) == 0:
+      raise ResolveError("No targets were matched.")
+    if len(self.dependencies) > 1:
+      output = '\n  * '.join(address.spec for address in self.dependencies)
+      raise ResolveError(
+        "Expected a single target, but was given multiple targets.\n\n"
+        f"Did you mean one of:\n  * {output}"
+      )
+    return self.dependencies[0]
 
 
 @dataclass(frozen=True)
 class AddressWithOrigin:
   """A BuildFileAddress along with the cmd-line spec it was generated from."""
-  address: BuildFileAddress
+  address: Address
   origin: Union[AddressSpec, FilesystemResolvedSpec]
 
 
@@ -29,10 +40,7 @@ class AddressesWithOrigins(Collection[AddressWithOrigin]):
 
 
 class BuildFileAddresses(Collection[BuildFileAddress]):
-  @property
-  def addresses(self) -> List[Address]:
-    """Converts the BuildFileAddress objects in this collection to Address objects."""
-    return [bfa.to_address() for bfa in self]
+  """NB: V2 should generally use Addresses instead of BuildFileAddresses."""
 
 
 class NotSerializableError(TypeError):
