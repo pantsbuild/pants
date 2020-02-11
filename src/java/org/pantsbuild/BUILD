@@ -3,5 +3,5 @@
 
 files(
   name = 'junit_directory',
-  sources = rglobs('junit/*'),
+  sources = ['junit/**/*'],
 )

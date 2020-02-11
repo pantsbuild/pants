@@ -6,19 +6,22 @@ from typing import Optional, Tuple
 
 from pants.backend.python.lint.bandit.subsystem import Bandit
 from pants.backend.python.lint.python_lint_target import PythonLintTarget
+from pants.backend.python.rules import download_pex_bin, pex
 from pants.backend.python.rules.pex import (
   CreatePex,
   Pex,
   PexInterpreterConstraints,
   PexRequirements,
 )
-from pants.backend.python.subsystems.python_setup import PythonSetup
+from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.legacy.structs import PythonTargetAdaptor, TargetAdaptor
 from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
+from pants.option.global_options import GlobMatchErrorBehavior
+from pants.python.python_setup import PythonSetup
 from pants.rules.core.lint import LintResult
 
 
@@ -58,7 +61,11 @@ async def lint(
 
   config_path: Optional[str] = bandit.options.config
   config_snapshot = await Get[Snapshot](
-    PathGlobs(include=tuple([config_path] if config_path else []))
+    PathGlobs(
+      globs=tuple([config_path] if config_path else []),
+      glob_match_error_behavior=GlobMatchErrorBehavior.error,
+      description_of_origin="the option `--bandit-config`",
+    )
   )
   requirements_pex = await Get[Pex](
     CreatePex(
@@ -91,4 +98,12 @@ async def lint(
 
 
 def rules():
-  return [lint, subsystem_rule(Bandit), UnionRule(PythonLintTarget, BanditTarget)]
+  return [
+    lint,
+    subsystem_rule(Bandit),
+    UnionRule(PythonLintTarget, BanditTarget),
+    *download_pex_bin.rules(),
+    *pex.rules(),
+    *python_native_code.rules(),
+    *subprocess_environment.rules(),
+  ]

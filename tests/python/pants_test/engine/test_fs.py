@@ -24,6 +24,7 @@ from pants.engine.fs import (
   PathGlobs,
   PathGlobsAndRoot,
   Snapshot,
+  SnapshotSubset,
   UrlToFetch,
   create_fs_rules,
 )
@@ -49,11 +50,10 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
     yield project_tree
 
   @staticmethod
-  def specs(filespecs):
-    if isinstance(filespecs, PathGlobs):
-      return filespecs
-    else:
-      return PathGlobs(include=filespecs)
+  def path_globs(globs) -> PathGlobs:
+    if isinstance(globs, PathGlobs):
+      return globs
+    return PathGlobs(globs)
 
   def assert_walk_dirs(self, filespecs_or_globs, paths, **kwargs):
     self.assert_walk_snapshot('dirs', filespecs_or_globs, paths, **kwargs)
@@ -66,13 +66,13 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
       scheduler = self.mk_scheduler(rules=create_fs_rules(), project_tree=project_tree)
       if prepare:
         prepare(project_tree)
-      result = self.execute(scheduler, Snapshot, self.specs(filespecs_or_globs))[0]
+      result = self.execute(scheduler, Snapshot, self.path_globs(filespecs_or_globs))[0]
       self.assertEqual(sorted(getattr(result, field)), sorted(paths))
 
   def assert_content(self, filespecs_or_globs, expected_content):
     with self.mk_project_tree() as project_tree:
       scheduler = self.mk_scheduler(rules=create_fs_rules(), project_tree=project_tree)
-      snapshot = self.execute_expecting_one_result(scheduler, Snapshot, self.specs(filespecs_or_globs)).value
+      snapshot = self.execute_expecting_one_result(scheduler, Snapshot, self.path_globs(filespecs_or_globs)).value
       result = self.execute_expecting_one_result(scheduler, FilesContent, snapshot.directory_digest).value
       actual_content = {f.path: f.content for f in result.dependencies}
       self.assertEqual(expected_content, actual_content)
@@ -80,7 +80,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
   def assert_digest(self, filespecs_or_globs, expected_files):
     with self.mk_project_tree() as project_tree:
       scheduler = self.mk_scheduler(rules=create_fs_rules(), project_tree=project_tree)
-      result = self.execute(scheduler, Snapshot, self.specs(filespecs_or_globs))[0]
+      result = self.execute(scheduler, Snapshot, self.path_globs(filespecs_or_globs))[0]
       # Confirm all expected files were digested.
       self.assertEqual(set(expected_files), set(result.files))
       self.assertTrue(result.directory_digest.fingerprint is not None)
@@ -237,7 +237,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
       with open(os.path.join(temp_dir, "roland"), "w") as f:
         f.write("European Burmese")
       scheduler = self.mk_scheduler(rules=create_fs_rules())
-      globs = PathGlobs(("*",), ())
+      globs = PathGlobs(["*"])
       snapshot = scheduler.capture_snapshots((PathGlobsAndRoot(globs, temp_dir),))[0]
       self.assert_snapshot_equals(snapshot, ["roland"], Digest(
         "63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16",
@@ -252,9 +252,9 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
         f.write("I don't know")
       scheduler = self.mk_scheduler(rules=create_fs_rules())
       snapshots = scheduler.capture_snapshots((
-        PathGlobsAndRoot(PathGlobs(("roland",), ()), temp_dir),
-        PathGlobsAndRoot(PathGlobs(("susannah",), ()), temp_dir),
-        PathGlobsAndRoot(PathGlobs(("doesnotexist",), ()), temp_dir),
+        PathGlobsAndRoot(PathGlobs(["roland"]), temp_dir),
+        PathGlobsAndRoot(PathGlobs(["susannah"]), temp_dir),
+        PathGlobsAndRoot(PathGlobs(["doesnotexist"]), temp_dir),
       ))
       self.assertEqual(3, len(snapshots))
       self.assert_snapshot_equals(snapshots[0], ["roland"], Digest(
@@ -270,7 +270,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
   def test_snapshot_from_outside_buildroot_failure(self):
     with temporary_dir() as temp_dir:
       scheduler = self.mk_scheduler(rules=create_fs_rules())
-      globs = PathGlobs(("*",), ())
+      globs = PathGlobs(["*"])
       with self.assertRaises(Exception) as cm:
         scheduler.capture_snapshots((PathGlobsAndRoot(globs, os.path.join(temp_dir, "doesnotexist")),))
       self.assertIn("doesnotexist", str(cm.exception))
@@ -292,10 +292,10 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
         f.write("Not sure actually")
       (empty_snapshot, roland_snapshot, susannah_snapshot, both_snapshot) = (
         self.scheduler.capture_snapshots((
-          PathGlobsAndRoot(PathGlobs(("doesnotmatch",), ()), temp_dir),
-          PathGlobsAndRoot(PathGlobs(("roland",), ()), temp_dir),
-          PathGlobsAndRoot(PathGlobs(("susannah",), ()), temp_dir),
-          PathGlobsAndRoot(PathGlobs(("*",), ()), temp_dir),
+          PathGlobsAndRoot(PathGlobs(["doesnotmatch"]), temp_dir),
+          PathGlobsAndRoot(PathGlobs(["roland"]), temp_dir),
+          PathGlobsAndRoot(PathGlobs(["susannah"]), temp_dir),
+          PathGlobsAndRoot(PathGlobs(["*"]), temp_dir),
         ))
       )
 
@@ -329,10 +329,10 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
         f.write("Not sure actually")
       (empty_snapshot, roland_snapshot, susannah_snapshot, both_snapshot) = (
         self.scheduler.capture_snapshots((
-          PathGlobsAndRoot(PathGlobs(("doesnotmatch",), ()), temp_dir),
-          PathGlobsAndRoot(PathGlobs(("roland",), ()), temp_dir),
-          PathGlobsAndRoot(PathGlobs(("susannah",), ()), temp_dir),
-          PathGlobsAndRoot(PathGlobs(("*",), ()), temp_dir),
+          PathGlobsAndRoot(PathGlobs(["doesnotmatch"]), temp_dir),
+          PathGlobsAndRoot(PathGlobs(["roland"]), temp_dir),
+          PathGlobsAndRoot(PathGlobs(["susannah"]), temp_dir),
+          PathGlobsAndRoot(PathGlobs(["*"]), temp_dir),
         ))
       )
 
@@ -413,8 +413,8 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
       )
 
       snapshot, snapshot_with_extra_files = self.scheduler.capture_snapshots((
-        PathGlobsAndRoot(PathGlobs(("characters/dark_tower/*",)), temp_dir),
-        PathGlobsAndRoot(PathGlobs(("**",)), temp_dir),
+        PathGlobsAndRoot(PathGlobs(["characters/dark_tower/*"]), temp_dir),
+        PathGlobsAndRoot(PathGlobs(["**"]), temp_dir),
       ))
       # Check that we got the full snapshots that we expect
       self.assertEquals(snapshot.files, relevant_files)
@@ -438,7 +438,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
         )
       )
       expected_snapshot = assert_single_element(self.scheduler.capture_snapshots((
-        PathGlobsAndRoot(PathGlobs(("*",)), tower_dir),
+        PathGlobsAndRoot(PathGlobs(["*"]), tower_dir),
       )))
       self.assertEquals(expected_snapshot.files, ('roland', 'susannah'))
       self.assertEquals(stripped_digest, expected_snapshot.directory_digest)
@@ -477,55 +477,52 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
       self.request_single_product(Snapshot, digest)
 
   def test_glob_match_error(self):
+    test_name = f"{__name__}.{self.test_glob_match_error.__name__}()"
     with self.assertRaises(ValueError) as cm:
       self.assert_walk_files(PathGlobs(
-        include=['not-a-file.txt'],
-        exclude=[],
+        globs=['not-a-file.txt'],
         glob_match_error_behavior=GlobMatchErrorBehavior.error,
+        description_of_origin=test_name,
       ), [])
-    expected_msg = (
-      "Globs did not match. Excludes were: []. Unmatched globs were: [\"not-a-file.txt\"].")
-    self.assertIn(expected_msg, str(cm.exception))
+    assert f'Unmatched glob from {test_name}: "not-a-file.txt"' in str(cm.exception)
 
-  def test_glob_match_exclude_error(self):
+  def test_glob_match_error_with_exclude(self):
+    test_name = f"{__name__}.{self.test_glob_match_error_with_exclude.__name__}()"
     with self.assertRaises(ValueError) as cm:
       self.assert_walk_files(PathGlobs(
-        include=['*.txt'],
-        exclude=['4.txt'],
+        globs=['*.txt', '!4.txt'],
         glob_match_error_behavior=GlobMatchErrorBehavior.error,
+        description_of_origin=test_name,
       ), [])
-    expected_msg = (
-      "Globs did not match. Excludes were: [\"4.txt\"]. Unmatched globs were: [\"*.txt\"].")
-    self.assertIn(expected_msg, str(cm.exception))
+    assert f'Unmatched glob from {test_name}: "*.txt", exclude: "4.txt"' in str(cm.exception)
+
+  @unittest.skip('Skipped to expedite landing #5769: see #5863')
+  def test_glob_match_warn_logging(self):
+    test_name = f"{__name__}.{self.test_glob_match_warn_logging.__name__}()"
+    with self.captured_logging(logging.WARNING) as captured:
+      self.assert_walk_files(PathGlobs(
+        globs=['not-a-file.txt'],
+        glob_match_error_behavior=GlobMatchErrorBehavior.warn,
+        description_of_origin=test_name,
+      ), [])
+      all_warnings = captured.warnings()
+      assert len(all_warnings) == 1
+      assert f'Unmatched glob from {test_name}: "not-a-file.txt"' == str(all_warnings[0])
 
   def test_glob_match_ignore_logging(self):
     with self.captured_logging(logging.WARNING) as captured:
       self.assert_walk_files(PathGlobs(
-        include=['not-a-file.txt'],
-        exclude=[''],
+        globs=['not-a-file.txt'],
         glob_match_error_behavior=GlobMatchErrorBehavior.ignore,
       ), [])
-      self.assertEqual(0, len(captured.warnings()))
-
-  @unittest.skip('Skipped to expedite landing #5769: see #5863')
-  def test_glob_match_warn_logging(self):
-    with self.captured_logging(logging.WARNING) as captured:
-      self.assert_walk_files(PathGlobs(
-        include=['not-a-file.txt'],
-        exclude=[''],
-        glob_match_error_behavior=GlobMatchErrorBehavior.warn,
-      ), [])
-      all_warnings = captured.warnings()
-      self.assertEqual(1, len(all_warnings))
-      single_warning = all_warnings[0]
-      self.assertEqual("???", str(single_warning))
+      assert len(captured.warnings()) == 0
 
   def prime_store_with_roland_digest(self):
     """This method primes the store with a directory of a file named 'roland' and contents 'European Burmese'."""
     with temporary_dir() as temp_dir:
       with open(os.path.join(temp_dir, "roland"), "w") as f:
         f.write("European Burmese")
-      globs = PathGlobs(("*",), ())
+      globs = PathGlobs(["*"])
       snapshot = self.scheduler.capture_snapshots((PathGlobsAndRoot(globs, temp_dir),))[0]
 
       expected_digest = Digest("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16", 80)
@@ -596,6 +593,73 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
           "9341f76bef74170bedffe51e4f2e233f61786b7752d21c2339f8ee6070eba819",
           82
         ))
+
+  def generate_original_digest(self) -> Digest:
+    content = b'dummy content'
+    input_files_content = InputFilesContent((
+      FileContent(path='a.txt', content=content),
+      FileContent(path='b.txt', content=content),
+      FileContent(path='c.txt', content=content),
+      FileContent(path='subdir/a.txt', content=content),
+      FileContent(path='subdir/b.txt', content=content),
+      FileContent(path='subdir2/a.txt', content=content),
+      FileContent(path='subdir2/nested_subdir/x.txt', content=content),
+    ))
+    return self.request_single_product(Digest, input_files_content)
+
+  def test_empty_snapshot_subset(self) -> None:
+    ss = SnapshotSubset(directory_digest=self.generate_original_digest(),
+        globs = PathGlobs(()),
+    )
+    subset_snapshot = self.request_single_product(Snapshot, ss)
+    assert subset_snapshot.directory_digest == EMPTY_DIRECTORY_DIGEST
+    assert subset_snapshot.files == ()
+    assert subset_snapshot.dirs == ()
+
+  def test_snapshot_subset_globs(self) -> None:
+    ss = SnapshotSubset(directory_digest=self.generate_original_digest(),
+        globs=PathGlobs(("a.txt", "c.txt", "subdir2/**")),
+    )
+
+    subset_snapshot = self.request_single_product(Snapshot, ss)
+    assert set(subset_snapshot.files) == {'a.txt', 'c.txt', 'subdir2/a.txt', 'subdir2/nested_subdir/x.txt'}
+    assert set(subset_snapshot.dirs) == {'subdir2/nested_subdir'}
+
+    content = b'dummy content'
+    subset_input = InputFilesContent((
+      FileContent(path='a.txt', content=content),
+      FileContent(path='c.txt', content=content),
+      FileContent(path='subdir2/a.txt', content=content),
+      FileContent(path='subdir2/nested_subdir/x.txt', content=content),
+    ))
+    subset_digest = self.request_single_product(Digest, subset_input)
+    assert subset_snapshot.directory_digest == subset_digest
+
+  def test_snapshot_subset_globs_2(self) -> None:
+    ss = SnapshotSubset(directory_digest=self.generate_original_digest(),
+        globs=PathGlobs(("a.txt", "c.txt", "subdir2/*")),
+    )
+
+    subset_snapshot = self.request_single_product(Snapshot, ss)
+    assert set(subset_snapshot.files) == {'a.txt', 'c.txt', 'subdir2/a.txt'} 
+    assert set(subset_snapshot.dirs) == {'subdir2/nested_subdir'}
+
+  def test_nonexistent_filename_globs(self) -> None:
+    # We expect to ignore, rather than error, on files that don't exist in the original snapshot.
+    ss = SnapshotSubset(directory_digest=self.generate_original_digest(),
+        globs=PathGlobs(("some_file_not_in_snapshot.txt", "a.txt"))
+    )
+
+    subset_snapshot = self.request_single_product(Snapshot, ss)
+    assert set(subset_snapshot.files) == {"a.txt"}
+
+    content = b'dummy content'
+    subset_input = InputFilesContent((
+      FileContent(path='a.txt', content=content),
+    ))
+
+    subset_digest = self.request_single_product(Digest, subset_input)
+    assert subset_snapshot.directory_digest == subset_digest
 
 
 class StubHandler(BaseHTTPRequestHandler):

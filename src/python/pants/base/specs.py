@@ -3,10 +3,25 @@
 
 import os
 import re
-from abc import ABC, abstractmethod
+from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple, cast
+from typing import (
+  TYPE_CHECKING,
+  Dict,
+  Iterable,
+  Iterator,
+  List,
+  Optional,
+  Sequence,
+  Tuple,
+  Union,
+  cast,
+)
 
+from pants.engine.fs import PathGlobs, Snapshot
+from pants.engine.objects import Collection
+from pants.option.custom_types import GlobExpansionConjunction
+from pants.option.global_options import GlobMatchErrorBehavior
 from pants.util.collections import assert_single_element
 from pants.util.dirutil import fast_relpath_optional, recursive_dirname
 from pants.util.filtering import create_filters, wrap_filters
@@ -18,7 +33,15 @@ if TYPE_CHECKING:
   from pants.engine.mapper import AddressFamily, AddressMapper
 
 
-class AddressSpec(ABC):
+class Spec(ABC):
+  """A specification for what Pants should operate on."""
+
+  @abstractmethod
+  def to_spec_string(self) -> str:
+    """Return the normalized string representation of this spec."""
+
+
+class AddressSpec(Spec, metaclass=ABCMeta):
   """Represents address selectors as passed from the command line.
 
   Supports `Single` target addresses as well as `Sibling` (:) and `Descendant` (::) selector forms.
@@ -27,10 +50,6 @@ class AddressSpec(ABC):
   substitute 'address' for a spec resolved to an address, or 'address selector' if you are
   referring to an unresolved spec string.
   """
-
-  @abstractmethod
-  def to_spec_string(self) -> str:
-    """Returns the normalized string representation of this address spec."""
 
   class AddressFamilyResolutionError(Exception):
     pass
@@ -298,3 +317,128 @@ class AddressSpecs:
 
   def __iter__(self) -> Iterator[AddressSpec]:
     return iter(self.dependencies)
+
+
+class FilesystemSpec(Spec, metaclass=ABCMeta):
+  pass
+
+
+class FilesystemResolvedSpec(FilesystemSpec, metaclass=ABCMeta):
+
+  @property
+  @abstractmethod
+  def resolved_files(self) -> Tuple[str, ...]:
+    """The literal files this spec refers to after resolving all globs and excludes."""
+
+
+@dataclass(frozen=True)
+class FilesystemLiteralSpec(FilesystemResolvedSpec):
+  """A literal file name, e.g. `foo.py`."""
+  file: str
+
+  @property
+  def resolved_files(self) -> Tuple[str, ...]:
+    return self.file,
+
+  def to_spec_string(self) -> str:
+    return self.file
+
+
+@dataclass(frozen=True)
+class FilesystemGlobSpec(FilesystemSpec):
+  """A spec with a glob or globs, e.g. `*.py` and `**/*.java`."""
+  glob: str
+
+  def to_spec_string(self) -> str:
+    return self.glob
+
+
+@dataclass(frozen=True)
+class FilesystemResolvedGlobSpec(FilesystemGlobSpec, FilesystemResolvedSpec):
+  """A spec with resolved globs, e.g. `*.py` may resolve to `('f1.py', 'f2.py', '__init__.py')`."""
+  _snapshot: Snapshot
+
+  @property
+  def resolved_files(self) -> Tuple[str, ...]:
+    return self._snapshot.files
+
+
+@dataclass(frozen=True)
+class FilesystemIgnoreSpec(FilesystemSpec):
+  """A spec to ignore certain files or globs."""
+  glob: str
+
+  def __post_init__(self) -> None:
+    if self.glob.startswith("!"):
+      raise ValueError(f"The `glob` for {self} should not start with `!`.")
+
+  def to_spec_string(self) -> str:
+    return f"!{self.glob}"
+
+
+class FilesystemSpecs(Collection[FilesystemSpec]):
+
+  @memoized_property
+  def includes(self) -> Tuple[Union[FilesystemLiteralSpec, FilesystemGlobSpec], ...]:
+    return tuple(
+      spec for spec in self.dependencies
+      if isinstance(spec, (FilesystemGlobSpec, FilesystemLiteralSpec))
+    )
+
+  @memoized_property
+  def ignores(self) -> Tuple[FilesystemIgnoreSpec, ...]:
+    return tuple(spec for spec in self.dependencies if isinstance(spec, FilesystemIgnoreSpec))
+
+  @staticmethod
+  def _generate_path_globs(specs: Iterable[FilesystemSpec]) -> PathGlobs:
+    return PathGlobs(
+      globs=(s.to_spec_string() for s in specs),
+      # We error on unmatched globs for consistency with unmatched address specs. This also
+      # ensures that scripts don't silently do the wrong thing.
+      glob_match_error_behavior=GlobMatchErrorBehavior.error,
+      # We validate that _every_ glob is valid.
+      conjunction=GlobExpansionConjunction.all_match,
+      description_of_origin="file arguments",
+    )
+
+  def path_globs_for_spec(
+    self, spec: Union[FilesystemLiteralSpec, FilesystemGlobSpec]
+  ) -> PathGlobs:
+    """Generate PathGlobs for the specific spec, automatically including the instance's
+    FilesystemIgnoreSpecs.
+    """
+    return self._generate_path_globs(specs=(spec, *self.ignores))
+
+  def to_path_globs(self) -> PathGlobs:
+    """Generate a single PathGlobs for the instance."""
+    return self._generate_path_globs(specs=(*self.includes, *self.ignores))
+
+
+class AmbiguousSpecs(Exception):
+  pass
+
+
+@dataclass(frozen=True)
+class Specs:
+  address_specs: AddressSpecs
+  filesystem_specs: FilesystemSpecs
+
+  def __post_init__(self) -> None:
+    if self.address_specs.dependencies and self.filesystem_specs.dependencies:
+      raise AmbiguousSpecs(
+        "Both address specs and filesystem specs given. Please use only one type of spec.\n\n"
+        f"Address specs: {', '.join(spec.to_spec_string() for spec in self.address_specs)}\n"
+        f"Filesystem specs: {', '.join(spec.to_spec_string() for spec in self.filesystem_specs)}"
+      )
+
+  @property
+  def provided_specs(self) -> Union[AddressSpecs, FilesystemSpecs]:
+    """Return whichever types of specs was provided by the user.
+
+    It is guaranteed that there will only ever be AddressSpecs or FilesystemSpecs, but not both,
+    through validation in the constructor."""
+    return (
+      self.filesystem_specs
+      if self.filesystem_specs.dependencies
+      else self.address_specs
+    )

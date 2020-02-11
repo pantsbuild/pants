@@ -4,16 +4,65 @@
 import logging
 import os
 import threading
-from typing import Optional
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Tuple, Union, cast
 
-from pants.binaries.binary_util import BinaryRequest, BinaryUtil
-from pants.engine.fs import PathGlobs, PathGlobsAndRoot
+from pants.binaries.binary_util import (
+  BinaryRequest,
+  BinaryToolUrlGenerator,
+  BinaryUtil,
+  HostPlatform,
+)
+from pants.engine.fs import Digest, PathGlobs, PathGlobsAndRoot, Snapshot, UrlToFetch
+from pants.engine.platform import Platform, PlatformConstraint
+from pants.engine.rules import RootRule, rule
+from pants.engine.selectors import Get
 from pants.fs.archive import XZCompressedTarArchiver, create_archiver
 from pants.subsystem.subsystem import Subsystem
+from pants.util.enums import match
 from pants.util.memo import memoized_method, memoized_property
+from pants.util.meta import frozen_after_init
+from pants.util.osutil import get_closest_mac_host_platform_pair
 
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class ToolVersion:
+  version: str
+
+
+@dataclass(frozen=True)
+class ToolForPlatform:
+  version: ToolVersion
+  digest: Digest
+
+  def into_tuple(self) -> Tuple[str, str, int]:
+    return (self.version.version, self.digest.fingerprint, self.digest.serialized_bytes_length)
+
+
+@rule
+def translate_host_platform(
+    platform_constraint: PlatformConstraint,
+    binary_util: BinaryUtil,
+) -> HostPlatform:
+  # This method attempts to provide a uname function to BinaryUtil.host_platform() so that the
+  # download urls can be calculated. For platforms that are different than the current host, we try
+  # to "spoof" the most appropriate value.
+  if Platform.current == Platform.darwin:
+    darwin_uname: Any = os.uname
+    linux_uname: Any = lambda: ('linux', None, None, None, 'x86_64')
+  else:
+    assert Platform.current == Platform.linux
+    darwin_uname = lambda: ('darwin', None, get_closest_mac_host_platform_pair(), None, 'x86_64')
+    linux_uname = os.uname
+
+  return cast(HostPlatform, match(platform_constraint, {
+    PlatformConstraint.none: lambda: HostPlatform.empty,
+    PlatformConstraint.darwin: lambda: binary_util.host_platform(uname=darwin_uname()),
+    PlatformConstraint.linux: lambda: binary_util.host_platform(uname=linux_uname()),
+  })())
 
 
 # TODO: Add integration tests for this file.
@@ -28,7 +77,9 @@ class BinaryToolBase(Subsystem):
   # They must also set options_scope appropriately.
   platform_dependent: Optional[bool] = None
   archive_type: Optional[str] = None  # See pants.fs.archive.archive for valid string values.
+
   default_version: Optional[str] = None
+  default_versions_and_digests: Dict[PlatformConstraint, ToolForPlatform] = {}
 
   # Subclasses may set this to the tool name as understood by BinaryUtil.
   # If unset, it defaults to the value of options_scope.
@@ -115,6 +166,22 @@ class BinaryToolBase(Subsystem):
       version_registration_kwargs['fingerprint'] = True
     register('--version', **version_registration_kwargs)
 
+    register('--version-digest-mapping', type=dict,
+             default={
+               # "Serialize" the default value dict into "basic" types that can be easily specified
+               # in pants.ini.
+               platform_constraint.value: tool.into_tuple()
+               for platform_constraint, tool in cls.default_versions_and_digests.items()
+             },
+             fingerprint=True,
+             help='A dict mapping <platform constraint> -> (<version>, <fingerprint>, <size_bytes>).'
+                  f'A "platform constraint" is any of {[c.value for c in PlatformConstraint]}, and '
+                  'is the platform to fetch the tool for. A platform-independent tool should '
+                  f'use {PlatformConstraint.none.value}, while a platform-dependent tool should specify '
+                  'all environments it needs to be used for. The "fingerprint" and "size_bytes" '
+                  'arguments are the result printed when running `sha256sum` and `wc -c` on '
+                  'the downloaded file, respectively.')
+
   @memoized_method
   def select(self, context=None):
     """Returns the path to the specified binary tool.
@@ -166,7 +233,7 @@ class BinaryToolBase(Subsystem):
   def _name_to_fetch(cls):
     return '{}{}'.format(cls._get_name(), cls.suffix)
 
-  def _make_binary_request(self, version):
+  def make_binary_request(self, version):
     return BinaryRequest(
       supportdir=self.get_support_dir(),
       version=version,
@@ -176,7 +243,7 @@ class BinaryToolBase(Subsystem):
       archiver=self._get_archiver())
 
   def _select_for_version(self, version):
-    binary_request = self._make_binary_request(version)
+    binary_request = self.make_binary_request(version)
     return self._binary_util.select(binary_request)
 
   @memoized_method
@@ -230,3 +297,112 @@ class XZ(NativeTool):
 
   def _executable_location(self):
     return os.path.join(self.select(), 'bin', 'xz')
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class VersionDigestMapping:
+  """Parse the --version-digest-mapping option back into a dictionary."""
+  version_digest_mapping: Tuple[Tuple[str, Tuple[str, str, int]], ...]
+
+  def __init__(self, version_digest_mapping: Dict[str, List[Union[str, int]]]) -> None:
+    self.version_digest_mapping = tuple(
+      (platform_constraint, tuple(data)) # type: ignore[misc]
+      for platform_constraint, data in version_digest_mapping.items()
+    )
+
+  @memoized_property
+  def _deserialized_mapping(
+      self,
+  ) -> Dict[PlatformConstraint, ToolForPlatform]:
+    deserialized: Dict[PlatformConstraint, ToolForPlatform] = {}
+    for platform_constraint, (version, fingerprint, size_bytes) in self.version_digest_mapping:
+      deserialized[PlatformConstraint(platform_constraint)] = ToolForPlatform(
+        version=ToolVersion(version),
+        digest=Digest(fingerprint, size_bytes),
+      )
+    return deserialized
+
+  def get(self, platform_constraint: PlatformConstraint) -> ToolForPlatform:
+    return self._deserialized_mapping[platform_constraint]
+
+
+@dataclass(frozen=True)
+class BinaryToolUrlSet:
+  tool_for_platform: ToolForPlatform
+  host_platform: HostPlatform
+  url_generator: BinaryToolUrlGenerator
+
+  def get_urls(self) -> List[str]:
+    return self.url_generator.generate_urls(
+      version=self.tool_for_platform.version.version,
+      host_platform=self.host_platform if self.host_platform != HostPlatform.empty else None)
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class BinaryToolFetchRequest:
+  tool: BinaryToolBase
+  platform_constraint: PlatformConstraint
+
+  def __init__(
+      self,
+      tool: BinaryToolBase,
+      platform_constraint: Optional[PlatformConstraint] = None,
+  ) -> None:
+    self.tool = tool
+    if platform_constraint is None:
+      if tool.platform_dependent:
+        platform_constraint = PlatformConstraint.local_platform
+      else:
+        platform_constraint = PlatformConstraint.none
+
+    self.platform_constraint = platform_constraint
+
+
+@rule
+async def get_binary_tool_urls(
+    req: BinaryToolFetchRequest,
+    binary_util: BinaryUtil,
+) -> BinaryToolUrlSet:
+  tool = req.tool
+  platform_constraint = req.platform_constraint
+
+  mapping = VersionDigestMapping(tool.get_options().version_digest_mapping)
+  tool_for_platform = mapping.get(platform_constraint)
+
+  version = tool_for_platform.version.version
+  url_generator = binary_util.get_url_generator(tool.make_binary_request(version))
+
+  host_platform = await Get[HostPlatform](PlatformConstraint, platform_constraint)
+
+  return BinaryToolUrlSet(
+    tool_for_platform=tool_for_platform,
+    host_platform=host_platform,
+    url_generator=url_generator,
+  )
+
+
+@rule
+async def fetch_binary_tool(req: BinaryToolFetchRequest, url_set: BinaryToolUrlSet) -> Snapshot:
+  digest = url_set.tool_for_platform.digest
+  urls = url_set.get_urls()
+
+  if not urls:
+    raise ValueError(f'binary tool url generator {url_set.url_generator} produced an empty list of '
+                     f'urls for the request {req}')
+  # TODO: allow fetching a UrlToFetch with failure! Consider FallibleUrlToFetch analog to
+  # FallibleExecuteProcessResult!
+  url_to_fetch = urls[0]
+
+  return await Get[Snapshot](UrlToFetch(url_to_fetch, digest))
+
+
+def rules():
+  return [
+    RootRule(PlatformConstraint),
+    translate_host_platform,
+    get_binary_tool_urls,
+    fetch_binary_tool,
+    RootRule(BinaryToolFetchRequest),
+  ]

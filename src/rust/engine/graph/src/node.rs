@@ -7,7 +7,7 @@ use std::hash::Hash;
 use boxfuture::BoxFuture;
 use hashing::Digest;
 
-use futures::future::Future;
+use futures01::future::Future;
 use petgraph::stable_graph;
 
 use crate::entry::Entry;

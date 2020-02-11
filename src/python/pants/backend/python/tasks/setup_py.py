@@ -605,8 +605,6 @@ class SetupPy(Task):
 
     exported_python_targets = OrderedSet(t for t in self.context.target_roots
                                          if is_exported_python_target(t))
-    if not exported_python_targets:
-      raise TaskError('setup-py target(s) must provide an artifact.')
 
     dist_dir = self.get_options().pants_distdir
 

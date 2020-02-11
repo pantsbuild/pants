@@ -8,7 +8,7 @@ page(
 
 files(
   name='examples_directory',
-  sources=rglobs('examples/*'),
+  sources=['examples/**/*'],
   dependencies = [
     '//:3rdparty_directory',
   ],
@@ -16,5 +16,5 @@ files(
 
 files(
   name='testprojects_directory',
-  sources=rglobs('testprojects/*'),
+  sources=['testprojects/**/*'],
 )

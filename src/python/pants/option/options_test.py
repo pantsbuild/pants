@@ -96,7 +96,7 @@ class OptionsTest(TestBase):
       bootstrap_option_values=bootstrap_option_values,
     )
     self._register(options)
-    return cast(Options, options)
+    return options
 
   _known_scope_infos = [intermediate('compile'),
                         task('compile.java'),
@@ -738,7 +738,7 @@ class OptionsTest(TestBase):
     options = Options.create(env={},
                              config=self._create_config(),
                              known_scope_infos=[task('bar'), intermediate('foo'), task('foo.bar')],
-                             args='./pants')
+                             args=['./pants'])
     options.register('', '--opt1')
     options.register('foo', '-o', '--opt2')
 
@@ -770,7 +770,7 @@ class OptionsTest(TestBase):
     options = Options.create(env={},
                              config=self._create_config(),
                              known_scope_infos=[subsystem('foo')],
-                             args='./pants')
+                             args=['./pants'])
     # All subsystem options are implicitly recursive (a subscope of subsystem scope represents
     # a separate instance of the subsystem, so it needs all the options).
     # We disallow explicit specification of recursive (even if set to True), to avoid confusion.
@@ -825,7 +825,7 @@ class OptionsTest(TestBase):
         """
       ))
       tmp.flush()
-      # Note that we prevent loading a real pants.ini during get_bootstrap_options().
+      # Note that we prevent loading a real pants.toml during get_bootstrap_options().
       flags = f'--target-spec-file={tmp.name} --pants-config-files="[]" ' \
                 'compile morx:tgt fleem:tgt'
       bootstrapper = OptionsBootstrapper.create(args=shlex.split(f"./pants {flags}"))

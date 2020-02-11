@@ -45,6 +45,7 @@ class JvmRun(JvmTask):
     super().__init__(*args, **kwargs)
     self.only_write_cmd_line = self.get_options().only_write_cmd_line
     self.args.extend(self.get_passthru_args())
+    self.args.extend(self.get_options().args)
 
   def execute(self):
     # The called binary may block for a while, allow concurrent pants activity during this pants

@@ -5,6 +5,7 @@ python_library(
   dependencies=[
     'src/python/pants/backend/native',
     'src/python/pants/backend/python/tasks',
+    'src/python/pants/python',
     'src/python/pants/util:collections',
     'src/python/pants/util:enums',
     'src/python/pants/util:meta',

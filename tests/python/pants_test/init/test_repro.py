@@ -71,7 +71,7 @@ class ReproTest(unittest.TestCase):
       temporary_dir() as capture_dir:
 
       add_file = partial(self.add_file, build_root)
-      add_file('pants.ini')
+      add_file('pants.toml')
       add_file('.git/foo', content='foo')
       add_file('dist/bar', content='bar')
       add_file('foo/bar', content='baz')

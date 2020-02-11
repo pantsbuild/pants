@@ -23,7 +23,7 @@ target(
 
 files(
   name = 'antlr_directory',
-  sources = rglobs('antlr/*'),
+  sources = ['antlr/**/*'],
   dependencies = [
     'testprojects/src/antlr/python:test_directory',
   ],
@@ -31,52 +31,52 @@ files(
 
 files(
   name = 'bad_requirements_directory',
-  sources = rglobs('bad_requirements/*'),
+  sources = ['bad_requirements/**/*'],
 )
 
 files(
   name = 'build_file_imports_function_directory',
-  sources = rglobs('build_file_imports_function/*'),
+  sources = ['build_file_imports_function/**/*'],
 )
 
 files(
   name = 'build_file_imports_module_directory',
-  sources = rglobs('build_file_imports_module/*'),
+  sources = ['build_file_imports_module/**/*'],
 )
 
 files(
   name = 'coordinated_runs_directory',
-  sources = rglobs('coordinated_runs/*'),
+  sources = ['coordinated_runs/**/*'],
 )
 
 files(
   name = 'interpreter_selection_directory',
-  sources = rglobs('interpreter_selection/*'),
+  sources = ['interpreter_selection/**/*'],
 )
 
 files(
   name = 'nested_runs_directory',
-  sources = rglobs('nested_runs/*'),
+  sources = ['nested_runs/**/*'],
 )
 
 files(
   name = 'no_build_file_directory',
-  sources = rglobs('no_build_file/*'),
+  sources = ['no_build_file/**/*'],
 )
 
 files(
   name = 'plugins_directory',
-  sources = rglobs('plugins/*'),
+  sources = ['plugins/**/*'],
 )
 
 files(
   name = 'print_env_directory',
-  sources = rglobs('print_env/*'),
+  sources = ['print_env/**/*'],
 )
 
 files(
   name = 'python_distribution_directory',
-  sources = rglobs('python_distribution/*'),
+  sources = ['python_distribution/**/*'],
   dependencies = [
     'testprojects/3rdparty:python_directory',
   ],
@@ -85,15 +85,15 @@ files(
 
 files(
   name = 'python_targets_directory',
-  sources = rglobs('python_targets/*'),
+  sources = ['python_targets/**/*'],
 )
 
 files(
   name = 'sources_directory',
-  sources = rglobs('sources/*'),
+  sources = ['sources/**/*'],
 )
 
 files(
   name = 'unicode_directory',
-  sources = rglobs('unicode/*'),
+  sources = ['unicode/**/*'],
 )

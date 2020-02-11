@@ -221,7 +221,7 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):  # t
 
       if isinstance(current_target, PythonRequirementLibrary):
         reqs = current_target.payload.get_field_value('requirements', set())
-        """:type : set[pants.backend.python.python_requirement.PythonRequirement]"""
+        """:type : set[pants.python.python_requirement.PythonRequirement]"""
         info['requirements'] = [req.key for req in reqs]
 
       if isinstance(current_target, PythonTarget):
@@ -420,6 +420,24 @@ class Export(ExportTask, ConsoleTask):  # type: ignore[misc]
 
   Intended for exporting project information for IDE, such as the IntelliJ Pants plugin.
   """
+
+  _register_console_transitivity_option = False
+
+  @classmethod
+  def register_options(cls, register):
+    super().register_options(register)
+    register(
+      '--transitive', type=bool, default=True, fingerprint=True,
+      help='If True, use all targets in the build graph, else use only target roots.',
+      removal_version="1.27.0.dev0",
+      removal_hint="`export` should always act transitively, which is the default. This option "
+                   "will be going away to ensure that Pants always does the right thing.",
+    )
+
+  @property
+  def act_transitively(self):
+    # NB: `export` should always act transitively
+    return self.get_options().transitive
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)

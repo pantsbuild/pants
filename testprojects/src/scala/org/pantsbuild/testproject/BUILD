@@ -26,42 +26,42 @@ target(
 
 files(
   name = 'compilation_failure_directory',
-  sources = rglobs('compilation_failure/*'),
+  sources = ['compilation_failure/**/*'],
 )
 
 files(
   name = 'compilation_warnings_directory',
-  sources = rglobs('compilation_warnings/*'),
+  sources = ['compilation_warnings/**/*'],
 )
 
 files(
   name = 'custom_scala_platform_directory',
-  sources = rglobs('custom_scala_platform/*'),
+  sources = ['custom_scala_platform/**/*'],
 )
 
 files(
   name = 'emptyscala_directory',
-  sources = rglobs('emptyscala/*'),
+  sources = ['emptyscala/**/*'],
 )
 
 files(
   name = 'exclude_direct_dep_directory',
-  sources = rglobs('exclude_direct_dep/*'),
+  sources = ['exclude_direct_dep/**/*'],
 )
 
 files(
   name = 'javadepsonscala_directory',
-  sources = rglobs('javadepsonscala/*'),
+  sources = ['javadepsonscala/**/*'],
 )
 
 files(
   name = 'javadepsonscalatransitive_directory',
-  sources = rglobs('javadepsonscalatransitive/*'),
+  sources = ['javadepsonscalatransitive/**/*'],
 )
 
 files(
   name = 'javasources_directory',
-  sources = rglobs('javasources/*'),
+  sources = ['javasources/**/*'],
   dependencies = [
     'testprojects/src/java/org/pantsbuild/testproject:javasources_directory',
     'testprojects/src/java/org/pantsbuild/testproject:publish_directory'
@@ -70,22 +70,22 @@ files(
 
 files(
   name = 'mutual_directory',
-  sources = rglobs('mutual/*'),
+  sources = ['mutual/**/*'],
 )
 
 files(
   name = 'procedure_syntax_directory',
-  sources = rglobs('procedure_syntax/*'),
+  sources = ['procedure_syntax/**/*'],
 )
 
 files(
   name = 'public_inference_directory',
-  sources = rglobs('public_inference/*'),
+  sources = ['public_inference/**/*'],
 )
 
 files(
   name = 'publish_directory',
-  sources = rglobs('publish/*'),
+  sources = ['publish/**/*'],
   dependencies = [
     'testprojects/src/java/org/pantsbuild/testproject:publish_directory'
   ],
@@ -93,12 +93,12 @@ files(
 
 files(
   name = 'rsc_compat_directory',
-  sources = rglobs('rsc_compat/*'),
+  sources = ['rsc_compat/**/*'],
 )
 
 files(
   name = 'scaladepsonboth_directory',
-  sources = rglobs('scaladepsonboth/*'),
+  sources = ['scaladepsonboth/**/*'],
   dependencies = [
     'testprojects/src/scala/org/pantsbuild/testproject:javasources_directory',
   ],
@@ -106,12 +106,12 @@ files(
 
 files(
   name = 'sharedsources_directory',
-  sources = rglobs('sharedsources/*'),
+  sources = ['sharedsources/**/*'],
 )
 
 files(
   name = 'thriftdeptest_directory',
-  sources = rglobs('thriftdeptest/*'),
+  sources = ['thriftdeptest/**/*'],
   dependencies = [
     'testprojects/src/thrift/org/pantsbuild:testproject_directory',
   ],
@@ -119,5 +119,5 @@ files(
 
 files(
   name = 'unicode_directory',
-  sources = rglobs('unicode/*'),
+  sources = ['unicode/**/*'],
 )

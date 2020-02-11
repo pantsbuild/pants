@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use futures::Future;
+use futures01::Future;
 
 use crate::core::{Failure, TypeId};
 use crate::handles::maybe_drop_handles;
@@ -136,9 +136,9 @@ impl Core {
       .map_err(|e| format!("Could not initialize Store: {:?}", e))?;
 
     let process_execution_metadata = ExecuteProcessRequestMetadata {
-      instance_name: remote_instance_name.clone(),
-      cache_key_gen_version: remote_execution_process_cache_namespace.clone(),
-      platform_properties: remote_execution_extra_platform_properties.clone(),
+      instance_name: remote_instance_name,
+      cache_key_gen_version: remote_execution_process_cache_namespace,
+      platform_properties: remote_execution_extra_platform_properties,
     };
 
     let local_command_runner = process_execution::local::CommandRunner::new(
@@ -174,8 +174,8 @@ impl Core {
             // requires the remote_execution_server be present when remote_execution is set.
             &remote_execution_server.unwrap(),
             process_execution_metadata.clone(),
-            root_ca_certs.clone(),
-            oauth_bearer_token.clone(),
+            root_ca_certs,
+            oauth_bearer_token,
             remote_execution_headers,
             store.clone(),
             // TODO if we ever want to configure the remote platform to be something else we

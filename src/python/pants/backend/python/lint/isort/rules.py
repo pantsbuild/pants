@@ -7,13 +7,14 @@ from typing import List, Optional, Tuple
 from pants.backend.python.lint.isort.subsystem import Isort
 from pants.backend.python.lint.python_format_target import PythonFormatTarget
 from pants.backend.python.lint.python_lint_target import PythonLintTarget
+from pants.backend.python.rules import download_pex_bin, pex
 from pants.backend.python.rules.pex import (
   CreatePex,
   Pex,
   PexInterpreterConstraints,
   PexRequirements,
 )
-from pants.backend.python.subsystems.python_setup import PythonSetup
+from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
 from pants.engine.isolated_process import (
@@ -24,6 +25,9 @@ from pants.engine.isolated_process import (
 from pants.engine.legacy.structs import TargetAdaptor
 from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
+from pants.option.custom_types import GlobExpansionConjunction
+from pants.option.global_options import GlobMatchErrorBehavior
+from pants.python.python_setup import PythonSetup
 from pants.rules.core.fmt import FmtResult
 from pants.rules.core.lint import LintResult
 
@@ -45,7 +49,14 @@ class IsortSetup:
 @rule
 async def setup_isort(isort: Isort) -> IsortSetup:
   config_path: Optional[List[str]] = isort.options.config
-  config_snapshot = await Get[Snapshot](PathGlobs(include=config_path or ()))
+  config_snapshot = await Get[Snapshot](
+    PathGlobs(
+      globs=config_path or (),
+      glob_match_error_behavior=GlobMatchErrorBehavior.error,
+      conjunction=GlobExpansionConjunction.all_match,
+      description_of_origin="the option `--isort-config`",
+    )
+  )
   requirements_pex = await Get[Pex](
     CreatePex(
       output_filename="isort.pex",
@@ -143,4 +154,8 @@ def rules():
     subsystem_rule(Isort),
     UnionRule(PythonFormatTarget, IsortTarget),
     UnionRule(PythonLintTarget, IsortTarget),
+    *download_pex_bin.rules(),
+    *pex.rules(),
+    *python_native_code.rules(),
+    *subprocess_environment.rules(),
   ]

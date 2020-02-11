@@ -3,7 +3,7 @@
 
 python_library(
   name = 'mock_logger',
-  sources = globs('mock_logger.py'),
+  sources = ['mock_logger.py'],
   dependencies = [
     'src/python/pants/testutil:mock_logger',
     'tests/python/pants_test:deprecated_testinfra',

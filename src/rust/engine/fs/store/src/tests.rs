@@ -6,7 +6,7 @@ use crate::{
 use bazel_protos;
 use bytes::Bytes;
 use digest::{Digest as DigestTrait, FixedOutput};
-use futures::Future;
+use futures01::Future;
 use hashing::{Digest, Fingerprint};
 use maplit::btreemap;
 use mock::StubCAS;

@@ -36,7 +36,7 @@ class BuildConfiguration:
     self._rules = OrderedSet()
     self._union_rules = OrderedDict()
 
-  def registered_aliases(self):
+  def registered_aliases(self) -> BuildFileAliases:
     """Return the registered aliases exposed in BUILD files.
 
     These returned aliases aren't so useful for actually parsing BUILD files.
@@ -44,7 +44,6 @@ class BuildConfiguration:
 
     :returns: A new BuildFileAliases instance containing this BuildConfiguration's registered alias
               mappings.
-    :rtype: :class:`pants.build_graph.build_file_aliases.BuildFileAliases`
     """
     target_factories_by_alias = self._target_by_alias.copy()
     target_factories_by_alias.update(self._target_macro_factory_by_alias)

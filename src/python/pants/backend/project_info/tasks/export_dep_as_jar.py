@@ -32,6 +32,8 @@ class ExportDepAsJar(ConsoleTask):
   jvm dependencies instead of sources.
   """
 
+  _register_console_transitivity_option = False
+
   @classmethod
   def subsystem_dependencies(cls):
     return super().subsystem_dependencies() + (DependencyContext,)
@@ -43,11 +45,25 @@ class ExportDepAsJar(ConsoleTask):
       help='Causes output to be a single line of JSON.')
     register('--sources', type=bool,
       help='Causes the sources of dependencies to be zipped and included in the project.')
+    register(
+      '--transitive', type=bool, default=True, fingerprint=True,
+      help='If True, use all targets in the build graph, else use only target roots.',
+      removal_version="1.27.0.dev0",
+      removal_hint="`export-dep-as-jar` should always act transitively, which is the default. "
+                   "This option will be going away to ensure that Pants always does the right "
+                   "thing.",
+    )
+
+  @property
+  def act_transitively(self):
+    # NB: `export-dep-as-jar` should always act transitively
+    return self.get_options().transitive
 
   @classmethod
   def prepare(cls, options, round_manager):
     super().prepare(options, round_manager)
     round_manager.require_data('export_dep_as_jar_classpath')
+    round_manager.require_data('zinc_args')
 
   @property
   def _output_folder(self):
@@ -154,7 +170,10 @@ class ExportDepAsJar(ConsoleTask):
     )
     return dependencies_to_include
 
-  def _process_target(self, current_target, modulizable_target_set, resource_target_map, runtime_classpath):
+  def _extract_arguments_with_prefix_from_zinc_args(self, args, prefix):
+    return [option[len(prefix):] for option in args if option.startswith(prefix)]
+
+  def _process_target(self, current_target, modulizable_target_set, resource_target_map, runtime_classpath, zinc_args_for_target):
     """
     :type current_target:pants.build_graph.target.Target
     """
@@ -169,7 +188,10 @@ class ExportDepAsJar(ConsoleTask):
       'pants_target_type': self._get_pants_target_alias(type(current_target)),
       'is_target_root': current_target in modulizable_target_set,
       'transitive': current_target.transitive,
-      'scope': str(current_target.scope)
+      'scope': str(current_target.scope),
+      'scalac_args': self._extract_arguments_with_prefix_from_zinc_args(zinc_args_for_target, '-S'),
+      'javac_args': self._extract_arguments_with_prefix_from_zinc_args(zinc_args_for_target, '-C'),
+      'extra_jvm_options': current_target.payload.get_field_value('extra_jvm_options', [])
     }
 
     if not current_target.is_synthetic:
@@ -319,7 +341,7 @@ class ExportDepAsJar(ConsoleTask):
         library_entry['sources'] = jarred_sources.name
     return library_entry
 
-  def generate_targets_map(self, targets, runtime_classpath):
+  def generate_targets_map(self, targets, runtime_classpath, zinc_args_for_all_targets):
     """Generates a dictionary containing all pertinent information about the target graph.
 
     The return dictionary is suitable for serialization by json.dumps.
@@ -347,7 +369,15 @@ class ExportDepAsJar(ConsoleTask):
       libraries_map[t.id] = self._make_libraries_entry(t, resource_target_map, runtime_classpath)
 
     for target in modulizable_targets:
-      info = self._process_target(target, modulizable_targets, resource_target_map, runtime_classpath)
+      zinc_args_for_target = zinc_args_for_all_targets.get(target)
+      if zinc_args_for_target is None:
+        if not isinstance(target, JvmTarget):
+          # non-JvmTarget targets (JvmApp, PythonLibrary, Page...) are not compiled with the jvm.
+          # Therefore, they don't need compiler args.
+          zinc_args_for_target = []
+        else:
+          raise TaskError(f"There was an error exporting target {target} - There were no zinc arguments registered for it")
+      info = self._process_target(target, modulizable_targets, resource_target_map, runtime_classpath, zinc_args_for_target)
       targets_map[target.address.spec] = info
 
     graph_info = self.initialize_graph_info()
@@ -357,10 +387,16 @@ class ExportDepAsJar(ConsoleTask):
     return graph_info
 
   def console_output(self, targets):
+
+    zinc_args_for_all_targets = self.context.products.get_data('zinc_args')
+    if zinc_args_for_all_targets is None:
+      raise TaskError("There was an error compiling the targets - There there are no zing argument entries")
+
     runtime_classpath = self.context.products.get_data('export_dep_as_jar_classpath')
     if runtime_classpath is None:
       raise TaskError("There was an error compiling the targets - There is no export_dep_as_jar classpath")
-    graph_info = self.generate_targets_map(targets, runtime_classpath=runtime_classpath)
+    graph_info = self.generate_targets_map(targets, runtime_classpath=runtime_classpath, zinc_args_for_all_targets=zinc_args_for_all_targets)
+
     if self.get_options().formatted:
       return json.dumps(graph_info, indent=4, separators=(',', ': ')).splitlines()
     else:

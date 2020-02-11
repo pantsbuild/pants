@@ -16,7 +16,7 @@ target(
 
 files(
   name = 'hello_directory',
-  sources = rglobs('hello/*'),
+  sources = ['hello/**/*'],
   dependencies = [
     'examples/src/java/org/pantsbuild/example:hello_directory',
     'examples/src/resources/org/pantsbuild/example:hello_directory',
@@ -25,7 +25,7 @@ files(
 
 files(
   name = 'useantlr_directory',
-  sources = rglobs('useantlr/*'),
+  sources = ['useantlr/**/*'],
   dependencies = [
     'examples/src/java/org/pantsbuild/example:antlr3_directory',
     'examples/src/java/org/pantsbuild/example:antlr4_directory',
@@ -34,7 +34,7 @@ files(
 
 files(
   name = 'usejaxb_directory',
-  sources = rglobs('usejaxb/*'),
+  sources = ['usejaxb/**/*'],
   dependencies = [
     'examples/src/java/org/pantsbuild/example:jaxb_directory',
     'examples/src/resources/org/pantsbuild/example:jaxb_directory',
@@ -43,7 +43,7 @@ files(
 
 files(
   name = 'useproto_directory',
-  sources = rglobs('useproto/*'),
+  sources = ['useproto/**/*'],
   dependencies = [
     'examples/src/protobuf/org/pantsbuild/example:distance_directory',
   ],
@@ -51,7 +51,7 @@ files(
 
 files(
   name = 'useprotoimports_directory',
-  sources = rglobs('useprotoimports/*'),
+  sources = ['useprotoimports/**/*'],
   dependencies = [
     'examples/src/protobuf/org/pantsbuild/example:imports_directory',
   ],
@@ -59,7 +59,7 @@ files(
 
 files(
   name = 'usethrift_directory',
-  sources = rglobs('usethrift/*'),
+  sources = ['usethrift/**/*'],
   dependencies = [
     'examples/src/thrift/org/pantsbuild/example:distance_directory',
     'examples/src/thrift/org/pantsbuild/example:precipitation_directory',
@@ -68,7 +68,7 @@ files(
 
 files(
   name = 'usewire_directory',
-  sources = rglobs('usethrift/*'),
+  sources = ['usethrift/**/*'],
   dependencies = [
     'examples/src/wire/org/pantsbuild/example:temperature_directory',
   ],

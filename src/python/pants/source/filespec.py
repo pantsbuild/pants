@@ -11,7 +11,7 @@ from pants.source.wrapped_globs import Filespec
 def globs_matches(
   paths: Iterable[str], patterns: Iterable[str], exclude_patterns: Iterable[str],
 ) -> bool:
-  path_globs = PathGlobs(include=patterns, exclude=exclude_patterns)
+  path_globs = PathGlobs(globs=(*patterns, *(f"!{e}" for e in exclude_patterns)))
   return Native().match_path_globs(path_globs, paths)
 
 

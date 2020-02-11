@@ -18,9 +18,10 @@ The `pants bundle` command enables you to bundle a project into a single archive
 In order to use the `bundle` goal, you need to target a `jvm_app` definition. Here's an example target:
 
     ::python
-    jvm_app(name='bundle',
+    jvm_app(
+      name='bundle',
       basename='my-project-deployable-bundle',
-      binary=':my-project-binary-target', # should point to a jvm_binary target
+      binary=':my-binary-target', # should point to a jvm_binary target
     )
 
 There are two ways to specify the desired file format:
@@ -30,7 +31,8 @@ There are two ways to specify the desired file format:
 Add an `archive` parameter to your `jvm_app` target. Here's an example:
 
     ::python
-    jvm_app(name='bundle',
+    jvm_app(
+      name='bundle',
       archive='zip',
       # etc
     )
@@ -40,7 +42,7 @@ Add an `archive` parameter to your `jvm_app` target. Here's an example:
 Add a `--bundle-jvm-archive` option when invoking the Pants executable. Here's an example:
 
     ::bash
-    $ ./pants bundle myproject/subproject:bundle --bundle-jvm-archive=zip
+    $ ./pants bundle src/java/com/myorg/myproject:bundle --bundle-jvm-archive=zip
 
 **Note**: If you perform *neither* of the steps explained in #1 and #2, no bundle will be created.
 

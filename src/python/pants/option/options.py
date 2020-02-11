@@ -5,10 +5,11 @@ import copy
 import re
 import sys
 from dataclasses import dataclass
-from typing import List
+from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Set, Tuple
 
 from pants.base.deprecated import warn_or_error
-from pants.option.arg_splitter import ArgSplitter
+from pants.option.arg_splitter import ArgSplitter, HelpRequest
+from pants.option.config import Config
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_tracker import OptionTracker
 from pants.option.option_util import is_list_option
@@ -18,17 +19,6 @@ from pants.option.parser_hierarchy import ParserHierarchy, all_enclosing_scopes,
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.meta import frozen_after_init
-
-
-def make_flag_regex(long_name, short_name=None):
-  long_esc = re.escape(long_name)
-  if short_name:
-    short_esc = re.escape(short_name)
-    rx_str = r"\A(?:\-({short_esc})|\-\-(?:(no)\-)?({long_esc})(?:=(.*))?)\Z".format(
-      short_esc=short_esc, long_esc=long_esc)
-  else:
-    rx_str = r"\A\-\-(?:(no)\-)?({long_esc})(?:=(.*))?\Z".format(long_esc=long_esc)
-  return re.compile(rx_str)
 
 
 class Options:
@@ -83,7 +73,7 @@ class Options:
     """More than one registration occurred for the same scope."""
 
   @classmethod
-  def complete_scopes(cls, scope_infos):
+  def complete_scopes(cls, scope_infos: Iterable[ScopeInfo]) -> Set[ScopeInfo]:
     """Expand a set of scopes to include all enclosing scopes.
 
     E.g., if the set contains `foo.bar.baz`, ensure that it also contains `foo.bar` and `foo`.
@@ -91,7 +81,7 @@ class Options:
     Also adds any deprecated scopes.
     """
     ret = {GlobalOptionsRegistrar.get_scope_info()}
-    original_scopes = dict()
+    original_scopes: Dict[str, ScopeInfo] = {}
     for si in scope_infos:
       ret.add(si)
       if si.scope in original_scopes:
@@ -113,11 +103,18 @@ class Options:
     return ret
 
   @classmethod
-  def create(cls, env, config, known_scope_infos, args=None, bootstrap_option_values=None):
+  def create(
+    cls,
+    env: Mapping[str, str],
+    config: Config,
+    known_scope_infos: Iterable[ScopeInfo],
+    args: Optional[Sequence[str]] = None,
+    bootstrap_option_values: Optional[OptionValueContainer] = None,
+  ) -> "Options":
     """Create an Options instance.
 
     :param env: a dict of environment variables.
-    :param :class:`pants.option.config.Config` config: data from a config file.
+    :param config: data from a config file.
     :param known_scope_infos: ScopeInfos for all scopes that may be encountered.
     :param args: a list of cmd-line args; defaults to `sys.argv` if None is supplied.
     :param bootstrap_option_values: An optional namespace containing the values of bootstrap
@@ -144,14 +141,34 @@ class Options:
     parser_hierarchy = ParserHierarchy(env, config, complete_known_scope_infos, option_tracker)
     bootstrap_option_values = bootstrap_option_values
     known_scope_to_info = {s.scope: s for s in complete_known_scope_infos}
-    return cls(split_args.goals, split_args.scope_to_flags, split_args.specs,
-               split_args.passthru, split_args.passthru_owner, help_request,
-               parser_hierarchy, bootstrap_option_values, known_scope_to_info,
-               option_tracker, split_args.unknown_scopes)
+    return cls(
+      goals=split_args.goals,
+      scope_to_flags=split_args.scope_to_flags,
+      specs=split_args.specs,
+      passthru=split_args.passthru,
+      passthru_owner=split_args.passthru_owner,
+      help_request=help_request,
+      parser_hierarchy=parser_hierarchy,
+      bootstrap_option_values=bootstrap_option_values,
+      known_scope_to_info=known_scope_to_info,
+      option_tracker=option_tracker,
+      unknown_scopes=split_args.unknown_scopes,
+    )
 
-  def __init__(self, goals, scope_to_flags, specs: List[str], passthru, passthru_owner, help_request,
-               parser_hierarchy, bootstrap_option_values, known_scope_to_info,
-               option_tracker, unknown_scopes) -> None:
+  def __init__(
+    self,
+    goals: List[str],
+    scope_to_flags: Dict[str, List[str]],
+    specs: List[str],
+    passthru: List[str],
+    passthru_owner: Optional[str],
+    help_request: Optional[HelpRequest],
+    parser_hierarchy: ParserHierarchy,
+    bootstrap_option_values: Optional[OptionValueContainer],
+    known_scope_to_info: Dict[str, ScopeInfo],
+    option_tracker: OptionTracker,
+    unknown_scopes: List[str],
+  ) -> None:
     """The low-level constructor for an Options instance.
 
     Dependees should use `Options.create` instead.
@@ -171,16 +188,16 @@ class Options:
 
   # TODO: Eliminate this in favor of a builder/factory.
   @property
-  def frozen(self):
+  def frozen(self) -> bool:
     """Whether or not this Options object is frozen from writes."""
     return self._frozen
 
   @property
-  def tracker(self):
+  def tracker(self) -> OptionTracker:
     return self._option_tracker
 
   @property
-  def help_request(self):
+  def help_request(self) -> Optional[HelpRequest]:
     """
     :API: public
     """
@@ -223,7 +240,7 @@ class Options:
     return self._specs
 
   @property
-  def goals(self):
+  def goals(self) -> List[str]:
     """The requested goals, in the order specified on the cmd line.
 
     :API: public
@@ -231,7 +248,7 @@ class Options:
     return self._goals
 
   @memoized_property
-  def goals_by_version(self):
+  def goals_by_version(self) -> Tuple[Tuple[str, ...], Tuple[str, ...], Tuple[str, ...]]:
     """Goals organized into three tuples by whether they are v1, ambiguous, or v2 goals (respectively).
 
     It's possible for a goal to be implemented with both v1 and v2, in which case a consumer
@@ -254,18 +271,18 @@ class Options:
     return tuple(v1), tuple(ambiguous), tuple(v2)
 
   @property
-  def known_scope_to_info(self):
+  def known_scope_to_info(self) -> Dict[str, ScopeInfo]:
     return self._known_scope_to_info
 
   @property
-  def scope_to_flags(self):
+  def scope_to_flags(self) -> Dict[str, List[str]]:
     return self._scope_to_flags
 
-  def freeze(self):
+  def freeze(self) -> None:
     """Freezes this Options instance."""
     self._frozen = True
 
-  def drop_flag_values(self):
+  def drop_flag_values(self) -> "Options":
     """Returns a copy of these options that ignores values specified via flags.
 
     Any pre-cached option values are cleared and only option values that come from option defaults,
@@ -273,27 +290,29 @@ class Options:
     """
     # An empty scope_to_flags to force all values to come via the config -> env hierarchy alone
     # and empty values in case we already cached some from flags.
-    no_flags = {}
-    return Options(self._goals,
-                   no_flags,
-                   self._specs,
-                   self._passthru,
-                   self._passthru_owner,
-                   self._help_request,
-                   self._parser_hierarchy,
-                   self._bootstrap_option_values,
-                   self._known_scope_to_info,
-                   self._option_tracker,
-                   self._unknown_scopes)
+    no_flags: Dict[str, List[str]] = {}
+    return Options(
+      goals=self._goals,
+      scope_to_flags=no_flags,
+      specs=self._specs,
+      passthru=self._passthru,
+      passthru_owner=self._passthru_owner,
+      help_request=self._help_request,
+      parser_hierarchy=self._parser_hierarchy,
+      bootstrap_option_values=self._bootstrap_option_values,
+      known_scope_to_info=self._known_scope_to_info,
+      option_tracker=self._option_tracker,
+      unknown_scopes=self._unknown_scopes,
+    )
 
-  def is_known_scope(self, scope):
+  def is_known_scope(self, scope: str) -> bool:
     """Whether the given scope is known by this instance.
 
     :API: public
     """
     return scope in self._known_scope_to_info
 
-  def passthru_args_for_scope(self, scope):
+  def passthru_args_for_scope(self, scope: str) -> List[str]:
     # Passthru args "belong" to the last scope mentioned on the command-line.
 
     # Note: If that last scope is a goal, we allow all tasks in that goal to access the passthru
@@ -311,14 +330,13 @@ class Options:
     if (scope and self._passthru_owner and scope.startswith(self._passthru_owner) and
           (len(scope) == len(self._passthru_owner) or scope[len(self._passthru_owner)] == '.')):
       return self._passthru
-    else:
-      return []
+    return []
 
-  def _assert_not_frozen(self):
+  def _assert_not_frozen(self) -> None:
     if self._frozen:
       raise self.FrozenOptionsError(f'cannot mutate frozen Options instance {self!r}.')
 
-  def register(self, scope, *args, **kwargs):
+  def register(self, scope: str, *args, **kwargs) -> None:
     """Register an option in the given scope."""
     self._assert_not_frozen()
     self.get_parser(scope).register(*args, **kwargs)
@@ -340,7 +358,7 @@ class Options:
     register.scope = optionable_class.options_scope
     return register
 
-  def get_parser(self, scope):
+  def get_parser(self, scope: str) -> Parser:
     """Returns the parser for the given scope, so code can register on it directly."""
     self._assert_not_frozen()
     return self._parser_hierarchy.get_parser_by_scope(scope)
@@ -448,7 +466,7 @@ class Options:
     self.walk_parsers(register_all_scoped_names)
     return sorted(all_scoped_flag_names, key=lambda flag_info: flag_info.scoped_arg)
 
-  def _make_parse_args_request(self, flags_in_scope, namespace):
+  def _make_parse_args_request(self, flags_in_scope, namespace, include_passive_options=False):
     levenshtein_max_distance = (
       self._bootstrap_option_values.option_name_check_distance
       if self._bootstrap_option_values
@@ -459,11 +477,16 @@ class Options:
       namespace=namespace,
       get_all_scoped_flag_names=lambda: self._all_scoped_flag_names_for_fuzzy_matching,
       levenshtein_max_distance=levenshtein_max_distance,
+      include_passive_options=include_passive_options
     )
 
   # TODO: Eagerly precompute backing data for this?
   @memoized_method
-  def for_scope(self, scope, inherit_from_enclosing_scope=True):
+  def for_scope(
+      self, scope: str,
+      inherit_from_enclosing_scope: bool = True,
+      include_passive_options: bool = False
+  ) -> OptionValueContainer:
     """Return the option values for the given scope.
 
     Values are attributes of the returned object, e.g., options.foo.
@@ -480,7 +503,7 @@ class Options:
 
     # Now add our values.
     flags_in_scope = self._scope_to_flags.get(scope, [])
-    parse_args_request = self._make_parse_args_request(flags_in_scope, values)
+    parse_args_request = self._make_parse_args_request(flags_in_scope, values, include_passive_options)
     self._parser_hierarchy.get_parser_by_scope(scope).parse_args(parse_args_request)
 
     # Check for any deprecation conditions, which are evaluated using `self._flag_matchers`.
@@ -540,12 +563,12 @@ class Options:
         pairs.append((val_type, val))
     return pairs
 
-  def __getitem__(self, scope):
+  def __getitem__(self, scope: str) -> OptionValueContainer:
     # TODO(John Sirois): Mainly supports use of dict<str, dict<str, str>> for mock options in tests,
     # Consider killing if tests consolidate on using TestOptions instead of the raw dicts.
     return self.for_scope(scope)
 
-  def bootstrap_option_values(self):
+  def bootstrap_option_values(self) -> Optional[OptionValueContainer]:
     """Return the option values for bootstrap options.
 
     General code can also access these values in the global scope.  But option registration code
@@ -553,7 +576,7 @@ class Options:
     """
     return self._bootstrap_option_values
 
-  def for_global_scope(self):
+  def for_global_scope(self) -> OptionValueContainer:
     """Return the option values for the global scope.
 
     :API: public

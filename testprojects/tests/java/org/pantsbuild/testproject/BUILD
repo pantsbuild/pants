@@ -34,7 +34,7 @@ target(
 
 files(
   name='annotation_directory',
-  sources=rglobs('annotation/*'),
+  sources=['annotation/**/*'],
   dependencies = [
     'testprojects/src/java/org/pantsbuild/testproject:annotation_directory',
   ],
@@ -42,12 +42,12 @@ files(
 
 files(
   name='buildrefactor_directory',
-  sources=rglobs('buildrefactor/*'),
+  sources=['buildrefactor/**/*'],
 )
 
 files(
   name='coverage_directory',
-  sources=rglobs('coverage/*'),
+  sources=['coverage/**/*'],
   dependencies = [
     'testprojects/src/java/org/pantsbuild/testproject:coverage_directory',
   ],
@@ -55,7 +55,7 @@ files(
 
 files(
   name='cucumber_directory',
-  sources=rglobs('cucumber/*'),
+  sources=['cucumber/**/*'],
   dependencies = [
     'testprojects/3rdparty:cucumber_directory',
     'testprojects/tests/resources/org/pantsbuild/testproject:cucumber_directory',
@@ -64,7 +64,7 @@ files(
 
 files(
   name='cwdexample_directory',
-  sources=rglobs('cwdexample/*'),
+  sources=['cwdexample/**/*'],
   dependencies = [
     'testprojects/src/java/org/pantsbuild/testproject:cwdexample_directory',
   ],
@@ -72,32 +72,32 @@ files(
 
 files(
   name='depman_directory',
-  sources=rglobs('depman/*'),
+  sources=['depman/**/*'],
 )
 
 files(
   name='dummies_directory',
-  sources=rglobs('dummies/*'),
+  sources=['dummies/**/*'],
 )
 
 files(
   name='exports_directory',
-  sources=rglobs('exports/*'),
+  sources=['exports/**/*'],
 )
 
 files(
   name='fail256_directory',
-  sources=rglobs('fail256/*'),
+  sources=['fail256/**/*'],
 )
 
 files(
   name='htmlreport_directory',
-  sources=rglobs('htmlreport/*'),
+  sources=['htmlreport/**/*'],
 )
 
 files(
   name='ideacodeandresources_directory',
-  sources=rglobs('ideacodeandresources/*'),
+  sources=['ideacodeandresources/**/*'],
   dependencies = [
     'testprojects/src/resources/org/pantsbuild/testproject:ideacodeandresources_directory',
     'testprojects/tests/resources/org/pantsbuild/testproject:ideacodeandresources_directory',
@@ -106,7 +106,7 @@ files(
 
 files(
   name='idearesourcesonly_directory',
-  sources=rglobs('idearesourcesonly/*'),
+  sources=['idearesourcesonly/**/*'],
   dependencies = [
     'testprojects/tests/resources/org/pantsbuild/testproject:idearesourcesonly_directory',
   ],
@@ -114,12 +114,12 @@ files(
 
 files(
   name='ideatestsandlib_directory',
-  sources=rglobs('ideatestsandlib/*'),
+  sources=['ideatestsandlib/**/*'],
 )
 
 files(
   name='ivyclassifier_directory',
-  sources=rglobs('ivyclassifier/*'),
+  sources=['ivyclassifier/**/*'],
   dependencies = [
     'testprojects/tests/resources/org/pantsbuild/testproject:ivyclassifier_directory',
   ]
@@ -127,47 +127,47 @@ files(
 
 files(
   name='matcher_directory',
-  sources=rglobs('matcher/*'),
+  sources=['matcher/**/*'],
 )
 
 files(
   name='parallel_directory',
-  sources=rglobs('parallel/*'),
+  sources=['parallel/**/*'],
 )
 
 files(
   name='parallelclassesandmethods_directory',
-  sources=rglobs('parallelclassesandmethods/*'),
+  sources=['parallelclassesandmethods/**/*'],
 )
 
 files(
   name='parallelmethods_directory',
-  sources=rglobs('parallelmethods/*'),
+  sources=['parallelmethods/**/*'],
 )
 
 files(
   name='strictdeps_directory',
-  sources=rglobs('strictdeps/*'),
+  sources=['strictdeps/**/*'],
 )
 
 files(
   name='syntheticjar_directory',
-  sources=rglobs('syntheticjar/*'),
+  sources=['syntheticjar/**/*'],
 )
 
 files(
   name='testjvms_directory',
-  sources=rglobs('testjvms/*'),
+  sources=['testjvms/**/*'],
 )
 
 files(
   name='timeout_directory',
-  sources=rglobs('timeout/*'),
+  sources=['timeout/**/*'],
 )
 
 files(
   name='unicode_directory',
-  sources=rglobs('unicode/*'),
+  sources=['unicode/**/*'],
   dependencies = [
     'testprojects/src/java/org/pantsbuild/testproject:unicode_directory',
   ],
@@ -175,6 +175,6 @@ files(
 
 files(
   name='workdirs_directory',
-  sources=rglobs('workdirs/*'),
+  sources=['workdirs/**/*'],
 )
 

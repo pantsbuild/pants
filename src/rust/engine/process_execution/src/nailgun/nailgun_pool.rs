@@ -11,7 +11,7 @@ use std::process::Stdio;
 use std::sync::Arc;
 
 use boxfuture::{try_future, BoxFuture, Boxable};
-use futures::future::Future;
+use futures01::future::Future;
 use log::{debug, info};
 use parking_lot::Mutex;
 use regex::Regex;
@@ -146,7 +146,6 @@ impl NailgunPool {
               .lock()
               .try_wait()
               .map_err(|e| format!("Error getting the process status! {}", e))
-              .clone()
         };
         match status {
           Ok(None) => {

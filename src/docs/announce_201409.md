@@ -89,7 +89,7 @@ list](http://pantsbuild.org/howto_contribute.html) and follow
 **Organization Perspectives:**
 
 -   [Introducing Pants: a build system for large-scale codebases like
-    Foursquare’s](http://engineering.foursquare.com/2014/09/16/introducing-pants-a-build-system-for-large-scale-codebases-like-foursquares/),
+    Foursquare’s](https://enterprise.foursquare.com/intersections/article/introducing-pants-a-build-system-for-large-scale/),
     Foursquare Engineering Blog
 -   [Trying on
     Pants](http://corner.squareup.com/2014/09/trying-on-pants.html),

@@ -3,5 +3,5 @@
 
 files(
   name='examples_directory',
-  sources=rglobs('examples/*'),
+  sources=['examples/**/*'],
 )

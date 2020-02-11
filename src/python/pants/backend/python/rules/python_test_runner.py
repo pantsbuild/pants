@@ -10,10 +10,9 @@ from pants.backend.python.rules.pex import Pex
 from pants.backend.python.rules.pex_from_target_closure import CreatePexFromTargetClosure
 from pants.backend.python.rules.prepare_chrooted_python_sources import ChrootedPythonSources
 from pants.backend.python.subsystems.pytest import PyTest
-from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.build_graph.address import Address
-from pants.engine.addressable import BuildFileAddresses
+from pants.engine.addressable import Addresses
 from pants.engine.fs import Digest, DirectoriesToMerge, FileContent, InputFilesContent
 from pants.engine.interactive_runner import InteractiveProcessRequest
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
@@ -22,6 +21,7 @@ from pants.engine.legacy.structs import PythonTestsAdaptor
 from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.option.global_options import GlobalOptions
+from pants.python.python_setup import PythonSetup
 from pants.rules.core.strip_source_root import SourceRootStrippedSources
 from pants.rules.core.test import TestDebugRequest, TestOptions, TestResult, TestTarget
 
@@ -99,13 +99,13 @@ async def setup_pytest_for_target(
   # TODO: Rather than consuming the TestOptions subsystem, the TestRunner should pass on coverage
   # configuration via #7490.
   transitive_hydrated_targets = await Get[TransitiveHydratedTargets](
-    BuildFileAddresses((test_target.address,))
+    Addresses((test_target.address,))
   )
   all_targets = transitive_hydrated_targets.closure
 
   resolved_requirements_pex = await Get[Pex](
     CreatePexFromTargetClosure(
-      build_file_addresses=BuildFileAddresses((test_target.address,)),
+      addresses=Addresses((test_target.address,)),
       output_filename='pytest-with-requirements.pex',
       entry_point="pytest:main",
       additional_requirements=pytest.get_requirement_strings(),
@@ -132,7 +132,7 @@ async def setup_pytest_for_target(
   # optimization, this ensures that any transitive sources, such as a test project file named
   # test_fail.py, do not unintentionally end up being run as tests.
   source_root_stripped_test_target_sources = await Get[SourceRootStrippedSources](
-    Address, test_target.address.to_address()
+    Address, test_target.address
   )
 
   coverage_args = []

@@ -3,5 +3,5 @@
 
 files(
   name='java_tests_directory',
-  sources=rglobs('tests/java/*'),
+  sources=['tests/java/**/*'],
 )

@@ -3,7 +3,7 @@
 
 files(
   name = '3rdparty_directory',
-  sources = rglobs('3rdparty/*'),
+  sources = ['3rdparty/**/*'],
 )
 
 # We use this to establish the build root, rather than `./pants`, because we cannot safely use the
@@ -33,12 +33,12 @@ files(
 
 files(
   name = 'scalajs_3rdparty_directory',
-  sources = rglobs('contrib/scalajs/3rdparty/*'),
+  sources = ['contrib/scalajs/3rdparty/**/*'],
 )
 
 files(
-  name = 'pants_ini',
-  source = 'pants.ini',
+  name = 'pants_toml',
+  source = 'pants.toml',
 )
 
 files(

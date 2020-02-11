@@ -6,7 +6,6 @@ from pathlib import Path, PurePath
 from textwrap import dedent
 from typing import List, Optional
 
-from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.rules import (
   download_pex_bin,
   inject_init,
@@ -19,13 +18,14 @@ from pants.backend.python.subsystems import python_native_code, subprocess_envir
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_tests import PythonTests
-from pants.build_graph.address import BuildFileAddress
+from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.fs import FileContent
 from pants.engine.interactive_runner import InteractiveRunner
 from pants.engine.legacy.structs import PythonTestsAdaptor
 from pants.engine.rules import RootRule, subsystem_rule
 from pants.engine.selectors import Params
+from pants.python.python_requirement import PythonRequirement
 from pants.rules.core import strip_source_root
 from pants.rules.core.test import Status, TestDebugRequest, TestOptions, TestResult
 from pants.testutil.interpreter_selection_utils import skip_unless_python27_and_python3_present
@@ -123,15 +123,14 @@ class PythonTestRunnerIntegrationTest(TestBase):
   def run_pytest(self, *, passthrough_args: Optional[str] = None) -> TestResult:
     args = [
       "--backend-packages2=pants.backend.python",
-      "--pytest-version=pytest>=4.6.6,<4.7",  # so that we can run Python 2 tests
-      "--pytest-pytest-plugins=zipp==1.0.0",  # transitive dep of Pytest; we pin to ensure Python 2 support
+      # pin to lower versions so that we can run Python 2 tests
+      "--pytest-version=pytest>=4.6.6,<4.7",
+      "--pytest-pytest-plugins=['zipp==1.0.0']",
     ]
     if passthrough_args:
       args.append(f"--pytest-args='{passthrough_args}'")
     options_bootstrapper = create_options_bootstrapper(args=args)
-    target = PythonTestsAdaptor(
-      address=BuildFileAddress(rel_path=f"{self.source_root}/BUILD", target_name="target"),
-    )
+    target = PythonTestsAdaptor(address=Address.parse(f"{self.source_root}:target"))
     test_result = self.request_single_product(TestResult, Params(target, options_bootstrapper))
     debug_request = self.request_single_product(
       TestDebugRequest, Params(target, options_bootstrapper),

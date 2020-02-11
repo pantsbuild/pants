@@ -12,12 +12,12 @@ target(
 
 files(
   name = 'hello_directory',
-  sources = rglobs('hello/*'),
+  sources = ['hello/**/*'],
 )
 
 files(
   name = 'tensorflow_custom_op_directory',
-  sources = rglobs('tensorflow_custom_op/*'),
+  sources = ['tensorflow_custom_op/**/*'],
   dependencies = [
     'examples/3rdparty:python_directory',
     'examples/src/python/example:tensorflow_custom_op_directory',
@@ -26,7 +26,7 @@ files(
 
 files(
   name = 'usethriftpy_directory',
-  sources = rglobs('usethriftpy/*'),
+  sources = ['usethriftpy/**/*'],
   dependencies = [
     'examples/3rdparty:python_directory',
     'examples/src/thrift/org/pantsbuild/example:distance_directory',

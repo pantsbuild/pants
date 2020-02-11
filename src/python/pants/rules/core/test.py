@@ -7,9 +7,9 @@ from enum import Enum
 from typing import Optional
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
-from pants.build_graph.address import Address, BuildFileAddress
-from pants.engine.addressable import BuildFileAddresses
-from pants.engine.build_files import AddressProvenanceMap
+from pants.build_graph.address import Address
+from pants.engine.addressable import Addresses
+from pants.engine.build_files import AddressOriginMap
 from pants.engine.console import Console
 from pants.engine.fs import Digest
 from pants.engine.goal import Goal, GoalSubsystem
@@ -66,7 +66,7 @@ class TestDebugRequest:
 class TestTarget:
   """A union for registration of a testable target type."""
 
-  # Prevent this class from being detected by pytest as a test class.
+  # Prevent this class from being detected by Pytest as a test class.
   __test__ = False
 
   @staticmethod
@@ -79,6 +79,8 @@ class TestTarget:
 class TestOptions(GoalSubsystem):
   """Runs tests."""
   name = "test"
+
+  required_union_implementations = (TestTarget,)
 
   # Prevent this class from being detected by pytest as a test class.
   __test__ = False
@@ -107,7 +109,7 @@ class Test(Goal):
 
 @dataclass(frozen=True)
 class AddressAndTestResult:
-  address: BuildFileAddress
+  address: Address
   test_result: Optional[TestResult]  # If None, target was not a test target.
 
   @staticmethod
@@ -115,10 +117,10 @@ class AddressAndTestResult:
     target: HydratedTarget,
     *,
     union_membership: UnionMembership,
-    provenance_map: AddressProvenanceMap
+    address_origin_map: AddressOriginMap
   ) -> bool:
     is_valid_target_type = (
-      provenance_map.is_single_address(target.address)
+      address_origin_map.is_single_address(target.address)
       or union_membership.is_member(TestTarget, target.adaptor)
     )
     has_sources = hasattr(target.adaptor, "sources") and target.adaptor.sources.snapshot.files
@@ -127,19 +129,21 @@ class AddressAndTestResult:
 
 @dataclass(frozen=True)
 class AddressAndDebugRequest:
-  address: BuildFileAddress
+  address: Address
   request: TestDebugRequest
 
 
 @goal_rule
-async def run_tests(console: Console, options: TestOptions, runner: InteractiveRunner, addresses: BuildFileAddresses) -> Test:
+async def run_tests(
+  console: Console, options: TestOptions, runner: InteractiveRunner, addresses: Addresses,
+) -> Test:
   if options.values.debug:
-    address = await Get[BuildFileAddress](BuildFileAddresses, addresses)
-    addr_debug_request = await Get[AddressAndDebugRequest](Address, address.to_address())
+    address = addresses.expect_single()
+    addr_debug_request = await Get[AddressAndDebugRequest](Address, address)
     result = runner.run_local_interactive_process(addr_debug_request.request.ipr)
     return Test(result.process_exit_code)
 
-  results = await MultiGet(Get[AddressAndTestResult](Address, addr.to_address()) for addr in addresses)
+  results = await MultiGet(Get[AddressAndTestResult](Address, addr) for addr in addresses)
   did_any_fail = False
   filtered_results = [(x.address, x.test_result) for x in results if x.test_result is not None]
 
@@ -171,11 +175,11 @@ async def run_tests(console: Console, options: TestOptions, runner: InteractiveR
 async def coordinator_of_tests(
   target: HydratedTarget,
   union_membership: UnionMembership,
-  provenance_map: AddressProvenanceMap
+  address_origin_map: AddressOriginMap
 ) -> AddressAndTestResult:
 
   if not AddressAndTestResult.is_testable(
-    target, union_membership=union_membership, provenance_map=provenance_map
+    target, union_membership=union_membership, address_origin_map=address_origin_map
   ):
     return AddressAndTestResult(target.address, None)
 
@@ -203,7 +207,7 @@ async def coordinator_of_debug_tests(target: HydratedTarget) -> AddressAndDebugR
 
 def rules():
   return [
-      coordinator_of_tests,
-      coordinator_of_debug_tests,
-      run_tests,
-    ]
+    coordinator_of_tests,
+    coordinator_of_debug_tests,
+    run_tests,
+  ]

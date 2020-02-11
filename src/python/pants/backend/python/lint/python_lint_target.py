@@ -12,7 +12,7 @@ from pants.engine.legacy.structs import (
   TargetAdaptor,
 )
 from pants.engine.objects import union
-from pants.engine.rules import UnionMembership, UnionRule, rule
+from pants.engine.rules import RootRule, UnionMembership, UnionRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.rules.core.lint import LintResult, LintResults, LintTarget
 
@@ -39,6 +39,15 @@ async def lint_python_target(
     for member in union_membership.union_rules[PythonLintTarget]
   )
   return LintResults(results)
+
+
+PYTHON_TARGET_TYPES = [
+  PythonAppAdaptor,
+  PythonBinaryAdaptor,
+  PythonTargetAdaptor,
+  PythonTestsAdaptor,
+  PantsPluginAdaptor,
+]
 
 
 @rule
@@ -74,9 +83,6 @@ def rules():
     binary_adaptor,
     tests_adaptor,
     plugin_adaptor,
-    UnionRule(LintTarget, PythonTargetAdaptor),
-    UnionRule(LintTarget, PythonAppAdaptor),
-    UnionRule(LintTarget, PythonBinaryAdaptor),
-    UnionRule(LintTarget, PythonTestsAdaptor),
-    UnionRule(LintTarget, PantsPluginAdaptor),
+    *(RootRule(target_type) for target_type in PYTHON_TARGET_TYPES),
+    *(UnionRule(LintTarget, target_type) for target_type in PYTHON_TARGET_TYPES)
   ]

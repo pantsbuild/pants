@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
-  sources = globs('*.py', exclude=[globs('*_integration.py')]),
+  sources = ['*.py', '!*_integration.py'],
   dependencies=[
     'contrib/go/src/python/pants/contrib/go/subsystems',
     'contrib/go/src/python/pants/contrib/go/targets',
@@ -22,7 +22,7 @@ python_tests(
 
 python_tests(
   name = 'integration',
-  sources = globs('*_integration.py'),
+  sources = ['*_integration.py'],
   dependencies=[
     'contrib/go/src/python/pants/contrib/go/subsystems',
     'contrib/go:examples_directory',

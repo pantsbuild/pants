@@ -22,20 +22,20 @@ resources(
   name='fs_test',
   # Note that this test data dir is bundled into a tarfile, to preserve symlink structure
   # when copied into a chroot.
-  sources=rglobs('fs_test/*')
+  sources=['fs_test/**/*'],
 )
 
 resources(
   name='graph_test',
-  sources=rglobs('graph_test/*')
+  sources=['graph_test/**/*'],
 )
 
 resources(
   name='mapper_test',
-  sources=rglobs('mapper_test/*')
+  sources=['mapper_test/**/*'],
 )
 
 resources(
   name='scheduler_inputs',
-  sources=rglobs('scheduler_inputs/*')
+  sources=['scheduler_inputs/**/*'],
 )

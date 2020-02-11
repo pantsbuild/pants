@@ -43,6 +43,7 @@ class NativeBuildStep(CompilerOptionSetsMixin, MirroredTargetOptionMixin, Subsys
                Platform.linux: ToolchainVariant.gnu,
              }),
              type=ToolchainVariant,
+             fingerprint=True,
              help="Whether to use gcc (gnu) or clang (llvm) to compile C and C++. Note that "
                   "currently, despite the choice of toolchain, all linking is done with binutils "
                   "ld on Linux, and the XCode CLI Tools on MacOS.")

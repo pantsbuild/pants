@@ -2,6 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 java_protobuf_library(
-  sources=globs('*.proto'),
+  sources=['*.proto'],
   dependencies=['testprojects/src/protobuf/org/pantsbuild/testproject/import_from_buildroot/foo']
 )

@@ -5,11 +5,11 @@ import logging
 import os
 
 from pants.base.build_file import BuildFile
+from pants.base.exceptions import ResolveError
 from pants.base.specs import AddressSpecs, DescendantAddresses, SiblingAddresses
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.address_mapper import AddressMapper
 from pants.engine.addressable import BuildFileAddresses
-from pants.engine.mapper import ResolveError
 from pants.util.dirutil import fast_relpath
 
 
@@ -42,8 +42,10 @@ class LegacyAddressMapper(AddressMapper):
     # NB: this will cause any BUILD file, whether it contains the address declaration or not to be
     # considered the one that declared it. That's ok though, because the spec path should be enough
     # information for debugging most of the time.
-    return any(address.spec_path == os.path.dirname(fp)
-               for fp in file_paths if BuildFile._is_buildfile_name(os.path.basename(fp)))
+    return any(
+      address.spec_path == os.path.dirname(fp)
+      for fp in file_paths if BuildFile._is_buildfile_name(os.path.basename(fp))
+    )
 
   @staticmethod
   def is_declaring_file(address, file_path):

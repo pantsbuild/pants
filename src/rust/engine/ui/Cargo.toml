@@ -13,5 +13,5 @@ path = "src/main.rs"
 
 [dependencies]
 rand = "0.5.1"
-termion = "1.5.4"
+termion = "1.5.5"
 unicode-segmentation = "1.6.0"

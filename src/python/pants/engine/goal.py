@@ -4,7 +4,7 @@
 from abc import abstractmethod
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import ClassVar, Type
+from typing import ClassVar, Tuple, Type
 
 from pants.cache.cache_setup import CacheSetup
 from pants.option.optionable import Optionable
@@ -30,6 +30,12 @@ class GoalSubsystem(SubsystemClientMixin, Optionable):
     ...
   ```
   """
+
+  options_scope_category = ScopeInfo.GOAL
+
+  # If the goal requires downstream implementations to work properly, such as `test` and `run`,
+  # it should declare the union types that must have members.
+  required_union_implementations: Tuple[Type, ...] = ()
 
   @classproperty
   @abstractmethod
@@ -69,8 +75,6 @@ class GoalSubsystem(SubsystemClientMixin, Optionable):
       )
       return dep,
     return tuple()
-
-  options_scope_category = ScopeInfo.GOAL
 
   def __init__(self, scope, scoped_options):
     # NB: This constructor is shaped to meet the contract of `Optionable(Factory).signature`.
@@ -131,7 +135,7 @@ class Outputting:
 
     The passed options instance will generally be the `Goal.Options` of an `Outputting` `Goal`.
     """
-    with self.output_sink(self, console) as output_sink:
+    with self.output_sink(console) as output_sink:
       yield lambda msg: output_sink.write(msg)
 
   @contextmanager

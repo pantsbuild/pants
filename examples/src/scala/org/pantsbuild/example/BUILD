@@ -24,12 +24,12 @@ page(
 
 files(
   name = 'fact_directory',
-  sources = rglobs('fact/*'),
+  sources = ['fact/**/*'],
 )
 
 files(
   name = 'hello_directory',
-  sources = rglobs('hello/*'),
+  sources = ['hello/**/*'],
   dependencies = [
     'examples/src/java/org/pantsbuild/example:hello_directory',
     'examples/src/resources/org/pantsbuild/example:hello_directory',
@@ -38,7 +38,7 @@ files(
 
 files(
   name = 'jvm_run_directory',
-  sources = rglobs('jvm_run/*'),
+  sources = ['jvm_run/**/*'],
   dependencies = [
     ':hello_directory',
   ],
@@ -46,7 +46,7 @@ files(
 
 files(
   name = 'scala_with_java_sources_directory',
-  sources = rglobs('scala_with_java_sources/*'),
+  sources = ['scala_with_java_sources/**/*'],
   dependencies = [
     'examples/src/java/org/pantsbuild/example:java_sources_directory',
   ],
@@ -54,15 +54,15 @@ files(
 
 files(
   name = 'scalac_directory',
-  sources = rglobs('scalac/*'),
+  sources = ['scalac/**/*'],
 )
 
 files(
   name = 'several_scala_targets_directory',
-  sources = rglobs('several_scala_targets/*'),
+  sources = ['several_scala_targets/**/*'],
 )
 
 files(
   name = 'styleissue_directory',
-  sources = rglobs('styleissue/*'),
+  sources = ['styleissue/**/*'],
 )

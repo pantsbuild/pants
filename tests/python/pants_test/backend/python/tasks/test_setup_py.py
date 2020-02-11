@@ -291,9 +291,8 @@ class TestSetupPy(SetupPyTestBase):
 
   def test_no_exported(self):
     foo = self.create_python_library(relpath='foo', name='foo')
-    with self.assertRaises(TaskError):
-      with self.run_execute(foo):
-        self.fail('Should not have gotten past run_execute.')
+    with self.run_execute(foo):
+      pass
 
   def test_no_owner(self):
     self.create_python_library(relpath='foo', name='foo')

@@ -17,7 +17,7 @@ This section of the Pants documentation describes the most common day-to-day Pan
 * [[Run a Binary Target|pants('src/docs/common_tasks:run')]]
 * [[Create a Bundled zip or Other Archive|pants('src/docs/common_tasks:bundle')]]
 * [[Create a Resource Bundle|pants('src/docs/common_tasks:resources')]]
-* [[Use globs and rglobs to Group Files|pants('src/docs/common_tasks:globs')]]
+* [[Use globs to group files|pants('src/docs/common_tasks:globs')]]
 * [[Access a REPL for a Target|pants('src/docs/common_tasks:repl')]]
 * [[Generate Code from Thrift Definitions|pants('src/docs/common_tasks:thrift_gen')]]
 * [[Authenticate to a Server|pants('src/docs/common_tasks:login')]]

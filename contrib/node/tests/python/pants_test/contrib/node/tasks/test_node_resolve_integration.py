@@ -41,10 +41,6 @@ class NodeResolveIntegrationTest(PantsRunIntegrationTest):
     self.assert_success(pants_run)
     return pants_run
 
-  def assert_not_triggered_install(self, pants_command, workdir):
-    res = self._run_successfully(pants_command, workdir)
-    assert "yarn install" not in res.stdout_data
-
   def run_and_assert_triggered_install(self, pants_command, workdir):
     res = self._run_successfully(pants_command, workdir)
     assert "yarn install" in res.stdout_data
@@ -66,17 +62,6 @@ class NodeResolveIntegrationTest(PantsRunIntegrationTest):
         }}
       }}
       """).format(target_name=target_name))
-
-  def test_no_reinstall_with_unchanged_lockfiles(self):
-    with self.temporary_workdir() as workdir:
-      root = 'contrib/node/testprojects/lockfile-invalidation'
-      target = root + ':lockfiles'
-      index_file = os.path.join(root, 'index.js')
-      command = ['run', target]
-      self.run_and_assert_triggered_install(command, workdir)
-
-      with self.with_overwritten_file_content(index_file, temporary_content='console.log("Hello World!!")'):
-        self.assert_not_triggered_install(command, workdir)
 
   def test_changing_lockfiles_triggers_reinstall(self):
     with self.temporary_workdir() as workdir:

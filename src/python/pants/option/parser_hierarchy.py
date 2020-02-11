@@ -2,11 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import re
-from typing import Iterator
+from typing import Dict, Iterable, Iterator, Mapping
 
 from pants.option.config import Config
+from pants.option.option_tracker import OptionTracker
 from pants.option.parser import Parser
-from pants.option.scope import GLOBAL_SCOPE
+from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 
 
 class InvalidScopeError(Exception):
@@ -52,10 +53,16 @@ class ParserHierarchy:
   empty string.)
   """
 
-  def __init__(self, env, config, scope_infos, option_tracker):
+  def __init__(
+    self,
+    env: Mapping[str, str],
+    config: Config,
+    scope_infos: Iterable[ScopeInfo],
+    option_tracker: OptionTracker,
+  ) -> None:
     # Sorting ensures that ancestors precede descendants.
     scope_infos = sorted(set(list(scope_infos)), key=lambda si: si.scope)
-    self._parser_by_scope = {}
+    self._parser_by_scope: Dict[str, Parser] = {}
     for scope_info in scope_infos:
       scope = scope_info.scope
       parent_parser = (None if scope == GLOBAL_SCOPE else
@@ -63,7 +70,7 @@ class ParserHierarchy:
       self._parser_by_scope[scope] = Parser(env, config, scope_info, parent_parser,
                                             option_tracker=option_tracker)
 
-  def get_parser_by_scope(self, scope):
+  def get_parser_by_scope(self, scope: str) -> Parser:
     try:
       return self._parser_by_scope[scope]
     except KeyError:

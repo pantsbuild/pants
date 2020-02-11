@@ -9,7 +9,7 @@ from pants.engine.fs import Workspace
 from pants.engine.goal import Goal
 from pants.engine.selectors import Params
 from pants.init.options_initializer import BuildConfigInitializer
-from pants.init.target_roots_calculator import TargetRootsCalculator
+from pants.init.specs_calculator import SpecsCalculator
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 from pants.util.meta import classproperty
@@ -60,8 +60,14 @@ class GoalRuleTestBase(TestBase):
     workspace = Workspace(scheduler)
 
     # Run for the target specs parsed from the args.
-    address_specs = TargetRootsCalculator.parse_address_specs(full_options.specs, self.build_root)
-    params = Params(address_specs, console, options_bootstrapper, workspace, *(additional_params or []))
+    specs = SpecsCalculator.parse_specs(full_options.specs, self.build_root)
+    params = Params(
+      specs.provided_specs,
+      console,
+      options_bootstrapper,
+      workspace,
+      *(additional_params or []),
+    )
     actual_exit_code = self.scheduler.run_goal_rule(self.goal_cls, params)
 
     # Flush and capture console output.

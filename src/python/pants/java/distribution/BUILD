@@ -16,5 +16,5 @@ python_library(
 
 resources(
   name='resources',
-  sources=globs('*.class'),
+  sources=['*.class'],
 )

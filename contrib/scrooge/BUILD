@@ -3,10 +3,10 @@
 
 files(
   name='scala_tests_directory',
-  sources=rglobs('tests/scala/*'),
+  sources=['tests/scala/**/*'],
 )
 
 files(
   name='thrift_tests_directory',
-  sources=rglobs('tests/thrift/*'),
+  sources=['tests/thrift/**/*'],
 )

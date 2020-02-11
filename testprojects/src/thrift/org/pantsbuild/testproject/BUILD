@@ -1,6 +1,6 @@
 java_thrift_library(
   name='thrift-java',
-  sources=rglobs('*.thrift'),
+  sources=['**/*.thrift'],
   compiler='scrooge',
   language='java',
   # NB: this setting is a temporary way to get tests passing, as Scrooge and Thrift

@@ -4,7 +4,7 @@
 
 python_tests(
   name = 'integration',
-  sources = globs('*_integration.py'),
+  sources = ['*_integration.py'],
   dependencies=[
     'src/python/pants/testutil:int-test',
     'examples/src/java/org/pantsbuild/example:hello_directory',

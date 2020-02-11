@@ -2,7 +2,7 @@ Release Process
 ===============
 
 This page describes how to make a versioned release of Pants and
-other related packages to PyPi.  If you need to release pants jvm tools
+other related packages to PyPI.  If you need to release pants jvm tools
 (jars), see the
 [[JVM Artifact Release Process|pants('src/docs:release_jvm')]]
 page.
@@ -19,7 +19,7 @@ Once you know what to release, releasing pants involves:
 
 -   Preparing the release.
 -   (optional) Perform a release dry run.
--   Publishing the release to PyPi.
+-   Publishing the release to PyPI.
 -   Announce the release on pants-devel.
 
 0. Prerequisites
@@ -33,30 +33,18 @@ script fail:
 
   - **Create a pgp signing key** if you don't already have one.
 
-    You might use the gpg implementation of pgp and start here:
-    [www.gnupg.org/gph/en/manual/c14.html](https://www.gnupg.org/gph/en/manual/c14.html)
-
-  - If using gpg, **ensure that the gpg-agent is running** (for OS X, see
-    instructions [here](https://blog.chendry.org/2015/03/13/starting-gpg-agent-in-osx.html)),
-    and ensure that gpg is set up to use it (e.g., set `use-agent` in `~/.gnupg/gpg.conf`).
-
-  - **Configure git to use your pgp key** for signing release tags.
-
-    A description of the configuration can be found here:
+    You likely want to use the [gpg implementation](https://www.gnupg.org) of pgp. On macOS, you can `brew install gpg`. Once `gpg` is installed, generate a new key: [www.gnupg.org/gph/en/manual/c14.html](https://www.gnupg.org/gph/en/manual/c14.html).
+ 
+  - **Configure `git` to use your pgp key** for signing release tags: 
     [help.github.com/articles/telling-git-about-your-gpg-key/](https://help.github.com/articles/telling-git-about-your-gpg-key/)
+    
+    Note: the last step is required on macOS.
 
-  - **Create a pypi account** if you don't already have one.
+  - **Create a PyPI account** if you don't already have one: [pypi.org/account/register](https://pypi.org/account/register/).
 
-    You can register here: [pypi.org/account/register](https://pypi.org/account/register/)
+  - **Get your PyPI account added as a `maintainer` for all pantsbuild.pants packages.** You can ask any one of the current [Owners](#owners) to do this.
 
-  - **Get your pypi account added as an `owner` for all pantsbuild.pants packages.**
-
-    You can ask any one of the current [Owners](#owners) to do this.
-
-  - **Configure your pypi credentials locally in `~/.pypirc`**
-
-    For some versions of python it's necessary to use both a `server-login` and
-    `pypi` section containing the same info. This will do it:
+  - **Configure your PyPI credentials locally in `~/.pypirc`**:
 
         :::bash
         cat << EOF > ~/.pypirc && chmod 600 ~/.pypirc
@@ -68,10 +56,6 @@ script fail:
         username: <fill me in>
         password: <fill me in>
         EOF
-
-  - Note that the release script expects your pantsbuild/pants git remote to be named `origin`.
-    If you have another name for it, you should `git remote rename othername origin` before running
-    the release script, and rename it back afterwards.
 
 1. Prepare Release
 ------------------
@@ -154,18 +138,18 @@ Note that in addition to CI checking dry runs work, the release publish
 flow also performs a mandatory dry run so executing a dry run separately
 is not required.
 
-3. Publish to PyPi
+3. Publish to PyPI
 ------------------
 
 Once the two "Build wheels" Travis shards have completed for your release
-commit, you can publish to PyPi. First, ensure that you are on your release branch at your version
+commit, you can publish to PyPI. First, ensure that you are on your release branch at your version
 bump commit. Then, publish the release:
 
     :::bash
     $ ./build-support/bin/release.sh
 
 This also performs a dry run and then proceeds to upload the smoke
-tested wheels to PyPi. It may take a few minutes for the packages to be downloadable.
+tested wheels to PyPI. It may take a few minutes for the packages to be downloadable.
 
 Note: If you are releasing from `master` and new commits have landed after your release commit, you
 can reset to your commit (`git reset --hard <sha>`) before publishing.
@@ -173,10 +157,10 @@ can reset to your commit (`git reset --hard <sha>`) before publishing.
 4. Announce
 -----------
 
-Check PyPi to ensure everything looks good. The [pantsbuild.pants
+Check PyPI to ensure everything looks good. The [pantsbuild.pants
 package index page](https://pypi.org/pypi/pantsbuild.pants)
 should display the package version you just uploaded. The same check
-applies to other related package PyPi pages.
+applies to other related package PyPI pages.
 
 To test the packages are installable:
 

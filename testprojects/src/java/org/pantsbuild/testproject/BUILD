@@ -60,12 +60,12 @@ target(
 
 files(
   name = 'aliases_directory',
-  sources = rglobs('aliases/*'),
+  sources = ['aliases/**/*'],
 )
 
 files(
   name = 'annotation_directory',
-  sources = rglobs('annotation/*'),
+  sources = ['annotation/**/*'],
   dependencies = [
     'testprojects/3rdparty:com_directory',
   ],
@@ -73,12 +73,12 @@ files(
 
 files(
   name = 'bench_directory',
-  sources = rglobs('bench/*'),
+  sources = ['bench/**/*'],
 )
 
 files(
   name = 'bundle_directory',
-  sources = rglobs('bundle/*'),
+  sources = ['bundle/**/*'],
   dependencies = [
     'testprojects/src/resources/org/pantsbuild/testproject:bundleresources_directory',
     'testprojects/tests/resources/org/pantsbuild/testproject:bundleresources_directory',
@@ -87,17 +87,17 @@ files(
 
 files(
   name = 'compilation_warnings_directory',
-  sources = rglobs('compilation_warnings/*'),
+  sources = ['compilation_warnings/**/*'],
 )
 
 files(
   name = 'coverage_directory',
-  sources = rglobs('coverage/*'),
+  sources = ['coverage/**/*'],
 )
 
 files(
   name = 'cwdexample_directory',
-  sources = rglobs('cwdexample/*'),
+  sources = ['cwdexample/**/*'],
   dependencies = [
     'testprojects/3rdparty:checkstyle_directory',
   ],
@@ -105,42 +105,42 @@ files(
 
 files(
   name = 'cycle1_directory',
-  sources = rglobs('cycle1/*'),
+  sources = ['cycle1/**/*'],
 )
 
 files(
   name = 'cycle2_directory',
-  sources = rglobs('cycle2/*'),
+  sources = ['cycle2/**/*'],
 )
 
 files(
   name = 'deployexcludes_directory',
-  sources = rglobs('deployexcludes/*'),
+  sources = ['deployexcludes/**/*'],
 )
 
 files(
   name = 'depman_directory',
-  sources = rglobs('depman/*'),
+  sources = ['depman/**/*'],
 )
 
 files(
   name = 'dummies_directory',
-  sources = rglobs('dummies/*'),
+  sources = ['dummies/**/*'],
 )
 
 files(
   name = 'exclude_directory',
-  sources = rglobs('exclude/*'),
+  sources = ['exclude/**/*'],
 )
 
 files(
   name = 'extra_jvm_options_directory',
-  sources = rglobs('extra_jvm_options/*'),
+  sources = ['extra_jvm_options/**/*'],
 )
 
 files(
   name = 'ideacodeandresources_directory',
-  sources = rglobs('ideacodeandresources/*'),
+  sources = ['ideacodeandresources/**/*'],
   dependencies = [
     'testprojects/src/resources/org/pantsbuild/testproject:ideacodeandresources_directory',
   ],
@@ -148,7 +148,7 @@ files(
 
 files(
   name = 'idearesourcesonly_directory',
-  sources = rglobs('idearesourcesonly/*'),
+  sources = ['idearesourcesonly/**/*'],
   dependencies = [
     'testprojects/src/resources/org/pantsbuild/testproject:idearesourcesonly_directory',
   ],
@@ -156,7 +156,7 @@ files(
 
 files(
   name = 'inccompile_directory',
-  sources = rglobs('inccompile/*'),
+  sources = ['inccompile/**/*'],
   dependencies = [
     'testprojects/3rdparty:jetty_directory',
   ],
@@ -164,17 +164,17 @@ files(
 
 files(
   name = 'intransitive_directory',
-  sources = rglobs('intransitive/*'),
+  sources = ['intransitive/**/*'],
 )
 
 files(
   name = 'jarversionincompatibility_directory',
-  sources = rglobs('jarversionincompatibility/*'),
+  sources = ['jarversionincompatibility/**/*'],
 )
 
 files(
   name = 'javadepsonscala_directory',
-  sources = rglobs('javadepsonscala/*'),
+  sources = ['javadepsonscala/**/*'],
   dependencies = [
     'testprojects/src/scala/org/pantsbuild/testproject:javadepsonscala_directory',
   ],
@@ -182,7 +182,7 @@ files(
 
 files(
   name = 'javadepsonscalatransitive_directory',
-  sources = rglobs('javadepsonscalatransitive/*'),
+  sources = ['javadepsonscalatransitive/**/*'],
   dependencies = [
     'testprojects/src/scala/org/pantsbuild/testproject:javadepsonscalatransitive_directory',
   ],
@@ -193,32 +193,32 @@ files(
 # here. Instead, we declare this in `:all_targets`.
 files(
   name = 'javasources_directory',
-  sources = rglobs('javasources/*'),
+  sources = ['javasources/**/*'],
 )
 
 files(
   name = 'junit_directory',
-  sources = rglobs('junit/*'),
+  sources = ['junit/**/*'],
 )
 
 files(
   name = 'jvmprepcommand_directory',
-  sources = rglobs('jvmprepcommand/*'),
+  sources = ['jvmprepcommand/**/*'],
 )
 
 files(
   name = 'manifest_directory',
-  sources = rglobs('manifest/*'),
+  sources = ['manifest/**/*'],
 )
 
 files(
   name = 'missing_sources_directory',
-  sources = rglobs('missing_sources/*'),
+  sources = ['missing_sources/**/*'],
 )
 
 files(
   name = 'missingdepswhitelist_directory',
-  sources = rglobs('missingdepswhitelist/*'),
+  sources = ['missingdepswhitelist/**/*'],
   dependencies = [
     ':missingdepswhitelist2_directory',
     ':publish_directory',
@@ -227,12 +227,12 @@ files(
 
 files(
   name = 'missingdepswhitelist2_directory',
-  sources = rglobs('missingdepswhitelist2/*'),
+  sources = ['missingdepswhitelist2/**/*'],
 )
 
 files(
   name = 'missingdirectdepswhitelist_directory',
-  sources = rglobs('missingdirectdepswhitelist/*'),
+  sources = ['missingdirectdepswhitelist/**/*'],
   dependencies = [
     ':missingdirectdepswhitelist2_directory',
   ],
@@ -240,7 +240,7 @@ files(
 
 files(
   name = 'missingdirectdepswhitelist2_directory',
-  sources = rglobs('missingdirectdepswhitelist2/*'),
+  sources = ['missingdirectdepswhitelist2/**/*'],
   dependencies = [
     ':publish_directory',
   ],
@@ -248,7 +248,7 @@ files(
 
 files(
   name = 'missingjardepswhitelist_directory',
-  sources = rglobs('missingjardepswhitelist/*'),
+  sources = ['missingjardepswhitelist/**/*'],
   dependencies = [
     ':missingjardepswhitelist2_directory',
   ],
@@ -256,22 +256,22 @@ files(
 
 files(
   name = 'missingjardepswhitelist2_directory',
-  sources = rglobs('missingjardepswhitelist2/*'),
+  sources = ['missingjardepswhitelist2/**/*'],
 )
 
 files(
   name = 'nocache_directory',
-  sources = rglobs('nocache/*'),
+  sources = ['nocache/**/*'],
 )
 
 files(
   name = 'packageinfo_directory',
-  sources = rglobs('packageinfo/*'),
+  sources = ['packageinfo/**/*'],
 )
 
 files(
   name = 'page_directory',
-  sources = rglobs('page/*'),
+  sources = ['page/**/*'],
   dependencies = [
     'examples/src/java/org/pantsbuild/example:hello_directory',
   ],
@@ -279,17 +279,17 @@ files(
 
 files(
   name = 'phrases_directory',
-  sources = rglobs('phrases/*'),
+  sources = ['phrases/**/*'],
 )
 
 files(
   name = 'printversion_directory',
-  sources = rglobs('printversion/*'),
+  sources = ['printversion/**/*'],
 )
 
 files(
   name = 'proto-ordering_directory',
-  sources = rglobs('proto-ordering/*'),
+  sources = ['proto-ordering/**/*'],
   dependencies = [
     'testprojects/src/protobuf/org/pantsbuild/testproject:proto-ordering_directory',
   ],
@@ -297,12 +297,12 @@ files(
 
 files(
   name = 'provided_directory',
-  sources = rglobs('provided/*'),
+  sources = ['provided/**/*'],
 )
 
 files(
   name = 'publish_directory',
-  sources = rglobs('publish/*'),
+  sources = ['publish/**/*'],
   dependencies = [
     'testprojects/src/protobuf/org/pantsbuild/testproject:distance_directory',
   ],
@@ -310,22 +310,22 @@ files(
 
 files(
   name = 'resdependency_directory',
-  sources = rglobs('resdependency/*'),
+  sources = ['resdependency/**/*'],
 )
 
 files(
   name = 'runner_directory',
-  sources = rglobs('runner/*'),
+  sources = ['runner/**/*'],
 )
 
 files(
   name = 'runtime_directory',
-  sources = rglobs('runtime/*'),
+  sources = ['runtime/**/*'],
 )
 
 files(
   name = 'shading_directory',
-  sources = rglobs('shading/*'),
+  sources = ['shading/**/*'],
   dependencies = [
     ':shadingdep_directory',
   ],
@@ -333,12 +333,12 @@ files(
 
 files(
   name = 'shadingdep_directory',
-  sources = rglobs('shadingdep/*'),
+  sources = ['shadingdep/**/*'],
 )
 
 files(
   name = 'thriftdeptest_directory',
-  sources = rglobs('thriftdeptest/*'),
+  sources = ['thriftdeptest/**/*'],
   dependencies = [
     'testprojects/src/thrift/org/pantsbuild:testproject_directory',
   ],
@@ -346,12 +346,12 @@ files(
 
 files(
   name = 'typeparameters_directory',
-  sources = rglobs('typeparameters/*'),
+  sources = ['typeparameters/**/*'],
 )
 
 files(
   name = 'unicode_directory',
-  sources = rglobs('unicode/*'),
+  sources = ['unicode/**/*'],
   dependencies = [
     'testprojects/src/scala/org/pantsbuild/testproject:unicode_directory',
   ],
@@ -359,7 +359,7 @@ files(
 
 files(
   name = 'utf8proto_directory',
-  sources = rglobs('utf8proto/*'),
+  sources = ['utf8proto/**/*'],
   dependencies = [
     'testprojects/src/protobuf/org/pantsbuild/testproject:utf8proto_directory',
   ],

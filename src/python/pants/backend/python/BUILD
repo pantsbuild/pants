@@ -7,25 +7,25 @@ python_library(
   dependencies = [
     ':pants_requirement',
     ':python_artifact',
-    ':python_requirement',
     ':python_requirements',
     'src/python/pants/backend/python/rules',
     'src/python/pants/backend/python/targets',
     'src/python/pants/backend/python/tasks',
     'src/python/pants/build_graph',
     'src/python/pants/goal:task_registrar',
+    'src/python/pants/python',
   ],
   tags = {"partially_type_checked"},
 )
 
 python_library(
   name = 'all_utils',
-  sources = globs('*.py', exclude=[['__init__.py', 'register.py']]),
+  sources = ['*.py', '!__init__.py', '!register.py'],
   dependencies = [
     ':interpreter_cache',
     ':python_artifact',
-    ':python_requirement',
     ':python_requirements',
+    'src/python/pants/python',
   ],
   tags = {"partially_type_checked"},
 )
@@ -46,6 +46,7 @@ python_library(
     'src/python/pants/backend/python/targets',
     'src/python/pants/base:exceptions',
     'src/python/pants/process',
+    'src/python/pants/python',
     'src/python/pants/subsystem',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
@@ -57,11 +58,11 @@ python_library(
   name = 'pants_requirement',
   sources = ['pants_requirement.py'],
   dependencies = [
-    'src/python/pants/backend/python:python_requirement',
     'src/python/pants/backend/python/targets',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
+    'src/python/pants/python',
     'src/python/pants/util:meta',
   ],
   tags = {"partially_type_checked"},
@@ -79,6 +80,10 @@ python_library(
 python_library(
   name = 'python_requirement',
   sources = ['python_requirement.py'],
+  dependencies = [
+    'src/python/pants/base:deprecated',
+    'src/python/pants/python'
+  ],
   tags = {"partially_type_checked"},
 )
 

@@ -5,6 +5,7 @@ import json
 import os
 import textwrap
 from contextlib import contextmanager
+from unittest.mock import MagicMock
 from zipfile import ZipFile
 
 from pants.backend.jvm.register import build_file_aliases as register_jvm
@@ -284,6 +285,8 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
     context.products.safe_create_data('export_dep_as_jar_classpath',
                                       init_func=lambda: runtime_classpath)
 
+    context.products.safe_create_data('zinc_args', init_func=lambda: MagicMock())
+
     bootstrap_task = BootstrapJvmTools(context, self.pants_workdir)
     bootstrap_task.execute()
     task = self.create_task(context)
@@ -360,6 +363,9 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
     jvm_target = result['targets']['project_info:jvm_target']
     jvm_target['libraries'] = sorted(jvm_target['libraries'])
     expected_jvm_target = {
+      'scalac_args': [],
+      'javac_args': [],
+      'extra_jvm_options': [],
       'excludes': [],
       'globs': {'globs': ['project_info/this/is/a/source/Foo.scala',
                           'project_info/this/is/a/source/Bar.scala']},

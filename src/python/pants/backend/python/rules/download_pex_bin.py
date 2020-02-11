@@ -6,12 +6,20 @@ from typing import Any, Iterable, Optional
 
 from pants.backend.python.rules.hermetic_pex import HermeticPex
 from pants.backend.python.subsystems.python_native_code import PexBuildEnvironment
-from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
-from pants.engine.fs import Digest, SingleFileExecutable, Snapshot, UrlToFetch
+from pants.binaries.binary_tool import BinaryToolFetchRequest, Script, ToolForPlatform, ToolVersion
+from pants.binaries.binary_util import BinaryToolUrlGenerator
+from pants.engine.fs import Digest, SingleFileExecutable, Snapshot
 from pants.engine.isolated_process import ExecuteProcessRequest
-from pants.engine.rules import rule
+from pants.engine.platform import PlatformConstraint
+from pants.engine.rules import rule, subsystem_rule
 from pants.engine.selectors import Get
+from pants.python.python_setup import PythonSetup
+
+
+class PexBinUrlGenerator(BinaryToolUrlGenerator):
+  def generate_urls(self, version, host_platform):
+    return [f'https://github.com/pantsbuild/pex/releases/download/{version}/pex']
 
 
 @dataclass(frozen=True)
@@ -26,7 +34,23 @@ class DownloadedPexBin(HermeticPex):
   def directory_digest(self) -> Digest:
     return self.exe.directory_digest
 
-  def create_execute_request(  # type: ignore[override]
+  class Factory(Script):
+    options_scope = 'download-pex-bin'
+    name = 'pex'
+    default_version = 'v1.6.12'
+
+    default_versions_and_digests = {
+      PlatformConstraint.none: ToolForPlatform(
+        digest=Digest('ce64cb72cd23d2123dd48126af54ccf2b718d9ecb98c2ed3045ed1802e89e7e1',
+                      1842359),
+        version=ToolVersion('v1.6.12'),
+      ),
+    }
+
+    def get_external_url_generator(self):
+      return PexBinUrlGenerator()
+
+  def create_execute_request(   # type: ignore[override]
     self,
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
@@ -65,15 +89,13 @@ class DownloadedPexBin(HermeticPex):
 
 
 @rule
-async def download_pex_bin() -> DownloadedPexBin:
-  # TODO: Inject versions and digests here through some option, rather than hard-coding it.
-  url = 'https://github.com/pantsbuild/pex/releases/download/v1.6.12/pex'
-  digest = Digest('ce64cb72cd23d2123dd48126af54ccf2b718d9ecb98c2ed3045ed1802e89e7e1', 1842359)
-  snapshot = await Get[Snapshot](UrlToFetch(url, digest))
+async def download_pex_bin(pex_binary_tool: DownloadedPexBin.Factory) -> DownloadedPexBin:
+  snapshot = await Get[Snapshot](BinaryToolFetchRequest(pex_binary_tool))
   return DownloadedPexBin(SingleFileExecutable(snapshot))
 
 
 def rules():
   return [
     download_pex_bin,
+    subsystem_rule(DownloadedPexBin.Factory),
   ]

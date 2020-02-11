@@ -253,6 +253,7 @@ class Scheduler:
                                                      self._to_type(product))
     self._raise_or_return(res)
 
+  @property
   def visualize_to_dir(self):
     return self._visualize_to_dir
 
@@ -270,6 +271,9 @@ class Scheduler:
 
   def _run_and_return_roots(self, session, execution_request):
     raw_roots = self._native.lib.scheduler_execute(self._scheduler, session, execution_request)
+    if raw_roots == self._native.ffi.NULL:
+      raise KeyboardInterrupt
+
     remaining_runtime_exceptions_to_capture = list(self._native.consume_cffi_extern_method_runtime_exceptions())
     try:
       roots = []
@@ -411,10 +415,10 @@ class SchedulerSession:
     return self._scheduler.with_fork_context(func)
 
   def _maybe_visualize(self):
-    if self._scheduler.visualize_to_dir() is not None:
-      name = 'graph.{0:03d}.dot'.format(self._run_count)
+    if self._scheduler.visualize_to_dir is not None:
+      name = f'graph.{self._run_count:03d}.dot'
       self._run_count += 1
-      self.visualize_graph_to_file(os.path.join(self._scheduler.visualize_to_dir(), name))
+      self.visualize_graph_to_file(os.path.join(self._scheduler.visualize_to_dir, name))
 
   def execute(self, execution_request):
     """Invoke the engine for the given ExecutionRequest, returning Return and Throw states.
@@ -422,8 +426,12 @@ class SchedulerSession:
     :return: A tuple of (root, Return) tuples and (root, Throw) tuples.
     """
     start_time = time.time()
-    roots = list(zip(execution_request.roots,
-                     self._scheduler._run_and_return_roots(self._session, execution_request.native)))
+    roots = list(
+      zip(
+        execution_request.roots,
+        self._scheduler._run_and_return_roots(self._session, execution_request.native),
+      ),
+    )
 
     ExceptionSink.toggle_ignoring_sigint_v2_engine(False)
 

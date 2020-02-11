@@ -3,7 +3,7 @@
 
 files(
   name = 'bash_scripts',
-  sources = globs('*.sh'),
+  sources = ['*.sh'],
 )
 
 # We include this entry, even though the scripts are already covered by individual `python_binary`
@@ -11,7 +11,7 @@ files(
 # stripping the source root from the files.
 files(
   name = 'python_scripts',
-  sources = globs('*.py'),
+  sources = ['*.py'],
 )
 
 python_binary(

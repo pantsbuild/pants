@@ -55,7 +55,7 @@ Ivy Resolution
 You can view Ivy's report of how it resolved each (transitive) third-party dependency:
 
     :::bash
-    $ ./pants resolve.ivy --open examples/tests/java/org/pantsbuild/example/hello/greet
+    $ ./pants resolve.ivy --open src/java/com/myorg/myproject/example/hello/greet
 
 
 Ivy HTTP Debugging

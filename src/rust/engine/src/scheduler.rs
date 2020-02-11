@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{mpsc, Arc};
 use std::time::Duration;
 
-use futures::future::{self, Future};
+use futures01::future::{self, Future};
 
 use crate::context::{Context, Core};
 use crate::core::{Failure, Params, TypeId, Value};
@@ -18,8 +18,12 @@ use indexmap::IndexMap;
 use log::{debug, info, warn};
 use logging::logger::LOGGER;
 use parking_lot::Mutex;
-use ui::EngineDisplay;
+use ui::{EngineDisplay, KeyboardCommand};
 use workunit_store::WorkUnitStore;
+
+pub enum ExecutionTermination {
+  KeyboardInterrupt,
+}
 
 ///
 /// A Session represents a related series of requests (generally: one run of the pants CLI) on an
@@ -332,7 +336,11 @@ impl Scheduler {
   ///
   /// Compute the results for roots in the given request.
   ///
-  pub fn execute(&self, request: &ExecutionRequest, session: &Session) -> Vec<RootResult> {
+  pub fn execute(
+    &self,
+    request: &ExecutionRequest,
+    session: &Session,
+  ) -> Result<Vec<RootResult>, ExecutionTermination> {
     // Bootstrap tasks for the roots, and then wait for all of them.
     debug!("Launching {} roots.", request.roots.len());
 
@@ -359,7 +367,7 @@ impl Scheduler {
     let mut tasks_to_display = IndexMap::new();
     let refresh_interval = Duration::from_millis(100);
 
-    match session.maybe_display() {
+    Ok(match session.maybe_display() {
       Some(display) => {
         {
           let mut display = display.lock();
@@ -371,12 +379,24 @@ impl Scheduler {
           if let Ok(res) = receiver.recv_timeout(refresh_interval) {
             break res;
           } else {
-            Scheduler::display_ongoing_tasks(
+            let render_result = Scheduler::display_ongoing_tasks(
               &self.core.graph,
               &roots,
               display,
               &mut tasks_to_display,
             );
+            match render_result {
+              Err(e) => warn!("{}", e),
+              Ok(KeyboardCommand::CtrlC) => {
+                info!("Exiting early in response to Ctrl-C");
+                {
+                  let mut display = display.lock();
+                  display.finish();
+                }
+                return Err(ExecutionTermination::KeyboardInterrupt);
+              }
+              Ok(KeyboardCommand::None) => (),
+            };
           }
         };
         LOGGER.deregister_engine_display(unique_handle);
@@ -391,7 +411,7 @@ impl Scheduler {
           break res;
         }
       },
-    }
+    })
   }
 
   fn display_ongoing_tasks(
@@ -399,7 +419,7 @@ impl Scheduler {
     roots: &[NodeKey],
     display: &Mutex<EngineDisplay>,
     tasks_to_display: &mut IndexMap<String, Duration>,
-  ) {
+  ) -> Result<KeyboardCommand, String> {
     // Update the graph. To do that, we iterate over heavy hitters.
 
     let worker_count = {
@@ -439,7 +459,7 @@ impl Scheduler {
     for i in tasks_to_display.len()..worker_count {
       d.update(i.to_string(), "".to_string());
     }
-    d.render();
+    d.render()
   }
 }
 

@@ -183,6 +183,7 @@ python_tests(
     'src/python/pants/engine:rules',
     'src/python/pants/engine:selectors',
     'tests/python/pants_test/engine/examples:parsers',
+    'src/python/pants/testutil/engine:util',
     'src/python/pants/testutil/subsystem',
     'src/python/pants/testutil:test_base',
   ],
@@ -201,6 +202,7 @@ python_tests(
     'src/python/pants/engine:scheduler',
     'tests/python/pants_test/engine/examples:scheduler_inputs',
     'src/python/pants/testutil:test_base',
+    'src/python/pants/testutil/engine:util',
   ],
   tags = {"partially_type_checked"},
 )

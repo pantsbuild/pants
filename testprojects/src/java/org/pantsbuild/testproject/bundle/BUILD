@@ -5,29 +5,32 @@ jvm_app(
   basename = 'bundle-example',
   binary=':bundle-bin',
   bundles=[
-    bundle(fileset=globs('data/*')),
+    bundle(fileset=['data/*']),
   ]
 )
 
-jvm_app(name='mapper',
+jvm_app(
+  name='mapper',
   binary=':bundle-bin',
   bundles=[
     bundle(
       mapper=DirectoryReMapper('testprojects/src/java/org/pantsbuild/testproject/bundle/a/b', 'bundle_files'),
-      fileset=globs('a/b/*')),
+      fileset=['a/b/*']),
   ]
 )
 
-jvm_app(name='relative_to',
+jvm_app(
+  name='relative_to',
   binary=':bundle-bin',
   bundles=[
     bundle(
       relative_to='a',
-      fileset=globs('a/b/*')),
+      fileset=['a/b/*']),
   ]
 )
 
-jvm_app(name='rel_path',
+jvm_app(
+  name='rel_path',
   binary=':bundle-bin',
   bundles=[
     bundle(
@@ -37,7 +40,8 @@ jvm_app(name='rel_path',
   ]
 )
 
-jvm_app(name='directory',
+jvm_app(
+  name='directory',
   binary=':bundle-bin',
   bundles=[
     bundle(
@@ -46,7 +50,8 @@ jvm_app(name='directory',
   ]
 )
 
-jvm_app(name='explicit_recursion',
+jvm_app(
+  name='explicit_recursion',
   binary=':bundle-bin',
   bundles=[
     bundle(
@@ -57,7 +62,8 @@ jvm_app(name='explicit_recursion',
 
 # The binary, the "runnable" part:
 
-jvm_binary(name = 'bundle-bin',
+jvm_binary(
+  name = 'bundle-bin',
   source = 'BundleMain.java',
   main = 'org.pantsbuild.testproject.bundle.BundleMain',
   basename = 'bundle-example-bin',

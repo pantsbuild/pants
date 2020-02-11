@@ -23,18 +23,23 @@ in the root (i.e. the "build root") of your repo:
     :::bash
     curl -L -O https://pantsbuild.github.io/setup/pants && chmod +x pants
 
-Start by running the below command to auto-generate a `pants.ini` config file with sensible defaults.
+To verify that Pants bootstraps correctly, run:
 
     :::bash
-    ./pants generate-pants-ini
+    ./pants --version
 
-This command pins the `pants_version`. When you'd like to upgrade Pants, just edit the version in `pants.ini` and `./pants` will self-update on the next run.
+Now, run this command to create an initial `pants.ini` config file:
 
-To use Pants plugins published to PyPi, add them to a `plugins` list, like so:
+    :::bash
+    printf "[GLOBAL]\npants_version: $(./pants --version)\n" > pants.ini
+
+This config pins the `pants_version`. When you'd like to upgrade Pants, edit the version in `pants.ini` and `./pants` will self-update on the next run.
+
+To use Pants plugins published to PyPI, add them to a `plugins` list, like so:
 
     :::ini
     [GLOBAL]
-    pants_version: 1.15.0
+    pants_version: ...
 
     plugins: [
         'pantsbuild.pants.contrib.go==%(pants_version)s',
@@ -60,6 +65,7 @@ empty file named `BUILD_ROOT` to act as the sentinel for determining your projec
 
 PEX-based Installation
 ----------------------
+
 The virtualenv-based method is the recommended way of installing Pants.
 However in cases where you can't depend on a local pants installation (e.g., your machines
 prohibit software installation), some sites fetch a pre-built executable `pants.pex` using

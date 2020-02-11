@@ -9,7 +9,6 @@
   clippy::expl_impl_clone_on_copy,
   clippy::if_not_else,
   clippy::needless_continue,
-  clippy::single_match_else,
   clippy::unseparated_literal_suffix,
   clippy::used_underscore_binding
 )]
@@ -45,6 +44,8 @@ mod types;
 pub use crate::context::Core;
 pub use crate::core::{Function, Key, Params, TypeId, Value};
 pub use crate::handles::Handle;
-pub use crate::scheduler::{ExecutionRequest, RootResult, Scheduler, Session};
+pub use crate::scheduler::{
+  ExecutionRequest, ExecutionTermination, RootResult, Scheduler, Session,
+};
 pub use crate::tasks::{Rule, Tasks};
 pub use crate::types::Types;

@@ -8,7 +8,7 @@ use std::thread;
 use std::time::Duration;
 
 use boxfuture::{BoxFuture, Boxable};
-use futures::future::{self, Future};
+use futures01::future::{self, Future};
 use hashing::Digest;
 use parking_lot::Mutex;
 
@@ -352,7 +352,7 @@ fn critical_path() {
   {
     // The roots are all the sources, so we're covering the entire graph
     let roots = ["download jvm", "download a", "download b", "download c"]
-      .into_iter()
+      .iter()
       .map(|n| tnode(n))
       .collect::<Vec<_>>();
     let (expected_total_duration, expected_critical_path) = (
@@ -370,7 +370,7 @@ fn critical_path() {
   {
     // The roots exclude some nodes ("download jvm", "download a") from the graph.
     let roots = ["download b", "download c"]
-      .into_iter()
+      .iter()
       .map(|n| tnode(n))
       .collect::<Vec<_>>();
     let (expected_total_duration, expected_critical_path) = (

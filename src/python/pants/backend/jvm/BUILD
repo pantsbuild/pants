@@ -67,7 +67,7 @@ python_library(
 
 resources(
   name='ivy_utils_resources',
-  sources=globs('templates/ivy_utils/*.mustache'),
+  sources=['templates/ivy_utils/*.mustache'],
 )
 
 python_library(

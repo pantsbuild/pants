@@ -2,8 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from collections.abc import MutableMapping, MutableSequence
-from typing import Any, Dict, Iterable, Optional
+from typing import Any, Dict, Iterable, Optional, cast
 
+from pants.build_graph.address import Address
 from pants.engine.addressable import addressable, addressable_list
 from pants.engine.objects import Serializable, SerializableFactory, Validatable, ValidationError
 from pants.util.objects import SubclassesOf, SuperclassesOf
@@ -106,19 +107,15 @@ class Struct(Serializable, SerializableFactory, Validatable):
     """
     return self._kwargs.get('name')
 
-  # TODO: this should return Optional[Address], but then we get a bunch of errors in rules using
-  # TargetAdaptor. Possibly, wait for the Target API to deal with this.
   @property
-  def address(self):
+  def address(self) -> Optional[Address]:
     """Return the address of this object, if any.
 
     In general structs need not be identified by an address, in which case they are
     generally embedded objects; ie: attributes values of enclosing named structs.
     Any top-level struct, though, will be identifiable via a unique address.
-
-    :rtype: :class:`pants.build_graph.address.Address`
     """
-    return self._kwargs.get('address')
+    return cast(Optional[Address], self._kwargs.get('address'))
 
   @property
   def type_alias(self) -> str:

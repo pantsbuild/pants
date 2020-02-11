@@ -3,7 +3,7 @@
 
 # Local sources which depend on remote sources extracted from a jar.
 java_protobuf_library(
-  sources=globs('*.proto'),
+  sources=['*.proto'],
   dependencies=[
     ':remote',
   ],

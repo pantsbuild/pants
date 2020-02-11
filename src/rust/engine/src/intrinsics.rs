@@ -1,11 +1,12 @@
 use crate::context::Context;
-use crate::core::{throw, Failure, /*Key, Params,*/ TypeId, Value};
+use crate::core::{throw, Failure, TypeId, Value};
 use crate::externs;
 use crate::nodes::MultiPlatformExecuteProcess;
 use crate::nodes::{lift_digest, DownloadedFile, NodeFuture, Snapshot};
 use boxfuture::{try_future, Boxable};
 use bytes;
-use futures::future::{self, Future};
+use fs::PathGlobs;
+use futures01::{future, Future};
 use hashing;
 use std::path::PathBuf;
 
@@ -34,6 +35,8 @@ pub fn run_intrinsic(
     path_globs_to_snapshot(context, value)
   } else if product == types.directory_digest && input == types.input_files_content {
     input_files_content_to_digest(context, value)
+  } else if product == types.snapshot && input == types.snapshot_subset {
+    snapshot_subset_to_snapshot(context, value)
   } else {
     panic!("Unrecognized intrinsic: {:?} -> {:?}", input, product)
   }
@@ -103,7 +106,7 @@ fn directory_with_prefix_to_strip_to_digest(context: Context, request: Value) ->
 }
 
 fn directory_with_prefix_to_add_to_digest(context: Context, request: Value) -> NodeFuture<Value> {
-  let core = context.core.clone();
+  let core = context.core;
   future::result(
     lift_digest(&externs::project_ignoring_type(
       &request,
@@ -134,7 +137,7 @@ fn digest_to_snapshot(context: Context, directory_digest_val: Value) -> NodeFutu
 
 fn directories_to_merge_to_digest(context: Context, request: Value) -> NodeFuture<Value> {
   let workunit_store = context.session.workunit_store();
-  let core = context.core.clone();
+  let core = context.core;
   let digests: Result<Vec<hashing::Digest>, Failure> =
     externs::project_multi(&request, "directories")
       .into_iter()
@@ -182,11 +185,34 @@ fn input_files_content_to_digest(context: Context, files_content: Value) -> Node
         .to_boxed()
     })
     .collect();
-  futures::future::join_all(digests)
+  future::join_all(digests)
     .and_then(|digests| {
       store::Snapshot::merge_directories(context.core.store(), digests, workunit_store)
         .map_err(|err| throw(&err))
         .map(move |digest: hashing::Digest| Snapshot::store_directory(&context.core, &digest))
     })
+    .to_boxed()
+}
+
+fn snapshot_subset_to_snapshot(context: Context, value: Value) -> NodeFuture<Value> {
+  let workunit_store = context.session.workunit_store();
+  let globs = externs::project_ignoring_type(&value, "globs");
+  let store = context.core.store();
+
+  let path_globs = future::result(Snapshot::lift_path_globs(&globs));
+  let original_digest = future::result(lift_digest(&externs::project_ignoring_type(
+    &value,
+    "directory_digest",
+  )));
+
+  path_globs
+    .join(original_digest)
+    .and_then(
+      move |(path_globs, original_digest): (PathGlobs, hashing::Digest)| {
+        store::Snapshot::get_snapshot_subset(store, original_digest, path_globs, workunit_store)
+      },
+    )
+    .map(move |snapshot: store::Snapshot| Snapshot::store_snapshot(&context.core, &snapshot))
+    .map_err(|err| throw(&err))
     .to_boxed()
 }

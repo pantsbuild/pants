@@ -6,6 +6,7 @@ import os
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.base.build_environment import get_buildroot
+from pants.base.deprecated import deprecated_conditional
 from pants.task.console_task import ConsoleTask
 
 
@@ -23,6 +24,22 @@ class FileDeps(ConsoleTask):
              help='Instead of outputting filenames, output globs (ignoring excludes)')
     register('--absolute', type=bool, default=True,
              help='If True output with absolute path, else output with path relative to the build root')
+
+  @property
+  def act_transitively(self):
+    # NB: Stop overriding this property once the deprecation is complete.
+    deprecated_conditional(
+      lambda: self.get_options().is_default("transitive"),
+      entity_description=f"Pants defaulting to `--filedeps-transitive`",
+      removal_version="1.28.0.dev0",
+      hint_message="Currently, Pants defaults to `--filedeps-transitive`, which means that it "
+                   "will find all transitive files used by the target, rather than only direct "
+                   "file dependencies. This is a useful feature, but surprising to be the default."
+                   "\n\nTo prepare for this change to the default value, set in `pants.ini` under "
+                   "the section `filedeps` the value `transitive: False`. In Pants 1.28.0, "
+                   "you can safely remove the setting."
+    )
+    return self.get_options().transitive
 
   def _file_path(self, path):
     return os.path.join(get_buildroot(), path) if self.get_options().absolute else path

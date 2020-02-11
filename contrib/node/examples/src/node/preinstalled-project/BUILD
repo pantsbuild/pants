@@ -2,7 +2,7 @@
 # an alternative Node module resolver.
 
 node_preinstalled_module(
-  sources=globs('package.json', 'src/*.js', 'test/*.js'),
+  sources=['package.json', 'src/*.js', 'test/*.js'],
   dependencies_archive_url=
     'https://node-preinstalled-modules.pantsbuild.org/node_modules.tar.gz'
 )

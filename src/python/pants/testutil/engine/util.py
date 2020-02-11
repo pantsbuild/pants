@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass
 from io import StringIO
 from types import CoroutineType, GeneratorType
-from typing import Any, Callable, Optional, Sequence, Type
+from typing import Any, Callable, List, Optional, Sequence, Tuple, Type, get_type_hints
 
 from colors import blue, green, red
 
@@ -143,7 +143,8 @@ class Target(Struct):
 TARGET_TABLE = SymbolTable({'struct': Struct, 'target': Target})
 
 
-def assert_equal_with_printing(test_case, expected, actual):
+def assert_equal_with_printing(test_case, expected, actual,
+                               uniform_formatter: Optional[Callable[[str], str]] = None):
   """Asserts equality, but also prints the values so they can be compared on failure.
 
   Usage:
@@ -159,6 +160,11 @@ def assert_equal_with_printing(test_case, expected, actual):
   print(expected)
   print('Actual:')
   print(str_actual)
+
+  if uniform_formatter is not None:
+    expected = uniform_formatter(expected)
+    str_actual = uniform_formatter(str_actual)
+
   test_case.assertEqual(expected, str_actual)
 
 
@@ -201,3 +207,30 @@ class MockConsole:
 
   def red(self, text):
     return self._safe_color(text, red)
+
+
+def fmt_rust_function(func: Callable) -> str:
+  """Generate the str for a Rust Function, which is how Rust refers to `@rule`s.
+
+  This is useful when comparing strings against engine error messages. See
+  https://github.com/pantsbuild/pants/blob/5b97905443836b71dfa77cefc7cbc1735c7457cb/src/rust/engine/src/core.rs#L164.
+  """
+  return f"{func.__module__}:{func.__code__.co_firstlineno}:{func.__name__}"
+
+
+def fmt_rule(rule: Callable, *, gets: Optional[List[Tuple[str, str]]] = None) -> str:
+  """Generate the str that the engine will use for the rule.
+
+  This is useful when comparing strings against engine error messages.
+  """
+  type_hints = get_type_hints(rule)
+  product = type_hints.pop("return").__name__
+  params = ", ".join(t.__name__ for t in type_hints.values())
+  gets_str = ""
+  if gets:
+    get_members = ', '.join(
+      f"Get[{product_subject_pair[0]}]({product_subject_pair[1]})"
+      for product_subject_pair in gets
+    )
+    gets_str = f", gets=[{get_members}]"
+  return f"@rule({fmt_rust_function(rule)}({params}) -> {product}{gets_str})"
