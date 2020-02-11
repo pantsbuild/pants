@@ -499,6 +499,7 @@ class _Locator(object):
     :rtype: :class:`Distribution`
     :raises: :class:`Distribution.Error` if no suitable java distribution could be found.
     """
+    dists = []
     for location in itertools.chain(self._distribution_environment.jvm_locations):
       try:
         dist = Distribution(home_path=location.home_path,
@@ -506,6 +507,7 @@ class _Locator(object):
                             minimum_version=minimum_version,
                             maximum_version=maximum_version,
                             jdk=jdk)
+        dists.append(dist)
         dist.validate()
         logger.debug('Located {} for constraints: minimum_version {}, maximum_version {}, jdk {}'
                      .format(dist, minimum_version, maximum_version, jdk))
@@ -522,8 +524,8 @@ class _Locator(object):
                       'distribution: minimum_version {}, maximum_version {}')
     else:
       error_format = ('Failed to locate a {} distribution with minimum_version {}, '
-                      'maximum_version {}')
-    raise self.Error(error_format.format('JDK' if jdk else 'JRE', minimum_version, maximum_version))
+                      'maximum_version {}. Found {}')
+    raise self.Error(error_format.format('JDK' if jdk else 'JRE', minimum_version, maximum_version, ', '.join(d.version for d in dists)))
 
 
 class DistributionLocator(Subsystem):
