@@ -30,7 +30,7 @@ class StripSourceRootsTests(TestBase):
     adaptor.address.spec_path = original_path
     if target_type_alias:
       adaptor.type_alias = target_type_alias
-    target = HydratedTarget(Address.parse("some/target/BUILD:target"), adaptor, ())
+    target = HydratedTarget(Address.parse("some/target:target"), adaptor, ())
     stripped_sources = self.request_single_product(
       SourceRootStrippedSources, Params(target, create_options_bootstrapper())
     )
