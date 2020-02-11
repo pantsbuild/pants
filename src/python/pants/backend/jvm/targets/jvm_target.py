@@ -33,7 +33,6 @@ class JvmTarget(Target, Jarable):
                excludes=None,
                services=None,
                platform=None,
-               runtime_platform=None,
                strict_deps=None,
                exports=None,
                compiler_option_sets=None,
@@ -67,11 +66,6 @@ class JvmTarget(Target, Jarable):
                          these that exist: (1) the default_platform specified for jvm-platform,
                          (2) a platform constructed from whatever java version is returned by
                          DistributionLocator.cached().version.
-    :param str runtime_platform: The name of the platform (defined under the jvm-platform subsystem) to use
-                         for runtime (that is, a key into the --jvm-platform-platforms
-                         dictionary). If unspecified, the platform will default to the first one of
-                         these that exist: (1) the default_runtime_platform specified for
-                         jvm-platform, (2) the platform that would be used for the platform kwarg.
     :param bool strict_deps: When True, only the directly declared deps of the target will be used
                              at compilation time. This enforces that all direct deps of the target
                              are declared, and can improve compilation speed due to smaller
@@ -103,7 +97,6 @@ class JvmTarget(Target, Jarable):
       'provides': provides,
       'excludes': excludes,
       'platform': PrimitiveField(platform),
-      'runtime_platform': PrimitiveField(runtime_platform),
       'strict_deps': PrimitiveField(strict_deps),
       'exports': PrimitivesSetField(exports or []),
       'compiler_option_sets': PrimitivesSetField(compiler_option_sets),
@@ -195,15 +188,6 @@ class JvmTarget(Target, Jarable):
     :rtype: JvmPlatformSettings
     """
     return JvmPlatform.global_instance().get_platform_for_target(self)
-
-  @property
-  def runtime_platform(self):
-    """Runtime platform associated with this target.
-
-    :return: The jvm platform object.
-    :rtype: JvmPlatformSettings
-    """
-    return JvmPlatform.global_instance().get_runtime_platform_for_target(self)
 
   @memoized_property
   def jar_dependencies(self):

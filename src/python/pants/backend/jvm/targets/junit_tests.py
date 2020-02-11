@@ -4,13 +4,14 @@
 
 from pants.backend.jvm.subsystems.junit import JUnit
 from pants.backend.jvm.targets.jvm_target import JvmTarget
+from pants.backend.jvm.targets.runtime_platform_mixin import RuntimePlatformMixin
 from pants.base.deprecated import deprecated, deprecated_conditional
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 
 
-class JUnitTests(JvmTarget):
+class JUnitTests(JvmTarget, RuntimePlatformMixin):
   """JUnit tests.
 
   :API: public
@@ -37,7 +38,7 @@ class JUnitTests(JvmTarget):
 
   def __init__(self, cwd=None, payload=None, timeout=None,
                extra_jvm_options=None, extra_env_vars=None, concurrency=None,
-               threads=None, **kwargs):
+               threads=None, runtime_platform=None, **kwargs):
     """
     :param str cwd: working directory (relative to the build root) for the tests under this
       target. If unspecified (None), the working directory will be controlled by junit_run's --cwd
@@ -55,6 +56,11 @@ class JUnitTests(JvmTarget):
       or 'PARALLEL_CLASSES_AND_METHODS'.  Overrides the setting of --test-junit-default-concurrency.
     :param int threads: Use the specified number of threads when running the test. Overrides
       the setting of --test-junit-parallel-threads.
+    :param str runtime_platform: The name of the platform (defined under the jvm-platform subsystem)
+      to use for runtime (that is, a key into the --jvm-platform-platforms dictionary). If
+      unspecified, the platform will default to the first one of these that exist: (1) the
+      default_runtime_platform specified for jvm-platform, (2) the platform that would be used for
+      the platform kwarg.
     """
 
     payload = payload or Payload()
@@ -79,6 +85,7 @@ class JUnitTests(JvmTarget):
       'extra_jvm_options': PrimitiveField(tuple(extra_jvm_options or ())),
       'extra_env_vars': PrimitiveField(tuple(extra_env_vars.items())),
     })
+    self.init_runtime_platform(payload, runtime_platform)
     super().__init__(payload=payload, **kwargs)
 
     # These parameters don't need to go into the fingerprint:

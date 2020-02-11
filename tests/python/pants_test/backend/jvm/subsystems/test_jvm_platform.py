@@ -3,8 +3,19 @@
 
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.jvm_target import JvmTarget
+from pants.backend.jvm.targets.runtime_platform_mixin import RuntimePlatformMixin
+from pants.base.payload import Payload
+from pants.java.distribution.distribution import DistributionLocator
 from pants.testutil.subsystem.util import init_subsystem
 from pants.testutil.test_base import TestBase
+
+
+class HasRuntimePlatform(JvmTarget, RuntimePlatformMixin):
+
+  def __init__(self, payload=None, runtime_platform=None, **kwargs):
+    payload = payload or Payload()
+    self.init_runtime_platform(payload, runtime_platform)
+    super(HasRuntimePlatform, self).__init__(payload=payload, **kwargs)
 
 
 class JvmPlatformTest(TestBase):
@@ -23,12 +34,12 @@ class JvmPlatformTest(TestBase):
       }
     })
 
-    without_platforms = self.make_target('//:without-platforms', JvmTarget)
-    just_platform = self.make_target('//:with-platform', JvmTarget,
+    without_platforms = self.make_target('//:without-platforms', HasRuntimePlatform)
+    just_platform = self.make_target('//:with-platform', HasRuntimePlatform,
       platform='target-platform')
-    just_runtime_platform = self.make_target('//:with-runtime-platform', JvmTarget,
+    just_runtime_platform = self.make_target('//:with-runtime-platform', HasRuntimePlatform,
       runtime_platform='target-runtime-platform')
-    both_platforms = self.make_target('//:with-platform-and-runtime-platform', JvmTarget,
+    both_platforms = self.make_target('//:with-platform-and-runtime-platform', HasRuntimePlatform,
       platform='target-platform',
       runtime_platform='target-runtime-platform')
 
@@ -56,12 +67,12 @@ class JvmPlatformTest(TestBase):
       }
     })
 
-    without_platforms = self.make_target('//:without-platforms', JvmTarget)
-    just_platform = self.make_target('//:with-platform', JvmTarget,
+    without_platforms = self.make_target('//:without-platforms', HasRuntimePlatform)
+    just_platform = self.make_target('//:with-platform', HasRuntimePlatform,
       platform='target-platform')
-    just_runtime_platform = self.make_target('//:with-runtime-platform', JvmTarget,
+    just_runtime_platform = self.make_target('//:with-runtime-platform', HasRuntimePlatform,
       runtime_platform='target-runtime-platform')
-    both_platforms = self.make_target('//:with-platform-and-runtime-platform', JvmTarget,
+    both_platforms = self.make_target('//:with-platform-and-runtime-platform', HasRuntimePlatform,
       platform='target-platform',
       runtime_platform='target-runtime-platform')
 
@@ -91,29 +102,29 @@ class JvmPlatformTest(TestBase):
       }
     })
 
-    just_platform = self.make_target('//:parent-with-runtime-platform', JvmTarget,
+    just_platform = self.make_target('//:parent-with-runtime-platform', HasRuntimePlatform,
       platform='parent-target-platform')
-    just_runtime_platform = self.make_target('//:parent-with-platform', JvmTarget,
+    just_runtime_platform = self.make_target('//:parent-with-platform', HasRuntimePlatform,
       runtime_platform='parent-target-runtime-platform')
 
-    synth_none = self.make_target('//:without-platforms', JvmTarget,
+    synth_none = self.make_target('//:without-platforms', HasRuntimePlatform,
       synthetic=True,
       derived_from=just_runtime_platform)
-    synth_just_platform = self.make_target('//:with-platform', JvmTarget,
+    synth_just_platform = self.make_target('//:with-platform', HasRuntimePlatform,
       synthetic=True,
       derived_from=just_runtime_platform,
       platform='target-platform')
-    synth_just_runtime = self.make_target('//:with-runtime-platform', JvmTarget,
+    synth_just_runtime = self.make_target('//:with-runtime-platform', HasRuntimePlatform,
       synthetic=True,
       derived_from=just_runtime_platform,
       runtime_platform='target-runtime-platform')
-    synth_both = self.make_target('//:with-platform-and-runtime-platform', JvmTarget,
+    synth_both = self.make_target('//:with-platform-and-runtime-platform', HasRuntimePlatform,
       synthetic=True,
       derived_from=just_runtime_platform,
       platform='target-platform',
       runtime_platform='target-runtime-platform')
     synth_just_platform_with_parent_same = self.make_target(
-      '//:with-platform-and-platform-parent', JvmTarget,
+      '//:with-platform-and-platform-parent', HasRuntimePlatform,
       synthetic=True,
       derived_from=just_platform,
       platform='target-platform')
@@ -129,3 +140,34 @@ class JvmPlatformTest(TestBase):
             'target-runtime-platform')
     assert (instance.get_runtime_platform_for_target(
       synth_just_platform_with_parent_same).name == 'default-platform')
+
+  def test_lookup_with_no_runtime_platform_having_targets(self):
+    init_subsystem(JvmPlatform, options={
+      'jvm-platform': {
+        'platforms': {
+          'default-platform': {'target': '8'},
+          'default-runtime-platform': {'target': '8'},
+          'target-platform': {'target': '8'},
+          'target-runtime-platform': {'target': '8'},
+          'parent-target-platform': {'target': '8'},
+          'parent-target-runtime-platform': {'target': '8'},
+          'other': {'target':'9'}
+        },
+        'default_platform': 'default-platform',
+        'default_runtime_platform': None
+      }
+    })
+
+    just_platform = self.make_target('//:only-platform', JvmTarget,
+      platform='other')
+    no_platform = self.make_target('//:no-platform', JvmTarget)
+
+    instance = JvmPlatform.global_instance()
+    assert (instance.preferred_jvm_distribution([just_platform.platform]) ==
+            DistributionLocator.cached(minimum_version='9'))
+    assert (instance.preferred_jvm_distribution([]).version ==
+            DistributionLocator.cached(minimum_version='1.8').version)
+    assert (instance.preferred_jvm_distribution([no_platform.platform]) ==
+            DistributionLocator.cached(minimum_version='1.8'))
+    assert (instance.preferred_jvm_distribution([]).version ==
+            DistributionLocator.cached(minimum_version='1.8').version)

@@ -4,12 +4,13 @@
 from typing import FrozenSet
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
+from pants.backend.jvm.targets.runtime_platform_mixin import RuntimePlatformMixin
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 
 
-class JvmPrepCommand(JvmTarget):
+class JvmPrepCommand(JvmTarget, RuntimePlatformMixin):
   """A command (defined in a Java target) that must be run before other tasks in a goal.
 
   For example, you can use `jvm_prep_command()` to execute a script that sets up tunnels to database
@@ -53,14 +54,19 @@ class JvmPrepCommand(JvmTarget):
     return JvmPrepCommand._goals
 
   def __init__(self, payload=None, mainclass=None, args=None, jvm_options=None, goal=None,
-      **kwargs):
+    runtime_platform=None, **kwargs):
     """
     :param args: A list of command-line args to the excutable.
     :param goal: Pants goal to run this command in [test, binary or compile]. If not specified,
                  runs in 'test'
     :param jvm_options: extra options to pass the JVM
     :param mainclass: The path to the executable that should be run.
-    """
+    :param str runtime_platform: The name of the platform (defined under the jvm-platform subsystem)
+      to use for runtime (that is, a key into the --jvm-platform-platforms dictionary). If
+      unspecified, the platform will default to the first one of these that exist: (1) the
+      default_runtime_platform specified for jvm-platform, (2) the platform that would be used for
+      the platform kwarg.
+      """
     payload = payload or Payload()
     goal = goal or 'test'
     payload.add_fields({
@@ -69,6 +75,7 @@ class JvmPrepCommand(JvmTarget):
       'args': PrimitiveField(args or []),
       'jvm_options': PrimitiveField(jvm_options or []),
     })
+    self.init_runtime_platform(payload, runtime_platform)
     super().__init__(payload=payload, **kwargs)
     if not mainclass:
       raise TargetDefinitionException(self, 'mainclass must be specified.')
