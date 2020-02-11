@@ -22,7 +22,7 @@ from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.option.global_options import GlobalOptions
 from pants.python.python_setup import PythonSetup
-from pants.rules.core.strip_source_root import SourceRootStrippedSources
+from pants.rules.core.strip_source_roots import SourceRootStrippedSources
 from pants.rules.core.test import TestDebugRequest, TestOptions, TestResult, TestTarget
 
 
