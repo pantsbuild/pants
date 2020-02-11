@@ -280,7 +280,7 @@ class BinaryUtil:
     pass
 
   class NoBaseUrlsError(TaskError):
-    """Indicates that no urls were specified in pants.toml."""
+    """Indicates that no urls were specified in pants.ini."""
     pass
 
   class BinaryResolutionError(TaskError):

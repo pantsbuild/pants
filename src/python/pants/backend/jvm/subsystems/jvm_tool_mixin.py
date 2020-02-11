@@ -33,10 +33,10 @@ class JvmToolMixin:
       if dep_spec.startswith('['):
         raise ValueError(dedent("""\
           JVM tool configuration now expects a single target address, use the
-          following in pants.toml:
+          following in pants.ini:
 
           [{scope}]
-          {key} = "//tool/classpath:address"
+          {key}: //tool/classpath:address
           """.format(scope=self.scope, key=self.key)))
       return dep_spec
 

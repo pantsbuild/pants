@@ -47,7 +47,7 @@ class ConsoleTask(QuietTaskMixin, Task):
                      "command line, rather than only the targets you specify. This is often useful, "
                      "such as running `./pants dependencies --transitive`, but it is surprising "
                      "to have this behavior by default.\n\nTo prepare for this change to the default "
-                     f"value, set in `pants.toml` under the section `{self.options_scope}` the value "
+                     f"value, set in `pants.ini` under the section `{self.options_scope}` the value "
                      "`transitive: False`. In Pants 1.27.0, you can safely remove the setting."
       )
       return self.get_options().transitive
