@@ -77,7 +77,8 @@ class _DestWrapper:
 class LegacyBuildGraph(BuildGraph):
   """A directed acyclic graph of Targets and dependencies. Not necessarily connected.
 
-  This implementation is backed by a Scheduler that is able to resolve TransitiveHydratedTargets.
+  This implementation is backed by a Scheduler that is able to resolve
+  LegacyTransitiveHydratedTargets.
   """
 
   @classmethod
@@ -99,7 +100,7 @@ class LegacyBuildGraph(BuildGraph):
     """Returns a new BuildGraph instance of the same type and with the same __init__ params."""
     return LegacyBuildGraph(self._scheduler, self._target_types)
 
-  def _index(self, hydrated_targets: Iterable["HydratedTarget"]) -> Set[BuildFileAddress]:
+  def _index(self, hydrated_targets: Iterable["LegacyHydratedTarget"]) -> Set[BuildFileAddress]:
     """Index from the given roots into the storage provided by the base class.
 
     This is an additive operation: any existing connections involving these nodes are preserved.
@@ -108,12 +109,11 @@ class LegacyBuildGraph(BuildGraph):
     new_targets: List[Target] = list()
 
     # Index the ProductGraph.
-    for hydrated_target in hydrated_targets:
-      target_adaptor = hydrated_target.adaptor
-      address = target_adaptor.address
-      all_addresses.add(address)  # type: ignore[arg-type]  # TODO: get this working
+    for legacy_hydrated_target in hydrated_targets:
+      address = legacy_hydrated_target.address
+      all_addresses.add(address)
       if address not in self._target_by_address:
-        new_targets.append(self._index_target(target_adaptor))
+        new_targets.append(self._index_target(legacy_hydrated_target))
 
     # Once the declared dependencies of all targets are indexed, inject their
     # additional "traversable_(dependency_)?specs".
@@ -143,14 +143,14 @@ class LegacyBuildGraph(BuildGraph):
 
     return all_addresses
 
-  def _index_target(self, target_adaptor: TargetAdaptor) -> Target:
-    """Instantiate the given TargetAdaptor, index it in the graph, and return a Target."""
+  def _index_target(self, legacy_hydrated_target: "LegacyHydratedTarget") -> Target:
+    """Instantiate the given LegacyHydratedTarget, index it in the graph, and return a Target."""
     # Instantiate the target.
-    address = target_adaptor.address
-    target = self._instantiate_target(target_adaptor)
+    address = legacy_hydrated_target.address
+    target = self._instantiate_target(legacy_hydrated_target)
     self._target_by_address[address] = target
 
-    for dependency in target_adaptor.dependencies:
+    for dependency in legacy_hydrated_target.dependencies:
       if dependency in self._target_dependencies_by_address[address]:
         raise self.DuplicateAddressError(
           'Addresses in dependencies must be unique. '
@@ -162,13 +162,16 @@ class LegacyBuildGraph(BuildGraph):
       self._target_dependees_by_address[dependency].add(address)
     return target
 
-  def _instantiate_target(self, target_adaptor: TargetAdaptor) -> Target:
-    """Given a TargetAdaptor struct previously parsed from a BUILD file, instantiate a Target."""
-    target_cls = self._target_types[target_adaptor.type_alias]
+  def _instantiate_target(self, legacy_hydrated_target: "LegacyHydratedTarget") -> Target:
+    """Given a LegacyHydratedTarget previously parsed from a BUILD file, instantiate a Target."""
+    target_cls = self._target_types[legacy_hydrated_target.adaptor.type_alias]
     try:
       # Pop dependencies, which were already consumed during construction.
-      kwargs = target_adaptor.kwargs()
+      kwargs = legacy_hydrated_target.adaptor.kwargs()
       kwargs.pop('dependencies')
+
+      # Replace the `address` field of type `Address` with type `BuildFileAddress`.
+      kwargs["address"] = legacy_hydrated_target.address
 
       # Instantiate.
       if issubclass(target_cls, AppBase):
@@ -180,8 +183,9 @@ class LegacyBuildGraph(BuildGraph):
       raise
     except Exception as e:
       raise TargetDefinitionException(
-          target_adaptor.address,
-          'Failed to instantiate Target with type {}: {}'.format(target_cls, e))
+        legacy_hydrated_target.address,
+        'Failed to instantiate Target with type {}: {}'.format(target_cls, e),
+      )
 
   def _instantiate_app(self, target_cls: Type[Target], kwargs) -> Target:
     """For App targets, convert BundleAdaptor to BundleProps."""
@@ -247,7 +251,7 @@ class LegacyBuildGraph(BuildGraph):
 
     logger.debug('Injecting address specs to %s: %s', self, address_specs)
     with self._resolve_context():
-      thts, = self._scheduler.product_request(TransitiveHydratedTargets, [address_specs])
+      thts, = self._scheduler.product_request(LegacyTransitiveHydratedTargets, [address_specs])
 
     self._index(thts.closure)
 
@@ -385,6 +389,29 @@ class TransitiveHydratedTargets:
 
 
 @dataclass(frozen=True)
+class LegacyHydratedTarget:
+  """A rip on HydratedTarget for the purpose of V1, which must use BuildFileAddress rather than
+  Address.
+  """
+  address: BuildFileAddress
+  adaptor: TargetAdaptor
+  dependencies: Tuple[Address, ...]
+
+  def __hash__(self):
+    return hash(self.address)
+
+  @staticmethod
+  def from_hydrated_target(ht: HydratedTarget, bfa: BuildFileAddress) -> "LegacyHydratedTarget":
+    return LegacyHydratedTarget(address=bfa, adaptor=ht.adaptor, dependencies=ht.dependencies)
+
+
+@dataclass(frozen=True)
+class LegacyTransitiveHydratedTargets:
+  roots: Tuple[LegacyHydratedTarget, ...]
+  closure: OrderedSet  # TODO: this is an OrderedSet[LegacyHydratedTarget]
+
+
+@dataclass(frozen=True)
 class SourcesSnapshot:
   """Sources matched by command line specs, either directly via FilesystemSpecs or indirectly via
   AddressSpecs.
@@ -515,6 +542,29 @@ async def transitive_hydrated_targets(addresses: Addresses) -> TransitiveHydrate
     to_visit.extend(tht.dependencies)
 
   return TransitiveHydratedTargets(tuple(tht.root for tht in transitive_hydrated_targets), closure)
+
+
+@rule
+async def legacy_transitive_hydrated_targets(
+  addresses: Addresses,
+) -> LegacyTransitiveHydratedTargets:
+  thts = await Get[TransitiveHydratedTargets](Addresses, addresses)
+  roots_bfas = await MultiGet(
+    Get[BuildFileAddress](Address, hydrated_target.address) for hydrated_target in thts.roots
+  )
+  closure_bfas = await MultiGet(
+    Get[BuildFileAddress](Address, hydrated_target.address) for hydrated_target in thts.closure
+  )
+  return LegacyTransitiveHydratedTargets(
+    roots=tuple(
+      LegacyHydratedTarget.from_hydrated_target(ht, bfa)
+      for ht, bfa in zip(thts.roots, roots_bfas)
+    ),
+    closure=OrderedSet(
+      LegacyHydratedTarget.from_hydrated_target(ht, bfa)
+      for ht, bfa in zip(thts.closure, closure_bfas)
+    ),
+  )
 
 
 @rule
@@ -742,8 +792,9 @@ async def addresses_with_origins_from_filesystem_specs(
 def create_legacy_graph_tasks():
   """Create tasks to recursively parse the legacy graph."""
   return [
-    transitive_hydrated_targets,
     transitive_hydrated_target,
+    transitive_hydrated_targets,
+    legacy_transitive_hydrated_targets,
     hydrated_targets,
     hydrate_target,
     find_owners,
