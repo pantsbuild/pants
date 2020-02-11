@@ -227,11 +227,11 @@ class ExportDepAsJar(ConsoleTask):
     if isinstance(current_target, JvmTarget):
       info['excludes'] = [self._exclude_id(exclude) for exclude in current_target.excludes]
       info['platform'] = current_target.platform.name
-      # TODO Remove when bumping export version to 1.1.0
-      if hasattr(current_target, 'test_platform'):
-        info['test_platform'] = current_target.runtime_platform.name
       if hasattr(current_target, 'runtime_platform'):
         info['runtime_platform'] = current_target.runtime_platform.name
+        # TODO Remove when bumping export version to 1.1.0
+        if hasattr(current_target, 'test_platform'):
+          info['test_platform'] = current_target.runtime_platform.name
 
     return info
 
