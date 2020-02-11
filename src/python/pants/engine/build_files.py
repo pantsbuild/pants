@@ -18,6 +18,7 @@ from pants.engine.addressable import (
   Addresses,
   AddressesWithOrigins,
   AddressWithOrigin,
+  BuildFileAddresses,
 )
 from pants.engine.fs import Digest, FilesContent, PathGlobs, Snapshot
 from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper
@@ -90,6 +91,12 @@ async def find_build_file(address: Address) -> BuildFileAddress:
     for build_file_address in address_family.addressables.keys()
     if build_file_address == address
   )
+
+
+@rule
+async def find_build_files(addresses: Addresses) -> BuildFileAddresses:
+  bfas = await MultiGet(Get[BuildFileAddress](Address, address) for address in addresses)
+  return BuildFileAddresses(bfas)
 
 
 @rule
@@ -306,6 +313,7 @@ def create_graph_rules(address_mapper: AddressMapper):
     hydrate_struct,
     parse_address_family,
     find_build_file,
+    find_build_files,
     # AddressSpec handling: locate directories that contain build files, and request
     # AddressFamilies for each of them.
     addresses_with_origins_from_address_families,

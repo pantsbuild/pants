@@ -39,6 +39,10 @@ class AddressesWithOrigins(Collection[AddressWithOrigin]):
   pass
 
 
+class BuildFileAddresses(Collection[BuildFileAddress]):
+  """NB: V2 should generally use Addresses instead of BuildFileAddresses."""
+
+
 class NotSerializableError(TypeError):
   """Indicates an addressable descriptor is illegally installed in a non-Serializable type."""
 
