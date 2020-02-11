@@ -10,7 +10,7 @@ from pants.base.exceptions import ResolveError
 from pants.base.project_tree import Dir
 from pants.base.specs import AddressSpecs, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address
-from pants.engine.addressable import BuildFileAddresses, addressable, addressable_dict
+from pants.engine.addressable import Addresses, addressable, addressable_dict
 from pants.engine.build_files import (
   ResolvedTypeMismatchError,
   addresses_with_origins_from_address_families,
@@ -67,14 +67,14 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
   def _snapshot(self) -> Snapshot:
     return Snapshot(Digest('xx', 2), ('root/BUILD',), ())
 
-  def _resolve_build_file_addresses(
+  def _resolve_addresses(
     self,
     address_specs: AddressSpecs,
     address_family: AddressFamily,
     snapshot: Snapshot,
     address_mapper: AddressMapper,
-  ) -> BuildFileAddresses:
-    pbfas = run_rule(
+  ) -> Addresses:
+    addresses_with_origins = run_rule(
       addresses_with_origins_from_address_families,
       rule_args=[address_mapper, address_specs],
       mock_gets=[
@@ -90,7 +90,7 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
         ),
       ],
     )
-    return cast(BuildFileAddresses, run_rule(strip_address_origins, rule_args=[pbfas]))
+    return cast(Addresses, run_rule(strip_address_origins, rule_args=[addresses_with_origins]))
 
   def test_duplicated(self) -> None:
     """Test that matching the same AddressSpec twice succeeds."""
@@ -99,11 +99,12 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
     address_family = AddressFamily('a', {'a': ('a/BUILD', 'this is an object!')})
     address_specs = AddressSpecs([address, address])
 
-    bfas = self._resolve_build_file_addresses(
-      address_specs, address_family, snapshot, self._address_mapper())
+    addresses = self._resolve_addresses(
+      address_specs, address_family, snapshot, self._address_mapper()
+    )
 
-    self.assertEqual(len(bfas.dependencies), 1)
-    self.assertEqual(bfas.dependencies[0].spec, 'a:a')
+    self.assertEqual(len(addresses.dependencies), 1)
+    self.assertEqual(addresses.dependencies[0].spec, 'a:a')
 
   def test_tag_filter(self) -> None:
     """Test that targets are filtered based on `tags`."""
@@ -115,7 +116,7 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
       }
     )
 
-    targets = self._resolve_build_file_addresses(
+    targets = self._resolve_addresses(
       address_specs, address_family, self._snapshot(), self._address_mapper())
 
     self.assertEqual(len(targets.dependencies), 1)
@@ -130,14 +131,14 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
       """"b" was not found in namespace "root". Did you mean one of:
   :a""")
     with self.assertRaisesRegex(ResolveError, expected_rx_str):
-      self._resolve_build_file_addresses(
+      self._resolve_addresses(
         address_specs, address_family, self._snapshot(), self._address_mapper())
 
     # Ensure that we still catch nonexistent targets later on in the list of command-line
     # address specs.
     address_specs = AddressSpecs([SingleAddress('root', 'a'), SingleAddress('root', 'b')])
     with self.assertRaisesRegex(ResolveError, expected_rx_str):
-      self._resolve_build_file_addresses(
+      self._resolve_addresses(
         address_specs, address_family, self._snapshot(), self._address_mapper())
 
   def test_exclude_pattern(self) -> None:
@@ -149,7 +150,7 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
                                    }
     )
 
-    targets = self._resolve_build_file_addresses(
+    targets = self._resolve_addresses(
       address_specs, address_family, self._snapshot(), self._address_mapper())
 
     self.assertEqual(len(targets.dependencies), 1)
@@ -164,7 +165,7 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
                                    }
     )
 
-    targets = self._resolve_build_file_addresses(
+    targets = self._resolve_addresses(
       address_specs, address_family, self._snapshot(), self._address_mapper())
 
     self.assertEqual(len(targets.dependencies), 0)

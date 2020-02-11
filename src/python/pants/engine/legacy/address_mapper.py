@@ -9,7 +9,7 @@ from pants.base.exceptions import ResolveError
 from pants.base.specs import AddressSpecs, DescendantAddresses, SiblingAddresses
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.address_mapper import AddressMapper
-from pants.engine.addressable import BuildFileAddresses
+from pants.engine.addressable import Addresses
 from pants.util.dirutil import fast_relpath
 
 
@@ -63,7 +63,7 @@ class LegacyAddressMapper(AddressMapper):
   def _internal_scan_specs(self, specs, fail_fast=True, missing_is_fatal=True):
     # TODO: This should really use `product_request`, but on the other hand, we need to
     # deprecate the entire `AddressMapper` interface anyway. See #4769.
-    request = self._scheduler.execution_request([BuildFileAddresses], [AddressSpecs(tuple(specs))])
+    request = self._scheduler.execution_request([Addresses], [AddressSpecs(tuple(specs))])
     returns, throws = self._scheduler.execute(request)
 
     if throws:

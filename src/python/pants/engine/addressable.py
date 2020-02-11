@@ -5,7 +5,7 @@ import inspect
 from collections.abc import MutableMapping, MutableSequence
 from dataclasses import dataclass
 from functools import update_wrapper
-from typing import Any, List, Set, Tuple, Type, Union
+from typing import Any, Set, Tuple, Type, Union
 
 from pants.base.exceptions import ResolveError
 from pants.base.specs import AddressSpec, FilesystemResolvedSpec
@@ -37,13 +37,6 @@ class AddressWithOrigin:
 
 class AddressesWithOrigins(Collection[AddressWithOrigin]):
   pass
-
-
-class BuildFileAddresses(Collection[BuildFileAddress]):
-  @property
-  def addresses(self) -> List[Address]:
-    """Converts the BuildFileAddress objects in this collection to Address objects."""
-    return [bfa.to_address() for bfa in self]
 
 
 class NotSerializableError(TypeError):
