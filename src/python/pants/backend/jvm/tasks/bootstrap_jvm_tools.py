@@ -155,7 +155,7 @@ class BootstrapJvmTools(IvyTaskMixin, CoursierMixin, JarTask):  # type: ignore[m
                   from pants.ini (or any other config file) to use the default tool.
 
                   The default classpath is: {default_classpath}
-                  
+
                   Note that tool target addresses in pants.ini should be specified *without* quotes.
                 """).strip().format(tool=dep_spec,
                                     option=jvm_tool.key,
