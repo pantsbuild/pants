@@ -52,7 +52,7 @@ def create_isolated_git_repo():
   # Isolated Git Repo Structure:
   # worktree
   # |--README
-  # |--pants.ini
+  # |--pants.toml
   # |--3rdparty
   #    |--BUILD
   # |--src
@@ -95,17 +95,17 @@ def create_isolated_git_repo():
       return write_path
 
     create_file('README', 'N.B. This is just a test tree.')
-    create_file('pants.ini',
+    create_file('pants.toml',
       """
       [GLOBAL]
-      pythonpath: [
-          "{0}/contrib/go/src/python",
-          "{0}/pants-plugins/src/python"
-        ]
-      backend_packages: +[
-          "internal_backend.utilities",
-          "pants.contrib.go"
-        ]
+      pythonpath = [
+        "{0}/contrib/go/src/python",
+        "{0}/pants-plugins/src/python"
+      ]
+      backend_packages.add = [
+        "internal_backend.utilities",
+        "pants.contrib.go"
+      ]
       """.format(get_buildroot())
     )
     copy_into('.gitignore')

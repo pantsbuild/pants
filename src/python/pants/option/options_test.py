@@ -825,7 +825,7 @@ class OptionsTest(TestBase):
         """
       ))
       tmp.flush()
-      # Note that we prevent loading a real pants.ini during get_bootstrap_options().
+      # Note that we prevent loading a real pants.toml during get_bootstrap_options().
       flags = f'--target-spec-file={tmp.name} --pants-config-files="[]" ' \
                 'compile morx:tgt fleem:tgt'
       bootstrapper = OptionsBootstrapper.create(args=shlex.split(f"./pants {flags}"))

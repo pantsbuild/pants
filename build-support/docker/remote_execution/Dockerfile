@@ -10,7 +10,7 @@
 #   4. $ docker build --tag rbe-remote-execution build-support/docker/remote_execution
 #   5. $ docker tag rbe-remote-execution gcr.io/pants-remoting-beta/rbe-remote-execution
 #   6. $ docker push gcr.io/pants-remoting-beta/rbe-remote-execution
-#   7. Update `pants.remote.ini` to use the new SHA printed to the console.
+#   7. Update `pants.remote.toml` to use the new SHA printed to the console.
 
 FROM gcr.io/cloud-marketplace/google/rbe-ubuntu16-04@sha256:da0f21c71abce3bbb92c3a0c44c3737f007a82b60f8bd2930abc55fe64fc2729
 
