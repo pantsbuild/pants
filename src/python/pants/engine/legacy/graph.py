@@ -30,12 +30,7 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.remote_sources import RemoteSources
 from pants.build_graph.target import Target
-from pants.engine.addressable import (
-  Addresses,
-  AddressesWithOrigins,
-  AddressWithOrigin,
-  BuildFileAddresses,
-)
+from pants.engine.addressable import Addresses, AddressesWithOrigins, AddressWithOrigin
 from pants.engine.fs import EMPTY_SNAPSHOT, PathGlobs, Snapshot
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.structs import (
@@ -116,7 +111,7 @@ class LegacyBuildGraph(BuildGraph):
     for hydrated_target in hydrated_targets:
       target_adaptor = hydrated_target.adaptor
       address = target_adaptor.address
-      all_addresses.add(address)
+      all_addresses.add(address)  # type: ignore[arg-type]  # TODO: get this working
       if address not in self._target_by_address:
         new_targets.append(self._index_target(target_adaptor))
 
@@ -359,7 +354,7 @@ class HydratedTarget:
   Transitive graph walks collect ordered sets of TransitiveHydratedTargets which involve a huge amount
   of hashing: we implement eq/hash via direct usage of an Address field to speed that up.
   """
-  address: BuildFileAddress
+  address: Address
   adaptor: TargetAdaptor
   dependencies: Tuple[Address, ...]
 
@@ -457,7 +452,7 @@ class OwnersRequest:
 
 @dataclass(frozen=True)
 class Owners:
-  addresses: BuildFileAddresses
+  addresses: Addresses
 
 
 @rule
@@ -483,10 +478,13 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
     target_sources = target_kwargs.get('sources', None)
     return target_sources and any_matches_filespec(paths=sources_set, spec=target_sources.filespec)
 
-  owners = BuildFileAddresses(
+  build_file_addresses = await MultiGet(
+    Get[BuildFileAddress](Address, ht.adaptor.address) for ht in candidate_targets
+  )
+  owners = Addresses(
     ht.adaptor.address
-    for ht in candidate_targets
-    if LegacyAddressMapper.any_is_declaring_file(ht.adaptor.address, sources_set)
+    for ht, bfa in zip(candidate_targets, build_file_addresses)
+    if LegacyAddressMapper.any_is_declaring_file(bfa, sources_set)
     or owns_any_source(ht)
   )
   return Owners(owners)
@@ -609,10 +607,9 @@ async def hydrate_sources(
   path_globs = dataclasses.replace(
     sources_field.path_globs,
     glob_match_error_behavior=glob_match_error_behavior,
-    # TODO(#9012): add line number referring to the sources field.
-    description_of_origin=(
-      f"{address.rel_path} for target {address.relative_spec}'s `{sources_field.arg}` field"
-    ),
+    # TODO(#9012): add line number referring to the sources field. When doing this, we'll likely
+    # need to `await Get[BuildFileAddress](Address)`.
+    description_of_origin=f"{address}'s `{sources_field.arg}` field",
   )
   snapshot = await Get[Snapshot](PathGlobs, path_globs)
   fileset_with_spec = _eager_fileset_with_spec(
@@ -634,8 +631,9 @@ async def hydrate_bundles(
     dataclasses.replace(
       pg,
       glob_match_error_behavior=glob_match_error_behavior,
-      # TODO(#9012): add line number referring to the bundles field.
-      description_of_origin=f"{address.rel_path} for target {address.relative_spec}'s `bundles` field",
+      # TODO(#9012): add line number referring to the bundles field. When doing this, we'll likely
+      # need to `await Get[BuildFileAddress](Address)`.
+      description_of_origin=f"{address}'s `bundles` field",
     )
     for pg in bundles_field.path_globs_list
   ]

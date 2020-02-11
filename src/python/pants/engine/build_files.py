@@ -18,7 +18,6 @@ from pants.engine.addressable import (
   Addresses,
   AddressesWithOrigins,
   AddressWithOrigin,
-  BuildFileAddresses,
 )
 from pants.engine.fs import Digest, FilesContent, PathGlobs, Snapshot
 from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper
@@ -183,7 +182,7 @@ async def hydrate_struct(address_mapper: AddressMapper, address: Address) -> Hyd
         hydrated_args[key] = maybe_consume(key, value)
     return _hydrate(type(item), address.spec_path, **hydrated_args)
 
-  return HydratedStruct(consume_dependencies(struct, args={"address": build_file_address}))
+  return HydratedStruct(consume_dependencies(struct, args={"address": address}))
 
 
 def _hydrate(item_type, spec_path, **kwargs):
@@ -225,7 +224,7 @@ async def addresses_with_origins_from_address_families(
   address_family_by_directory = {af.namespace: af for af in address_families}
 
   matched_addresses = OrderedSet()
-  bfaddr_to_origin: Dict[BuildFileAddress, AddressSpec] = {}
+  addr_to_origin: Dict[Address, AddressSpec] = {}
 
   for address_spec in address_specs:
     # NB: if an address spec is provided which expands to some number of targets, but those targets
@@ -242,31 +241,30 @@ async def addresses_with_origins_from_address_families(
         addr_families_for_spec
       )
       for bfaddr, _ in all_bfaddr_tgt_pairs:
+        addr = bfaddr.to_address()
         # A target might be covered by multiple specs, so we take the most specific one.
-        bfaddr_to_origin[bfaddr] = more_specific(bfaddr_to_origin.get(bfaddr), address_spec)
+        addr_to_origin[addr] = more_specific(addr_to_origin.get(addr), address_spec)
     except AddressSpec.AddressResolutionError as e:
       raise AddressLookupError(e) from e
     except SingleAddress._SingleAddressResolutionError as e:
       _raise_did_you_mean(e.single_address_family, e.name, source=e)
 
     matched_addresses.update(
-      bfaddr
+      bfaddr.to_address()
       for (bfaddr, tgt) in all_bfaddr_tgt_pairs
       if address_specs.matcher.matches_target_address_pair(bfaddr, tgt)
     )
 
   # NB: This may be empty, as the result of filtering by tag and exclude patterns!
   return AddressesWithOrigins(
-    AddressWithOrigin(address=bfaddr, origin=bfaddr_to_origin[bfaddr])
-    for bfaddr in matched_addresses
+    AddressWithOrigin(address=addr, origin=addr_to_origin[addr])
+    for addr in matched_addresses
   )
 
 
 @rule
-def strip_address_origins(addresses_with_origins: AddressesWithOrigins) -> BuildFileAddresses:
-  return BuildFileAddresses(
-    address_with_origin.address for address_with_origin in addresses_with_origins
-  )
+def strip_address_origins(addresses_with_origins: AddressesWithOrigins) -> Addresses:
+  return Addresses(address_with_origin.address for address_with_origin in addresses_with_origins)
 
 
 @dataclass(frozen=True)
@@ -281,16 +279,10 @@ class AddressOriginMap:
 def address_origin_map(addresses_with_origins: AddressesWithOrigins) -> AddressOriginMap:
   return AddressOriginMap(
     addr_to_origin={
-      address_with_origin.address.to_address(): address_with_origin.origin
+      address_with_origin.address: address_with_origin.origin
       for address_with_origin in addresses_with_origins
     }
   )
-
-
-# TODO(#6657): Remove this once BFA is removed.
-@rule
-def bfas_to_addresses(build_file_addresses: BuildFileAddresses) -> Addresses:
-  return Addresses(bfa.to_address() for bfa in build_file_addresses)
 
 
 def _address_spec_to_globs(address_mapper: AddressMapper, address_specs: AddressSpecs) -> PathGlobs:
@@ -319,10 +311,7 @@ def create_graph_rules(address_mapper: AddressMapper):
     addresses_with_origins_from_address_families,
     strip_address_origins,
     address_origin_map,
-    bfas_to_addresses,
     # Root rules representing parameters that might be provided via root subjects.
     RootRule(Address),
-    RootRule(BuildFileAddress),
-    RootRule(BuildFileAddresses),
     RootRule(AddressSpecs),
   ]

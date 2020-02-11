@@ -7,7 +7,7 @@ from typing import Dict, Optional
 from unittest.mock import Mock
 
 from pants.base.specs import DescendantAddresses, SingleAddress, Spec
-from pants.build_graph.address import Address, BuildFileAddress
+from pants.build_graph.address import Address
 from pants.engine.addressable import Addresses
 from pants.engine.build_files import AddressOriginMap
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, Digest, FileContent, InputFilesContent, Snapshot
@@ -172,7 +172,7 @@ class TestTest(TestBase):
   def run_coordinator_of_tests(
     self,
     *,
-    address: BuildFileAddress,
+    address: Address,
     addr_to_origin: Optional[Dict[Address, Spec]] = None,
     test_target_type: bool = True,
     include_sources: bool = True,
@@ -212,44 +212,44 @@ class TestTest(TestBase):
     return result
 
   def test_coordinator_single_test_target(self) -> None:
-    bfaddr = BuildFileAddress(rel_path='some/dir', target_name='tests')
-    result = self.run_coordinator_of_tests(address=bfaddr)
+    addr = Address.parse("some/dir:tests")
+    result = self.run_coordinator_of_tests(address=addr)
     assert result == AddressAndTestResult(
-      bfaddr.to_address(), TestResult(status=Status.SUCCESS, stdout='foo', stderr='')
+      addr, TestResult(status=Status.SUCCESS, stdout='foo', stderr='')
     )
 
   def test_coordinator_single_non_test_target(self) -> None:
-    bfaddr = BuildFileAddress(target_name='bin', rel_path='some/dir')
+    addr = Address.parse("some/dir:bin")
     # Note that this is not the same error message the end user will see, as we're resolving
     # union Get requests in run_rule, not the real engine.  But this test still asserts that
     # we error when we expect to error.
     with self.assertRaisesRegex(AssertionError, r'Rule requested: .* which cannot be satisfied.'):
       self.run_coordinator_of_tests(
-        address=bfaddr,
-        addr_to_origin={bfaddr.to_address(): SingleAddress(directory='some/dir', name='bin')},
+        address=addr,
+        addr_to_origin={addr: SingleAddress(directory='some/dir', name='bin')},
         test_target_type=False,
       )
 
   def test_coordinator_empty_sources(self) -> None:
-    bfaddr = BuildFileAddress(rel_path='some/dir', target_name='tests')
-    result = self.run_coordinator_of_tests(address=bfaddr, include_sources=False)
-    assert result == AddressAndTestResult(bfaddr.to_address(), None)
+    addr = Address.parse("some/dir:tests")
+    result = self.run_coordinator_of_tests(address=addr, include_sources=False)
+    assert result == AddressAndTestResult(addr, None)
 
   def test_coordinator_globbed_test_target(self) -> None:
-    bfaddr = BuildFileAddress(rel_path='some/dir', target_name='tests')
+    addr = Address.parse("some/dir:tests")
     result = self.run_coordinator_of_tests(
-      address=bfaddr,
-      addr_to_origin={bfaddr.to_address(): DescendantAddresses(directory='some/dir')}
+      address=addr,
+      addr_to_origin={addr: DescendantAddresses(directory='some/dir')}
     )
     assert result == AddressAndTestResult(
-      bfaddr.to_address(), TestResult(status=Status.SUCCESS, stdout='foo', stderr='')
+      addr, TestResult(status=Status.SUCCESS, stdout='foo', stderr='')
     )
 
   def test_coordinator_globbed_non_test_target(self) -> None:
-    bfaddr = BuildFileAddress(rel_path='some/dir', target_name='bin')
+    addr = Address.parse("some/dir:bin")
     result = self.run_coordinator_of_tests(
-      address=bfaddr,
-      addr_to_origin={bfaddr.to_address(): DescendantAddresses(directory='some/dir')},
+      address=addr,
+      addr_to_origin={addr: DescendantAddresses(directory='some/dir')},
       test_target_type=False,
     )
-    assert result == AddressAndTestResult(bfaddr.to_address(), None)
+    assert result == AddressAndTestResult(addr, None)
