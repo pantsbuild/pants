@@ -41,7 +41,8 @@ async def run_python_repl(
     build_root: BuildRoot,
     global_options: GlobalOptions) -> PythonRepl:
 
-  # note - when eric's changes are merged, the .to_address() won't be necessary
+  # NOTE -  when Eric's changes pertaining to BuildFileAddresses are merged  in https://github.com/pantsbuild/pants/pull/9100, the
+  # .to_address() call will no longer be necessary.
   python_addresses = Addresses(
     ht.address.to_address() for ht in targets.closure if isinstance(ht.adaptor, PythonTargetAdaptor)
   )
@@ -49,18 +50,17 @@ async def run_python_repl(
   create_pex = CreatePexFromTargetClosure(
     addresses=python_addresses,
     output_filename="python-repl.pex",
-    entry_point=None,
   )
 
   repl_pex = await Get[Pex](CreatePexFromTargetClosure, create_pex)
 
   with temporary_dir(root_dir=global_options.pants_workdir, cleanup=False) as tmpdir:
-    path_relative_to_build_root = str(PurePath(tmpdir).relative_to(build_root.path))
+    path_relative_to_build_root = PurePath(tmpdir).relative_to(build_root.path).as_posix()
     workspace.materialize_directory(
       DirectoryToMaterialize(repl_pex.directory_digest, path_prefix=path_relative_to_build_root)
     )
 
-    full_path = str(PurePath(tmpdir, repl_pex.output_filename))
+    full_path = PurePath(tmpdir, repl_pex.output_filename).as_posix()
     run_request = InteractiveProcessRequest(
       argv=(full_path,),
       run_in_workspace=True,
