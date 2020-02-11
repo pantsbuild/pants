@@ -6,6 +6,7 @@ import re
 import unittest
 from typing import Tuple, Type, cast
 
+from pants.base.exceptions import ResolveError
 from pants.base.project_tree import Dir
 from pants.base.specs import AddressSpecs, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address
@@ -15,11 +16,11 @@ from pants.engine.build_files import (
   addresses_with_origins_from_address_families,
   create_graph_rules,
   parse_address_family,
-  remove_origins,
+  strip_address_origins,
 )
 from pants.engine.fs import Digest, FileContent, FilesContent, PathGlobs, Snapshot, create_fs_rules
 from pants.engine.legacy.structs import TargetAdaptor
-from pants.engine.mapper import AddressFamily, AddressMapper, ResolveError
+from pants.engine.mapper import AddressFamily, AddressMapper
 from pants.engine.nodes import Return, State, Throw
 from pants.engine.parser import HydratedStruct, SymbolTable
 from pants.engine.rules import rule
@@ -89,7 +90,7 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
         ),
       ],
     )
-    return cast(BuildFileAddresses, run_rule(remove_origins, rule_args=[pbfas]))
+    return cast(BuildFileAddresses, run_rule(strip_address_origins, rule_args=[pbfas]))
 
   def test_duplicated(self) -> None:
     """Test that matching the same AddressSpec twice succeeds."""

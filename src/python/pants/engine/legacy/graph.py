@@ -12,7 +12,7 @@ from typing import Any, Dict, Iterable, List, Tuple, cast
 
 from twitter.common.collections import OrderedSet
 
-from pants.base.exceptions import TargetDefinitionException
+from pants.base.exceptions import ResolveError, TargetDefinitionException
 from pants.base.parse_context import ParseContext
 from pants.base.specs import (
   AddressSpec,
@@ -43,7 +43,6 @@ from pants.engine.legacy.structs import (
   SourcesField,
   TargetAdaptor,
 )
-from pants.engine.mapper import ResolveError
 from pants.engine.objects import Collection
 from pants.engine.parser import HydratedStruct
 from pants.engine.rules import RootRule, rule
@@ -235,25 +234,6 @@ class LegacyBuildGraph(BuildGraph):
       raise AddressLookupError(
         'Build graph construction failed: {} {}'.format(type(e).__name__, str(e))
       )
-
-  def _inject_addresses(self, subjects):
-    """Injects targets into the graph for each of the given `Address` objects, and then yields them.
-
-    TODO: See #5606 about undoing the split between `_inject_addresses` and `_inject_address_specs`.
-    """
-    logger.debug('Injecting addresses to %s: %s', self, subjects)
-    with self._resolve_context():
-      addresses = tuple(subjects)
-      thts, = self._scheduler.product_request(TransitiveHydratedTargets,
-                                              [BuildFileAddresses(addresses)])
-
-    self._index(thts.closure)
-
-    yielded_addresses = set()
-    for address in subjects:
-      if address not in yielded_addresses:
-        yielded_addresses.add(address)
-        yield address
 
   def _inject_address_specs(self, address_specs: AddressSpecs):
     """Injects targets into the graph for the given `AddressSpecs` object.
@@ -690,25 +670,14 @@ async def hydrate_sources_snapshot(hydrated_struct: HydratedStruct) -> SourcesSn
 
 
 @rule
-async def sources_snapshots_from_build_file_addresses(
-  address_specs: AddressSpecs,
-) -> SourcesSnapshots:
-  """Request SourcesSnapshots for the given BuildFileAddresses.
+async def sources_snapshots_from_address_specs(address_specs: AddressSpecs) -> SourcesSnapshots:
+  """Request SourcesSnapshots for the given address specs.
 
   Each address will map to a corresponding SourcesSnapshot. This rule avoids hydrating any other
-  fields."""
-
-  # NB: this line must be an `await Get`, rather than directly requesting `BuildFileAddresses`
-  # directly in the rule signature. Why? The `owners_from_filesystem_specs()` rule provides a way
-  # to go from FilesystemSpecs -> BuildFileAddresses. Then, this rule provides a way to go from
-  # BuildFileAddresses -> SourcesSnapshots. But, we already have a way to go from
-  # FilesystemSpecs -> SourcesSnapshots directly, so there are now two ways to go from
-  # FilesystemSpecs -> SourcesSnapshot and the graph does not like the ambiguity. By having the
-  # rule request AddressSpecs instead, we remove the ambiguity.
-  build_file_addresses = await Get[BuildFileAddresses](AddressSpecs, address_specs)
-  snapshots = await MultiGet(
-    Get[SourcesSnapshot](Address, a) for a in build_file_addresses.addresses
-  )
+  fields.
+  """
+  addresses = await Get[Addresses](AddressSpecs, address_specs)
+  snapshots = await MultiGet(Get[SourcesSnapshot](Address, a) for a in addresses)
   return SourcesSnapshots(snapshots)
 
 
@@ -779,7 +748,7 @@ def create_legacy_graph_tasks():
     sort_targets,
     hydrate_sources_snapshot,
     addresses_with_origins_from_filesystem_specs,
-    sources_snapshots_from_build_file_addresses,
+    sources_snapshots_from_address_specs,
     sources_snapshots_from_filesystem_specs,
     RootRule(FilesystemSpecs),
     RootRule(OwnersRequest),

@@ -61,3 +61,19 @@ class BackendConfigurationError(BuildConfigurationError):
 
 class IncompatiblePlatformsError(Exception):
   """Indicates that target platforms are incompatible with a target that contains native code."""
+
+
+class MappingError(Exception):
+  """Indicates an error mapping addressable objects."""
+
+
+class UnaddressableObjectError(MappingError):
+  """Indicates an un-addressable object was found at the top level."""
+
+
+class DuplicateNameError(MappingError):
+  """Indicates more than one top-level object was found with the same name."""
+
+
+class ResolveError(MappingError):
+  """Indicates an error resolving targets."""
