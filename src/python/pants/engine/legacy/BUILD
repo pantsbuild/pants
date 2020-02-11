@@ -80,7 +80,6 @@ python_library(
     'src/python/pants/engine:mapper',
     'src/python/pants/engine:objects',
     'src/python/pants/engine:parser',
-    'src/python/pants/engine:scheduler',
     'src/python/pants/engine:selectors',
     'src/python/pants/option',
     'src/python/pants/scm/subsystems:changed',

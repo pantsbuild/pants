@@ -48,7 +48,6 @@ from pants.engine.legacy.structs import (
 from pants.engine.objects import Collection
 from pants.engine.parser import HydratedStruct
 from pants.engine.rules import RootRule, rule
-from pants.engine.scheduler import SchedulerSession
 from pants.engine.selectors import Get, MultiGet
 from pants.option.global_options import (
   GlobalOptions,
@@ -87,13 +86,11 @@ class LegacyBuildGraph(BuildGraph):
   """
 
   @classmethod
-  def create(
-    cls, scheduler: SchedulerSession, build_file_aliases: BuildFileAliases,
-  ) -> "LegacyBuildGraph":
+  def create(cls, scheduler, build_file_aliases: BuildFileAliases) -> "LegacyBuildGraph":
     """Construct a graph given a Scheduler and BuildFileAliases."""
     return cls(scheduler, target_types_from_build_file_aliases(build_file_aliases))
 
-  def __init__(self, scheduler: SchedulerSession, target_types: Dict[str, Type[Target]]) -> None:
+  def __init__(self, scheduler, target_types: Dict[str, Type[Target]]) -> None:
     """Construct a graph given a Scheduler, and set of target type aliases.
 
     :param scheduler: A Scheduler that is configured to be able to resolve TransitiveHydratedTargets.
