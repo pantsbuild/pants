@@ -1,7 +1,6 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import configparser
 import glob
 import os
 import re
@@ -21,6 +20,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.fs.archive import ZIP
+from pants.option.config import TomlSerializer
 from pants.subsystem.subsystem import Subsystem
 from pants.testutil.file_test_util import check_symlinks, contains_exact_files
 from pants.util.contextutil import environment_as, pushd, temporary_dir
@@ -202,7 +202,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
   def hermetic(cls):
     """Subclasses may override to acknowledge that they are hermetic.
 
-    That is, that they should run without reading the real pants.ini.
+    That is, that they should run without reading the real pants.toml.
     """
     return False
 
@@ -323,17 +323,10 @@ class PantsRunIntegrationTest(unittest.TestCase):
       args.append("--no-shutdown-pantsd-after-run")
 
     if config:
-      config_data = config.copy()
-      # TODO(#6071): RawConfigParser is legacy. Investigate updating to modern API.
-      ini = configparser.RawConfigParser(defaults=config_data.pop('DEFAULT', None))
-      for section, section_config in config_data.items():
-        ini.add_section(section)
-        for key, value in section_config.items():
-          ini.set(section, key, value)
-      ini_file_name = os.path.join(workdir, 'pants.ini')
-      with safe_open(ini_file_name, mode='w') as fp:
-        ini.write(fp)
-      args.append('--pants-config-files=' + ini_file_name)
+      toml_file_name = os.path.join(workdir, 'pants.toml')
+      with safe_open(toml_file_name, mode='w') as fp:
+        fp.write(TomlSerializer(config).serialize())
+      args.append('--pants-config-files=' + toml_file_name)
 
     pants_script = [sys.executable, '-m', 'pants']
 
@@ -620,8 +613,8 @@ class PantsRunIntegrationTest(unittest.TestCase):
       'pants',
       'pants.pex',
       'pants-plugins',
-      'pants.ini',
-      'pants.travis-ci.ini',
+      'pants.toml',
+      'pants.travis-ci.toml',
       'pyproject.toml',
       'rust-toolchain',
       'src',

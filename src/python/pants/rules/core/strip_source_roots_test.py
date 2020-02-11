@@ -4,7 +4,7 @@
 from typing import Optional
 from unittest.mock import Mock
 
-from pants.build_graph.address import BuildFileAddress
+from pants.build_graph.address import Address
 from pants.build_graph.files import Files
 from pants.engine.legacy.graph import HydratedTarget
 from pants.engine.rules import RootRule
@@ -30,9 +30,7 @@ class StripSourceRootsTests(TestBase):
     adaptor.address.spec_path = original_path
     if target_type_alias:
       adaptor.type_alias = target_type_alias
-    target = HydratedTarget(
-      BuildFileAddress(rel_path='some/target/BUILD', target_name='target'), adaptor, (),
-    )
+    target = HydratedTarget(Address.parse("some/target:target"), adaptor, ())
     stripped_sources = self.request_single_product(
       SourceRootStrippedSources, Params(target, create_options_bootstrapper())
     )

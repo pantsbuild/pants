@@ -37,8 +37,8 @@ files(
 )
 
 files(
-  name = 'pants_ini',
-  source = 'pants.ini',
+  name = 'pants_toml',
+  source = 'pants.toml',
 )
 
 files(

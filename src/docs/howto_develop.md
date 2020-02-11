@@ -212,7 +212,7 @@ passing the `--remote-execution-enabled` flag to `ci.py`, such as:
 To use remote execution for a specific test(s), run this:
 
     :::bash
-    $ ./pants --pants-config-files=pants.remote.ini \
+    $ ./pants --pants-config-files=pants.remote.toml \
       --remote-oauth-bearer-token-path=<(gcloud auth application-default print-access-token | perl -p -e 'chomp if eof') \
       --no-v1 --v2 test tests/python/pants_test/util:strutil 
 

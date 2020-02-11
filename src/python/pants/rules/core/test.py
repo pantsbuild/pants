@@ -120,7 +120,7 @@ class AddressAndTestResult:
     address_origin_map: AddressOriginMap
   ) -> bool:
     is_valid_target_type = (
-      address_origin_map.is_single_address(target.address.to_address())
+      address_origin_map.is_single_address(target.address)
       or union_membership.is_member(TestTarget, target.adaptor)
     )
     has_sources = hasattr(target.adaptor, "sources") and target.adaptor.sources.snapshot.files
@@ -181,7 +181,7 @@ async def coordinator_of_tests(
   if not AddressAndTestResult.is_testable(
     target, union_membership=union_membership, address_origin_map=address_origin_map
   ):
-    return AddressAndTestResult(target.address.to_address(), None)
+    return AddressAndTestResult(target.address, None)
 
   # TODO(#6004): when streaming to live TTY, rely on V2 UI for this information. When not a
   # live TTY, periodically dump heavy hitters to stderr. See
@@ -195,14 +195,14 @@ async def coordinator_of_tests(
     f"Tests {'succeeded' if result.status == Status.SUCCESS else 'failed'}: "
     f"{target.address.reference()}"
   )
-  return AddressAndTestResult(target.address.to_address(), result)
+  return AddressAndTestResult(target.address, result)
 
 
 @rule
 async def coordinator_of_debug_tests(target: HydratedTarget) -> AddressAndDebugRequest:
   logger.info(f"Starting tests in debug mode: {target.address.reference()}")
   request = await Get[TestDebugRequest](TestTarget, target.adaptor)
-  return AddressAndDebugRequest(target.address.to_address(), request)
+  return AddressAndDebugRequest(target.address, request)
 
 
 def rules():

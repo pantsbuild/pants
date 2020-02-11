@@ -8,7 +8,7 @@ from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class IgnorePatternsPantsIniIntegrationTest(PantsRunIntegrationTest):
-  """Tests the functionality of the build_ignore_patterns option in pants.ini ."""
+  """Tests the functionality of the build_ignore_patterns option in pants.toml ."""
 
   @classmethod
   def use_pantsd_env_var(cls):
@@ -19,7 +19,7 @@ class IgnorePatternsPantsIniIntegrationTest(PantsRunIntegrationTest):
     """
     return False
 
-  def test_build_ignore_patterns_pants_ini(self):
+  def test_build_ignore_patterns_pants_toml(self):
     target_path = "testprojects/src/java/org/pantsbuild/testproject/phrases"
     targets = [
       f"{target_path}:{target}"
