@@ -4,6 +4,7 @@
 import inspect
 from abc import abstractmethod
 from collections import defaultdict
+from typing import Any, Dict, Optional, Tuple, Type, Union, cast
 
 from pants.base.build_file_target_factory import BuildFileTargetFactory
 from pants.build_graph.target import Target
@@ -96,22 +97,22 @@ class BuildFileAliases:
   """
 
   @staticmethod
-  def _is_target_type(obj):
+  def _is_target_type(obj: Any) -> bool:
     return inspect.isclass(obj) and issubclass(obj, Target)
 
   @staticmethod
-  def _is_target_macro_factory(obj):
+  def _is_target_macro_factory(obj: Any) -> bool:
     return isinstance(obj, TargetMacro.Factory)
 
   @classmethod
-  def _validate_alias(cls, category, alias, obj):
+  def _validate_alias(cls, category: str, alias: str, obj: Any) -> None:
     if not isinstance(alias, str):
       raise TypeError('Aliases must be strings, given {category} entry {alias!r} of type {typ} as '
                       'the alias of {obj}'
                       .format(category=category, alias=alias, typ=type(alias).__name__, obj=obj))
 
   @classmethod
-  def _validate_not_targets(cls, category, alias, obj):
+  def _validate_not_targets(cls, category: str, alias: str, obj: Any) -> None:
     if cls._is_target_type(obj):
       raise TypeError('The {category} entry {alias!r} is a Target subclasss - these should be '
                       'registered via the `targets` parameter'
@@ -122,7 +123,9 @@ class BuildFileAliases:
                       .format(category=category, alias=alias))
 
   @classmethod
-  def _validate_targets(cls, targets):
+  def _validate_targets(
+    cls, targets: Optional[Dict[str, Union[Type[Target], TargetMacro.Factory]]],
+  ) -> Tuple[Dict[str, Type[Target]], Dict[str, TargetMacro.Factory]]:
     if not targets:
       return {}, {}
 
@@ -131,9 +134,9 @@ class BuildFileAliases:
     for alias, obj in targets.items():
       cls._validate_alias('targets', alias, obj)
       if cls._is_target_type(obj):
-        target_types[alias] = obj
+        target_types[alias] = cast(Type[Target], obj)
       elif cls._is_target_macro_factory(obj):
-        target_macro_factories[alias] = obj
+        target_macro_factories[alias] = cast(TargetMacro.Factory, obj)
       else:
         raise TypeError('Only Target types and TargetMacro.Factory instances can be registered '
                         'via the `targets` parameter, given item {alias!r} with value {value} of '
@@ -165,38 +168,39 @@ class BuildFileAliases:
 
     return context_aware_object_factories.copy()
 
-  def __init__(self, targets=None, objects=None, context_aware_object_factories=None):
+  def __init__(
+    self,
+    targets: Optional[Dict[str, Union[Type[Target], TargetMacro.Factory]]] = None,
+    objects: Optional[Dict] = None,
+    context_aware_object_factories: Optional[Dict] = None,
+  ) -> None:
     """
     :API: public
 
-    :param dict targets: A mapping from string aliases to Target subclasses or TargetMacro.Factory
-                         instances
-    :param dict objects: A mapping from string aliases to arbitrary objects.
-    :param dict context_aware_object_factories: A mapping from string aliases to context aware
-                                                object factory callables.
+    :param targets: A mapping from string aliases to Target subclasses or TargetMacro.Factory instances
+    :param objects: A mapping from string aliases to arbitrary objects.
+    :param context_aware_object_factories: A mapping from string aliases to context aware
+                                           object factory callables.
     """
     self._target_types, self._target_macro_factories = self._validate_targets(targets)
     self._objects = self._validate_objects(objects)
     self._context_aware_object_factories = self._validate_context_aware_object_factories(
-      context_aware_object_factories)
+      context_aware_object_factories
+    )
 
   @property
-  def target_types(self):
+  def target_types(self) -> Dict[str, Type[Target]]:
     """Returns a mapping from string aliases to Target subclasses.
 
     :API: public
-
-    :rtype: dict
     """
     return self._target_types
 
   @property
-  def target_macro_factories(self):
+  def target_macro_factories(self) -> Dict[str, TargetMacro.Factory]:
     """Returns a mapping from string aliases to TargetMacro.Factory instances.
 
     :API: public
-
-    :rtype: dict
     """
     return self._target_macro_factories
 

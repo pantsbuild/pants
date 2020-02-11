@@ -7,16 +7,17 @@ import os
 import posixpath
 import shutil
 import sys
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import reduce
-from typing import Any, Optional, Tuple
+from typing import Any, List, Optional, Tuple, cast
 
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.engine.rules import rule
 from pants.fs.archive import archiver_for_path
 from pants.net.http.fetcher import Fetcher
 from pants.option.global_options import GlobalOptionsRegistrar
@@ -24,7 +25,7 @@ from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import chmod_plus_x, safe_concurrent_creation, safe_open
-from pants.util.memo import memoized_method, memoized_property
+from pants.util.memo import memoized_classproperty, memoized_method, memoized_property
 from pants.util.osutil import (
   SUPPORTED_PLATFORM_NORMALIZED_NAMES,
   get_closest_mac_host_platform_pair,
@@ -40,8 +41,12 @@ class HostPlatform:
 
   :class:`BinaryToolUrlGenerator` instances receive this to generate download urls.
   """
-  os_name: Any
-  arch_or_version: Any
+  os_name: Optional[str]
+  arch_or_version: Optional[str]
+
+  @memoized_classproperty
+  def empty(cls):
+    return cls(None, None)
 
   def binary_path_components(self):
     """These strings are used as consecutive components of the path where a binary is fetched.
@@ -50,7 +55,7 @@ class HostPlatform:
     return [self.os_name, self.arch_or_version]
 
 
-class BinaryToolUrlGenerator:
+class BinaryToolUrlGenerator(ABC):
   """Encapsulates the selection of urls to download for some binary tool.
 
   :API: public
@@ -61,7 +66,7 @@ class BinaryToolUrlGenerator:
   """
 
   @abstractmethod
-  def generate_urls(self, version, host_platform):
+  def generate_urls(self, version, host_platform) -> List[str]:
     """Return a list of urls to download some binary tool from given a version and platform.
 
     Each url is tried in order to resolve the binary -- if the list of urls is empty, or downloading
@@ -101,7 +106,7 @@ class PantsHosted(BinaryToolUrlGenerator):
         .format(binary_request.name))
     self._baseurls = baseurls
 
-  def generate_urls(self, _version, host_platform):
+  def generate_urls(self, version, host_platform):
     """Append the file's download path to each of --binaries-baseurls.
 
     This assumes that the urls in --binaries-baseurls point somewhere that mirrors Pants's
@@ -253,9 +258,9 @@ class BinaryUtil:
     options_scope = 'binaries'
 
     @classmethod
-    def create(cls):
+    def create(cls) -> 'BinaryUtil':
       # NB: create is a class method to ~force binary fetch location to be global.
-      return cls._create_for_cls(BinaryUtil)
+      return cast(BinaryUtil, cls._create_for_cls(BinaryUtil))
 
     @classmethod
     def _create_for_cls(cls, binary_util_cls):
@@ -324,8 +329,8 @@ class BinaryUtil:
   # to fail until a binary is requested. The HostPlatform should be a parameter that gets lazily
   # resolved by the v2 engine.
   @memoized_method
-  def _host_platform(self):
-    uname_result = self._uname_func()
+  def host_platform(self, uname=None):
+    uname_result = uname if uname else self._uname_func()
     sysname, _, release, _, machine = uname_result
     os_id_key = sysname.lower()
     try:
@@ -364,9 +369,9 @@ class BinaryUtil:
         .format(os_id_tuple, self._path_by_id))
 
   def _get_download_path(self, binary_request):
-    return binary_request.get_download_path(self._host_platform())
+    return binary_request.get_download_path(self.host_platform())
 
-  def _get_url_generator(self, binary_request):
+  def get_url_generator(self, binary_request):
 
     external_url_generator = binary_request.external_url_generator
 
@@ -384,7 +389,7 @@ class BinaryUtil:
     return url_generator
 
   def _get_urls(self, url_generator, binary_request):
-    return url_generator.generate_urls(binary_request.version, self._host_platform())
+    return url_generator.generate_urls(binary_request.version, self.host_platform())
 
   def select(self, binary_request):
     """Fetches a file, unpacking it if necessary."""
@@ -397,7 +402,7 @@ class BinaryUtil:
       raise self.BinaryResolutionError(binary_request, e)
 
     try:
-      url_generator = self._get_url_generator(binary_request)
+      url_generator = self.get_url_generator(binary_request)
     except self.NoBaseUrlsError as e:
       raise self.BinaryResolutionError(binary_request, e)
 
@@ -518,3 +523,14 @@ def select(argv):
 
 if __name__ == '__main__':
   print(select(sys.argv))
+
+
+@rule
+def provide_binary_util() -> BinaryUtil:
+  return BinaryUtil.Factory.create()
+
+
+def rules():
+  return [
+    provide_binary_util,
+  ]

@@ -8,7 +8,7 @@ from unittest.mock import Mock
 
 from pants.base.specs import DescendantAddresses, SingleAddress, Spec
 from pants.build_graph.address import Address, BuildFileAddress
-from pants.engine.addressable import BuildFileAddresses
+from pants.engine.addressable import Addresses
 from pants.engine.build_files import AddressOriginMap
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, Digest, FileContent, InputFilesContent, Snapshot
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
@@ -59,10 +59,10 @@ class TestTest(TestBase):
     console = MockConsole(use_colors=False)
     options = MockOptions(debug=debug)
     runner = InteractiveRunner(self.scheduler)
-    addr = self.make_build_target_address("some/target")
+    addr = Address.parse("some/target")
     res = run_rule(
       run_tests,
-      rule_args=[console, options, runner, BuildFileAddresses([addr])],
+      rule_args=[console, options, runner, Addresses([addr])],
       mock_gets=[
         MockGet(
           product_type=AddressAndTestResult,
@@ -72,26 +72,15 @@ class TestTest(TestBase):
         MockGet(
           product_type=AddressAndDebugRequest,
           subject_type=Address,
-          mock=lambda _: AddressAndDebugRequest(addr, TestDebugRequest(ipr=self.make_successful_ipr() if success else self.make_failure_ipr()))
-        ),
-        MockGet(
-          product_type=BuildFileAddress,
-          subject_type=BuildFileAddresses,
-          mock=lambda addresses: addresses.dependencies[0],
+          mock=lambda _: AddressAndDebugRequest(
+            addr,
+            TestDebugRequest(ipr=self.make_successful_ipr() if success else self.make_failure_ipr())
+          )
         ),
       ],
     )
     assert console.stdout.getvalue() == expected_console_output
     assert (0 if success else 1) == res.exit_code
-
-  @staticmethod
-  def make_build_target_address(spec: str) -> BuildFileAddress:
-    address = Address.parse(spec)
-    return BuildFileAddress(
-      build_file=None,
-      target_name=address.target_name,
-      rel_path=f'{address.spec_path}/BUILD',
-    )
 
   def test_output_success(self) -> None:
     self.single_target_test(
@@ -120,10 +109,10 @@ class TestTest(TestBase):
     console = MockConsole(use_colors=False)
     options = MockOptions(debug=False)
     runner = InteractiveRunner(self.scheduler)
-    target1 = self.make_build_target_address("testprojects/tests/python/pants/passes")
-    target2 = self.make_build_target_address("testprojects/tests/python/pants/fails")
+    target1 = Address.parse("testprojects/tests/python/pants/passes")
+    target2 = Address.parse("testprojects/tests/python/pants/fails")
 
-    def make_result(target: BuildFileAddress) -> AddressAndTestResult:
+    def make_result(target: Address) -> AddressAndTestResult:
       if target == target1:
         tr = TestResult(status=Status.SUCCESS, stdout='I passed\n', stderr='')
       elif target == target2:
@@ -132,21 +121,18 @@ class TestTest(TestBase):
         raise Exception("Unrecognised target")
       return AddressAndTestResult(target, tr)
 
-    def make_debug_request(target: BuildFileAddress) -> AddressAndDebugRequest:
-      request = TestDebugRequest(ipr=self.make_successful_ipr() if target == target1 else self.make_failure_ipr())
+    def make_debug_request(target: Address) -> AddressAndDebugRequest:
+      request = TestDebugRequest(
+        ipr=self.make_successful_ipr() if target == target1 else self.make_failure_ipr()
+      )
       return AddressAndDebugRequest(target, request)
 
     res = run_rule(
       run_tests,
-      rule_args=[console, options, runner, (target1, target2)],
+      rule_args=[console, options, runner, Addresses([target1, target2])],
       mock_gets=[
         MockGet(product_type=AddressAndTestResult, subject_type=Address, mock=make_result),
         MockGet(product_type=AddressAndDebugRequest, subject_type=Address, mock=make_debug_request),
-        MockGet(
-          product_type=BuildFileAddress,
-          subject_type=BuildFileAddresses,
-          mock=lambda addresses: addresses.dependencies[0]
-        ),
       ],
     )
 
@@ -229,7 +215,7 @@ class TestTest(TestBase):
     bfaddr = BuildFileAddress(rel_path='some/dir', target_name='tests')
     result = self.run_coordinator_of_tests(address=bfaddr)
     assert result == AddressAndTestResult(
-      bfaddr, TestResult(status=Status.SUCCESS, stdout='foo', stderr='')
+      bfaddr.to_address(), TestResult(status=Status.SUCCESS, stdout='foo', stderr='')
     )
 
   def test_coordinator_single_non_test_target(self) -> None:
@@ -247,7 +233,7 @@ class TestTest(TestBase):
   def test_coordinator_empty_sources(self) -> None:
     bfaddr = BuildFileAddress(rel_path='some/dir', target_name='tests')
     result = self.run_coordinator_of_tests(address=bfaddr, include_sources=False)
-    assert result == AddressAndTestResult(bfaddr, None)
+    assert result == AddressAndTestResult(bfaddr.to_address(), None)
 
   def test_coordinator_globbed_test_target(self) -> None:
     bfaddr = BuildFileAddress(rel_path='some/dir', target_name='tests')
@@ -256,7 +242,7 @@ class TestTest(TestBase):
       addr_to_origin={bfaddr.to_address(): DescendantAddresses(directory='some/dir')}
     )
     assert result == AddressAndTestResult(
-      bfaddr, TestResult(status=Status.SUCCESS, stdout='foo', stderr='')
+      bfaddr.to_address(), TestResult(status=Status.SUCCESS, stdout='foo', stderr='')
     )
 
   def test_coordinator_globbed_non_test_target(self) -> None:
@@ -266,4 +252,4 @@ class TestTest(TestBase):
       addr_to_origin={bfaddr.to_address(): DescendantAddresses(directory='some/dir')},
       test_target_type=False,
     )
-    assert result == AddressAndTestResult(bfaddr, None)
+    assert result == AddressAndTestResult(bfaddr.to_address(), None)
