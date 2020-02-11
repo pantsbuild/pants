@@ -230,7 +230,7 @@ fn generate_for_tower(thirdpartyprotobuf: &Path, out_dir: &Path) {
 fn replace_if_changed<F: FnOnce(&Path)>(path: &Path, f: F) {
   let tempdir = tempfile::TempDir::new().unwrap();
   f(tempdir.path());
-  if !dir_diff::is_different(path, tempdir.path()).unwrap() {
+  if let Ok(false) = dir_diff::is_different(path, tempdir.path()) {
     return;
   }
   if path.exists() {
