@@ -10,7 +10,7 @@ from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.legacy.graph import TransitiveHydratedTargets
 from pants.engine.rules import goal_rule
-from pants.engine.selectors import Get
+from pants.engine.selectors import Get, MultiGet
 
 
 class FiledepsOptions(LineOriented, GoalSubsystem):
@@ -46,10 +46,14 @@ async def file_deps(
   transitive_hydrated_targets: TransitiveHydratedTargets,
 ) -> Filedeps:
   unique_rel_paths: Set[str] = set()
-  for hydrated_target in transitive_hydrated_targets.closure:
-    bfa = await Get[BuildFileAddress](Address, hydrated_target.address)
-    unique_rel_paths.add(bfa.rel_path)
-
+  build_file_addresses = await MultiGet(
+    Get[BuildFileAddress](Address, hydrated_target.address)
+    for hydrated_target in transitive_hydrated_targets.closure
+  )
+  for hydrated_target, build_file_address in zip(
+    transitive_hydrated_targets.closure, build_file_addresses
+  ):
+    unique_rel_paths.add(build_file_address.rel_path)
     adaptor = hydrated_target.adaptor
     if hasattr(adaptor, "sources"):
       sources_paths = (
