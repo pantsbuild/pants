@@ -7,12 +7,6 @@ not undergone the vetting associated with ``stable`` releases.
 1.26.0.dev0 (02/11/2020)
 ------------------------
 
-API Changes
-~~~~~~~~~~~
-
-* Revert "Switch to dot idea project type (#8745)" (#9096)
-  `PR #9096 <https://github.com/pantsbuild/pants/pull/9096>`_
-
 New Features
 ~~~~~~~~~~~~
 
@@ -36,6 +30,9 @@ Bugfixes
 
 * Allow test specs to be used with --no-fast for junit (#9093)
   `PR #9093 <https://github.com/pantsbuild/pants/pull/9093>`_
+
+* Revert "Switch to dot idea project type (#8745)" (#9096)
+  `PR #9096 <https://github.com/pantsbuild/pants/pull/9096>`_
 
 * Fix deprecation warning for `--transitive` for goals that ignore the option (#9076)
   `PR #9076 <https://github.com/pantsbuild/pants/pull/9076>`_
