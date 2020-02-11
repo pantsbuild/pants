@@ -5,8 +5,10 @@ python_library(
   dependencies = [
     '3rdparty/python:dataclasses',
     'src/python/pants:version',
+    'src/python/pants/backend/graph_info/subsystems',
     'src/python/pants/base:build_root',
     'src/python/pants/base:exiter',
+    'src/python/pants/binaries',
     'src/python/pants/build_graph',
     'src/python/pants/engine:goal',
     'src/python/pants/engine:rules',

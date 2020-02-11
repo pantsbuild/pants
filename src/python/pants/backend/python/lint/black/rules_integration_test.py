@@ -7,6 +7,8 @@ import pytest
 
 from pants.backend.python.lint.black.rules import BlackTarget
 from pants.backend.python.lint.black.rules import rules as black_rules
+from pants.backend.python.rules import download_pex_bin, pex
+from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.build_graph.address import Address
 from pants.engine.fs import Digest, FileContent, InputFilesContent, Snapshot
 from pants.engine.legacy.structs import TargetAdaptor
@@ -16,10 +18,15 @@ from pants.rules.core.fmt import FmtResult
 from pants.rules.core.lint import LintResult
 from pants.source.wrapped_globs import EagerFilesetWithSpec
 from pants.testutil.option.util import create_options_bootstrapper
+from pants.testutil.subsystem.util import init_subsystems
 from pants.testutil.test_base import TestBase
 
 
 class BlackIntegrationTest(TestBase):
+
+  def setUp(self):
+    super().setUp()
+    init_subsystems([download_pex_bin.DownloadedPexBin.Factory])
 
   good_source = FileContent(path="test/good.py", content=b'animal = "Koala"\n')
   bad_source = FileContent(path="test/bad.py", content=b'name=    "Anakin"\n')
@@ -30,7 +37,16 @@ class BlackIntegrationTest(TestBase):
 
   @classmethod
   def rules(cls):
-    return (*super().rules(), *black_rules(), RootRule(BlackTarget))
+    return (
+      *super().rules(),
+      *black_rules(),
+      download_pex_bin.download_pex_bin,
+      *pex.rules(),
+      *python_native_code.rules(),
+      *subprocess_environment.rules(),
+      RootRule(BlackTarget),
+      RootRule(download_pex_bin.DownloadedPexBin.Factory),
+    )
 
   def run_black(
     self,
@@ -56,8 +72,16 @@ class BlackIntegrationTest(TestBase):
     lint_target = BlackTarget(target_adaptor)
     fmt_target = BlackTarget(target_adaptor, prior_formatter_result_digest=input_snapshot.directory_digest)
     options_bootstrapper = create_options_bootstrapper(args=args)
-    lint_result = self.request_single_product(LintResult, Params(lint_target, options_bootstrapper))
-    fmt_result = self.request_single_product(FmtResult, Params(fmt_target, options_bootstrapper))
+    lint_result = self.request_single_product(LintResult, Params(
+      lint_target,
+      options_bootstrapper,
+      download_pex_bin.DownloadedPexBin.Factory.global_instance(),
+    ))
+    fmt_result = self.request_single_product(FmtResult, Params(
+      fmt_target,
+      options_bootstrapper,
+      download_pex_bin.DownloadedPexBin.Factory.global_instance(),
+    ))
     return lint_result, fmt_result
 
   def get_digest(self, source_files: List[FileContent]) -> Digest:
