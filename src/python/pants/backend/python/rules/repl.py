@@ -41,10 +41,8 @@ async def run_python_repl(
     build_root: BuildRoot,
     global_options: GlobalOptions) -> PythonRepl:
 
-  # NOTE -  when Eric's changes pertaining to BuildFileAddresses are merged  in https://github.com/pantsbuild/pants/pull/9100, the
-  # .to_address() call will no longer be necessary.
   python_addresses = Addresses(
-    ht.address.to_address() for ht in targets.closure if isinstance(ht.adaptor, PythonTargetAdaptor)
+    ht.address for ht in targets.closure if isinstance(ht.adaptor, PythonTargetAdaptor)
   )
 
   create_pex = CreatePexFromTargetClosure(

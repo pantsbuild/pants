@@ -15,26 +15,33 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.fs import FileContent
 from pants.engine.interactive_runner import InteractiveRunner
+from pants.engine.rules import RootRule
 from pants.rules.core import strip_source_root
 from pants.testutil.goal_rule_test_base import GoalRuleTestBase
+from pants.testutil.subsystem.util import init_subsystems
 
 
 class PythonReplTest(GoalRuleTestBase):
   goal_cls = PythonRepl
+
+  def setUp(self):
+    super().setUp()
+    init_subsystems([download_pex_bin.DownloadedPexBin.Factory])
 
   @classmethod
   def rules(cls):
     return (
       *super().rules(),
       *repl.rules(),
-      *download_pex_bin.rules(),
       *inject_init.rules(),
       *pex.rules(),
+      download_pex_bin.download_pex_bin,
       *pex_from_target_closure.rules(),
       *prepare_chrooted_python_sources.rules(),
       *python_native_code.rules(),
       *strip_source_root.rules(),
       *subprocess_environment.rules(),
+      RootRule(download_pex_bin.DownloadedPexBin.Factory),
     )
 
   @classmethod
@@ -61,6 +68,7 @@ class PythonReplTest(GoalRuleTestBase):
 
     additional_params = [
       InteractiveRunner(self.scheduler),
+      download_pex_bin.DownloadedPexBin.Factory.global_instance(),
     ]
 
     output = self.execute_rule(args=["src/python:some_lib"], additional_params=additional_params)
