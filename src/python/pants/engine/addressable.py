@@ -5,10 +5,10 @@ import inspect
 from collections.abc import MutableMapping, MutableSequence
 from dataclasses import dataclass
 from functools import update_wrapper
-from typing import Any, Sequence, Set, Tuple, Type, Union
+from typing import Any, Sequence, Set, Tuple, Type
 
 from pants.base.exceptions import ResolveError
-from pants.base.specs import AddressSpec, FilesystemResolvedSpec
+from pants.base.specs import OriginSpec
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.objects import Collection, Resolvable, Serializable
 from pants.util.objects import TypeConstraintError
@@ -36,7 +36,7 @@ class Addresses(Collection[Address]):
 class AddressWithOrigin:
   """A BuildFileAddress along with the cmd-line spec it was generated from."""
   address: Address
-  origin: Union[AddressSpec, FilesystemResolvedSpec]
+  origin: OriginSpec
 
 
 class AddressesWithOrigins(Collection[AddressWithOrigin]):

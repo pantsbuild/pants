@@ -8,6 +8,7 @@ from collections.abc import MutableSequence, MutableSet
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable, List, Optional, Sequence, Tuple, Type, Union, cast
 
+from pants.base.specs import OriginSpec
 from pants.build_graph.address import Address
 from pants.build_graph.target import Target
 from pants.engine.addressable import addressable_list
@@ -308,6 +309,12 @@ class PythonRequirementLibraryAdaptor(TargetAdaptor): pass
 class PantsPluginAdaptor(PythonTargetAdaptor):
   def get_sources(self) -> "GlobsWithConjunction":
     return GlobsWithConjunction.for_literal_files(['register.py'], self.address.spec_path)
+
+
+@dataclass(frozen=True)
+class PythonTestsAdaptorWithOrigin:
+  adaptor: PythonTestsAdaptor
+  origin: OriginSpec
 
 
 # TODO: Remove all the subclasses once we remove globs et al. The only remaining subclass would be
