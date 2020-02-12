@@ -215,9 +215,11 @@ class BaseZincCompile(JvmCompile):
 
     if zinc_analysis is not None:
       for compile_context in compile_contexts:
-        zinc_analysis[compile_context.target] = (compile_context.classes_dir.path,
-        compile_context.jar_file.path,
-        compile_context.analysis_file)
+        zinc_analysis[compile_context.target] = (
+          compile_context.classes_dir.path,
+          compile_context.jar_file.path,
+          compile_context.analysis_file
+        )
 
     if zinc_args is not None:
       for compile_context in compile_contexts:

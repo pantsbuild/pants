@@ -31,7 +31,7 @@ class ExportDepAsJar(ConsoleTask):
   This is an experimental task that mimics export but uses the jars for
   jvm dependencies instead of sources.
 
-  This goal effects the contents of the runtime_classpath, and should not be
+  This goal affects the contents of the runtime_classpath, and should not be
   combined with any other goals on the command line.
   """
 
@@ -182,7 +182,9 @@ class ExportDepAsJar(ConsoleTask):
   def _extract_arguments_with_prefix_from_zinc_args(self, args, prefix):
     return [option[len(prefix):] for option in args if option.startswith(prefix)]
 
-  def _process_target(self, current_target, modulizable_target_set, resource_target_map, runtime_classpath, zinc_args_for_target):
+  def _process_target(
+    self, current_target, modulizable_target_set, resource_target_map, runtime_classpath, zinc_args_for_target
+  ):
     """
     :type current_target:pants.build_graph.target.Target
     """
@@ -400,6 +402,7 @@ class ExportDepAsJar(ConsoleTask):
 
   def console_output(self, targets):
     zinc_args_for_all_targets = self.context.products.get_data('zinc_args')
+
     if zinc_args_for_all_targets is None:
       raise TaskError("There was an error compiling the targets - There there are no zing argument entries")
 

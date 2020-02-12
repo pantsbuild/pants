@@ -64,11 +64,11 @@ class ExportDepAsJarIntegrationTest(ScalacPluginIntegrationTestBase):
   def test_global_compiler_plugin_with_global_options(self):
     target_to_test = f'{self.scalac_test_targets_dir}/plugin:global'
     config = self.with_global_plugin_args(
-              ['arg1', 'arg2'],
-              self.with_global_plugin_enabled()
-            )
+      ['arg1', 'arg2'],
+      self.with_global_plugin_enabled()
+    )
     expected_options = {'scalac_args': [
-      r'\-Xplugin\:.*examples.src.scala.org.pantsbuild.example.scalac.plugin.simple_scalac_plugin/current/zinc/classes.*',
+      r'\-Xplugin\:.*examples.src.scala.org.pantsbuild.example.scalac.plugin.simple_scalac_plugin/current/zinc/.*',
       '-P:simple_scalac_plugin:arg1',
       '-P:simple_scalac_plugin:arg2',
     ]}
@@ -78,7 +78,7 @@ class ExportDepAsJarIntegrationTest(ScalacPluginIntegrationTestBase):
     target_to_test = f'{self.scalac_test_targets_dir}/plugin:global'
     config = self.with_compiler_option_sets_enabled_scalac_plugins()
     expected_options = {'scalac_args': [
-      r'\-Xplugin\:.*examples.src.scala.org.pantsbuild.example.scalac.plugin.simple_scalac_plugin/current/zinc/classes.*',
+      r'\-Xplugin\:.*examples.src.scala.org.pantsbuild.example.scalac.plugin.simple_scalac_plugin/current/zinc/.*',
       '-P:simple_scalac_plugin:abc',
       '-P:simple_scalac_plugin:def',
     ]}
@@ -89,7 +89,7 @@ class ExportDepAsJarIntegrationTest(ScalacPluginIntegrationTestBase):
     config = self.with_global_plugin_enabled()
 
     expected_options = {'scalac_args': [
-      r'\-Xplugin\:.*examples.src.scala.org.pantsbuild.example.scalac.plugin.simple_scalac_plugin/current/zinc/classes.*',
+      r'\-Xplugin\:.*examples.src.scala.org.pantsbuild.example.scalac.plugin.simple_scalac_plugin/current/zinc/.*',
       '-P:simple_scalac_plugin:args',
       '-P:simple_scalac_plugin:from',
       '-P:simple_scalac_plugin:target',
@@ -101,7 +101,7 @@ class ExportDepAsJarIntegrationTest(ScalacPluginIntegrationTestBase):
     target_to_test = f'{self.scalac_test_targets_dir}/plugin:local'
     config = {}
     expected_options = {'scalac_args': [
-      r'\-Xplugin\:.*examples.src.scala.org.pantsbuild.example.scalac.plugin.simple_scalac_plugin/current/zinc/classes.*',
+      r'\-Xplugin\:.*examples.src.scala.org.pantsbuild.example.scalac.plugin.simple_scalac_plugin/current/zinc/.*',
       '-P:simple_scalac_plugin:args',
       '-P:simple_scalac_plugin:from',
       '-P:simple_scalac_plugin:target',

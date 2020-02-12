@@ -438,13 +438,13 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     fingerprint_strategy = DependencyContext.global_instance().create_fingerprint_strategy(
         classpath_product)
 
+    dependees_of_target_roots = None
     # If we are only exporting jars then we can omit some targets from the runtime_classpath.
     if self.context.products.is_required_data("export_dep_as_jar_signal"):
       # Filter modulized targets from invalid targets list.
       target_root_addresses = [t.address for t in set(self.context.target_roots)]
       dependees_of_target_roots = self.context.build_graph.transitive_dependees_of_addresses(target_root_addresses)
       relevant_targets = list(set(relevant_targets) - dependees_of_target_roots)
-      self.create_extra_products_for_targets(dependees_of_target_roots)
 
     if not relevant_targets:
       return
@@ -474,6 +474,9 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
           for conf in self._confs:
             classpath_product.remove_for_target(cc.target, [(conf, cc.classes_dir)])
             classpath_product.add_for_target(cc.target, [(conf, cc.jar_file)])
+
+    if dependees_of_target_roots is not None:
+      self.create_extra_products_for_targets(dependees_of_target_roots)
 
   def _classpath_for_context(self, context):
     if self.get_options().use_classpath_jars:
