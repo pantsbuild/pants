@@ -23,25 +23,26 @@ class SourceRootStrippedSources:
 class StripSourceRootsRequest:
   """A request to strip source roots for every file in the snapshot.
 
-  The field `sentinel_file` is used to determine the source root for the files to be stripped. This
-  assumes that every file shares the same source root, which should be true in practice as the
-  `sources` field for a target always has files in the same source root (outside of aggregate
-  targets, which we don't expect to ever strip the source root from). See
+  The field `representative_path` is used to determine the source root for the files to be stripped.
+  This assumes that every file shares the same source root, which should be true in practice as the
+  `sources` field for a target always has files in the same source root. We don't proactively
+  validate this assumption because of the performance implications of running
+  `SourceRoots.find_by_path` on every single file in the snapshot, as opposed to only one file. See
   https://github.com/pantsbuild/pants/pull/9112#discussion_r377999025 for more context on this
   design.
   """
   snapshot: Snapshot
-  sentinel_file: str
+  representative_path: str
 
   def determine_source_root(self, *, source_root_config: SourceRootConfig) -> str:
     source_roots_object = source_root_config.get_source_roots()
-    source_root = source_roots_object.safe_find_by_path(self.sentinel_file)
+    source_root = source_roots_object.safe_find_by_path(self.representative_path)
     if source_root is not None:
       return cast(str, source_root.path)
     if source_root_config.options.unmatched == "fail":
-      raise NoSourceRootError(f"Could not find a source root for `{self.sentinel_file}`.")
+      raise NoSourceRootError(f"Could not find a source root for `{self.representative_path}`.")
     # Otherwise, create a source root by using the parent directory.
-    return PurePath(self.sentinel_file).parent.as_posix()
+    return PurePath(self.representative_path).parent.as_posix()
 
 
 @rule
@@ -66,7 +67,7 @@ async def strip_source_roots_from_snapshot(
 async def strip_source_roots_from_target(
   hydrated_target: HydratedTarget,
 ) -> SourceRootStrippedSources:
-  """Remove source roots from a target (depending upon the target type), e.g.
+  """Remove source roots from a target, e.g.
   `src/python/pants/util/strutil.py` -> `pants/util/strutil.py`.
   """
   target_adaptor = hydrated_target.adaptor
@@ -82,11 +83,9 @@ async def strip_source_roots_from_target(
   if target_adaptor.type_alias == Files.alias():
     return SourceRootStrippedSources(snapshot=target_adaptor.sources.snapshot)
 
-  # NB: The sentinel file does not need to actually exist. It is solely used to determine what the
-  # source root is for the target.
-  sentinel_file = PurePath(hydrated_target.address.spec_path, "SENTINEL").as_posix()
+  build_file = PurePath(hydrated_target.address.spec_path, "BUILD").as_posix()
   return await Get[SourceRootStrippedSources](
-    StripSourceRootsRequest(target_adaptor.sources.snapshot, sentinel_file=sentinel_file)
+    StripSourceRootsRequest(target_adaptor.sources.snapshot, representative_path=build_file)
   )
 
 

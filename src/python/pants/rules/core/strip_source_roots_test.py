@@ -47,7 +47,7 @@ class StripSourceRootsTests(TestBase):
     ) -> List[str]:
       input_snapshot = self.make_snapshot({fp: "" for fp in paths})
       return self.get_stripped_files(
-        StripSourceRootsRequest(input_snapshot, sentinel_file=paths[0]), args=args,
+        StripSourceRootsRequest(input_snapshot, representative_path=paths[0]), args=args,
       )
 
     # Normal source roots
