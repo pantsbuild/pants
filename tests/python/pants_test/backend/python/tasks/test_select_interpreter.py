@@ -2,11 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import json
-from typing import Tuple
-
 import os
 import unittest.mock
 from textwrap import dedent
+from typing import Tuple
 
 from pex.interpreter import PythonInterpreter
 from pex.variables import ENV
