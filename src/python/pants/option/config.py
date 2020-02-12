@@ -312,8 +312,12 @@ class _TomlValues(_ConfigValues):
 
     return recurse(mapping=self.values, remaining_sections=section.split("."))
 
-  def _possibly_interpolate_value(self, raw_value: str, *, option: str, section: str) -> str:
-    """For any values with %(foo)s, substitute it with the corresponding default val."""
+  def _possibly_interpolate_value(
+    self, raw_value: str, *, option: str, section: str, section_values: Dict,
+  ) -> str:
+    """For any values with %(foo)s, substitute it with the corresponding value from
+    DEFAULT or the same section.
+    """
     def format_str(value: str) -> str:
       # Because dictionaries use the symbols `{}`, we must proactively escape the symbols so that
       # .format() does not try to improperly interpolate.
@@ -324,10 +328,12 @@ class _TomlValues(_ConfigValues):
         string=escaped_str,
       )
       try:
-        return new_style_format_str.format(**self.defaults)
+        possible_interpolations = {**self.defaults, **section_values}
+        return new_style_format_str.format(**possible_interpolations)
       except KeyError as e:
+        bad_reference = e.args[0]
         raise configparser.InterpolationMissingOptionError(
-          option=option, section=section, rawval=raw_value, reference=e.args[0],
+          option, section, raw_value, bad_reference,
         )
 
     def recursively_format_str(value: str) -> str:
@@ -345,15 +351,22 @@ class _TomlValues(_ConfigValues):
     *,
     option: str,
     section: str,
+    section_values: Dict,
     interpolate: bool = True,
     list_prefix: Optional[str] = None,
   ) -> str:
     """For parity with configparser, we convert all values back to strings, which allows us to
     avoid upstream changes to files like parser.py.
 
-    This is clunky. If we drop INI support, we should remove this and use native values.
+    This is clunky. If we drop INI support, we should remove this and use native values (although
+    we must still support interpolation).
     """
-    possibly_interpolate = partial(self._possibly_interpolate_value, option=option, section=section)
+    possibly_interpolate = partial(
+      self._possibly_interpolate_value,
+      option=option,
+      section=section,
+      section_values=section_values,
+    )
     if isinstance(raw_value, str):
       return possibly_interpolate(raw_value) if interpolate else raw_value
 
@@ -368,6 +381,11 @@ class _TomlValues(_ConfigValues):
       return f"{list_prefix or ''}[{list_members}]"
 
     return str(raw_value)
+
+  def _stringify_val_without_interpolation(self, raw_value: _TomlValue) -> str:
+    return self._stringify_val(
+      raw_value, option="", section="", section_values={}, interpolate=False,
+    )
 
   @property
   def sections(self) -> List[str]:
@@ -401,10 +419,12 @@ class _TomlValues(_ConfigValues):
       return True
 
   def get_value(self, section: str, option: str) -> Optional[str]:
-    stringify = partial(self._stringify_val, option=option, section=section)
     section_values = self._find_section_values(section)
     if section_values is None:
       raise configparser.NoSectionError(section)
+    stringify = partial(
+      self._stringify_val, option=option, section=section, section_values=section_values,
+    )
     if option not in section_values:
       if option not in self.defaults:
         raise configparser.NoOptionError(option, section)
@@ -442,7 +462,7 @@ class _TomlValues(_ConfigValues):
   @property
   def defaults(self) -> Mapping[str, str]:
     return {
-      option: self._stringify_val(option_val, option=option, section="DEFAULT", interpolate=False)
+      option: self._stringify_val_without_interpolation(option_val)
       for option, option_val in self.values["DEFAULT"].items()
     }
 
