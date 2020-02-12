@@ -51,7 +51,7 @@ from pants.engine.selectors import Get, MultiGet
 from pants.option.custom_types import shell_str
 from pants.python.python_setup import PythonSetup
 from pants.rules.core.distdir import DistDir
-from pants.rules.core.strip_source_root import SourceRootStrippedSources
+from pants.rules.core.strip_source_roots import SourceRootStrippedSources
 from pants.source.source_root import SourceRootConfig
 
 

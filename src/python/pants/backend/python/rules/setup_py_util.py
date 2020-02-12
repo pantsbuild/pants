@@ -12,20 +12,13 @@ from pants.engine.fs import FilesContent
 from pants.engine.legacy.graph import HydratedTarget
 from pants.engine.legacy.structs import PythonTargetAdaptor, ResourcesAdaptor
 from pants.python.python_setup import PythonSetup
-from pants.rules.core.strip_source_root import SourceRootStrippedSources
-from pants.source.source_root import SourceRoots
+from pants.rules.core.strip_source_roots import SourceRootStrippedSources
+from pants.source.source_root import NoSourceRootError, SourceRoots
 from pants.util.strutil import ensure_text
 
 
 # Convenient type alias for the pair (package name, data files in the package).
 PackageDatum = Tuple[str, Tuple[str, ...]]
-
-
-class NoSourceRootError(Exception):
-  """Indicates we failed to map a source file to a source root.
-
-  This future-proofs us against switching --source-unmatched from 'create' to 'fail'.
-  """
 
 
 def source_root_or_raise(source_roots: SourceRoots, path: str) -> str:

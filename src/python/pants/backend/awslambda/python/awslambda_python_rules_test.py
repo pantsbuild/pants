@@ -22,7 +22,7 @@ from pants.engine.legacy.graph import HydratedTarget
 from pants.engine.legacy.structs import PythonAWSLambdaAdaptor
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
-from pants.rules.core import strip_source_root
+from pants.rules.core import strip_source_roots
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.subsystem.util import init_subsystems
 from pants.testutil.test_base import TestBase
@@ -47,7 +47,7 @@ class TestPythonAWSLambdaCreation(TestBase):
       *pex_from_target_closure.rules(),
       *prepare_chrooted_python_sources.rules(),
       *python_native_code.rules(),
-      *strip_source_root.rules(),
+      *strip_source_roots.rules(),
       *subprocess_environment.rules(),
       RootRule(PythonAWSLambdaAdaptor),
       RootRule(download_pex_bin.DownloadedPexBin.Factory),

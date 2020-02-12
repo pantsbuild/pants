@@ -11,7 +11,7 @@ from pants.rules.core import (
   list_roots,
   list_targets,
   run,
-  strip_source_root,
+  strip_source_roots,
   test,
 )
 
@@ -26,7 +26,7 @@ def rules():
     *list_targets.rules(),
     *filedeps.rules(),
     *run.rules(),
-    *strip_source_root.rules(),
+    *strip_source_roots.rules(),
     *distdir.rules(),
     *test.rules()
   ]

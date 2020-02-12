@@ -8,7 +8,7 @@ from pants.engine.fs import Digest, DirectoriesToMerge
 from pants.engine.legacy.graph import HydratedTarget, HydratedTargets
 from pants.engine.rules import rule
 from pants.engine.selectors import Get, MultiGet
-from pants.rules.core.strip_source_root import SourceRootStrippedSources
+from pants.rules.core.strip_source_roots import SourceRootStrippedSources
 
 
 @dataclass(frozen=True)
