@@ -20,7 +20,7 @@ class SourceRootStrippedSources:
 
 
 @dataclass(frozen=True)
-class SnapshotToStrip:
+class StripSourceRootsRequest:
   """A request to strip source roots for every file in the snapshot.
 
   The field `sentinel_file` is used to determine the source root for the files to be stripped. This
@@ -46,15 +46,15 @@ class SnapshotToStrip:
 
 @rule
 async def strip_source_roots_from_snapshot(
-  snapshot_to_strip: SnapshotToStrip, source_root_config: SourceRootConfig,
+  request: StripSourceRootsRequest, source_root_config: SourceRootConfig,
 ) -> SourceRootStrippedSources:
   """Removes source roots from a snapshot,
   e.g. `src/python/pants/util/strutil.py` -> `pants/util/strutil.py`.
   """
-  source_root = snapshot_to_strip.determine_source_root(source_root_config=source_root_config)
+  source_root = request.determine_source_root(source_root_config=source_root_config)
   resulting_digest = await Get[Digest](
     DirectoryWithPrefixToStrip(
-      directory_digest=snapshot_to_strip.snapshot.directory_digest,
+      directory_digest=request.snapshot.directory_digest,
       prefix=source_root,
     )
   )
@@ -86,7 +86,7 @@ async def strip_source_roots_from_target(
   # source root is for the target.
   sentinel_file = PurePath(hydrated_target.address.spec_path, "SENTINEL").as_posix()
   return await Get[SourceRootStrippedSources](
-    SnapshotToStrip(target_adaptor.sources.snapshot, sentinel_file=sentinel_file)
+    StripSourceRootsRequest(target_adaptor.sources.snapshot, sentinel_file=sentinel_file)
   )
 
 

@@ -13,7 +13,7 @@ from pants.engine.legacy.graph import HydratedTarget
 from pants.engine.rules import RootRule
 from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Params
-from pants.rules.core.strip_source_roots import SnapshotToStrip, SourceRootStrippedSources
+from pants.rules.core.strip_source_roots import SourceRootStrippedSources, StripSourceRootsRequest
 from pants.rules.core.strip_source_roots import rules as strip_source_root_rules
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
@@ -26,14 +26,17 @@ class StripSourceRootsTests(TestBase):
       *super().rules(),
       *strip_source_root_rules(),
       RootRule(HydratedTarget),
-      RootRule(SnapshotToStrip),
+      RootRule(StripSourceRootsRequest),
     )
 
   def get_stripped_files(
-    self, original: Union[SnapshotToStrip, HydratedTarget], *, args: Optional[List[str]] = None,
+    self,
+    request: Union[StripSourceRootsRequest, HydratedTarget],
+    *,
+    args: Optional[List[str]] = None,
   ) -> List[str]:
     result = self.request_single_product(
-      SourceRootStrippedSources, Params(original, create_options_bootstrapper(args=args))
+      SourceRootStrippedSources, Params(request, create_options_bootstrapper(args=args))
     )
     return sorted(result.snapshot.files)
 
@@ -44,7 +47,7 @@ class StripSourceRootsTests(TestBase):
     ) -> List[str]:
       input_snapshot = self.make_snapshot({fp: "" for fp in paths})
       return self.get_stripped_files(
-        SnapshotToStrip(input_snapshot, sentinel_file=paths[0]), args=args,
+        StripSourceRootsRequest(input_snapshot, sentinel_file=paths[0]), args=args,
       )
 
     # Normal source roots
