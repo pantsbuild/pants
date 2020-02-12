@@ -1,12 +1,13 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from functools import partial
+from pathlib import PurePath
 from typing import List, Optional, Union
 from unittest.mock import Mock
 
 import pytest
 
+from pants.build_graph.address import Address
 from pants.build_graph.files import Files
 from pants.engine.legacy.graph import HydratedTarget
 from pants.engine.rules import RootRule
@@ -37,30 +38,41 @@ class StripSourceRootsTests(TestBase):
     return sorted(result.snapshot.files)
 
   def test_strip_snapshot(self) -> None:
-    original_paths = [
-      "src/python/project/example.py",
-      "src/java/com/project/example.java",
-      "tests/python/project_test/example.py",
-      "no-source-root/example.txt",
-    ]
-    stripped_paths = [
-      "project/example.py",
-      "com/project/example.java",
-      "project_test/example.py",
-      "example.txt",
-    ]
 
-    input_snapshot = self.make_snapshot({fp: "" for fp in original_paths})
-    get_stripped_files_for_snapshot = partial(
-      self.get_stripped_files, SnapshotToStrip(input_snapshot)
-    )
+    def get_stripped_files_for_snapshot(
+      paths: List[str], *, args: Optional[List[str]] = None
+    ) -> List[str]:
+      input_snapshot = self.make_snapshot({fp: "" for fp in paths})
+      return self.get_stripped_files(
+        SnapshotToStrip(input_snapshot, sentinel_file=paths[0]), args=args,
+      )
 
-    assert get_stripped_files_for_snapshot() == sorted(stripped_paths)
+    # Normal source roots
+    assert get_stripped_files_for_snapshot(
+      ["src/python/project/example.py"]
+    ) == ["project/example.py"]
+    assert get_stripped_files_for_snapshot(
+      ["src/java/com/project/example.java"]
+    ) == ["com/project/example.java"]
+    assert get_stripped_files_for_snapshot(
+      ["tests/python/project_test/example.py"]
+    ) == ["project_test/example.py"]
 
-    # Also test that we error when `--source-unmatched=fail`
+    # Unrecognized source root
+    unrecognized_source_root = "no-source-root/example.txt"
+    assert get_stripped_files_for_snapshot([unrecognized_source_root]) == ["example.txt"]
     with pytest.raises(ExecutionError) as exc:
-      get_stripped_files_for_snapshot(args=["--source-unmatched=fail"])
-    assert "NoSourceRootError: Could not find a source root for `no-source-root/example.txt`" in str(exc.value)
+      get_stripped_files_for_snapshot([unrecognized_source_root], args=["--source-unmatched=fail"])
+    assert f"NoSourceRootError: Could not find a source root for `{unrecognized_source_root}`" in str(exc.value)
+
+    # We don't support multiple source roots in the same snapshot, but also don't proactively
+    # validate for this situation because we don't expect it to happen in practice and we want to
+    # avoid having to call `SourceRoot.find_by_path` on every single file.
+    with pytest.raises(ExecutionError) as exc:
+      get_stripped_files_for_snapshot(
+        ["src/python/project/example.py", "src/java/com/project/example.java"],
+      )
+    assert "Cannot strip prefix src/python" in str(exc.value)
 
   def test_strip_target(self) -> None:
 
@@ -79,8 +91,9 @@ class StripSourceRootsTests(TestBase):
       adaptor.sources = Mock()
       adaptor.sources.snapshot = self.make_snapshot({fp: "" for fp in source_paths})
 
+      address = Address(spec_path=PurePath(source_paths[0]).parent.as_posix(), target_name="target")
       return self.get_stripped_files(
-        HydratedTarget(address=Mock(), adaptor=adaptor, dependencies=()),
+        HydratedTarget(address=address, adaptor=adaptor, dependencies=()),
       )
 
     # normal target
