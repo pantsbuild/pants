@@ -7,6 +7,8 @@ from functools import partial
 from textwrap import dedent
 from typing import Dict, List, Optional
 
+import pytest
+
 from pants.base.build_environment import get_buildroot
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -238,6 +240,7 @@ class OptionsBootstrapperTest(unittest.TestCase):
       opts_single_config.register('resolver', '--resolver')
       self.assertEqual('coursier', opts_single_config.for_scope('resolver').resolver)
 
+  @pytest.mark.flaky(retries=2)
   def test_full_options_caching(self) -> None:
     with temporary_file_path() as config:
       args = self._config_path(config)
