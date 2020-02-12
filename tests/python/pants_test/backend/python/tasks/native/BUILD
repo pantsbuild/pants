@@ -23,7 +23,7 @@ python_tests(
     'tests/python/pants_test/backend/python/tasks:python_task_test_base',
     'tests/python/pants_test/engine:scheduler_test_base',
     'src/python/pants/testutil/subsystem',
-    'tests/python/pants_test:interpreter_selection_utils',
+    'src/python/pants/testutil:interpreter_selection_utils',
     'src/python/pants/testutil:task_test_base',
   ],
   tags={'platform_specific_behavior', 'partially_type_checked'},

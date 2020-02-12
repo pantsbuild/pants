@@ -25,10 +25,10 @@ python_tests(
   name = 'legacy_engine',
   sources = ['test_legacy_engine.py'],
   dependencies = [
-    ':engine_test_base',
     'src/python/pants/base:exceptions',
     'src/python/pants/engine:legacy_engine',
     'src/python/pants/testutil/base:context_utils',
+    'src/python/pants/testutil/engine:engine_test_base',
   ],
   tags = {"partially_type_checked"},
 )
@@ -37,10 +37,10 @@ python_tests(
   name='round_engine',
   sources=['test_round_engine.py'],
   dependencies = [
-    ':engine_test_base',
     'src/python/pants/engine:legacy_engine',
     'src/python/pants/task',
     'src/python/pants/testutil:test_base',
+    'src/python/pants/testutil/engine:engine_test_base',
   ],
   tags = {"partially_type_checked"},
 )
@@ -147,12 +147,12 @@ python_tests(
   sources=['test_mapper.py'],
   dependencies=[
     ':scheduler_test_base',
-    ':util',
     'src/python/pants/build_graph',
     'src/python/pants/engine:build_files',
     'src/python/pants/engine:mapper',
     'src/python/pants/engine:objects',
     'src/python/pants/engine:struct',
+    'src/python/pants/testutil/engine:util',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/engine/examples:mapper_test',
     'tests/python/pants_test/engine/examples:parsers',
@@ -177,7 +177,6 @@ python_tests(
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':scheduler_test_base',
-    ':util',
     'src/python/pants/engine:build_files',
     'src/python/pants/engine:console',
     'src/python/pants/engine:rules',
@@ -196,7 +195,6 @@ python_tests(
   coverage=['pants.engine.nodes', 'pants.engine.scheduler'],
   dependencies=[
     '3rdparty/python:dataclasses',
-    ':util',
     'src/python/pants/base:cmd_line_spec_parser',
     'src/python/pants/build_graph',
     'src/python/pants/engine:scheduler',
@@ -222,11 +220,11 @@ python_library(
   name='scheduler_test_base',
   sources=['scheduler_test_base.py'],
   dependencies=[
-    ':util',
     'src/python/pants/base:project_tree',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:parser',
     'src/python/pants/engine:scheduler',
+    'src/python/pants/testutil/engine:util',
     'src/python/pants/util:dirutil',
   ],
   tags = {"partially_type_checked"},

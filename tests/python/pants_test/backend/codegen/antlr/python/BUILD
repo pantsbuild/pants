@@ -21,7 +21,7 @@ python_tests(
   sources = ['*_integration.py'],
   dependencies = [
     'src/python/pants/testutil:int-test',
-    'tests/python/pants_test:interpreter_selection_utils',
+    'src/python/pants/testutil:interpreter_selection_utils',
     'testprojects/src/python:antlr_directory',
     'testprojects/src/antlr/python:test_directory',
   ],
