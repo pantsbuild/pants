@@ -31,6 +31,7 @@ def test_fully_automatable_config() -> None:
       [str_values]
       normal: .isort.cfg
       version: isort>=4.8
+      target: src/python:example
       path: /usr/bin/test.txt
       fromfile: @build-support/example.txt
       interpolation: %(foo)s/example
@@ -47,6 +48,7 @@ def test_fully_automatable_config() -> None:
       [str_values]
       normal = ".isort.cfg"
       version = "isort>=4.8"
+      target = "src/python:example"
       path = "/usr/bin/test.txt"
       fromfile = "@build-support/example.txt"
       interpolation = "%(foo)s/example"

@@ -50,11 +50,10 @@ async def find_owners(
   changed_request: ChangedRequest,
 ) -> ChangedAddresses:
   owners = await Get[Owners](OwnersRequest(sources=changed_request.sources))
-  direct_owners = Addresses(bfa.to_address() for bfa in owners.addresses)
 
   # If the ChangedRequest does not require dependees, then we're done.
   if changed_request.include_dependees == IncludeDependeesOption.NONE:
-    return ChangedAddresses(direct_owners)
+    return ChangedAddresses(owners.addresses)
 
   # Otherwise: find dependees.
   all_addresses = await Get[Addresses](AddressSpecs((DescendantAddresses(''),)))
@@ -68,8 +67,8 @@ async def find_owners(
     target_types_from_build_file_aliases(bfa), address_mapper, all_structs
   )
   if changed_request.include_dependees == IncludeDependeesOption.DIRECT:
-    return ChangedAddresses(Addresses(graph.dependents_of_addresses(direct_owners)))
-  return ChangedAddresses(Addresses(graph.transitive_dependents_of_addresses(direct_owners)))
+    return ChangedAddresses(Addresses(graph.dependents_of_addresses(owners.addresses)))
+  return ChangedAddresses(Addresses(graph.transitive_dependents_of_addresses(owners.addresses)))
 
 
 @dataclass(frozen=True)

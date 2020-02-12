@@ -295,8 +295,8 @@ class OptionsBootstrapperTest(unittest.TestCase):
     def config_path(*args, **env):
       return OptionsBootstrapper.get_config_file_paths(env, args)
 
-    self.assertEqual(['/foo/bar/pants.ini'],
-                     config_path('main', 'args', "--pants-config-files=['/foo/bar/pants.ini']"))
+    self.assertEqual(['/foo/bar/pants.toml'],
+                     config_path('main', 'args', "--pants-config-files=['/foo/bar/pants.toml']"))
 
     self.assertEqual(['/from/env1', '/from/env2'],
                      config_path('main', 'args',
@@ -307,7 +307,7 @@ class OptionsBootstrapperTest(unittest.TestCase):
                                  'goal', '--other-flag', PANTS_CONFIG_FILES="['/from/env']"))
 
     # Test appending to the default.
-    self.assertEqual([f'{get_buildroot()}/pants.ini', '/from/env', '/from/flag'],
+    self.assertEqual([f'{get_buildroot()}/pants.toml', '/from/env', '/from/flag'],
                      config_path('main', 'args', '-x', "--pants-config-files=+['/from/flag']",
                                  'goal', '--other-flag', PANTS_CONFIG_FILES="+['/from/env']"))
 

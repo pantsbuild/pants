@@ -4,7 +4,7 @@
 python_library(
   dependencies=[
     '//:build_root',
-    '//:pants_ini',
+    '//:pants_toml',
     'src/python/pants/option',
     'src/python/pants/bin',  # NB: not explicitly used, but necessary for OptionsBootstrapper to be set up properly.
   ],

@@ -8,6 +8,7 @@ from typing import Dict
 
 from twitter.common.collections import OrderedSet
 
+from pants.base.exceptions import ResolveError
 from pants.base.project_tree import Dir
 from pants.base.specs import AddressSpec, AddressSpecs, SingleAddress, Spec, more_specific
 from pants.build_graph.address import Address, BuildFileAddress
@@ -20,7 +21,7 @@ from pants.engine.addressable import (
   BuildFileAddresses,
 )
 from pants.engine.fs import Digest, FilesContent, PathGlobs, Snapshot
-from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
+from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper
 from pants.engine.objects import Locatable, SerializableFactory, Validatable
 from pants.engine.parser import HydratedStruct
 from pants.engine.rules import RootRule, rule
@@ -80,6 +81,23 @@ def _raise_did_you_mean(address_family: AddressFamily, name: str, source=None) -
     raise resolve_error from source
   raise resolve_error
 
+@rule
+async def find_build_file(address: Address) -> BuildFileAddress:
+  address_family = await Get[AddressFamily](Dir(address.spec_path))
+  if address not in address_family.addressables:
+    _raise_did_you_mean(address_family=address_family, name=address.target_name)
+  return next(
+    build_file_address
+    for build_file_address in address_family.addressables.keys()
+    if build_file_address == address
+  )
+
+
+@rule
+async def find_build_files(addresses: Addresses) -> BuildFileAddresses:
+  bfas = await MultiGet(Get[BuildFileAddress](Address, address) for address in addresses)
+  return BuildFileAddresses(bfas)
+
 
 @rule
 async def hydrate_struct(address_mapper: AddressMapper, address: Address) -> HydratedStruct:
@@ -88,19 +106,9 @@ async def hydrate_struct(address_mapper: AddressMapper, address: Address) -> Hyd
   Recursively collects any embedded addressables within the Struct, but will not walk into a
   dependencies field, since those should be requested explicitly by rules.
   """
-
+  build_file_address = await Get[BuildFileAddress](Address, address)
   address_family = await Get[AddressFamily](Dir(address.spec_path))
-
-  # NB: `address_family.addressables` is a dictionary of `BuildFileAddress`es and we look it up
-  # with an `Address`. This works because `BuildFileAddress` is a subclass, but MyPy warns that it
-  # could be a bug.
-  struct = address_family.addressables.get(address)  # type: ignore[call-overload]
-  addresses = address_family.addressables
-  if not struct or address not in addresses:
-    _raise_did_you_mean(address_family, address.target_name)
-  # TODO: This is effectively: "get the BuildFileAddress for this Address".
-  #  see https://github.com/pantsbuild/pants/issues/6657
-  address = next(build_address for build_address in addresses if build_address == address)
+  struct = address_family.addressables.get(build_file_address)
 
   inline_dependencies = []
 
@@ -134,8 +142,9 @@ async def hydrate_struct(address_mapper: AddressMapper, address: Address) -> Hyd
   collect_inline_dependencies(struct)
 
   # And then hydrate the inline dependencies.
-  hydrated_inline_dependencies = await MultiGet(Get[HydratedStruct](Address, a)
-                                                for a in inline_dependencies)
+  hydrated_inline_dependencies = await MultiGet(
+    Get[HydratedStruct](Address, a) for a in inline_dependencies
+  )
   dependencies = [d.value for d in hydrated_inline_dependencies]
 
   def maybe_consume(outer_key, value):
@@ -222,7 +231,7 @@ async def addresses_with_origins_from_address_families(
   address_family_by_directory = {af.namespace: af for af in address_families}
 
   matched_addresses = OrderedSet()
-  addr_to_origin: Dict[BuildFileAddress, AddressSpec] = {}
+  addr_to_origin: Dict[Address, AddressSpec] = {}
 
   for address_spec in address_specs:
     # NB: if an address spec is provided which expands to some number of targets, but those targets
@@ -235,10 +244,11 @@ async def addresses_with_origins_from_address_families(
       raise ResolveError(e) from e
 
     try:
-      all_addr_tgt_pairs = address_spec.address_target_pairs_from_address_families(
+      all_bfaddr_tgt_pairs = address_spec.address_target_pairs_from_address_families(
         addr_families_for_spec
       )
-      for addr, _ in all_addr_tgt_pairs:
+      for bfaddr, _ in all_bfaddr_tgt_pairs:
+        addr = bfaddr.to_address()
         # A target might be covered by multiple specs, so we take the most specific one.
         addr_to_origin[addr] = more_specific(addr_to_origin.get(addr), address_spec)
     except AddressSpec.AddressResolutionError as e:
@@ -247,9 +257,9 @@ async def addresses_with_origins_from_address_families(
       _raise_did_you_mean(e.single_address_family, e.name, source=e)
 
     matched_addresses.update(
-      addr
-      for (addr, tgt) in all_addr_tgt_pairs
-      if address_specs.matcher.matches_target_address_pair(addr, tgt)
+      bfaddr.to_address()
+      for (bfaddr, tgt) in all_bfaddr_tgt_pairs
+      if address_specs.matcher.matches_target_address_pair(bfaddr, tgt)
     )
 
   # NB: This may be empty, as the result of filtering by tag and exclude patterns!
@@ -260,10 +270,8 @@ async def addresses_with_origins_from_address_families(
 
 
 @rule
-def remove_origins(addresses_with_origins: AddressesWithOrigins) -> BuildFileAddresses:
-  return BuildFileAddresses(
-    address_with_origin.address for address_with_origin in addresses_with_origins
-  )
+def strip_address_origins(addresses_with_origins: AddressesWithOrigins) -> Addresses:
+  return Addresses(address_with_origin.address for address_with_origin in addresses_with_origins)
 
 
 @dataclass(frozen=True)
@@ -278,16 +286,10 @@ class AddressOriginMap:
 def address_origin_map(addresses_with_origins: AddressesWithOrigins) -> AddressOriginMap:
   return AddressOriginMap(
     addr_to_origin={
-      address_with_origin.address.to_address(): address_with_origin.origin
+      address_with_origin.address: address_with_origin.origin
       for address_with_origin in addresses_with_origins
     }
   )
-
-
-# TODO(#6657): Remove this once BFA is removed.
-@rule
-def bfas_to_addresses(build_file_addresses: BuildFileAddresses) -> Addresses:
-  return Addresses(bfa.to_address() for bfa in build_file_addresses)
 
 
 def _address_spec_to_globs(address_mapper: AddressMapper, address_specs: AddressSpecs) -> PathGlobs:
@@ -310,15 +312,14 @@ def create_graph_rules(address_mapper: AddressMapper):
     # BUILD file parsing.
     hydrate_struct,
     parse_address_family,
+    find_build_file,
+    find_build_files,
     # AddressSpec handling: locate directories that contain build files, and request
     # AddressFamilies for each of them.
     addresses_with_origins_from_address_families,
-    remove_origins,
+    strip_address_origins,
     address_origin_map,
-    bfas_to_addresses,
     # Root rules representing parameters that might be provided via root subjects.
     RootRule(Address),
-    RootRule(BuildFileAddress),
-    RootRule(BuildFileAddresses),
     RootRule(AddressSpecs),
   ]

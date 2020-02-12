@@ -54,7 +54,7 @@ class ScalastyleTest(NailgunTaskTestBase):
       contents='\n'.join(exclude_patterns) if exclude_patterns else '')
 
   def _create_context(self, scalastyle_config=None, excludes=None, target_roots=None):
-    # If config is not specified, then we override pants.ini scalastyle such that
+    # If config is not specified, then we override pants.toml scalastyle such that
     # we have a default scalastyle config xml but with empty excludes.
     self.set_options_for_scope(Scalastyle.options_scope, config=scalastyle_config)
     self.set_options(excludes=excludes)

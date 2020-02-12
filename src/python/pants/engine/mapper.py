@@ -5,6 +5,7 @@ import re
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, Optional, Tuple, Union
 
+from pants.base.exceptions import DuplicateNameError, MappingError, UnaddressableObjectError
 from pants.build_graph.address import BuildFileAddress
 from pants.engine.objects import Serializable
 from pants.engine.parser import Parser
@@ -13,18 +14,6 @@ from pants.util.meta import frozen_after_init
 
 
 ThinAddressableObject = Union[Serializable, Any]
-
-
-class MappingError(Exception):
-  """Indicates an error mapping addressable objects."""
-
-
-class UnaddressableObjectError(MappingError):
-  """Indicates an un-addressable object was found at the top level."""
-
-
-class DuplicateNameError(MappingError):
-  """Indicates more than one top-level object was found with the same name."""
 
 
 @dataclass(frozen=True)
@@ -145,10 +134,6 @@ class AddressFamily:
   def __repr__(self):
     return 'AddressFamily(namespace={!r}, objects_by_name={!r})'.format(
         self.namespace, list(self.objects_by_name.keys()))
-
-
-class ResolveError(MappingError):
-  """Indicates an error resolving targets."""
 
 
 @frozen_after_init

@@ -7,6 +7,8 @@ import pytest
 
 from pants.backend.python.lint.bandit.rules import BanditTarget
 from pants.backend.python.lint.bandit.rules import rules as bandit_rules
+from pants.backend.python.rules import download_pex_bin, pex
+from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
@@ -17,10 +19,16 @@ from pants.engine.selectors import Params
 from pants.rules.core.lint import LintResult
 from pants.source.wrapped_globs import EagerFilesetWithSpec
 from pants.testutil.option.util import create_options_bootstrapper
+from pants.testutil.subsystem.util import init_subsystems
 from pants.testutil.test_base import TestBase
 
 
 class BanditIntegrationTest(TestBase):
+
+  def setUp(self):
+    super().setUp()
+    init_subsystems([download_pex_bin.DownloadedPexBin.Factory])
+
   good_source = FileContent(path="test/good.py", content=b"hashlib.sha256()\n")
   bad_source = FileContent(path="test/bad.py", content=b"hashlib.md5()\n")
   # MD5 is a insecure hashing function
@@ -31,7 +39,16 @@ class BanditIntegrationTest(TestBase):
 
   @classmethod
   def rules(cls):
-    return (*super().rules(), *bandit_rules(), RootRule(BanditTarget))
+    return (
+      *super().rules(),
+      *bandit_rules(),
+      download_pex_bin.download_pex_bin,
+      *pex.rules(),
+      *python_native_code.rules(),
+      *subprocess_environment.rules(),
+      RootRule(BanditTarget),
+      RootRule(download_pex_bin.DownloadedPexBin.Factory),
+    )
 
   def run_bandit(
     self,
@@ -60,7 +77,11 @@ class BanditIntegrationTest(TestBase):
       )
     )
     return self.request_single_product(
-      LintResult, Params(target, create_options_bootstrapper(args=args)),
+      LintResult, Params(
+        target,
+        create_options_bootstrapper(args=args),
+        download_pex_bin.DownloadedPexBin.Factory.global_instance(),
+      ),
     )
 
   def test_single_passing_source(self) -> None:

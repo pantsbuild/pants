@@ -222,7 +222,7 @@ class TestStrategy(Enum):
                         "./pants.pex",
                         "--no-v1",
                         "--v2",
-                        "--pants-config-files=pants.remote.ini",
+                        "--pants-config-files=pants.remote.toml",
                         f"--remote-oauth-bearer-token-path={oauth_token_path}",
                         "test",
                         *sorted(targets),

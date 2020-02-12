@@ -8,7 +8,7 @@ from collections.abc import MutableSequence, MutableSet
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable, List, Optional, Sequence, Tuple, Type, Union, cast
 
-from pants.build_graph.address import BuildFileAddress
+from pants.build_graph.address import Address
 from pants.build_graph.target import Target
 from pants.engine.addressable import addressable_list
 from pants.engine.fs import GlobExpansionConjunction, PathGlobs
@@ -31,8 +31,10 @@ class TargetAdaptor(StructWithDeps):
   """
 
   @property
-  def address(self) -> BuildFileAddress:
-    return cast(BuildFileAddress, super().address)
+  def address(self) -> Address:
+    # TODO: this isn't actually safe to override as not being Optional. There are
+    # some cases where this property is not defined. But, then we get a ton of MyPy issues.
+    return cast(Address, super().address)
 
   def get_sources(self) -> Optional["GlobsWithConjunction"]:
     """Returns target's non-deferred sources if exists or the default sources if defined.
@@ -136,7 +138,7 @@ class SourcesField:
   lazy construction will be more natural.
     see https://github.com/pantsbuild/pants/issues/3560
 
-  :param address: The BuildFileAddress of the TargetAdaptor for which this field is an argument.
+  :param address: The Address of the TargetAdaptor for which this field is an argument.
   :param arg: The name of this argument: usually 'sources', but occasionally also 'resources' in the
     case of python resource globs.
   :param filespecs: The merged filespecs dict the describes the paths captured by this field.
@@ -144,7 +146,7 @@ class SourcesField:
   :param validate_fn: A function which takes an EagerFilesetWithSpec and throws if it's not
     acceptable. This API will almost certainly change in the near future.
   """
-  address: BuildFileAddress
+  address: Address
   arg: str
   filespecs: wrapped_globs.Filespec
   base_globs: "BaseGlobs"
@@ -185,7 +187,7 @@ class PageAdaptor(TargetAdaptor):
 @dataclass(frozen=True)
 class BundlesField:
   """Represents the `bundles` argument, each of which has a PathGlobs to represent its `fileset`."""
-  address: BuildFileAddress
+  address: Address
   bundles: Any
   filespecs_list: List[wrapped_globs.Filespec]
   path_globs_list: List[PathGlobs]

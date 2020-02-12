@@ -467,6 +467,7 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'testprojects/tests/java/org/pantsbuild/testproject:coverage_directory',
     'testprojects/tests/java/org/pantsbuild/testproject:cucumber_directory',
+    'testprojects/tests/java/org/pantsbuild/testproject:dummies_directory',
     'testprojects/tests/java/org/pantsbuild/testproject:htmlreport_directory',
     'testprojects/tests/java/org/pantsbuild/testproject:matcher_directory',
     'testprojects/tests/java/org/pantsbuild/testproject:syntheticjar_directory',

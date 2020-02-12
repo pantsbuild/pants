@@ -76,15 +76,15 @@ fn main() {
 
   for worker_id in worker_ids.clone() {
     display.add_worker(worker_id);
-    display.render();
+    let _ = display.render();
     thread::sleep(Duration::from_millis(63));
   }
 
-  display.render();
+  let _ = display.render();
   thread::sleep(Duration::from_secs(1));
 
   while !done {
-    display.render();
+    let _ = display.render();
     thread::sleep(Duration::from_millis(55));
 
     gen_display_work(

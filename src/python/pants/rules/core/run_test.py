@@ -5,13 +5,14 @@ from typing import cast
 from unittest.mock import Mock
 
 from pants.base.build_root import BuildRoot
-from pants.build_graph.address import Address, BuildFileAddress
+from pants.build_graph.address import Address
+from pants.engine.addressable import Addresses
 from pants.engine.fs import Digest, FileContent, InputFilesContent, Workspace
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
 from pants.rules.core.binary import CreatedBinary
 from pants.rules.core.run import Run, run
 from pants.testutil.engine.util import MockConsole, MockGet, run_rule
-from pants.testutil.goal_rule_test_base import GoalRuleTestBase
+from pants.testutil.test_base import TestBase
 
 
 # TODO: Create a utility to mock GoalSubsystems.
@@ -20,8 +21,7 @@ class MockOptions:
     self.values = Mock(**values)
 
 
-class RunTest(GoalRuleTestBase):
-  goal_cls = Run
+class RunTest(TestBase):
 
   def create_mock_binary(self, program_text: bytes) -> CreatedBinary:
     input_files_content = InputFilesContent((
@@ -38,16 +38,17 @@ class RunTest(GoalRuleTestBase):
   ) -> Run:
     workspace = Workspace(self.scheduler)
     interactive_runner = InteractiveRunner(self.scheduler)
-    address = Address.parse(address_spec)
-    bfa = BuildFileAddress(
-      build_file=None,
-      target_name=address.target_name,
-      rel_path=f'{address.spec_path}/BUILD'
-    )
     BuildRoot().path = self.build_root
     res = run_rule(
       run,
-      rule_args=[console, workspace, interactive_runner, BuildRoot(), bfa, MockOptions(args=[])],
+      rule_args=[
+        console,
+        workspace,
+        interactive_runner,
+        BuildRoot(),
+        Addresses([Address.parse(address_spec)]),
+        MockOptions(args=[]),
+      ],
       mock_gets=[
         MockGet(
           product_type=CreatedBinary,

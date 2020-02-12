@@ -83,7 +83,7 @@ def generate_new_config(config: Path) -> List[str]:
   for i, line in enumerate(original_text_lines):
     option_regex = r"(?P<option>[a-zA-Z0-9_]+)"
     before_value_regex = rf"\s*{option_regex}\s*[:=]\s*"
-    valid_value_characters = r"a-zA-Z0-9_.@!%\=\>\<\-\(\)\/"
+    valid_value_characters = r"a-zA-Z0-9_.@!:%\=\>\<\-\(\)\/"
     value_regex = rf"(?P<value>[{valid_value_characters}]+)"
     parsed_line = re.match(
       rf"{before_value_regex}{value_regex}\s*$", line,
