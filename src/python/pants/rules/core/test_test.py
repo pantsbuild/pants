@@ -12,7 +12,11 @@ from pants.engine.addressable import AddressesWithOrigins, AddressWithOrigin
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, Digest, FileContent, InputFilesContent, Snapshot
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
 from pants.engine.legacy.graph import HydratedTarget, HydratedTargetWithOrigin
-from pants.engine.legacy.structs import PythonBinaryAdaptor, PythonTestsAdaptor
+from pants.engine.legacy.structs import (
+  PythonBinaryAdaptor,
+  PythonTestsAdaptor,
+  PythonTestsAdaptorWithOrigin,
+)
 from pants.engine.rules import UnionMembership
 from pants.rules.core.test import (
   AddressAndDebugRequest,
@@ -217,12 +221,12 @@ class TestTest(TestBase):
             target=HydratedTarget(address, target_adaptor, ()),
             origin=origin or SingleAddress(directory=address.spec_path, name=address.target_name),
           ),
-          UnionMembership(union_rules={TestTarget: [PythonTestsAdaptor]}),
+          UnionMembership(union_rules={TestTarget: [PythonTestsAdaptorWithOrigin]}),
         ],
         mock_gets=[
           MockGet(
             product_type=TestResult,
-            subject_type=PythonTestsAdaptor,
+            subject_type=PythonTestsAdaptorWithOrigin,
             mock=lambda _: TestResult(status=Status.SUCCESS, stdout='foo', stderr=''),
           ),
         ],

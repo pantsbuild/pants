@@ -311,10 +311,86 @@ class PantsPluginAdaptor(PythonTargetAdaptor):
     return GlobsWithConjunction.for_literal_files(['register.py'], self.address.spec_path)
 
 
+# TODO(#4535): Find a less clunky solution for precise file args as part of the Target API. The
+# trick here is that we must have some way to preserve the OriginSpec while also having a distinct
+# type for each target so that unions work properly.
 @dataclass(frozen=True)
-class PythonTestsAdaptorWithOrigin:
-  adaptor: PythonTestsAdaptor
+class TargetAdaptorWithOrigin:
+  adaptor: TargetAdaptor
   origin: OriginSpec
+
+  @staticmethod
+  def create(adaptor: TargetAdaptor, origin: OriginSpec) -> "TargetAdaptorWithOrigin":
+    adaptor_with_origin_cls: Type["TargetAdaptorWithOrigin"] = {
+      TargetAdaptor: TargetAdaptorWithOrigin,
+      AppAdaptor: AppAdaptorWithOrigin,
+      JvmAppAdaptor: JvmAppAdaptorWithOrigin,
+      PythonAppAdaptor: PythonAppAdaptorWithOrigin,
+      ResourcesAdaptor: ResourcesAdaptorWithOrigin,
+      RemoteSourcesAdaptor: RemoteSourcesAdaptorWithOrigin,
+      PythonTargetAdaptor: PythonTargetAdaptorWithOrigin,
+      PythonBinaryAdaptor: PythonBinaryAdaptorWithOrigin,
+      PythonTestsAdaptor: PythonTestsAdaptorWithOrigin,
+      PythonAWSLambdaAdaptor: PythonAWSLambdaAdaptorWithOrigin,
+      PythonRequirementLibraryAdaptor: PythonRequirementLibraryAdaptorWithOrigin,
+      PantsPluginAdaptor: PantsPluginAdaptorWithOrigin,
+    }[type(adaptor)]
+    return adaptor_with_origin_cls(adaptor, origin)
+
+
+@dataclass(frozen=True)
+class AppAdaptorWithOrigin(TargetAdaptorWithOrigin):
+  adaptor: AppAdaptor
+
+
+@dataclass(frozen=True)
+class JvmAppAdaptorWithOrigin(TargetAdaptorWithOrigin):
+  adaptor: JvmAppAdaptor
+
+
+@dataclass(frozen=True)
+class PythonAppAdaptorWithOrigin(TargetAdaptorWithOrigin):
+  adaptor: PythonAppAdaptor
+
+
+@dataclass(frozen=True)
+class ResourcesAdaptorWithOrigin(TargetAdaptorWithOrigin):
+  adaptor: ResourcesAdaptor
+
+
+@dataclass(frozen=True)
+class RemoteSourcesAdaptorWithOrigin(TargetAdaptorWithOrigin):
+  adaptor: RemoteSourcesAdaptor
+
+
+@dataclass(frozen=True)
+class PythonTargetAdaptorWithOrigin(TargetAdaptorWithOrigin):
+  adaptor: PythonTargetAdaptor
+
+
+@dataclass(frozen=True)
+class PythonBinaryAdaptorWithOrigin(TargetAdaptorWithOrigin):
+  adaptor: PythonBinaryAdaptor
+
+
+@dataclass(frozen=True)
+class PythonTestsAdaptorWithOrigin(TargetAdaptorWithOrigin):
+  adaptor: PythonTestsAdaptor
+
+
+@dataclass(frozen=True)
+class PythonAWSLambdaAdaptorWithOrigin(TargetAdaptorWithOrigin):
+  adaptor: PythonAWSLambdaAdaptor
+
+
+@dataclass(frozen=True)
+class PythonRequirementLibraryAdaptorWithOrigin(TargetAdaptorWithOrigin):
+  adaptor: PythonRequirementLibraryAdaptor
+
+
+@dataclass(frozen=True)
+class PantsPluginAdaptorWithOrigin(TargetAdaptorWithOrigin):
+  adaptor: PantsPluginAdaptor
 
 
 # TODO: Remove all the subclasses once we remove globs et al. The only remaining subclass would be
