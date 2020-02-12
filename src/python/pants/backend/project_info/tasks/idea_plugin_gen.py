@@ -84,6 +84,9 @@ class IdeaPluginGen(ConsoleTask):
       removal_hint="`idea-plugin` should always act transitively, which is the default. This option "
                    "will be going away to ensure that Pants always does the right thing.",
     )
+    register('--possible-paths', type=list, default=['/Applications/IntelliJ IDEA CE.app',
+                                                     '/Applications/IntelliJ IDEA.app'],
+             help='Sets the the list of paths for IntelliJ lookup.')
 
   @property
   def act_transitively(self):
@@ -96,13 +99,12 @@ class IdeaPluginGen(ConsoleTask):
     self.open = self.get_options().open
 
     self.java_encoding = self.get_options().java_encoding
-    self.project_template = os.path.join(_TEMPLATE_BASEDIR,
-                                         'project-12.mustache')
-    self.workspace_template = os.path.join(_TEMPLATE_BASEDIR,
+    self.idea_modules_template = os.path.join(_TEMPLATE_BASEDIR,
+                                           'modules-12.mustache')
+    self.idea_workspace_template = os.path.join(_TEMPLATE_BASEDIR,
                                            'workspace-12.mustache')
-    self.rootmodule_template = os.path.join(_TEMPLATE_BASEDIR,
-                                           'rootmodule-12.mustache')
     self.java_language_level = self.get_options().java_language_level
+    self.possible_paths = self.get_options().possible_paths
 
     if self.get_options().java_jdk_name:
       self.java_jdk = self.get_options().java_jdk_name
@@ -113,16 +115,13 @@ class IdeaPluginGen(ConsoleTask):
     safe_mkdir(output_dir)
 
     with temporary_dir(root_dir=output_dir, cleanup=False) as output_project_dir:
-      project_name = self.get_project_name(self.context.options.specs)
-
       self.gen_project_workdir = output_project_dir
-      self.project_filename = os.path.join(self.gen_project_workdir,
-                                           '{}.ipr'.format(project_name))
-      self.workspace_filename = os.path.join(self.gen_project_workdir,
-                                             '{}.iws'.format(project_name))
-      self.rootmodule_filename = os.path.join(self.gen_project_workdir,
-                                              'rootmodule.iml')
+      self.idea_workspace_filename = os.path.join(self.gen_project_workdir,
+                                                  ".idea", "workspace.xml")
+      self.idea_modules_filename = os.path.join(self.gen_project_workdir,
+                                                  ".idea", "modules.xml")
       self.intellij_output_dir = os.path.join(self.gen_project_workdir, 'out')
+      self.intellij_idea_dir = os.path.join(self.gen_project_workdir, '.idea')
 
   @classmethod
   def get_project_name(cls, target_specs):
@@ -160,21 +159,20 @@ class IdeaPluginGen(ConsoleTask):
 
     # Generate (without merging in any extra components).
     safe_mkdir(os.path.abspath(self.intellij_output_dir))
+    safe_mkdir(os.path.abspath(self.intellij_idea_dir))
 
     def gen_file(template_file_name, **mustache_kwargs):
       return self._generate_to_tempfile(
         Generator(pkgutil.get_data(__name__, template_file_name).decode(), **mustache_kwargs)
       )
 
-    ipr = gen_file(self.project_template, project=configured_project)
-    iws = gen_file(self.workspace_template, workspace=configured_workspace)
-    iml_root = gen_file(self.workspace_template)
+    idea_ws = gen_file(self.idea_workspace_template, workspace=configured_workspace)
+    idea_modules = gen_file(self.idea_modules_template, project=configured_project)
 
-    shutil.move(ipr, self.project_filename)
-    shutil.move(iws, self.workspace_filename)
-    shutil.move(iml_root, self.rootmodule_filename)
+    shutil.move(idea_ws, self.idea_workspace_filename)
+    shutil.move(idea_modules, self.idea_modules_filename)
 
-    return self.project_filename
+    return self.gen_project_workdir
 
   def _generate_to_tempfile(self, generator):
     """Applies the specified generator to a temp file and returns the path to that file.
@@ -205,6 +203,6 @@ class IdeaPluginGen(ConsoleTask):
         subprocess.Popen([open_with, ide_file], stdout=null, stderr=null)
       else:
         try:
-          desktop.ui_open(ide_file)
+          desktop.idea_open(ide_file, self.possible_paths[::-1])
         except desktop.OpenError as e:
           raise TaskError(e)
