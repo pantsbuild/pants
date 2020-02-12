@@ -73,7 +73,7 @@ class JUnitTests(JvmTarget, RuntimePlatformMixin):
 
     deprecated_conditional(lambda: 'test_platform' in kwargs, '1.27.0.dev0', 'test_platform',
       'Replaced with runtime_platform.')
-    if 'test_platform' in kwargs and 'runtime_platform' in kwargs:
+    if 'test_platform' in kwargs and runtime_platform:
       raise TargetDefinitionException(self,
         'Cannot specify runtime_platform and test_platform together.')
     if 'test_platform' in kwargs and 'runtime_platform' not in kwargs:

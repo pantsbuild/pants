@@ -5,7 +5,6 @@ from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.runtime_platform_mixin import RuntimePlatformMixin
 from pants.base.payload import Payload
-from pants.java.distribution.distribution import DistributionLocator
 from pants.testutil.subsystem.util import init_subsystem
 from pants.testutil.test_base import TestBase
 
@@ -140,34 +139,3 @@ class JvmPlatformTest(TestBase):
             'target-runtime-platform')
     assert (instance.get_runtime_platform_for_target(
       synth_just_platform_with_parent_same).name == 'default-platform')
-
-  def test_lookup_with_no_runtime_platform_having_targets(self):
-    init_subsystem(JvmPlatform, options={
-      'jvm-platform': {
-        'platforms': {
-          'default-platform': {'target': '8'},
-          'default-runtime-platform': {'target': '8'},
-          'target-platform': {'target': '8'},
-          'target-runtime-platform': {'target': '8'},
-          'parent-target-platform': {'target': '8'},
-          'parent-target-runtime-platform': {'target': '8'},
-          'other': {'target':'9'}
-        },
-        'default_platform': 'default-platform',
-        'default_runtime_platform': None
-      }
-    })
-
-    just_platform = self.make_target('//:only-platform', JvmTarget,
-      platform='other')
-    no_platform = self.make_target('//:no-platform', JvmTarget)
-
-    instance = JvmPlatform.global_instance()
-    assert (instance.preferred_jvm_distribution([just_platform.platform]) ==
-            DistributionLocator.cached(minimum_version='9'))
-    assert (instance.preferred_jvm_distribution([]).version ==
-            DistributionLocator.cached(minimum_version='1.8').version)
-    assert (instance.preferred_jvm_distribution([no_platform.platform]) ==
-            DistributionLocator.cached(minimum_version='1.8'))
-    assert (instance.preferred_jvm_distribution([]).version ==
-            DistributionLocator.cached(minimum_version='1.8').version)
