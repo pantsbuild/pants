@@ -39,7 +39,10 @@ from pants.engine.rules import RootRule
 from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Params
 from pants.python.python_requirement import PythonRequirement
-from pants.rules.core.strip_source_roots import strip_source_roots_from_target
+from pants.rules.core.strip_source_roots import (
+  strip_source_roots_from_snapshot,
+  strip_source_roots_from_target,
+)
 from pants.source.source_root import SourceRootConfig
 from pants.testutil.subsystem.util import init_subsystem
 from pants.testutil.test_base import TestBase
@@ -68,6 +71,7 @@ class TestGenerateChroot(TestSetupPyBase):
       generate_chroot,
       get_sources,
       get_requirements,
+      strip_source_roots_from_snapshot,
       strip_source_roots_from_target,
       get_ancestor_init_py,
       get_owned_dependencies,
@@ -158,6 +162,7 @@ class TestGetSources(TestSetupPyBase):
   def rules(cls):
     return super().rules() + [
       get_sources,
+      strip_source_roots_from_snapshot,
       strip_source_roots_from_target,
       get_ancestor_init_py,
       RootRule(SetupPySourcesRequest),
