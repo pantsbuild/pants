@@ -65,7 +65,10 @@ class TestDebugRequest:
 
 @union
 class TestTarget:
-  """A union for registration of a testable target type."""
+  """A union for registration of a testable target type.
+
+  The union members should be subclasses of TargetAdaptorWithOrigin.
+  """
 
   # Prevent this class from being detected by Pytest as a test class.
   __test__ = False
@@ -192,9 +195,9 @@ async def coordinator_of_tests(
   # live TTY, periodically dump heavy hitters to stderr. See
   # https://github.com/pantsbuild/pants/issues/6004#issuecomment-492699898.
   logger.info(f"Starting tests: {target.address.reference()}")
-  # NB: This has the effect of "casting" a TargetAdaptor to a member of the TestTarget union.
-  # The adaptor will always be a member because of the union membership check above, but if
-  # it were not it would fail at runtime with a useful error message.
+  # NB: This has the effect of "casting" a TargetAdaptorWithOrigin to a member of the TestTarget
+  # union. If the adaptor is not a member of the union, the engine will fail at runtime with a
+  # useful error message.
   result = await Get[TestResult](TestTarget, adaptor_with_origin)
   logger.info(
     f"Tests {'succeeded' if result.status == Status.SUCCESS else 'failed'}: "

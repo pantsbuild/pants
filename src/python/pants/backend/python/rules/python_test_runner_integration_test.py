@@ -19,7 +19,6 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
-from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.fs import FileContent
 from pants.engine.interactive_runner import InteractiveRunner
@@ -133,15 +132,15 @@ class PythonTestRunnerIntegrationTest(TestBase):
     if passthrough_args:
       args.append(f"--pytest-args='{passthrough_args}'")
     options_bootstrapper = create_options_bootstrapper(args=args)
-    adaptor = PythonTestsAdaptor(address=Address.parse(f"{self.source_root}:target"))
     if origin is None:
       origin = SingleAddress(directory=self.source_root, name="target")
-    # TODO: get this working.
-    target = PythonTestsAdaptorWithOrigin(adaptor, origin)
-    test_result = self.request_single_product(TestResult, Params(target, options_bootstrapper))
-    debug_request = self.request_single_product(
-      TestDebugRequest, Params(target, options_bootstrapper),
+    v1_target = self.target(f"{self.source_root}:target")
+    adaptor = PythonTestsAdaptor(
+      address=v1_target.address.to_address(), sources=v1_target._sources_field.sources,
     )
+    params = Params(PythonTestsAdaptorWithOrigin(adaptor, origin), options_bootstrapper)
+    test_result = self.request_single_product(TestResult, params)
+    debug_request = self.request_single_product(TestDebugRequest, params)
     debug_result = InteractiveRunner(self.scheduler).run_local_interactive_process(debug_request.ipr)
     if test_result.status == Status.SUCCESS:
       assert debug_result.process_exit_code == 0
