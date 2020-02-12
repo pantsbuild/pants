@@ -1,11 +1,15 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import json
+from typing import Tuple
+
 import os
 import unittest.mock
 from textwrap import dedent
 
 from pex.interpreter import PythonInterpreter
+from pex.variables import ENV
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.targets.python_library import PythonLibrary
@@ -15,7 +19,7 @@ from pants.base.exceptions import TaskError
 from pants.option.ranked_value import RankedValue
 from pants.python.python_setup import PythonSetup
 from pants.testutil.task_test_base import TaskTestBase
-from pants.util.dirutil import chmod_plus_x, safe_mkdtemp
+from pants.util.dirutil import chmod_plus_x, safe_mkdtemp, safe_rmtree
 
 
 class SelectInterpreterTest(TaskTestBase):
@@ -28,27 +32,39 @@ class SelectInterpreterTest(TaskTestBase):
 
     # We're tied tightly to pex implementation details here faking out a python binary that outputs
     # only one value no matter what arguments, environment or input stream it has attached. That
-    # value is the interpreter identity which is - minimally, one line containing:
+    # value is the interpreter identity which is a JSON dict with exactly the following keys:
+    # binary, python_tag, abi_tag, platform_tag, version, supported_tags, env_markers.
+
     # <impl> <abi> <impl_version> <major> <minor> <patch>
 
-    def fake_interpreter(id_str):
+    def fake_interpreter(python_tag: str, abi_tag: str, version: Tuple[int, int, int]):
       interpreter_dir = safe_mkdtemp()
       binary = os.path.join(interpreter_dir, 'python')
+      values = dict(
+        binary=binary,
+        python_tag=python_tag,
+        abi_tag=abi_tag,
+        platform_tag='',
+        version=version,
+        supported_tags=[],
+        env_markers={}
+      )
+      id_str = json.dumps(values)
       with open(binary, 'w') as fp:
-        fp.write(dedent("""
-        #!{}
+        fp.write(dedent(f"""
+        #!{PythonInterpreter.get().binary}
         from __future__ import print_function
 
-        print({!r})
-        """.format(PythonInterpreter.get().binary, id_str)).strip())
+        print({id_str!r})
+        """).strip())
       chmod_plus_x(binary)
       return PythonInterpreter.from_binary(binary)
 
     # impl, abi, impl_version, major, minor, patch
     self.fake_interpreters = [
-      fake_interpreter('ip ip2 2 2 77 777'),
-      fake_interpreter('ip ip2 2 2 88 888'),
-      fake_interpreter('ip ip2 2 2 99 999')
+      fake_interpreter(python_tag='ip', abi_tag='ip2', version=(2, 77, 777)),
+      fake_interpreter(python_tag='ip', abi_tag='ip2', version=(2, 88, 888)),
+      fake_interpreter(python_tag='ip', abi_tag='ip2', version=(2, 99, 999)),
     ]
 
     self.set_options_for_scope(
@@ -75,7 +91,10 @@ class SelectInterpreterTest(TaskTestBase):
                             dependencies=dependencies, compatibility=compatibility)
 
   def _select_interpreter(self, target_roots, should_invalidate=None):
-    PythonInterpreter.CACHE.clear()
+    # TODO: Call PythonInterpreter.clear_cache() instead, when
+    # https://github.com/pantsbuild/pex/pull/885 is available.
+    interpreter_cache_dir = os.path.join(ENV.PEX_ROOT, 'interpreters')
+    safe_rmtree(interpreter_cache_dir)
 
     context = self.context(target_roots=target_roots)
 
