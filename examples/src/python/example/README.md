@@ -512,20 +512,20 @@ passed to the `setup` function.
 
     :::python
     python_library(
-      name='test_infra',
+      name='testutil_wheel',
       dependencies=[
-        'tests/python/pants_test:base_test',
+        ':base_test',
         ...
       ],
       provides=setup_py(
-        name='pantsbuild.pants.testinfra',
+        name='pantsbuild.pants.testutil',
         version='0.0.24',
         description='Test support for writing pants plugins.',
         long_description='''A much longer description of this package. Pages and pages!''',
         url='https://github.com/pantsbuild/pants',
         license='Apache License, Version 2.0',
         zip_safe=True,
-        namespace_packages=['pants_test'],
+        namespace_packages=['pants.testutil'],
         classifiers=[
           'Intended Audience :: Developers',
           'License :: OSI Approved :: Apache Software License',
@@ -541,7 +541,7 @@ passed to the `setup` function.
 The <a pantsref="oref_goal_setup-py">`setup-py`</a> goal builds a package from such a target:
 
     :::bash
-    $ ./pants setup-py src/python/pants:test_infra
+    $ ./pants setup-py src/python/pants/testutil:testutil_wheel
     10:23:06 00:00 [main]
                    (To run a reporting server: ./pants server)
     10:23:07 00:01   [bootstrap]
@@ -550,8 +550,8 @@ The <a pantsref="oref_goal_setup-py">`setup-py`</a> goal builds a package from s
                    Executing tasks in goals: setup-py
     10:23:07 00:01   [setup-py]
     10:23:07 00:01     [setup-py]
-                       Running packager against /Users/you/workspace/pants/dist/pantsbuild.pants.testinfra-0.0.24
-                       Writing /Users/you/workspace/pants/dist/pantsbuild.pants.testinfra-0.0.24.tar.gz
+                       Running packager against /Users/you/workspace/pants/dist/pantsbuild.pants.testutil-0.0.24
+                       Writing /Users/you/workspace/pants/dist/pantsbuild.pants.testutil-0.0.24.tar.gz
                    SUCCESS
 
 

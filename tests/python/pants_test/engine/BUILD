@@ -1,26 +1,6 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-python_library(
-  name = 'util',
-  sources = ['util.py'],
-  dependencies = [
-    'src/python/pants/testutil/engine:util',
-    'tests/python/pants_test:deprecated_testinfra',
-  ],
-  tags = {'partially_type_checked'},
-)
-
-python_library(
-  name = 'engine_test_base',
-  sources = ['base_engine_test.py'],
-  dependencies = [
-    'src/python/pants/testutil/engine:engine_test_base',
-    'tests/python/pants_test:deprecated_testinfra',
-  ],
-  tags = {'partially_type_checked'},
-)
-
 python_tests(
   name = 'legacy_engine',
   sources = ['test_legacy_engine.py'],
