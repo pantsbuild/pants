@@ -122,7 +122,7 @@ async def setup_pytest_for_target(
 
   chrooted_sources = await Get[ChrootedPythonSources](HydratedTargets(all_targets))
   directories_to_merge = [
-    chrooted_sources.digest,
+    chrooted_sources.snapshot.directory_digest,
     resolved_requirements_pex.directory_digest,
   ]
 

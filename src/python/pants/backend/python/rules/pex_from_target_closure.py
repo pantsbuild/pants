@@ -41,6 +41,7 @@ async def create_pex_from_target_closure(request: CreatePexFromTargetClosure,
     python_setup=python_setup
   )
 
+  chrooted_sources: Optional[ChrootedPythonSources] = None
   if request.include_source_files:
     chrooted_sources = await Get[ChrootedPythonSources](HydratedTargets(all_targets))
 
@@ -54,7 +55,9 @@ async def create_pex_from_target_closure(request: CreatePexFromTargetClosure,
     requirements=requirements,
     interpreter_constraints=interpreter_constraints,
     entry_point=request.entry_point,
-    input_files_digest=chrooted_sources.digest if request.include_source_files else None,
+    input_files_digest=(
+      chrooted_sources.snapshot.directory_digest if chrooted_sources else None
+    ),
     additional_args=request.additional_args,
   )
 
