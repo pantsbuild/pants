@@ -675,6 +675,13 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
       yield cm
     self.assertIn(error_text, str(cm.exception))
 
+  @contextmanager
+  def assertDoesNotRaise(self):
+    try:
+      yield
+    except Exception as e:
+      raise AssertionError(f'section should not have raised, but did: {e}') from e
+
   def get_bootstrap_options(self, cli_options=()):
     """Retrieves bootstrap options.
 
