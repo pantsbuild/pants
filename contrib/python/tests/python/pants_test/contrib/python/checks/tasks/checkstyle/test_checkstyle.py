@@ -18,7 +18,7 @@ from pants.util.dirutil import safe_mkdtemp, safe_rmtree
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 from parameterized import parameterized
 from pex.interpreter import PythonInterpreter
-from wheel.install import WheelFile
+from wheel.wheelfile import WheelFile
 
 from pants.contrib.python.checks.tasks.checkstyle.checkstyle import Checkstyle
 
