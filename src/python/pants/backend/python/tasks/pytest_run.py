@@ -22,7 +22,6 @@ from pants.backend.python.tasks.gather_sources import GatherSources
 from pants.backend.python.tasks.pytest_prep import PytestPrep
 from pants.backend.python.tasks.python_execution_task_base import ensure_interpreter_search_path_env
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import ErrorWhileTesting, TaskError
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
 from pants.base.hash_utils import Sharder
@@ -658,18 +657,9 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
       if self.get_options().colors:
         args.extend(['--color', 'yes'])
 
-      deprecated_conditional(
-        lambda: self.get_passthru_args(),
-        removal_version='1.26.0.dev1',
-        entity_description='Using the old style of passthrough args for Pytest',
-        hint_message="You passed arguments to Pytest through either the "
-                     "`--test-pytest-passthrough-args` option or the style "
-                     "`./pants test.pytest -- -k FooTest --quiet`. Instead, pass any arguments to "
-                     "Pytest like this: `./pants test :: --pytest-args='-k FooTest --quiet'`.\n\n"
-                     "This change is meant to reduce confusion in how option scopes work with "
-                     "passthrough args and to prepare for Pytest eventually exclusively using the "
-                     "V2 implementation, which only supports `--pytest-args`.",
-      )
+      # NB: While passthrough args are not supported in v2 yet, as discussed on #9075, it seems
+      # likely that we can find a way to preserve the ability to use passthrough args for
+      # umabiguous goals in v2.
       args.extend([*self.get_passthru_args(), *PyTest.global_instance().options.args])
 
       args.extend(test_args)
