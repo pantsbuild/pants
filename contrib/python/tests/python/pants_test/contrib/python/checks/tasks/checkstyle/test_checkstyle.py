@@ -28,8 +28,6 @@ CHECKER_RESOLVE_METHOD = [('sys.path', True), ('resolve', False)]
 # IMPORTANT NOTE: This test fails if run in a chroot.
 # To run it, use `./pants test.pytest --no-chroot`.
 # One more reason to kill this plugin...
-
-
 class CheckstyleTest(PythonTaskTestBase):
 
   py2_constraint = 'CPython>=2.7,<3'
