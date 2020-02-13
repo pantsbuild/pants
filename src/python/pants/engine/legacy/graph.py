@@ -412,6 +412,8 @@ class LegacyTransitiveHydratedTargets:
   closure: OrderedSet  # TODO: this is an OrderedSet[LegacyHydratedTarget]
 
 
+# TODO(#7490): Remove this once we have multiple params support so that rules can do something
+# like `await Get[TestResult](Params(Address(..), Origin(..)))`.
 @dataclass(frozen=True)
 class HydratedTargetWithOrigin:
   """A wrapper around HydratedTarget that preserves the original spec used to resolve the target.

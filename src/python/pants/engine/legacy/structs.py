@@ -311,9 +311,8 @@ class PantsPluginAdaptor(PythonTargetAdaptor):
     return GlobsWithConjunction.for_literal_files(['register.py'], self.address.spec_path)
 
 
-# TODO(#4535): Find a less clunky solution for precise file args as part of the Target API. The
-# trick here is that we must have some way to preserve the OriginSpec while also having a distinct
-# type for each target so that unions work properly.
+# TODO(#7490): Remove this once we have multiple params support so that rules can do something
+# like `await Get[TestResult](Params(Address(..), Origin(..)))`.
 @dataclass(frozen=True)
 class TargetAdaptorWithOrigin:
   adaptor: TargetAdaptor

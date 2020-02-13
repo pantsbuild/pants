@@ -134,6 +134,10 @@ class PythonTestRunnerIntegrationTest(TestBase):
     options_bootstrapper = create_options_bootstrapper(args=args)
     if origin is None:
       origin = SingleAddress(directory=self.source_root, name="target")
+    # TODO: We must use the V1 target's `_sources_field.sources` field to set the TargetAdaptor's
+    # sources attribute. The adaptor will not auto-populate this field. However, it will
+    # auto-populate things like `dependencies` and this was not necessary before using
+    # PythonTestsAdaptorWithOrigin. Why is this necessary in test code?
     v1_target = self.target(f"{self.source_root}:target")
     adaptor = PythonTestsAdaptor(
       address=v1_target.address.to_address(), sources=v1_target._sources_field.sources,
