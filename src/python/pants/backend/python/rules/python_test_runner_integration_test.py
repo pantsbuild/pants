@@ -17,11 +17,11 @@ from pants.backend.python.subsystems import python_native_code, subprocess_envir
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_tests import PythonTests
-from pants.build_graph.address import Address
+from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.fs import FileContent
 from pants.engine.interactive_runner import InteractiveRunner
-from pants.engine.legacy.structs import PythonTestsAdaptor
+from pants.engine.legacy.structs import PythonTestsAdaptor, PythonTestsAdaptorWithOrigin
 from pants.engine.rules import RootRule, subsystem_rule
 from pants.engine.selectors import Params
 from pants.python.python_requirement import PythonRequirement
@@ -46,7 +46,7 @@ class PythonTestRunnerIntegrationTest(TestBase):
 
   def write_file(self, file_content: FileContent) -> None:
     self.create_file(
-      relpath=str(PurePath(self.source_root, file_content.path)),
+      relpath=PurePath(self.source_root, file_content.path).as_posix(),
       contents=file_content.content.decode(),
     )
 
@@ -115,10 +115,12 @@ class PythonTestRunnerIntegrationTest(TestBase):
       *strip_source_roots.rules(),
       *subprocess_environment.rules(),
       subsystem_rule(TestOptions),
-      RootRule(PythonTestsAdaptor),
+      RootRule(PythonTestsAdaptorWithOrigin),
     )
 
-  def run_pytest(self, *, passthrough_args: Optional[str] = None) -> TestResult:
+  def run_pytest(
+    self, *, passthrough_args: Optional[str] = None, origin: Optional[OriginSpec] = None,
+  ) -> TestResult:
     args = [
       "--backend-packages2=pants.backend.python",
       # pin to lower versions so that we can run Python 2 tests
@@ -128,11 +130,19 @@ class PythonTestRunnerIntegrationTest(TestBase):
     if passthrough_args:
       args.append(f"--pytest-args='{passthrough_args}'")
     options_bootstrapper = create_options_bootstrapper(args=args)
-    target = PythonTestsAdaptor(address=Address.parse(f"{self.source_root}:target"))
-    test_result = self.request_single_product(TestResult, Params(target, options_bootstrapper))
-    debug_request = self.request_single_product(
-      TestDebugRequest, Params(target, options_bootstrapper),
+    if origin is None:
+      origin = SingleAddress(directory=self.source_root, name="target")
+    # TODO: We must use the V1 target's `_sources_field.sources` field to set the TargetAdaptor's
+    # sources attribute. The adaptor will not auto-populate this field. However, it will
+    # auto-populate things like `dependencies` and this was not necessary before using
+    # PythonTestsAdaptorWithOrigin. Why is this necessary in test code?
+    v1_target = self.target(f"{self.source_root}:target")
+    adaptor = PythonTestsAdaptor(
+      address=v1_target.address.to_address(), sources=v1_target._sources_field.sources,
     )
+    params = Params(PythonTestsAdaptorWithOrigin(adaptor, origin), options_bootstrapper)
+    test_result = self.request_single_product(TestResult, params)
+    debug_request = self.request_single_product(TestDebugRequest, params)
     debug_result = InteractiveRunner(self.scheduler).run_local_interactive_process(debug_request.ipr)
     if test_result.status == Status.SUCCESS:
       assert debug_result.process_exit_code == 0
@@ -158,6 +168,14 @@ class PythonTestRunnerIntegrationTest(TestBase):
     assert result.status == Status.FAILURE
     assert "test_good.py ." in result.stdout
     assert "test_bad.py F" in result.stdout
+
+  def test_precise_file_args(self) -> None:
+    self.create_python_test_target([self.good_source, self.bad_source])
+    file_arg = FilesystemLiteralSpec(PurePath(self.source_root, self.good_source.path).as_posix())
+    result = self.run_pytest(origin=file_arg)
+    assert result.status == Status.SUCCESS
+    assert "test_good.py ." in result.stdout
+    assert "test_bad.py F" not in result.stdout
 
   def test_absolute_import(self) -> None:
     self.create_basic_library()

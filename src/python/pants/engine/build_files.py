@@ -321,5 +321,6 @@ def create_graph_rules(address_mapper: AddressMapper):
     address_origin_map,
     # Root rules representing parameters that might be provided via root subjects.
     RootRule(Address),
+    RootRule(AddressWithOrigin),
     RootRule(AddressSpecs),
   ]

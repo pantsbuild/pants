@@ -3,17 +3,20 @@
 
 import logging
 from textwrap import dedent
-from typing import Dict, Optional
+from typing import Optional
 from unittest.mock import Mock
 
-from pants.base.specs import DescendantAddresses, SingleAddress, Spec
+from pants.base.specs import DescendantAddresses, OriginSpec, SingleAddress
 from pants.build_graph.address import Address
-from pants.engine.addressable import Addresses
-from pants.engine.build_files import AddressOriginMap
+from pants.engine.addressable import AddressesWithOrigins, AddressWithOrigin
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, Digest, FileContent, InputFilesContent, Snapshot
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
-from pants.engine.legacy.graph import HydratedTarget
-from pants.engine.legacy.structs import PythonBinaryAdaptor, PythonTestsAdaptor
+from pants.engine.legacy.graph import HydratedTarget, HydratedTargetWithOrigin
+from pants.engine.legacy.structs import (
+  PythonBinaryAdaptor,
+  PythonTestsAdaptor,
+  PythonTestsAdaptorWithOrigin,
+)
 from pants.engine.rules import UnionMembership
 from pants.rules.core.test import (
   AddressAndDebugRequest,
@@ -55,6 +58,15 @@ class TestTest(TestBase):
     content = b"import sys; sys.exit(1)"
     return self.make_ipr(content)
 
+  @staticmethod
+  def make_addresses_with_origins(*addresses: Address) -> AddressesWithOrigins:
+    return AddressesWithOrigins([
+      AddressWithOrigin(
+        address=address,
+        origin=SingleAddress(directory=address.spec_path, name=address.target_name)
+      ) for address in addresses
+    ])
+
   def single_target_test(self, result, expected_console_output, success=True, debug=False):
     console = MockConsole(use_colors=False)
     options = MockOptions(debug=debug)
@@ -62,16 +74,16 @@ class TestTest(TestBase):
     addr = Address.parse("some/target")
     res = run_rule(
       run_tests,
-      rule_args=[console, options, runner, Addresses([addr])],
+      rule_args=[console, options, runner, self.make_addresses_with_origins(addr)],
       mock_gets=[
         MockGet(
           product_type=AddressAndTestResult,
-          subject_type=Address,
+          subject_type=AddressWithOrigin,
           mock=lambda _: AddressAndTestResult(addr, result),
         ),
         MockGet(
           product_type=AddressAndDebugRequest,
-          subject_type=Address,
+          subject_type=AddressWithOrigin,
           mock=lambda _: AddressAndDebugRequest(
             addr,
             TestDebugRequest(ipr=self.make_successful_ipr() if success else self.make_failure_ipr())
@@ -109,30 +121,38 @@ class TestTest(TestBase):
     console = MockConsole(use_colors=False)
     options = MockOptions(debug=False)
     runner = InteractiveRunner(self.scheduler)
-    target1 = Address.parse("testprojects/tests/python/pants/passes")
-    target2 = Address.parse("testprojects/tests/python/pants/fails")
+    address1 = Address.parse("testprojects/tests/python/pants/passes")
+    address2 = Address.parse("testprojects/tests/python/pants/fails")
 
-    def make_result(target: Address) -> AddressAndTestResult:
-      if target == target1:
+    def make_result(address_with_origin: AddressWithOrigin) -> AddressAndTestResult:
+      address = address_with_origin.address
+      if address == address1:
         tr = TestResult(status=Status.SUCCESS, stdout='I passed\n', stderr='')
-      elif target == target2:
+      elif address == address2:
         tr = TestResult(status=Status.FAILURE, stdout='I failed\n', stderr='')
       else:
         raise Exception("Unrecognised target")
-      return AddressAndTestResult(target, tr)
+      return AddressAndTestResult(address, tr)
 
-    def make_debug_request(target: Address) -> AddressAndDebugRequest:
+    def make_debug_request(address_with_origin: AddressWithOrigin) -> AddressAndDebugRequest:
+      address = address_with_origin.address
       request = TestDebugRequest(
-        ipr=self.make_successful_ipr() if target == target1 else self.make_failure_ipr()
+        ipr=self.make_successful_ipr() if address == address1 else self.make_failure_ipr()
       )
-      return AddressAndDebugRequest(target, request)
+      return AddressAndDebugRequest(address, request)
 
     res = run_rule(
       run_tests,
-      rule_args=[console, options, runner, Addresses([target1, target2])],
+      rule_args=[console, options, runner, self.make_addresses_with_origins(address1, address2)],
       mock_gets=[
-        MockGet(product_type=AddressAndTestResult, subject_type=Address, mock=make_result),
-        MockGet(product_type=AddressAndDebugRequest, subject_type=Address, mock=make_debug_request),
+        MockGet(
+          product_type=AddressAndTestResult, subject_type=AddressWithOrigin, mock=make_result
+        ),
+        MockGet(
+          product_type=AddressAndDebugRequest,
+          subject_type=AddressWithOrigin,
+          mock=make_debug_request
+        ),
       ],
     )
 
@@ -173,7 +193,7 @@ class TestTest(TestBase):
     self,
     *,
     address: Address,
-    addr_to_origin: Optional[Dict[Address, Spec]] = None,
+    origin: Optional[OriginSpec] = None,
     test_target_type: bool = True,
     include_sources: bool = True,
   ) -> AddressAndTestResult:
@@ -197,14 +217,16 @@ class TestTest(TestBase):
       result: AddressAndTestResult = run_rule(
         coordinator_of_tests,
         rule_args=[
-          HydratedTarget(address, target_adaptor, ()),
-          UnionMembership(union_rules={TestTarget: [PythonTestsAdaptor]}),
-          AddressOriginMap(addr_to_origin=addr_to_origin or {}),
+          HydratedTargetWithOrigin(
+            target=HydratedTarget(address, target_adaptor, ()),
+            origin=origin or SingleAddress(directory=address.spec_path, name=address.target_name),
+          ),
+          UnionMembership(union_rules={TestTarget: [PythonTestsAdaptorWithOrigin]}),
         ],
         mock_gets=[
           MockGet(
             product_type=TestResult,
-            subject_type=PythonTestsAdaptor,
+            subject_type=PythonTestsAdaptorWithOrigin,
             mock=lambda _: TestResult(status=Status.SUCCESS, stdout='foo', stderr=''),
           ),
         ],
@@ -226,7 +248,7 @@ class TestTest(TestBase):
     with self.assertRaisesRegex(AssertionError, r'Rule requested: .* which cannot be satisfied.'):
       self.run_coordinator_of_tests(
         address=addr,
-        addr_to_origin={addr: SingleAddress(directory='some/dir', name='bin')},
+        origin=SingleAddress(directory='some/dir', name='bin'),
         test_target_type=False,
       )
 
@@ -238,8 +260,7 @@ class TestTest(TestBase):
   def test_coordinator_globbed_test_target(self) -> None:
     addr = Address.parse("some/dir:tests")
     result = self.run_coordinator_of_tests(
-      address=addr,
-      addr_to_origin={addr: DescendantAddresses(directory='some/dir')}
+      address=addr, origin=DescendantAddresses(directory='some/dir'),
     )
     assert result == AddressAndTestResult(
       addr, TestResult(status=Status.SUCCESS, stdout='foo', stderr='')
@@ -249,7 +270,7 @@ class TestTest(TestBase):
     addr = Address.parse("some/dir:bin")
     result = self.run_coordinator_of_tests(
       address=addr,
-      addr_to_origin={addr: DescendantAddresses(directory='some/dir')},
+      origin=DescendantAddresses(directory='some/dir'),
       test_target_type=False,
     )
     assert result == AddressAndTestResult(addr, None)
