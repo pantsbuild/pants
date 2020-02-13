@@ -10,6 +10,7 @@ import re
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from dataclasses import dataclass
+from functools import partial
 from hashlib import sha1
 from pathlib import PurePath
 from typing import Any, ClassVar, Dict, List, Mapping, Optional, Sequence, Tuple, Union, cast
@@ -311,8 +312,12 @@ class _TomlValues(_ConfigValues):
 
     return recurse(mapping=self.values, remaining_sections=section.split("."))
 
-  def _possibly_interpolate_value(self, raw_value: str) -> str:
-    """For any values with %(foo)s, substitute it with the corresponding default val."""
+  def _possibly_interpolate_value(
+    self, raw_value: str, *, option: str, section: str, section_values: Dict,
+  ) -> str:
+    """For any values with %(foo)s, substitute it with the corresponding value from
+    DEFAULT or the same section.
+    """
     def format_str(value: str) -> str:
       # Because dictionaries use the symbols `{}`, we must proactively escape the symbols so that
       # .format() does not try to improperly interpolate.
@@ -322,7 +327,14 @@ class _TomlValues(_ConfigValues):
         repl=r"{\g<interpolated>}",
         string=escaped_str,
       )
-      return new_style_format_str.format(**self.defaults)
+      try:
+        possible_interpolations = {**self.defaults, **section_values}
+        return new_style_format_str.format(**possible_interpolations)
+      except KeyError as e:
+        bad_reference = e.args[0]
+        raise configparser.InterpolationMissingOptionError(
+          option, section, raw_value, bad_reference,
+        )
 
     def recursively_format_str(value: str) -> str:
       # It's possible to interpolate with a value that itself has an interpolation. We must fully
@@ -334,26 +346,46 @@ class _TomlValues(_ConfigValues):
     return recursively_format_str(raw_value)
 
   def _stringify_val(
-    self, raw_value: _TomlValue, *, interpolate: bool = True, list_prefix: Optional[str] = None,
+    self,
+    raw_value: _TomlValue,
+    *,
+    option: str,
+    section: str,
+    section_values: Dict,
+    interpolate: bool = True,
+    list_prefix: Optional[str] = None,
   ) -> str:
     """For parity with configparser, we convert all values back to strings, which allows us to
     avoid upstream changes to files like parser.py.
 
-    This is clunky. If we drop INI support, we should remove this and use native values."""
+    This is clunky. If we drop INI support, we should remove this and use native values (although
+    we must still support interpolation).
+    """
+    possibly_interpolate = partial(
+      self._possibly_interpolate_value,
+      option=option,
+      section=section,
+      section_values=section_values,
+    )
     if isinstance(raw_value, str):
-      return self._possibly_interpolate_value(raw_value) if interpolate else raw_value
+      return possibly_interpolate(raw_value) if interpolate else raw_value
 
     if isinstance(raw_value, list):
       def stringify_list_member(member: _TomlPrimitve) -> str:
         if not isinstance(member, str):
           return str(member)
-        interpolated_member = self._possibly_interpolate_value(member) if interpolate else member
+        interpolated_member = possibly_interpolate(member) if interpolate else member
         return f'"{interpolated_member}"'
 
       list_members = ", ".join(stringify_list_member(member) for member in raw_value)
       return f"{list_prefix or ''}[{list_members}]"
 
     return str(raw_value)
+
+  def _stringify_val_without_interpolation(self, raw_value: _TomlValue) -> str:
+    return self._stringify_val(
+      raw_value, option="", section="", section_values={}, interpolate=False,
+    )
 
   @property
   def sections(self) -> List[str]:
@@ -390,10 +422,13 @@ class _TomlValues(_ConfigValues):
     section_values = self._find_section_values(section)
     if section_values is None:
       raise configparser.NoSectionError(section)
+    stringify = partial(
+      self._stringify_val, option=option, section=section, section_values=section_values,
+    )
     if option not in section_values:
       if option not in self.defaults:
         raise configparser.NoOptionError(option, section)
-      return self._stringify_val(self.defaults[option])
+      return stringify(raw_value=self.defaults[option])
     option_value = section_values[option]
     # Handle the special `my_list_option.add` and `my_list_option.remove` syntax.
     if isinstance(option_value, dict):
@@ -401,18 +436,14 @@ class _TomlValues(_ConfigValues):
       has_remove = "remove" in option_value
       if not has_add and not has_remove:
         raise configparser.NoOptionError(option, section)
-      add_val = (
-        self._stringify_val(option_value["add"], list_prefix="+") if has_add else None
-      )
-      remove_val = (
-        self._stringify_val(option_value["remove"], list_prefix="-") if has_remove else None
-      )
+      add_val = stringify(option_value["add"], list_prefix="+") if has_add else None
+      remove_val = stringify(option_value["remove"], list_prefix="-") if has_remove else None
       if has_add and has_remove:
         return f"{add_val},{remove_val}"
       if has_add:
         return add_val
       return remove_val
-    return self._stringify_val(option_value)
+    return stringify(option_value)
 
   def options(self, section: str) -> List[str]:
     section_values = self._find_section_values(section)
@@ -431,7 +462,7 @@ class _TomlValues(_ConfigValues):
   @property
   def defaults(self) -> Mapping[str, str]:
     return {
-      option: self._stringify_val(option_val, interpolate=False)
+      option: self._stringify_val_without_interpolation(option_val)
       for option, option_val in self.values["DEFAULT"].items()
     }
 

@@ -72,7 +72,6 @@ class File1(ConfigFile):
           list3: -["x", "y", "z"]
         
           [b]
-          name: overridden_from_default
           preempt: True
           
           [b.nested]
@@ -84,6 +83,11 @@ class File1(ConfigFile):
           
           [b.nested.nested-again]
           movie: inception
+          
+          [c]
+          name: overridden_from_default
+          interpolated_from_section: %(name)s is interpolated
+          recursively_interpolated_from_section: %(interpolated_from_section)s (again)
           """
         ),
         ConfigFormat.toml: dedent(
@@ -107,7 +111,6 @@ class File1(ConfigFile):
           list3.remove = ["x", "y", "z"]
         
           [b]
-          name = "overridden_from_default"
           preempt = true
         
           [b.nested]
@@ -120,6 +123,11 @@ class File1(ConfigFile):
         
           [b.nested.nested-again]
           movie = "inception"
+          
+          [c]
+          name = "overridden_from_default"
+          interpolated_from_section = "%(name)s is interpolated"
+          recursively_interpolated_from_section = "%(interpolated_from_section)s (again)"
           """
         ),
       }
@@ -151,7 +159,6 @@ class File1(ConfigFile):
         "list3": '-["x", "y", "z"]',
       },
       "b": {
-        "name": "overridden_from_default",
         "preempt": "True",
       },
       "b.nested": {
@@ -160,6 +167,11 @@ class File1(ConfigFile):
       "b.nested.nested-again": {
         "movie": "inception",
       },
+      "c": {
+        "name": "overridden_from_default",
+        "interpolated_from_section": "overridden_from_default is interpolated",
+        "recursively_interpolated_from_section": "overridden_from_default is interpolated (again)",
+      }
     }
     return match(
       self.format,
@@ -193,13 +205,13 @@ class File2(ConfigFile):
           [b]
           preempt: False
 
-          [c.child]
-          no_values_in_parent: True
-
           [d]
           list: +[0, 1],-[8, 9]
 
-          [defined_section]
+          [empty_section]
+          
+          [p.child]
+          no_values_in_parent: True
           """
         ),
         ConfigFormat.toml: dedent(
@@ -210,14 +222,14 @@ class File2(ConfigFile):
           [b]
           preempt = false
 
-          [c.child]
-          no_values_in_parent = true
-
           [d]
           list.add = [0, 1]
           list.remove = [8, 9]
 
-          [defined_section]
+          [empty_section]
+          
+          [p.child]
+          no_values_in_parent = true
           """
         ),
       }
@@ -230,19 +242,11 @@ class File2(ConfigFile):
   @property
   def expected_options(self) -> Dict:
     return {
-      "a": {
-        "fast": "True",
-      },
-      "b": {
-        "preempt": "False",
-      },
-      "c.child": {
-        "no_values_in_parent": "True",
-      },
-      "d": {
-        "list": "+[0, 1],-[8, 9]",
-      },
-      "defined_section": {},
+      "a": {"fast": "True"},
+      "b": {"preempt": "False"},
+      "d": {"list": "+[0, 1],-[8, 9]"},
+      "empty_section": {},
+      "p.child": {"no_values_in_parent": "True"},
     }
 
 
@@ -288,7 +292,7 @@ class ConfigBaseTest(TestBase):
       assert self.config.has_section(section) is True
     # We should only look at explicitly defined sections. For example, if `cache.java` is defined
     # but `cache` is not, then `cache` should not be included in the sections.
-    assert self.config.has_section('c') is False
+    assert self.config.has_section('p') is False
 
   def test_has_option(self) -> None:
     # Check has all DEFAULT values
@@ -321,7 +325,7 @@ class ConfigBaseTest(TestBase):
     nested_sections = {
       "b": "nested",
       "b.nested": "nested-again",
-      "c": "child",
+      "p": "child",
     }
     for parent_section, child_section in nested_sections.items():
       assert self.config.has_option(section=parent_section, option=child_section) is False
