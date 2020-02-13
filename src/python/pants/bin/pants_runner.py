@@ -4,7 +4,6 @@
 import logging
 import os
 import sys
-import warnings
 from typing import List, Mapping, Optional
 
 from pants.base.exception_sink import ExceptionSink
@@ -89,9 +88,6 @@ class PantsRunner(ExceptionSink.AccessGlobalExiterMixin):
 
     ExceptionSink.reset_should_print_backtrace_to_terminal(global_bootstrap_options.print_exception_stacktrace)
     ExceptionSink.reset_log_location(global_bootstrap_options.pants_workdir)
-
-    for message_regexp in global_bootstrap_options.ignore_pants_warnings:
-      warnings.filterwarnings(action='ignore', message=message_regexp)
 
     # TODO https://github.com/pantsbuild/pants/issues/7205
     if self._should_run_with_pantsd(global_bootstrap_options):
