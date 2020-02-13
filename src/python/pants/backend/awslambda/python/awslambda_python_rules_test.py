@@ -10,7 +10,6 @@ from pants.backend.awslambda.common.awslambda_common_rules import CreatedAWSLamb
 from pants.backend.awslambda.python.awslambda_python_rules import rules as awslambda_python_rules
 from pants.backend.python.rules import (
   download_pex_bin,
-  inject_init,
   pex,
   pex_from_target_closure,
   prepare_chrooted_python_sources,
@@ -42,7 +41,6 @@ class TestPythonAWSLambdaCreation(TestBase):
       # If we pull in the subsystem_rule() as well from this file, we get an error saying the scope
       # 'download-pex-bin' was not found when trying to fetch the appropriate scope.
       download_pex_bin.download_pex_bin,
-      *inject_init.rules(),
       *pex.rules(),
       *pex_from_target_closure.rules(),
       *prepare_chrooted_python_sources.rules(),
