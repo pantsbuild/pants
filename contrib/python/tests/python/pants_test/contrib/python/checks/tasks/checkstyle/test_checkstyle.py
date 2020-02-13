@@ -52,7 +52,7 @@ class CheckstyleTest(PythonTaskTestBase):
 
   @staticmethod
   def install_wheel(wheel, root_dir):
-    subprocess.check_call(['pip', 'install', '--root', root_dir, wheel])
+    subprocess.check_call(['pip', 'install', '--no-input', '--root', root_dir, wheel])
     importable_path = os.path.join(root_dir, 'install', os.path.basename(wheel))
     return importable_path
 
