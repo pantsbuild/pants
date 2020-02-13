@@ -442,38 +442,37 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     # If we are only exporting jars then we can omit some targets from the runtime_classpath.
     if self.context.products.is_required_data("export_dep_as_jar_signal"):
       # Filter modulized targets from invalid targets list.
-      target_root_addresses = [t.address for t in set(self.context.target_roots)]
-      dependees_of_target_roots = self.context.build_graph.transitive_dependees_of_addresses(target_root_addresses)
+      target_roots_in_play = set(relevant_targets) & set(self.context.target_roots)
+      addresses_in_play = [t.address for t in target_roots_in_play]
+      dependees_of_target_roots = self.context.build_graph.transitive_dependees_of_addresses(addresses_in_play)
       relevant_targets = list(set(relevant_targets) - dependees_of_target_roots)
 
-    if not relevant_targets:
-      return
+    if relevant_targets:
+      # Note, JVM targets are validated (`vts.update()`) as they succeed.  As a result,
+      # we begin writing artifacts out to the cache immediately instead of waiting for
+      # all targets to finish.
+      with self.invalidated(relevant_targets,
+                            invalidate_dependents=True,
+                            fingerprint_strategy=fingerprint_strategy,
+                            topological_order=True) as invalidation_check:
 
-    # Note, JVM targets are validated (`vts.update()`) as they succeed.  As a result,
-    # we begin writing artifacts out to the cache immediately instead of waiting for
-    # all targets to finish.
-    with self.invalidated(relevant_targets,
-                          invalidate_dependents=True,
-                          fingerprint_strategy=fingerprint_strategy,
-                          topological_order=True) as invalidation_check:
+        compile_contexts = {vt.target: self.create_compile_context(vt.target, vt.results_dir)
+                            for vt in invalidation_check.all_vts}
 
-      compile_contexts = {vt.target: self.create_compile_context(vt.target, vt.results_dir)
-                          for vt in invalidation_check.all_vts}
+        self.do_compile(
+          invalidation_check,
+          compile_contexts,
+          classpath_product,
+        )
 
-      self.do_compile(
-        invalidation_check,
-        compile_contexts,
-        classpath_product,
-      )
-
-      if not self.get_options().use_classpath_jars:
-        # Once compilation has completed, replace the classpath entry for each target with
-        # its jar'd representation.
-        for ccs in compile_contexts.values():
-          cc = self.select_runtime_context(ccs)
-          for conf in self._confs:
-            classpath_product.remove_for_target(cc.target, [(conf, cc.classes_dir)])
-            classpath_product.add_for_target(cc.target, [(conf, cc.jar_file)])
+        if not self.get_options().use_classpath_jars:
+          # Once compilation has completed, replace the classpath entry for each target with
+          # its jar'd representation.
+          for ccs in compile_contexts.values():
+            cc = self.select_runtime_context(ccs)
+            for conf in self._confs:
+              classpath_product.remove_for_target(cc.target, [(conf, cc.classes_dir)])
+              classpath_product.add_for_target(cc.target, [(conf, cc.jar_file)])
 
     if dependees_of_target_roots is not None:
       self.create_extra_products_for_targets(dependees_of_target_roots)

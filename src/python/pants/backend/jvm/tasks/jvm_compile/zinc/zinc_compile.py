@@ -235,6 +235,8 @@ class BaseZincCompile(JvmCompile):
       self.context.products.safe_create_data('zinc_args', lambda: defaultdict(list))
 
   def create_extra_products_for_targets(self, targets):
+    if not targets:
+      return
     if self.context.products.is_required_data('zinc_args'):
       zinc_args = self.context.products.get_data('zinc_args')
       with self.invalidated(targets,
