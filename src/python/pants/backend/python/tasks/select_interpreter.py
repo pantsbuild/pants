@@ -4,7 +4,6 @@
 import hashlib
 import os
 
-from pex.executor import Executor
 from pex.interpreter import PythonInterpreter
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
