@@ -3,7 +3,6 @@
 
 import os
 from dataclasses import dataclass
-from pathlib import PurePath
 from textwrap import dedent
 from typing import Optional, Tuple
 
@@ -12,17 +11,8 @@ from pants.backend.python.rules.pex_from_target_closure import CreatePexFromTarg
 from pants.backend.python.rules.prepare_chrooted_python_sources import ChrootedPythonSources
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
-from pants.base.specs import FilesystemResolvedSpec
 from pants.engine.addressable import Addresses
-from pants.engine.fs import (
-  Digest,
-  DirectoriesToMerge,
-  FileContent,
-  InputFilesContent,
-  PathGlobs,
-  Snapshot,
-  SnapshotSubset,
-)
+from pants.engine.fs import Digest, DirectoriesToMerge, FileContent, InputFilesContent
 from pants.engine.interactive_runner import InteractiveProcessRequest
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
@@ -31,7 +21,10 @@ from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.option.global_options import GlobalOptions
 from pants.python.python_setup import PythonSetup
-from pants.rules.core.strip_source_roots import SourceRootStrippedSources, StripSourceRootsRequest
+from pants.rules.core.find_target_source_files import (
+  FindTargetSourceFilesRequest,
+  TargetSourceFiles,
+)
 from pants.rules.core.test import TestDebugRequest, TestOptions, TestResult, TestTarget
 
 
@@ -102,12 +95,11 @@ def get_packages_to_cover(
 
 @rule
 async def setup_pytest_for_target(
-  target_with_origin: PythonTestsAdaptorWithOrigin,
+  adaptor_with_origin: PythonTestsAdaptorWithOrigin,
   pytest: PyTest,
   test_options: TestOptions,
 ) -> TestTargetSetup:
-  adaptor = target_with_origin.adaptor
-  origin = target_with_origin.origin
+  adaptor = adaptor_with_origin.adaptor
   # TODO: Rather than consuming the TestOptions subsystem, the TestRunner should pass on coverage
   # configuration via #7490.
   transitive_hydrated_targets = await Get[TransitiveHydratedTargets](Addresses((adaptor.address,)))
@@ -136,32 +128,10 @@ async def setup_pytest_for_target(
     resolved_requirements_pex.directory_digest,
   ]
 
-  # Get the file names for the test_target, adjusted for the source root. This allows us to
-  # specify to Pytest which files to test and thus to avoid the test auto-discovery defined by
-  # https://pytest.org/en/latest/goodpractices.html#test-discovery. In addition to a performance
-  # optimization, this ensures that any transitive sources, such as a test project file named
-  # test_fail.py, do not unintentionally end up being run as tests.
-  # TODO: generalize this once it's we add precise file args to `fmt` and `lint`. Those will likely
-  # have a slightly different implementation, such as _not_ stripping source roots for most linters,
-  # so it's not clear yet what should be generalized.
-  test_files_snapshot = adaptor.sources.snapshot
-  if isinstance(origin, FilesystemResolvedSpec):
-    # NB: we ensure that `precise_files_specified` is a subset of the original target's `sources`.
-    # It's possible when given a glob filesystem spec that the spec will have resolved files not
-    # belonging to this target - those must be filtered out.
-    precise_files_specified = set(test_files_snapshot.files).intersection(origin.resolved_files)
-    test_files_snapshot = await Get[Snapshot](
-      SnapshotSubset(
-        directory_digest=test_files_snapshot.directory_digest,
-        globs=PathGlobs(sorted(precise_files_specified)),
-      )
-    )
-  test_files = await Get[SourceRootStrippedSources](
-    StripSourceRootsRequest(
-      test_files_snapshot,
-      # TODO: simply pass `address.spec_path` once `--source-unmatched` is removed.
-      representative_path=PurePath(adaptor.address.spec_path, "BUILD").as_posix(),
-    )
+  # Get the file names for the test_target so that we can specify to Pytest precisely which files
+  # to test, rather than using auto-discovery.
+  test_files = await Get[TargetSourceFiles](
+    FindTargetSourceFilesRequest(adaptor_with_origin, strip_source_roots=True)
   )
   test_file_names = test_files.snapshot.files
 

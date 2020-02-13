@@ -93,7 +93,7 @@ class AddressAndTestResult:
     is_not_a_glob = isinstance(adaptor_with_origin.origin, (SingleAddress, FilesystemLiteralSpec))
     has_sources = (
       hasattr(adaptor_with_origin.adaptor, "sources")
-      and adaptor_with_origin.adaptor.sources.snapshot.files
+      and bool(adaptor_with_origin.adaptor.sources.snapshot.files)
     )
     return has_sources and (is_test_target or is_not_a_glob)
 
