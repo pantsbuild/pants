@@ -316,7 +316,13 @@ class PantsDaemon(FingerprintedProcessManager):
     with stdio_as(stdin_fd=-1, stdout_fd=-1, stderr_fd=-1):
       # Reinitialize logging for the daemon context.
       init_rust_logger(self._log_level, self._log_show_rust_3rdparty)
-      result = setup_logging(self._log_level, log_dir=self._log_dir, log_name=self.LOG_NAME, native=self._native)
+      result = setup_logging(
+        self._log_level,
+        log_dir=self._log_dir,
+        log_name=self.LOG_NAME,
+        native=self._native,
+        warnings_filter_regexes=self._bootstrap_options.for_global_scope(),
+      )
       self._native.override_thread_logging_destination_to_just_pantsd()
 
       # Do a python-level redirect of stdout/stderr, which will not disturb `0,1,2`.

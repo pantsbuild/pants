@@ -6,6 +6,7 @@ import http.client
 import logging
 import os
 import sys
+import warnings
 from collections import namedtuple
 from contextlib import contextmanager
 from logging import StreamHandler
@@ -64,7 +65,13 @@ def setup_logging_from_options(bootstrap_options):
   # N.B. quiet help says 'Squelches all console output apart from errors'.
   level = 'ERROR' if bootstrap_options.quiet else bootstrap_options.level.upper()
   native = Native()
-  return setup_logging(level, console_stream=sys.stderr, log_dir=bootstrap_options.logdir, native=native)
+  return setup_logging(
+    level,
+    console_stream=sys.stderr,
+    log_dir=bootstrap_options.logdir,
+    native=native,
+    warnings_filter_regexes=bootstrap_options.ignore_pants_warnings
+  )
 
 
 class NativeHandler(StreamHandler):
@@ -130,7 +137,16 @@ def encapsulated_global_logger():
       global_logger.addHandler(handler)
 
 
-def setup_logging(level, console_stream=None, log_dir=None, scope=None, log_name=None, native=None):
+def setup_logging(
+  level,
+  *,
+  console_stream=None,
+  log_dir=None,
+  scope=None,
+  log_name=None,
+  native=None,
+  warnings_filter_regexes=None,
+):
   """Configures logging for a given scope, by default the global scope.
 
   :param str level: The logging level to enable, must be one of the level names listed here:
@@ -146,6 +162,8 @@ def setup_logging(level, console_stream=None, log_dir=None, scope=None, log_name
                     configured.
   :param str log_name: The base name of the log file (defaults to 'pants.log').
   :param Native native: An instance of the Native FFI lib, to register rust logging.
+  :param list warnings_filter_regexes: A series of regexes to ignore warnings for, typically from
+                                       the `ignore_pants_warnings` option.
   :returns: The full path to the main log file if file logging is configured or else `None`.
   :rtype: str
   """
@@ -189,6 +207,9 @@ def setup_logging(level, console_stream=None, log_dir=None, scope=None, log_name
 
   # This routes warnings through our loggers instead of straight to raw stderr.
   logging.captureWarnings(True)
+
+  for message_regexp in (warnings_filter_regexes or ()):
+    warnings.filterwarnings(action='ignore', message=message_regexp)
 
   _maybe_configure_extended_logging(logger)
 
