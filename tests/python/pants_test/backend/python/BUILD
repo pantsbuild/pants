@@ -35,7 +35,7 @@ python_tests(
     'src/python/pants/backend/python:interpreter_cache',
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil:pexrc_util',
-    'tests/python/pants_test:interpreter_selection_utils',
+    'src/python/pants/testutil:interpreter_selection_utils',
     'src/python/pants/testutil:test_base',
   ],
   tags = {"partially_type_checked"},

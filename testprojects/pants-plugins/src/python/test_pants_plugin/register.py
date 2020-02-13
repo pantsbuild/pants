@@ -3,8 +3,8 @@
 
 import os
 
-from test_pants_plugin.pants_infra_tests import PantsInfraTests
-from test_pants_plugin.subsystems.pants_test_infra import PantsTestInfra
+from test_pants_plugin.pants_testutil_tests import PantsTestutilTests
+from test_pants_plugin.subsystems.pants_testutil_subsystem import PantsTestutilSubsystem
 from test_pants_plugin.tasks.deprecation_warning_task import DeprecationWarningTask
 from test_pants_plugin.tasks.lifecycle_stub_task import LifecycleStubTask
 
@@ -15,7 +15,7 @@ from pants.goal.task_registrar import TaskRegistrar as task
 def build_file_aliases():
   return BuildFileAliases(
     context_aware_object_factories={
-      'pants_infra_tests': PantsInfraTests,
+      'pants_testutil_tests': PantsTestutilTests,
     }
   )
 
@@ -25,7 +25,7 @@ def register_goals():
 
 
 def global_subsystems():
-  return (PantsTestInfra,)
+  return PantsTestutilSubsystem,
 
 
 if os.environ.get('_RAISE_KEYBOARDINTERRUPT_ON_IMPORT', False):

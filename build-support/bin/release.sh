@@ -118,14 +118,6 @@ function pkg_testutil_install_test() {
   python -c "import pants.testutil"
 }
 
-function pkg_testinfra_install_test() {
-  local version=$1
-  shift
-  local PIP_ARGS=("$@")
-  pip install "${PIP_ARGS[@]}" "pantsbuild.pants.testinfra==${version}" && \
-  python -c "import pants_test"
-}
-
 #
 # End of package declarations.
 #

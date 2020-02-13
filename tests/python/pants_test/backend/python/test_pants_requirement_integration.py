@@ -25,12 +25,12 @@ class PantsRequirementIntegrationTest(PantsRequirementIntegrationTestBase):
       get_buildroot(), 'testprojects/pants-plugins/src/python')
     testproject_backend_pkg_name = 'test_pants_plugin'
     pants_req_addr = 'testprojects/pants-plugins/3rdparty/python/pants'
-    pants_test_infra_addr = 'tests/python/pants_test:test_infra'
+    pants_testutil_addr = 'src/python/pants/testutil:testutil_wheel'
     pre_cmd_args = [
       f"--pythonpath=+['{testproject_backend_src_dir}']",
       f"--backend-packages=+['{testproject_backend_pkg_name}']",
-      f"--pants-test-infra-pants-requirement-target={pants_req_addr}",
-      f"--pants-test-infra-pants-test-infra-target={pants_test_infra_addr}",
+      f"--pants-testutil-requirement-target={pants_req_addr}",
+      f"--pants-testutil-testutil-target={pants_testutil_addr}",
     ]
     command = pre_cmd_args + cmd
     return self.run_pants(command=command)

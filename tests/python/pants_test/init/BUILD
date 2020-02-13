@@ -23,7 +23,7 @@ python_tests(
     'src/python/pants/util:dirutil',
     'src/python/pants/testutil/engine:util',
     'src/python/pants/testutil/subsystem',
-    'tests/python/pants_test:interpreter_selection_utils',
+    'src/python/pants/testutil:interpreter_selection_utils',
     'src/python/pants/testutil:test_base',
   ],
   tags = {"partially_type_checked"},
