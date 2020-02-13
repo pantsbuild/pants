@@ -18,7 +18,6 @@ from pants.util.dirutil import safe_mkdtemp, safe_rmtree
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 from parameterized import parameterized
 from pex.interpreter import PythonInterpreter
-from wheel.wheelfile import WheelFile
 
 from pants.contrib.python.checks.tasks.checkstyle.checkstyle import Checkstyle
 
@@ -26,10 +25,15 @@ from pants.contrib.python.checks.tasks.checkstyle.checkstyle import Checkstyle
 CHECKER_RESOLVE_METHOD = [('sys.path', True), ('resolve', False)]
 
 
+# IMPORTANT NOTE: This test fails if run in a chroot.
+# To run it, use `./pants test.pytest --no-chroot`.
+# One more reason to kill this plugin...
+
+
 class CheckstyleTest(PythonTaskTestBase):
 
   py2_constraint = 'CPython>=2.7,<3'
-  py3_constraint = 'CPython>=3.4,<3.6'
+  py3_constraint = 'CPython>=3.6,<3.8'
 
   @staticmethod
   def build_checker_wheel(root_dir: str) -> str:
@@ -50,10 +54,8 @@ class CheckstyleTest(PythonTaskTestBase):
 
   @staticmethod
   def install_wheel(wheel, root_dir):
+    subprocess.check_call(['pip', 'install', '--root', root_dir, wheel])
     importable_path = os.path.join(root_dir, 'install', os.path.basename(wheel))
-    overrides = {path: importable_path
-                 for path in ('purelib', 'platlib', 'headers', 'scripts', 'data')}
-    WheelFile(wheel).install(force=True, overrides=overrides)
     return importable_path
 
   _distdir = None

@@ -5,7 +5,6 @@ python_tests(
   dependencies=[
     '3rdparty/python:parameterized',
     '3rdparty/python:pex',
-    '3rdparty/python:wheel',
     '//:build_root',
     '//:pants_pex',
     'build-support/regexes',
