@@ -22,7 +22,7 @@ from pants.engine.isolated_process import (
   ExecuteProcessResult,
   FallibleExecuteProcessResult,
 )
-from pants.engine.legacy.structs import TargetAdaptor
+from pants.engine.legacy.structs import TargetAdaptorWithOrigin
 from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.option.custom_types import GlobExpansionConjunction
@@ -34,7 +34,7 @@ from pants.rules.core.lint import LintResult
 
 @dataclass(frozen=True)
 class IsortTarget:
-  target: TargetAdaptor
+  adaptor_with_origin: TargetAdaptorWithOrigin
   prior_formatter_result_digest: Optional[Digest] = None  # unused by `lint`
 
 
@@ -81,11 +81,11 @@ class IsortArgs:
 
   @staticmethod
   def create(
-    *, wrapped_target: IsortTarget, isort_setup: IsortSetup, check_only: bool,
+    *, isort_target: IsortTarget, isort_setup: IsortSetup, check_only: bool,
   ) -> "IsortArgs":
     # NB: isort auto-discovers config files. There is no way to hardcode them via command line
     # flags. So long as the files are in the Pex's input files, isort will use the config.
-    files = wrapped_target.target.sources.snapshot.files
+    files = isort_target.adaptor_with_origin.adaptor.sources.snapshot.files
     pex_args = []
     if check_only:
       pex_args.append("--check-only")
@@ -97,14 +97,16 @@ class IsortArgs:
 
 @rule
 async def create_isort_request(
-  wrapped_target: IsortTarget,
+  isort_target: IsortTarget,
   isort_args: IsortArgs,
   isort_setup: IsortSetup,
   python_setup: PythonSetup,
   subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> ExecuteProcessRequest:
-  target = wrapped_target.target
-  sources_digest = wrapped_target.prior_formatter_result_digest or target.sources.snapshot.directory_digest
+  adaptor = isort_target.adaptor_with_origin.adaptor
+  sources_digest = (
+    isort_target.prior_formatter_result_digest or adaptor.sources.snapshot.directory_digest
+  )
   merged_input_files = await Get[Digest](
     DirectoriesToMerge(
       directories=(
@@ -120,26 +122,26 @@ async def create_isort_request(
     pex_path="./isort.pex",
     pex_args=isort_args.args,
     input_files=merged_input_files,
-    output_files=target.sources.snapshot.files,
-    description=f'Run isort for {target.address.reference()}',
+    output_files=adaptor.sources.snapshot.files,
+    description=f'Run isort for {adaptor.address.reference()}',
   )
 
 
 @rule(name="Format using isort")
-async def fmt(wrapped_target: IsortTarget, isort_setup: IsortSetup) -> FmtResult:
+async def fmt(isort_target: IsortTarget, isort_setup: IsortSetup) -> FmtResult:
   if isort_setup.skip:
     return FmtResult.noop()
-  args = IsortArgs.create(wrapped_target=wrapped_target, isort_setup=isort_setup, check_only=False)
+  args = IsortArgs.create(isort_target=isort_target, isort_setup=isort_setup, check_only=False)
   request = await Get[ExecuteProcessRequest](IsortArgs, args)
   result = await Get[ExecuteProcessResult](ExecuteProcessRequest, request)
   return FmtResult.from_execute_process_result(result)
 
 
 @rule(name="Lint using isort")
-async def lint(wrapped_target: IsortTarget, isort_setup: IsortSetup) -> LintResult:
+async def lint(isort_target: IsortTarget, isort_setup: IsortSetup) -> LintResult:
   if isort_setup.skip:
     return LintResult.noop()
-  args = IsortArgs.create(wrapped_target=wrapped_target, isort_setup=isort_setup, check_only=True)
+  args = IsortArgs.create(isort_target=isort_target, isort_setup=isort_setup, check_only=True)
   request = await Get[ExecuteProcessRequest](IsortArgs, args)
   result = await Get[FallibleExecuteProcessResult](ExecuteProcessRequest, request)
   return LintResult.from_fallible_execute_process_result(result)

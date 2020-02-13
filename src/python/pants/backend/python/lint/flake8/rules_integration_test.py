@@ -7,13 +7,13 @@ import pytest
 
 from pants.backend.python.lint.flake8.rules import Flake8Target
 from pants.backend.python.lint.flake8.rules import rules as flake8_rules
-from pants.backend.python.rules import download_pex_bin, pex
-from pants.backend.python.subsystems import python_native_code, subprocess_environment
+from pants.backend.python.rules import download_pex_bin
 from pants.backend.python.targets.python_library import PythonLibrary
+from pants.base.specs import SingleAddress
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.fs import FileContent, InputFilesContent, Snapshot
-from pants.engine.legacy.structs import PythonTargetAdaptor
+from pants.engine.legacy.structs import PythonTargetAdaptor, PythonTargetAdaptorWithOrigin
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.rules.core.lint import LintResult
@@ -44,9 +44,6 @@ class Flake8IntegrationTest(TestBase):
       *super().rules(),
       *flake8_rules(),
       download_pex_bin.download_pex_bin,
-      *pex.rules(),
-      *python_native_code.rules(),
-      *subprocess_environment.rules(),
       RootRule(Flake8Target),
       RootRule(download_pex_bin.DownloadedPexBin.Factory),
     )
@@ -70,13 +67,13 @@ class Flake8IntegrationTest(TestBase):
     if skip:
       args.append(f"--flake8-skip")
     input_snapshot = self.request_single_product(Snapshot, InputFilesContent(source_files))
-    target = Flake8Target(
-      PythonTargetAdaptor(
-        sources=EagerFilesetWithSpec('test', {'globs': []}, snapshot=input_snapshot),
-        address=Address.parse("test:target"),
-        compatibility=[interpreter_constraints] if interpreter_constraints else None,
-      )
+    adaptor = PythonTargetAdaptor(
+      sources=EagerFilesetWithSpec('test', {'globs': []}, snapshot=input_snapshot),
+      address=Address.parse("test:target"),
+      compatibility=[interpreter_constraints] if interpreter_constraints else None,
     )
+    origin = SingleAddress(directory="test", name="target")
+    target = Flake8Target(PythonTargetAdaptorWithOrigin(adaptor, origin))
     return self.request_single_product(
       LintResult, Params(
         target,

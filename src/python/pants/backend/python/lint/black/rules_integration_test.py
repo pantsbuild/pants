@@ -7,11 +7,11 @@ import pytest
 
 from pants.backend.python.lint.black.rules import BlackTarget
 from pants.backend.python.lint.black.rules import rules as black_rules
-from pants.backend.python.rules import download_pex_bin, pex
-from pants.backend.python.subsystems import python_native_code, subprocess_environment
+from pants.backend.python.rules import download_pex_bin
+from pants.base.specs import SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.fs import Digest, FileContent, InputFilesContent, Snapshot
-from pants.engine.legacy.structs import TargetAdaptor
+from pants.engine.legacy.structs import TargetAdaptor, TargetAdaptorWithOrigin
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.rules.core.fmt import FmtResult
@@ -41,9 +41,6 @@ class BlackIntegrationTest(TestBase):
       *super().rules(),
       *black_rules(),
       download_pex_bin.download_pex_bin,
-      *pex.rules(),
-      *python_native_code.rules(),
-      *subprocess_environment.rules(),
       RootRule(BlackTarget),
       RootRule(download_pex_bin.DownloadedPexBin.Factory),
     )
@@ -65,20 +62,22 @@ class BlackIntegrationTest(TestBase):
     if skip:
       args.append(f"--black-skip")
     input_snapshot = self.request_single_product(Snapshot, InputFilesContent(source_files))
-    target_adaptor = TargetAdaptor(
+    adaptor = TargetAdaptor(
       sources=EagerFilesetWithSpec('test', {'globs': []}, snapshot=input_snapshot),
       address=Address.parse("test:target"),
     )
-    lint_target = BlackTarget(target_adaptor)
-    fmt_target = BlackTarget(target_adaptor, prior_formatter_result_digest=input_snapshot.directory_digest)
+    origin = SingleAddress(directory="test", name="target")
+    adaptor_with_origin = TargetAdaptorWithOrigin(adaptor, origin)
     options_bootstrapper = create_options_bootstrapper(args=args)
     lint_result = self.request_single_product(LintResult, Params(
-      lint_target,
+      BlackTarget(adaptor_with_origin),
       options_bootstrapper,
       download_pex_bin.DownloadedPexBin.Factory.global_instance(),
     ))
     fmt_result = self.request_single_product(FmtResult, Params(
-      fmt_target,
+      BlackTarget(
+        adaptor_with_origin, prior_formatter_result_digest=input_snapshot.directory_digest,
+      ),
       options_bootstrapper,
       download_pex_bin.DownloadedPexBin.Factory.global_instance(),
     ))

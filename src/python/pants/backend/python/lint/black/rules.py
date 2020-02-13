@@ -24,7 +24,7 @@ from pants.engine.isolated_process import (
   ExecuteProcessResult,
   FallibleExecuteProcessResult,
 )
-from pants.engine.legacy.structs import TargetAdaptor
+from pants.engine.legacy.structs import TargetAdaptorWithOrigin
 from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.option.global_options import GlobMatchErrorBehavior
@@ -35,7 +35,7 @@ from pants.rules.core.lint import LintResult
 
 @dataclass(frozen=True)
 class BlackTarget:
-  target: TargetAdaptor
+  adaptor_with_origin: TargetAdaptorWithOrigin
   prior_formatter_result_digest: Optional[Digest] = None  # unused by `lint`
 
 
@@ -81,9 +81,9 @@ class BlackArgs:
 
   @staticmethod
   def create(
-    *, wrapped_target: BlackTarget, black_setup: BlackSetup, check_only: bool,
+    *, black_target: BlackTarget, black_setup: BlackSetup, check_only: bool,
   ) -> "BlackArgs":
-    files = wrapped_target.target.sources.snapshot.files
+    files = black_target.adaptor_with_origin.adaptor.sources.snapshot.files
     pex_args = []
     if check_only:
       pex_args.append("--check")
@@ -103,14 +103,14 @@ class BlackArgs:
 
 @rule
 async def create_black_request(
-  wrapped_target: BlackTarget,
+  black_target: BlackTarget,
   black_args: BlackArgs,
   black_setup: BlackSetup,
   python_setup: PythonSetup,
   subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> ExecuteProcessRequest:
-  target = wrapped_target.target
-  sources_digest = wrapped_target.prior_formatter_result_digest or target.sources.snapshot.directory_digest
+  adaptor = black_target.adaptor_with_origin.adaptor
+  sources_digest = black_target.prior_formatter_result_digest or adaptor.sources.snapshot.directory_digest
   merged_input_files = await Get[Digest](
     DirectoriesToMerge(
       directories=(
@@ -126,26 +126,26 @@ async def create_black_request(
       pex_path="./black.pex",
       pex_args=black_args.args,
       input_files=merged_input_files,
-      output_files=target.sources.snapshot.files,
-      description=f'Run Black for {target.address.reference()}',
+      output_files=adaptor.sources.snapshot.files,
+      description=f'Run Black for {adaptor.address.reference()}',
   )
 
 
 @rule(name="Format using Black")
-async def fmt(wrapped_target: BlackTarget, black_setup: BlackSetup) -> FmtResult:
+async def fmt(black_target: BlackTarget, black_setup: BlackSetup) -> FmtResult:
   if black_setup.skip:
     return FmtResult.noop()
-  args = BlackArgs.create(black_setup=black_setup, wrapped_target=wrapped_target, check_only=False)
+  args = BlackArgs.create(black_setup=black_setup, black_target=black_target, check_only=False)
   request = await Get[ExecuteProcessRequest](BlackArgs, args)
   result = await Get[ExecuteProcessResult](ExecuteProcessRequest, request)
   return FmtResult.from_execute_process_result(result)
 
 
 @rule(name="Lint using Black")
-async def lint(wrapped_target: BlackTarget, black_setup: BlackSetup) -> LintResult:
+async def lint(black_target: BlackTarget, black_setup: BlackSetup) -> LintResult:
   if black_setup.skip:
     return LintResult.noop()
-  args = BlackArgs.create(black_setup=black_setup, wrapped_target=wrapped_target, check_only=True)
+  args = BlackArgs.create(black_setup=black_setup, black_target=black_target, check_only=True)
   request = await Get[ExecuteProcessRequest](BlackArgs, args)
   result = await Get[FallibleExecuteProcessResult](ExecuteProcessRequest, request)
   return LintResult.from_fallible_execute_process_result(result)
