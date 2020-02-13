@@ -22,10 +22,9 @@ from pants.backend.python.rules.setup_py_util import (
 )
 from pants.backend.python.rules.setuptools import Setuptools
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
-from pants.base.specs import AddressSpecs, AscendantAddresses
+from pants.base.specs import AddressSpecs, AscendantAddresses, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.addressable import Addresses
-from pants.engine.build_files import AddressOriginMap
 from pants.engine.console import Console
 from pants.engine.fs import (
   Digest,
@@ -43,7 +42,12 @@ from pants.engine.fs import (
 )
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
-from pants.engine.legacy.graph import HydratedTarget, HydratedTargets, TransitiveHydratedTargets
+from pants.engine.legacy.graph import (
+  HydratedTarget,
+  HydratedTargets,
+  HydratedTargetsWithOrigins,
+  TransitiveHydratedTargets,
+)
 from pants.engine.legacy.structs import PythonBinaryAdaptor, PythonTargetAdaptor, ResourcesAdaptor
 from pants.engine.objects import Collection
 from pants.engine.rules import goal_rule, rule, subsystem_rule
@@ -233,9 +237,14 @@ def validate_args(args: Tuple[str, ...]):
 
 
 @goal_rule
-async def run_setup_pys(targets: HydratedTargets, options: SetupPyOptions, console: Console,
-                        address_origin_map: AddressOriginMap, python_setup: PythonSetup,
-                        distdir: DistDir, workspace: Workspace) -> SetupPy:
+async def run_setup_pys(
+  targets_with_origins: HydratedTargetsWithOrigins,
+  options: SetupPyOptions,
+  console: Console,
+  python_setup: PythonSetup,
+  distdir: DistDir,
+  workspace: Workspace
+) -> SetupPy:
   """Run setup.py commands on all exported targets addressed."""
   args = tuple(options.values.args)
   validate_args(args)
@@ -246,11 +255,12 @@ async def run_setup_pys(targets: HydratedTargets, options: SetupPyOptions, conso
   exported_targets: List[ExportedTarget] = []
   explicit_nonexported_targets: List[HydratedTarget] = []
 
-  for hydrated_target in targets:
-    if _is_exported(hydrated_target):
-      exported_targets.append(ExportedTarget(hydrated_target))
-    elif address_origin_map.is_single_address(hydrated_target.address):
-      explicit_nonexported_targets.append(hydrated_target)
+  for hydrated_target_with_origin in targets_with_origins:
+    target = hydrated_target_with_origin.target
+    if _is_exported(target):
+      exported_targets.append(ExportedTarget(target))
+    elif isinstance(hydrated_target_with_origin.origin, SingleAddress):
+      explicit_nonexported_targets.append(target)
   if explicit_nonexported_targets:
     raise TargetNotExported(
       'Cannot run setup.py on these targets, because they have no `provides=` clause: '
@@ -265,8 +275,13 @@ async def run_setup_pys(targets: HydratedTargets, options: SetupPyOptions, conso
     )
     exported_targets = list(set(owners))
 
-  py2 = is_python2((getattr(target.adaptor, 'compatibility', None) for target in targets),
-                   python_setup)
+  py2 = is_python2(
+    (
+      getattr(target_with_origin.target.adaptor, 'compatibility', None)
+      for target_with_origin in targets_with_origins
+    ),
+    python_setup
+  )
   chroots = await MultiGet(Get[SetupPyChroot](
     SetupPyChrootRequest(target, py2)) for target in exported_targets)
 
