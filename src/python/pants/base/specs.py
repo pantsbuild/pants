@@ -442,3 +442,6 @@ class Specs:
       if self.filesystem_specs.dependencies
       else self.address_specs
     )
+
+
+OriginSpec = Union[AddressSpec, FilesystemResolvedSpec]

@@ -83,7 +83,6 @@ def core_packages():
   return {
     Package("pantsbuild.pants", "//src/python/pants:pants-packaged", bdist_wheel_flags=bdist_wheel_flags),
     Package("pantsbuild.pants.testutil", "//src/python/pants/testutil:testutil_wheel"),
-    Package("pantsbuild.pants.testinfra", "//tests/python/pants_test:test_infra"),
   }
 
 

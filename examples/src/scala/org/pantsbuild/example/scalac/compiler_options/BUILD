@@ -3,13 +3,13 @@
 scala_library(
   name="with_nonfatal_warnings",
   compiler_option_sets = {"non_fatal_warnings"},
-  sources=globs("*.scala"),
+  sources=["*.scala"],
 )
 
 scala_library(
   name="with_nonfatal_warnings_and_plugin",
   compiler_option_sets = {"non_fatal_warnings"},
-  sources=globs("*.scala"),
+  sources=["*.scala"],
   dependencies=[
     'examples/src/scala/org/pantsbuild/example/scalac/plugin:simple_scalac_plugin'
   ],

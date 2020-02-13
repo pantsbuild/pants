@@ -11,7 +11,7 @@ from pants.engine.legacy.structs import PythonBinaryAdaptor
 from pants.engine.rules import UnionRule, rule
 from pants.engine.selectors import Get
 from pants.rules.core.binary import BinaryTarget, CreatedBinary
-from pants.rules.core.strip_source_root import SourceRootStrippedSources
+from pants.rules.core.strip_source_roots import SourceRootStrippedSources
 
 
 @rule

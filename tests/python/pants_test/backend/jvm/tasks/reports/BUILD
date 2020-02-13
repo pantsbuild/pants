@@ -13,7 +13,6 @@ python_tests(
     'src/python/pants/backend/jvm/tasks/reports',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:strutil',
-    'tests/python/pants_test:test_infra',
   ],
   tags = {'partially_type_checked'},
 )

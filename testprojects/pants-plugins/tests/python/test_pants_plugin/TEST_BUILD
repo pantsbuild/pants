@@ -1,1 +1,1 @@
-pants_infra_tests()
+pants_testutil_tests()

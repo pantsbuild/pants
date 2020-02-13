@@ -3,17 +3,17 @@
 
 import os
 from contextlib import contextmanager
+from unittest import TestCase
 
 from pants.backend.jvm.tasks.reports.junit_html_report import (
   JUnitHtmlReport,
   ReportTestCase,
   ReportTestSuite,
 )
-from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir
 
 
-class TestJUnitHtmlReport(TestBase):
+class TestJUnitHtmlReport(TestCase):
 
   _JUNIT_XML_DIR = 'tests/python/pants_test/backend/jvm/tasks/reports/junit_xml'
 

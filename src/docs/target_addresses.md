@@ -78,24 +78,25 @@ are not allowed in BUILD files.
 A trailing single colon specifies a glob of targets at the specified location:
 
     :::bash
-    $ ./pants list tests/python/pants_test:
-    src/python/pants/testutil:int-test
-    tests/python/pants_test:base_test
-    tests/python/pants_test:test_infra
-    tests/python/pants_test:test_maven_layout
+    $ ./pants list src/python/pants/util:
+    src/python/pants/util:argutil
+    src/python/pants/util:collections
+    src/python/pants/util:contextutil
+    src/python/pants/util:desktop
+    ...
+   
 
 A trailing double colon specifies a recursive glob of targets at the specified location:
 
     :::bash
-    $ ./pants list tests/python/pants_test::
-    src/python/pants/testutil:int-test
-    tests/python/pants_test:base_test
-    tests/python/pants_test:test_infra
-    tests/python/pants_test:test_maven_layout
-    tests/python/pants_test/base:base
+    $ ./pants list src/python/pants/backend/project_info::
+    src/python/pants/backend/project_info/tasks:all
+    src/python/pants/backend/project_info/tasks:dependencies
+    src/python/pants/backend/project_info/tasks:depmap
     ...
-    tests/python/pants_test/tasks:sort_targets
-    src/python/pants/testutil:testutils
+    src/python/pants/backend/project_info/rules:rules
+    src/python/pants/backend/project_info/rules:tests
+    src/python/pants/backend/project_info:plugin
 
 Alternative: File args
 ======================
