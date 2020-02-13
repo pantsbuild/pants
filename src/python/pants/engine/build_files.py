@@ -3,14 +3,13 @@
 
 import os.path
 from collections.abc import MutableMapping, MutableSequence
-from dataclasses import dataclass
 from typing import Dict
 
 from twitter.common.collections import OrderedSet
 
 from pants.base.exceptions import ResolveError
 from pants.base.project_tree import Dir
-from pants.base.specs import AddressSpec, AddressSpecs, SingleAddress, Spec, more_specific
+from pants.base.specs import AddressSpec, AddressSpecs, SingleAddress, more_specific
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.engine.addressable import (
@@ -274,24 +273,6 @@ def strip_address_origins(addresses_with_origins: AddressesWithOrigins) -> Addre
   return Addresses(address_with_origin.address for address_with_origin in addresses_with_origins)
 
 
-@dataclass(frozen=True)
-class AddressOriginMap:
-  addr_to_origin: Dict[Address, Spec]
-
-  def is_single_address(self, address: Address) -> bool:
-    return isinstance(self.addr_to_origin.get(address), SingleAddress)
-
-
-@rule
-def address_origin_map(addresses_with_origins: AddressesWithOrigins) -> AddressOriginMap:
-  return AddressOriginMap(
-    addr_to_origin={
-      address_with_origin.address: address_with_origin.origin
-      for address_with_origin in addresses_with_origins
-    }
-  )
-
-
 def _address_spec_to_globs(address_mapper: AddressMapper, address_specs: AddressSpecs) -> PathGlobs:
   """Given an AddressSpecs object, return a PathGlobs object for the build files that it matches."""
   patterns = set()
@@ -318,7 +299,6 @@ def create_graph_rules(address_mapper: AddressMapper):
     # AddressFamilies for each of them.
     addresses_with_origins_from_address_families,
     strip_address_origins,
-    address_origin_map,
     # Root rules representing parameters that might be provided via root subjects.
     RootRule(Address),
     RootRule(AddressWithOrigin),
