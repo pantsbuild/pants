@@ -582,10 +582,6 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              help='Output a timing report at the end of the run.')
     register('-e', '--explain', type=bool, passive=no_v1,
              help='Explain the execution of goals.')
-    register('-t', '--timeout', advanced=True, type=int, metavar='<seconds>', passive=no_v1,
-             removal_version="1.26.0.dev1",
-             removal_hint="This option is not used and may be removed with no change in behavior. ",
-             help='Number of seconds to wait for http connections.')
     # TODO: After moving to the new options system these abstraction leaks can go away.
     register('-k', '--kill-nailguns', advanced=True, type=bool, passive=no_v1,
              help='Kill nailguns before exiting')
