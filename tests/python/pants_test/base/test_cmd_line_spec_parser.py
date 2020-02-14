@@ -93,6 +93,12 @@ class CmdLineSpecParserTest(TestBase):
 
   def test_dot_glob(self) -> None:
     self.assert_filesystem_spec_parsed(".", glob("**/*"))
+    self.assert_filesystem_spec_parsed("a/b/.", glob("a/b/**/*"))
+    # We don't expand `.` in any other context to preserve command line accordances and to avoid
+    # ambiguity. We can tweak the grammar later if we find a need.
+    self.assert_address_spec_parsed("a/b/c.", single("a/b/c.", "c."))
+    self.assert_address_spec_parsed("a/./b", single("a/b", "b"))
+    self.assert_address_spec_parsed("a/./", single("a", "a"))
 
   def test_excludes(self) -> None:
     for glob_str in ["!", "!a/b/", "!/a/b/*"]:

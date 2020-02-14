@@ -67,6 +67,8 @@ class CmdLineSpecParser:
     """
     if spec == ".":
       return FilesystemGlobSpec("**/*")
+    if spec.endswith("/."):
+      return FilesystemGlobSpec(f"{spec[:-len('.')]}**/*")
     if spec.endswith('::'):
       spec_path = spec[:-len('::')]
       return DescendantAddresses(directory=self._normalize_spec_path(spec_path))
