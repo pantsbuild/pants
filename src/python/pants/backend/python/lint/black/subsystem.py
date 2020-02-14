@@ -7,7 +7,7 @@ from pants.option.custom_types import file_option, shell_str
 
 class Black(PythonToolBase):
   options_scope = 'black'
-  default_version = 'black==19.3b0'
+  default_version = 'black==19.10b0'
   default_extra_requirements = ['setuptools']
   default_entry_point = 'black:patched_main'
   default_interpreter_constraints = ["CPython>=3.6"]
