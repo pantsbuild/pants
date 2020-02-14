@@ -65,6 +65,8 @@ class CmdLineSpecParser:
 
     :raises: CmdLineSpecParser.BadSpecError if the address selector could not be parsed.
     """
+    if spec == ".":
+      return FilesystemGlobSpec("**/*")
     if spec.endswith('::'):
       spec_path = spec[:-len('::')]
       return DescendantAddresses(directory=self._normalize_spec_path(spec_path))

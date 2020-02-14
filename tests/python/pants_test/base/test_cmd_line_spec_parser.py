@@ -91,6 +91,9 @@ class CmdLineSpecParserTest(TestBase):
     for glob_str in ["*", "**/*", "a/b/*", "a/b/test_*.py", "a/b/**/test_*"]:
       self.assert_filesystem_spec_parsed(glob_str, glob(glob_str))
 
+  def test_dot_glob(self) -> None:
+    self.assert_filesystem_spec_parsed(".", glob("**/*"))
+
   def test_excludes(self) -> None:
     for glob_str in ["!", "!a/b/", "!/a/b/*"]:
       self.assert_filesystem_spec_parsed(glob_str, ignore(glob_str[1:]))
