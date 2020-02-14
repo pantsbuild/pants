@@ -19,7 +19,7 @@ from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
 
-class StripSourceRootsTests(TestBase):
+class StripSourceRootsTest(TestBase):
   @classmethod
   def rules(cls):
     return (

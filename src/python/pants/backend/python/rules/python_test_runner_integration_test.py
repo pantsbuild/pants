@@ -25,7 +25,7 @@ from pants.engine.legacy.structs import PythonTestsAdaptor, PythonTestsAdaptorWi
 from pants.engine.rules import RootRule, subsystem_rule
 from pants.engine.selectors import Params
 from pants.python.python_requirement import PythonRequirement
-from pants.rules.core import strip_source_roots
+from pants.rules.core import find_target_source_files, strip_source_roots
 from pants.rules.core.test import Status, TestDebugRequest, TestOptions, TestResult
 from pants.testutil.interpreter_selection_utils import skip_unless_python27_and_python3_present
 from pants.testutil.option.util import create_options_bootstrapper
@@ -108,6 +108,7 @@ class PythonTestRunnerIntegrationTest(TestBase):
       *super().rules(),
       *python_test_runner.rules(),
       *download_pex_bin.rules(),
+      *find_target_source_files.rules(),
       *pex.rules(),
       *pex_from_target_closure.rules(),
       *prepare_chrooted_python_sources.rules(),
