@@ -599,10 +599,10 @@ class SetupPy(Task):
     return setup_dir, reduced_deps
 
   def _get_exported_targets(self):
-      if self.context.products.is_required_data(self.PYTHON_DISTS_RECURSIVE_PRODUCT):
-          return self.context.targets()
+    if self.context.products.is_required_data(self.PYTHON_DISTS_RECURSIVE_PRODUCT):
+      return self.context.targets()
 
-      return self.context.target_roots
+    return self.context.target_roots
 
   def execute(self):
     # We drive creation of setup.py distributions from the original target graph, grabbing codegen'd
