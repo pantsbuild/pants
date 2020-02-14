@@ -554,6 +554,12 @@ class GlobalOptions(Subsystem):
             "any prior running Pants command must be finished for the current one to start. "
             "To never timeout, use the value -1.",
         )
+        register(
+            "--pantsd-local-client-fallback",
+            type=bool,
+            help="Whether to avoid waiting for exclusive access to pantsd in the case of "
+            "concurrent pants invocations and just invoke pants without pantsd.",
+        )
 
         # These facilitate configuring the native engine.
         register(

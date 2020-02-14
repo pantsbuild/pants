@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
+import os
 import sys
 import time
 from contextlib import contextmanager
@@ -9,10 +10,11 @@ from typing import List, Mapping
 
 from pants.base.exception_sink import ExceptionSink, SignalHandler
 from pants.console.stty_utils import STTYSettings
-from pants.java.nailgun_client import NailgunClient
+from pants.java.nailgun_client import NailgunClient, RemoteClientFallback
 from pants.java.nailgun_protocol import NailgunProtocol
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.pantsd.pants_daemon import PantsDaemon
+from pants.process.lock import OwnerPrintingInterProcessFileLock
 from pants.util.dirutil import maybe_read_file
 
 logger = logging.getLogger(__name__)
@@ -125,6 +127,8 @@ class RemotePantsRunner:
             )
             try:
                 return self._connect_and_execute(pantsd_handle)
+            except RemoteClientFallback as e:
+                raise self.Fallback() from e
             except self.RECOVERABLE_EXCEPTIONS as e:
                 if attempt > retries:
                     raise self.Fallback(e)
@@ -173,6 +177,7 @@ class RemotePantsRunner:
             out=self._stdout,
             err=self._stderr,
             exit_on_broken_pipe=True,
+            fallback_on_client_blocked=self._bootstrap_options.for_global_scope().pantsd_local_client_fallback,
             metadata_base_dir=pantsd_handle.metadata_base_dir,
         )
 
@@ -217,5 +222,17 @@ class RemotePantsRunner:
         return PantsDaemon.Factory.maybe_launch(options_bootstrapper=self._options_bootstrapper)
 
     def run(self, args=None):
-        pantsd_handle = self._maybe_launch_pantsd()
+        workdir = self._bootstrap_options.for_global_scope().pants_workdir
+        lock = OwnerPrintingInterProcessFileLock(
+            os.path.join(workdir, ".pantsd-restart-check-file-lock")
+        )
+
+        if not lock.acquired:
+            lock.acquire()
+
+        try:
+            pantsd_handle = self._maybe_launch_pantsd()
+        finally:
+            lock.release()
+
         self._run_pants_with_retry(pantsd_handle)

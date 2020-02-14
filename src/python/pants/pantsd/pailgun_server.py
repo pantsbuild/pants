@@ -245,12 +245,15 @@ class PailgunServer(ThreadingMixIn, TCPServer):
     def _send_stderr(self, request, message):
         NailgunProtocol.send_stderr(request, message)
 
+    def _send_client_blocked(self, request):
+        NailgunProtocol.send_client_blocked(request)
+
     @contextmanager
     def ensure_request_is_exclusive(self, environment, request):
         """Ensure that this is the only pants running.
 
-        We currently don't allow parallel pants runs, so this function blocks a request thread until
-        there are no more requests being handled.
+        This class spawns a thread per request via `ThreadingMixIn`: the thread body runs
+        `process_request_thread`, which we override.
         """
         # TODO add `did_poll` to pantsd metrics
 
@@ -277,6 +280,8 @@ class PailgunServer(ThreadingMixIn, TCPServer):
             with yield_and_release(time_polled):
                 yield
         else:
+            self._send_client_blocked(request)
+
             self.logger.debug(
                 f"request {request} didn't acquire the lock on the first try, polling..."
             )
