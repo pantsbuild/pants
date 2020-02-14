@@ -11,7 +11,7 @@ from pants.engine.legacy.graph import TransitiveHydratedTargets
 from pants.engine.legacy.structs import PythonTargetAdaptor
 from pants.engine.rules import UnionRule, rule
 from pants.engine.selectors import Get
-from pants.rules.core.repl import ReplBinary, ReplDeterminer
+from pants.rules.core.repl import ReplBinary, ReplImplementation
 
 
 logger = logging.getLogger(__name__)
@@ -47,7 +47,7 @@ async def run_python_repl(repl: PythonRepl) -> ReplBinary:
 
 def rules():
   return [
-    UnionRule(ReplDeterminer, PythonRepl),
+    UnionRule(ReplImplementation, PythonRepl),
     run_python_repl,
     targets_to_python_repl,
   ]

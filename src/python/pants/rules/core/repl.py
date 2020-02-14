@@ -27,8 +27,9 @@ class Repl(Goal):
 
 
 @union
-class ReplDeterminer:
-  pass
+class ReplImplementation:
+  """This type proxies from the top-level `repl` goal to a specific REPL implementation
+  for a specific language or languages."""
 
 
 @dataclass(frozen=True)
