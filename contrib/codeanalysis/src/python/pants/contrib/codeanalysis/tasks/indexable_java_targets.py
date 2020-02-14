@@ -22,8 +22,8 @@ class IndexableJavaTargets(Subsystem):
   def get(self, context):
     """Return the indexable targets in the given context.
 
-    Computes them lazily from the given context.  They are then fixed for the duration
-    of the run, even if this method is called again with a different context.
+    Computes them lazily from the given context.  They are then fixed for the duration of the run,
+    even if this method is called again with a different context.
     """
     if self.get_options().recursive:
       requested_targets = context.targets(exclude_scopes=Scope(self.get_options().exclude_scopes))

@@ -17,7 +17,8 @@ We want to allow direct invocation of scripts for these reasons:
    breaks. If we had to rely on invoking via `./pants run`, this would not be possible.
 
 Callers of this file, however, are free to dogfood Pants as they'd like, and any script
-may be called via `./pants run` instead of direct invocation if desired."""
+may be called via `./pants run` instead of direct invocation if desired.
+"""
 
 import subprocess
 import time

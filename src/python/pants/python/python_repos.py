@@ -58,8 +58,8 @@ RequestsContext.resolve = _resolve_monkey
 class PythonRepos(Subsystem):
   """A python code repository.
 
-  Note that this is part of the Pants core, and not the python backend, because it's
-  used to bootstrap Pants plugins.
+  Note that this is part of the Pants core, and not the python backend, because it's used to
+  bootstrap Pants plugins.
   """
   options_scope = 'python-repos'
 

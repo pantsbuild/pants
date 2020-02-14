@@ -40,7 +40,8 @@ def python_interpreter_path(version):
 
 
 def skip_unless_all_pythons_present(*versions):
-  """A decorator that only runs the decorated test method if all of the specified pythons are present.
+  """A decorator that only runs the decorated test method if all of the specified pythons are
+  present.
 
   :param string *versions: Python version strings, such as 2.7, 3.
   """

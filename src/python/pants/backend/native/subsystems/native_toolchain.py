@@ -141,7 +141,8 @@ class BaseLinker:
   """A Linker which is not specific to any compiler yet.
 
   This represents Linker objects provided by subsystems, but may need additional information to be
-  usable by a specific compiler."""
+  usable by a specific compiler.
+  """
   linker: Linker
 
 

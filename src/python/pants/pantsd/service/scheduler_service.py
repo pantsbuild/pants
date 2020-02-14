@@ -67,7 +67,7 @@ class SchedulerService(PantsService):
     self._loop_condition = LoopCondition()
 
   def _get_snapshot(self):
-    """Returns a Snapshot of the input globs"""
+    """Returns a Snapshot of the input globs."""
     return self._scheduler_session.product_request(
       Snapshot, subjects=[PathGlobs(self._invalidation_globs)])[0]
 
@@ -88,7 +88,10 @@ class SchedulerService(PantsService):
       self._fs_event_service.register_pidfile_handler(self._pantsd_pidfile, self._enqueue_fs_event)
 
   def _enqueue_fs_event(self, event):
-    """Watchman filesystem event handler for BUILD/requirements.txt updates. Called via a thread."""
+    """Watchman filesystem event handler for BUILD/requirements.txt updates.
+
+    Called via a thread.
+    """
     self._logger.info('enqueuing {} changes for subscription {}'
                       .format(len(event['files']), event['subscription']))
     self._event_queue.put(event)
@@ -134,7 +137,7 @@ class SchedulerService(PantsService):
     self._maybe_invalidate_scheduler_batch()
 
   def _process_event_queue(self):
-    """File event notification queue processor. """
+    """File event notification queue processor."""
     try:
       event = self._event_queue.get(timeout=0.05)
     except queue.Empty:
@@ -174,10 +177,11 @@ class SchedulerService(PantsService):
   def prepare_v1_graph_run_v2(
     self, options: Options, options_bootstrapper: OptionsBootstrapper,
   ) -> Tuple[LegacyGraphSession, Specs, int]:
-    """For v1 (and v2): computing Specs for a later v1 run
+    """For v1 (and v2): computing Specs for a later v1 run.
 
-    For v2: running an entire v2 run
-    The exit_code in the return indicates whether any issue was encountered"""
+    For v2: running an entire v2 run The exit_code in the return indicates whether any issue was
+    encountered
+    """
     # If any nodes exist in the product graph, wait for the initial watchman event to avoid
     # racing watchman startup vs invalidation events.
     graph_len = self._scheduler.graph_len()
@@ -268,7 +272,8 @@ class LoopCondition:
       self._condition.notify_all()
 
   def wait(self, timeout):
-    """Waits for the condition for at most the given timeout and returns True if the condition triggered.
+    """Waits for the condition for at most the given timeout and returns True if the condition
+    triggered.
 
     Generally called in a loop until the condition triggers.
     """

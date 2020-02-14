@@ -49,7 +49,7 @@ class WithProp:
 
   @classproperty
   def class_property(cls):
-    "class_property docs"
+    """class_property docs."""
     return cls._value
 
   @classmethod
@@ -58,7 +58,7 @@ class WithProp:
 
   @staticproperty
   def static_property():  # type: ignore[misc]  # MyPy expects methods to have `self` or `cls`
-    "static_property docs"
+    """static_property docs."""
     return 'static_property'
 
   @staticmethod
@@ -74,7 +74,8 @@ class OverridingValueInit(WithProp):
   """Override the class-level `_value` with an instance-level `_value` from a constructor.
 
   The class-level methods should still return the class-level `_value`, but the new instance methods
-  should return the value from the constructor."""
+  should return the value from the constructor.
+  """
 
   def __init__(self, v):
     # This will be ignored when accessed as a class method.

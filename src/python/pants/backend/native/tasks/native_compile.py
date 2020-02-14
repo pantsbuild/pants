@@ -196,7 +196,10 @@ class NativeCompile(NativeTask, metaclass=ABCMeta):
   class _HeaderOnlyLibrary(Exception): pass
 
   def _make_compile_argv(self, compile_request):
-    """Return a list of arguments to use to compile sources. Subclasses can override and append."""
+    """Return a list of arguments to use to compile sources.
+
+    Subclasses can override and append.
+    """
 
     sources_minus_headers = list(self._iter_sources_minus_headers(compile_request))
     if len(sources_minus_headers) == 0:

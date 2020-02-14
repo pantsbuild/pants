@@ -65,9 +65,9 @@ class Java(JvmToolMixin, ZincLanguageMixin, InjectablesMixin, Subsystem):
   def global_javac_classpath(cls, products):
     """Returns a classpath entry for the java compiler library, useable as a tool.
 
-    If no javac library is specified, will return an empty list.  The caller must handle
-    this case by defaulting to the JDK's tools.jar.  We can't provide that jar here
-    because we'd have to know about a Distribution.
+    If no javac library is specified, will return an empty list.  The caller must handle this case
+    by defaulting to the JDK's tools.jar.  We can't provide that jar here because we'd have to know
+    about a Distribution.
     """
     return cls.global_instance().javac_classpath(products)
 

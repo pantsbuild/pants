@@ -36,8 +36,8 @@ class MinimalCover(ConsoleTask):
   def _collect_internal_deps(self, targets):
     """Collect one level of dependencies from the given targets, and then transitively walk.
 
-    This is different from directly executing `Target.closure_for_targets`, because the
-    resulting set will not include the roots unless the roots depend on one another.
+    This is different from directly executing `Target.closure_for_targets`, because the resulting
+    set will not include the roots unless the roots depend on one another.
     """
     roots = set()
     for target in targets:

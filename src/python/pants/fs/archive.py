@@ -163,7 +163,8 @@ class ZipArchiver(Archiver):
     """Extract from a zip file, with an optional filter.
 
     :param function filter_func: optional filter with the filename as the parameter.  Returns True
-                                 if the file should be extracted."""
+                                 if the file should be extracted.
+    """
     with open_zip(path) as archive_file:
       for name in archive_file.namelist():
         # While we're at it, we also perform this safety test.

@@ -39,7 +39,7 @@ from pants.util.memo import memoized_property
 
 
 class SourceRootTypes:
-  """Defines SourceRoot Types Constants"""
+  """Defines SourceRoot Types Constants."""
   SOURCE = 'SOURCE'  # Source Target
   TEST = 'TEST'  # Test Target
   SOURCE_GENERATED = 'SOURCE_GENERATED'  # Code Gen Source Targets
@@ -72,6 +72,7 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):  # t
   @staticmethod
   def _jar_id(jar):
     """Create a string identifier for the IvyModuleRef key.
+
     :param IvyModuleRef jar: key for a resolved jar
     :returns: String representing the key as a maven coordinate
     """
@@ -83,6 +84,7 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):  # t
   @staticmethod
   def _exclude_id(jar):
     """Create a string identifier for the Exclude key.
+
     :param Exclude jar: key for an excluded jar
     :returns: String representing the key as a maven coordinate
     """
@@ -393,7 +395,7 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):  # t
     return mapping
 
   def _get_pants_target_alias(self, pants_target_type):
-    """Returns the pants target alias for the given target"""
+    """Returns the pants target alias for the given target."""
     if pants_target_type in self.target_aliases_map:
       return self.target_aliases_map.get(pants_target_type)
     else:

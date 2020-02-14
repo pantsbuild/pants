@@ -68,7 +68,6 @@ class AbstractTestGenerator(ABC):
         ...
 
       ThingTest.generate_tests()
-
     """
 
   @classmethod
@@ -133,8 +132,8 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
   def invalidate_for(self, *relpaths):
     """Invalidates all files from the relpath, recursively up to the root.
 
-    Many python operations implicitly create parent directories, so we assume that touching a
-    file located below directories that do not currently exist will result in their creation.
+    Many python operations implicitly create parent directories, so we assume that touching a file
+    located below directories that do not currently exist will result in their creation.
     """
     if self._scheduler is None:
       return
@@ -423,7 +422,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     return cast(SchedulerSession, self._scheduler)
 
   def post_scheduler_init(self):
-    """Run after initializing the Scheduler, it will have the same lifetime"""
+    """Run after initializing the Scheduler, it will have the same lifetime."""
     pass
 
   @property
@@ -584,7 +583,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     return targets
 
   def create_library(self, path, target_type, name, sources=None, **kwargs):
-    """Creates a library target of given type at the BUILD file at path with sources
+    """Creates a library target of given type at the BUILD file at path with sources.
 
     :API: public
 
@@ -641,7 +640,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     self.assertEqual(expected, list(itertools.islice(actual_iter, len(expected))))
 
   def assertInFile(self, string, file_path):
-    """Verifies that a string appears in a file
+    """Verifies that a string appears in a file.
 
     :API: public
     """

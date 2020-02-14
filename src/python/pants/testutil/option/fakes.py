@@ -117,8 +117,7 @@ def create_options(options, passthru_args=None, fingerprintable_options=None):
       return {}
 
     def get_fingerprintable_for_scope(self, bottom_scope, include_passthru=False):
-      """Returns a list of fingerprintable (option type, option value) pairs for
-      the given scope.
+      """Returns a list of fingerprintable (option type, option value) pairs for the given scope.
 
       Note that this method only collects values for a single scope, NOT from
       all enclosing scopes as in the Options class!

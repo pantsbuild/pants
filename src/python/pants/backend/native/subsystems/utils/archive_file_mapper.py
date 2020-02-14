@@ -24,8 +24,8 @@ class ArchiveFileMapper(Subsystem):
     """Assert that the path components (which are joined into a glob) match exactly one path.
 
     The matched path may be a file or a directory. This method is used to avoid having to guess
-    platform-specific intermediate directory names, e.g. 'x86_64-linux-gnu' or
-    'x86_64-apple-darwin17.5.0'.
+    platform-specific intermediate directory names, e.g. 'x86_64-linux-gnu' or 'x86_64-apple-
+    darwin17.5.0'.
     """
     glob_path_string = os.path.join(*components)
     expanded_glob = glob.glob(glob_path_string)

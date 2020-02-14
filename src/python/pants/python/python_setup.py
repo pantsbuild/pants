@@ -114,8 +114,7 @@ class PythonSetup(Subsystem):
     return os.path.join(self.get_options().pants_workdir, *self.options_scope.split('.'))
 
   def compatibility_or_constraints(self, compatibility):
-    """
-    Return either the given compatibility, or the interpreter constraints. If interpreter
+    """Return either the given compatibility, or the interpreter constraints. If interpreter
     constraints are supplied by the CLI flag, return those only.
 
     :param compatibility: Optional[List[str]], e.g. None or ['CPython>3'].
@@ -160,9 +159,8 @@ class PythonSetup(Subsystem):
   def get_pex_python_paths():
     """Returns a list of paths to Python interpreters as defined in a pexrc file.
 
-    These are provided by a PEX_PYTHON_PATH in either of '/etc/pexrc', '~/.pexrc'.
-    PEX_PYTHON_PATH defines a colon-separated list of paths to interpreters
-    that a pex can be built and run against.
+    These are provided by a PEX_PYTHON_PATH in either of '/etc/pexrc', '~/.pexrc'. PEX_PYTHON_PATH
+    defines a colon-separated list of paths to interpreters that a pex can be built and run against.
     """
     ppp = Variables.from_rc().get('PEX_PYTHON_PATH')
     if ppp:

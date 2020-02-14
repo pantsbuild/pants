@@ -135,7 +135,8 @@ def shell_str(s: str) -> str:
   and then the parser will safely merge this expanded list with any other values defined for the
   option.
 
-  :API: public"""
+  :API: public
+  """
   return s
 
 
@@ -192,7 +193,8 @@ class ListValueComponent:
   def merge(cls, components: Iterable["ListValueComponent"]) -> "ListValueComponent":
     """Merges components into a single component, applying their actions appropriately.
 
-    This operation is associative:  M(M(a, b), c) == M(a, M(b, c)) == M(a, b, c)."""
+    This operation is associative:  M(M(a, b), c) == M(a, M(b, c)) == M(a, b, c).
+    """
     # Note that action of the merged component is MODIFY until the first REPLACE is encountered.
     # This guarantees associativity.
     action = cls.MODIFY
@@ -284,7 +286,8 @@ class DictValueComponent:
   def merge(cls, components: Iterable["DictValueComponent"]) -> "DictValueComponent":
     """Merges components into a single component, applying their actions appropriately.
 
-    This operation is associative:  M(M(a, b), c) == M(a, M(b, c)) == M(a, b, c)."""
+    This operation is associative:  M(M(a, b), c) == M(a, M(b, c)) == M(a, b, c).
+    """
     # Note that action of the merged component is EXTEND until the first REPLACE is encountered.
     # This guarantees associativity.
     action = cls.EXTEND

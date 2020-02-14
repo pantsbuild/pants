@@ -48,7 +48,7 @@ class UnpackRemoteSourcesTest(TestBase):
 
   @unittest.expectedFailure
   def test_problematic_cases(self):
-    """These should pass, but don't"""
+    """These should pass, but don't."""
     # See https://github.com/twitter/commons/issues/380.  'foo*bar' doesn't match 'foobar'
     self.assertFalse(self._run_filter("foo/bar.java",
                                       include_patterns=['foo/*.java'],

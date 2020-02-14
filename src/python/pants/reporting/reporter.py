@@ -14,8 +14,8 @@ class ReporterDestination:
 class Reporter:
   """Formats and emits reports.
 
-  Subclasses implement the callback methods, to provide specific reporting
-  functionality, e.g., to console or to browser.
+  Subclasses implement the callback methods, to provide specific reporting functionality, e.g., to
+  console or to browser.
   """
 
   @dataclass(frozen=True)
@@ -23,7 +23,8 @@ class Reporter:
     """Generic reporting settings.
 
     Subclasses of Reporter should extend their own Settings and add any additional settings they'd
-    like."""
+    like.
+    """
     log_level: str  # Display log messages up to this level.
 
   def __init__(self, run_tracker, settings):
@@ -47,7 +48,7 @@ class Reporter:
     pass
 
   def bulk_record_workunits(self, engine_workunits):
-    """A collection of workunits from v2 engine part"""
+    """A collection of workunits from v2 engine part."""
     pass
 
   def handle_log(self, workunit, level, *msg_elements):

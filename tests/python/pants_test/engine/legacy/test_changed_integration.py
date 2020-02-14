@@ -251,7 +251,8 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
 
   @classmethod
   def generate_tests(cls):
-    """Generates tests on the class for better reporting granularity than an opaque for loop test."""
+    """Generates tests on the class for better reporting granularity than an opaque for loop
+    test."""
     def safe_filename(f):
       return f.replace('/', '_').replace('.', '_')
 

@@ -179,8 +179,7 @@ def test_list_options() -> None:
 
 def test_dict_options() -> None:
   """We can safely preserve one-line dict values, which only need to be wrapped in quotes to work
-  properly.
-  """
+  properly."""
   assert_rewrite(
     original=dedent(
       """\

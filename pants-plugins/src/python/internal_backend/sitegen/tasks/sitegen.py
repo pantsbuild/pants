@@ -28,8 +28,8 @@ Suggested use:
 def beautiful_soup(*args, **kwargs):
   """Indirection function so we can lazy-import bs4.
 
-  It's an expensive import that invokes re.compile a lot, so we don't want to incur that cost
-  unless we must.
+  It's an expensive import that invokes re.compile a lot, so we don't want to incur that cost unless
+  we must.
   """
   import bs4
   return bs4.BeautifulSoup(*args, **kwargs)
@@ -161,8 +161,8 @@ def precompute(config, soups):
 def fixup_internal_links(config, soups):
   """Find href="..." links that link to pages in our docset; fix them up.
 
-  We don't preserve relative paths between files as we copy-transform them
-  from source to dest. So adjust the paths to work with new locations.
+  We don't preserve relative paths between files as we copy-transform them from source to dest. So
+  adjust the paths to work with new locations.
   """
   # Pages can come from different dirs; they can go to different dirs.
   # Thus, there's some relative-path-computing here.
@@ -188,8 +188,7 @@ _heading_re = re.compile(r'^h[1-6]$')  # match heading tag names h1,h2,h3,...
 
 
 def rel_href(src: str, dst: str) -> str:
-  """For src='foo/bar.html', dst='garply.html#frotz' return relative link '../garply.html#frotz'.
-  """
+  """For src='foo/bar.html', dst='garply.html#frotz' return relative link '../garply.html#frotz'."""
   src_dir = Path(src).parent
   return os.path.relpath(dst, src_dir)
 
@@ -255,7 +254,7 @@ def transform_soups(config, soups, precomputed):
 
 
 def get_title(soup):
-  """Given a soup, pick out a title"""
+  """Given a soup, pick out a title."""
   if soup.title:
     return soup.title.string
   if soup.h1:
@@ -328,7 +327,7 @@ def generate_page_tocs(soups, precomputed):
 
 
 def generate_page_toc(soup):
-  """Return page-level (~list of headings) TOC template data for soup"""
+  """Return page-level (~list of headings) TOC template data for soup."""
   # Maybe we don't want to show all the headings. E.g., it's common for a page
   # to have just one H1, a title at the top. Our heuristic: if a page has just
   # one heading of some outline level, don't show it.
@@ -389,5 +388,5 @@ def copy_extras(config):
 
 
 def load_template(config):
-  """Return text of template file specified in config"""
+  """Return text of template file specified in config."""
   return Path(config['template']).read_text()

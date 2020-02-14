@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class JvmResolveSubsystem(Subsystem):
-  """Used to keep track of global jvm resolver settings
+  """Used to keep track of global jvm resolver settings.
 
   :API: public
   """

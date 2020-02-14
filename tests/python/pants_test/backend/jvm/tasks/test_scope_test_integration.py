@@ -43,7 +43,7 @@ class ScopeTestIntegrationTest(PantsRunIntegrationTest):
     ]))
 
   def test_binary_fails_to_run(self):
-    "Ensure the binary does not have access to 'test'-scoped dependencies at runtime."
+    """Ensure the binary does not have access to 'test'-scoped dependencies at runtime."""
     self.assert_failure(self.run_pants([
       '--no-java-strict-deps', 'run', self._spec('bin'),
     ]))

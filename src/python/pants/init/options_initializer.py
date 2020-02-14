@@ -125,8 +125,8 @@ class OptionsInitializer:
   def compute_pantsd_invalidation_globs(buildroot, bootstrap_options):
     """Computes the merged value of the `--pantsd-invalidation-globs` option.
 
-    Combines --pythonpath and --pants-config-files files that are in {buildroot} dir
-    with those invalidation_globs provided by users.
+    Combines --pythonpath and --pants-config-files files that are in {buildroot} dir with those
+    invalidation_globs provided by users.
     """
     invalidation_globs = []
     globs = bootstrap_options.pythonpath + \

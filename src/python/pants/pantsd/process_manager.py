@@ -51,9 +51,9 @@ class ProcessGroup:
   def iter_processes(self, proc_filter=None):
     """Yields processes from psutil.process_iter with an optional filter and swallows psutil errors.
 
-    If a psutil exception is raised during execution of the filter, that process will not be
-    yielded but subsequent processes will. On the other hand, if psutil.process_iter raises
-    an exception, no more processes will be yielded.
+    If a psutil exception is raised during execution of the filter, that process will not be yielded
+    but subsequent processes will. On the other hand, if psutil.process_iter raises an exception, no
+    more processes will be yielded.
     """
     with swallow_psutil_exceptions():  # process_iter may raise
       for proc in psutil.process_iter():
@@ -218,7 +218,10 @@ class ProcessMetadataManager:
 
 
 class ProcessManager(ProcessMetadataManager):
-  """Subprocess/daemon management mixin/superclass. Not intended to be thread-safe."""
+  """Subprocess/daemon management mixin/superclass.
+
+  Not intended to be thread-safe.
+  """
 
   class InvalidCommandOutput(Exception): pass
   class NonResponsiveProcess(Exception): pass
@@ -260,7 +263,10 @@ class ProcessManager(ProcessMetadataManager):
 
   @property
   def process_name(self):
-    """The logical process name. If defined, this is compared to exe_name for stale pid checking."""
+    """The logical process name.
+
+    If defined, this is compared to exe_name for stale pid checking.
+    """
     return self._process_name
 
   @memoized_property
@@ -332,7 +338,7 @@ class ProcessManager(ProcessMetadataManager):
     return self.await_metadata_by_name(self._name, 'socket', timeout, self._socket_type)
 
   def write_pid(self, pid=None):
-    """Write the current processes PID to the pidfile location"""
+    """Write the current processes PID to the pidfile location."""
     pid = pid or os.getpid()
     self.write_metadata_by_name(self._name, 'pid', str(pid))
 
@@ -392,8 +398,8 @@ class ProcessManager(ProcessMetadataManager):
       return False
 
   def purge_metadata(self, force=False):
-    """Instance-based version of ProcessMetadataManager.purge_metadata_by_name() that checks
-    for process liveness before purging metadata.
+    """Instance-based version of ProcessMetadataManager.purge_metadata_by_name() that checks for
+    process liveness before purging metadata.
 
     :param bool force: If True, skip process liveness check before purging metadata.
     :raises: `ProcessManager.MetadataError` when OSError is encountered on metadata dir removal.
@@ -505,8 +511,8 @@ class ProcessManager(ProcessMetadataManager):
 
     Use this if your post_fork_child block invokes a subprocess via subprocess.Popen(). In this
     case, a second fork such as used in daemonize() is extraneous given that Popen() also forks.
-    Using this daemonization method vs daemonize() leaves the responsibility of writing the pid
-    to the caller to allow for library-agnostic flexibility in subprocess execution.
+    Using this daemonization method vs daemonize() leaves the responsibility of writing the pid to
+    the caller to allow for library-agnostic flexibility in subprocess execution.
     """
     self.purge_metadata()
     self.pre_fork(**pre_fork_opts or {})

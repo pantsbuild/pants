@@ -67,8 +67,7 @@ class SourcesField(PayloadField):
     return self._ref_address
 
   def snapshot(self, scheduler: Optional["SchedulerSession"] = None) -> Snapshot:
-    """
-    Returns a Snapshot containing the sources, relative to the build root.
+    """Returns a Snapshot containing the sources, relative to the build root.
 
     This API is experimental, and subject to change.
     """

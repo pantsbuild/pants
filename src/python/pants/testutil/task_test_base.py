@@ -27,9 +27,8 @@ def is_exe(name):
 
 
 def ensure_cached(task_cls, expected_num_artifacts=None):
-  """Decorator for a task-executing unit test. Asserts that after running the
-  decorated test function, the cache for task_cls contains
-  expected_num_artifacts.
+  """Decorator for a task-executing unit test. Asserts that after running the decorated test
+  function, the cache for task_cls contains expected_num_artifacts.
 
   Uses a new temp dir for the artifact cache, and uses a glob based on the
   task's synthesized subtype to find the cache directories within the new temp

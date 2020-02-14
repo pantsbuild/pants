@@ -14,8 +14,8 @@ from pants.contrib.node.tasks.node_task import NodeTask
 class NodeTest(TestRunnerTaskMixin, NodeTask):
   """Runs a test script from package.json in a NodeModule, currently via "npm run [script name]".
 
-  Implementations of abstract methods from TestRunnerTaskMixin:
-  _execute, _spawn, _test_target_filter, _validate_target
+  Implementations of abstract methods from TestRunnerTaskMixin: _execute, _spawn,
+  _test_target_filter, _validate_target
   """
 
   def __init__(self, *args, **kwargs):
@@ -34,10 +34,10 @@ class NodeTest(TestRunnerTaskMixin, NodeTask):
   def _run_node_distribution_command(self, command, workunit):
     """Overrides NodeTask._run_node_distribution_command.
 
-    This is what is ultimately used to run the Command.
-    It must return the return code of the process. The base implementation just calls
-    command.run immediately. We override here to invoke TestRunnerTaskMixin.spawn_and_wait,
-    which ultimately invokes _spawn, which finally calls command.run.
+    This is what is ultimately used to run the Command. It must return the return code of the
+    process. The base implementation just calls command.run immediately. We override here to invoke
+    TestRunnerTaskMixin.spawn_and_wait, which ultimately invokes _spawn, which finally calls
+    command.run.
     """
     return self.spawn_and_wait(self._currently_executing_test_targets, command, workunit)
 

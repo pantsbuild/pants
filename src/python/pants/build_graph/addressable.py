@@ -92,9 +92,9 @@ class Addressable(ABC):
   def addressed_name(self):
     """This property is inspected by AddressableCallProxy to automatically name Addressables.
 
-    Generally, a subclass will inspect its captured arguments and return, for example, the
-      captured `name` parameter.  A value of `None` (the default) causes AddressableCallProxy
-      to skip capturing and naming this instance.
+    Generally, a subclass will inspect its captured arguments and return, for example, the captured
+    `name` parameter.  A value of `None` (the default) causes AddressableCallProxy   to skip
+    capturing and naming this instance.
     """
     return None
 

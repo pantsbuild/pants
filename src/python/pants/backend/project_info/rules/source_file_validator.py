@@ -104,9 +104,9 @@ class RegexMatchResults(Collection[RegexMatchResult]):
 class Matcher:
   """Class to match a single (possibly inverted) regex.
 
-  Matches are allowed anywhere in the string (so really a "search" in the Python regex parlance).
-  To anchor a match at the beginning of a string, use the ^ anchor. To anchor at the beginning
-  of any line, use the ^ anchor along with the MULTILINE directive (?m).  See test for examples.
+  Matches are allowed anywhere in the string (so really a "search" in the Python regex parlance). To
+  anchor a match at the beginning of a string, use the ^ anchor. To anchor at the beginning of any
+  line, use the ^ anchor along with the MULTILINE directive (?m).  See test for examples.
   """
 
   def __init__(self, pattern, inverted=False):

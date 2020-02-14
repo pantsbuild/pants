@@ -73,9 +73,9 @@ class SourceRoots:
   def add_source_root(self, path, langs=tuple(), category=SourceRootCategories.UNKNOWN):
     """Add the specified fixed source root, which must be relative to the buildroot.
 
-    Useful in a limited set of circumstances, e.g., when unpacking sources from a jar with
-    unknown structure.  Tests should prefer to use dirs that match our source root patterns
-    instead of explicitly setting source roots here.
+    Useful in a limited set of circumstances, e.g., when unpacking sources from a jar with unknown
+    structure.  Tests should prefer to use dirs that match our source root patterns instead of
+    explicitly setting source roots here.
     """
     self._trie.add_fixed(path, langs, category)
 

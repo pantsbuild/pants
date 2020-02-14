@@ -112,8 +112,7 @@ class TargetAdaptor(StructWithDeps):
     return None
 
   def validate_sources(self, sources):
-    """"
-    Validate that the sources argument is allowed.
+    """" Validate that the sources argument is allowed.
 
     Examples may be to check that the number of sources is correct, that file extensions are as
     expected, etc.

@@ -15,7 +15,8 @@ CacheStat = namedtuple('CacheStat', ['hit_targets', 'miss_targets'])
 class ArtifactCacheStats:
   """Tracks the hits and misses in the artifact cache.
 
-  If dir is specified, writes the hits and misses to files in that dir."""
+  If dir is specified, writes the hits and misses to files in that dir.
+  """
 
   def __init__(self, dir=None):
     def init_stat():

@@ -10,8 +10,8 @@ from pants.contrib.scalajs.targets.scala_js_target import ScalaJSTarget
 class ScalaJSLibrary(ScalaJSTarget, Target):
   """A library with scala sources, intended to be compiled to Javascript.
 
-  Linking multiple libraries together into a shippable blob additionally requires a
-  ScalaJSBinary target.
+  Linking multiple libraries together into a shippable blob additionally requires a ScalaJSBinary
+  target.
   """
 
   def __init__(self, sources=None, address=None, payload=None, **kwargs):

@@ -12,34 +12,34 @@ Value = Union[str, int, float, None, Dict, Enum, List]
 class RankedValue:
   """An option value, together with a rank inferred from its source.
 
-  Allows us to control which source wins: e.g., a command-line flag overrides an environment
-  variable which overrides a config, etc. For example:
+   Allows us to control which source wins: e.g., a command-line flag overrides an environment
+   variable which overrides a config, etc. For example:
 
-  Consider this config:
+   Consider this config:
 
-  [compile.java]
-  foo: 11
+   [compile.java]
+   foo: 11
 
-  And this environment variable:
+   And this environment variable:
 
-  PANTS_COMPILE_FOO: 22
+   PANTS_COMPILE_FOO: 22
 
- If the command-line is
+  If the command-line is
 
-  ./pants compile target
+   ./pants compile target
 
-  we expect the value of foo in the compile.java scope to be 22, because it was explicitly
-  set by the user in the enclosing compile scope. I.e., the outer scope's environment value
-  overrides the inner scope's config value.
+   we expect the value of foo in the compile.java scope to be 22, because it was explicitly
+   set by the user in the enclosing compile scope. I.e., the outer scope's environment value
+   overrides the inner scope's config value.
 
-  However if the command-line is
+   However if the command-line is
 
-  ./pants compile.java --foo=33 target
+   ./pants compile.java --foo=33 target
 
-  we now expect the value of foo in the compile.java to be 33. I.e., the inner scope's flag
-  overrides the outer scope's environment value.
+   we now expect the value of foo in the compile.java to be 33. I.e., the inner scope's flag
+   overrides the outer scope's environment value.
 
-  To tell these cases apart we need to know the "ranking" of the value.
+   To tell these cases apart we need to know the "ranking" of the value.
   """
 
   # The ranked value sources. Higher ranks override lower ones.

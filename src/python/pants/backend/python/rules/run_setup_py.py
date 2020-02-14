@@ -99,9 +99,9 @@ class ExportedTarget:
 class DependencyOwner:
   """An ExportedTarget in its role as an owner of other targets.
 
-  We need this type to prevent rule ambiguities when computing the list of targets
-  owned by an ExportedTarget (which involves going from ExportedTarget -> dep -> owner (which
-  is itself an ExportedTarget) and checking if owner is this the original ExportedTarget.
+  We need this type to prevent rule ambiguities when computing the list of targets owned by an
+  ExportedTarget (which involves going from ExportedTarget -> dep -> owner (which is itself an
+  ExportedTarget) and checking if owner is this the original ExportedTarget.
   """
   exported_target: ExportedTarget
 
@@ -149,8 +149,8 @@ class SetupPySourcesRequest:
 class SetupPySources:
   """The sources required by a setup.py command.
 
-  Includes some information derived from analyzing the source, namely the packages,
-  namespace packages and resource files in the source.
+  Includes some information derived from analyzing the source, namely the packages, namespace
+  packages and resource files in the source.
   """
   digest: Digest
   packages: Tuple[str, ...]

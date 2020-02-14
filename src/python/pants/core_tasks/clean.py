@@ -15,7 +15,8 @@ logger = logging.getLogger(__name__)
 class Clean(Task):
   """Delete all build products, creating a clean workspace.
 
-  The clean-all method allows for both synchronous and asynchronous options with the --async option."""
+  The clean-all method allows for both synchronous and asynchronous options with the --async option.
+  """
 
   @classmethod
   def register_options(cls, register):

@@ -8,8 +8,8 @@ from pants_test.base.pants_ignore_test_base import PantsIgnoreTestBase
 
 
 class FileSystemPantsIgnoreTest(unittest.TestCase, PantsIgnoreTestBase):
-  """
-  Common test cases are defined in PantsIgnoreTestBase.
+  """Common test cases are defined in PantsIgnoreTestBase.
+
   Special test cases can be defined here.
   """
 

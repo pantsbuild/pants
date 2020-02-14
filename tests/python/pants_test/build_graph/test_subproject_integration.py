@@ -82,21 +82,16 @@ def harness():
 class SubprojectIntegrationTest(PantsRunIntegrationTest):
 
   def test_subproject_without_flag(self):
-    """
-    Assert that when getting the dependencies of a project which relies
-    on a subproject which relies on its own internal library, a failure
-    occurs without the --subproject-roots option
-    """
+    """Assert that when getting the dependencies of a project which relies on a subproject which
+    relies on its own internal library, a failure occurs without the --subproject-roots option."""
     with harness():
       pants_args = ['dependencies', SUBPROJ_SPEC]
       self.assert_failure(self.run_pants(pants_args))
 
   def test_subproject_with_flag(self):
-    """
-    Assert that when getting the dependencies of a project which relies on
-    a subproject which relies on its own internal library, all things
-    go well when that subproject is declared as a subproject
-    """
+    """Assert that when getting the dependencies of a project which relies on a subproject which
+    relies on its own internal library, all things go well when that subproject is declared as a
+    subproject."""
     with harness():
       # Has dependencies below the subproject.
       pants_args = [f'--subproject-roots={SUBPROJ_ROOT}',

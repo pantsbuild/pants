@@ -39,8 +39,8 @@ class RunJvmPrepCommandBase(Task):
   def register_options(cls, register):
     """Register options for this optionable.
 
-    In this case, there are no special options, but we want to use this opportunity to setup
-    goal validation in JvmPrepCommand before the build graph is parsed.
+    In this case, there are no special options, but we want to use this opportunity to setup goal
+    validation in JvmPrepCommand before the build graph is parsed.
     """
     super().register_options(register)
     JvmPrepCommand.add_goal(cls.goal)

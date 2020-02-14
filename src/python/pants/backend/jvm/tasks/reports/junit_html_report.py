@@ -22,7 +22,7 @@ _LOGGER = logging.getLogger(__name__)
 
 @total_ordering
 class ReportTestSuite:
-  """Data object for a JUnit test suite"""
+  """Data object for a JUnit test suite."""
 
   class MergeError(Exception):
     def __init__(self, suites, test_cases):
@@ -143,7 +143,7 @@ class ReportTestSuite:
 
 @dataclass(frozen=True, order=True)
 class ReportTestCase:
-  """Data object for a JUnit test case"""
+  """Data object for a JUnit test case."""
   name: Any
   time: float
   failure: Optional[Any] = None
@@ -177,7 +177,7 @@ class JUnitHtmlReportInterface(ABC):
 
   @abstractmethod
   def report(self, output_dir):
-    """Generate the junit test result report
+    """Generate the junit test result report.
 
     :returns: The generated report path iff it should be opened for the user.
     :rtype: str
@@ -192,7 +192,7 @@ class NoJunitHtmlReport(JUnitHtmlReportInterface):
 
 
 class JUnitHtmlReport(JUnitHtmlReportInterface):
-  """Generates an HTML report from JUnit TEST-*.xml files"""
+  """Generates an HTML report from JUnit TEST-*.xml files."""
 
   @classmethod
   def create(cls, xml_dir, open_report=False, logger=None, error_on_conflict=True):

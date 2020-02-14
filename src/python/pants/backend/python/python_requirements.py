@@ -5,7 +5,7 @@ import os
 
 
 class PythonRequirements:
-  """Translates a pip requirements file into an equivalent set of python_requirements
+  """Translates a pip requirements file into an equivalent set of python_requirements.
 
   If the ``requirements.txt`` file has lines ``foo>=3.14`` and ``bar>=2.7``,
   then this is roughly like::

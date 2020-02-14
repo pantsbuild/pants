@@ -154,15 +154,14 @@ def temporary_dir(
   permissions: Optional[int] = None,
   prefix: Optional[str] = tempfile.template,
 ) -> Iterator[str]:
-  """
-    A with-context that creates a temporary directory.
+  """A with-context that creates a temporary directory.
 
-    :API: public
+  :API: public
 
-    You may specify the following keyword args:
-    :param root_dir: The parent directory to create the temporary directory.
-    :param cleanup: Whether or not to clean up the temporary directory.
-    :param permissions: If provided, sets the directory permissions to this mode.
+  You may specify the following keyword args:
+  :param root_dir: The parent directory to create the temporary directory.
+  :param cleanup: Whether or not to clean up the temporary directory.
+  :param permissions: If provided, sets the directory permissions to this mode.
   """
   path = tempfile.mkdtemp(dir=root_dir, suffix=suffix, prefix=prefix)
 
@@ -182,14 +181,13 @@ def temporary_file_path(
   suffix: Optional[str] = None,
   permissions: Optional[int] = None,
 ) -> Iterator[str]:
-  """
-    A with-context that creates a temporary file and returns its path.
+  """A with-context that creates a temporary file and returns its path.
 
-    :API: public
+  :API: public
 
-    You may specify the following keyword args:
-    :param root_dir: The parent directory to create the temporary file.
-    :param cleanup: Whether or not to clean up the temporary file.
+  You may specify the following keyword args:
+  :param root_dir: The parent directory to create the temporary file.
+  :param cleanup: Whether or not to clean up the temporary file.
   """
   with temporary_file(root_dir, cleanup=cleanup, suffix=suffix, permissions=permissions) as fd:
     fd.close()
@@ -204,19 +202,18 @@ def temporary_file(
   permissions: Optional[int] = None,
   binary_mode: bool = True,
 ) -> Iterator[IO]:
-  """
-    A with-context that creates a temporary file and returns a writeable file descriptor to it.
+  """A with-context that creates a temporary file and returns a writeable file descriptor to it.
 
-    You may specify the following keyword args:
-    :param root_dir: The parent directory to create the temporary file.
-    :param cleanup: Whether or not to clean up the temporary file.
-    :param suffix: If suffix is specified, the file name will end with that suffix.
-                       Otherwise there will be no suffix.
-                       mkstemp() does not put a dot between the file name and the suffix;
-                       if you need one, put it at the beginning of suffix.
-                       See :py:class:`tempfile.NamedTemporaryFile`.
-    :param permissions: If provided, sets the file to use these permissions.
-    :param binary_mode: Whether file opens in binary or text mode.
+  You may specify the following keyword args:
+  :param root_dir: The parent directory to create the temporary file.
+  :param cleanup: Whether or not to clean up the temporary file.
+  :param suffix: If suffix is specified, the file name will end with that suffix.
+                     Otherwise there will be no suffix.
+                     mkstemp() does not put a dot between the file name and the suffix;
+                     if you need one, put it at the beginning of suffix.
+                     See :py:class:`tempfile.NamedTemporaryFile`.
+  :param permissions: If provided, sets the file to use these permissions.
+  :param binary_mode: Whether file opens in binary or text mode.
   """
   mode = 'w+b' if binary_mode else 'w+'  # tempfile's default is 'w+b'
   with tempfile.NamedTemporaryFile(suffix=suffix, dir=root_dir, delete=False, mode=mode) as fd:
@@ -254,9 +251,7 @@ def safe_file(path: str, suffix: Optional[str] = None, cleanup: bool = True) -> 
 
 @contextmanager
 def pushd(directory: str) -> Iterator[str]:
-  """
-    A with-context that encapsulates pushd/popd.
-  """
+  """A with-context that encapsulates pushd/popd."""
   cwd = os.getcwd()
   os.chdir(directory)
   try:
@@ -296,10 +291,9 @@ def open_zip(path_or_file: Union[str, Any], *args, **kwargs) -> Iterator[zipfile
 
 @contextmanager
 def open_tar(path_or_file: Union[str, Any], *args, **kwargs) -> Iterator[TarFile]:
-  """
-    A with-context for tar files.  Passes through positional and kwargs to tarfile.open.
+  """A with-context for tar files.  Passes through positional and kwargs to tarfile.open.
 
-    If path_or_file is a file, caller must close it separately.
+  If path_or_file is a file, caller must close it separately.
   """
   (path, fileobj) = (path_or_file, None) if isinstance(path_or_file, str) else (None, path_or_file)
   kwargs["fileobj"] = fileobj
@@ -310,7 +304,7 @@ def open_tar(path_or_file: Union[str, Any], *args, **kwargs) -> Iterator[TarFile
 
 
 class Timer:
-  """Very basic with-context to time operations
+  """Very basic with-context to time operations.
 
   Example usage:
     >>> from pants.util.contextutil import Timer
@@ -319,7 +313,6 @@ class Timer:
     ...
     >>> timer.elapsed
     2.0020849704742432
-
   """
 
   def __init__(self, clock=time) -> None:

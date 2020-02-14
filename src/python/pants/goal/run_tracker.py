@@ -557,9 +557,8 @@ class RunTracker(Subsystem):
       self.outcomes[path] = workunit.outcome_string(workunit.outcome())
 
   def get_critical_path_timings(self):
-    """
-    Get the cumulative timings of each goal and all of the goals it (transitively) depended on.
-    """
+    """Get the cumulative timings of each goal and all of the goals it (transitively) depended
+    on."""
     setup_workunit = WorkUnitLabel.SETUP.lower()
     transitive_dependencies = dict()
     for goal_info in self._sorted_goal_infos:
@@ -627,9 +626,8 @@ class RunTracker(Subsystem):
   def _get_option_to_record(self, scope, option=None):
     """Looks up an option scope (and optionally option therein) in the options parsed by Pants.
 
-    Returns a dict of of all options in the scope, if option is None.
-    Returns the specific option if option is not None.
-    Raises ValueError if scope or option could not be found.
+    Returns a dict of of all options in the scope, if option is None. Returns the specific option if
+    option is not None. Raises ValueError if scope or option could not be found.
     """
     scope_to_look_up = scope if scope != 'GLOBAL' else ''
     try:

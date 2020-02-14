@@ -23,8 +23,8 @@ from pants.util.meta import frozen_after_init
 
 
 def side_effecting(cls):
-  """Annotates a class to indicate that it is a side-effecting type, which needs
-  to be handled specially with respect to rule caching semantics."""
+  """Annotates a class to indicate that it is a side-effecting type, which needs to be handled
+  specially with respect to rule caching semantics."""
   cls.__side_effecting = True
   return cls
 
@@ -391,9 +391,8 @@ class TaskRule(Rule):
 class RootRule(Rule):
   """Represents a root input to an execution of a rule graph.
 
-  Roots act roughly like parameters, in that in some cases the only source of a
-  particular type might be when a value is provided as a root subject at the beginning
-  of an execution.
+  Roots act roughly like parameters, in that in some cases the only source of a particular type
+  might be when a value is provided as a root subject at the beginning of an execution.
   """
   _output_type: Type
 

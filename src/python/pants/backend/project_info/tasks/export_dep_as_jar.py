@@ -28,8 +28,8 @@ from pants.util.memo import memoized_property
 class ExportDepAsJar(ConsoleTask):
   """[Experimental] Create project info for IntelliJ with dependencies treated as jars.
 
-  This is an experimental task that mimics export but uses the jars for
-  jvm dependencies instead of sources.
+  This is an experimental task that mimics export but uses the jars for jvm dependencies instead of
+  sources.
   """
 
   _register_console_transitivity_option = False
@@ -92,7 +92,7 @@ class ExportDepAsJar(ConsoleTask):
     return mapping
 
   def _get_pants_target_alias(self, pants_target_type):
-    """Returns the pants target alias for the given target"""
+    """Returns the pants target alias for the given target."""
     if pants_target_type in self.target_aliases_map:
       return self.target_aliases_map.get(pants_target_type)
     else:
@@ -101,6 +101,7 @@ class ExportDepAsJar(ConsoleTask):
   @staticmethod
   def _jar_id(jar):
     """Create a string identifier for the IvyModuleRef key.
+
     :param IvyModuleRef jar: key for a resolved jar
     :returns: String representing the key as a maven coordinate
     """
@@ -112,6 +113,7 @@ class ExportDepAsJar(ConsoleTask):
   @staticmethod
   def _exclude_id(jar):
     """Create a string identifier for the Exclude key.
+
     :param Exclude jar: key for an excluded jar
     :returns: String representing the key as a maven coordinate
     """
@@ -212,9 +214,8 @@ class ExportDepAsJar(ConsoleTask):
           yield M2Coordinate(org=coordinate.org, name=coordinate.name, rev=coordinate.rev)
 
     def _full_library_set_for_target(target):
-      """
-      Get the full library set for a target, including jar dependencies and jars of the library itself.
-      """
+      """Get the full library set for a target, including jar dependencies and jars of the library
+      itself."""
       libraries = set([])
       if isinstance(target, JarLibrary):
         jars = set([])

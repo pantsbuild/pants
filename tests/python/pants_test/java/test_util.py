@@ -89,14 +89,14 @@ class SafeClasspathTest(unittest.TestCase):
   def test_safe_classpath(self):
     """For directory structure like:
 
-       ./
-       ./libs/A.jar
-       ./libs/resources/
-       ./synthetic_jar_dir
+    ./
+    ./libs/A.jar
+    ./libs/resources/
+    ./synthetic_jar_dir
 
-       Verify a synthetic jar with the following classpath in manifest is created:
+    Verify a synthetic jar with the following classpath in manifest is created:
 
-        Class-Path: ../libs/A.jar:../libs/resources/
+     Class-Path: ../libs/A.jar:../libs/resources/
     """
     RESOURCES = 'resources'
     LIB_DIR = 'libs'

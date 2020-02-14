@@ -170,10 +170,10 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
                     pants_run.stderr_data)
 
   def test_from_config_invalid_global_option(self) -> None:
-    """
-    This test can be interpreted in two ways:
-      1. An invalid global option `invalid_global` will be caught.
-      2. Variable `invalid_global` is not allowed in [GLOBAL].
+    """This test can be interpreted in two ways:
+
+    1. An invalid global option `invalid_global` will be caught.
+    2. Variable `invalid_global` is not allowed in [GLOBAL].
     """
     with temporary_dir(root_dir=os.path.abspath('.')) as tempdir:
       config_path = os.path.relpath(os.path.join(tempdir, 'config.ini'))
@@ -197,9 +197,7 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
                     pants_run.stderr_data)
 
   def test_invalid_command_line_option_and_invalid_config(self) -> None:
-    """
-    Make sure invalid command line error will be thrown and exits.
-    """
+    """Make sure invalid command line error will be thrown and exits."""
     with temporary_dir(root_dir=os.path.abspath('.')) as tempdir:
       config_path = os.path.relpath(os.path.join(tempdir, 'config.ini'))
       with open(config_path, 'w+') as f:

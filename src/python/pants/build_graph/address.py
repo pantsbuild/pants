@@ -19,8 +19,8 @@ def parse_spec(
   relative_to: Optional[str] = None,
   subproject_roots: Optional[Sequence[str]] = None,
 ) -> Tuple[str, str]:
-  """Parses a target address spec and returns the path from the root of the repo to this Target
-  and Target name.
+  """Parses a target address spec and returns the path from the root of the repo to this Target and
+  Target name.
 
   :API: public
 
@@ -95,7 +95,7 @@ def parse_spec(
 # It's unclear, though, in a deprecation warning what should be the alternative that we recommend
 # people use?
 class Addresses(namedtuple('Addresses', ['addresses', 'rel_path'])):
-  """ Used as a sentinel type for identifying a list of string specs.
+  """Used as a sentinel type for identifying a list of string specs.
 
   addresses: list of string specs
   rel_path: addresses might be relative specs, so they need to be interpreted

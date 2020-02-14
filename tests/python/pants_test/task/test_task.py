@@ -235,9 +235,11 @@ class TaskTest(TaskTestBase):
     return task_object.fingerprint
 
   def _synth_fp(self, scope=None, cls=FakeTask, options_fingerprintable=None, **kwargs):
-    """Synthesize a subtype of `cls`, instantiate it, and take its
-    fingerprint. `options_fingerprintable` describes the registered options in
-    their respective scopes which can contribute to the task fingerprint."""
+    """Synthesize a subtype of `cls`, instantiate it, and take its fingerprint.
+
+    `options_fingerprintable` describes the registered options in their respective scopes which can
+    contribute to the task fingerprint.
+    """
     task_type = self._synthesize_subtype(scope=scope, cls=cls, **kwargs)
     return self._task_type_to_fp(
       task_type, options_fingerprintable=options_fingerprintable)
@@ -510,15 +512,13 @@ class TaskTest(TaskTestBase):
     self.assertFalse(vtA.cacheable)
 
   def test_fingerprint_identity(self):
-    """Tasks formed with the same parameters should have the same fingerprint
-    (smoke test)."""
+    """Tasks formed with the same parameters should have the same fingerprint (smoke test)."""
     x = self._synth_fp()
     y = self._synth_fp()
     self.assertEqual(y, x)
 
   def test_fingerprint_implementation_version_single(self):
-    """Tasks with a different implementation_version() should have different
-    fingerprints."""
+    """Tasks with a different implementation_version() should have different fingerprints."""
     empty_impls = self._synth_fp(_impls=[])
     zero_version = self._synth_fp(_impls=[('asdf', 0)])
     self.assertNotEqual(zero_version, empty_impls)
@@ -531,8 +531,8 @@ class TaskTest(TaskTestBase):
     self.assertNotEqual(zero_one_version, one_version)
 
   def test_fingerprint_implementation_version_inheritance(self):
-    """The implementation_version() of superclasses of the task should affect
-    the task fingerprint."""
+    """The implementation_version() of superclasses of the task should affect the task
+    fingerprint."""
     versioned_fake = self._synth_fp(_impls=[('asdf', 0)])
     base_version_other_fake = self._synth_fp(
       cls=OtherFakeTask,
@@ -561,8 +561,8 @@ class TaskTest(TaskTestBase):
     self.assertNotEqual(b_fingerprint, a_fingerprint)
 
   def test_fingerprint_changing_options_scope(self):
-    """The options_scope of the task and any of its subsystem_dependencies
-    should affect the task fingerprint."""
+    """The options_scope of the task and any of its subsystem_dependencies should affect the task
+    fingerprint."""
     task_fp = self._synth_fp(scope='xxx')
     other_task_fp = self._synth_fp(scope='yyy')
     self.assertNotEqual(other_task_fp, task_fp)
@@ -574,8 +574,8 @@ class TaskTest(TaskTestBase):
     self.assertNotEqual(scoped_subsystems_fp, subsystem_deps_fp)
 
   def test_fingerprint_options_on_registered_scopes_only(self):
-    """Changing or setting an option value should only affect the task
-    fingerprint if it is registered as a fingerprintable option."""
+    """Changing or setting an option value should only affect the task fingerprint if it is
+    registered as a fingerprintable option."""
     default_fp = self._synth_fp(cls=AnotherFakeTask, options_fingerprintable={})
     self.set_options_for_scope(
       AnotherFakeTask.options_scope, **{'fake-option': False})
@@ -588,8 +588,7 @@ class TaskTest(TaskTestBase):
     self.assertNotEqual(registered_option_fp, default_fp)
 
   def test_fingerprint_changing_option_value(self):
-    """Changing an option value in some scope should affect the task
-    fingerprint."""
+    """Changing an option value in some scope should affect the task fingerprint."""
     cur_option_spec = {
       AnotherFakeTask.options_scope: {'fake-option': bool},
     }
@@ -630,8 +629,7 @@ class TaskTest(TaskTestBase):
     self.assert_passthru_args(expected=['c "d e"'], passthrough_args_option=['c "d e"'])
 
   def test_fingerprint_passthru_args(self):
-    """Passthrough arguments should affect fingerprints iff the task
-    supports passthrough args."""
+    """Passthrough arguments should affect fingerprints iff the task supports passthrough args."""
     task_type_base = self._synthesize_subtype(cls=AnotherFakeTask)
     empty_passthru_args_fp = self._task_type_to_fp(
       task_type_base,

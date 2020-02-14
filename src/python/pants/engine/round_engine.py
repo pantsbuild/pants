@@ -62,9 +62,8 @@ class RoundEngine(Engine):
     """Indicates there is a cycle in the goal dependency graph."""
 
   class TaskOrderError(DependencyError):
-    """Indicates a task depends on data produced by another task in the same goal that is
-    scheduled to runs after it.
-    """
+    """Indicates a task depends on data produced by another task in the same goal that is scheduled
+    to runs after it."""
 
   class MissingProductError(DependencyError):
     """Indicates an expressed data dependency if not provided by any installed task."""

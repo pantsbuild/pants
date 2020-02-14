@@ -59,7 +59,7 @@ class ArtifactCache:
     self.artifact_root = artifact_root
 
   def prune(self):
-    """Prune stale cache files
+    """Prune stale cache files.
 
     Remove old unused cache files
     :return:
@@ -166,7 +166,6 @@ def call_insert(tup):
 
   :param tup: A 4-tuple of an ArtifactCache and the 3 args passed to ArtifactCache.insert:
               eg (some_cache_instance, cache_key, [some_file, another_file], False)
-
   """
   try:
     cache, key, files, overwrite = tup

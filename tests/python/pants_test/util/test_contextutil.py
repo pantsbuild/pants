@@ -226,8 +226,8 @@ class ContextutilTest(unittest.TestCase):
   def _stdio_as_tempfiles(self) -> Iterator[None]:
     """Harness to replace `sys.std*` with tempfiles.
 
-    Validates that all files are read/written/flushed correctly, and acts as a
-    contextmanager to allow for recursive tests.
+    Validates that all files are read/written/flushed correctly, and acts as a contextmanager to
+    allow for recursive tests.
     """
 
     # Prefix contents written within this instance with a unique string to differentiate

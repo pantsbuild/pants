@@ -28,9 +28,7 @@ class ExportDepAsJarIntegrationTest(ScalacPluginIntegrationTestBase):
     return export_result
 
   def _check_compiler_options_for_target_are(self, target, expected_options_patterns, config):
-    """
-    Export the target, and check that the options are correct.
-    """
+    """Export the target, and check that the options are correct."""
 
     export_output = self._do_test_compiler_options_in_export_output(config, target)
 

@@ -128,8 +128,8 @@ class OptionsFingerprinter:
   def _fingerprint_dirs(self, dirpaths, topdown=True, onerror=None, followlinks=False):
     """Returns a fingerprint of the given file directories and all their sub contents.
 
-    This assumes that the file directories are of reasonable size
-    to cause memory or performance issues.
+    This assumes that the file directories are of reasonable size to cause memory or performance
+    issues.
     """
     # Note that we don't sort the dirpaths, as their order may have meaning.
     filepaths = []

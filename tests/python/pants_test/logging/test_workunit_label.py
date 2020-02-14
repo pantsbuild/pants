@@ -7,10 +7,10 @@ from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class WorkUnitLabelTest(PantsRunIntegrationTest):
-  """
-  This tests whether workunit label will appear in the log.
-  The pants run itself is going to fail due to non existent main class when invoking java,
-  but the point is to check whether certain label gets printed out.
+  """This tests whether workunit label will appear in the log.
+
+  The pants run itself is going to fail due to non existent main class when invoking java, but the
+  point is to check whether certain label gets printed out.
   """
 
   load_plugin_cmdline = [

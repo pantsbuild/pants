@@ -18,6 +18,6 @@ def is_dict_option(kwargs) -> bool:
 def flatten_shlexed_list(shlexed_args: Sequence[str]) -> List[str]:
   """Convert a list of shlexed args into a flattened list of individual args.
 
-   For example, ['arg1 arg2=foo', '--arg3'] would be converted to ['arg1', 'arg2=foo', '--arg3'].
-   """
+  For example, ['arg1 arg2=foo', '--arg3'] would be converted to ['arg1', 'arg2=foo', '--arg3'].
+  """
   return [arg for shlexed_arg in shlexed_args for arg in shlex.split(shlexed_arg)]

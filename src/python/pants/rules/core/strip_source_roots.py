@@ -49,9 +49,8 @@ class StripSourceRootsRequest:
 async def strip_source_roots_from_snapshot(
   request: StripSourceRootsRequest, source_root_config: SourceRootConfig,
 ) -> SourceRootStrippedSources:
-  """Removes source roots from a snapshot,
-  e.g. `src/python/pants/util/strutil.py` -> `pants/util/strutil.py`.
-  """
+  """Removes source roots from a snapshot, e.g. `src/python/pants/util/strutil.py` ->
+  `pants/util/strutil.py`."""
   source_root = request.determine_source_root(source_root_config=source_root_config)
   resulting_digest = await Get[Digest](
     DirectoryWithPrefixToStrip(
@@ -67,9 +66,8 @@ async def strip_source_roots_from_snapshot(
 async def strip_source_roots_from_target(
   hydrated_target: HydratedTarget,
 ) -> SourceRootStrippedSources:
-  """Remove source roots from a target, e.g.
-  `src/python/pants/util/strutil.py` -> `pants/util/strutil.py`.
-  """
+  """Remove source roots from a target, e.g. `src/python/pants/util/strutil.py` ->
+  `pants/util/strutil.py`."""
   target_adaptor = hydrated_target.adaptor
 
   # TODO: make TargetAdaptor return a 'sources' field with an empty snapshot instead of raising to

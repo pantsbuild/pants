@@ -20,7 +20,7 @@ from pants.contrib.node.tasks.node_task import NodeTask
 
 
 class JavascriptStyleBase(NodeTask):
-  """ Check javascript source files to ensure they follow the style guidelines.
+  """Check javascript source files to ensure they follow the style guidelines.
 
   :API: public
   """

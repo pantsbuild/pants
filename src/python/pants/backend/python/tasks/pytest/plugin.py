@@ -19,8 +19,8 @@ import pytest
 class NodeRenamerPlugin(object):
   """A pytest plugin to modify the console output of test names.
 
-  Replaces the chroot-based source paths with the source-tree based ones, which are more readable
-  to the end user.
+  Replaces the chroot-based source paths with the source-tree based ones, which are more readable to
+  the end user.
   """
 
   def __init__(self, rootdir, sources_map):

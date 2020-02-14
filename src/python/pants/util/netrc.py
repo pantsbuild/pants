@@ -11,7 +11,7 @@ class Netrc:
   """Fetches username and password from ~/.netrc for logged in user."""
 
   class NetrcError(Exception):
-    """Raised to indicate Netrc errors"""
+    """Raised to indicate Netrc errors."""
 
     def __init__(self, *args, **kwargs):
       super(Netrc.NetrcError, self).__init__(*args, **kwargs)

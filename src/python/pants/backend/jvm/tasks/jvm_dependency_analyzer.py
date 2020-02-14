@@ -31,8 +31,8 @@ class JvmDependencyAnalyzer:
   def files_for_target(self, target):
     """Yields a sequence of abs path of source, class or jar files provided by the target.
 
-    The runtime classpath for a target must already have been finalized for a target in order
-    to compute its provided files.
+    The runtime classpath for a target must already have been finalized for a target in order to
+    compute its provided files.
     """
     def gen():
       # Compute src -> target.
