@@ -14,12 +14,12 @@ class ExportDepAsJarIntegrationTest(ScalacPluginIntegrationTestBase):
   scalac_test_targets_dir = 'examples/src/scala/org/pantsbuild/example/scalac'
   javac_test_targets_dir = 'examples/src/java/org/pantsbuild/example/javac'
   commonly_expected_options = {
-    'scalac_args':  ['-encoding', 'UTF-8', '-g:vars', '-target:jvm-1.8', '-deprecation', '-unchecked', '-feature'],
+    'scalac_args': ['-encoding', 'UTF-8', '-g:vars', '-target:jvm-1.8', '-deprecation', '-unchecked', '-feature'],
     'javac_args': ['-encoding', 'UTF-8', '-source', '1.8', '-target', '1.8'],
     'extra_jvm_options': [],
   }
 
-  def _do_test_compiler_options_in_export_output(self, config, target):
+  def _run_export_dep_as_jar_goal(self, config, target):
     with self.temporary_workdir() as workdir:
       pants_run = self.run_pants_with_workdir(
         ['export-dep-as-jar', target], workdir, config)
@@ -32,7 +32,7 @@ class ExportDepAsJarIntegrationTest(ScalacPluginIntegrationTestBase):
     Export the target, and check that the options are correct.
     """
 
-    export_output = self._do_test_compiler_options_in_export_output(config, target)
+    export_output = self._run_export_dep_as_jar_goal(config, target)
 
     target_info = export_output['targets'][target]
 
@@ -118,7 +118,21 @@ class ExportDepAsJarIntegrationTest(ScalacPluginIntegrationTestBase):
     self._check_compiler_options_for_target_are(target_to_test, expected_options, config)
 
   def test_extra_jvm_options(self):
-    target_to_test = f'testprojects/src/java/org/pantsbuild/testproject/extra_jvm_options:opts'
+    target_to_test = 'testprojects/src/java/org/pantsbuild/testproject/extra_jvm_options:opts'
     config = {}
     expected_options = {'extra_jvm_options': ['-Dproperty.color=orange', '-Dproperty.size=2', '-DMyFlag', '-Xmx1m']}
     self._check_compiler_options_for_target_are(target_to_test, expected_options, config)
+
+  def test_node_module_deps(self):
+    target_to_test = 'examples/src/scala/org/pantsbuild/example/several_scala_targets:greet_json'
+    export_output = self._run_export_dep_as_jar_goal({}, target_to_test)
+    self.assertIn(
+      'examples.src.scala.org.pantsbuild.example.several_scala_targets.node.names_to_greet',
+      export_output['libraries']
+    )
+    self.assertIn(
+      'examples.src.scala.org.pantsbuild.example.several_scala_targets.node.names_to_greet',
+      export_output[
+        'targets'
+      ]['examples/src/scala/org/pantsbuild/example/several_scala_targets:greet_json']['libraries']
+    )
