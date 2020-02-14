@@ -717,7 +717,7 @@ Interrupted by user over pailgun client!
               source = 'A.py',
               {a_deps}
             )
-    
+
             python_library(
               name = 'B',
               source = 'B.py',
@@ -772,7 +772,10 @@ Interrupted by user over pailgun client!
             checker.assert_running()
             self.assert_failure(result)
             # Assert that the desired exception has been triggered once.
-            self.assertRegex(result.stderr_data, r"Exception message:.*badreq==99.99.99")
+            self.assertIn(
+                """Exception message: Could not satisfy all requirements for badreq==99.99.99:\n    badreq==99.99.99""",
+                result.stderr_data,
+            )
             # Assert that it has only been triggered once.
             self.assertNotIn(
                 "During handling of the above exception, another exception occurred:",
@@ -806,3 +809,35 @@ Interrupted by user over pailgun client!
             checker.assert_started()
             self.assert_success(result)
             self.assertNotIn("Another pants invocation is running", result.stderr_data)
+
+    def test_local_client_fallback(self):
+        """Test that running with --pantsd-local-client-fallback will fall back to a non-daemon
+        client."""
+        config = {
+            "GLOBAL": {
+                "enable_pantsd": True,
+                "pantsd_local_client_fallback": True,
+                "watchman_socket_path": f"/tmp/watchman.{os.getpid()}.sock",
+            },
+        }
+
+        with self.temporary_workdir() as workdir:
+            pants_run = self.run_pants_with_workdir(["goals"], workdir=workdir, config=config)
+            self.assert_success(pants_run)
+
+            checker.assert_started()
+
+            handle = self.run_pants_with_workdir_without_waiting(["list", "::"], workdir, config)
+
+            fallback_result = self.run_pants_with_workdir(["list", "::"], workdir, config)
+            self.assert_success(fallback_result)
+
+            assert (
+                "[WARN] caught client exception: Fallback(), falling back to non-daemon mode"
+                in fallback_result.stderr_data
+            )
+
+            orig_result = handle.join()
+            self.assert_success(orig_result)
+
+            assert orig_result.stdout_data == fallback_result.stdout_data
