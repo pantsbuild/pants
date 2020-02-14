@@ -10,6 +10,37 @@ The ``1.25.x`` series brings two major changes to Pants:
 
 Please see https://groups.google.com/forum/#!topic/pants-devel/3nmdSeyvwU0 for more information.
 
+1.25.0rc1 (02/4/2020)
+---------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Remove pytest passthrough args deprecation. (#9126)
+  `PR #9126 <https://github.com/pantsbuild/pants/pull/9126>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix warnings filtering under pantsd. (#9121)
+  `PR #9121 <https://github.com/pantsbuild/pants/pull/9121>`_
+
+* Revert "Switch to dot idea project type (#8745)" (#9096)
+  `PR #9096 <https://github.com/pantsbuild/pants/pull/9096>`_
+
+* Allow test specs to be used with --no-fast for junit (#9093)
+  `PR #9093 <https://github.com/pantsbuild/pants/pull/9093>`_
+
+* Re-pin pytest, and add a pin for zipp. (#9095)
+  `PR #9095 <https://github.com/pantsbuild/pants/pull/9095>`_
+
+* Trigger warning/error for deprecated Target method overrides. (#9073)
+  `PR #9073 <https://github.com/pantsbuild/pants/pull/9073>`_
+
+* Fix deprecation warning for `--transitive` for goals that ignore the option (#9076)
+  `PR #9076 <https://github.com/pantsbuild/pants/pull/9076>`_
+
+
 1.25.0rc0 (02/4/2020)
 ---------------------
 
