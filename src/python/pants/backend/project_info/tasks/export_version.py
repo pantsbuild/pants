@@ -13,4 +13,4 @@
 #
 # Note format changes in src/docs/export.md and update the Changelog section.
 #
-DEFAULT_EXPORT_VERSION = '1.0.15'
+DEFAULT_EXPORT_VERSION = '1.1.0'

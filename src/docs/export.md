@@ -177,11 +177,11 @@ The following is an abbreviated export file from a command in the pants repo:
 
 # Export Format Changes
 
-## 1.0.15
+## 1.1.0
 
-Added 'runtime_platform' to target
+Added 'runtime_platform' to target.
 
-Deprecated 'test_platform'. (todo figure out what deprecation means)
+Removed 'test_platform'.
 
 ## 1.0.14
 
