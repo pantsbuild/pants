@@ -11,7 +11,7 @@ from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 
 
-class JUnitTests(JvmTarget, RuntimePlatformMixin):
+class JUnitTests(RuntimePlatformMixin, JvmTarget):
   """JUnit tests.
 
   :API: public
