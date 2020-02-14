@@ -43,6 +43,11 @@ class Login(ConsoleTask):
     if targets:
       raise TaskError('The login task does not take any target arguments.')
     provider = self.get_options().to
+    if provider is None:
+      raise TaskError(
+        "Please give the provider with `./pants login --to`. (Run "
+        "`./pants help login` to see what this option expects.)"
+      )
     try:
       BasicAuth.global_instance().authenticate(provider)
       return ['', 'Logged in successfully using .netrc credentials.']
