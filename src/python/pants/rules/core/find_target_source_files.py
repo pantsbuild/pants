@@ -7,7 +7,7 @@ from pathlib import PurePath
 from pants.base.specs import FilesystemResolvedSpec
 from pants.engine.fs import PathGlobs, Snapshot, SnapshotSubset
 from pants.engine.legacy.structs import TargetAdaptorWithOrigin
-from pants.engine.rules import rule
+from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get
 from pants.rules.core.strip_source_roots import SourceRootStrippedSources, StripSourceRootsRequest
 
@@ -56,4 +56,4 @@ async def find_target_source_files(request: FindTargetSourceFilesRequest) -> Tar
 
 
 def rules():
-  return [find_target_source_files]
+  return [find_target_source_files, RootRule(FindTargetSourceFilesRequest)]
