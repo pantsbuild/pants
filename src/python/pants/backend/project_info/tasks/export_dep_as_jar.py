@@ -15,6 +15,7 @@ from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.project_info.tasks.export import SourceRootTypes
 from pants.backend.project_info.tasks.export_version import DEFAULT_EXPORT_VERSION
+from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import ZincCompile
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.resources import Resources
@@ -385,9 +386,8 @@ class ExportDepAsJar(ConsoleTask):
     for target in modulizable_targets:
       zinc_args_for_target = zinc_args_for_all_targets.get(target)
       if zinc_args_for_target is None:
-        if not isinstance(target, JvmTarget):
-          # non-JvmTarget targets (JvmApp, PythonLibrary, Page...) are not compiled with the jvm.
-          # Therefore, they don't need compiler args.
+        if not ZincCompile.select(target):
+          # Targets that weren't selected by ZincCompile also wont have zinc args.
           zinc_args_for_target = []
         else:
           raise TaskError(f"There was an error exporting target {target} - There were no zinc arguments registered for it")

@@ -239,6 +239,7 @@ class BaseZincCompile(JvmCompile):
       return
     if self.context.products.is_required_data('zinc_args'):
       zinc_args = self.context.products.get_data('zinc_args')
+      import pdb; pdb.set_trace()
       with self.invalidated(targets,
                             invalidate_dependents=False,
                             topological_order=True) as invalidation_check:
@@ -771,7 +772,8 @@ class ZincCompile(BaseZincCompile):
   def product_types(cls):
     return ['runtime_classpath', 'export_dep_as_jar_signal', 'zinc_analysis', 'zinc_args']
 
-  def select(self, target):
+  @staticmethod
+  def select(target):
     # Require that targets are marked for JVM compilation, to differentiate from
     # targets owned by the scalajs contrib module.
     if not isinstance(target, JvmTarget):

@@ -14,6 +14,7 @@ from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.subsystems.zinc import Zinc
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.javac_plugin import JavacPlugin
+from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
 from pants.backend.jvm.tasks.classpath_entry import ClasspathEntry
 from pants.backend.jvm.tasks.jvm_compile.class_not_found_error_patterns import (
@@ -444,7 +445,10 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
       # Filter modulized targets from invalid targets list.
       target_roots_in_play = set(relevant_targets) & set(self.context.target_roots)
       addresses_in_play = [t.address for t in target_roots_in_play]
-      dependees_of_target_roots = self.context.build_graph.transitive_dependees_of_addresses(addresses_in_play)
+      dependees_of_target_roots = set(
+        t for t in self.context.build_graph.transitive_dependees_of_addresses(addresses_in_play)
+        if self.select(t)
+      )
       relevant_targets = list(set(relevant_targets) - dependees_of_target_roots)
 
     if relevant_targets:
