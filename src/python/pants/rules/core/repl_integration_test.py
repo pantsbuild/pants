@@ -1,9 +1,9 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import pants.engine.build_files as build_files
 from pants.backend.python.rules import (
   download_pex_bin,
-  inject_init,
   pex,
   pex_from_target_closure,
   prepare_chrooted_python_sources,
@@ -17,12 +17,13 @@ from pants.engine.fs import FileContent
 from pants.engine.interactive_runner import InteractiveRunner
 from pants.engine.rules import RootRule
 from pants.rules.core import strip_source_roots
+from pants.rules.core.repl import Repl, run_repl
 from pants.testutil.goal_rule_test_base import GoalRuleTestBase
 from pants.testutil.subsystem.util import init_subsystems
 
 
-class PythonReplTest(GoalRuleTestBase):
-  goal_cls = PythonRepl
+class ReplTest(GoalRuleTestBase):
+  goal_cls = Repl
 
   def setUp(self):
     super().setUp()
@@ -33,7 +34,7 @@ class PythonReplTest(GoalRuleTestBase):
     return (
       *super().rules(),
       *repl.rules(),
-      *inject_init.rules(),
+      run_repl,
       *pex.rules(),
       download_pex_bin.download_pex_bin,
       *pex_from_target_closure.rules(),
@@ -41,7 +42,9 @@ class PythonReplTest(GoalRuleTestBase):
       *python_native_code.rules(),
       *strip_source_roots.rules(),
       *subprocess_environment.rules(),
+      build_files.strip_address_origins,
       RootRule(download_pex_bin.DownloadedPexBin.Factory),
+      RootRule(PythonRepl),
     )
 
   @classmethod
