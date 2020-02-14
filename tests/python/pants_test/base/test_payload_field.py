@@ -42,10 +42,7 @@ class PayloadTest(TestBase):
     )
 
   def test_jars_field_apidocs(self):
-    """apidocs are not properly rolled into the cache key right now.
-
-    Is this intentional?
-    """
+    """apidocs are not properly rolled into the cache key right now; is this intentional?"""
 
     jar1 = JarDependency('com', 'foo', '1.0.0', apidocs='pantsbuild.github.io')
     jar2 = JarDependency('com', 'foo', '1.0.0', apidocs='someother.pantsbuild.github.io')
