@@ -6,7 +6,7 @@ from typing import List, Optional, Tuple
 from pants.backend.python.lint.isort.rules import IsortTarget
 from pants.backend.python.lint.isort.rules import rules as isort_rules
 from pants.backend.python.rules import download_pex_bin
-from pants.base.specs import SingleAddress
+from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.fs import Digest, FileContent, InputFilesContent, Snapshot
 from pants.engine.legacy.structs import TargetAdaptor, TargetAdaptorWithOrigin
@@ -58,6 +58,7 @@ class IsortIntegrationTest(TestBase):
     config: Optional[str] = None,
     passthrough_args: Optional[str] = None,
     skip: bool = False,
+    origin: Optional[OriginSpec] = None,
   ) -> Tuple[LintResult, FmtResult]:
     args = ["--backend-packages2=pants.backend.python.lint.isort"]
     if config is not None:
@@ -72,7 +73,8 @@ class IsortIntegrationTest(TestBase):
       sources=EagerFilesetWithSpec('test', {'globs': []}, snapshot=input_snapshot),
       address=Address.parse("test:target"),
     )
-    origin = SingleAddress(directory="test", name="target")
+    if origin is None:
+      origin = SingleAddress(directory="test", name="target")
     adaptor_with_origin = TargetAdaptorWithOrigin(adaptor, origin)
     options_bootstrapper = create_options_bootstrapper(args=args)
     lint_result = self.request_single_product(LintResult, Params(
@@ -115,6 +117,14 @@ class IsortIntegrationTest(TestBase):
     assert "Fixing" in fmt_result.stdout and "test/bad.py" in fmt_result.stdout
     assert "test/good.py" not in fmt_result.stdout
     assert fmt_result.digest == self.get_digest([self.good_source, self.fixed_bad_source])
+
+  def test_precise_file_args(self) -> None:
+    file_arg = FilesystemLiteralSpec(self.good_source.path)
+    lint_result, fmt_result = self.run_isort([self.good_source, self.bad_source], origin=file_arg)
+    assert lint_result.exit_code == 0
+    assert lint_result.stdout == ""
+    assert fmt_result.stdout == ""
+    assert fmt_result.digest == self.get_digest([self.good_source, self.bad_source])
 
   def test_respects_config_file(self) -> None:
     lint_result, fmt_result = self.run_isort(

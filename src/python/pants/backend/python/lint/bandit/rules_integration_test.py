@@ -9,7 +9,7 @@ from pants.backend.python.lint.bandit.rules import BanditTarget
 from pants.backend.python.lint.bandit.rules import rules as bandit_rules
 from pants.backend.python.rules import download_pex_bin
 from pants.backend.python.targets.python_library import PythonLibrary
-from pants.base.specs import SingleAddress
+from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.fs import FileContent, InputFilesContent, Snapshot
@@ -55,6 +55,7 @@ class BanditIntegrationTest(TestBase):
     passthrough_args: Optional[str] = None,
     interpreter_constraints: Optional[str] = None,
     skip: bool = False,
+    origin: Optional[OriginSpec] = None,
   ) -> LintResult:
     args = ["--backend-packages2=pants.backend.python.lint.bandit"]
     if config:
@@ -71,7 +72,8 @@ class BanditIntegrationTest(TestBase):
       address=Address.parse("test:target"),
       compatibility=[interpreter_constraints] if interpreter_constraints else None,
     )
-    origin = SingleAddress(directory="test", name="target")
+    if origin is None:
+      origin = SingleAddress(directory="test", name="target")
     target = BanditTarget(PythonTargetAdaptorWithOrigin(adaptor, origin))
     return self.request_single_product(
       LintResult, Params(
@@ -96,6 +98,12 @@ class BanditIntegrationTest(TestBase):
     assert result.exit_code == 1
     assert "test/good.py" not in result.stdout
     assert "Issue: [B303:blacklist] Use of insecure MD2, MD4, MD5" in result.stdout
+
+  def test_precise_file_args(self) -> None:
+    file_arg = FilesystemLiteralSpec(self.good_source.path)
+    result = self.run_bandit([self.good_source, self.bad_source], origin=file_arg)
+    assert result.exit_code == 0
+    assert "No issues identified." in result.stdout
 
   @pytest.mark.skip(reason="Get config file creation to work with options parsing")
   def test_respects_config_file(self) -> None:

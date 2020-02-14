@@ -8,7 +8,7 @@ import pytest
 from pants.backend.python.lint.black.rules import BlackTarget
 from pants.backend.python.lint.black.rules import rules as black_rules
 from pants.backend.python.rules import download_pex_bin
-from pants.base.specs import SingleAddress
+from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.fs import Digest, FileContent, InputFilesContent, Snapshot
 from pants.engine.legacy.structs import TargetAdaptor, TargetAdaptorWithOrigin
@@ -52,6 +52,7 @@ class BlackIntegrationTest(TestBase):
     config: Optional[str] = None,
     passthrough_args: Optional[str] = None,
     skip: bool = False,
+    origin: Optional[OriginSpec] = None,
   ) -> Tuple[LintResult, FmtResult]:
     args = ["--backend-packages2=pants.backend.python.lint.black"]
     if config is not None:
@@ -66,7 +67,8 @@ class BlackIntegrationTest(TestBase):
       sources=EagerFilesetWithSpec('test', {'globs': []}, snapshot=input_snapshot),
       address=Address.parse("test:target"),
     )
-    origin = SingleAddress(directory="test", name="target")
+    if origin is None:
+      origin = SingleAddress(directory="test", name="target")
     adaptor_with_origin = TargetAdaptorWithOrigin(adaptor, origin)
     options_bootstrapper = create_options_bootstrapper(args=args)
     lint_result = self.request_single_product(LintResult, Params(
@@ -106,6 +108,14 @@ class BlackIntegrationTest(TestBase):
     self.assertIn("1 file would be reformatted, 1 file would be left unchanged", lint_result.stderr)
     self.assertIn("1 file reformatted, 1 file left unchanged", fmt_result.stderr)
     self.assertEqual(fmt_result.digest, self.get_digest([self.good_source, self.fixed_bad_source]))
+
+  def test_precise_file_args(self) -> None:
+    file_arg = FilesystemLiteralSpec(self.good_source.path)
+    lint_result, fmt_result = self.run_black([self.good_source, self.bad_source], origin=file_arg)
+    assert lint_result.exit_code == 0
+    assert "1 file would be left unchanged" in lint_result.stderr
+    assert "1 file left unchanged" in fmt_result.stderr
+    assert fmt_result.digest == self.get_digest([self.good_source, self.bad_source])
 
   @pytest.mark.skip(reason="Get config file creation to work with options parsing")
   def test_respects_config_file(self) -> None:
