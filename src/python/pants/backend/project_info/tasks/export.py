@@ -268,8 +268,8 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):  # t
       if isinstance(current_target, JvmTarget):
         info['excludes'] = [self._exclude_id(exclude) for exclude in current_target.excludes]
         info['platform'] = current_target.platform.name
-        if hasattr(current_target, 'test_platform'):
-          info['test_platform'] = current_target.test_platform.name
+        if hasattr(current_target, 'runtime_platform'):
+          info['runtime_platform'] = current_target.runtime_platform.name
 
       info['roots'] = [{
         'source_root': source_root_package_prefix[0],

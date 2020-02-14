@@ -195,10 +195,6 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
                              include_scopes=Scopes.JVM_TEST_SCOPES,
                              **kwargs)
 
-  def _jvm_platforms_from_targets(self, targets):
-    return [target.test_platform for target in targets
-            if isinstance(target, JUnitTests)]
-
   def _spawn(self, distribution, executor=None, *args, **kwargs):
     """Returns a processhandler to a process executing java.
 
@@ -220,7 +216,8 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     across test targets. Used for coverage instrumentation.
     """
 
-    distribution = self.preferred_jvm_distribution_for_targets(targets,
+    distribution = self.preferred_jvm_distribution_for_targets(
+      [t for t in targets if isinstance(t, JUnitTests)],
       strict=self._strict_jvm_version)
     actual_executor = SubprocessExecutor(distribution)
     return distribution.execute_java(*args, executor=actual_executor, **kwargs)
@@ -376,7 +373,7 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
   def _iter_batches(self, test_registry):
     tests_by_properties = test_registry.index(
       lambda tgt: tgt.cwd if tgt.cwd is not None else self._working_dir,
-      lambda tgt: tgt.test_platform,
+      lambda tgt: tgt.runtime_platform,
       lambda tgt: tgt.payload.extra_jvm_options,
       lambda tgt: tgt.payload.extra_env_vars,
       lambda tgt: tgt.concurrency,
