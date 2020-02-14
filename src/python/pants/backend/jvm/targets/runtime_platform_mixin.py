@@ -4,15 +4,19 @@
 from abc import ABC
 
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
+from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 
 
 class RuntimePlatformMixin(ABC):
-  """A mixin that identifies a target class as one that can have a jvm runtime_platform.
+  """A mixin that identifies a root target type as one that can have a jvm runtime_platform.
 
-  mixin in usage
+  Mixin Usage
 
-  change __init__:
+  Add RuntimePlatformMixin to the superclass list ahead of Target. Otherwise you'll get
+  UnknownArgumentError from Target's argument validation.
+
+  Change __init__:
     - Add runtime_platform=None to the kwargs.
     - Add the following to the doc string:
     :param str runtime_platform: The name of the platform (defined under the jvm-platform subsystem)
@@ -24,10 +28,12 @@ class RuntimePlatformMixin(ABC):
   :API: public
   """
 
-  def init_runtime_platform(self, payload, runtime_platform):
+  def __init__(self, payload, runtime_platform=None, **kwargs):
+    payload = payload or Payload()
     payload.add_fields({
       'runtime_platform': PrimitiveField(runtime_platform),
     })
+    super(RuntimePlatformMixin, self).__init__(payload=payload, **kwargs)
 
   @property
   def runtime_platform(self):

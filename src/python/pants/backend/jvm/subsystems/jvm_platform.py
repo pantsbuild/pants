@@ -53,9 +53,12 @@ class JvmPlatform(Subsystem):
     register('--platforms', advanced=True, type=dict, default={}, fingerprint=True,
              help='Compile settings that can be referred to by name in jvm_targets.')
     register('--default-platform', advanced=True, type=str, default=None, fingerprint=True,
-             help='Name of the default platform to use if none are specified.')
+             help='Name of the default platform to use for compilation. If default-runtime-platform'
+                  ' is None, also applies to runtime. Used when targets leave platform unspecified.'
+            )
     register('--default-runtime-platform', advanced=True, type=str, default=None, fingerprint=True,
-             help='Name of the default runtime platform to use if none are specified.')
+             help='Name of the default runtime platform. Used when targets leave runtime_platform'
+                  ' unspecified.')
     register('--compiler', advanced=True, choices=cls._COMPILER_CHOICES, default='rsc', fingerprint=True,
              help='Java compiler implementation to use.')
 
@@ -168,7 +171,7 @@ class JvmPlatform(Subsystem):
   def get_runtime_platform_for_target(self, target):
     """Find the runtime platform associated with this target.
 
-    :param JvmTarget target: target to query.
+    :param JvmTarget,RuntimePlatformMixin target: target to query.
     :return: The jvm platform object.
     :rtype: JvmPlatformSettings
     """

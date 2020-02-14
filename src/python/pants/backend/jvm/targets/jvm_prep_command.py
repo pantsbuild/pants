@@ -10,7 +10,7 @@ from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 
 
-class JvmPrepCommand(JvmTarget, RuntimePlatformMixin):
+class JvmPrepCommand(RuntimePlatformMixin, JvmTarget):
   """A command (defined in a Java target) that must be run before other tasks in a goal.
 
   For example, you can use `jvm_prep_command()` to execute a script that sets up tunnels to database
@@ -75,8 +75,7 @@ class JvmPrepCommand(JvmTarget, RuntimePlatformMixin):
       'args': PrimitiveField(args or []),
       'jvm_options': PrimitiveField(jvm_options or []),
     })
-    self.init_runtime_platform(payload, runtime_platform)
-    super().__init__(payload=payload, **kwargs)
+    super().__init__(payload=payload, runtime_platform=runtime_platform, **kwargs)
     if not mainclass:
       raise TargetDefinitionException(self, 'mainclass must be specified.')
     if goal not in self.goals():

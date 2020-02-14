@@ -6,7 +6,7 @@ from pants.backend.jvm.targets.runtime_platform_mixin import RuntimePlatformMixi
 from pants.base.payload import Payload
 
 
-class Benchmark(JvmTarget, RuntimePlatformMixin):
+class Benchmark(RuntimePlatformMixin, JvmTarget):
   """A caliper benchmark.
 
   Run it with the ``bench`` goal.
@@ -21,5 +21,4 @@ class Benchmark(JvmTarget, RuntimePlatformMixin):
                          jvm-platform, (2) the platform that would be used for the platform kwarg.
     """
     payload = payload or Payload()
-    self.init_runtime_platform(payload, runtime_platform)
-    super().__init__(payload=payload, **kwargs)
+    super().__init__(payload=payload, runtime_platform=runtime_platform, **kwargs)

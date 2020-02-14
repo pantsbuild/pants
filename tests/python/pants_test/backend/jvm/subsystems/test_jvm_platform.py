@@ -9,12 +9,12 @@ from pants.testutil.subsystem.util import init_subsystem
 from pants.testutil.test_base import TestBase
 
 
-class HasRuntimePlatform(JvmTarget, RuntimePlatformMixin):
+class HasRuntimePlatform(RuntimePlatformMixin, JvmTarget):
 
   def __init__(self, payload=None, runtime_platform=None, **kwargs):
     payload = payload or Payload()
-    self.init_runtime_platform(payload, runtime_platform)
-    super(HasRuntimePlatform, self).__init__(payload=payload, **kwargs)
+    super(HasRuntimePlatform, self).__init__(payload=payload, runtime_platform=runtime_platform,
+      **kwargs)
 
 
 class JvmPlatformTest(TestBase):

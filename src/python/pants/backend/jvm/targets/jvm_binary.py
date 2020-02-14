@@ -280,7 +280,7 @@ class ManifestEntries(FingerprintedMixin):
     return self.payload.entries
 
 
-class JvmBinary(JvmTarget, RuntimePlatformMixin):
+class JvmBinary(RuntimePlatformMixin, JvmTarget):
   """A JVM binary.
 
   Below are a summary of how key goals affect targets of this type:
@@ -367,9 +367,9 @@ class JvmBinary(JvmTarget, RuntimePlatformMixin):
       'shading_rules': PrimitiveField(shading_rules or ()),
       'extra_jvm_options': PrimitiveField(list(extra_jvm_options or ())),
     })
-    self.init_runtime_platform(payload, runtime_platform)
 
-    super().__init__(name=name, address=address, payload=payload, sources=sources, **kwargs)
+    super().__init__(name=name, address=address, payload=payload, sources=sources,
+      runtime_platform=runtime_platform, **kwargs)
 
   @property
   def basename(self):

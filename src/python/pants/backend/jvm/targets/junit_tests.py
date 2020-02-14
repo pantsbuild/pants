@@ -71,7 +71,7 @@ class JUnitTests(JvmTarget, RuntimePlatformMixin):
       if value is not None:
         extra_env_vars[key] = str(value)
 
-    deprecated_conditional(lambda: 'test_platform' in kwargs, '1.27.0.dev0', 'test_platform',
+    deprecated_conditional(lambda: 'test_platform' in kwargs, '1.28.0.dev0', 'test_platform',
       'Replaced with runtime_platform.')
     if 'test_platform' in kwargs and runtime_platform:
       raise TargetDefinitionException(self,
@@ -85,8 +85,7 @@ class JUnitTests(JvmTarget, RuntimePlatformMixin):
       'extra_jvm_options': PrimitiveField(tuple(extra_jvm_options or ())),
       'extra_env_vars': PrimitiveField(tuple(extra_env_vars.items())),
     })
-    self.init_runtime_platform(payload, runtime_platform)
-    super().__init__(payload=payload, **kwargs)
+    super().__init__(payload=payload, runtime_platform=runtime_platform, **kwargs)
 
     # These parameters don't need to go into the fingerprint:
     self._concurrency = concurrency
@@ -119,7 +118,7 @@ class JUnitTests(JvmTarget, RuntimePlatformMixin):
 
   # NB: Cannot annotate the property. Extracted this to enable
   # warning.
-  @deprecated('1.27.0.dev0', 'Use runtime_platform')
+  @deprecated('1.28.0.dev0', 'Use runtime_platform')
   def _test_platform(self):
     return self.runtime_platform
 
