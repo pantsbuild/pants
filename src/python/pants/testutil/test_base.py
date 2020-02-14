@@ -676,10 +676,14 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     self.assertIn(error_text, str(cm.exception))
 
   @contextmanager
-  def assertDoesNotRaise(self):
+  def assertDoesNotRaise(self, exc_class: Type[BaseException] = Exception):
+    """Verifies that the block does not raise an exception of the specified type.
+
+    :API: public
+    """
     try:
       yield
-    except Exception as e:
+    except exc_class as e:
       raise AssertionError(f'section should not have raised, but did: {e}') from e
 
   def get_bootstrap_options(self, cli_options=()):
