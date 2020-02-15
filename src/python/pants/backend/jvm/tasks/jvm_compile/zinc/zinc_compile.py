@@ -239,7 +239,6 @@ class BaseZincCompile(JvmCompile):
       return
     if self.context.products.is_required_data('zinc_args'):
       zinc_args = self.context.products.get_data('zinc_args')
-      import pdb; pdb.set_trace()
       with self.invalidated(targets,
                             invalidate_dependents=False,
                             topological_order=True) as invalidation_check:
