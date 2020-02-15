@@ -889,9 +889,9 @@ impl<N: Node> Graph<N> {
     run_token: RunToken,
     result: Option<Result<N::Item, N::Error>>,
   ) {
-    let (entry, complete_as_dirty, dep_generations) = {
+    let (entry, has_dirty_dependencies, dep_generations) = {
       let inner = self.inner.lock();
-      let mut complete_as_dirty = false;
+      let mut has_dirty_dependencies = false;
       // Get the Generations of all dependencies of the Node. We can trust that these have not changed
       // since we began executing, as long as we are not currently marked dirty (see the method doc).
       let dep_generations = inner
@@ -903,14 +903,14 @@ impl<N: Node> Graph<N> {
           // independent of matching Generation values. This is to allow for the behaviour that an
           // uncacheable Node should always have dirty dependents, transitively.
           if !entry.node().cacheable(context) || !entry.is_clean(context) {
-            complete_as_dirty = true;
+            has_dirty_dependencies = true;
           }
           entry.generation()
         })
         .collect();
       (
         inner.entry_for_id(entry_id).cloned(),
-        complete_as_dirty,
+        has_dirty_dependencies,
         dep_generations,
       )
     };
@@ -922,7 +922,7 @@ impl<N: Node> Graph<N> {
         run_token,
         dep_generations,
         result,
-        complete_as_dirty,
+        has_dirty_dependencies,
         &mut inner,
       );
     }

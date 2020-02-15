@@ -409,7 +409,7 @@ impl<N: Node> Entry<N> {
     result_run_token: RunToken,
     dep_generations: Vec<Generation>,
     result: Option<Result<N::Item, N::Error>>,
-    complete_as_dirty: bool,
+    has_dirty_dependencies: bool,
     _graph: &mut super::InnerGraph<N>,
   ) {
     let mut state = self.state.lock();
@@ -475,7 +475,7 @@ impl<N: Node> Entry<N> {
           let (generation, next_result) = if let Some(result) = result {
             let next_result = if !self.node.cacheable(context) {
               EntryResult::Uncacheable(result, context.session_id().clone())
-            } else if complete_as_dirty {
+            } else if has_dirty_dependencies {
               EntryResult::Dirty(result)
             } else {
               EntryResult::Clean(result)
@@ -491,7 +491,7 @@ impl<N: Node> Entry<N> {
             // NB: The `expect` here avoids a clone and a comparison: see the method docs.
             let mut result =
               previous_result.expect("A Node cannot be marked clean without a previous result.");
-            if complete_as_dirty {
+            if has_dirty_dependencies {
               result.dirty();
             } else {
               result.clean();
