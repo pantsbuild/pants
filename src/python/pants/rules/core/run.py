@@ -1,7 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pathlib import Path
+from pathlib import PurePath
 
 from pants.base.build_root import BuildRoot
 from pants.build_graph.address import Address
@@ -10,7 +10,7 @@ from pants.engine.console import Console
 from pants.engine.fs import DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
-from pants.engine.rules import goal_rule
+from pants.engine.rules import UnionMembership, goal_rule
 from pants.engine.selectors import Get
 from pants.option.custom_types import shell_str
 from pants.rules.core.binary import BinaryTarget, CreatedBinary
@@ -46,18 +46,22 @@ async def run(
   build_root: BuildRoot,
   addresses: Addresses,
   options: RunOptions,
+  union_membership: UnionMembership,
 ) -> Run:
+  if not union_membership.has_members_for_all(options.required_union_implementations):
+    return Run(exit_code=0)
+
   address = addresses.expect_single()
   binary = await Get[CreatedBinary](Address, address)
 
-  with temporary_dir(root_dir=str(Path(build_root.path, ".pants.d")), cleanup=True) as tmpdir:
-    path_relative_to_build_root = str(Path(tmpdir).relative_to(build_root.path))
+  with temporary_dir(root_dir=PurePath(build_root.path, ".pants.d").as_posix(), cleanup=True) as tmpdir:
+    path_relative_to_build_root = PurePath(tmpdir).relative_to(build_root.path).as_posix()
     workspace.materialize_directory(
       DirectoryToMaterialize(binary.digest, path_prefix=path_relative_to_build_root)
     )
 
     console.write_stdout(f"Running target: {address}\n")
-    full_path = str(Path(tmpdir, binary.binary_name))
+    full_path = PurePath(tmpdir, binary.binary_name).as_posix()
     run_request = InteractiveProcessRequest(
       argv=(full_path, *options.values.args),
       run_in_workspace=True,

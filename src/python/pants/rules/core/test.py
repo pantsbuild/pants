@@ -141,7 +141,11 @@ async def run_tests(
   options: TestOptions,
   runner: InteractiveRunner,
   addresses_with_origins: AddressesWithOrigins,
+  union_membership: UnionMembership,
 ) -> Test:
+  if not union_membership.has_members_for_all(options.required_union_implementations):
+    return Test(exit_code=0)
+
   if options.values.debug:
     address_with_origin = addresses_with_origins.expect_single()
     addr_debug_request = await Get[AddressAndDebugRequest](AddressWithOrigin, address_with_origin)

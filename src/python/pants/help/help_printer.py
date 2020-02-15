@@ -75,11 +75,11 @@ class HelpPrinter:
         if scope_info.category == ScopeInfo.GOAL
       ]
       for scope_info in goal_scope_infos:
-        if scope_info.optionable_cls is None or not issubclass(scope_info.optionable_cls, GoalSubsystem):
+        optionable_cls = scope_info.optionable_cls
+        if optionable_cls is None or not issubclass(optionable_cls, GoalSubsystem):
           continue
-        is_unimplemented = any(
-          self._union_membership.union_rules.get(union_type) is None
-          for union_type in scope_info.optionable_cls.required_union_implementations
+        is_unimplemented = self._union_membership.has_members_for_all(
+          optionable_cls.required_union_implementations
         )
         if is_unimplemented:
           continue
