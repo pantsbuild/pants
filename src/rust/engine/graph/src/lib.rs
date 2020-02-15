@@ -363,6 +363,7 @@ impl<N: Node> InnerGraph<N> {
     mut visualizer: V,
     roots: &[N],
     path: &Path,
+    context: &N::Context,
   ) -> io::Result<()> {
     let file = File::create(path)?;
     let mut f = BufWriter::new(file);
@@ -375,7 +376,7 @@ impl<N: Node> InnerGraph<N> {
     f.write_all(b"  concentrate=true;\n")?;
     f.write_all(b"  rankdir=TB;\n")?;
 
-    let mut format_color = |entry: &Entry<N>| visualizer.color(entry);
+    let mut format_color = |entry: &Entry<N>| visualizer.color(entry, context);
 
     let root_entries = roots
       .iter()
@@ -385,7 +386,7 @@ impl<N: Node> InnerGraph<N> {
 
     for eid in self.walk(root_entries, Direction::Outgoing) {
       let entry = self.unsafe_entry_for_id(eid);
-      let node_str = entry.format();
+      let node_str = entry.format(context);
 
       // Write the node header.
       f.write_fmt(format_args!(
@@ -398,7 +399,7 @@ impl<N: Node> InnerGraph<N> {
         let dep_entry = self.unsafe_entry_for_id(dep_id);
 
         // Write an entry per edge.
-        let dep_str = dep_entry.format();
+        let dep_str = dep_entry.format(context);
         f.write_fmt(format_args!("    \"{}\" -> \"{}\"\n", node_str, dep_str))?;
       }
     }
@@ -407,7 +408,12 @@ impl<N: Node> InnerGraph<N> {
     Ok(())
   }
 
-  fn trace<T: NodeTracer<N>>(&self, roots: &[N], file_path: &Path) -> Result<(), String> {
+  fn trace<T: NodeTracer<N>>(
+    &self,
+    roots: &[N],
+    file_path: &Path,
+    context: &N::Context,
+  ) -> Result<(), String> {
     let root_ids: IndexSet<EntryId, FNV> = roots
       .iter()
       .filter_map(|nk| self.entry_id(nk))
@@ -428,7 +434,7 @@ impl<N: Node> InnerGraph<N> {
         let mut non_bottom_deps = self
           .pg
           .neighbors_directed(id, Direction::Outgoing)
-          .filter(|dep_id| !T::is_bottom(self.unsafe_entry_for_id(*dep_id).peek()))
+          .filter(|dep_id| !T::is_bottom(self.unsafe_entry_for_id(*dep_id).peek(context)))
           .peekable();
 
         if non_bottom_deps.peek().is_none() {
@@ -485,7 +491,7 @@ impl<N: Node> InnerGraph<N> {
 
       // Render the path.
       self
-        .trace_render_path_to_file::<T>(&path, file_path)
+        .trace_render_path_to_file::<T>(&path, file_path, context)
         .map_err(|e| format!("Failed to render trace to {:?}: {}", file_path, e))?;
     }
 
@@ -499,6 +505,7 @@ impl<N: Node> InnerGraph<N> {
     &self,
     path: &[EntryId],
     file_path: &Path,
+    context: &N::Context,
   ) -> io::Result<()> {
     let file = OpenOptions::new().append(true).open(file_path)?;
     let mut f = BufWriter::new(file);
@@ -512,7 +519,7 @@ impl<N: Node> InnerGraph<N> {
           "{}\n{}  {}",
           output,
           indent,
-          T::state_str(&indent, entry.peek())
+          T::state_str(&indent, entry.peek(context))
         )
       } else {
         output
@@ -583,31 +590,37 @@ impl<N: Node> InnerGraph<N> {
     res
   }
 
-  fn reachable_digest_count(&self, roots: &[N]) -> usize {
+  fn reachable_digest_count(&self, roots: &[N], context: &N::Context) -> usize {
+    // TODO: This is a surprisingly expensive method, because it will clone all reachable values by
+    // calling `peek` on them.
     let root_ids = roots
       .iter()
       .filter_map(|node| self.entry_id(node))
       .cloned()
       .collect();
     self
-      .digests_internal(self.walk(root_ids, Direction::Outgoing).collect())
+      .digests_internal(
+        self.walk(root_ids, Direction::Outgoing).collect(),
+        context.clone(),
+      )
       .count()
   }
 
-  fn all_digests(&self) -> Vec<hashing::Digest> {
+  fn all_digests(&self, context: &N::Context) -> Vec<hashing::Digest> {
     self
-      .digests_internal(self.pg.node_indices().collect())
+      .digests_internal(self.pg.node_indices().collect(), context.clone())
       .collect()
   }
 
   fn digests_internal<'g>(
     &'g self,
     entryids: Vec<EntryId>,
+    context: N::Context,
   ) -> impl Iterator<Item = hashing::Digest> + 'g {
     entryids
       .into_iter()
       .filter_map(move |eid| self.entry_for_id(eid))
-      .filter_map(|entry| match entry.peek() {
+      .filter_map(move |entry| match entry.peek(&context) {
         Some(Ok(item)) => N::digest(item),
         _ => None,
       })
@@ -642,10 +655,12 @@ impl<N: Node> Graph<N> {
   /// In the context of the given src Node, declare a dependency on the given dst Node and
   /// begin its execution if it has not already started.
   ///
-  pub fn get<C>(&self, src_id: EntryId, context: &C, dst_node: N) -> BoxFuture<N::Item, N::Error>
-  where
-    C: NodeContext<Node = N>,
-  {
+  pub fn get(
+    &self,
+    src_id: EntryId,
+    context: &N::Context,
+    dst_node: N,
+  ) -> BoxFuture<N::Item, N::Error> {
     let maybe_entry_and_id = {
       // Get or create the destination, and then insert the dep and return its state.
       let mut inner = self.inner.lock();
@@ -656,7 +671,9 @@ impl<N: Node> Graph<N> {
           // TODO: doing cycle detection under the lock... unfortunate, but probably unavoidable
           // without a much more complicated algorithm.
           let potential_dst_id = inner.ensure_entry(dst_node);
-          if let Some(cycle_path) = Self::report_cycle(src_id, potential_dst_id, &mut inner) {
+          if let Some(cycle_path) =
+            Self::report_cycle(src_id, potential_dst_id, &mut inner, context)
+          {
             // Cyclic dependency: render an error.
             let path_strs = cycle_path
               .into_iter()
@@ -695,6 +712,7 @@ impl<N: Node> Graph<N> {
     src_id: EntryId,
     potential_dst_id: EntryId,
     inner: &mut InnerGraph<N>,
+    context: &N::Context,
   ) -> Option<Vec<Entry<N>>> {
     let mut counter = 0;
     loop {
@@ -704,7 +722,7 @@ impl<N: Node> Graph<N> {
         // them, and then check if there are still any cycles in the graph.
         let dirty_nodes: HashSet<_> = cycle_path
           .iter()
-          .filter(|n| n.may_have_dirty_edges())
+          .filter(|n| !n.is_clean(context))
           .map(|n| n.node().clone())
           .collect();
         if dirty_nodes.is_empty() {
@@ -759,10 +777,7 @@ impl<N: Node> Graph<N> {
   ///
   /// Create the given Node if it does not already exist.
   ///
-  pub fn create<C>(&self, node: N, context: &C) -> BoxFuture<N::Item, N::Error>
-  where
-    C: NodeContext<Node = N>,
-  {
+  pub fn create(&self, node: N, context: &N::Context) -> BoxFuture<N::Item, N::Error> {
     let maybe_entry_and_id = {
       let mut inner = self.inner.lock();
       if inner.draining {
@@ -783,14 +798,11 @@ impl<N: Node> Graph<N> {
   /// Gets the generations of the dependencies of the given EntryId, (re)computing or cleaning
   /// them first if necessary.
   ///
-  fn dep_generations<C>(
+  fn dep_generations(
     &self,
     entry_id: EntryId,
-    context: &C,
-  ) -> BoxFuture<Vec<Generation>, N::Error>
-  where
-    C: NodeContext<Node = N>,
-  {
+    context: &N::Context,
+  ) -> BoxFuture<Vec<Generation>, N::Error> {
     let mut inner = self.inner.lock();
     let dep_ids = inner
       .pg
@@ -870,28 +882,35 @@ impl<N: Node> Graph<N> {
   /// contains dirty nodes, clearing those nodes (removing any edges from them). This is a little
   /// hacky, but will tide us over until we fully solve this problem.
   ///
-  fn complete<C>(
+  fn complete(
     &self,
-    context: &C,
+    context: &N::Context,
     entry_id: EntryId,
     run_token: RunToken,
     result: Option<Result<N::Item, N::Error>>,
-  ) where
-    C: NodeContext<Node = N>,
-  {
-    let (entry, entry_id, dep_generations) = {
+  ) {
+    let (entry, has_dirty_dependencies, dep_generations) = {
       let inner = self.inner.lock();
+      let mut has_dirty_dependencies = false;
       // Get the Generations of all dependencies of the Node. We can trust that these have not changed
       // since we began executing, as long as we are not currently marked dirty (see the method doc).
       let dep_generations = inner
         .pg
         .neighbors_directed(entry_id, Direction::Outgoing)
         .filter_map(|dep_id| inner.entry_for_id(dep_id))
-        .map(Entry::generation)
+        .map(|entry| {
+          // If a dependency is uncacheable or currently dirty, this Node should complete as dirty,
+          // independent of matching Generation values. This is to allow for the behaviour that an
+          // uncacheable Node should always have dirty dependents, transitively.
+          if !entry.node().cacheable(context) || !entry.is_clean(context) {
+            has_dirty_dependencies = true;
+          }
+          entry.generation()
+        })
         .collect();
       (
         inner.entry_for_id(entry_id).cloned(),
-        entry_id,
+        has_dirty_dependencies,
         dep_generations,
       )
     };
@@ -903,6 +922,7 @@ impl<N: Node> Graph<N> {
         run_token,
         dep_generations,
         result,
+        has_dirty_dependencies,
         &mut inner,
       );
     }
@@ -921,9 +941,14 @@ impl<N: Node> Graph<N> {
     inner.invalidate_from_roots(predicate)
   }
 
-  pub fn trace<T: NodeTracer<N>>(&self, roots: &[N], path: &Path) -> Result<(), String> {
+  pub fn trace<T: NodeTracer<N>>(
+    &self,
+    roots: &[N],
+    path: &Path,
+    context: &N::Context,
+  ) -> Result<(), String> {
     let inner = self.inner.lock();
-    inner.trace::<T>(roots, path)
+    inner.trace::<T>(roots, path, context)
   }
 
   pub fn visualize<V: NodeVisualizer<N>>(
@@ -931,9 +956,10 @@ impl<N: Node> Graph<N> {
     visualizer: V,
     roots: &[N],
     path: &Path,
+    context: &N::Context,
   ) -> io::Result<()> {
     let inner = self.inner.lock();
-    inner.visualize(visualizer, roots, path)
+    inner.visualize(visualizer, roots, path, context)
   }
 
   pub fn heavy_hitters(&self, roots: &[N], k: usize) -> HashMap<String, Duration> {
@@ -941,14 +967,14 @@ impl<N: Node> Graph<N> {
     inner.heavy_hitters(roots, k)
   }
 
-  pub fn reachable_digest_count(&self, roots: &[N]) -> usize {
+  pub fn reachable_digest_count(&self, roots: &[N], context: &N::Context) -> usize {
     let inner = self.inner.lock();
-    inner.reachable_digest_count(roots)
+    inner.reachable_digest_count(roots, context)
   }
 
-  pub fn all_digests(&self) -> Vec<hashing::Digest> {
+  pub fn all_digests(&self, context: &N::Context) -> Vec<hashing::Digest> {
     let inner = self.inner.lock();
-    inner.all_digests()
+    inner.all_digests(context)
   }
 
   ///
