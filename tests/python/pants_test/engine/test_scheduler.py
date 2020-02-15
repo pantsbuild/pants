@@ -206,7 +206,7 @@ class SchedulerTest(TestBase):
     self.assertEquals(result_str, consumes_a_and_b(a, b))
 
     # But not a subset.
-    expected_msg = ("No installed @rules can compute {} for input Params(A), but"
+    expected_msg = ("No installed @rules can compute {} given input Params(A), but"
                     .format(str.__name__))
     with self.assertRaisesRegex(Exception, re.escape(expected_msg)):
       self.request_single_product(str, Params(a))
