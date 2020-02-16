@@ -146,7 +146,7 @@ class FileDepsTest(GoalRuleTestBase):
   def test_globs(self) -> None:
     self.create_files("some/target", ["test1.py", "test2.py"])
     self.add_to_build_file(
-      "some/target", target="target(name='target', sources=globs('test*.py'))"
+      "some/target", target="target(name='target', sources=['test*.py'])"
     )
     self.assert_filedeps(
       targets=["some/target"],

@@ -3,6 +3,7 @@
 
 from pathlib import Path
 from typing import List, Tuple, Type
+from unittest.mock import Mock
 
 from pants.base.specs import SingleAddress
 from pants.build_graph.address import Address
@@ -27,7 +28,7 @@ from pants.engine.legacy.structs import (
   TargetAdaptor,
 )
 from pants.engine.rules import UnionMembership
-from pants.rules.core.fmt import AggregatedFmtResults, Fmt, FmtResult, FormatTarget, fmt
+from pants.rules.core.fmt import AggregatedFmtResults, Fmt, FmtOptions, FmtResult, FormatTarget, fmt
 from pants.source.wrapped_globs import EagerFilesetWithSpec
 from pants.testutil.engine.util import MockConsole, MockGet, run_rule
 from pants.testutil.test_base import TestBase
@@ -62,7 +63,9 @@ class FmtTest(TestBase):
     )
     return HydratedTargetWithOrigin(ht, SingleAddress(directory="src", name=name))
 
-  def run_fmt_rule(self, *, targets: List[HydratedTargetWithOrigin]) -> Tuple[Fmt, str]:
+  def run_fmt_rule(
+    self, *, targets: List[HydratedTargetWithOrigin], union_implemented: bool = True,
+  ) -> Tuple[Fmt, str]:
     result_digest = self.request_single_product(
       Digest,
       InputFilesContent([
@@ -70,13 +73,19 @@ class FmtTest(TestBase):
       ])
     )
     console = MockConsole(use_colors=False)
+    # TODO(#9141): replace this with a proper util to create `GoalSubsystem`s
+    fmt_options = Mock()
+    fmt_options.required_union_implementations = FmtOptions.required_union_implementations
     result: Fmt = run_rule(
       fmt,
       rule_args=[
         console,
         HydratedTargetsWithOrigins(targets),
         Workspace(self.scheduler),
-        UnionMembership(union_rules={FormatTarget: [PythonTargetAdaptorWithOrigin]})
+        fmt_options,
+        UnionMembership(
+          {FormatTarget: [PythonTargetAdaptorWithOrigin]} if union_implemented else {}
+        )
       ],
       mock_gets=[
         MockGet(
@@ -105,6 +114,14 @@ class FmtTest(TestBase):
       return
     assert formatted_file.is_file()
     assert formatted_file.read_text() == self.formatted_content
+
+  def test_no_implementations_noops(self) -> None:
+    result, stdout = self.run_fmt_rule(
+      targets=[self.make_hydrated_target_with_origin()], union_implemented=False,
+    )
+    assert result.exit_code == 0
+    assert stdout.strip() == ""
+    self.assert_workspace_modified(modified=False)
 
   def test_non_union_member_noops(self) -> None:
     result, stdout = self.run_fmt_rule(

@@ -16,6 +16,7 @@ from pants.engine.legacy.structs import (
   PythonBinaryAdaptor,
   PythonTestsAdaptor,
   PythonTestsAdaptorWithOrigin,
+  TargetAdaptorWithOrigin,
 )
 from pants.engine.rules import UnionMembership
 from pants.rules.core.test import (
@@ -23,6 +24,7 @@ from pants.rules.core.test import (
   AddressAndTestResult,
   Status,
   TestDebugRequest,
+  TestOptions,
   TestResult,
   TestTarget,
   coordinator_of_tests,
@@ -33,9 +35,11 @@ from pants.testutil.engine.util import MockConsole, MockGet, run_rule
 from pants.testutil.test_base import TestBase
 
 
+# TODO(#9141): replace this with a proper util to create `GoalSubsystem`s
 class MockOptions:
   def __init__(self, **values):
     self.values = Mock(**values)
+    self.required_union_implementations = TestOptions.required_union_implementations
 
 
 class TestTest(TestBase):
@@ -74,7 +78,13 @@ class TestTest(TestBase):
     addr = Address.parse("some/target")
     res = run_rule(
       run_tests,
-      rule_args=[console, options, runner, self.make_addresses_with_origins(addr)],
+      rule_args=[
+        console,
+        options,
+        runner,
+        self.make_addresses_with_origins(addr),
+        UnionMembership({TestTarget: [TargetAdaptorWithOrigin]}),
+      ],
       mock_gets=[
         MockGet(
           product_type=AddressAndTestResult,
@@ -143,7 +153,13 @@ class TestTest(TestBase):
 
     res = run_rule(
       run_tests,
-      rule_args=[console, options, runner, self.make_addresses_with_origins(address1, address2)],
+      rule_args=[
+        console,
+        options,
+        runner,
+        self.make_addresses_with_origins(address1, address2),
+        UnionMembership({TestTarget: [TargetAdaptorWithOrigin]}),
+      ],
       mock_gets=[
         MockGet(
           product_type=AddressAndTestResult, subject_type=AddressWithOrigin, mock=make_result
