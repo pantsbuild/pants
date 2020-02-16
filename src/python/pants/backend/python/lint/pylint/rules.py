@@ -106,7 +106,9 @@ async def lint(
     ),
   )
 
-  source_files = await Get[TargetSourceFiles](FindTargetSourceFilesRequest(adaptor_with_origin))
+  source_files = await Get[TargetSourceFiles](
+    FindTargetSourceFilesRequest(adaptor_with_origin, strip_source_roots=True)
+  )
 
   request = requirements_pex.create_execute_request(
     python_setup=python_setup,

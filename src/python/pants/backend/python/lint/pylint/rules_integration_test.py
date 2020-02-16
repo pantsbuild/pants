@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from functools import partialmethod
-from pathlib import PurePath
 from textwrap import dedent
 from typing import List, Optional
 
@@ -11,7 +10,7 @@ import pytest
 from pants.backend.python.lint.pylint.rules import PylintTarget
 from pants.backend.python.lint.pylint.rules import rules as pylint_rules
 from pants.backend.python.targets.python_library import PythonLibrary
-from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
+from pants.base.specs import OriginSpec, SingleAddress
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.fs import FileContent, InputFilesContent, Snapshot
@@ -25,9 +24,9 @@ from pants.testutil.test_base import TestBase
 
 
 class PylintIntegrationTest(TestBase):
-  source_root = "tests/python/pants_test"
-  good_source = FileContent(path="good.py", content=b"'''docstring'''\nVAR = 42\n")
-  bad_source = FileContent(path="bad.py", content=b"VAR = 42\n")
+  source_root = "src/python"
+  good_source = FileContent(path=f"{source_root}/good.py", content=b"'''docstring'''\nVAR = 42\n")
+  bad_source = FileContent(path=f"{source_root}/bad.py", content=b"VAR = 42\n")
 
   create_python_library = partialmethod(
     TestBase.create_library, path=source_root, target_type="python_library", name="target",
@@ -35,8 +34,7 @@ class PylintIntegrationTest(TestBase):
 
   def write_file(self, file_content: FileContent) -> None:
     self.create_file(
-      relpath=str(PurePath(self.source_root, file_content.path)),
-      contents=file_content.content.decode(),
+      relpath=file_content.path, contents=file_content.content.decode()
     )
 
   @classmethod
@@ -102,6 +100,14 @@ class PylintIntegrationTest(TestBase):
     assert "good.py" not in result.stdout
     assert "bad.py:1:0: C0114" in result.stdout
 
+  def test_precise_file_args(self) -> None:
+    self.create_python_library()
+    self.write_file(self.good_source)
+    self.write_file(self.bad_source)
+    result = self.run_pylint([self.good_source])
+    assert result.exit_code == 0
+    assert "Your code has been rated at 10.00/10" in result.stdout.strip()
+  
   @pytest.mark.skip(reason="Get config file creation to work with options parsing")
   def test_respects_config_file(self) -> None:
     self.create_python_library()
@@ -124,7 +130,7 @@ class PylintIntegrationTest(TestBase):
     )
     self.write_file(
       FileContent(
-        path="dependency.py",
+        path=f"{self.source_root}/dependency.py",
         content=dedent(
           """\
           from nonexistent import erroneous
@@ -134,11 +140,11 @@ class PylintIntegrationTest(TestBase):
       )
     )
     source = FileContent(
-      path="test_dependency.py",
+      path=f"{self.source_root}/test_dependency.py",
       content=dedent(
         """\
         '''Docstring'''
-        from pants_test.dependency import VAR
+        from dependency import VAR
         assert VAR == 42
         """
       ).encode(),
