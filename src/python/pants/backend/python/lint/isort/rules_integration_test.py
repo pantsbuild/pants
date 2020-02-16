@@ -5,7 +5,6 @@ from typing import List, Optional, Tuple
 
 from pants.backend.python.lint.isort.rules import IsortTarget
 from pants.backend.python.lint.isort.rules import rules as isort_rules
-from pants.backend.python.rules import download_pex_bin
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.fs import Digest, FileContent, InputFilesContent, Snapshot
@@ -16,15 +15,10 @@ from pants.rules.core.fmt import FmtResult
 from pants.rules.core.lint import LintResult
 from pants.source.wrapped_globs import EagerFilesetWithSpec
 from pants.testutil.option.util import create_options_bootstrapper
-from pants.testutil.subsystem.util import init_subsystems
 from pants.testutil.test_base import TestBase
 
 
 class IsortIntegrationTest(TestBase):
-
-  def setUp(self):
-    super().setUp()
-    init_subsystems([download_pex_bin.DownloadedPexBin.Factory])
 
   good_source = FileContent(path="test/good.py", content=b'from animals import cat, dog\n')
   bad_source = FileContent(path="test/bad.py", content=b'from colors import green, blue\n')
@@ -43,13 +37,7 @@ class IsortIntegrationTest(TestBase):
 
   @classmethod
   def rules(cls):
-    return (
-      *super().rules(),
-      *isort_rules(),
-      download_pex_bin.download_pex_bin,
-      RootRule(IsortTarget),
-      RootRule(download_pex_bin.DownloadedPexBin.Factory),
-    )
+    return (*super().rules(), *isort_rules(), RootRule(IsortTarget))
 
   def run_isort(
     self,
@@ -80,14 +68,12 @@ class IsortIntegrationTest(TestBase):
     lint_result = self.request_single_product(LintResult, Params(
       IsortTarget(adaptor_with_origin),
       options_bootstrapper,
-      download_pex_bin.DownloadedPexBin.Factory.global_instance(),
     ))
     fmt_result = self.request_single_product(FmtResult, Params(
       IsortTarget(
         adaptor_with_origin, prior_formatter_result_digest=input_snapshot.directory_digest,
       ),
       options_bootstrapper,
-      download_pex_bin.DownloadedPexBin.Factory.global_instance(),
     ))
     return lint_result, fmt_result
 
