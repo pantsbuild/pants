@@ -11,10 +11,11 @@ import pytest
 from pants.backend.python.lint.pylint.rules import PylintTarget
 from pants.backend.python.lint.pylint.rules import rules as pylint_rules
 from pants.backend.python.targets.python_library import PythonLibrary
+from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.fs import FileContent, InputFilesContent, Snapshot
-from pants.engine.legacy.structs import PythonTargetAdaptor
+from pants.engine.legacy.structs import PythonTargetAdaptor, PythonTargetAdaptorWithOrigin
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.rules.core.lint import LintResult
@@ -54,6 +55,7 @@ class PylintIntegrationTest(TestBase):
     passthrough_args: Optional[str] = None,
     interpreter_constraints: Optional[str] = None,
     skip: bool = False,
+    origin: Optional[OriginSpec] = None,
   ) -> LintResult:
     args = ["--backend-packages2=pants.backend.python.lint.pylint"]
     if config:
@@ -65,13 +67,14 @@ class PylintIntegrationTest(TestBase):
     if skip:
       args.append(f"--pylint-skip")
     input_snapshot = self.request_single_product(Snapshot, InputFilesContent(source_files))
-    target = PylintTarget(
-      PythonTargetAdaptor(
-        sources=EagerFilesetWithSpec(self.source_root, {'globs': []}, snapshot=input_snapshot),
-        address=Address.parse(f"{self.source_root}:target"),
-        compatibility=[interpreter_constraints] if interpreter_constraints else None,
-      )
+    adaptor = PythonTargetAdaptor(
+      sources=EagerFilesetWithSpec(self.source_root, {'globs': []}, snapshot=input_snapshot),
+      address=Address.parse(f"{self.source_root}:target"),
+      compatibility=[interpreter_constraints] if interpreter_constraints else None,
     )
+    if origin is None:
+      origin = SingleAddress(directory="test", name="target")
+    target = PylintTarget(PythonTargetAdaptorWithOrigin(adaptor, origin))
     return self.request_single_product(
       LintResult, Params(target, create_options_bootstrapper(args=args)),
     )

@@ -20,33 +20,36 @@ from pants.build_graph.address import Address
 from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTarget, HydratedTargets
-from pants.engine.legacy.structs import PythonTargetAdaptor, TargetAdaptor
+from pants.engine.legacy.structs import PythonTargetAdaptor, TargetAdaptorWithOrigin
 from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
-from pants.rules.core import strip_source_roots
+from pants.rules.core import find_target_source_files, strip_source_roots
+from pants.rules.core.find_target_source_files import (
+  FindTargetSourceFilesRequest,
+  TargetSourceFiles,
+)
 from pants.rules.core.lint import LintResult
-from pants.rules.core.strip_source_roots import SourceRootStrippedSources
 
 
 @dataclass(frozen=True)
 class PylintTarget:
-  target: TargetAdaptor
+  adaptor_with_origin: TargetAdaptorWithOrigin
 
 
-def generate_args(file_names: Tuple[str, ...], pylint: Pylint) -> Tuple[str, ...]:
+def generate_args(*, source_files: TargetSourceFiles, pylint: Pylint) -> Tuple[str, ...]:
   args = []
   if pylint.options.config is not None:
     args.append(f"--config={pylint.options.config}")
   args.extend(pylint.options.args)
-  args.extend(file_names)
+  args.extend(sorted(source_files.snapshot.files))
   return tuple(args)
 
 
 @rule(name="Lint using Pylint")
 async def lint(
-  wrapped_target: PylintTarget,
+  pylint_target: PylintTarget,
   pylint: Pylint,
   python_setup: PythonSetup,
   subprocess_encoding_environment: SubprocessEncodingEnvironment,
@@ -54,11 +57,12 @@ async def lint(
   if pylint.options.skip:
     return LintResult.noop()
 
-  target = wrapped_target.target
+  adaptor_with_origin = pylint_target.adaptor_with_origin
+  adaptor = adaptor_with_origin.adaptor
 
   # Pylint needs direct dependencies in the chroot to ensure that imports are valid. However, it
   # doesn't lint those direct dependencies nor does it care about transitive dependencies.
-  hydrated_target = await Get[HydratedTarget](Address, target.address)
+  hydrated_target = await Get[HydratedTarget](Address, adaptor.address)
   dependencies = await MultiGet(
     Get[HydratedTarget](Address, dependency)
     for dependency in hydrated_target.dependencies
@@ -67,17 +71,20 @@ async def lint(
     HydratedTargets([hydrated_target, *dependencies])
   )
 
-  source_root_stripped_target_sources = await Get[SourceRootStrippedSources](
-    Address, target.address
-  )
-  file_names = source_root_stripped_target_sources.snapshot.files
-
   # NB: Pylint output depends upon which Python interpreter version it's run with. We ensure that
   # each target runs with its own interpreter constraints. See
   # http://pylint.pycqa.org/en/latest/faq.html#what-versions-of-python-is-pylint-supporting.
   interpreter_constraints = PexInterpreterConstraints.create_from_adaptors(
-    adaptors=[target] if isinstance(target, PythonTargetAdaptor) else [],
+    adaptors=[adaptor] if isinstance(adaptor, PythonTargetAdaptor) else [],
     python_setup=python_setup
+  )
+  requirements_pex = await Get[Pex](
+    CreatePex(
+      output_filename="pylint.pex",
+      requirements=PexRequirements(requirements=tuple(pylint.get_requirement_specs())),
+      interpreter_constraints=interpreter_constraints,
+      entry_point=pylint.get_entry_point(),
+    )
   )
 
   config_path: Optional[str] = pylint.options.config
@@ -86,14 +93,6 @@ async def lint(
       globs=tuple([config_path] if config_path else []),
       glob_match_error_behavior=GlobMatchErrorBehavior.error,
       description_of_origin="the option `--pylint-config`",
-    )
-  )
-  requirements_pex = await Get[Pex](
-    CreatePex(
-      output_filename="pylint.pex",
-      requirements=PexRequirements(requirements=tuple(pylint.get_requirement_specs())),
-      interpreter_constraints=interpreter_constraints,
-      entry_point=pylint.get_entry_point(),
     )
   )
 
@@ -106,13 +105,16 @@ async def lint(
       )
     ),
   )
+
+  source_files = await Get[TargetSourceFiles](FindTargetSourceFilesRequest(adaptor_with_origin))
+
   request = requirements_pex.create_execute_request(
     python_setup=python_setup,
     subprocess_encoding_environment=subprocess_encoding_environment,
     pex_path=f'./pylint.pex',
-    pex_args=generate_args(file_names, pylint),
+    pex_args=generate_args(source_files=source_files, pylint=pylint),
     input_files=merged_input_files,
-    description=f'Run Pylint for {target.address.reference()}',
+    description=f'Run Pylint for {adaptor.address.reference()}',
   )
   result = await Get[FallibleExecuteProcessResult](ExecuteProcessRequest, request)
   return LintResult.from_fallible_execute_process_result(result)
@@ -124,6 +126,7 @@ def rules():
     subsystem_rule(Pylint),
     UnionRule(PythonLintTarget, PylintTarget),
     *download_pex_bin.rules(),
+    *find_target_source_files.rules(),
     *pex.rules(),
     *prepare_chrooted_python_sources.rules(),
     *strip_source_roots.rules(),
