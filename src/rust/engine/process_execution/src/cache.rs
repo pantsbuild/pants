@@ -40,8 +40,13 @@ impl crate::CommandRunner for CommandRunner {
     let key = digest.0;
 
     let command_runner = self.clone();
-    self
-      .lookup(key, context.clone())
+    let maybe_result_fut = if req.cacheable() {
+      self.lookup(key, context.clone()).to_boxed()
+    } else {
+      future::ok(None).to_boxed()
+    };
+
+    maybe_result_fut
       .then(move |maybe_result| {
         match maybe_result {
           Ok(Some(result)) => return future::ok(result).to_boxed(),

@@ -1092,7 +1092,8 @@ impl Node for NodeKey {
 
   fn cacheable(&self, _context: &Self::Context) -> bool {
     match self {
-      &NodeKey::Task(ref s) => s.task.cacheable,
+      NodeKey::Task(s) => s.task.cacheable,
+      NodeKey::MultiPlatformExecuteProcess(mp_epr) => mp_epr.0.cacheable(),
       _ => true,
     }
   }

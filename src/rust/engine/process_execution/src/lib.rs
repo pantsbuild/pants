@@ -256,6 +256,15 @@ impl MultiPlatformExecuteProcessRequest {
       .next()
       .map(|(_platforms, epr)| format!("Executing process: {}", epr.description))
   }
+
+  pub fn cacheable(&self) -> bool {
+    self
+      .0
+      .iter()
+      .next()
+      .map(|(_platforms, epr)| !epr.foreground)
+      .unwrap_or(true)
+  }
 }
 
 impl From<ExecuteProcessRequest> for MultiPlatformExecuteProcessRequest {

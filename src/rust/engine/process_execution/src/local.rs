@@ -398,7 +398,6 @@ pub trait CapturedWorkdir {
       })
       .and_then({
         let context = context.clone();
-        let req_description = req_description.clone();
         move |()| {
           // If the process should run in the foreground, acquire access to stdio, and hold it until
           // after the process has exited.
@@ -406,10 +405,7 @@ pub trait CapturedWorkdir {
             context
               .stdio_holder
               .stdio_acquire()
-              .map(move |guard| {
-                println!(">>> Launching in the foreground: {}", req_description);
-                Some(guard)
-              })
+              .map(Some)
               .map_err(|()| {
                 "Failed to acquire stdio while running process in the foreground.".to_owned()
               })
