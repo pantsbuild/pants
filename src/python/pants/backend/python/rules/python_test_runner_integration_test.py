@@ -20,13 +20,12 @@ from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.fs import FileContent
-from pants.engine.interactive_runner import InteractiveRunner
 from pants.engine.legacy.structs import PythonTestsAdaptor, PythonTestsAdaptorWithOrigin
 from pants.engine.rules import RootRule, subsystem_rule
 from pants.engine.selectors import Params
 from pants.python.python_requirement import PythonRequirement
 from pants.rules.core import find_target_source_files, strip_source_roots
-from pants.rules.core.test import Status, TestDebugRequest, TestOptions, TestResult
+from pants.rules.core.test import Status, TestOptions, TestResult
 from pants.testutil.interpreter_selection_utils import skip_unless_python27_and_python3_present
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
@@ -142,14 +141,7 @@ class PythonTestRunnerIntegrationTest(TestBase):
       address=v1_target.address.to_address(), sources=v1_target._sources_field.sources,
     )
     params = Params(PythonTestsAdaptorWithOrigin(adaptor, origin), options_bootstrapper)
-    test_result = self.request_single_product(TestResult, params)
-    debug_request = self.request_single_product(TestDebugRequest, params)
-    debug_result = InteractiveRunner(self.scheduler).run_local_interactive_process(debug_request.ipr)
-    if test_result.status == Status.SUCCESS:
-      assert debug_result.process_exit_code == 0
-    else:
-      assert debug_result.process_exit_code != 0
-    return test_result
+    return self.request_single_product(TestResult, params)
 
   def test_single_passing_test(self) -> None:
     self.create_python_test_target([self.good_source])

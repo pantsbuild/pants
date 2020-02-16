@@ -13,7 +13,6 @@ from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.addressable import Addresses
 from pants.engine.fs import Digest, DirectoriesToMerge, FileContent, InputFilesContent
-from pants.engine.interactive_runner import InteractiveProcessRequest
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
 from pants.engine.legacy.structs import PythonTestsAdaptor, PythonTestsAdaptorWithOrigin
@@ -25,7 +24,7 @@ from pants.rules.core.find_target_source_files import (
   FindTargetSourceFilesRequest,
   TargetSourceFiles,
 )
-from pants.rules.core.test import TestDebugRequest, TestOptions, TestResult, TestTarget
+from pants.rules.core.test import TestOptions, TestResult, TestTarget
 
 
 DEFAULT_COVERAGE_CONFIG = dedent(f"""
@@ -188,25 +187,15 @@ async def run_python_test(
     description=f'Run Pytest for {target_with_origin.adaptor.address.reference()}',
     timeout_seconds=test_setup.timeout_seconds if test_setup.timeout_seconds is not None else 9999,
     env=env,
+    foreground=test_options.values.debug,
   )
   result = await Get[FallibleExecuteProcessResult](ExecuteProcessRequest, request)
   return TestResult.from_fallible_execute_process_result(result)
 
 
-@rule(name="Run pytest in an interactive process")
-async def debug_python_test(test_setup: TestTargetSetup) -> TestDebugRequest:
-  run_request = InteractiveProcessRequest(
-    argv=(test_setup.requirements_pex.output_filename, *test_setup.args),
-    run_in_workspace=False,
-    input_files=test_setup.input_files_digest
-  )
-  return TestDebugRequest(run_request)
-
-
 def rules():
   return [
     run_python_test,
-    debug_python_test,
     setup_pytest_for_target,
     UnionRule(TestTarget, PythonTestsAdaptorWithOrigin),
     subsystem_rule(PyTest),

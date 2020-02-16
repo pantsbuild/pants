@@ -13,7 +13,6 @@ from pants.engine.addressable import AddressesWithOrigins, AddressWithOrigin
 from pants.engine.console import Console
 from pants.engine.fs import Digest
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
 from pants.engine.isolated_process import FallibleExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTargetWithOrigin
 from pants.engine.legacy.structs import TargetAdaptorWithOrigin
@@ -55,14 +54,6 @@ class TestResult:
     )
 
 
-@dataclass(frozen=True)
-class TestDebugRequest:
-  ipr: InteractiveProcessRequest
-
-  # Prevent this class from being detected by pytest as a test class.
-  __test__ = False
-
-
 @union
 class TestTarget:
   """A union for registration of a testable target type.
@@ -96,12 +87,6 @@ class AddressAndTestResult:
       and bool(adaptor_with_origin.adaptor.sources.snapshot.files)
     )
     return has_sources and (is_test_target or is_not_a_glob)
-
-
-@dataclass(frozen=True)
-class AddressAndDebugRequest:
-  address: Address
-  request: TestDebugRequest
 
 
 class TestOptions(GoalSubsystem):
@@ -139,15 +124,8 @@ class Test(Goal):
 async def run_tests(
   console: Console,
   options: TestOptions,
-  runner: InteractiveRunner,
   addresses_with_origins: AddressesWithOrigins,
 ) -> Test:
-  if options.values.debug:
-    address_with_origin = addresses_with_origins.expect_single()
-    addr_debug_request = await Get[AddressAndDebugRequest](AddressWithOrigin, address_with_origin)
-    result = runner.run_local_interactive_process(addr_debug_request.request.ipr)
-    return Test(result.process_exit_code)
-
   results = await MultiGet(
     Get[AddressAndTestResult](AddressWithOrigin, address_with_origin)
     for address_with_origin in addresses_with_origins
@@ -206,22 +184,8 @@ async def coordinator_of_tests(
   return AddressAndTestResult(target.address, result)
 
 
-@rule
-async def coordinator_of_debug_tests(
-  target_with_origin: HydratedTargetWithOrigin,
-) -> AddressAndDebugRequest:
-  target = target_with_origin.target
-  adaptor_with_origin = TargetAdaptorWithOrigin.create(
-    adaptor=target.adaptor, origin=target_with_origin.origin
-  )
-  logger.info(f"Starting tests in debug mode: {target.address.reference()}")
-  request = await Get[TestDebugRequest](TestTarget, adaptor_with_origin)
-  return AddressAndDebugRequest(target.address, request)
-
-
 def rules():
   return [
     coordinator_of_tests,
-    coordinator_of_debug_tests,
     run_tests,
   ]

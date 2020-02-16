@@ -19,10 +19,8 @@ from pants.engine.legacy.structs import (
 )
 from pants.engine.rules import UnionMembership
 from pants.rules.core.test import (
-  AddressAndDebugRequest,
   AddressAndTestResult,
   Status,
-  TestDebugRequest,
   TestResult,
   TestTarget,
   coordinator_of_tests,
@@ -81,14 +79,6 @@ class TestTest(TestBase):
           subject_type=AddressWithOrigin,
           mock=lambda _: AddressAndTestResult(addr, result),
         ),
-        MockGet(
-          product_type=AddressAndDebugRequest,
-          subject_type=AddressWithOrigin,
-          mock=lambda _: AddressAndDebugRequest(
-            addr,
-            TestDebugRequest(ipr=self.make_successful_ipr() if success else self.make_failure_ipr())
-          )
-        ),
       ],
     )
     assert console.stdout.getvalue() == expected_console_output
@@ -134,24 +124,12 @@ class TestTest(TestBase):
         raise Exception("Unrecognised target")
       return AddressAndTestResult(address, tr)
 
-    def make_debug_request(address_with_origin: AddressWithOrigin) -> AddressAndDebugRequest:
-      address = address_with_origin.address
-      request = TestDebugRequest(
-        ipr=self.make_successful_ipr() if address == address1 else self.make_failure_ipr()
-      )
-      return AddressAndDebugRequest(address, request)
-
     res = run_rule(
       run_tests,
       rule_args=[console, options, runner, self.make_addresses_with_origins(address1, address2)],
       mock_gets=[
         MockGet(
           product_type=AddressAndTestResult, subject_type=AddressWithOrigin, mock=make_result
-        ),
-        MockGet(
-          product_type=AddressAndDebugRequest,
-          subject_type=AddressWithOrigin,
-          mock=make_debug_request
         ),
       ],
     )
