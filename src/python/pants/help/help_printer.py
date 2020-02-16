@@ -78,10 +78,10 @@ class HelpPrinter:
         optionable_cls = scope_info.optionable_cls
         if optionable_cls is None or not issubclass(optionable_cls, GoalSubsystem):
           continue
-        is_unimplemented = self._union_membership.has_members_for_all(
+        is_implemented = self._union_membership.has_members_for_all(
           optionable_cls.required_union_implementations
         )
-        if is_unimplemented:
+        if not is_implemented:
           continue
         description = scope_info.description or "<no description>"
         goal_descriptions[scope_info.scope] = description
