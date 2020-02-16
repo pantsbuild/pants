@@ -6,12 +6,7 @@ from typing import Optional, Tuple
 
 from pants.backend.python.lint.pylint.subsystem import Pylint
 from pants.backend.python.lint.python_lint_target import PythonLintTarget
-from pants.backend.python.rules import (
-  download_pex_bin,
-  inject_init,
-  pex,
-  prepare_chrooted_python_sources,
-)
+from pants.backend.python.rules import download_pex_bin, pex, prepare_chrooted_python_sources
 from pants.backend.python.rules.pex import (
   CreatePex,
   Pex,
@@ -30,9 +25,9 @@ from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
-from pants.rules.core import strip_source_root
+from pants.rules.core import strip_source_roots
 from pants.rules.core.lint import LintResult
-from pants.rules.core.strip_source_root import SourceRootStrippedSources
+from pants.rules.core.strip_source_roots import SourceRootStrippedSources
 
 
 @dataclass(frozen=True)
@@ -107,7 +102,7 @@ async def lint(
       directories=(
         requirements_pex.directory_digest,
         config_snapshot.directory_digest,
-        sources_digest.digest,
+        sources_digest.snapshot.directory_digest,
       )
     ),
   )
@@ -129,10 +124,9 @@ def rules():
     subsystem_rule(Pylint),
     UnionRule(PythonLintTarget, PylintTarget),
     *download_pex_bin.rules(),
-    *inject_init.rules(),
     *pex.rules(),
     *prepare_chrooted_python_sources.rules(),
-    *strip_source_root.rules(),
+    *strip_source_roots.rules(),
     *python_native_code.rules(),
     *subprocess_environment.rules(),
   ]
