@@ -5,7 +5,6 @@ from typing import List, Optional, Tuple
 
 from pants.backend.python.lint.docformatter.rules import DocformatterTarget
 from pants.backend.python.lint.docformatter.rules import rules as docformatter_rules
-from pants.backend.python.rules import download_pex_bin
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.fs import Digest, FileContent, InputFilesContent, Snapshot
@@ -16,15 +15,10 @@ from pants.rules.core.fmt import FmtResult
 from pants.rules.core.lint import LintResult
 from pants.source.wrapped_globs import EagerFilesetWithSpec
 from pants.testutil.option.util import create_options_bootstrapper
-from pants.testutil.subsystem.util import init_subsystems
 from pants.testutil.test_base import TestBase
 
 
-class BlackIntegrationTest(TestBase):
-
-  def setUp(self):
-    super().setUp()
-    init_subsystems([download_pex_bin.DownloadedPexBin.Factory])
+class DocformatterIntegrationTest(TestBase):
 
   good_source = FileContent(path="test/good.py", content=b'"""Good docstring."""\n')
   bad_source = FileContent(path="test/bad.py", content=b'"""Oops, missing a period"""\n')
@@ -32,13 +26,7 @@ class BlackIntegrationTest(TestBase):
 
   @classmethod
   def rules(cls):
-    return (
-      *super().rules(),
-      *docformatter_rules(),
-      download_pex_bin.download_pex_bin,
-      RootRule(DocformatterTarget),
-      RootRule(download_pex_bin.DownloadedPexBin.Factory),
-    )
+    return (*super().rules(), *docformatter_rules(), RootRule(DocformatterTarget))
 
   def run_docformatter(
     self,
@@ -62,18 +50,18 @@ class BlackIntegrationTest(TestBase):
       origin = SingleAddress(directory="test", name="target")
     adaptor_with_origin = TargetAdaptorWithOrigin(adaptor, origin)
     options_bootstrapper = create_options_bootstrapper(args=args)
-    lint_result = self.request_single_product(LintResult, Params(
-      DocformatterTarget(adaptor_with_origin),
-      options_bootstrapper,
-      download_pex_bin.DownloadedPexBin.Factory.global_instance(),
-    ))
-    fmt_result = self.request_single_product(FmtResult, Params(
-      DocformatterTarget(
-        adaptor_with_origin, prior_formatter_result_digest=input_snapshot.directory_digest,
+    lint_result = self.request_single_product(
+      LintResult, Params(DocformatterTarget(adaptor_with_origin), options_bootstrapper)
+    )
+    fmt_result = self.request_single_product(
+      FmtResult,
+      Params(
+        DocformatterTarget(
+          adaptor_with_origin, prior_formatter_result_digest=input_snapshot.directory_digest,
+        ),
+        options_bootstrapper,
       ),
-      options_bootstrapper,
-      download_pex_bin.DownloadedPexBin.Factory.global_instance(),
-    ))
+    )
     return lint_result, fmt_result
 
   def get_digest(self, source_files: List[FileContent]) -> Digest:
