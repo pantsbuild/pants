@@ -246,17 +246,17 @@ impl Core {
 
 #[derive(Clone)]
 pub struct Context {
-  pub entry_id: EntryId,
+  entry_id: Option<EntryId>,
   pub core: Arc<Core>,
   pub session: Session,
 }
 
 impl Context {
-  pub fn new(entry_id: EntryId, core: Arc<Core>, session: Session) -> Context {
+  pub fn new(core: Arc<Core>, session: Session) -> Context {
     Context {
-      entry_id: entry_id,
-      core: core,
-      session: session,
+      entry_id: None,
+      core,
+      session,
     }
   }
 
@@ -266,10 +266,12 @@ impl Context {
   pub fn get<N: WrappedNode>(&self, node: N) -> BoxFuture<N::Item, Failure> {
     // TODO: Odd place for this... could do it periodically in the background?
     maybe_drop_handles();
-    self
-      .core
-      .graph
-      .get(self.entry_id, self, node.into())
+    let result = if let Some(entry_id) = self.entry_id {
+      self.core.graph.get(entry_id, self, node.into()).to_boxed()
+    } else {
+      self.core.graph.create(node.into(), self).to_boxed()
+    };
+    result
       .map(|node_result| {
         node_result
           .try_into()
@@ -281,6 +283,7 @@ impl Context {
 
 impl NodeContext for Context {
   type Node = NodeKey;
+  type SessionId = String;
 
   ///
   /// Clones this Context for a new EntryId. Because the Core of the context is an Arc, this
@@ -288,10 +291,14 @@ impl NodeContext for Context {
   ///
   fn clone_for(&self, entry_id: EntryId) -> Context {
     Context {
-      entry_id: entry_id,
+      entry_id: Some(entry_id),
       core: self.core.clone(),
       session: self.session.clone(),
     }
+  }
+
+  fn session_id(&self) -> &Self::SessionId {
+    self.session.build_id()
   }
 
   fn graph(&self) -> &Graph<NodeKey> {

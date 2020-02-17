@@ -7,8 +7,8 @@ from pants.option.custom_types import file_option, shell_str
 
 class Isort(PythonToolBase):
   options_scope = 'isort'
-  default_version = 'isort==4.3.20'
-  default_extra_requirements = ['setuptools']
+  default_version = 'isort>=4.3.21,<4.4'
+  default_extra_requirements = ['setuptools<45']  # NB: `<45` is for Python 2 support
   default_entry_point = 'isort.main'
 
   @classmethod

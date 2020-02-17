@@ -934,20 +934,20 @@ impl<R: Rule> RuleGraph<R> {
           })
           .collect();
         let suggestions_str = if suggestions.is_empty() {
-          ".".to_string()
+          format!(
+            "return the type {}. Is the @rule that you're expecting to run registered?",
+            product,
+          )
         } else {
           suggestions.sort();
           format!(
-            ", but there were @rules that could compute it using:\n  {}",
+            "can compute {} given input Params({}), but there were @rules that could compute it using:\n  {}",
+            product,
+            params_str(&params),
             suggestions.join("\n  ")
           )
         };
-        Err(format!(
-          "No installed @rules can compute {} for input Params({}){}",
-          product,
-          params_str(&params),
-          suggestions_str,
-        ))
+        Err(format!("No installed @rules {}", suggestions_str,))
       }
       0 => {
         // Some Param(s) were not registered.

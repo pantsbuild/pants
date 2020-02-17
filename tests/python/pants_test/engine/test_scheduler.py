@@ -206,7 +206,7 @@ class SchedulerTest(TestBase):
     self.assertEquals(result_str, consumes_a_and_b(a, b))
 
     # But not a subset.
-    expected_msg = ("No installed @rules can compute {} for input Params(A), but"
+    expected_msg = ("No installed @rules can compute {} given input Params(A), but"
                     .format(str.__name__))
     with self.assertRaisesRegex(Exception, re.escape(expected_msg)):
       self.request_single_product(str, Params(a))
@@ -221,10 +221,8 @@ class SchedulerTest(TestBase):
 
     # Test that an inner Get in transitive_coroutine_rule() is able to resolve B from C due to the
     # existence of transitive_b_c().
-    result_d = self.request_single_product(D, Params(c))
-    # We don't need the inner B objects to be the same, and we know the arguments are type-checked,
-    # we're just testing transitively resolving products in this file.
-    self.assertTrue(isinstance(result_d, D))
+    with self.assertDoesNotRaise():
+      _ = self.request_single_product(D, Params(c))
 
   @contextmanager
   def _assert_execution_error(self, expected_msg):
@@ -232,11 +230,10 @@ class SchedulerTest(TestBase):
       yield
 
   def test_union_rules(self):
-    a = self.request_single_product(A, Params(UnionWrapper(UnionA())))
-    # TODO: figure out what to assert here!
-    self.assertTrue(isinstance(a, A))
-    a = self.request_single_product(A, Params(UnionWrapper(UnionB())))
-    self.assertTrue(isinstance(a, A))
+    with self.assertDoesNotRaise():
+      _ = self.request_single_product(A, Params(UnionWrapper(UnionA())))
+    with self.assertDoesNotRaise():
+      _ = self.request_single_product(A, Params(UnionWrapper(UnionB())))
     # Fails due to no union relationship from A -> UnionBase.
     with self._assert_execution_error("Type A is not a member of the UnionBase @union"):
       self.request_single_product(A, Params(UnionWrapper(A())))

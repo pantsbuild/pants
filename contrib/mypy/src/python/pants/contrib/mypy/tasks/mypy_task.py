@@ -15,7 +15,7 @@ from pants.backend.python.tasks.resolve_requirements import ResolveRequirements
 from pants.backend.python.tasks.resolve_requirements_task_base import ResolveRequirementsTaskBase
 from pants.base import hash_utils
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import deprecated_conditional, resolve_conflicting_options
+from pants.base.deprecated import resolve_conflicting_options
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.target import Target
@@ -86,10 +86,6 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
              help='Tag name to identify Python targets to execute MyPy')
     register('--verbose', type=bool, default=False,
              help='Extra detail showing non-whitelisted targets')
-
-  @classmethod
-  def supports_passthru_args(cls):
-    return True
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -265,20 +261,6 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
       config = self._resolve_conflicting_options(old_option='config_file', new_option='config')
       if config:
         cmd.append(f'--config-file={os.path.join(get_buildroot(), config)}')
-      deprecated_conditional(
-        lambda: self.get_passthru_args(),
-        removal_version='1.26.0.dev1',
-        entity_description='Using the old style of passthrough args for MyPy',
-        hint_message="You passed arguments to MyPy through either the "
-                     "`--lint-mypy-passthrough-args` option or the style "
-                     "`./pants lint.mypy -- --python-version 3.7 --disallow-any-expr`. Instead, "
-                     "pass any arguments to MyPy like this: "
-                     "`./pants lint :: --mypy-args='--python-version 3.7 --disallow-any-expr'`.\n\n"
-                     "This change is meant to reduce confusion in how option scopes work with "
-                     "passthrough args and to prepare for MyPy eventually exclusively using the "
-                     "V2 implementation, which only supports `--mypy-args`.",
-      )
-      cmd.extend(self.get_passthru_args())
       cmd.extend(self._mypy_subsystem.options.args)
       cmd.append(f'@{sources_list_path}')
 

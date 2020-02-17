@@ -23,6 +23,7 @@ python_library(
     'jvm_prep_command.py',
     'jvm_target.py',
     'managed_jar_dependencies.py',
+    'runtime_platform_mixin.py',
     'tools_jar.py',
     'unpacked_jars.py',
   ],

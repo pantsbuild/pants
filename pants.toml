@@ -309,7 +309,7 @@ options = ["-Djava.awt.headless=true", "-Xmx1g"]
 [jvm-platform]
 default_platform = "java8"
 # TODO(#8669): remove `java7` once we can install openJDK 11 on the RBE docker image, which would
-# allow fixing testprojects/tests/java/org/pantsbuild/testproject/testjvms:eight-test-platform to
+# allow fixing testprojects/tests/java/org/pantsbuild/testproject/testjvms:eight-runtime-platform to
 # use Java 8 and 11, rather than Java 7 and 8.
 platforms = """
 {

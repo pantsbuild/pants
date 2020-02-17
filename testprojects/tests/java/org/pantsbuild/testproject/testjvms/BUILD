@@ -18,10 +18,10 @@ junit_tests(
 )
 
 junit_tests(
-  name='eight-test-platform',
+  name='eight-runtime-platform',
   sources=['TestEight.java'],
   platform='java7',
-  test_platform='java8',
+  runtime_platform='java8',
   dependencies=[':base'],
   strict_deps=False,
 )

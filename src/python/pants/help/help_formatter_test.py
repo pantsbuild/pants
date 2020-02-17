@@ -11,8 +11,8 @@ from pants.help.help_info_extracter import OptionHelpInfo
 class OptionHelpFormatterTest(unittest.TestCase):
   def format_help_for_foo(self, **kwargs):
     ohi = OptionHelpInfo(registering_class=type(None), display_args=['--foo'],
-                         scoped_cmd_line_args=['--foo'], unscoped_cmd_line_args=['--foo'],
-                         typ=bool, default=None, help='help for foo',
+                         comma_separated_display_args='--foo', scoped_cmd_line_args=['--foo'],
+                         unscoped_cmd_line_args=['--foo'], typ=bool, default=None, help='help for foo',
                          deprecated_message=None, removal_version=None, removal_hint=None,
                          choices=None)
     ohi = replace(ohi, **kwargs)

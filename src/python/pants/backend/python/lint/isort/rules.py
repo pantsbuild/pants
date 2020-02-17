@@ -22,41 +22,61 @@ from pants.engine.isolated_process import (
   ExecuteProcessResult,
   FallibleExecuteProcessResult,
 )
-from pants.engine.legacy.structs import TargetAdaptor
+from pants.engine.legacy.structs import TargetAdaptorWithOrigin
 from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.option.custom_types import GlobExpansionConjunction
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
+from pants.rules.core import find_target_source_files, strip_source_roots
+from pants.rules.core.find_target_source_files import (
+  FindTargetSourceFilesRequest,
+  TargetSourceFiles,
+)
 from pants.rules.core.fmt import FmtResult
 from pants.rules.core.lint import LintResult
 
 
 @dataclass(frozen=True)
 class IsortTarget:
-  target: TargetAdaptor
+  adaptor_with_origin: TargetAdaptorWithOrigin
   prior_formatter_result_digest: Optional[Digest] = None  # unused by `lint`
 
 
 @dataclass(frozen=True)
-class IsortSetup:
-  requirements_pex: Pex
-  config_snapshot: Snapshot
-  passthrough_args: Tuple[str, ...]
-  skip: bool
+class SetupRequest:
+  target: IsortTarget
+  check_only: bool
+
+
+@dataclass(frozen=True)
+class Setup:
+  process_request: ExecuteProcessRequest
+
+
+def generate_args(
+  *, source_files: TargetSourceFiles, isort: Isort, check_only: bool,
+) -> Tuple[str, ...]:
+  # NB: isort auto-discovers config files. There is no way to hardcode them via command line
+  # flags. So long as the files are in the Pex's input files, isort will use the config.
+  args = []
+  if check_only:
+    args.append("--check-only")
+  args.extend(isort.options.args)
+  args.extend(sorted(source_files.snapshot.files))
+  return tuple(args)
 
 
 @rule
-async def setup_isort(isort: Isort) -> IsortSetup:
-  config_path: Optional[List[str]] = isort.options.config
-  config_snapshot = await Get[Snapshot](
-    PathGlobs(
-      globs=config_path or (),
-      glob_match_error_behavior=GlobMatchErrorBehavior.error,
-      conjunction=GlobExpansionConjunction.all_match,
-      description_of_origin="the option `--isort-config`",
-    )
-  )
+async def setup(
+  request: SetupRequest,
+  isort: Isort,
+  python_setup: PythonSetup,
+  subprocess_encoding_environment: SubprocessEncodingEnvironment,
+) -> Setup:
+  adaptor_with_origin = request.target.adaptor_with_origin
+  adaptor = adaptor_with_origin.adaptor
+
   requirements_pex = await Get[Pex](
     CreatePex(
       output_filename="isort.pex",
@@ -67,95 +87,82 @@ async def setup_isort(isort: Isort) -> IsortSetup:
       entry_point=isort.get_entry_point(),
     )
   )
-  return IsortSetup(
-    requirements_pex=requirements_pex,
-    config_snapshot=config_snapshot,
-    passthrough_args=tuple(isort.options.args),
-    skip=isort.options.skip,
+
+  config_path: Optional[List[str]] = isort.options.config
+  config_snapshot = await Get[Snapshot](
+    PathGlobs(
+      globs=config_path or (),
+      glob_match_error_behavior=GlobMatchErrorBehavior.error,
+      conjunction=GlobExpansionConjunction.all_match,
+      description_of_origin="the option `--isort-config`",
+    )
   )
 
+  # NB: We populate the chroot with every source file belonging to the target, but possibly only
+  # tell isort to run over some of those files when given file arguments.
+  full_sources_digest = (
+    request.target.prior_formatter_result_digest or adaptor.sources.snapshot.directory_digest
+  )
+  specified_source_files = await Get[TargetSourceFiles](
+    FindTargetSourceFilesRequest(adaptor_with_origin)
+  )
 
-@dataclass(frozen=True)
-class IsortArgs:
-  args: Tuple[str, ...]
-
-  @staticmethod
-  def create(
-    *, wrapped_target: IsortTarget, isort_setup: IsortSetup, check_only: bool,
-  ) -> "IsortArgs":
-    # NB: isort auto-discovers config files. There is no way to hardcode them via command line
-    # flags. So long as the files are in the Pex's input files, isort will use the config.
-    files = wrapped_target.target.sources.snapshot.files
-    pex_args = []
-    if check_only:
-      pex_args.append("--check-only")
-    if isort_setup.passthrough_args:
-      pex_args.extend(isort_setup.passthrough_args)
-    pex_args.extend(files)
-    return IsortArgs(tuple(pex_args))
-
-
-@rule
-async def create_isort_request(
-  wrapped_target: IsortTarget,
-  isort_args: IsortArgs,
-  isort_setup: IsortSetup,
-  python_setup: PythonSetup,
-  subprocess_encoding_environment: SubprocessEncodingEnvironment,
-) -> ExecuteProcessRequest:
-  target = wrapped_target.target
-  sources_digest = wrapped_target.prior_formatter_result_digest or target.sources.snapshot.directory_digest
   merged_input_files = await Get[Digest](
     DirectoriesToMerge(
       directories=(
-        sources_digest,
-        isort_setup.requirements_pex.directory_digest,
-        isort_setup.config_snapshot.directory_digest,
+        full_sources_digest,
+        requirements_pex.directory_digest,
+        config_snapshot.directory_digest,
       )
     ),
   )
-  return isort_setup.requirements_pex.create_execute_request(
+
+  process_request = requirements_pex.create_execute_request(
     python_setup=python_setup,
     subprocess_encoding_environment=subprocess_encoding_environment,
     pex_path="./isort.pex",
-    pex_args=isort_args.args,
+    pex_args=generate_args(
+      source_files=specified_source_files, isort=isort, check_only=request.check_only,
+    ),
     input_files=merged_input_files,
-    output_files=target.sources.snapshot.files,
-    description=f'Run isort for {target.address.reference()}',
+    # NB: Even if the user specified to only run on certain files belonging to the target, we
+    # still capture in the output all of the source files.
+    output_files=adaptor.sources.snapshot.files,
+    description=f'Run isort for {adaptor.address.reference()}',
   )
+  return Setup(process_request)
 
 
 @rule(name="Format using isort")
-async def fmt(wrapped_target: IsortTarget, isort_setup: IsortSetup) -> FmtResult:
-  if isort_setup.skip:
+async def fmt(isort_target: IsortTarget, isort: Isort) -> FmtResult:
+  if isort.options.skip:
     return FmtResult.noop()
-  args = IsortArgs.create(wrapped_target=wrapped_target, isort_setup=isort_setup, check_only=False)
-  request = await Get[ExecuteProcessRequest](IsortArgs, args)
-  result = await Get[ExecuteProcessResult](ExecuteProcessRequest, request)
+  setup = await Get[Setup](SetupRequest(isort_target, check_only=False))
+  result = await Get[ExecuteProcessResult](ExecuteProcessRequest, setup.process_request)
   return FmtResult.from_execute_process_result(result)
 
 
 @rule(name="Lint using isort")
-async def lint(wrapped_target: IsortTarget, isort_setup: IsortSetup) -> LintResult:
-  if isort_setup.skip:
+async def lint(isort_target: IsortTarget, isort: Isort) -> LintResult:
+  if isort.options.skip:
     return LintResult.noop()
-  args = IsortArgs.create(wrapped_target=wrapped_target, isort_setup=isort_setup, check_only=True)
-  request = await Get[ExecuteProcessRequest](IsortArgs, args)
-  result = await Get[FallibleExecuteProcessResult](ExecuteProcessRequest, request)
+  setup = await Get[Setup](SetupRequest(isort_target, check_only=True))
+  result = await Get[FallibleExecuteProcessResult](ExecuteProcessRequest, setup.process_request)
   return LintResult.from_fallible_execute_process_result(result)
 
 
 def rules():
   return [
-    setup_isort,
-    create_isort_request,
+    setup,
     fmt,
     lint,
     subsystem_rule(Isort),
     UnionRule(PythonFormatTarget, IsortTarget),
     UnionRule(PythonLintTarget, IsortTarget),
     *download_pex_bin.rules(),
+    *find_target_source_files.rules(),
     *pex.rules(),
     *python_native_code.rules(),
+    *strip_source_roots.rules(),
     *subprocess_environment.rules(),
   ]

@@ -1,13 +1,14 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import itertools
 from dataclasses import dataclass
 
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.isolated_process import FallibleExecuteProcessResult
-from pants.engine.legacy.graph import HydratedTargets
-from pants.engine.legacy.structs import TargetAdaptor
+from pants.engine.legacy.graph import HydratedTargetsWithOrigins
+from pants.engine.legacy.structs import TargetAdaptorWithOrigin
 from pants.engine.objects import Collection, union
 from pants.engine.rules import UnionMembership, goal_rule
 from pants.engine.selectors import Get, MultiGet
@@ -40,19 +41,21 @@ class LintResults(Collection[LintResult]):
 
 @union
 class LintTarget:
-  """A union for registration of a formattable target type."""
+  """A union for registration of a lintable target type.
+
+  The union members should be subclasses of TargetAdaptorWithOrigin.
+  """
 
   @staticmethod
   def is_lintable(
-    target_adaptor: TargetAdaptor, *, union_membership: UnionMembership
+    adaptor_with_origin: TargetAdaptorWithOrigin, *, union_membership: UnionMembership
   ) -> bool:
-    return (
-      union_membership.is_member(LintTarget, target_adaptor)
-      # TODO: make TargetAdaptor return a 'sources' field with an empty snapshot instead of
-      #  raising to remove the hasattr() checks here!
-      and hasattr(target_adaptor, "sources")
-      and target_adaptor.sources.snapshot.files  # i.e., sources is not empty
+    is_lint_target = union_membership.is_member(LintTarget, adaptor_with_origin)
+    has_sources = (
+      hasattr(adaptor_with_origin.adaptor, "sources")
+      and bool(adaptor_with_origin.adaptor.sources.snapshot.files)
     )
+    return has_sources and is_lint_target
 
 
 class LintOptions(GoalSubsystem):
@@ -70,13 +73,21 @@ class Lint(Goal):
 
 
 @goal_rule
-async def lint(console: Console, targets: HydratedTargets, union_membership: UnionMembership) -> Lint:
+async def lint(
+  console: Console,
+  targets_with_origins: HydratedTargetsWithOrigins,
+  union_membership: UnionMembership,
+) -> Lint:
+  adaptors_with_origins = [
+    TargetAdaptorWithOrigin.create(target_with_origin.target.adaptor, target_with_origin.origin)
+    for target_with_origin in targets_with_origins
+  ]
   nested_results = await MultiGet(
-    Get[LintResults](LintTarget, target.adaptor)
-    for target in targets
-    if LintTarget.is_lintable(target.adaptor, union_membership=union_membership)
+    Get[LintResults](LintTarget, adaptor_with_origin)
+    for adaptor_with_origin in adaptors_with_origins
+    if LintTarget.is_lintable(adaptor_with_origin, union_membership=union_membership)
   )
-  results = [result for results in nested_results for result in results]
+  results = list(itertools.chain.from_iterable(nested_results))
 
   if not results:
     return Lint(exit_code=0)
@@ -94,6 +105,4 @@ async def lint(console: Console, targets: HydratedTargets, union_membership: Uni
 
 
 def rules():
-  return [
-    lint,
-  ]
+  return [lint]
