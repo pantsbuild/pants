@@ -10,7 +10,7 @@ from pants.engine.console import Console
 from pants.engine.fs import DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
-from pants.engine.rules import UnionMembership, goal_rule
+from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get
 from pants.option.custom_types import shell_str
 from pants.rules.core.binary import BinaryTarget, CreatedBinary
@@ -46,11 +46,7 @@ async def run(
   build_root: BuildRoot,
   addresses: Addresses,
   options: RunOptions,
-  union_membership: UnionMembership,
 ) -> Run:
-  if not union_membership.has_members_for_all(options.required_union_implementations):
-    return Run(exit_code=0)
-
   address = addresses.expect_single()
   binary = await Get[CreatedBinary](Address, address)
 

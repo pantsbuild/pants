@@ -11,6 +11,7 @@ from typing import List, Optional, Set, Tuple, cast
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.specs import Specs
 from pants.engine.fs import PathGlobs, Snapshot
+from pants.engine.rules import UnionMembership
 from pants.goal.run_tracker import RunTracker
 from pants.init.engine_initializer import LegacyGraphScheduler, LegacyGraphSession
 from pants.init.specs_calculator import SpecsCalculator
@@ -30,11 +31,13 @@ class SchedulerService(PantsService):
 
   def __init__(
     self,
+    *,
     fs_event_service: FSEventService,
     legacy_graph_scheduler: LegacyGraphScheduler,
     build_root: str,
     invalidation_globs: List[str],
     pantsd_pidfile: Optional[str],
+    union_membership: UnionMembership,
   ) -> None:
     """
     :param fs_event_service: An unstarted FSEventService instance for setting up filesystem event handlers.
@@ -50,6 +53,7 @@ class SchedulerService(PantsService):
     self._invalidation_globs = invalidation_globs
     self._build_root = build_root
     self._pantsd_pidfile = pantsd_pidfile
+    self._union_membership = union_membership
 
     self._scheduler = legacy_graph_scheduler.scheduler
     # This session is only used for checking whether any invalidation globs have been invalidated.
@@ -235,11 +239,12 @@ class SchedulerService(PantsService):
 
       # N.B. @goal_rules run pre-fork in order to cache the products they request during execution.
       exit_code = session.run_goal_rules(
-          options_bootstrapper,
-          options,
-          goals,
-          specs,
-        )
+        options_bootstrapper=options_bootstrapper,
+        union_membership=self._union_membership,
+        options=options,
+        goals=goals,
+        specs=specs,
+      )
 
     return specs, exit_code
 

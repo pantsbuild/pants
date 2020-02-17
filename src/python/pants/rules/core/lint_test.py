@@ -2,13 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from typing import Callable, List, Optional, Tuple
-from unittest.mock import Mock
 
 from pants.engine.legacy.graph import HydratedTargetsWithOrigins, HydratedTargetWithOrigin
 from pants.engine.legacy.structs import JvmAppAdaptor, PythonTargetAdaptorWithOrigin
 from pants.engine.rules import UnionMembership
 from pants.rules.core.fmt_test import FmtTest
-from pants.rules.core.lint import Lint, LintOptions, LintResult, LintResults, LintTarget, lint
+from pants.rules.core.lint import Lint, LintResult, LintResults, LintTarget, lint
 from pants.testutil.engine.util import MockConsole, MockGet, run_rule
 from pants.testutil.test_base import TestBase
 
@@ -20,23 +19,18 @@ class LintTest(TestBase):
     *,
     targets: List[HydratedTargetWithOrigin],
     mock_linters: Optional[Callable[[PythonTargetAdaptorWithOrigin], LintResults]] = None,
-    union_implemented: bool = True,
   ) -> Tuple[Lint, str]:
     if mock_linters is None:
       mock_linters = lambda adaptor_with_origin: LintResults([LintResult(
         exit_code=1, stdout=f"Linted `{adaptor_with_origin.adaptor.name}`", stderr=""
       )])
     console = MockConsole(use_colors=False)
-    # TODO(#9141): replace this with a proper util to create `GoalSubsystem`s
-    lint_options = Mock()
-    lint_options.required_union_implementations = LintOptions.required_union_implementations
     result: Lint = run_rule(
       lint,
       rule_args=[
         console,
         HydratedTargetsWithOrigins(targets),
-        lint_options,
-        UnionMembership({LintTarget: [PythonTargetAdaptorWithOrigin]} if union_implemented else {})
+        UnionMembership({LintTarget: [PythonTargetAdaptorWithOrigin]})
       ],
       mock_gets=[
         MockGet(
@@ -45,13 +39,6 @@ class LintTest(TestBase):
       ],
     )
     return result, console.stdout.getvalue()
-
-  def test_no_implementation_noops(self) -> None:
-    result, stdout = self.run_lint_rule(
-      targets=[FmtTest.make_hydrated_target_with_origin()], union_implemented=False,
-    )
-    assert result.exit_code == 0
-    assert stdout == ""
 
   def test_non_union_member_noops(self) -> None:
     result, stdout = self.run_lint_rule(

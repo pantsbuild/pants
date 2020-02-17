@@ -15,6 +15,7 @@ from pants.base.exception_sink import ExceptionSink, SignalHandler
 from pants.base.exiter import Exiter
 from pants.bin.daemon_pants_runner import DaemonPantsRunner
 from pants.engine.native import Native
+from pants.engine.rules import UnionMembership
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.logging import init_rust_logger, setup_logging
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
@@ -171,7 +172,8 @@ class PantsDaemon(FingerprintedProcessManager):
           build_root,
           bootstrap_options_values,
           legacy_graph_scheduler,
-          watchman
+          watchman,
+          union_membership=UnionMembership(build_config.union_rules())
         )
       else:
         build_root = None
@@ -189,7 +191,13 @@ class PantsDaemon(FingerprintedProcessManager):
       )
 
     @staticmethod
-    def _setup_services(build_root, bootstrap_options, legacy_graph_scheduler, watchman):
+    def _setup_services(
+      build_root,
+      bootstrap_options,
+      legacy_graph_scheduler,
+      watchman,
+      union_membership: UnionMembership,
+    ):
       """Initialize pantsd services.
 
       :returns: A PantsServices instance.
@@ -212,11 +220,14 @@ class PantsDaemon(FingerprintedProcessManager):
         )
 
       scheduler_service = SchedulerService(
-        fs_event_service,
-        legacy_graph_scheduler,
-        build_root,
-        OptionsInitializer.compute_pantsd_invalidation_globs(build_root, bootstrap_options),
-        pidfile,
+        fs_event_service=fs_event_service,
+        legacy_graph_scheduler=legacy_graph_scheduler,
+        build_root=build_root,
+        invalidation_globs=OptionsInitializer.compute_pantsd_invalidation_globs(
+          build_root, bootstrap_options
+        ),
+        pantsd_pidfile=pidfile,
+        union_membership=union_membership,
       )
 
       pailgun_service = PailgunService(

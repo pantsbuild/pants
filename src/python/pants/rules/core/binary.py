@@ -10,7 +10,7 @@ from pants.engine.fs import Digest, DirectoriesToMerge, DirectoryToMaterialize, 
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.legacy.graph import HydratedTarget
 from pants.engine.objects import union
-from pants.engine.rules import UnionMembership, goal_rule, rule
+from pants.engine.rules import goal_rule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.rules.core.distdir import DistDir
 
@@ -45,11 +45,7 @@ async def create_binary(
   workspace: Workspace,
   options: BinaryOptions,
   distdir: DistDir,
-  union_membership: UnionMembership,
 ) -> Binary:
-  if not union_membership.has_members_for_all(options.required_union_implementations):
-    return Binary(exit_code=0)
-
   with options.line_oriented(console) as print_stdout:
     print_stdout(f"Generating binaries in `./{distdir.relpath}`")
     binaries = await MultiGet(Get[CreatedBinary](Address, address) for address in addresses)

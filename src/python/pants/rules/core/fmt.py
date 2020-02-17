@@ -91,12 +91,8 @@ async def fmt(
   console: Console,
   targets_with_origins: HydratedTargetsWithOrigins,
   workspace: Workspace,
-  options: FmtOptions,
   union_membership: UnionMembership,
 ) -> Fmt:
-  if not union_membership.has_members_for_all(options.required_union_implementations):
-    return Fmt(exit_code=0)
-
   adaptors_with_origins = [
     TargetAdaptorWithOrigin.create(target_with_origin.target.adaptor, target_with_origin.origin)
     for target_with_origin in targets_with_origins

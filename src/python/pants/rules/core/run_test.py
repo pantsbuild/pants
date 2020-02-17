@@ -9,10 +9,8 @@ from pants.build_graph.address import Address
 from pants.engine.addressable import Addresses
 from pants.engine.fs import Digest, FileContent, InputFilesContent, Workspace
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
-from pants.engine.legacy.structs import TargetAdaptor
-from pants.engine.rules import UnionMembership
-from pants.rules.core.binary import BinaryTarget, CreatedBinary
-from pants.rules.core.run import Run, RunOptions, run
+from pants.rules.core.binary import CreatedBinary
+from pants.rules.core.run import Run, run
 from pants.testutil.engine.util import MockConsole, MockGet, run_rule
 from pants.testutil.test_base import TestBase
 
@@ -21,7 +19,6 @@ from pants.testutil.test_base import TestBase
 class MockOptions:
   def __init__(self, **values):
     self.values = Mock(**values)
-    self.required_union_implementations = RunOptions.required_union_implementations
 
 
 class RunTest(TestBase):
@@ -51,7 +48,6 @@ class RunTest(TestBase):
         BuildRoot(),
         Addresses([Address.parse(address_spec)]),
         MockOptions(args=[]),
-        UnionMembership({BinaryTarget: [TargetAdaptor]})
       ],
       mock_gets=[
         MockGet(

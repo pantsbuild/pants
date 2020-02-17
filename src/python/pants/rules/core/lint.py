@@ -76,12 +76,8 @@ class Lint(Goal):
 async def lint(
   console: Console,
   targets_with_origins: HydratedTargetsWithOrigins,
-  options: LintOptions,
   union_membership: UnionMembership,
 ) -> Lint:
-  if not union_membership.has_members_for_all(options.required_union_implementations):
-    return Lint(exit_code=0)
-
   adaptors_with_origins = [
     TargetAdaptorWithOrigin.create(target_with_origin.target.adaptor, target_with_origin.origin)
     for target_with_origin in targets_with_origins
