@@ -7,9 +7,9 @@ from pants.option.custom_types import file_option, shell_str
 
 class Pylint(PythonToolBase):
   options_scope = 'pylint'
-  default_version = 'pylint'
+  default_version = 'pylint>=2.4.4,<2.5'
   default_entry_point = 'pylint'
-  default_interpreter_constraints = ["CPython>=2.7,<3", "CPython>=3.4"]
+  default_interpreter_constraints = ["CPython>=3.5"]
 
   @classmethod
   def register_options(cls, register):

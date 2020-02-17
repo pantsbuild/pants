@@ -24,9 +24,14 @@ from pants.testutil.test_base import TestBase
 
 
 class PylintIntegrationTest(TestBase):
+  # See http://pylint.pycqa.org/en/latest/user_guide/run.html#exit-codes for exit codes.
   source_root = "src/python"
-  good_source = FileContent(path=f"{source_root}/good.py", content=b"'''docstring'''\nVAR = 42\n")
-  bad_source = FileContent(path=f"{source_root}/bad.py", content=b"VAR = 42\n")
+  good_source = FileContent(
+    path=f"{source_root}/good.py", content=b"'''docstring'''\nUPPERCASE_CONSTANT = ''\n",
+  )
+  bad_source = FileContent(
+    path=f"{source_root}/bad.py", content=b"'''docstring'''\nlowercase_constant = ''\n",
+  )
 
   create_python_library = partialmethod(
     TestBase.create_library, path=source_root, target_type="python_library", name="target",
@@ -88,17 +93,17 @@ class PylintIntegrationTest(TestBase):
     self.create_python_library()
     self.write_file(self.bad_source)
     result = self.run_pylint([self.bad_source])
-    assert result.exit_code == 16
-    assert "bad.py:1:0: C0114" in result.stdout
+    assert result.exit_code == 16  # convention message issued
+    assert "bad.py:2:0: C0103" in result.stdout
 
   def test_mixed_sources(self) -> None:
     self.create_python_library()
     self.write_file(self.good_source)
     self.write_file(self.bad_source)
     result = self.run_pylint([self.good_source, self.bad_source])
-    assert result.exit_code == 16
+    assert result.exit_code == 16  # convention message issued
     assert "good.py" not in result.stdout
-    assert "bad.py:1:0: C0114" in result.stdout
+    assert "bad.py:2:0: C0103" in result.stdout
 
   def test_precise_file_args(self) -> None:
     self.create_python_library()
@@ -107,19 +112,19 @@ class PylintIntegrationTest(TestBase):
     result = self.run_pylint([self.good_source])
     assert result.exit_code == 0
     assert "Your code has been rated at 10.00/10" in result.stdout.strip()
-  
+
   @pytest.mark.skip(reason="Get config file creation to work with options parsing")
   def test_respects_config_file(self) -> None:
     self.create_python_library()
     self.write_file(self.bad_source)
-    result = self.run_pylint([self.bad_source], config="[pylint]\ndisable = C0114\n")
+    result = self.run_pylint([self.bad_source], config="[pylint]\ndisable = C0103\n")
     assert result.exit_code == 0
     assert result.stdout.strip() == ""
 
   def test_respects_passthrough_args(self) -> None:
     self.create_python_library()
     self.write_file(self.bad_source)
-    result = self.run_pylint([self.bad_source], passthrough_args="--disable=C0114")
+    result = self.run_pylint([self.bad_source], passthrough_args="--disable=C0103")
     assert result.exit_code == 0
     assert "Your code has been rated at 10.00/10" in result.stdout.strip()
 
@@ -133,8 +138,9 @@ class PylintIntegrationTest(TestBase):
         path=f"{self.source_root}/dependency.py",
         content=dedent(
           """\
-          from nonexistent import erroneous
-          VAR = 42
+          # No docstring because Pylint doesn't lint dependencies
+          from transitive_dep import doesnt_matter_if_variable_exists
+          THIS_VARIABLE_EXISTS = ''
           """
         ).encode(),
       )
@@ -143,9 +149,9 @@ class PylintIntegrationTest(TestBase):
       path=f"{self.source_root}/test_dependency.py",
       content=dedent(
         """\
-        '''Docstring'''
-        from dependency import VAR
-        assert VAR == 42
+        '''Code is not executed, but Pylint will check that variables exist and are used'''
+        from dependency import THIS_VARIABLE_EXISTS
+        print(THIS_VARIABLE_EXISTS)
         """
       ).encode(),
     )
