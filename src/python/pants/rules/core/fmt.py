@@ -91,7 +91,7 @@ async def fmt(
   console: Console,
   targets_with_origins: HydratedTargetsWithOrigins,
   workspace: Workspace,
-  union_membership: UnionMembership,
+  union_membership: UnionMembership
 ) -> Fmt:
   adaptors_with_origins = [
     TargetAdaptorWithOrigin.create(target_with_origin.target.adaptor, target_with_origin.origin)

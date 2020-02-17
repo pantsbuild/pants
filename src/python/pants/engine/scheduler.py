@@ -118,9 +118,9 @@ class Scheduler:
   def _root_type_ids(self):
     return self._to_ids_buf(self._root_subject_types)
 
-  def graph_trace(self, execution_request):
+  def graph_trace(self, session, execution_request):
     with temporary_file_path() as path:
-      self._native.lib.graph_trace(self._scheduler, execution_request, path.encode())
+      self._native.lib.graph_trace(self._scheduler, session, execution_request, path.encode())
       with open(path, 'r') as fd:
         for line in fd.readlines():
           yield line.rstrip()
@@ -302,8 +302,8 @@ class Scheduler:
                            '`self._native._peek_cffi_extern_method_runtime_exceptions()`.')
     return roots
 
-  def lease_files_in_graph(self):
-    self._native.lib.lease_files_in_graph(self._scheduler)
+  def lease_files_in_graph(self, session):
+    self._native.lib.lease_files_in_graph(self._scheduler, session)
 
   def garbage_collect_store(self):
     self._native.lib.garbage_collect_store(self._scheduler)
@@ -350,7 +350,7 @@ class SchedulerSession:
 
   def trace(self, execution_request):
     """Yields a stringified 'stacktrace' starting from the scheduler's roots."""
-    for line in self._scheduler.graph_trace(execution_request.native):
+    for line in self._scheduler.graph_trace(self._session, execution_request.native):
       yield line
 
   def visualize_graph_to_file(self, filename):
@@ -613,7 +613,7 @@ class SchedulerSession:
     return result
 
   def lease_files_in_graph(self):
-    self._scheduler.lease_files_in_graph()
+    self._scheduler.lease_files_in_graph(self._session)
 
   def garbage_collect_store(self):
     self._scheduler.garbage_collect_store()
