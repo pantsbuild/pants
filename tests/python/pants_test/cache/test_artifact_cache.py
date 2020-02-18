@@ -63,9 +63,9 @@ class TestArtifactCache(TestBase):
     @contextmanager
     def override_check_for_max_retry(self, should_check: bool) -> Iterator[None]:
         patch_opts = dict(autospec=True, spec_set=True)
-        with self.restore_max_retries_flag(),\
-             unittest.mock.patch.object(RequestsSession, 'should_check_for_max_retry_error',
-                                    **patch_opts) as check_max_retry_predicate:
+        with self.restore_max_retries_flag(), unittest.mock.patch.object(
+            RequestsSession, "should_check_for_max_retry_error", **patch_opts
+        ) as check_max_retry_predicate:
             check_max_retry_predicate.return_value = should_check
             yield
 
@@ -226,65 +226,19 @@ class TestArtifactCache(TestBase):
 
     @pytest.mark.flaky(retries=1)  # https://github.com/pantsbuild/pants/issues/6838
     def test_multiproc(self):
-        key = CacheKey('muppet_key', 'fake_hash')
+        key = CacheKey("muppet_key", "fake_hash")
 
-       with self.setup_local_cache() as cache:
-           self.assertFalse(call_use_cached_files((cache, key, None)))
-           with self.setup_test_file(cache.artifact_root) as path:
-               call_insert((cache, key, [path], False))
-               self.assertTrue(call_use_cached_files((cache, key, None)))
-
-       with self.setup_rest_cache() as cache:
-           self.assertFalse(call_use_cached_files((cache, key, None)))
-           with self.setup_test_file(cache.artifact_root) as path:
-               call_insert((cache, key, [path], False))
-               self.assertTrue(call_use_cached_files((cache, key, None)))
-
-    def test_failed_multiproc(self):
-        key = CacheKey('muppet_key', 'fake_hash')
-
-        # Failed requests should return failure status, but not raise exceptions
-        with self.setup_rest_cache(return_failed=True) as cache:
+        with self.setup_local_cache() as cache:
             self.assertFalse(call_use_cached_files((cache, key, None)))
             with self.setup_test_file(cache.artifact_root) as path:
                 call_insert((cache, key, [path], False))
-                self.assertFalse(call_use_cached_files((cache, key, None)))
+                self.assertTrue(call_use_cached_files((cache, key, None)))
 
-    def test_noops_after_max_retries_exceeded(self):
-        key = CacheKey('muppet_key', 'fake_hash')
-
-      with self.setup_rest_cache() as cache:
-          # Assert that the artifact doesn't exist, then insert it and check that it exists.
-          self.assertFalse(call_use_cached_files((cache, key, None)))
-          with self.setup_test_file(cache.artifact_root) as path:
-              call_insert((cache, key, [path], False))
-              self.assertTrue(call_use_cached_files((cache, key, None)))
-
-          # No failed requests should have occurred yet, so no retries should have been triggered.
-          self.assertFalse(RequestsSession._max_retries_exceeded)
-
-          # Now assert that when max retries are exceeded, the cache returns 404s.
-          with self.restore_max_retries_flag():
-              RequestsSession._max_retries_exceeded = True
-              self.assertFalse(call_use_cached_files((cache, key, None)))
-          # After the flag is toggled back, the cache successfully finds the entry.
-          self.assertTrue(call_use_cached_files((cache, key, None)))
-
-    def test_max_retries_exceeded(self):
-        key = CacheKey('muppet_key', 'fake_hash')
-
-        # Assert that the global "retries exceeded" flag is set when retries are exceeded.
-        with self.override_check_for_max_retry(should_check=True),\
-             self.setup_rest_cache(return_failed='connection-error') as cache,\
-             self.captured_logging(logging.WARNING) as captured:
-
+        with self.setup_rest_cache() as cache:
             self.assertFalse(call_use_cached_files((cache, key, None)))
-            self.assertTrue(RequestsSession._max_retries_exceeded)
-
-            _, retry_warning = tuple(captured.warnings())
-            self.assertIn(
-                'Maximum retries were exceeded for the current connection pool. Avoiding the remote cache for the rest of the pants process lifetime.',
-                retry_warning)
+            with self.setup_test_file(cache.artifact_root) as path:
+                call_insert((cache, key, [path], False))
+                self.assertTrue(call_use_cached_files((cache, key, None)))
 
     def test_failed_multiproc(self):
         key = CacheKey("muppet_key", "fake_hash")
@@ -294,7 +248,44 @@ class TestArtifactCache(TestBase):
             self.assertFalse(call_use_cached_files((cache, key, None)))
             with self.setup_test_file(cache.artifact_root) as path:
                 call_insert((cache, key, [path], False))
+                self.assertFalse(call_use_cached_files((cache, key, None)))
+
+    def test_noops_after_max_retries_exceeded(self):
+        key = CacheKey("muppet_key", "fake_hash")
+
+        with self.setup_rest_cache() as cache:
+            # Assert that the artifact doesn't exist, then insert it and check that it exists.
             self.assertFalse(call_use_cached_files((cache, key, None)))
+            with self.setup_test_file(cache.artifact_root) as path:
+                call_insert((cache, key, [path], False))
+                self.assertTrue(call_use_cached_files((cache, key, None)))
+
+            # No failed requests should have occurred yet, so no retries should have been triggered.
+            self.assertFalse(RequestsSession._max_retries_exceeded)
+
+            # Now assert that when max retries are exceeded, the cache returns 404s.
+            with self.restore_max_retries_flag():
+                RequestsSession._max_retries_exceeded = True
+                self.assertFalse(call_use_cached_files((cache, key, None)))
+            # After the flag is toggled back, the cache successfully finds the entry.
+            self.assertTrue(call_use_cached_files((cache, key, None)))
+
+    def test_max_retries_exceeded(self):
+        key = CacheKey("muppet_key", "fake_hash")
+
+        # Assert that the global "retries exceeded" flag is set when retries are exceeded.
+        with self.override_check_for_max_retry(should_check=True), self.setup_rest_cache(
+            return_failed="connection-error"
+        ) as cache, self.captured_logging(logging.WARNING) as captured:
+
+            self.assertFalse(call_use_cached_files((cache, key, None)))
+            self.assertTrue(RequestsSession._max_retries_exceeded)
+
+            _, retry_warning = tuple(captured.warnings())
+            self.assertIn(
+                "Maximum retries were exceeded for the current connection pool. Avoiding the remote cache for the rest of the pants process lifetime.",
+                retry_warning,
+            )
 
     def test_successful_request_cleans_result_dir(self):
         key = CacheKey("muppet_key", "fake_hash")

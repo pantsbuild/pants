@@ -5,4 +5,4 @@ from pants.cache.restful_artifact_cache import RequestsSession
 
 
 def global_subsystems():
-  return {RequestsSession.Factory}
+    return {RequestsSession.Factory}

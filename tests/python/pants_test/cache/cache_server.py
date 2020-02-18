@@ -94,10 +94,10 @@ class FailRESTHandler(http.server.SimpleHTTPRequestHandler):
 
 
 class ConnectionErrorRESTHandler(FailRESTHandler):
-  """Fail to connect to all requests."""
+    """Fail to connect to all requests."""
 
-  def _return_failed(self):
-    raise Exception('Intentional connection failure!')
+    def _return_failed(self):
+        raise Exception("Intentional connection failure!")
 
 
 class TestCacheServer:
@@ -146,8 +146,8 @@ def _cache_server_process(queue, return_failed, cache_root):
                     handler = FailRESTHandler
                 elif return_failed is False:
                     handler = SimpleRESTHandler
-                elif return_failed == 'connection-error':
-                  handler = ConnectionErrorRESTHandler
+                elif return_failed == "connection-error":
+                    handler = ConnectionErrorRESTHandler
                 httpd = socketserver.TCPServer(("localhost", 0), handler)
                 port = httpd.server_address[1]
                 queue.put(port)
