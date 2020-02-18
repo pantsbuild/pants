@@ -160,13 +160,13 @@ class ExportDepAsJar(ConsoleTask):
     return f
 
   def _dependencies_to_include_in_libraries(self, t, modulizable_target_set):
-    dependencies_to_include = set([])
+    dependencies_to_include = []
     self.context.build_graph.walk_transitive_dependency_graph(
       [direct_dep.address for direct_dep in t.dependencies],
       # NB: Dependency graph between modulizable targets is represented with modules,
       #     so we don't need to expand those branches of the dep graph.
       predicate=lambda dep: dep not in modulizable_target_set,
-      work=lambda dep: dependencies_to_include.add(dep),
+      work=lambda dep: dependencies_to_include.append(dep),
     )
     return dependencies_to_include
 
