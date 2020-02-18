@@ -138,12 +138,6 @@ class ExportDepAsJarIntegrationTest(ScalacPluginIntegrationTestBase):
         'examples.src.scala.org.pantsbuild.example.several_scala_targets.node.names_to_greet',
         export_output['libraries']
       )
-      self.assertIn(
-        '.pants.d',
-        export_output[
-          'libraries'
-        ]['examples.src.scala.org.pantsbuild.example.several_scala_targets.node.names_to_greet']['default'],
-      )
       artifact_path = os.path.join(export_output['libraries'][
         'examples.src.scala.org.pantsbuild.example.several_scala_targets.node.names_to_greet'
       ]['default'], 'names_to_greet', 'names.json')
