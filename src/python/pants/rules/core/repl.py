@@ -11,25 +11,27 @@ from pants.engine.fs import Digest, DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
 from pants.engine.objects import union
-from pants.engine.rules import goal_rule
+from pants.engine.rules import UnionMembership, goal_rule
 from pants.engine.selectors import Get
 from pants.option.global_options import GlobalOptions
 from pants.util.contextutil import temporary_dir
-
-
-class ReplOptions(GoalSubsystem):
-  """Opens a REPL."""
-  name = 'repl2'
-
-
-class Repl(Goal):
-  subsystem_cls = ReplOptions
 
 
 @union
 class ReplImplementation:
   """This type proxies from the top-level `repl` goal to a specific REPL implementation
   for a specific language or languages."""
+  addresses: Addresses
+
+
+class ReplOptions(GoalSubsystem):
+  """Opens a REPL."""
+  name = 'repl'
+  required_union_implementations = (ReplImplementation,)
+
+
+class Repl(Goal):
+  subsystem_cls = ReplOptions
 
 
 @dataclass(frozen=True)
@@ -45,9 +47,14 @@ async def run_repl(
     runner: InteractiveRunner,
     addresses: Addresses,
     build_root: BuildRoot,
+    union_membership: UnionMembership,
     global_options: GlobalOptions) -> Repl:
 
-  repl_binary = await Get[ReplBinary](Addresses, addresses)
+  # Once #9142 is merged, we can guarantee that we will only even enter this `goal_rule` if there
+  # exists an implementer of the `ReplImplementation` union, so it's not a problem that this can
+  # in principle throw an exception.
+  repl_impl = next(iter(union_membership.union_rules[ReplImplementation]))
+  repl_binary = await Get[ReplBinary](ReplImplementation, repl_impl(addresses))
 
   with temporary_dir(root_dir=global_options.pants_workdir, cleanup=False) as tmpdir:
     path_relative_to_build_root = PurePath(tmpdir).relative_to(build_root.path).as_posix()

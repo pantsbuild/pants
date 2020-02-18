@@ -23,11 +23,6 @@ class PythonRepl:
 
 
 @rule
-async def targets_to_python_repl(addresses: Addresses) -> PythonRepl:
-  return PythonRepl(addresses=addresses)
-
-
-@rule
 async def run_python_repl(repl: PythonRepl) -> ReplBinary:
   targets = await Get[TransitiveHydratedTargets](Addresses, repl.addresses)
   python_addresses = Addresses(
@@ -49,5 +44,4 @@ def rules():
   return [
     UnionRule(ReplImplementation, PythonRepl),
     run_python_repl,
-    targets_to_python_repl,
   ]
