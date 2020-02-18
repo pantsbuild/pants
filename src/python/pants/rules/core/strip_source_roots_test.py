@@ -43,12 +43,18 @@ class StripSourceRootsTest(TestBase):
   def test_strip_snapshot(self) -> None:
 
     def get_stripped_files_for_snapshot(
-      paths: List[str], *, args: Optional[List[str]] = None
+      paths: List[str],
+      *,
+      support_multiple_source_roots: bool = False,
+      args: Optional[List[str]] = None,
     ) -> List[str]:
       input_snapshot = self.make_snapshot({fp: "" for fp in paths})
-      return self.get_stripped_files(
-        StripSourceRootsRequest(input_snapshot, representative_path=paths[0]), args=args,
+      request = (
+        StripSourceRootsRequest(input_snapshot, representative_path=paths[0])
+        if not support_multiple_source_roots else
+        StripSourceRootsRequest(input_snapshot, support_multiple_source_roots=True)
       )
+      return self.get_stripped_files(request, args=args)
 
     # Normal source roots
     assert get_stripped_files_for_snapshot(
@@ -68,14 +74,14 @@ class StripSourceRootsTest(TestBase):
       get_stripped_files_for_snapshot([unrecognized_source_root], args=["--source-unmatched=fail"])
     assert f"NoSourceRootError: Could not find a source root for `{unrecognized_source_root}`" in str(exc.value)
 
-    # We don't support multiple source roots in the same snapshot, but also don't proactively
-    # validate for this situation because we don't expect it to happen in practice and we want to
-    # avoid having to call `SourceRoot.find_by_path` on every single file.
+    # Support for multiple source roots
+    multiple_source_roots = ["src/python/project/example.py", "src/java/com/project/example.java"]
     with pytest.raises(ExecutionError) as exc:
-      get_stripped_files_for_snapshot(
-        ["src/python/project/example.py", "src/java/com/project/example.java"],
-      )
+      get_stripped_files_for_snapshot(multiple_source_roots, support_multiple_source_roots=False)
     assert "Cannot strip prefix src/python" in str(exc.value)
+    assert sorted(
+      get_stripped_files_for_snapshot(multiple_source_roots, support_multiple_source_roots=True)
+    ) == sorted(["project/example.py", "com/project/example.java"])
 
   def test_strip_target(self) -> None:
 
