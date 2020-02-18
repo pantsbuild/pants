@@ -250,6 +250,20 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
 
     self.linear_build_graph = self.make_linear_graph(['a', 'b', 'c', 'd', 'e'], target_type=ScalaLibrary)
 
+    self.strict_deps_enabled = self.make_target(
+      'strict_deps:enabled',
+      target_type=JvmTarget,
+      dependencies=[self.scala_with_source_dep],
+      strict_deps=True
+    )
+
+    self.strict_deps_disabled = self.make_target(
+      'strict_deps:disabled',
+      target_type=JvmTarget,
+      dependencies=[self.scala_with_source_dep],
+      strict_deps=False
+    )
+
   def create_runtime_classpath_for_targets(self, target):
     def path_to_zjar_with_workdir(address: Address):
       return os.path.join(self.pants_workdir, address.path_safe_spec, "z.jar")

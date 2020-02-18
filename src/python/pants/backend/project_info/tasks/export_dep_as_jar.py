@@ -170,7 +170,7 @@ class ExportDepAsJar(ConsoleTask):
       [direct_dep.address for direct_dep in t.dependencies],
       # NB: Dependency graph between modulizable targets is represented with modules,
       #     so we don't need to expand those branches of the dep graph.
-      predicate=lambda dep: dep not in modulizable_target_set and dep in dependencies_needed_in_classpath,
+      predicate=lambda dep: (dep not in modulizable_target_set) and (dep in dependencies_needed_in_classpath),
       work=lambda dep: dependencies_to_include.append(dep),
     )
     return dependencies_to_include
@@ -233,9 +233,9 @@ class ExportDepAsJar(ConsoleTask):
 
     def _dependencies_needed_in_classpath(target):
       if isinstance(target, JvmTarget):
-        return DependencyContext.global_instance().dependencies_respecting_strict_deps(target)
+        return [dep for dep in DependencyContext.global_instance().dependencies_respecting_strict_deps(target)]
       else:
-        return DependencyContext.global_instance().all_dependencies(target)
+        return [dep for dep in target.closure()]
 
     dependencies_needed_in_classpath = _dependencies_needed_in_classpath(current_target)
 
