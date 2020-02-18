@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import json
+import os
 import re
 
 from pants_test.backend.jvm.tasks.jvm_compile.scala.base_scalac_plugin_integration_test import (
@@ -123,16 +124,33 @@ class ExportDepAsJarIntegrationTest(ScalacPluginIntegrationTestBase):
     expected_options = {'extra_jvm_options': ['-Dproperty.color=orange', '-Dproperty.size=2', '-DMyFlag', '-Xmx1m']}
     self._check_compiler_options_for_target_are(target_to_test, expected_options, config)
 
-  def test_node_module_deps(self):
-    target_to_test = 'examples/src/scala/org/pantsbuild/example/several_scala_targets:greet_json'
-    export_output = self._run_export_dep_as_jar_goal({}, target_to_test)
-    self.assertIn(
-      'examples.src.scala.org.pantsbuild.example.several_scala_targets.node.names_to_greet',
-      export_output['libraries']
-    )
-    self.assertIn(
-      'examples.src.scala.org.pantsbuild.example.several_scala_targets.node.names_to_greet',
-      export_output[
-        'targets'
-      ]['examples/src/scala/org/pantsbuild/example/several_scala_targets:greet_json']['libraries']
-    )
+  def test_node_module_deps_as_target_roots(self):
+    targets_to_test = [
+        'examples/src/scala/org/pantsbuild/example/several_scala_targets:greet_json',
+        'examples/src/scala/org/pantsbuild/example/several_scala_targets/node:names_to_greet',
+    ]
+    with self.temporary_workdir() as workdir:
+      pants_run = self.run_pants_with_workdir(
+        ['export-dep-as-jar'] + targets_to_test, workdir, {})
+      self.assert_success(pants_run)
+      export_output = json.loads(pants_run.stdout_data)
+      self.assertIn(
+        'examples.src.scala.org.pantsbuild.example.several_scala_targets.node.names_to_greet',
+        export_output['libraries']
+      )
+      self.assertIn(
+        '.pants.d',
+        export_output[
+          'libraries'
+        ]['examples.src.scala.org.pantsbuild.example.several_scala_targets.node.names_to_greet']['default'],
+      )
+      artifact_path = os.path.join(export_output['libraries'][
+        'examples.src.scala.org.pantsbuild.example.several_scala_targets.node.names_to_greet'
+      ]['default'], 'names_to_greet', 'names.json')
+      self.assertTrue(os.path.exists(artifact_path))
+      self.assertIn(
+        'examples.src.scala.org.pantsbuild.example.several_scala_targets.node.names_to_greet',
+        export_output[
+          'targets'
+        ]['examples/src/scala/org/pantsbuild/example/several_scala_targets:greet_json']['libraries']
+      )

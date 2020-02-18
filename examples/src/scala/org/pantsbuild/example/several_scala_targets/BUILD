@@ -22,7 +22,7 @@ scala_library(
   dependencies=[
     'examples/src/scala/org/pantsbuild/example/several_scala_targets/node:names_to_greet',
   ],
-  sources=['greeting_json_names.scala'],
+  sources=['GreetingJsonNames.scala'],
 )
 
 jvm_binary(

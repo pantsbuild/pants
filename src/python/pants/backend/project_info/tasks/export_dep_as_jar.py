@@ -337,7 +337,9 @@ class ExportDepAsJar(ConsoleTask):
       jarred_resources = ExportDepAsJar._zip_sources(target, resource_jar_root)
       library_entry['default'] = jarred_resources.name
     elif target_type == SourceRootTypes.RESOURCE_GENERATED:
-      library_entry.update(runtime_classpath.get_for_target(target))
+      library_entry.update(
+        [(conf, os.path.realpath(path_entry)) for conf, path_entry in runtime_classpath.get_for_target(target)]
+      )
     else:
       jar_products = runtime_classpath.get_for_target(target)
       for conf, jar_entry in jar_products:
