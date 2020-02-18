@@ -159,13 +159,18 @@ class ExportDepAsJar(ConsoleTask):
           zip_file.write(os.path.join(get_buildroot(), src_from_build_root), src_from_source_root)
     return f
 
-  def _dependencies_to_include_in_libraries(self, t, modulizable_target_set):
+  def _dependencies_to_include_in_libraries(self, t, modulizable_target_set, dependencies_needed_in_classpath):
+    """
+    NB: We need to pass dependencies_needed_in_classpath here to make sure we're being strict_deps-aware
+        when computing the dependencies.
+    """
+
     dependencies_to_include = []
     self.context.build_graph.walk_transitive_dependency_graph(
       [direct_dep.address for direct_dep in t.dependencies],
       # NB: Dependency graph between modulizable targets is represented with modules,
       #     so we don't need to expand those branches of the dep graph.
-      predicate=lambda dep: dep not in modulizable_target_set,
+      predicate=lambda dep: dep not in modulizable_target_set and dep in dependencies_needed_in_classpath,
       work=lambda dep: dependencies_to_include.append(dep),
     )
     return dependencies_to_include
@@ -192,9 +197,6 @@ class ExportDepAsJar(ConsoleTask):
       'scope': str(current_target.scope),
       'compiler_options': self._extract_compiler_args_from_zinc_args(compiler_options_and_plugins.get(current_target))
     }
-
-    if not current_target.is_synthetic:
-      info['globs'] = current_target.globs_relative_to_buildroot()
 
     def iter_transitive_jars(jar_lib):
       """
@@ -226,8 +228,19 @@ class ExportDepAsJar(ConsoleTask):
         libraries.add(target.id)
       return libraries
 
+    if not current_target.is_synthetic:
+      info['globs'] = current_target.globs_relative_to_buildroot()
+
+    def _dependencies_needed_in_classpath(target):
+      if isinstance(target, JvmTarget):
+        return DependencyContext.global_instance().dependencies_respecting_strict_deps(target)
+      else:
+        return DependencyContext.global_instance().all_dependencies(target)
+
+    dependencies_needed_in_classpath = _dependencies_needed_in_classpath(current_target)
+
     libraries_for_target = set([self._jar_id(jar) for jar in iter_transitive_jars(current_target)])
-    for dep in self._dependencies_to_include_in_libraries(current_target, modulizable_target_set):
+    for dep in self._dependencies_to_include_in_libraries(current_target, modulizable_target_set, dependencies_needed_in_classpath):
       libraries_for_target.update(_full_library_set_for_target(dep))
     info['libraries'].extend(libraries_for_target)
 
