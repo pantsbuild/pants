@@ -611,3 +611,14 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
       'org.apache:apache-jar:12.12.2012',
       result['targets'][spec]['libraries']
     )
+
+  def test_libraries_respect_strict_deps(self):
+    enabled_spec = self.strict_deps_enabled.address.spec
+    enabled_result = self.execute_export_json(enabled_spec)['targets'][enabled_spec]
+    disabled_spec = self.strict_deps_disabled.address.spec
+    disabled_result = self.execute_export_json(disabled_spec)['targets'][disabled_spec]
+
+    dependency_library_entry = self.jvm_target_with_sources.address.spec.replace(":", ".")
+
+    assert dependency_library_entry in disabled_result['libraries']
+    assert dependency_library_entry not in enabled_result['libraries']
