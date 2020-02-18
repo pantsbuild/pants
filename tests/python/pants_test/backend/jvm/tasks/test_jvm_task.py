@@ -6,6 +6,7 @@ import unittest.mock
 
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform, JvmPlatformSettings
 from pants.backend.jvm.targets.jvm_target import JvmTarget
+from pants.backend.jvm.targets.runtime_platform_mixin import RuntimePlatformMixin
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.testutil.jvm.jvm_task_test_base import JvmTaskTestBase
@@ -52,7 +53,7 @@ class JvmTaskTest(JvmTaskTestBase):
 
   def test_distribution_from_jvm_platform_passed_through(self):
     fake_dist = "a dist"
-    platforms = [JvmPlatformSettings('8', '8', [])]
+    platforms = [JvmPlatformSettings('8', '8', [], [])]
     with unittest.mock.patch.object(JvmPlatform, 'preferred_jvm_distribution') as plat_mock:
       plat_mock.return_value = fake_dist
       dist = self.task.preferred_jvm_distribution(platforms)
@@ -62,7 +63,7 @@ class JvmTaskTest(JvmTaskTestBase):
 
   def test_distribution_from_targets_passes_through_platforms(self):
     fake_dist = "a dist"
-    java8_platform = JvmPlatformSettings('8', '8', [])
+    java8_platform = JvmPlatformSettings('8', '8', [], [])
     targets = [self.make_target('platformed_target', JvmTarget, platform='java8')]
     with unittest.mock.patch.object(JvmPlatform, 'preferred_jvm_distribution') as plat_mock:
       with unittest.mock.patch.object(JvmPlatform.global_instance(), 'get_platform_for_target') as \
@@ -74,3 +75,32 @@ class JvmTaskTest(JvmTaskTestBase):
 
         plat_mock.assert_called_once_with([java8_platform], strict=False, jdk=False)
         self.assertEqual(fake_dist, dist)
+
+  def test_runtime_platforms_for_targets(self):
+    java8_platform = JvmPlatformSettings('8', '8', [], [])
+    class OneOffTarget(JvmTarget):
+      def __init__(self, platform):
+        self._platform = platform
+
+      @property
+      def platform(self):
+        return self._platform
+
+    class OneOffRuntimePlatformTarget(RuntimePlatformMixin, JvmTarget):
+      def __init__(self, runtime_platform):
+        self._runtime_platform = runtime_platform
+
+      @property
+      def runtime_platform(self):
+        return self._runtime_platform
+
+    with unittest.mock.patch.object(JvmPlatform, 'default_runtime_platform',
+      new_callable=unittest.mock.PropertyMock) as plat_mock:
+      plat_mock.return_value = "default-platform"
+
+      targets = [OneOffTarget(java8_platform), OneOffRuntimePlatformTarget(java8_platform)]
+      self.assertEqual([java8_platform, java8_platform],
+        self.task.runtime_platforms_for_targets(targets))
+
+      self.assertEqual([JvmPlatform.default_runtime_platform],
+        self.task.runtime_platforms_for_targets([]))

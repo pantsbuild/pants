@@ -320,7 +320,8 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
               distribution=distribution,
               classpath=complete_classpath,
               main=JUnit.RUNNER_MAIN,
-              jvm_options=self.jvm_options + list(platform.args) + extra_jvm_options + list(target_jvm_options),
+              jvm_options=self.jvm_options + list(platform.jvm_options) + extra_jvm_options + list(
+                target_jvm_options),
               args=args + batch_tests,
               workunit_factory=self.context.new_workunit,
               workunit_name='run',

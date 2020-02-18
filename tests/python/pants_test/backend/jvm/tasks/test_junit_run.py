@@ -228,7 +228,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
       """))], target_name='tests/java/org/pantsbuild/foo:foo_test')
 
   @ensure_cached(JUnitRun, expected_num_artifacts=1)
-  def test_junit_runner_runtime_platform_args(self):
+  def test_junit_runner_runtime_platform_jvm_options(self):
     self.make_target(
       spec='tests/java/org/pantsbuild/foo:foo_test',
       target_type=JUnitTests,
@@ -245,7 +245,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
           'java8-extra': {
           'source': '8',
           'target': '8',
-          'args': ['-Dexample.property=1'] },})
+          'jvm_options': ['-Dexample.property=1'] },})
     self._execute_junit_runner([('FooTest.java', dedent("""
         package org.pantsbuild.foo;
         import org.junit.Test;

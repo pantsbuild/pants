@@ -1,7 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
+from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform, JvmPlatformSettings
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.runtime_platform_mixin import RuntimePlatformMixin
 from pants.base.payload import Payload
@@ -139,3 +139,41 @@ class JvmPlatformTest(TestBase):
             'target-runtime-platform')
     assert (instance.get_runtime_platform_for_target(
       synth_just_platform_with_parent_same).name == 'default-platform')
+
+  def test_jvm_options(self):
+    init_subsystem(JvmPlatform, options={
+      'jvm-platform': {
+        'platforms': {
+          'platform-with-jvm-options': {'target': '8', 'jvm_options':['-Dsomething']},
+          'platform-without-jvm-options': {'target': '8'},
+          'platform-with-jvm-options-needing-shlex': {'target': '8',
+            'jvm_options':['-Dsomething -Dsomethingelse']},
+        },
+      }
+    })
+    instance = JvmPlatform.global_instance()
+    with_options = instance.get_platform_by_name('platform-with-jvm-options')
+    without_options = instance.get_platform_by_name('platform-without-jvm-options')
+    need_shlex_options = instance.get_platform_by_name('platform-with-jvm-options-needing-shlex')
+    assert ('-Dsomething',) == with_options.jvm_options
+    assert tuple() == without_options.jvm_options
+    assert ('-Dsomething', '-Dsomethingelse') == need_shlex_options.jvm_options
+
+  def test_compile_setting_equivalence(self):
+    assert (JvmPlatformSettings('11', '11', ['-Xfoo:bar'], []) ==
+            JvmPlatformSettings('11', '11', ['-Xfoo:bar'], []))
+    assert (JvmPlatformSettings('11', '11', [], ['-Xfoo:bar -Xbaz']) ==
+            JvmPlatformSettings('11', '11', [], ['-Xfoo:bar', '-Xbaz']))
+
+  def test_compile_setting_inequivalence(self):
+    assert (JvmPlatformSettings('11', '11', ['-Xfoo:bar'], []) !=
+            JvmPlatformSettings('11', '12', ['-Xfoo:bar'], []))
+
+    assert (JvmPlatformSettings('11', '11', ['-Xfoo:bar'], []) !=
+      JvmPlatformSettings('11', '11', ['-Xbar:foo'], []))
+
+    assert (JvmPlatformSettings('9', '11', ['-Xfoo:bar'], []) !=
+      JvmPlatformSettings('11', '11', ['-Xfoo:bar'], []))
+
+    assert (JvmPlatformSettings('11', '11', [], ['-Xvmsomething']) !=
+            JvmPlatformSettings('11', '11', [], []))

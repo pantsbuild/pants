@@ -9,13 +9,49 @@ from pants.base.revision import Revision
 from pants.java.distribution.distribution import DistributionLocator
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method, memoized_property
+from pants.util.strutil import safe_shlex_split
 
 
 logger = logging.getLogger(__name__)
 
 
+def flatten_and_shlex(list_of_shell):
+  ret = []
+  for elem in list_of_shell or ():
+    ret.extend(safe_shlex_split(elem))
+  return ret
+
+
 class JvmPlatform(Subsystem):
-  """Used to keep track of repo compile and runtime settings for jvm targets."""
+  """Used to keep track of repo compile and runtime settings for jvm targets.
+
+  JvmPlatform covers both compile time and runtime jvm platform settings. A platform is a group of
+  compile time and runtime configurations.
+
+  For compile time configuration, there are three main attributes, `source`, `target` and `args`.
+  `source` and `target` map directly to the javac arguments of the same name, though they accept
+   more aliases than javac. `args`, allows the platform to specify additional, global to that
+   platform, compile arguments.
+
+  For runtime configuration, `target` and `jvm_options` are used. `target` is used to determine the
+  version of the JVM to use. `jvm_options` is used by some tasks to allow platforms to specify
+  platform specific JVM options. These can make transitions between JVM versions smoother by
+  allowing compatibility options to be provided globally.
+
+  An example pants.toml config might look like this:
+
+      [jvm-platform]
+      default_platform: java8
+      default_runtime_platform: java10
+      platforms =
+      \"\"\"
+       {
+          'java8': { 'source': '8', 'target': '8', 'args': [] },
+          'java10': {'source': '10', 'target': '10', 'args': [],
+                     'jvm_options': ['-Djava.compat.foo=act-like-java-8'] },
+        }
+     \"\"\"
+  """
 
   # NB: These assume a java version number N can be specified as either 'N' or '1.N'
   # (eg, '7' is equivalent to '1.7'). Java stopped following this convention starting with Java 9,
@@ -70,6 +106,7 @@ class JvmPlatform(Subsystem):
     return JvmPlatformSettings(platform.get('source', platform.get('target')),
                                platform.get('target', platform.get('source')),
                                platform.get('args', ()),
+                               platform.get('jvm_options', ()),
                                name=name)
 
   @classmethod
@@ -106,7 +143,7 @@ class JvmPlatform(Subsystem):
     source_level = JvmPlatform.parse_java_version(DistributionLocator.cached().version)
     target_level = source_level
     platform_name = f'(DistributionLocator.cached().version {source_level})'
-    return JvmPlatformSettings(source_level, target_level, [], name=platform_name)
+    return JvmPlatformSettings(source_level, target_level, [], [], name=platform_name)
 
   @memoized_property
   def default_platform(self):
@@ -226,17 +263,19 @@ class JvmPlatformSettings:
   class IllegalSourceTargetCombination(TaskError):
     """Illegal pair of -source and -target flags to compile java."""
 
-  def __init__(self, source_level, target_level, args, name=None, by_default=False):
+  def __init__(self, source_level, target_level, args, jvm_options, name=None, by_default=False):
     """
     :param source_level: Revision object or string for the java source level.
     :param target_level: Revision object or string for the java target level.
     :param list args: Additional arguments to pass to the java compiler.
+    :param list jvm_options: Additional jvm options specific to this JVM platform.
     :param str name: name to identify this platform.
     :param by_default: True if this value was inferred by omission of a specific platform setting.
     """
     self.source_level = JvmPlatform.parse_java_version(source_level)
     self.target_level = JvmPlatform.parse_java_version(target_level)
     self.args = tuple(args or ())
+    self.jvm_options = tuple(flatten_and_shlex(jvm_options or ()))
     self.name = name
     self._by_default = by_default
     self._validate_source_target()
@@ -262,6 +301,7 @@ class JvmPlatformSettings:
     yield self.source_level
     yield self.target_level
     yield self.args
+    yield self.jvm_options
 
   def __eq__(self, other):
     return tuple(self) == tuple(other)
