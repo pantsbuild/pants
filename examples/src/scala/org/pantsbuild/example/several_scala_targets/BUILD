@@ -17,3 +17,18 @@ scala_library(
   name='greeting_everybody',
   sources=['greeting_everybody.scala'],
 )
+scala_library(
+  name='greet_json',
+  dependencies=[
+    'examples/src/scala/org/pantsbuild/example/several_scala_targets/node:names_to_greet',
+  ],
+  sources=['GreetingJsonNames.scala'],
+)
+
+jvm_binary(
+  name="greet_binary",
+  dependencies=[
+    'examples/src/scala/org/pantsbuild/example/several_scala_targets:greet_json',
+  ],
+  main='org.pantsbuild.example.several_scala_targets.greet_json_names.GreetingJsonNames',
+)
