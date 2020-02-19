@@ -52,9 +52,12 @@ target(
     'src/python/pants/backend/jvm:plugin',
     'src/python/pants/backend/project_info:plugin',
     'src/python/pants/backend/python:plugin',
+    'src/python/pants/backend/python/lint/bandit',
     'src/python/pants/backend/python/lint/black',
+    'src/python/pants/backend/python/lint/docformatter',
     'src/python/pants/backend/python/lint/flake8',
     'src/python/pants/backend/python/lint/isort',
+    'src/python/pants/backend/python/lint/pylint',
     'src/python/pants/backend/native',
   ],
 )
