@@ -226,8 +226,8 @@ class UnmatchedTargetAddressError(ResolveError):
 @rule
 async def addresses_with_origins_from_address_families(
   address_mapper: AddressMapper,
-    address_specs: AddressSpecs,
-    unmatched_behavior: UnmatchedAddressSpecBehavior,
+  address_specs: AddressSpecs,
+  unmatched_behavior: UnmatchedAddressSpecBehavior,
 ) -> AddressesWithOrigins:
   """Given an AddressMapper and list of AddressSpecs, return matching AddressesWithOrigins.
 
