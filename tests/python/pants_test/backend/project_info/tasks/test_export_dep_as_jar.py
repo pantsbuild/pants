@@ -632,7 +632,9 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
     disabled_spec = self.strict_deps_disabled.address.spec
     disabled_result = self.execute_export_json(disabled_spec)['targets'][disabled_spec]
 
-    dependency_library_entry = self.jvm_target_with_sources.address.spec.replace(":", ".")
+    # Both the targets under test transitively depend on this target
+    # but it shouldn't be included in the strict deps case.
+    transitive_dependency_library_entry = self.jvm_target_with_sources.id
 
-    assert dependency_library_entry in disabled_result['libraries']
-    assert dependency_library_entry not in enabled_result['libraries']
+    assert transitive_dependency_library_entry in disabled_result['libraries']
+    assert transitive_dependency_library_entry not in enabled_result['libraries']
