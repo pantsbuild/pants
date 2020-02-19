@@ -133,8 +133,8 @@ class ClassPropertyTest(TestBase):
     self.assertTrue(hasattr(WithProp(), 'class_property'))
 
   def test_docstring(self):
-    self.assertEqual("class_property docs", WithProp.__dict__['class_property'].__doc__)
-    self.assertEqual("static_property docs", WithProp.__dict__['static_property'].__doc__)
+    self.assertEqual("class_property docs.", WithProp.__dict__['class_property'].__doc__)
+    self.assertEqual("static_property docs.", WithProp.__dict__['static_property'].__doc__)
 
   def test_override_value(self):
     self.assertEqual('val1', OverridingValueField.class_property)
