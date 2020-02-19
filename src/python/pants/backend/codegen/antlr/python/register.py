@@ -7,13 +7,10 @@ from pants.goal.task_registrar import TaskRegistrar as task
 
 
 def build_file_aliases():
-  return BuildFileAliases(
-    targets={
-      'python_antlr_library': PythonAntlrLibrary,
-    }
-  )
+    return BuildFileAliases(targets={"python_antlr_library": PythonAntlrLibrary,})
 
 
 def register_goals():
-  from pants.backend.codegen.antlr.python.antlr_py_gen import AntlrPyGen
-  task(name='antlr-py', action=AntlrPyGen).install('gen')
+    from pants.backend.codegen.antlr.python.antlr_py_gen import AntlrPyGen
+
+    task(name="antlr-py", action=AntlrPyGen).install("gen")

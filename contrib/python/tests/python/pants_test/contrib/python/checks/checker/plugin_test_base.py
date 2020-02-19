@@ -15,43 +15,44 @@ from pants.contrib.python.checks.checker.common import CheckstylePlugin, Nit, Py
 # TODO: Refactor this test suite to leverage the ConsoleTaskTestBase class
 # for proper integration testing (i.e. any test that runs task.execute()).
 class CheckstylePluginTestBase(unittest.TestCase):
-  plugin_type: Optional[Type[CheckstylePlugin]] = None   # Subclasses must override.
+    plugin_type: Optional[Type[CheckstylePlugin]] = None  # Subclasses must override.
 
-  @property
-  def file_required(self):
-    """Override and return `True` if the plugin needs to operate on a file on disk."""
-    return False
+    @property
+    def file_required(self):
+        """Override and return `True` if the plugin needs to operate on a file on disk."""
+        return False
 
-  def create_python_file(self, file_content):
-    if self.file_required:
-      tmpdir = safe_mkdtemp()
-      with open(os.path.join(tmpdir, 'file.py'), 'w') as fp:
-        fp.write(file_content)
-        fp.close()
-        return PythonFile.parse('file.py', root=tmpdir)
-    else:
-      return PythonFile.from_statement(file_content)
+    def create_python_file(self, file_content):
+        if self.file_required:
+            tmpdir = safe_mkdtemp()
+            with open(os.path.join(tmpdir, "file.py"), "w") as fp:
+                fp.write(file_content)
+                fp.close()
+                return PythonFile.parse("file.py", root=tmpdir)
+        else:
+            return PythonFile.from_statement(file_content)
 
-  def get_plugin(self, file_content, **options):
-    python_file = self.create_python_file(file_content)
-    full_options = copy.copy(options)
-    full_options['skip'] = False
-    options_object = create_options({'foo': full_options}).for_scope('foo')
-    return self.plugin_type(options_object, python_file)
+    def get_plugin(self, file_content, **options):
+        python_file = self.create_python_file(file_content)
+        full_options = copy.copy(options)
+        full_options["skip"] = False
+        options_object = create_options({"foo": full_options}).for_scope("foo")
+        return self.plugin_type(options_object, python_file)
 
-  def assertNit(self, file_content, expected_code, expected_severity=Nit.ERROR,
-                expected_line_number=None):
-    plugin = self.get_plugin(file_content)
-    nits = list(plugin.nits())
-    self.assertEqual(1, len(nits), 'Expected single nit, got: {}'.format(nits))
-    nit = nits[0]
-    self.assertEqual(expected_code, nit.code)
-    self.assertEqual(expected_severity, nit.severity)
-    if expected_line_number is not None:
-      self.assertEqual(expected_line_number, nit.line_number)
-    return nit
+    def assertNit(
+        self, file_content, expected_code, expected_severity=Nit.ERROR, expected_line_number=None
+    ):
+        plugin = self.get_plugin(file_content)
+        nits = list(plugin.nits())
+        self.assertEqual(1, len(nits), "Expected single nit, got: {}".format(nits))
+        nit = nits[0]
+        self.assertEqual(expected_code, nit.code)
+        self.assertEqual(expected_severity, nit.severity)
+        if expected_line_number is not None:
+            self.assertEqual(expected_line_number, nit.line_number)
+        return nit
 
-  def assertNoNits(self, file_content):
-    plugin = self.get_plugin(file_content)
-    nits = list(plugin.nits())
-    self.assertEqual([], nits)
+    def assertNoNits(self, file_content):
+        plugin = self.get_plugin(file_content)
+        nits = list(plugin.nits())
+        self.assertEqual([], nits)

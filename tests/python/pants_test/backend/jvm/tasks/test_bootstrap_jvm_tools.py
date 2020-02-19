@@ -19,138 +19,151 @@ from pants.util.contextutil import open_zip
 
 
 class BootstrapJvmToolsTestBase(JvmToolTaskTestBase):
-  @contextmanager
-  def execute_tool(self, classpath, main, args=None):
-    init_subsystem(DistributionLocator)
-    executor = SubprocessExecutor(DistributionLocator.cached())
-    process = executor.spawn(classpath, main, args=args,
-                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    out, err = process.communicate()
-    self.assertEqual(0, process.returncode)
-    self.assertEqual('', err.strip().decode())
-    yield out.decode()
+    @contextmanager
+    def execute_tool(self, classpath, main, args=None):
+        init_subsystem(DistributionLocator)
+        executor = SubprocessExecutor(DistributionLocator.cached())
+        process = executor.spawn(
+            classpath, main, args=args, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
+        out, err = process.communicate()
+        self.assertEqual(0, process.returncode)
+        self.assertEqual("", err.strip().decode())
+        yield out.decode()
 
 
 class BootstrapJvmToolsShadingTest(BootstrapJvmToolsTestBase):
-  class JvmToolTask(JvmToolTaskMixin, Task):
+    class JvmToolTask(JvmToolTaskMixin, Task):
+        @classmethod
+        def register_options(cls, register):
+            super(BootstrapJvmToolsShadingTest.JvmToolTask, cls).register_options(register)
+
+            # We know this version of ant has a dependency on org.apache.ant#ant-launcher;1.9.4
+            ant_classpath = [JarDependency(org="org.apache.ant", name="ant", rev="1.9.4")]
+
+            cls.register_jvm_tool(
+                register, "ant", classpath=ant_classpath, classpath_spec="test:ant"
+            )
+            cls.register_jvm_tool(
+                register,
+                "ant-shaded",
+                classpath=ant_classpath,
+                classpath_spec="test:ant",
+                main="org.apache.tools.ant.Main",
+            )
+
+        def execute(self):
+            return self.tool_classpath("ant"), self.tool_classpath("ant-shaded")
+
     @classmethod
-    def register_options(cls, register):
-      super(BootstrapJvmToolsShadingTest.JvmToolTask, cls).register_options(register)
+    def task_type(cls):
+        return cls.JvmToolTask
 
-      # We know this version of ant has a dependency on org.apache.ant#ant-launcher;1.9.4
-      ant_classpath = [JarDependency(org='org.apache.ant', name='ant', rev='1.9.4')]
+    def test_shaded_and_unshaded(self):
+        task = self.prepare_execute(context=self.context())
+        ant_classpath, ant_shaded_classpath = task.execute()
 
-      cls.register_jvm_tool(register,
-                            'ant',
-                            classpath=ant_classpath,
-                            classpath_spec='test:ant')
-      cls.register_jvm_tool(register,
-                            'ant-shaded',
-                            classpath=ant_classpath,
-                            classpath_spec='test:ant',
-                            main='org.apache.tools.ant.Main')
+        # Verify the many jar -> 1 binary input jar for shading case is exercised.
+        self.assertEqual(2, len(ant_classpath))
+        self.assertEqual(1, len(ant_shaded_classpath))
 
-    def execute(self):
-      return self.tool_classpath('ant'), self.tool_classpath('ant-shaded')
+        # Verify both the normal and shaded tools run successfully and produce the same output.
+        def assert_run_ant_version(classpath):
+            with self.execute_tool(
+                classpath, "org.apache.tools.ant.Main", args=["-version"]
+            ) as out:
+                self.assertTrue(out.strip().startswith("Apache Ant(TM) version 1.9.4"))
 
-  @classmethod
-  def task_type(cls):
-    return cls.JvmToolTask
+        assert_run_ant_version(ant_classpath)
+        assert_run_ant_version(ant_shaded_classpath)
 
-  def test_shaded_and_unshaded(self):
-    task = self.prepare_execute(context=self.context())
-    ant_classpath, ant_shaded_classpath = task.execute()
+        # Verify that the same set of classes is encompassed by the normal and shaded tools.
+        # Further check that just the tool main package is excluded from shading.
+        def classfile_contents(classpath):
+            contents = set()
+            for jar in classpath:
+                with open_zip(jar) as zip:
+                    contents.update(name for name in zip.namelist() if name.endswith(".class"))
+            return contents
 
-    # Verify the many jar -> 1 binary input jar for shading case is exercised.
-    self.assertEqual(2, len(ant_classpath))
-    self.assertEqual(1, len(ant_shaded_classpath))
+        classfiles = classfile_contents(ant_classpath)
+        shaded_classfiles = classfile_contents(ant_shaded_classpath)
+        self.assertEqual(len(classfiles), len(shaded_classfiles))
 
-    # Verify both the normal and shaded tools run successfully and produce the same output.
-    def assert_run_ant_version(classpath):
-      with self.execute_tool(classpath, 'org.apache.tools.ant.Main', args=['-version']) as out:
-        self.assertTrue(out.strip().startswith('Apache Ant(TM) version 1.9.4'))
+        excluded_classes = classfiles.intersection(shaded_classfiles)
+        self.assertTrue(len(excluded_classes) >= 1)
+        for excluded_class in excluded_classes:
+            self.assertEqual("org/apache/tools/ant", os.path.dirname(excluded_class))
 
-    assert_run_ant_version(ant_classpath)
-    assert_run_ant_version(ant_shaded_classpath)
+        prefix_len = len(Shading.SHADE_PREFIX)
 
-    # Verify that the same set of classes is encompassed by the normal and shaded tools.
-    # Further check that just the tool main package is excluded from shading.
-    def classfile_contents(classpath):
-      contents = set()
-      for jar in classpath:
-        with open_zip(jar) as zip:
-          contents.update(name for name in zip.namelist() if name.endswith('.class'))
-      return contents
+        def strip_prefix(shaded):
+            return {classfile[prefix_len:] for classfile in shaded}
 
-    classfiles = classfile_contents(ant_classpath)
-    shaded_classfiles = classfile_contents(ant_shaded_classpath)
-    self.assertEqual(len(classfiles), len(shaded_classfiles))
-
-    excluded_classes = classfiles.intersection(shaded_classfiles)
-    self.assertTrue(len(excluded_classes) >= 1)
-    for excluded_class in excluded_classes:
-      self.assertEqual('org/apache/tools/ant', os.path.dirname(excluded_class))
-
-    prefix_len = len(Shading.SHADE_PREFIX)
-
-    def strip_prefix(shaded):
-      return {classfile[prefix_len:] for classfile in shaded}
-
-    self.assertEqual(classfiles - excluded_classes,
-                     strip_prefix(shaded_classfiles - excluded_classes))
+        self.assertEqual(
+            classfiles - excluded_classes, strip_prefix(shaded_classfiles - excluded_classes)
+        )
 
 
 class BootstrapJvmToolsOptionalTest(BootstrapJvmToolsTestBase):
-  class JvmToolTask(JvmToolTaskMixin, Task):
+    class JvmToolTask(JvmToolTaskMixin, Task):
+        @classmethod
+        def register_options(cls, register):
+            super(BootstrapJvmToolsOptionalTest.JvmToolTask, cls).register_options(register)
+            cls.register_jvm_tool(register, "plugins", classpath=[], classpath_spec="test:plugins")
+
+        def execute(self):
+            return self.tool_classpath("plugins")
+
     @classmethod
-    def register_options(cls, register):
-      super(BootstrapJvmToolsOptionalTest.JvmToolTask, cls).register_options(register)
-      cls.register_jvm_tool(register, 'plugins', classpath=[], classpath_spec='test:plugins')
+    def task_type(cls):
+        return cls.JvmToolTask
 
-    def execute(self):
-      return self.tool_classpath('plugins')
+    def test_unsupplied(self):
+        task = self.prepare_execute(context=self.context())
+        classpath = task.execute()
+        self.assertEqual([], classpath)
 
-  @classmethod
-  def task_type(cls):
-    return cls.JvmToolTask
-
-  def test_unsupplied(self):
-    task = self.prepare_execute(context=self.context())
-    classpath = task.execute()
-    self.assertEqual([], classpath)
-
-  def test_supplied(self):
-    self.make_target('test:plugins', JarLibrary, jars=[JarDependency('junit', 'junit', '4.12')])
-    task = self.prepare_execute(context=self.context())
-    classpath = task.execute()
-    with self.execute_tool(classpath, 'org.junit.runner.JUnitCore') as out:
-      self.assertIn('OK (0 tests)', out)
+    def test_supplied(self):
+        self.make_target("test:plugins", JarLibrary, jars=[JarDependency("junit", "junit", "4.12")])
+        task = self.prepare_execute(context=self.context())
+        classpath = task.execute()
+        with self.execute_tool(classpath, "org.junit.runner.JUnitCore") as out:
+            self.assertIn("OK (0 tests)", out)
 
 
 class BootstrapJvmToolsNonOptionalNoDefaultTest(BootstrapJvmToolsTestBase):
-  class JvmToolTask(JvmToolTaskMixin, Task):
+    class JvmToolTask(JvmToolTaskMixin, Task):
+        @classmethod
+        def register_options(cls, register):
+            super(BootstrapJvmToolsNonOptionalNoDefaultTest.JvmToolTask, cls).register_options(
+                register
+            )
+            cls.register_jvm_tool(register, "checkstyle", classpath_spec="test:checkstyle")
+
+        def execute(self):
+            return self.tool_classpath("checkstyle")
+
     @classmethod
-    def register_options(cls, register):
-      super(BootstrapJvmToolsNonOptionalNoDefaultTest.JvmToolTask, cls).register_options(register)
-      cls.register_jvm_tool(register, 'checkstyle', classpath_spec='test:checkstyle')
+    def task_type(cls):
+        return cls.JvmToolTask
 
-    def execute(self):
-      return self.tool_classpath('checkstyle')
+    def test_unsupplied(self):
+        with self.assertRaisesRegex(
+            BootstrapJvmTools.ToolResolveError,
+            r"\s*Failed to resolve target for tool: test:checkstyle\..*",
+        ):
+            self.execute(context=self.context())
 
-  @classmethod
-  def task_type(cls):
-    return cls.JvmToolTask
-
-  def test_unsupplied(self):
-    with self.assertRaisesRegex(BootstrapJvmTools.ToolResolveError,
-                                 r'\s*Failed to resolve target for tool: test:checkstyle\..*'):
-      self.execute(context=self.context())
-
-  def test_supplied(self):
-    self.make_target('test:checkstyle',
-                     JarLibrary,
-                     jars=[JarDependency('com.puppycrawl.tools', 'checkstyle', '6.10.1')])
-    task = self.prepare_execute(context=self.context())
-    classpath = task.execute()
-    with self.execute_tool(classpath, 'com.puppycrawl.tools.checkstyle.Main', args=['-v']) as out:
-      self.assertIn('6.10.1', out)
+    def test_supplied(self):
+        self.make_target(
+            "test:checkstyle",
+            JarLibrary,
+            jars=[JarDependency("com.puppycrawl.tools", "checkstyle", "6.10.1")],
+        )
+        task = self.prepare_execute(context=self.context())
+        classpath = task.execute()
+        with self.execute_tool(
+            classpath, "com.puppycrawl.tools.checkstyle.Main", args=["-v"]
+        ) as out:
+            self.assertIn("6.10.1", out)

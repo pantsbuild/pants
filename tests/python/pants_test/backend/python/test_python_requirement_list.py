@@ -11,41 +11,43 @@ from pants.testutil.test_base import TestBase
 
 
 class PythonRequirementListTest(TestBase):
-  @classmethod
-  def alias_groups(cls):
-    return BuildFileAliases(
-        targets={
-            'python_requirement_library': PythonRequirementLibrary,
-        },
-        objects={
-            'python_requirement': PythonRequirement,
-        },
-    )
+    @classmethod
+    def alias_groups(cls):
+        return BuildFileAliases(
+            targets={"python_requirement_library": PythonRequirementLibrary,},
+            objects={"python_requirement": PythonRequirement,},
+        )
 
-  def test_bad_list(self):
-    self.add_to_build_file(
-        'lib',
-        dedent('''
+    def test_bad_list(self):
+        self.add_to_build_file(
+            "lib",
+            dedent(
+                """
           python_requirement_library(
             name='pyunit',
             requirements=[
               'argparse==1.2.1'
             ]
           )
-        '''))
-    with self.assertRaises(TargetDefinitionException):
-      self.target('lib:pyunit')
+        """
+            ),
+        )
+        with self.assertRaises(TargetDefinitionException):
+            self.target("lib:pyunit")
 
-  def test_good_list(self):
-    self.add_to_build_file(
-        'lib',
-        dedent('''
+    def test_good_list(self):
+        self.add_to_build_file(
+            "lib",
+            dedent(
+                """
           python_requirement_library(
             name='pyunit',
             requirements=[
               python_requirement('argparse==1.2.1')
             ]
           )
-        '''))
+        """
+            ),
+        )
 
-    self.target('lib:pyunit')
+        self.target("lib:pyunit")

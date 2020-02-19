@@ -10,18 +10,18 @@ from pants.util.contextutil import temporary_dir
 
 
 def assert_rewrite(*, original: str, expected: str) -> None:
-  with temporary_dir() as tmpdir:
-    build = Path(tmpdir, "pants.ini")
-    build.write_text(original)
-    result = generate_new_config(build)
-  assert result == expected.splitlines()
+    with temporary_dir() as tmpdir:
+        build = Path(tmpdir, "pants.ini")
+        build.write_text(original)
+        result = generate_new_config(build)
+    assert result == expected.splitlines()
 
 
 def test_fully_automatable_config() -> None:
-  """We should be able to safely convert all of this config without any issues."""
-  assert_rewrite(
-    original=dedent(
-      """\
+    """We should be able to safely convert all of this config without any issues."""
+    assert_rewrite(
+        original=dedent(
+            """\
       [GLOBAL]
       bool_opt1: false
       bool_opt2: True
@@ -37,9 +37,9 @@ def test_fully_automatable_config() -> None:
       fromfile: @build-support/example.txt
       interpolation: %(foo)s/example
       """
-    ),
-    expected=dedent(
-      """\
+        ),
+        expected=dedent(
+            """\
       [GLOBAL]
       bool_opt1 = false
       bool_opt2 = true
@@ -55,15 +55,15 @@ def test_fully_automatable_config() -> None:
       fromfile = "@build-support/example.txt"
       interpolation = "%(foo)s/example"
       """
+        ),
     )
-  )
 
 
 def test_different_key_value_symbols() -> None:
-  """You can use both `:` or `=` in INI for key-value pairs."""
-  assert_rewrite(
-    original=dedent(
-      """\
+    """You can use both `:` or `=` in INI for key-value pairs."""
+    assert_rewrite(
+        original=dedent(
+            """\
       [GLOBAL]
       o1: a
       o2:  a
@@ -78,9 +78,9 @@ def test_different_key_value_symbols() -> None:
       o11 =a
       o12  =a
       """
-    ),
-    expected=dedent(
-      """\
+        ),
+        expected=dedent(
+            """\
       [GLOBAL]
       o1 = "a"
       o2 = "a"
@@ -95,15 +95,15 @@ def test_different_key_value_symbols() -> None:
       o11 = "a"
       o12 = "a"
       """
+        ),
     )
-  )
 
 
 def test_comments() -> None:
-  """We don't mess with comments."""
-  assert_rewrite(
-    original=dedent(
-      """\
+    """We don't mess with comments."""
+    assert_rewrite(
+        original=dedent(
+            """\
       [GLOBAL]
       bool_opt1: False  # Good riddance!
       bool_opt2: True
@@ -116,9 +116,9 @@ def test_comments() -> None:
       [isort]  # comments on section headers shouldn't matter because we don't convert sections
       config: .isort.cfg
       """
-    ),
-    expected=dedent(
-      """\
+        ),
+        expected=dedent(
+            """\
       [GLOBAL]
       bool_opt1: False  # Good riddance!
       bool_opt2 = true
@@ -131,19 +131,19 @@ def test_comments() -> None:
       [isort]  # comments on section headers shouldn't matter because we don't convert sections
       config = ".isort.cfg"
       """
+        ),
     )
-  )
 
 
 def test_list_options() -> None:
-  """We can safely update one-line lists.
+    """We can safely update one-line lists.
 
-  The list members will already be correctly quoted for us. All that we need to update is the
-  option->key symbol and simple `+` adds and `-` removes.
-  """
-  assert_rewrite(
-    original=dedent(
-      """\
+    The list members will already be correctly quoted for us. All that we need to update is the
+    option->key symbol and simple `+` adds and `-` removes.
+    """
+    assert_rewrite(
+        original=dedent(
+            """\
       [GLOBAL]
       l1: []
       l2: [0, 1]
@@ -157,9 +157,9 @@ def test_list_options() -> None:
       l10: [0, 1]  # comment
       l11: [0, 1]  ; comment
       """
-    ),
-    expected=dedent(
-      """\
+        ),
+        expected=dedent(
+            """\
       [GLOBAL]
       l1 = []
       l2 = [0, 1]
@@ -173,16 +173,16 @@ def test_list_options() -> None:
       l10: [0, 1]  # comment
       l11: [0, 1]  ; comment
       """
+        ),
     )
-  )
 
 
 def test_dict_options() -> None:
-  """We can safely preserve one-line dict values, which only need to be wrapped in quotes to work
-  properly."""
-  assert_rewrite(
-    original=dedent(
-      """\
+    """We can safely preserve one-line dict values, which only need to be wrapped in quotes to work
+    properly."""
+    assert_rewrite(
+        original=dedent(
+            """\
       [GLOBAL]
       d1: {}
       d2: {"a": 0}
@@ -192,9 +192,9 @@ def test_dict_options() -> None:
       d6: {"a": 0}  # comment
       d7: {"a": 0}  ; comment
       """
-    ),
-    expected=dedent(
-      """\
+        ),
+        expected=dedent(
+            """\
       [GLOBAL]
       d1 = \"""{}\"""
       d2 = \"""{"a": 0}\"""
@@ -204,14 +204,14 @@ def test_dict_options() -> None:
       d6: {"a": 0}  # comment
       d7: {"a": 0}  ; comment
       """
+        ),
     )
-  )
 
 
 def test_multiline_options_ignored() -> None:
-  """Don't mess with multiline options, which are too difficult to get right."""
-  original = dedent(
-    """\
+    """Don't mess with multiline options, which are too difficult to get right."""
+    original = dedent(
+        """\
     [GLOBAL]
     multiline_string: in a galaxy far,
        far, away...
@@ -227,5 +227,5 @@ def test_multiline_options_ignored() -> None:
         'a': 0,
       }
     """
-  )
-  assert_rewrite(original=original, expected=original)
+    )
+    assert_rewrite(original=original, expected=original)

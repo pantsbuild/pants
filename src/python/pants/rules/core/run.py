@@ -18,65 +18,70 @@ from pants.util.contextutil import temporary_dir
 
 
 class RunOptions(GoalSubsystem):
-  """Runs a runnable target."""
-  name = 'run'
+    """Runs a runnable target."""
 
-  # NB: To be runnable, you must be a BinaryTarget.
-  required_union_implementations = (BinaryTarget,)
+    name = "run"
 
-  @classmethod
-  def register_options(cls, register) -> None:
-    super().register_options(register)
-    register(
-      '--args', type=list, member_type=shell_str, fingerprint=True,
-      help="Arguments to pass directly to the executed target, e.g. "
-           "`--run-args=\"val1 val2 --debug\"`",
-    )
+    # NB: To be runnable, you must be a BinaryTarget.
+    required_union_implementations = (BinaryTarget,)
+
+    @classmethod
+    def register_options(cls, register) -> None:
+        super().register_options(register)
+        register(
+            "--args",
+            type=list,
+            member_type=shell_str,
+            fingerprint=True,
+            help="Arguments to pass directly to the executed target, e.g. "
+            '`--run-args="val1 val2 --debug"`',
+        )
 
 
 class Run(Goal):
-  subsystem_cls = RunOptions
+    subsystem_cls = RunOptions
 
 
 @goal_rule
 async def run(
-  console: Console,
-  workspace: Workspace,
-  runner: InteractiveRunner,
-  build_root: BuildRoot,
-  addresses: Addresses,
-  options: RunOptions,
+    console: Console,
+    workspace: Workspace,
+    runner: InteractiveRunner,
+    build_root: BuildRoot,
+    addresses: Addresses,
+    options: RunOptions,
 ) -> Run:
-  address = addresses.expect_single()
-  binary = await Get[CreatedBinary](Address, address)
+    address = addresses.expect_single()
+    binary = await Get[CreatedBinary](Address, address)
 
-  with temporary_dir(root_dir=PurePath(build_root.path, ".pants.d").as_posix(), cleanup=True) as tmpdir:
-    path_relative_to_build_root = PurePath(tmpdir).relative_to(build_root.path).as_posix()
-    workspace.materialize_directory(
-      DirectoryToMaterialize(binary.digest, path_prefix=path_relative_to_build_root)
-    )
+    with temporary_dir(
+        root_dir=PurePath(build_root.path, ".pants.d").as_posix(), cleanup=True
+    ) as tmpdir:
+        path_relative_to_build_root = PurePath(tmpdir).relative_to(build_root.path).as_posix()
+        workspace.materialize_directory(
+            DirectoryToMaterialize(binary.digest, path_prefix=path_relative_to_build_root)
+        )
 
-    console.write_stdout(f"Running target: {address}\n")
-    full_path = PurePath(tmpdir, binary.binary_name).as_posix()
-    run_request = InteractiveProcessRequest(
-      argv=(full_path, *options.values.args),
-      run_in_workspace=True,
-    )
+        console.write_stdout(f"Running target: {address}\n")
+        full_path = PurePath(tmpdir, binary.binary_name).as_posix()
+        run_request = InteractiveProcessRequest(
+            argv=(full_path, *options.values.args), run_in_workspace=True,
+        )
 
-    try:
-      result = runner.run_local_interactive_process(run_request)
-      exit_code = result.process_exit_code
-      if result.process_exit_code == 0:
-        console.write_stdout(f"{address} ran successfully.\n")
-      else:
-        console.write_stderr(f"{address} failed with code {result.process_exit_code}!\n")
+        try:
+            result = runner.run_local_interactive_process(run_request)
+            exit_code = result.process_exit_code
+            if result.process_exit_code == 0:
+                console.write_stdout(f"{address} ran successfully.\n")
+            else:
+                console.write_stderr(f"{address} failed with code {result.process_exit_code}!\n")
 
-    except Exception as e:
-      console.write_stderr(f"Exception when attempting to run {address}: {e!r}\n")
-      exit_code = -1
+        except Exception as e:
+            console.write_stderr(f"Exception when attempting to run {address}: {e!r}\n")
+            exit_code = -1
 
-  return Run(exit_code)
+    return Run(exit_code)
 
 
 def rules():
-  return [run]
+    return [run]

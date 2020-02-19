@@ -12,22 +12,23 @@ from pants.testutil.jvm.nailgun_task_test_base import NailgunTaskTestBase
 
 
 class AntlrPyGenTest(NailgunTaskTestBase):
-  @classmethod
-  def task_type(cls):
-    return AntlrPyGen
+    @classmethod
+    def task_type(cls):
+        return AntlrPyGen
 
-  @classmethod
-  def alias_groups(cls):
-    return super().alias_groups().merge(BuildFileAliases(
-      targets={
-        'python_antlr_library': PythonAntlrLibrary,
-      },
-    ))
+    @classmethod
+    def alias_groups(cls):
+        return (
+            super()
+            .alias_groups()
+            .merge(BuildFileAliases(targets={"python_antlr_library": PythonAntlrLibrary,},))
+        )
 
-  def test_antlr_py_gen(self):
-    self.create_file(
-      relpath='foo/bar/baz/Baz.g',
-      contents=dedent("""
+    def test_antlr_py_gen(self):
+        self.create_file(
+            relpath="foo/bar/baz/Baz.g",
+            contents=dedent(
+                """
         grammar Baz;
 
         options {
@@ -43,28 +44,38 @@ class AntlrPyGenTest(NailgunTaskTestBase):
         ID : 'a'..'z'+;
         INT : '0'..'9'+;
         WS : (' '|'\n') {$channel=HIDDEN;} ;
-      """))
+      """
+            ),
+        )
 
-    self.add_to_build_file('foo/bar/baz/BUILD', dedent("""
+        self.add_to_build_file(
+            "foo/bar/baz/BUILD",
+            dedent(
+                """
         python_antlr_library(
           name='baz',
           module='foo.bar.baz',
           sources=['Baz.g'],
         )
-      """))
+      """
+            ),
+        )
 
-    target = self.target('foo/bar/baz')
-    context = self.context(target_roots=[target])
-    task = self.prepare_execute(context)
-    target_workdir = self.test_workdir
+        target = self.target("foo/bar/baz")
+        context = self.context(target_roots=[target])
+        task = self.prepare_execute(context)
+        target_workdir = self.test_workdir
 
-    # Generate code, then create a synthetic target.
-    task.execute_codegen(target, target_workdir)
-    actual_sources = {s for s in Fileset.rglobs('*.py', root=target_workdir)}
-    self.assertSetEqual({
-      'foo/__init__.py',
-      'foo/bar/__init__.py',
-      'foo/bar/baz/__init__.py',
-      'foo/bar/baz/BazParser.py',
-      'foo/bar/baz/BazLexer.py',
-    }, actual_sources)
+        # Generate code, then create a synthetic target.
+        task.execute_codegen(target, target_workdir)
+        actual_sources = {s for s in Fileset.rglobs("*.py", root=target_workdir)}
+        self.assertSetEqual(
+            {
+                "foo/__init__.py",
+                "foo/bar/__init__.py",
+                "foo/bar/baz/__init__.py",
+                "foo/bar/baz/BazParser.py",
+                "foo/bar/baz/BazLexer.py",
+            },
+            actual_sources,
+        )

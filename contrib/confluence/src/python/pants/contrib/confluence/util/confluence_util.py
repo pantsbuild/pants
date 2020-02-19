@@ -10,7 +10,6 @@ from xmlrpc.client import Binary
 from xmlrpc.client import Error as XMLRPCError
 from xmlrpc.client import ServerProxy
 
-
 log = logging.getLogger(__name__)
 
 
@@ -24,157 +23,156 @@ mimetypes.init()
 
 
 class ConfluenceError(Exception):
-  """Indicates a problem performing an action with confluence."""
+    """Indicates a problem performing an action with confluence."""
 
 
 class Confluence:
-  """Interface for fetching and storing data in confluence."""
+    """Interface for fetching and storing data in confluence."""
 
-  def __init__(self, api_entrypoint, server_url, session_token, content_format='markdown'):
-    """Initialize with an established confluence connection."""
-    self._api_entrypoint = api_entrypoint
-    self._server_url = server_url
-    self._session_token = session_token
-    self._content_format = content_format
+    def __init__(self, api_entrypoint, server_url, session_token, content_format="markdown"):
+        """Initialize with an established confluence connection."""
+        self._api_entrypoint = api_entrypoint
+        self._server_url = server_url
+        self._session_token = session_token
+        self._content_format = content_format
 
-  @staticmethod
-  def login(confluence_url, user=None, api_entrypoint='confluence2'):
-    """Prompts the user to log in to confluence, and returns a Confluence object.
+    @staticmethod
+    def login(confluence_url, user=None, api_entrypoint="confluence2"):
+        """Prompts the user to log in to confluence, and returns a Confluence object.
 
-    :param confluence_url: Base url of wiki, e.g. https://confluence.atlassian.com/
-    :param user: Username
-    :param api_entrypoint: 'confluence1' or None results in Confluence 3.x. The default
-                           value is 'confluence2' which results in Confluence 4.x or 5.x
-    :rtype: returns a connected Confluence instance
-    raises ConfluenceError if login is unsuccessful.
-    """
-    server = ServerProxy(confluence_url + '/rpc/xmlrpc')
-    user = user or getpass.getuser()
-    password = getpass.getpass(f'Please enter confluence password for {user}: ')
+        :param confluence_url: Base url of wiki, e.g. https://confluence.atlassian.com/
+        :param user: Username
+        :param api_entrypoint: 'confluence1' or None results in Confluence 3.x. The default
+                               value is 'confluence2' which results in Confluence 4.x or 5.x
+        :rtype: returns a connected Confluence instance
+        raises ConfluenceError if login is unsuccessful.
+        """
+        server = ServerProxy(confluence_url + "/rpc/xmlrpc")
+        user = user or getpass.getuser()
+        password = getpass.getpass(f"Please enter confluence password for {user}: ")
 
-    if api_entrypoint in (None, 'confluence1'):
-      # TODO(???) didn't handle this JSirois review comment:
-      #   Can you just switch on in create_html_page?
-      #   Alternatively store a lambda here in each branch.
-      api = server.confluence1
-      fmt = 'markdown'
-    elif api_entrypoint == 'confluence2':
-      api = server.confluence2
-      fmt = 'xhtml'
-    else:
-      raise ConfluenceError(f"Don't understand api_entrypoint {api_entrypoint}")
+        if api_entrypoint in (None, "confluence1"):
+            # TODO(???) didn't handle this JSirois review comment:
+            #   Can you just switch on in create_html_page?
+            #   Alternatively store a lambda here in each branch.
+            api = server.confluence1
+            fmt = "markdown"
+        elif api_entrypoint == "confluence2":
+            api = server.confluence2
+            fmt = "xhtml"
+        else:
+            raise ConfluenceError(f"Don't understand api_entrypoint {api_entrypoint}")
 
-    try:
-      return Confluence(api, confluence_url, api.login(user, password), fmt)
-    except XMLRPCError as e:
-      raise ConfluenceError(f'Failed to log in to {confluence_url}: {e!r}')
+        try:
+            return Confluence(api, confluence_url, api.login(user, password), fmt)
+        except XMLRPCError as e:
+            raise ConfluenceError(f"Failed to log in to {confluence_url}: {e!r}")
 
-  @staticmethod
-  def get_url(server_url, wiki_space, page_title):
-    """return the url for a confluence page in a given space and with a given title."""
-    return f'{server_url}/display/{wiki_space}/{quote_plus(page_title)}'
+    @staticmethod
+    def get_url(server_url, wiki_space, page_title):
+        """return the url for a confluence page in a given space and with a given title."""
+        return f"{server_url}/display/{wiki_space}/{quote_plus(page_title)}"
 
-  def logout(self):
-    """Terminates the session and connection to the server.
+    def logout(self):
+        """Terminates the session and connection to the server.
 
-    Upon completion, the invoking instance is no longer usable to communicate with confluence.
-    """
-    self._api_entrypoint.logout(self._session_token)
+        Upon completion, the invoking instance is no longer usable to communicate with confluence.
+        """
+        self._api_entrypoint.logout(self._session_token)
 
-  def getpage(self, wiki_space, page_title):
-    """Fetches a page object.
+    def getpage(self, wiki_space, page_title):
+        """Fetches a page object.
 
-    Returns None if the page does not exist or otherwise could not be fetched.
-    """
-    try:
-      return self._api_entrypoint.getPage(self._session_token, wiki_space, page_title)
-    except XMLRPCError as e:
-      log.warning(f'Failed to fetch page {page_title}: {e!r}')
-      return None
+        Returns None if the page does not exist or otherwise could not be fetched.
+        """
+        try:
+            return self._api_entrypoint.getPage(self._session_token, wiki_space, page_title)
+        except XMLRPCError as e:
+            log.warning(f"Failed to fetch page {page_title}: {e!r}")
+            return None
 
-  def storepage(self, page):
-    """Stores a page object, updating the page if it already exists.
+    def storepage(self, page):
+        """Stores a page object, updating the page if it already exists.
 
-    returns the stored page, or None if the page could not be stored.
-    """
-    try:
-      return self._api_entrypoint.storePage(self._session_token, page)
-    except XMLRPCError as e:
-      title = page.get('title', '[unknown title]')
-      log.error(f'Failed to store page {title}: {e!r}')
-      return None
+        returns the stored page, or None if the page could not be stored.
+        """
+        try:
+            return self._api_entrypoint.storePage(self._session_token, page)
+        except XMLRPCError as e:
+            title = page.get("title", "[unknown title]")
+            log.error(f"Failed to store page {title}: {e!r}")
+            return None
 
-  def removepage(self, page):
-    """Deletes a page from confluence.
+    def removepage(self, page):
+        """Deletes a page from confluence.
 
-    raises ConfluenceError if the page could not be removed.
-    """
-    try:
-      self._api_entrypoint.removePage(self._session_token, page)
-    except XMLRPCError as e:
-      raise ConfluenceError(f'Failed to delete page: {e!r}')
+        raises ConfluenceError if the page could not be removed.
+        """
+        try:
+            self._api_entrypoint.removePage(self._session_token, page)
+        except XMLRPCError as e:
+            raise ConfluenceError(f"Failed to delete page: {e!r}")
 
-  def create(self, space, title, content, parent_page=None, **pageoptions):
-    """Create a new confluence page with the given title and content.
+    def create(self, space, title, content, parent_page=None, **pageoptions):
+        """Create a new confluence page with the given title and content.
 
-    Additional page options available in the xmlrpc api can be specified as kwargs. returns the
-    created page or None if the page could not be stored. raises ConfluenceError if a parent page
-    was specified but could not be found.
-    """
+        Additional page options available in the xmlrpc api can be specified as kwargs. returns the
+        created page or None if the page could not be stored. raises ConfluenceError if a parent
+        page was specified but could not be found.
+        """
 
-    pagedef = dict(
-      space = space,
-      title = title,
-      url = Confluence.get_url(self._server_url, space, title),
-      content = content,
-      contentStatus = 'current',
-      current = True
-    )
-    pagedef.update(**pageoptions)
+        pagedef = dict(
+            space=space,
+            title=title,
+            url=Confluence.get_url(self._server_url, space, title),
+            content=content,
+            contentStatus="current",
+            current=True,
+        )
+        pagedef.update(**pageoptions)
 
-    if parent_page:
-      # Get the parent page id.
-      parent_page_obj = self.getpage(space, parent_page)
-      if parent_page_obj is None:
-        raise ConfluenceError(f'Failed to find parent page {parent_page} in space {space}')
-      pagedef['parentId'] = parent_page_obj['id']
+        if parent_page:
+            # Get the parent page id.
+            parent_page_obj = self.getpage(space, parent_page)
+            if parent_page_obj is None:
+                raise ConfluenceError(f"Failed to find parent page {parent_page} in space {space}")
+            pagedef["parentId"] = parent_page_obj["id"]
 
-    # Now create the page
-    return self.storepage(pagedef)
+        # Now create the page
+        return self.storepage(pagedef)
 
-  def create_html_page(self, space, title, html, parent_page=None, **pageoptions):
-    if self._content_format == 'markdown':
-      content = '{html}\n\n%s\n\n{html}' % html
-    elif self._content_format == 'xhtml':
-      content = f'''<ac:macro ac:name="html">
+    def create_html_page(self, space, title, html, parent_page=None, **pageoptions):
+        if self._content_format == "markdown":
+            content = "{html}\n\n%s\n\n{html}" % html
+        elif self._content_format == "xhtml":
+            content = f"""<ac:macro ac:name="html">
           <ac:plain-text-body><![CDATA[{html}]]></ac:plain-text-body>
-          </ac:macro>'''
-    else:
-      raise ConfluenceError(f"Don't know how to convert {self._content_format} to HTML")
-    return self.create(space, title, content, parent_page, **pageoptions)
+          </ac:macro>"""
+        else:
+            raise ConfluenceError(f"Don't know how to convert {self._content_format} to HTML")
+        return self.create(space, title, content, parent_page, **pageoptions)
 
-  def addattachment(self, page, filename):
-    """Add an attachment to an existing page.
+    def addattachment(self, page, filename):
+        """Add an attachment to an existing page.
 
-    Note: this will first read the entire file into memory
-    """
-    mime_type = mimetypes.guess_type(filename, strict=False)[0]
-    if not mime_type:
-      raise ConfluenceError(f'Failed to detect MIME type of {filename}')
+        Note: this will first read the entire file into memory
+        """
+        mime_type = mimetypes.guess_type(filename, strict=False)[0]
+        if not mime_type:
+            raise ConfluenceError(f"Failed to detect MIME type of {filename}")
 
-    try:
-      with open(filename, 'rb') as f:
-        file_data = f.read()
+        try:
+            with open(filename, "rb") as f:
+                file_data = f.read()
 
-      attachment = dict(fileName=basename(filename), contentType=mime_type)
-      return self._api_entrypoint.addAttachment(self._session_token,
-                                                page['id'],
-                                                attachment,
-                                                Binary(file_data))
-    except (IOError, OSError) as e:
-      log.error(f'Failed to read data from file {filename}: {e!r}')
-      return None
-    except XMLRPCError:
-      title = page.get('title', '[unknown title]')
-      log.error(f'Failed to add file attachment {filename} to page: {title}')
-      return None
+            attachment = dict(fileName=basename(filename), contentType=mime_type)
+            return self._api_entrypoint.addAttachment(
+                self._session_token, page["id"], attachment, Binary(file_data)
+            )
+        except (IOError, OSError) as e:
+            log.error(f"Failed to read data from file {filename}: {e!r}")
+            return None
+        except XMLRPCError:
+            title = page.get("title", "[unknown title]")
+            log.error(f"Failed to add file attachment {filename} to page: {title}")
+            return None

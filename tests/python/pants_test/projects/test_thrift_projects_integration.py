@@ -5,6 +5,5 @@ from pants_test.projects.projects_test_base import ProjectsTestBase
 
 
 class TestThriftProjectsIntegration(ProjectsTestBase):
-
-  def test_thrift_projects(self) -> None:
-    self.assert_valid_projects("examples/src/thrift::", "testprojects/src/thrift::")
+    def test_thrift_projects(self) -> None:
+        self.assert_valid_projects("examples/src/thrift::", "testprojects/src/thrift::")

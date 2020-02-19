@@ -5,6 +5,5 @@ from pants_test.projects.projects_test_base import ProjectsTestBase
 
 
 class TestAntlrProjectsIntegration(ProjectsTestBase):
-
-  def test_antlr_projects(self) -> None:
-    self.assert_valid_projects("examples/src/antlr::", "testprojects/src/antlr::")
+    def test_antlr_projects(self) -> None:
+        self.assert_valid_projects("examples/src/antlr::", "testprojects/src/antlr::")

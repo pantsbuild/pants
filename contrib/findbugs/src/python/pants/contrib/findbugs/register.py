@@ -7,4 +7,4 @@ from pants.contrib.findbugs.tasks.findbugs import FindBugs
 
 
 def register_goals():
-  task(name='findbugs', action=FindBugs).install('compile')
+    task(name="findbugs", action=FindBugs).install("compile")

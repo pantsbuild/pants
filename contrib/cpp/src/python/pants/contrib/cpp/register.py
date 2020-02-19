@@ -13,16 +13,11 @@ from pants.contrib.cpp.tasks.cpp_run import CppRun
 
 
 def build_file_aliases():
-  return BuildFileAliases(
-    targets={
-      'cpp_library': CppLibrary,
-      'cpp_binary': CppBinary,
-    }
-  )
+    return BuildFileAliases(targets={"cpp_library": CppLibrary, "cpp_binary": CppBinary,})
 
 
 def register_goals():
-  task(name='cpp', action=CppCompile).install('compile')
-  task(name='cpplib', action=CppLibraryCreate).install('binary')
-  task(name='cpp', action=CppBinaryCreate).install('binary')
-  task(name='cpp', action=CppRun).install('run')
+    task(name="cpp", action=CppCompile).install("compile")
+    task(name="cpplib", action=CppLibraryCreate).install("binary")
+    task(name="cpp", action=CppBinaryCreate).install("binary")
+    task(name="cpp", action=CppRun).install("run")

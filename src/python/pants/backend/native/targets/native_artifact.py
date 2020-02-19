@@ -15,37 +15,42 @@ from pants.util.enums import match
 # extra safety, we override __setattr__() to ensure that the hash can never be accidentally changed.
 @dataclass
 class NativeArtifact(PayloadField):
-  """A BUILD file object declaring a target can be exported to other languages with a native ABI."""
-  lib_name: str
+    """A BUILD file object declaring a target can be exported to other languages with a native
+    ABI."""
 
-  def __init__(self, lib_name: str) -> None:
-    self.lib_name = lib_name
-    self._is_frozen = True
+    lib_name: str
 
-  def __hash__(self) -> int:
-    return hash(self.lib_name)
+    def __init__(self, lib_name: str) -> None:
+        self.lib_name = lib_name
+        self._is_frozen = True
 
-  def __setattr__(self, key: str, value: Any) -> None:
-    if hasattr(self, "_is_frozen") and key == "lib_name":
-      raise FrozenInstanceError(
-        f"Attempting to modify the attribute {key} with value {value} on {self}."
-      )
-    super().__setattr__(key, value)
+    def __hash__(self) -> int:
+        return hash(self.lib_name)
 
-  # TODO: This should probably be made into an @classproperty (see PR #5901).
-  @classmethod
-  def alias(cls):
-    return 'native_artifact'
+    def __setattr__(self, key: str, value: Any) -> None:
+        if hasattr(self, "_is_frozen") and key == "lib_name":
+            raise FrozenInstanceError(
+                f"Attempting to modify the attribute {key} with value {value} on {self}."
+            )
+        super().__setattr__(key, value)
 
-  def as_shared_lib(self, platform):
-    # TODO: check that the name conforms to some format in the constructor (e.g. no dots?).
-    return match(platform, {
-      Platform.darwin: f"lib{self.lib_name}.dylib",
-      Platform.linux: f"lib{self.lib_name}.so",
-    })
+    # TODO: This should probably be made into an @classproperty (see PR #5901).
+    @classmethod
+    def alias(cls):
+        return "native_artifact"
 
-  def _compute_fingerprint(self):
-    # TODO: This fingerprint computation boilerplate is error-prone and could probably be
-    # streamlined, for simple payload fields.
-    hasher = sha1(self.lib_name.encode())
-    return hasher.hexdigest()
+    def as_shared_lib(self, platform):
+        # TODO: check that the name conforms to some format in the constructor (e.g. no dots?).
+        return match(
+            platform,
+            {
+                Platform.darwin: f"lib{self.lib_name}.dylib",
+                Platform.linux: f"lib{self.lib_name}.so",
+            },
+        )
+
+    def _compute_fingerprint(self):
+        # TODO: This fingerprint computation boilerplate is error-prone and could probably be
+        # streamlined, for simple payload fields.
+        hasher = sha1(self.lib_name.encode())
+        return hasher.hexdigest()

@@ -11,58 +11,63 @@ from pants.testutil.task_test_base import ConsoleTaskTestBase
 
 
 class FilemapTest(ConsoleTaskTestBase):
-  @classmethod
-  def alias_groups(cls):
-    return BuildFileAliases(
-      targets={
-        'python_library': PythonLibrary,
-      },
-    )
+    @classmethod
+    def alias_groups(cls):
+        return BuildFileAliases(targets={"python_library": PythonLibrary,},)
 
-  @classmethod
-  def task_type(cls):
-    return Filemap
+    @classmethod
+    def task_type(cls):
+        return Filemap
 
-  def setUp(self):
-    super().setUp()
+    def setUp(self):
+        super().setUp()
 
-    def add_to_build_file(path, name, *files):
-      for f in files:
-        self.create_file(os.path.join(path, f), '')
+        def add_to_build_file(path, name, *files):
+            for f in files:
+                self.create_file(os.path.join(path, f), "")
 
-      self.add_to_build_file(path, dedent("""
+            self.add_to_build_file(
+                path,
+                dedent(
+                    """
           python_library(name='{name}',
             sources=[{sources}]
           )
-          """.format(name=name, sources=','.join(repr(f) for f in files))))
+          """.format(
+                        name=name, sources=",".join(repr(f) for f in files)
+                    )
+                ),
+            )
 
-    add_to_build_file('common/src/py/a', 'a', 'one.py')
-    add_to_build_file('common/src/py/b', 'b', 'two.py', 'three.py')
-    add_to_build_file('common/src/py/c', 'c', 'four.py')
-    add_to_build_file('common', 'dummy')
-    self.target('common/src/py/b')
+        add_to_build_file("common/src/py/a", "a", "one.py")
+        add_to_build_file("common/src/py/b", "b", "two.py", "three.py")
+        add_to_build_file("common/src/py/c", "c", "four.py")
+        add_to_build_file("common", "dummy")
+        self.target("common/src/py/b")
 
-  def test_all(self):
-    self.assert_console_output(
-      'common/src/py/a/one.py common/src/py/a:a',
-      'common/src/py/b/two.py common/src/py/b:b',
-      'common/src/py/b/three.py common/src/py/b:b',
-      'common/src/py/c/four.py common/src/py/c:c',
-      targets=self.targets('::')
-    )
+    def test_all(self):
+        self.assert_console_output(
+            "common/src/py/a/one.py common/src/py/a:a",
+            "common/src/py/b/two.py common/src/py/b:b",
+            "common/src/py/b/three.py common/src/py/b:b",
+            "common/src/py/c/four.py common/src/py/c:c",
+            targets=self.targets("::"),
+        )
 
-  def test_one(self):
-    self.assert_console_output(
-      'common/src/py/b/two.py common/src/py/b:b',
-      'common/src/py/b/three.py common/src/py/b:b',
-      targets=[self.target('common/src/py/b')]
-    )
+    def test_one(self):
+        self.assert_console_output(
+            "common/src/py/b/two.py common/src/py/b:b",
+            "common/src/py/b/three.py common/src/py/b:b",
+            targets=[self.target("common/src/py/b")],
+        )
 
-  def test_dup(self):
-    self.assert_console_output(
-      'common/src/py/a/one.py common/src/py/a:a',
-      'common/src/py/c/four.py common/src/py/c:c',
-      targets=[self.target('common/src/py/a'),
-               self.target('common/src/py/c'),
-               self.target('common/src/py/a')]
-    )
+    def test_dup(self):
+        self.assert_console_output(
+            "common/src/py/a/one.py common/src/py/a:a",
+            "common/src/py/c/four.py common/src/py/c:c",
+            targets=[
+                self.target("common/src/py/a"),
+                self.target("common/src/py/c"),
+                self.target("common/src/py/a"),
+            ],
+        )

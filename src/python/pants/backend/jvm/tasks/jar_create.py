@@ -11,87 +11,96 @@ from pants.base.workunit import WorkUnitLabel
 
 
 def is_jvm_binary(target):
-  return isinstance(target, JvmBinary)
+    return isinstance(target, JvmBinary)
 
 
 def is_java_library(target):
-  return target.has_sources('.java')
+    return target.has_sources(".java")
 
 
 def is_scala_library(target):
-  return target.has_sources('.scala')
+    return target.has_sources(".scala")
 
 
 def is_jvm_library(target):
-  return (is_java_library(target)
-          or is_scala_library(target)
-          or (is_jvm_binary(target) and target.has_resources))
+    return (
+        is_java_library(target)
+        or is_scala_library(target)
+        or (is_jvm_binary(target) and target.has_resources)
+    )
 
 
 class JarCreate(JarBuilderTask):
-  """Jars jvm libraries and optionally their sources and their docs."""
+    """Jars jvm libraries and optionally their sources and their docs."""
 
-  @classmethod
-  def register_options(cls, register):
-    super().register_options(register)
-    register('--compressed', default=True, type=bool,
-             fingerprint=True,
-             help='Create compressed jars.')
+    @classmethod
+    def register_options(cls, register):
+        super().register_options(register)
+        register(
+            "--compressed",
+            default=True,
+            type=bool,
+            fingerprint=True,
+            help="Create compressed jars.",
+        )
 
-  @classmethod
-  def product_types(cls):
-    return ['jars']
+    @classmethod
+    def product_types(cls):
+        return ["jars"]
 
-  @classmethod
-  def prepare(cls, options, round_manager):
-    super().prepare(options, round_manager)
-    cls.JarBuilder.prepare(round_manager)
+    @classmethod
+    def prepare(cls, options, round_manager):
+        super().prepare(options, round_manager)
+        cls.JarBuilder.prepare(round_manager)
 
-  def __init__(self, *args, **kwargs):
-    super().__init__(*args, **kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
-    self.compressed = self.get_options().compressed
-    self._jars = {}
+        self.compressed = self.get_options().compressed
+        self._jars = {}
 
-  @property
-  def cache_target_dirs(self):
-    return True
+    @property
+    def cache_target_dirs(self):
+        return True
 
-  def execute(self):
-    # NB: Invalidating dependents transitively is more than is strictly necessary, but
-    # we know that JarBuilderTask touches (at least) the direct dependencies of targets (in
-    # the case of resources). One of these tasks could implement an FingerprintStrategy that
-    # would attempt to hash the relevant dependencies, but that is really error prone, and
-    # this task is more than fast enough to re-run (JarTool "copies" pre-zipped data from input
-    # zip/jar files).
-    with self.invalidated(self.context.targets(is_jvm_library),
-                          invalidate_dependents=True) as invalidation_check:
-      with self.context.new_workunit(name='jar-create', labels=[WorkUnitLabel.MULTITOOL]):
-        jar_mapping = self.context.products.get('jars')
+    def execute(self):
+        # NB: Invalidating dependents transitively is more than is strictly necessary, but
+        # we know that JarBuilderTask touches (at least) the direct dependencies of targets (in
+        # the case of resources). One of these tasks could implement an FingerprintStrategy that
+        # would attempt to hash the relevant dependencies, but that is really error prone, and
+        # this task is more than fast enough to re-run (JarTool "copies" pre-zipped data from input
+        # zip/jar files).
+        with self.invalidated(
+            self.context.targets(is_jvm_library), invalidate_dependents=True
+        ) as invalidation_check:
+            with self.context.new_workunit(name="jar-create", labels=[WorkUnitLabel.MULTITOOL]):
+                jar_mapping = self.context.products.get("jars")
 
-        for vt in invalidation_check.all_vts:
-          jar_name = vt.target.name + '.jar'
-          jar_path = os.path.join(vt.results_dir, jar_name)
+                for vt in invalidation_check.all_vts:
+                    jar_name = vt.target.name + ".jar"
+                    jar_path = os.path.join(vt.results_dir, jar_name)
 
-          def add_jar_to_products():
-            jar_mapping.add(vt.target, vt.results_dir).append(jar_name)
+                    def add_jar_to_products():
+                        jar_mapping.add(vt.target, vt.results_dir).append(jar_name)
 
-          if vt.valid:
-            if os.path.exists(jar_path):
-              add_jar_to_products()
-          else:
-            with self.create_jar(vt.target, jar_path) as jarfile:
-              with self.create_jar_builder(jarfile) as jar_builder:
-                if jar_builder.add_target(vt.target):
-                  add_jar_to_products()
+                    if vt.valid:
+                        if os.path.exists(jar_path):
+                            add_jar_to_products()
+                    else:
+                        with self.create_jar(vt.target, jar_path) as jarfile:
+                            with self.create_jar_builder(jarfile) as jar_builder:
+                                if jar_builder.add_target(vt.target):
+                                    add_jar_to_products()
 
-  @contextmanager
-  def create_jar(self, target, path):
-    existing = self._jars.setdefault(path, target)
-    if target != existing:
-      raise TaskError(
-          'Duplicate name: target {} tried to write {} already mapped to target {}'
-          .format(target, path, existing))
-    self._jars[path] = target
-    with self.open_jar(path, overwrite=True, compressed=self.compressed) as jar:
-      yield jar
+    @contextmanager
+    def create_jar(self, target, path):
+        existing = self._jars.setdefault(path, target)
+        if target != existing:
+            raise TaskError(
+                "Duplicate name: target {} tried to write {} already mapped to target {}".format(
+                    target, path, existing
+                )
+            )
+        self._jars[path] = target
+        with self.open_jar(path, overwrite=True, compressed=self.compressed) as jar:
+            yield jar

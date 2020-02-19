@@ -15,12 +15,13 @@ from pants.util.dirutil import safe_mkdir
 
 
 class NailgunTaskTest(JvmToolTaskTestBase):
-
-  class DetermineJavaCwd(NailgunTask):
-    def execute(self):
-      cwd_code = os.path.join(self.workdir, 'Cwd.java')
-      with open(cwd_code, 'w') as fp:
-        fp.write(dedent("""
+    class DetermineJavaCwd(NailgunTask):
+        def execute(self):
+            cwd_code = os.path.join(self.workdir, "Cwd.java")
+            with open(cwd_code, "w") as fp:
+                fp.write(
+                    dedent(
+                        """
         import java.io.IOException;
         import java.nio.charset.Charset;
         import java.nio.file.Files;
@@ -48,54 +49,54 @@ class NailgunTaskTest(JvmToolTaskTestBase):
             Files.write(Paths.get(comm_file), Arrays.asList(source, cwd), Charset.forName("UTF-8"));
           }
         }
-        """))
+        """
+                    )
+                )
 
-      javac = self.dist.binary('javac')
-      nailgun_cp = self.tool_classpath('nailgun-server')
+            javac = self.dist.binary("javac")
+            nailgun_cp = self.tool_classpath("nailgun-server")
 
-      classes_dir = os.path.join(self.workdir, 'classes')
-      safe_mkdir(classes_dir)
+            classes_dir = os.path.join(self.workdir, "classes")
+            safe_mkdir(classes_dir)
 
-      subprocess.check_call([
-        javac,
-        '-cp', os.pathsep.join(nailgun_cp),
-        '-d', classes_dir,
-        '-Werror',
-        cwd_code
-      ])
+            subprocess.check_call(
+                [javac, "-cp", os.pathsep.join(nailgun_cp), "-d", classes_dir, "-Werror", cwd_code]
+            )
 
-      comm_file = os.path.join(self.workdir, 'comm_file')
-      with temporary_dir() as python_cwd:
-        with pushd(python_cwd):
-          exit_code = self.runjava(nailgun_cp + [classes_dir], 'Cwd', args=[comm_file])
-          if exit_code != 0:
-            raise TaskError(exit_code=exit_code)
+            comm_file = os.path.join(self.workdir, "comm_file")
+            with temporary_dir() as python_cwd:
+                with pushd(python_cwd):
+                    exit_code = self.runjava(nailgun_cp + [classes_dir], "Cwd", args=[comm_file])
+                    if exit_code != 0:
+                        raise TaskError(exit_code=exit_code)
 
-          with open(comm_file, 'rb') as fp:
-            source, java_cwd = fp.read().strip().decode().splitlines()
-            return source, java_cwd, python_cwd
+                    with open(comm_file, "rb") as fp:
+                        source, java_cwd = fp.read().strip().decode().splitlines()
+                        return source, java_cwd, python_cwd
 
-  @classmethod
-  def task_type(cls):
-    return cls.DetermineJavaCwd
+    @classmethod
+    def task_type(cls):
+        return cls.DetermineJavaCwd
 
-  def assert_cwd_is_buildroot(self, expected_source):
-    task = self.prepare_execute(self.context())
-    source, java_cwd, python_cwd = task.execute()
+    def assert_cwd_is_buildroot(self, expected_source):
+        task = self.prepare_execute(self.context())
+        source, java_cwd, python_cwd = task.execute()
 
-    self.assertEqual(source, expected_source)
+        self.assertEqual(source, expected_source)
 
-    buildroot = os.path.realpath(get_buildroot())
-    self.assertEqual(buildroot, os.path.realpath(java_cwd))
-    self.assertNotEqual(buildroot, os.path.realpath(python_cwd))
+        buildroot = os.path.realpath(get_buildroot())
+        self.assertEqual(buildroot, os.path.realpath(java_cwd))
+        self.assertNotEqual(buildroot, os.path.realpath(python_cwd))
 
-  def test_execution_strategy_nailgun(self):
-    self.set_options(execution_strategy=NailgunTask.ExecutionStrategy.nailgun)
-    self.addCleanup(lambda: NailgunProcessGroup(metadata_base_dir=self.subprocess_dir).killall())
+    def test_execution_strategy_nailgun(self):
+        self.set_options(execution_strategy=NailgunTask.ExecutionStrategy.nailgun)
+        self.addCleanup(
+            lambda: NailgunProcessGroup(metadata_base_dir=self.subprocess_dir).killall()
+        )
 
-    self.assert_cwd_is_buildroot(expected_source='nailMain')
+        self.assert_cwd_is_buildroot(expected_source="nailMain")
 
-  def test_execution_strategy_subprocess(self):
-    self.set_options(execution_strategy=NailgunTask.ExecutionStrategy.subprocess)
+    def test_execution_strategy_subprocess(self):
+        self.set_options(execution_strategy=NailgunTask.ExecutionStrategy.subprocess)
 
-    self.assert_cwd_is_buildroot(expected_source='main')
+        self.assert_cwd_is_buildroot(expected_source="main")

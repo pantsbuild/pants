@@ -2,11 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.backend.python.rules import (
-  download_pex_bin,
-  pex,
-  pex_from_target_closure,
-  prepare_chrooted_python_sources,
-  repl,
+    download_pex_bin,
+    pex,
+    pex_from_target_closure,
+    prepare_chrooted_python_sources,
+    repl,
 )
 from pants.backend.python.rules.repl import PythonRepl
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
@@ -21,48 +21,43 @@ from pants.testutil.goal_rule_test_base import GoalRuleTestBase
 
 
 class ReplTest(GoalRuleTestBase):
-  goal_cls = Repl
+    goal_cls = Repl
 
-  @classmethod
-  def rules(cls):
-    return (
-      *super().rules(),
-      *repl.rules(),
-      run_repl,
-      *pex.rules(),
-      *download_pex_bin.rules(),
-      *pex_from_target_closure.rules(),
-      *prepare_chrooted_python_sources.rules(),
-      *python_native_code.rules(),
-      *strip_source_roots.rules(),
-      *subprocess_environment.rules(),
-      RootRule(PythonRepl),
-    )
+    @classmethod
+    def rules(cls):
+        return (
+            *super().rules(),
+            *repl.rules(),
+            run_repl,
+            *pex.rules(),
+            *download_pex_bin.rules(),
+            *pex_from_target_closure.rules(),
+            *prepare_chrooted_python_sources.rules(),
+            *python_native_code.rules(),
+            *strip_source_roots.rules(),
+            *subprocess_environment.rules(),
+            RootRule(PythonRepl),
+        )
 
-  @classmethod
-  def alias_groups(cls) -> BuildFileAliases:
-    return BuildFileAliases(
-      targets={
-        "python_library": PythonLibrary,
-      }
-    )
+    @classmethod
+    def alias_groups(cls) -> BuildFileAliases:
+        return BuildFileAliases(targets={"python_library": PythonLibrary,})
 
-  def test_repl_with_targets(self):
-    library_source = FileContent(path="some_lib.py", content=b"class SomeClass:\n  pass\n")
-    self.create_library(
-      name="some_lib",
-      target_type="python_library",
-      path="src/python",
-      sources=["some_lib.py"]
-    )
+    def test_repl_with_targets(self):
+        library_source = FileContent(path="some_lib.py", content=b"class SomeClass:\n  pass\n")
+        self.create_library(
+            name="some_lib",
+            target_type="python_library",
+            path="src/python",
+            sources=["some_lib.py"],
+        )
 
-    self.create_file(
-      relpath="src/python/some_lib.py",
-      contents=library_source.content.decode(),
-    )
+        self.create_file(
+            relpath="src/python/some_lib.py", contents=library_source.content.decode(),
+        )
 
-    output = self.execute_rule(
-      args=["--backend-packages2=pants.backend.python", "src/python:some_lib"],
-      additional_params=[InteractiveRunner(self.scheduler)],
-    )
-    assert output == "REPL exited successfully."
+        output = self.execute_rule(
+            args=["--backend-packages2=pants.backend.python", "src/python:some_lib"],
+            additional_params=[InteractiveRunner(self.scheduler)],
+        )
+        assert output == "REPL exited successfully."

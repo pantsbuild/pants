@@ -13,86 +13,103 @@ from pants.contrib.scalajs.targets.scala_js_binary import ScalaJSBinary
 
 
 class ScalaJSLink(NailgunTask):
-  """Links intermediate scala.js representation outputs into a javascript binary."""
+    """Links intermediate scala.js representation outputs into a javascript binary."""
 
-  _SCALA_JS_CLI_MAIN = 'org.scalajs.cli.Scalajsld'
+    _SCALA_JS_CLI_MAIN = "org.scalajs.cli.Scalajsld"
 
-  @classmethod
-  def register_options(cls, register):
-    super().register_options(register)
-    register('--full-opt', type=bool, fingerprint=True,
-             help='Perform all optimizations; this is generally only useful for deployments.')
-    register('--check-ir', type=bool, fingerprint=True,
-             help='Perform (relatively costly) validity checks of IR before linking it.')
-    # TODO: revisit after https://rbcommons.com/s/twitter/r/3225/
-    cls.register_jvm_tool(register, 'scala-js-cli', main=cls._SCALA_JS_CLI_MAIN)
+    @classmethod
+    def register_options(cls, register):
+        super().register_options(register)
+        register(
+            "--full-opt",
+            type=bool,
+            fingerprint=True,
+            help="Perform all optimizations; this is generally only useful for deployments.",
+        )
+        register(
+            "--check-ir",
+            type=bool,
+            fingerprint=True,
+            help="Perform (relatively costly) validity checks of IR before linking it.",
+        )
+        # TODO: revisit after https://rbcommons.com/s/twitter/r/3225/
+        cls.register_jvm_tool(register, "scala-js-cli", main=cls._SCALA_JS_CLI_MAIN)
 
-  @classmethod
-  def prepare(cls, options, round_manager):
-    super().prepare(options, round_manager)
-    # Require that scala_js compilation has completed.
-    round_manager.require_data('scala_js_ir')
+    @classmethod
+    def prepare(cls, options, round_manager):
+        super().prepare(options, round_manager)
+        # Require that scala_js compilation has completed.
+        round_manager.require_data("scala_js_ir")
 
-  @classmethod
-  def product_types(cls):
-    # Outputs are javascript blobs provided as a product or a resource to downstream consumers.
-    return ['scala_js_binaries', 'runtime_classpath']
+    @classmethod
+    def product_types(cls):
+        # Outputs are javascript blobs provided as a product or a resource to downstream consumers.
+        return ["scala_js_binaries", "runtime_classpath"]
 
-  @classmethod
-  def subsystem_dependencies(cls):
-    return super().subsystem_dependencies() + (ScalaJSPlatform,)
+    @classmethod
+    def subsystem_dependencies(cls):
+        return super().subsystem_dependencies() + (ScalaJSPlatform,)
 
-  @property
-  def cache_target_dirs(self):
-    return True
+    @property
+    def cache_target_dirs(self):
+        return True
 
-  def _is_linked(self, target):
-    return isinstance(target, ScalaJSBinary)
+    def _is_linked(self, target):
+        return isinstance(target, ScalaJSBinary)
 
-  def _target_file(self, vt):
-    return os.path.join(vt.results_dir, f"{vt.target.name}.js")
+    def _target_file(self, vt):
+        return os.path.join(vt.results_dir, f"{vt.target.name}.js")
 
-  def execute(self):
-    scala_js_binaries = self.context.products.get_data('scala_js_binaries',
-                                                       lambda: defaultdict(MultipleRootedProducts))
-    classpaths = self.context.products.get_data('runtime_classpath')
-    with self.invalidated(
-        self.context.targets(self._is_linked),
-        invalidate_dependents=True) as invalidation_check:
-      for vt in invalidation_check.all_vts:
-        if not vt.valid:
-          self.context.log.debug(f'Linking {vt.target.address.spec}...')
-          self._link(vt.target, self._target_file(vt), classpaths)
-        else:
-          self.context.log.debug(f'Already linked {vt.target.address.spec}')
-        scala_js_binaries[vt.target].add_abs_paths(vt.results_dir, [self._target_file(vt)])
-        classpaths.add_for_target(vt.target, [('default', vt.results_dir)])
+    def execute(self):
+        scala_js_binaries = self.context.products.get_data(
+            "scala_js_binaries", lambda: defaultdict(MultipleRootedProducts)
+        )
+        classpaths = self.context.products.get_data("runtime_classpath")
+        with self.invalidated(
+            self.context.targets(self._is_linked), invalidate_dependents=True
+        ) as invalidation_check:
+            for vt in invalidation_check.all_vts:
+                if not vt.valid:
+                    self.context.log.debug(f"Linking {vt.target.address.spec}...")
+                    self._link(vt.target, self._target_file(vt), classpaths)
+                else:
+                    self.context.log.debug(f"Already linked {vt.target.address.spec}")
+                scala_js_binaries[vt.target].add_abs_paths(vt.results_dir, [self._target_file(vt)])
+                classpaths.add_for_target(vt.target, [("default", vt.results_dir)])
 
-  def _link(self, target, output_file, classpaths):
-    args = ['--output', output_file]
-    if self.get_options().level == 'debug':
-      args.append('--debug')
-    if self.get_options().full_opt:
-      args.append('--fullOpt')
-    if self.get_options().check_ir:
-      args.append('--checkIR')
+    def _link(self, target, output_file, classpaths):
+        args = ["--output", output_file]
+        if self.get_options().level == "debug":
+            args.append("--debug")
+        if self.get_options().full_opt:
+            args.append("--fullOpt")
+        if self.get_options().check_ir:
+            args.append("--checkIR")
 
-    # NB: We give the linker the entire classpath for this target, and let it check validity.
-    args.extend(jar for _, jar in classpaths.get_for_targets(target.closure(bfs=True)))
+        # NB: We give the linker the entire classpath for this target, and let it check validity.
+        args.extend(jar for _, jar in classpaths.get_for_targets(target.closure(bfs=True)))
 
-    result = self.runjava(classpath=self.tool_classpath('scala-js-cli'), main=self._SCALA_JS_CLI_MAIN,
-                          jvm_options=self.get_options().jvm_options,
-                          args=args, workunit_name='scala-js-link')
+        result = self.runjava(
+            classpath=self.tool_classpath("scala-js-cli"),
+            main=self._SCALA_JS_CLI_MAIN,
+            jvm_options=self.get_options().jvm_options,
+            args=args,
+            workunit_name="scala-js-link",
+        )
 
-    # TODO: scopt doesn't exit(1) when it receives an invalid option, but in all cases here
-    # that should be caused by a task-implementation error rather than a user error.
-    if result != 0:
-      raise TaskError(
-          'java {main} ... exited non-zero ({result}) for {target}'.format(
-            main=self._SCALA_JS_CLI_MAIN, result=result, target=target.address.spec),
-          failed_targets=[target])
-    if not os.path.exists(output_file):
-      raise TaskError(
-          'java {main} ... failed to produce an output for {target}'.format(
-            main=self._SCALA_JS_CLI_MAIN, target=target.address.spec),
-          failed_targets=[target])
+        # TODO: scopt doesn't exit(1) when it receives an invalid option, but in all cases here
+        # that should be caused by a task-implementation error rather than a user error.
+        if result != 0:
+            raise TaskError(
+                "java {main} ... exited non-zero ({result}) for {target}".format(
+                    main=self._SCALA_JS_CLI_MAIN, result=result, target=target.address.spec
+                ),
+                failed_targets=[target],
+            )
+        if not os.path.exists(output_file):
+            raise TaskError(
+                "java {main} ... failed to produce an output for {target}".format(
+                    main=self._SCALA_JS_CLI_MAIN, target=target.address.spec
+                ),
+                failed_targets=[target],
+            )

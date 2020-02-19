@@ -7,21 +7,22 @@ from pants.contrib.python.checks.checker.trailing_whitespace import TrailingWhit
 
 
 class TrailingWhitespaceTest(CheckstylePluginTestBase):
-  plugin_type = TrailingWhitespace
+    plugin_type = TrailingWhitespace
 
-  def test_exception_map(self):
-    for test_input, results in [
-      ([9,0,0], False),
-      ([3,0,1], False),
-      ([3,17,17], False),
-      ([3,18,18], True),
-      ([3,18,10000], True),  # """ continued strings have no ends
-      ([6,8,8], False),
-      ([6,19,19], True),
-      ([6,19,23], True),
-      ([6,23,25], False),  # ("  " continued have string termination
-    ]:
-      tw = self.get_plugin("""
+    def test_exception_map(self):
+        for test_input, results in [
+            ([9, 0, 0], False),
+            ([3, 0, 1], False),
+            ([3, 17, 17], False),
+            ([3, 18, 18], True),
+            ([3, 18, 10000], True),  # """ continued strings have no ends
+            ([6, 8, 8], False),
+            ([6, 19, 19], True),
+            ([6, 19, 23], True),
+            ([6, 23, 25], False),  # ("  " continued have string termination
+        ]:
+            tw = self.get_plugin(
+                """
       test_string_001 = ""
       test_string_002 = " "
       test_string_003 = \"\"\"
@@ -35,19 +36,24 @@ class TrailingWhitespaceTest(CheckstylePluginTestBase):
       test_string_011 = ''
       # comment 012
       # comment 013
-      """.format('   '))  # Add the trailing whitespace with format, so that IDEs don't remove it.
-      self.assertEqual(0, len(list(tw.nits())))
-      self.assertEqual(results, bool(tw.has_exception(*test_input)))
+      """.format(
+                    "   "
+                )
+            )  # Add the trailing whitespace with format, so that IDEs don't remove it.
+            self.assertEqual(0, len(list(tw.nits())))
+            self.assertEqual(results, bool(tw.has_exception(*test_input)))
 
-  def test_continuation_with_exception(self):
-    statement = """
+    def test_continuation_with_exception(self):
+        statement = """
     test_string_001 = ("   "{}
                        "   ")
-    """.format('  ')  # Add the trailing whitespace with format, so that IDEs don't remove it.
-    self.assertNit(statement, 'T200')
+    """.format(
+            "  "
+        )  # Add the trailing whitespace with format, so that IDEs don't remove it.
+        self.assertNit(statement, "T200")
 
-  def test_trailing_slash(self):
-    statement = """
+    def test_trailing_slash(self):
+        statement = """
     foo = \\
       123
     bar = \"\"\"
@@ -56,4 +62,4 @@ class TrailingWhitespaceTest(CheckstylePluginTestBase):
                baz
     \"\"\"
     """
-    self.assertNit(statement, 'T201', expected_line_number='001-002')
+        self.assertNit(statement, "T201", expected_line_number="001-002")

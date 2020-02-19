@@ -6,12 +6,14 @@ from pants.subsystem.subsystem import Subsystem
 
 class PythonEval(Subsystem):
 
-  options_scope = 'python-eval'
+    options_scope = "python-eval"
 
-  @classmethod
-  def register_options(cls, register):
-    super().register_options(register)
-    register(
-      '--skip', type=bool, default=False,
-      help="Don't use `python-eval` when running `./pants lint`.",
-    )
+    @classmethod
+    def register_options(cls, register):
+        super().register_options(register)
+        register(
+            "--skip",
+            type=bool,
+            default=False,
+            help="Don't use `python-eval` when running `./pants lint`.",
+        )

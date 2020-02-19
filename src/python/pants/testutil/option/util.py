@@ -7,8 +7,8 @@ from pants.option.options_bootstrapper import OptionsBootstrapper
 
 
 def create_options_bootstrapper(
-  *, args: Optional[Iterable[str]] = None, env: Optional[Dict[str, str]] = None,
+    *, args: Optional[Iterable[str]] = None, env: Optional[Dict[str, str]] = None,
 ) -> OptionsBootstrapper:
-  return OptionsBootstrapper.create(
-    args=("--pants-config-files=[]", *(args or [])), env=env or {},
-  )
+    return OptionsBootstrapper.create(
+        args=("--pants-config-files=[]", *(args or [])), env=env or {},
+    )

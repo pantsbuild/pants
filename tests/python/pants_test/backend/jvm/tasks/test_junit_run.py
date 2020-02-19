@@ -32,29 +32,38 @@ from pants.util.dirutil import touch
 
 
 class JUnitRunnerTest(JvmToolTaskTestBase):
+    @classmethod
+    def task_type(cls):
+        return JUnitRun
 
-  @classmethod
-  def task_type(cls):
-    return JUnitRun
+    @classmethod
+    def alias_groups(cls):
+        return (
+            super()
+            .alias_groups()
+            .merge(
+                BuildFileAliases(
+                    targets={
+                        "files": Files,
+                        "junit_tests": JUnitTests,
+                        "python_tests": PythonTests,
+                    },
+                )
+            )
+        )
 
-  @classmethod
-  def alias_groups(cls):
-    return super().alias_groups().merge(BuildFileAliases(
-      targets={
-        'files': Files,
-        'junit_tests': JUnitTests,
-        'python_tests': PythonTests,
-      },
-    ))
+    def setUp(self):
+        super().setUp()
+        init_subsystem(JUnit)
 
-  def setUp(self):
-    super().setUp()
-    init_subsystem(JUnit)
-
-  @ensure_cached(JUnitRun, expected_num_artifacts=1)
-  def test_junit_runner_success(self):
-    self._execute_junit_runner(
-      [('FooTest.java', dedent("""
+    @ensure_cached(JUnitRun, expected_num_artifacts=1)
+    def test_junit_runner_success(self):
+        self._execute_junit_runner(
+            [
+                (
+                    "FooTest.java",
+                    dedent(
+                        """
         import org.junit.Test;
         import static org.junit.Assert.assertTrue;
         public class FooTest {
@@ -63,14 +72,21 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
             assertTrue(5 > 3);
           }
         }
-      """))]
-    )
+      """
+                    ),
+                )
+            ]
+        )
 
-  @ensure_cached(JUnitRun, expected_num_artifacts=0)
-  def test_junit_runner_failure(self):
-    with self.assertRaises(TaskError) as cm:
-      self._execute_junit_runner(
-        [('FooTest.java', dedent("""
+    @ensure_cached(JUnitRun, expected_num_artifacts=0)
+    def test_junit_runner_failure(self):
+        with self.assertRaises(TaskError) as cm:
+            self._execute_junit_runner(
+                [
+                    (
+                        "FooTest.java",
+                        dedent(
+                            """
           import org.junit.Test;
           import static org.junit.Assert.assertTrue;
           public class FooTest {
@@ -79,16 +95,23 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
               assertTrue(5 < 3);
             }
           }
-        """))]
-      )
+        """
+                        ),
+                    )
+                ]
+            )
 
-    self.assertEqual([t.name for t in cm.exception.failed_targets], ['foo_test'])
+        self.assertEqual([t.name for t in cm.exception.failed_targets], ["foo_test"])
 
-  @ensure_cached(JUnitRun, expected_num_artifacts=0)
-  def test_junit_runner_error(self):
-    with self.assertRaises(TaskError) as cm:
-      self._execute_junit_runner(
-        [('FooTest.java', dedent("""
+    @ensure_cached(JUnitRun, expected_num_artifacts=0)
+    def test_junit_runner_error(self):
+        with self.assertRaises(TaskError) as cm:
+            self._execute_junit_runner(
+                [
+                    (
+                        "FooTest.java",
+                        dedent(
+                            """
           import org.junit.Test;
           public class FooTest {
             @Test
@@ -96,126 +119,157 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
               throw new RuntimeException("test error");
             }
           }
-        """))]
-      )
+        """
+                        ),
+                    )
+                ]
+            )
 
-    self.assertEqual([t.name for t in cm.exception.failed_targets], ['foo_test'])
+        self.assertEqual([t.name for t in cm.exception.failed_targets], ["foo_test"])
 
-  def _execute_junit_runner(self, list_of_filename_content_tuples, create_some_resources=True,
-                            target_name=None):
-    # Create the temporary base test directory
-    test_rel_path = 'tests/java/org/pantsbuild/foo'
-    test_abs_path = self.create_dir(test_rel_path)
+    def _execute_junit_runner(
+        self, list_of_filename_content_tuples, create_some_resources=True, target_name=None
+    ):
+        # Create the temporary base test directory
+        test_rel_path = "tests/java/org/pantsbuild/foo"
+        test_abs_path = self.create_dir(test_rel_path)
 
-    # Create the temporary classes directory under work dir
-    test_classes_abs_path = self.create_workdir_dir(test_rel_path)
+        # Create the temporary classes directory under work dir
+        test_classes_abs_path = self.create_workdir_dir(test_rel_path)
 
-    test_java_file_abs_paths = []
-    # Generate the temporary java test source code.
-    for filename, content in list_of_filename_content_tuples:
-      test_java_file_rel_path = os.path.join(test_rel_path, filename)
-      test_java_file_abs_path = self.create_file(test_java_file_rel_path, content)
-      test_java_file_abs_paths.append(test_java_file_abs_path)
+        test_java_file_abs_paths = []
+        # Generate the temporary java test source code.
+        for filename, content in list_of_filename_content_tuples:
+            test_java_file_rel_path = os.path.join(test_rel_path, filename)
+            test_java_file_abs_path = self.create_file(test_java_file_rel_path, content)
+            test_java_file_abs_paths.append(test_java_file_abs_path)
 
-    # Invoke ivy to resolve classpath for junit.
-    classpath_file_abs_path = os.path.join(test_abs_path, 'junit.classpath')
-    ivy_subsystem = global_subsystem_instance(IvySubsystem)
-    distribution = DistributionLocator.cached(jdk=True)
-    ivy = Bootstrapper(ivy_subsystem=ivy_subsystem).ivy()
-    ivy.execute(args=['-cachepath', classpath_file_abs_path,
-                      '-dependency', 'junit', 'junit-dep', '4.10'],
-                executor=SubprocessExecutor(distribution=distribution))
+        # Invoke ivy to resolve classpath for junit.
+        classpath_file_abs_path = os.path.join(test_abs_path, "junit.classpath")
+        ivy_subsystem = global_subsystem_instance(IvySubsystem)
+        distribution = DistributionLocator.cached(jdk=True)
+        ivy = Bootstrapper(ivy_subsystem=ivy_subsystem).ivy()
+        ivy.execute(
+            args=[
+                "-cachepath",
+                classpath_file_abs_path,
+                "-dependency",
+                "junit",
+                "junit-dep",
+                "4.10",
+            ],
+            executor=SubprocessExecutor(distribution=distribution),
+        )
 
-    with open(classpath_file_abs_path, 'r') as fp:
-      classpath = fp.read()
+        with open(classpath_file_abs_path, "r") as fp:
+            classpath = fp.read()
 
-    # Now directly invoke javac to compile the test java code into classfiles that we can later
-    # inject into a product mapping for JUnitRun to execute against.
-    javac = distribution.binary('javac')
-    subprocess.check_call(
-      [javac, '-d', test_classes_abs_path, '-cp', classpath] + test_java_file_abs_paths)
+        # Now directly invoke javac to compile the test java code into classfiles that we can later
+        # inject into a product mapping for JUnitRun to execute against.
+        javac = distribution.binary("javac")
+        subprocess.check_call(
+            [javac, "-d", test_classes_abs_path, "-cp", classpath] + test_java_file_abs_paths
+        )
 
-    # If a target_name is specified create a target with it, otherwise create a junit_tests target.
-    if target_name:
-      target = self.target(target_name)
-    else:
-      target = self.create_library(test_rel_path, 'junit_tests', 'foo_test', ['FooTest.java'])
+        # If a target_name is specified create a target with it, otherwise create a junit_tests target.
+        if target_name:
+            target = self.target(target_name)
+        else:
+            target = self.create_library(test_rel_path, "junit_tests", "foo_test", ["FooTest.java"])
 
-    target_roots = []
-    if create_some_resources:
-      # Create a synthetic resource target.
-      target_roots.append(self.make_target('some_resources', Resources))
-    target_roots.append(target)
+        target_roots = []
+        if create_some_resources:
+            # Create a synthetic resource target.
+            target_roots.append(self.make_target("some_resources", Resources))
+        target_roots.append(target)
 
-    # Set the context with the two targets, one junit_tests target and
-    # one synthetic resources target.
-    # The synthetic resources target is to make sure we won't regress
-    # in the future with bug like https://github.com/pantsbuild/pants/issues/508. Note
-    # in that bug, the resources target must be the first one in the list.
-    context = self.context(target_roots=target_roots)
+        # Set the context with the two targets, one junit_tests target and
+        # one synthetic resources target.
+        # The synthetic resources target is to make sure we won't regress
+        # in the future with bug like https://github.com/pantsbuild/pants/issues/508. Note
+        # in that bug, the resources target must be the first one in the list.
+        context = self.context(target_roots=target_roots)
 
-    # Before we run the task, we need to inject the "runtime_classpath" with
-    # the compiled test java classes that JUnitRun will know which test
-    # classes to execute. In a normal run, this "runtime_classpath" will be
-    # populated by java compilation step.
-    self.populate_runtime_classpath(context=context, classpath=[test_classes_abs_path])
+        # Before we run the task, we need to inject the "runtime_classpath" with
+        # the compiled test java classes that JUnitRun will know which test
+        # classes to execute. In a normal run, this "runtime_classpath" will be
+        # populated by java compilation step.
+        self.populate_runtime_classpath(context=context, classpath=[test_classes_abs_path])
 
-    # Finally execute the task.
-    self.execute(context)
+        # Finally execute the task.
+        self.execute(context)
 
-  @ensure_cached(JUnitRun, expected_num_artifacts=0)
-  def test_junit_runner_raises_no_error_on_non_junit_target(self):
-    """Run pants against a `python_tests` target, but set an option for the `test.junit` task.
+    @ensure_cached(JUnitRun, expected_num_artifacts=0)
+    def test_junit_runner_raises_no_error_on_non_junit_target(self):
+        """Run pants against a `python_tests` target, but set an option for the `test.junit` task.
 
-    This should execute without error.
-    """
-    self.add_to_build_file('foo', dedent("""
+        This should execute without error.
+        """
+        self.add_to_build_file(
+            "foo",
+            dedent(
+                """
         python_tests(
           name='hello',
           sources=['some_file.py'],
         )
         """
-    ))
-    self.set_options(test='#abc')
-    self.execute(self.context(target_roots=[self.target('foo:hello')]))
+            ),
+        )
+        self.set_options(test="#abc")
+        self.execute(self.context(target_roots=[self.target("foo:hello")]))
 
-  @ensure_cached(JUnitRun, expected_num_artifacts=0)
-  def test_empty_sources(self):
-    self.add_to_build_file('foo', dedent("""
+    @ensure_cached(JUnitRun, expected_num_artifacts=0)
+    def test_empty_sources(self):
+        self.add_to_build_file(
+            "foo",
+            dedent(
+                """
         junit_tests(
           name='empty',
           sources=[],
         )
         """
-    ))
-    task = self.prepare_execute(self.context(target_roots=[self.target('foo:empty')]))
-    with self.assertRaisesRegex(TargetDefinitionException,
-                                 r'must include a non-empty set of sources'):
-      task.execute()
+            ),
+        )
+        task = self.prepare_execute(self.context(target_roots=[self.target("foo:empty")]))
+        with self.assertRaisesRegex(
+            TargetDefinitionException, r"must include a non-empty set of sources"
+        ):
+            task.execute()
 
-  @ensure_cached(JUnitRun, expected_num_artifacts=1)
-  def test_allow_empty_sources(self):
-    self.add_to_build_file('foo', dedent("""
+    @ensure_cached(JUnitRun, expected_num_artifacts=1)
+    def test_allow_empty_sources(self):
+        self.add_to_build_file(
+            "foo",
+            dedent(
+                """
         junit_tests(
           name='empty',
           sources=[],
         )
         """
-    ))
-    self.set_options(allow_empty_sources=True)
-    context = self.context(target_roots=[self.target('foo:empty')])
-    self.populate_runtime_classpath(context=context)
-    self.execute(context)
+            ),
+        )
+        self.set_options(allow_empty_sources=True)
+        context = self.context(target_roots=[self.target("foo:empty")])
+        self.populate_runtime_classpath(context=context)
+        self.execute(context)
 
-  @ensure_cached(JUnitRun, expected_num_artifacts=1)
-  def test_junit_runner_extra_jvm_options(self):
-    self.make_target(
-      spec='tests/java/org/pantsbuild/foo:foo_test',
-      target_type=JUnitTests,
-      sources=['FooTest.java'],
-      extra_jvm_options=['-Dexample.property=1'],
-    )
-    self._execute_junit_runner([('FooTest.java', dedent("""
+    @ensure_cached(JUnitRun, expected_num_artifacts=1)
+    def test_junit_runner_extra_jvm_options(self):
+        self.make_target(
+            spec="tests/java/org/pantsbuild/foo:foo_test",
+            target_type=JUnitTests,
+            sources=["FooTest.java"],
+            extra_jvm_options=["-Dexample.property=1"],
+        )
+        self._execute_junit_runner(
+            [
+                (
+                    "FooTest.java",
+                    dedent(
+                        """
         package org.pantsbuild.foo;
         import org.junit.Test;
         import static org.junit.Assert.assertTrue;
@@ -226,28 +280,35 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
             assertTrue(exampleProperty != null && exampleProperty.equals("1"));
           }
         }
-      """))], target_name='tests/java/org/pantsbuild/foo:foo_test')
+      """
+                    ),
+                )
+            ],
+            target_name="tests/java/org/pantsbuild/foo:foo_test",
+        )
 
-  @ensure_cached(JUnitRun, expected_num_artifacts=1)
-  def test_junit_runner_runtime_platform_args(self):
-    self.make_target(
-      spec='tests/java/org/pantsbuild/foo:foo_test',
-      target_type=JUnitTests,
-      sources=['FooTest.java'],
-      runtime_platform='java8-extra',
-    )
-    self.set_options_for_scope(JvmPlatform.options_scope,
-      default_platform='java8',
-      platforms={
-        'java8': {
-          'source': '8',
-          'target': '8',
-        },
-          'java8-extra': {
-          'source': '8',
-          'target': '8',
-          'args': ['-Dexample.property=1'] },})
-    self._execute_junit_runner([('FooTest.java', dedent("""
+    @ensure_cached(JUnitRun, expected_num_artifacts=1)
+    def test_junit_runner_runtime_platform_args(self):
+        self.make_target(
+            spec="tests/java/org/pantsbuild/foo:foo_test",
+            target_type=JUnitTests,
+            sources=["FooTest.java"],
+            runtime_platform="java8-extra",
+        )
+        self.set_options_for_scope(
+            JvmPlatform.options_scope,
+            default_platform="java8",
+            platforms={
+                "java8": {"source": "8", "target": "8",},
+                "java8-extra": {"source": "8", "target": "8", "args": ["-Dexample.property=1"]},
+            },
+        )
+        self._execute_junit_runner(
+            [
+                (
+                    "FooTest.java",
+                    dedent(
+                        """
         package org.pantsbuild.foo;
         import org.junit.Test;
         import static org.junit.Assert.assertTrue;
@@ -258,17 +319,27 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
             assertTrue(exampleProperty != null && exampleProperty.equals("1"));
           }
         }
-      """))], target_name='tests/java/org/pantsbuild/foo:foo_test')
+      """
+                    ),
+                )
+            ],
+            target_name="tests/java/org/pantsbuild/foo:foo_test",
+        )
 
-  @ensure_cached(JUnitRun, expected_num_artifacts=1)
-  def test_junit_runner_multiple_extra_jvm_options(self):
-    self.make_target(
-      spec='tests/java/org/pantsbuild/foo:foo_test',
-      target_type=JUnitTests,
-      sources=['FooTest.java'],
-      extra_jvm_options=['-Dexample.property1=1','-Dexample.property2=2'],
-    )
-    self._execute_junit_runner([('FooTest.java', dedent("""
+    @ensure_cached(JUnitRun, expected_num_artifacts=1)
+    def test_junit_runner_multiple_extra_jvm_options(self):
+        self.make_target(
+            spec="tests/java/org/pantsbuild/foo:foo_test",
+            target_type=JUnitTests,
+            sources=["FooTest.java"],
+            extra_jvm_options=["-Dexample.property1=1", "-Dexample.property2=2"],
+        )
+        self._execute_junit_runner(
+            [
+                (
+                    "FooTest.java",
+                    dedent(
+                        """
         package org.pantsbuild.foo;
         import org.junit.Test;
         import static org.junit.Assert.assertTrue;
@@ -283,34 +354,36 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
             assertTrue(exampleProperty3 == null);
           }
         }
-      """))], target_name='tests/java/org/pantsbuild/foo:foo_test')
+      """
+                    ),
+                )
+            ],
+            target_name="tests/java/org/pantsbuild/foo:foo_test",
+        )
 
-  # 2 runs with different targets (unique configurations), should cache twice.
-  @ensure_cached(JUnitRun, expected_num_artifacts=2)
-  def test_junit_runner_extra_env_vars(self):
-    self.make_target(
-      spec='tests/java/org/pantsbuild/foo:foo_test',
-      target_type=JUnitTests,
-      sources=['FooTest.java'],
-      extra_env_vars={
-        'HELLO': 27,
-        'THERE': 32,
-      },
-    )
+    # 2 runs with different targets (unique configurations), should cache twice.
+    @ensure_cached(JUnitRun, expected_num_artifacts=2)
+    def test_junit_runner_extra_env_vars(self):
+        self.make_target(
+            spec="tests/java/org/pantsbuild/foo:foo_test",
+            target_type=JUnitTests,
+            sources=["FooTest.java"],
+            extra_env_vars={"HELLO": 27, "THERE": 32,},
+        )
 
-    self.make_target(
-      spec='tests/java/org/pantsbuild/foo:bar_test',
-      target_type=JUnitTests,
-      sources=['FooTest.java'],
-      extra_env_vars={
-        'THE_ANSWER': 42,
-        'HELLO': 12,
-      },
-    )
+        self.make_target(
+            spec="tests/java/org/pantsbuild/foo:bar_test",
+            target_type=JUnitTests,
+            sources=["FooTest.java"],
+            extra_env_vars={"THE_ANSWER": 42, "HELLO": 12,},
+        )
 
-    self._execute_junit_runner(
-      [
-        ('FooTest.java', dedent("""
+        self._execute_junit_runner(
+            [
+                (
+                    "FooTest.java",
+                    dedent(
+                        """
         package org.pantsbuild.foo;
         import org.junit.Test;
         import static org.junit.Assert.assertEquals;
@@ -321,11 +394,20 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
             assertEquals("32", System.getenv().get("THERE"));
           }
         }
-      """))
-      ], target_name='tests/java/org/pantsbuild/foo:foo_test')
+      """
+                    ),
+                )
+            ],
+            target_name="tests/java/org/pantsbuild/foo:foo_test",
+        )
 
-    # Execute twice in a row to make sure the environment changes aren't sticky.
-    self._execute_junit_runner([('FooTest.java', dedent("""
+        # Execute twice in a row to make sure the environment changes aren't sticky.
+        self._execute_junit_runner(
+            [
+                (
+                    "FooTest.java",
+                    dedent(
+                        """
         package org.pantsbuild.foo;
         import org.junit.Test;
         import static org.junit.Assert.assertEquals;
@@ -338,23 +420,30 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
             assertFalse(System.getenv().containsKey("THERE"));
           }
         }
-      """))], target_name='tests/java/org/pantsbuild/foo:bar_test', create_some_resources=False)
+      """
+                    ),
+                )
+            ],
+            target_name="tests/java/org/pantsbuild/foo:bar_test",
+            create_some_resources=False,
+        )
 
-  @ensure_cached(JUnitRun, expected_num_artifacts=1)
-  def test_junit_runner_extra_env_vars_none(self):
-    with environment_as(THIS_VARIABLE="12", THAT_VARIABLE="This is a variable."):
-      self.make_target(
-        spec='tests/java/org/pantsbuild/foo:foo_test',
-        target_type=JUnitTests,
-        sources=['FooTest.java'],
-        extra_env_vars={
-          'HELLO': None,
-          'THERE': False,
-          'THIS_VARIABLE': None
-        },
-      )
+    @ensure_cached(JUnitRun, expected_num_artifacts=1)
+    def test_junit_runner_extra_env_vars_none(self):
+        with environment_as(THIS_VARIABLE="12", THAT_VARIABLE="This is a variable."):
+            self.make_target(
+                spec="tests/java/org/pantsbuild/foo:foo_test",
+                target_type=JUnitTests,
+                sources=["FooTest.java"],
+                extra_env_vars={"HELLO": None, "THERE": False, "THIS_VARIABLE": None},
+            )
 
-      self._execute_junit_runner([('FooTest.java', dedent("""
+            self._execute_junit_runner(
+                [
+                    (
+                        "FooTest.java",
+                        dedent(
+                            """
           package org.pantsbuild.foo;
           import org.junit.Test;
           import static org.junit.Assert.assertEquals;
@@ -368,18 +457,24 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
               assertFalse(System.getenv().containsKey("THIS_VARIABLE"));
             }
           }
-        """))], target_name='tests/java/org/pantsbuild/foo:foo_test')
+        """
+                        ),
+                    )
+                ],
+                target_name="tests/java/org/pantsbuild/foo:foo_test",
+            )
 
-  @ensure_cached(JUnitRun, expected_num_artifacts=1)
-  def test_junt_run_with_too_many_args(self):
-    max_subprocess_args = 2
-    num_of_classes = 5
+    @ensure_cached(JUnitRun, expected_num_artifacts=1)
+    def test_junt_run_with_too_many_args(self):
+        max_subprocess_args = 2
+        num_of_classes = 5
 
-    list_of_filename_content_tuples = []
-    for n in range(num_of_classes):
-      filename = f'FooTest{n}.java'
+        list_of_filename_content_tuples = []
+        for n in range(num_of_classes):
+            filename = f"FooTest{n}.java"
 
-      content = dedent("""
+            content = dedent(
+                """
           package org.pantsbuild.foo;
           import org.junit.Test;
           import static org.junit.Assert.assertTrue;
@@ -388,34 +483,37 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
             public void testFoo() {{
               int x = 5;
             }}
-          }}""".format(n))
-      list_of_filename_content_tuples.append((filename, content))
+          }}""".format(
+                    n
+                )
+            )
+            list_of_filename_content_tuples.append((filename, content))
 
-    self.make_target(
-      spec='tests/java/org/pantsbuild/foo:foo_test',
-      target_type=JUnitTests,
-      sources=[name for name, _ in list_of_filename_content_tuples],
-    )
-    self.set_options(max_subprocess_args=max_subprocess_args)
+        self.make_target(
+            spec="tests/java/org/pantsbuild/foo:foo_test",
+            target_type=JUnitTests,
+            sources=[name for name, _ in list_of_filename_content_tuples],
+        )
+        self.set_options(max_subprocess_args=max_subprocess_args)
 
-    self._execute_junit_runner(list_of_filename_content_tuples,
-                               target_name='tests/java/org/pantsbuild/foo:foo_test')
+        self._execute_junit_runner(
+            list_of_filename_content_tuples, target_name="tests/java/org/pantsbuild/foo:foo_test"
+        )
 
-  @ensure_cached(JUnitRun, expected_num_artifacts=1)
-  def test_junit_run_chroot(self):
-    self.create_files('config/org/pantsbuild/foo', ['sentinel', 'another'])
-    files = self.make_target(
-      spec='config/org/pantsbuild/foo:sentinel',
-      target_type=Files,
-      sources=['sentinel']
-    )
-    self.make_target(
-      spec='tests/java/org/pantsbuild/foo:foo_test',
-      target_type=JUnitTests,
-      sources=['FooTest.java'],
-      dependencies=[files]
-    )
-    content = dedent("""
+    @ensure_cached(JUnitRun, expected_num_artifacts=1)
+    def test_junit_run_chroot(self):
+        self.create_files("config/org/pantsbuild/foo", ["sentinel", "another"])
+        files = self.make_target(
+            spec="config/org/pantsbuild/foo:sentinel", target_type=Files, sources=["sentinel"]
+        )
+        self.make_target(
+            spec="tests/java/org/pantsbuild/foo:foo_test",
+            target_type=JUnitTests,
+            sources=["FooTest.java"],
+            dependencies=[files],
+        )
+        content = dedent(
+            """
         package org.pantsbuild.foo;
         import java.io.File;
         import org.junit.Test;
@@ -428,35 +526,38 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
             assertFalse(new File("config/org/pantsbuild/foo/another").exists());
           }
         }
-      """)
-    self.set_options(chroot=True)
-    self._execute_junit_runner([('FooTest.java', content)],
-                               target_name='tests/java/org/pantsbuild/foo:foo_test')
+      """
+        )
+        self.set_options(chroot=True)
+        self._execute_junit_runner(
+            [("FooTest.java", content)], target_name="tests/java/org/pantsbuild/foo:foo_test"
+        )
 
-  @ensure_cached(JUnitRun, expected_num_artifacts=0)
-  def test_junit_run_chroot_cwd_mutex(self):
-    with temporary_dir() as chroot:
-      self.set_options(chroot=True, cwd=chroot)
-      with self.assertRaises(JUnitRun.OptionError):
-        self.execute(self.context())
+    @ensure_cached(JUnitRun, expected_num_artifacts=0)
+    def test_junit_run_chroot_cwd_mutex(self):
+        with temporary_dir() as chroot:
+            self.set_options(chroot=True, cwd=chroot)
+            with self.assertRaises(JUnitRun.OptionError):
+                self.execute(self.context())
 
-  @ensure_cached(JUnitRun, expected_num_artifacts=1)
-  def test_junit_run_target_cwd_trumps_chroot(self):
-    with temporary_dir() as target_cwd:
-      self.create_files('config/org/pantsbuild/foo', ['files_dep_sentinel'])
-      files = self.make_target(
-        spec='config/org/pantsbuild/foo:sentinel',
-        target_type=Files,
-        sources=['files_dep_sentinel']
-      )
-      self.make_target(
-        spec='tests/java/org/pantsbuild/foo:foo_test',
-        target_type=JUnitTests,
-        sources=['FooTest.java'],
-        dependencies=[files],
-        cwd=target_cwd
-      )
-      content = dedent("""
+    @ensure_cached(JUnitRun, expected_num_artifacts=1)
+    def test_junit_run_target_cwd_trumps_chroot(self):
+        with temporary_dir() as target_cwd:
+            self.create_files("config/org/pantsbuild/foo", ["files_dep_sentinel"])
+            files = self.make_target(
+                spec="config/org/pantsbuild/foo:sentinel",
+                target_type=Files,
+                sources=["files_dep_sentinel"],
+            )
+            self.make_target(
+                spec="tests/java/org/pantsbuild/foo:foo_test",
+                target_type=JUnitTests,
+                sources=["FooTest.java"],
+                dependencies=[files],
+                cwd=target_cwd,
+            )
+            content = dedent(
+                """
         package org.pantsbuild.foo;
         import java.io.File;
         import org.junit.Test;
@@ -477,22 +578,27 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
                                 "config/org/pantsbuild/foo/files_dep_sentinel").exists());
           }}
         }}
-      """.format(self.build_root))
-      touch(os.path.join(target_cwd, 'target_cwd_sentinel'))
-      self.set_options(chroot=True)
-      self._execute_junit_runner([('FooTest.java', content)],
-                                 target_name='tests/java/org/pantsbuild/foo:foo_test')
+      """.format(
+                    self.build_root
+                )
+            )
+            touch(os.path.join(target_cwd, "target_cwd_sentinel"))
+            self.set_options(chroot=True)
+            self._execute_junit_runner(
+                [("FooTest.java", content)], target_name="tests/java/org/pantsbuild/foo:foo_test"
+            )
 
-  @ensure_cached(JUnitRun, expected_num_artifacts=1)
-  def test_junit_run_target_cwd_trumps_cwd_option(self):
-    with temporary_dir() as target_cwd:
-      self.make_target(
-        spec='tests/java/org/pantsbuild/foo:foo_test',
-        target_type=JUnitTests,
-        sources=['FooTest.java'],
-        cwd=target_cwd
-      )
-      content = dedent("""
+    @ensure_cached(JUnitRun, expected_num_artifacts=1)
+    def test_junit_run_target_cwd_trumps_cwd_option(self):
+        with temporary_dir() as target_cwd:
+            self.make_target(
+                spec="tests/java/org/pantsbuild/foo:foo_test",
+                target_type=JUnitTests,
+                sources=["FooTest.java"],
+                cwd=target_cwd,
+            )
+            content = dedent(
+                """
         package org.pantsbuild.foo;
         import java.io.File;
         import org.junit.Test;
@@ -505,17 +611,21 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
             assertFalse(new File("option_cwd_sentinel").exists());
           }
         }
-      """)
-      touch(os.path.join(target_cwd, 'target_cwd_sentinel'))
-      with temporary_dir() as option_cwd:
-        touch(os.path.join(option_cwd, 'option_cwd_sentinel'))
-        # TODO(8989): Don't require chroot=False
-        self.set_options(cwd=option_cwd, chroot=False)
-        self._execute_junit_runner([('FooTest.java', content)],
-                                   target_name='tests/java/org/pantsbuild/foo:foo_test')
+      """
+            )
+            touch(os.path.join(target_cwd, "target_cwd_sentinel"))
+            with temporary_dir() as option_cwd:
+                touch(os.path.join(option_cwd, "option_cwd_sentinel"))
+                # TODO(8989): Don't require chroot=False
+                self.set_options(cwd=option_cwd, chroot=False)
+                self._execute_junit_runner(
+                    [("FooTest.java", content)],
+                    target_name="tests/java/org/pantsbuild/foo:foo_test",
+                )
 
-  def test_junit_run_with_coverage_caching(self):
-    source_under_test_content = dedent("""
+    def test_junit_run_with_coverage_caching(self):
+        source_under_test_content = dedent(
+            """
       package org.pantsbuild.foo;
       class Foo {
         static String foo() {
@@ -525,12 +635,14 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
           return "bar";
         }
       }
-    """)
-    source_under_test = self.make_target(spec='tests/java/org/pantsbuild/foo',
-                                         target_type=JavaLibrary,
-                                         sources=['Foo.java'])
+    """
+        )
+        source_under_test = self.make_target(
+            spec="tests/java/org/pantsbuild/foo", target_type=JavaLibrary, sources=["Foo.java"]
+        )
 
-    test_content = dedent("""
+        test_content = dedent(
+            """
       package org.pantsbuild.foo;
       import org.pantsbuild.foo.Foo;
       import org.junit.Test;
@@ -541,25 +653,30 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
           assertEquals("foo", Foo.foo());
         }
       }
-    """)
-    self.make_target(spec='tests/java/org/pantsbuild/foo:foo_test',
-                     target_type=JUnitTests,
-                     sources=['FooTest.java'],
-                     dependencies=[source_under_test])
+    """
+        )
+        self.make_target(
+            spec="tests/java/org/pantsbuild/foo:foo_test",
+            target_type=JUnitTests,
+            sources=["FooTest.java"],
+            dependencies=[source_under_test],
+        )
 
-    self.set_options(coverage=True)
+        self.set_options(coverage=True)
 
-    with self.cache_check(expected_num_artifacts=1):
-      self._execute_junit_runner([('Foo.java', source_under_test_content),
-                                  ('FooTest.java', test_content)],
-                                 target_name='tests/java/org/pantsbuild/foo:foo_test')
+        with self.cache_check(expected_num_artifacts=1):
+            self._execute_junit_runner(
+                [("Foo.java", source_under_test_content), ("FooTest.java", test_content)],
+                target_name="tests/java/org/pantsbuild/foo:foo_test",
+            )
 
-    # Now re-execute with a partial invalidation of the input targets. Since coverage is enabled,
-    # that input set is {tests/java/org/pantsbuild/foo, tests/java/org/pantsbuild/foo:bar_test}
-    # with only tests/java/org/pantsbuild/foo:bar_test invalidated. Even though the invalidation is
-    # partial over all input targets, it is total over all the test targets in the input and so the
-    # successful result run is eligible for caching.
-    test_content_edited = dedent("""
+        # Now re-execute with a partial invalidation of the input targets. Since coverage is enabled,
+        # that input set is {tests/java/org/pantsbuild/foo, tests/java/org/pantsbuild/foo:bar_test}
+        # with only tests/java/org/pantsbuild/foo:bar_test invalidated. Even though the invalidation is
+        # partial over all input targets, it is total over all the test targets in the input and so the
+        # successful result run is eligible for caching.
+        test_content_edited = dedent(
+            """
       package org.pantsbuild.foo;
       import org.pantsbuild.foo.Foo;
       import org.junit.Test;
@@ -570,52 +687,58 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
           assertEquals("bar", Foo.bar());
         }
       }
-    """)
-    self.make_target(spec='tests/java/org/pantsbuild/foo:bar_test',
-                     target_type=JUnitTests,
-                     sources=['FooTest.java'],
-                     dependencies=[source_under_test])
+    """
+        )
+        self.make_target(
+            spec="tests/java/org/pantsbuild/foo:bar_test",
+            target_type=JUnitTests,
+            sources=["FooTest.java"],
+            dependencies=[source_under_test],
+        )
 
-    with self.cache_check(expected_num_artifacts=1):
-      self._execute_junit_runner([('Foo.java', source_under_test_content),
-                                  ('FooTest.java', test_content_edited)],
-                                 target_name='tests/java/org/pantsbuild/foo:bar_test',
-                                 create_some_resources=False)
+        with self.cache_check(expected_num_artifacts=1):
+            self._execute_junit_runner(
+                [("Foo.java", source_under_test_content), ("FooTest.java", test_content_edited)],
+                target_name="tests/java/org/pantsbuild/foo:bar_test",
+                create_some_resources=False,
+            )
 
-  @contextmanager
-  def _coverage_engine(self):
-    junit_run = self.prepare_execute(self.context())
-    with temporary_dir() as output_dir:
-      code_coverage = CodeCoverage.global_instance()
-      source_under_test = self.make_target(spec='tests/java/org/pantsbuild/foo',
-                                      target_type=JavaLibrary,
-                                      sources=['Foo.java'])
-      yield code_coverage.get_coverage_engine(task=junit_run,
-                                              output_dir=output_dir,
-                                              all_targets=[source_under_test],
-                                              execute_java=junit_run.execute_java_for_coverage)
+    @contextmanager
+    def _coverage_engine(self):
+        junit_run = self.prepare_execute(self.context())
+        with temporary_dir() as output_dir:
+            code_coverage = CodeCoverage.global_instance()
+            source_under_test = self.make_target(
+                spec="tests/java/org/pantsbuild/foo", target_type=JavaLibrary, sources=["Foo.java"]
+            )
+            yield code_coverage.get_coverage_engine(
+                task=junit_run,
+                output_dir=output_dir,
+                all_targets=[source_under_test],
+                execute_java=junit_run.execute_java_for_coverage,
+            )
 
-  def _assert_coverage_engine(self, expected_engine_type):
-    with self._coverage_engine() as engine:
-      self.assertIsInstance(engine, expected_engine_type)
+    def _assert_coverage_engine(self, expected_engine_type):
+        with self._coverage_engine() as engine:
+            self.assertIsInstance(engine, expected_engine_type)
 
-  def test_coverage_default_off(self):
-    self._assert_coverage_engine(NoCoverage)
+    def test_coverage_default_off(self):
+        self._assert_coverage_engine(NoCoverage)
 
-  def test_coverage_explicit_on(self):
-    self.set_options(coverage=True)
-    self._assert_coverage_engine(Cobertura)
+    def test_coverage_explicit_on(self):
+        self.set_options(coverage=True)
+        self._assert_coverage_engine(Cobertura)
 
-  def test_coverage_open_implicit_on(self):
-    self.set_options(coverage_open=True)
-    self._assert_coverage_engine(Cobertura)
+    def test_coverage_open_implicit_on(self):
+        self.set_options(coverage_open=True)
+        self._assert_coverage_engine(Cobertura)
 
-  def test_coverage_processor_implicit_on(self):
-    self.set_options(coverage_processor='jacoco')
-    self._assert_coverage_engine(Jacoco)
+    def test_coverage_processor_implicit_on(self):
+        self.set_options(coverage_processor="jacoco")
+        self._assert_coverage_engine(Jacoco)
 
-  def test_coverage_processor_invalid(self):
-    self.set_options(coverage_processor='bob')
-    with self.assertRaises(CodeCoverage.InvalidCoverageEngine):
-      with self._coverage_engine():
-        self.fail("We should never get here.")
+    def test_coverage_processor_invalid(self):
+        self.set_options(coverage_processor="bob")
+        with self.assertRaises(CodeCoverage.InvalidCoverageEngine):
+            with self._coverage_engine():
+                self.fail("We should never get here.")

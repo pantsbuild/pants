@@ -3,8 +3,8 @@
 
 
 class FetchError(Exception):
-  """Indicates an error fetching remote code."""
+    """Indicates an error fetching remote code."""
 
-  def add_message_prefix(self, prefix):
-    # Note: Assumes that this object was created with a single string argument.
-    self.args = (f'{prefix}{self.args[0]}', )
+    def add_message_prefix(self, prefix):
+        # Note: Assumes that this object was created with a single string argument.
+        self.args = (f"{prefix}{self.args[0]}",)

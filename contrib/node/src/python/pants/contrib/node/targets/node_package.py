@@ -7,27 +7,27 @@ from pants.build_graph.target import Target
 
 
 class NodePackage(Target):
-  """Represents an abstract Node package, currently handled by NPM internally.
+    """Represents an abstract Node package, currently handled by NPM internally.
 
-  All Node packages have a package name whether they are local or remote so this serves as a base
-  class for all concrete manifestations of packages.
-  """
-
-  def __init__(self, package_name=None, address=None, payload=None, **kwargs):
+    All Node packages have a package name whether they are local or remote so this serves as a base
+    class for all concrete manifestations of packages.
     """
+
+    def __init__(self, package_name=None, address=None, payload=None, **kwargs):
+        """
     :param string package_name: The remote module package name, if not supplied the target name is
                                 used.
     """
-    payload = payload or Payload()
-    payload.add_fields({
-      'package_name': PrimitiveField(package_name or address.target_name),
-    })
-    super().__init__(address=address, payload=payload, **kwargs)
+        payload = payload or Payload()
+        payload.add_fields(
+            {"package_name": PrimitiveField(package_name or address.target_name),}
+        )
+        super().__init__(address=address, payload=payload, **kwargs)
 
-  @property
-  def package_name(self):
-    """The name of the remote module package.
+    @property
+    def package_name(self):
+        """The name of the remote module package.
 
-    :rtype: string
-    """
-    return self.payload.package_name
+        :rtype: string
+        """
+        return self.payload.package_name

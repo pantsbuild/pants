@@ -5,7 +5,7 @@ from pants.backend.python.targets.python_target import PythonTarget
 
 
 class PythonGrpcioLibrary(PythonTarget):
-  """A Python library generated from Protocol Buffer IDL files."""
+    """A Python library generated from Protocol Buffer IDL files."""
 
-  def __init__(self, sources=None, **kwargs):
-    super().__init__(sources=sources, **kwargs)
+    def __init__(self, sources=None, **kwargs):
+        super().__init__(sources=sources, **kwargs)

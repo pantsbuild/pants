@@ -8,21 +8,22 @@ from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.build_graph.address import Address
 from pants.testutil.test_base import TestBase
 
-from pants.contrib.buildgen.build_file_manipulator import (BuildFileManipulator,
-                                                           BuildTargetParseError)
+from pants.contrib.buildgen.build_file_manipulator import (
+    BuildFileManipulator,
+    BuildTargetParseError,
+)
 
 
 class BuildFileManipulatorTest(TestBase):
+    def set_build_file_contents(self, content):
+        self.add_to_build_file("BUILD", content)
+        return BuildFile(self.project_tree, "BUILD")
 
-  def set_build_file_contents(self, content):
-    self.add_to_build_file('BUILD', content)
-    return BuildFile(self.project_tree, 'BUILD')
-
-  def setUp(self):
-    super().setUp()
-    self.project_tree = FileSystemProjectTree(self.build_root)
-    self.complicated_dep_comments = dedent(
-      """\
+    def setUp(self):
+        super().setUp()
+        self.project_tree = FileSystemProjectTree(self.build_root)
+        self.complicated_dep_comments = dedent(
+            """\
       target_type(
         # This comment should be okay
         name = 'no_bg_no_cry',  # Side comments here will stay
@@ -41,10 +42,10 @@ class BuildFileManipulatorTest(TestBase):
         thing = object()
         # And finally this comment survives
       )"""
-    )
+        )
 
-    self.multi_target_build_string = dedent(
-      """\
+        self.multi_target_build_string = dedent(
+            """\
       # This comment should stay
       target_type(
         name = 'target_top',
@@ -66,11 +67,11 @@ class BuildFileManipulatorTest(TestBase):
         name = 'target_bottom',
       )
       # Also this one though it's weird"""
-    )
+        )
 
-  def test_malformed_targets(self):
-    bad_targets = dedent(
-      """
+    def test_malformed_targets(self):
+        bad_targets = dedent(
+            """
       target_type(name='name_on_line')
 
       target_type(
@@ -113,30 +114,30 @@ class BuildFileManipulatorTest(TestBase):
         name = 'sentinel',
       )
       """
-    )
+        )
 
-    build_file = self.set_build_file_contents(bad_targets)
+        build_file = self.set_build_file_contents(bad_targets)
 
-    bad_target_names = [
-      'name_on_line',
-      'dangling_kwarg_value',
-      # TODO(pl): See TODO above
-      # 'non_str_literal',
-      'end_paren_not_on_own_line',
-      'name_not_in_build_file',
-      'has_non_kwarg',
-      'non_list_deps',
-    ]
-    # Make sure this exception isn't just being thrown no matter what.
-    # TODO(pl): These exception types should be more granular.
-    BuildFileManipulator.load(build_file, 'sentinel', {'target_type'})
-    for bad_target in bad_target_names:
-      with self.assertRaises(BuildTargetParseError):
-        BuildFileManipulator.load(build_file, bad_target, {'target_type'})
+        bad_target_names = [
+            "name_on_line",
+            "dangling_kwarg_value",
+            # TODO(pl): See TODO above
+            # 'non_str_literal',
+            "end_paren_not_on_own_line",
+            "name_not_in_build_file",
+            "has_non_kwarg",
+            "non_list_deps",
+        ]
+        # Make sure this exception isn't just being thrown no matter what.
+        # TODO(pl): These exception types should be more granular.
+        BuildFileManipulator.load(build_file, "sentinel", {"target_type"})
+        for bad_target in bad_target_names:
+            with self.assertRaises(BuildTargetParseError):
+                BuildFileManipulator.load(build_file, bad_target, {"target_type"})
 
-  def test_simple_targets(self):
-    simple_targets = dedent(
-      """
+    def test_simple_targets(self):
+        simple_targets = dedent(
+            """
       target_type(
         name = 'no_deps',
       )
@@ -152,39 +153,51 @@ class BuildFileManipulatorTest(TestBase):
         dependencies = []
       )
       """
-    )
+        )
 
-    build_file = self.set_build_file_contents(simple_targets)
+        build_file = self.set_build_file_contents(simple_targets)
 
-    for no_deps_name in ['no_deps', 'empty_deps', 'empty_deps_inline']:
-      no_deps = BuildFileManipulator.load(build_file, no_deps_name, {'target_type'})
-      self.assertEqual(tuple(no_deps.dependency_lines()), tuple())
-      no_deps.add_dependency(Address.parse(':fake_dep'))
-      self.assertEqual(tuple(no_deps.dependency_lines()),
-                       tuple(['  dependencies = [',
-                              "    ':fake_dep',",
-                              '  ],']))
-      no_deps.add_dependency(Address.parse(':b_fake_dep'))
-      no_deps.add_dependency(Address.parse(':a_fake_dep'))
-      self.assertEqual(tuple(no_deps.dependency_lines()),
-                       tuple(['  dependencies = [',
-                              "    ':a_fake_dep',",
-                              "    ':b_fake_dep',",
-                              "    ':fake_dep',",
-                              '  ],']))
-      self.assertEqual(tuple(no_deps.target_lines()),
-                       tuple(['target_type(',
-                              "  name = '{0}',".format(no_deps_name),
-                              '  dependencies = [',
-                              "    ':a_fake_dep',",
-                              "    ':b_fake_dep',",
-                              "    ':fake_dep',",
-                              '  ],',
-                              ')']))
+        for no_deps_name in ["no_deps", "empty_deps", "empty_deps_inline"]:
+            no_deps = BuildFileManipulator.load(build_file, no_deps_name, {"target_type"})
+            self.assertEqual(tuple(no_deps.dependency_lines()), tuple())
+            no_deps.add_dependency(Address.parse(":fake_dep"))
+            self.assertEqual(
+                tuple(no_deps.dependency_lines()),
+                tuple(["  dependencies = [", "    ':fake_dep',", "  ],"]),
+            )
+            no_deps.add_dependency(Address.parse(":b_fake_dep"))
+            no_deps.add_dependency(Address.parse(":a_fake_dep"))
+            self.assertEqual(
+                tuple(no_deps.dependency_lines()),
+                tuple(
+                    [
+                        "  dependencies = [",
+                        "    ':a_fake_dep',",
+                        "    ':b_fake_dep',",
+                        "    ':fake_dep',",
+                        "  ],",
+                    ]
+                ),
+            )
+            self.assertEqual(
+                tuple(no_deps.target_lines()),
+                tuple(
+                    [
+                        "target_type(",
+                        "  name = '{0}',".format(no_deps_name),
+                        "  dependencies = [",
+                        "    ':a_fake_dep',",
+                        "    ':b_fake_dep',",
+                        "    ':fake_dep',",
+                        "  ],",
+                        ")",
+                    ]
+                ),
+            )
 
-  def test_comment_rules(self):
-    expected_target_str = dedent(
-      """\
+    def test_comment_rules(self):
+        expected_target_str = dedent(
+            """\
       target_type(
         # This comment should be okay
         name = 'no_bg_no_cry',  # Side comments here will stay
@@ -203,17 +216,17 @@ class BuildFileManipulatorTest(TestBase):
         thing = object()
         # And finally this comment survives
       )"""
-    )
+        )
 
-    build_file = self.set_build_file_contents(self.complicated_dep_comments)
+        build_file = self.set_build_file_contents(self.complicated_dep_comments)
 
-    complicated_bfm = BuildFileManipulator.load(build_file, 'no_bg_no_cry', {'target_type'})
-    target_str = '\n'.join(complicated_bfm.target_lines())
-    self.assertEqual(target_str, expected_target_str)
+        complicated_bfm = BuildFileManipulator.load(build_file, "no_bg_no_cry", {"target_type"})
+        target_str = "\n".join(complicated_bfm.target_lines())
+        self.assertEqual(target_str, expected_target_str)
 
-  def test_forced_target_rules(self):
-    expected_target_str = dedent(
-      """\
+    def test_forced_target_rules(self):
+        expected_target_str = dedent(
+            """\
       target_type(
         # This comment should be okay
         name = 'no_bg_no_cry',  # Side comments here will stay
@@ -230,18 +243,18 @@ class BuildFileManipulatorTest(TestBase):
         thing = object()
         # And finally this comment survives
       )"""
-    )
+        )
 
-    build_file = self.set_build_file_contents(self.complicated_dep_comments)
+        build_file = self.set_build_file_contents(self.complicated_dep_comments)
 
-    complicated_bfm = BuildFileManipulator.load(build_file, 'no_bg_no_cry', {'target_type'})
-    complicated_bfm.clear_unforced_dependencies()
-    target_str = '\n'.join(complicated_bfm.target_lines())
-    self.assertEqual(target_str, expected_target_str)
+        complicated_bfm = BuildFileManipulator.load(build_file, "no_bg_no_cry", {"target_type"})
+        complicated_bfm.clear_unforced_dependencies()
+        target_str = "\n".join(complicated_bfm.target_lines())
+        self.assertEqual(target_str, expected_target_str)
 
-  def test_target_insertion_bottom(self):
-    expected_build_string = dedent(
-      """\
+    def test_target_insertion_bottom(self):
+        expected_build_string = dedent(
+            """\
       # This comment should stay
       target_type(
         name = 'target_top',
@@ -266,18 +279,18 @@ class BuildFileManipulatorTest(TestBase):
         ],
       )
       # Also this one though it's weird"""
-    )
+        )
 
-    build_file = self.set_build_file_contents(self.multi_target_build_string)
+        build_file = self.set_build_file_contents(self.multi_target_build_string)
 
-    multi_targ_bfm = BuildFileManipulator.load(build_file, 'target_bottom', {'target_type'})
-    multi_targ_bfm.add_dependency(Address.parse(':new_dep'))
-    build_file_str = '\n'.join(multi_targ_bfm.build_file_lines())
-    self.assertEqual(build_file_str, expected_build_string)
+        multi_targ_bfm = BuildFileManipulator.load(build_file, "target_bottom", {"target_type"})
+        multi_targ_bfm.add_dependency(Address.parse(":new_dep"))
+        build_file_str = "\n".join(multi_targ_bfm.build_file_lines())
+        self.assertEqual(build_file_str, expected_build_string)
 
-  def test_target_insertion_top(self):
-    expected_build_string = dedent(
-      """\
+    def test_target_insertion_top(self):
+        expected_build_string = dedent(
+            """\
       # This comment should stay
       target_type(
         name = 'target_top',
@@ -300,18 +313,18 @@ class BuildFileManipulatorTest(TestBase):
         name = 'target_bottom',
       )
       # Also this one though it's weird"""
-    )
+        )
 
-    build_file = self.set_build_file_contents(self.multi_target_build_string)
+        build_file = self.set_build_file_contents(self.multi_target_build_string)
 
-    multi_targ_bfm = BuildFileManipulator.load(build_file, 'target_top', {'target_type'})
-    multi_targ_bfm.add_dependency(Address.parse(':new_dep'))
-    build_file_str = '\n'.join(multi_targ_bfm.build_file_lines())
-    self.assertEqual(build_file_str, expected_build_string)
+        multi_targ_bfm = BuildFileManipulator.load(build_file, "target_top", {"target_type"})
+        multi_targ_bfm.add_dependency(Address.parse(":new_dep"))
+        build_file_str = "\n".join(multi_targ_bfm.build_file_lines())
+        self.assertEqual(build_file_str, expected_build_string)
 
-  def test_target_insertion_middle(self):
-    expected_build_string = dedent(
-      """\
+    def test_target_insertion_middle(self):
+        expected_build_string = dedent(
+            """\
       # This comment should stay
       target_type(
         name = 'target_top',
@@ -334,18 +347,18 @@ class BuildFileManipulatorTest(TestBase):
         name = 'target_bottom',
       )
       # Also this one though it's weird"""
-    )
+        )
 
-    build_file = self.set_build_file_contents(self.multi_target_build_string)
+        build_file = self.set_build_file_contents(self.multi_target_build_string)
 
-    multi_targ_bfm = BuildFileManipulator.load(build_file, 'target_middle', {'target_type'})
-    multi_targ_bfm.add_dependency(Address.parse(':new_dep'))
-    build_file_str = '\n'.join(multi_targ_bfm.build_file_lines())
-    self.assertEqual(build_file_str, expected_build_string)
+        multi_targ_bfm = BuildFileManipulator.load(build_file, "target_middle", {"target_type"})
+        multi_targ_bfm.add_dependency(Address.parse(":new_dep"))
+        build_file_str = "\n".join(multi_targ_bfm.build_file_lines())
+        self.assertEqual(build_file_str, expected_build_string)
 
-  def test_target_write(self):
-    expected_build_string = dedent(
-      """\
+    def test_target_write(self):
+        expected_build_string = dedent(
+            """\
       # This comment should stay
       target_type(
         name = 'target_top',
@@ -369,13 +382,13 @@ class BuildFileManipulatorTest(TestBase):
       )
       # Also this one though it's weird
       """
-    )
+        )
 
-    build_file = self.set_build_file_contents(self.multi_target_build_string + '\n')
+        build_file = self.set_build_file_contents(self.multi_target_build_string + "\n")
 
-    multi_targ_bfm = BuildFileManipulator.load(build_file, 'target_middle', {'target_type'})
-    multi_targ_bfm.add_dependency(Address.parse(':new_dep'))
-    multi_targ_bfm.write(dry_run=False)
+        multi_targ_bfm = BuildFileManipulator.load(build_file, "target_middle", {"target_type"})
+        multi_targ_bfm.add_dependency(Address.parse(":new_dep"))
+        multi_targ_bfm.write(dry_run=False)
 
-    with open(build_file.full_path, 'r') as bf:
-      self.assertEqual(bf.read(), expected_build_string)
+        with open(build_file.full_path, "r") as bf:
+            self.assertEqual(bf.read(), expected_build_string)
