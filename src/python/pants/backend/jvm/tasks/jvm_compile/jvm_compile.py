@@ -343,8 +343,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     """
 
   def create_extra_products_for_targets(self, targets):
-    """Allows subclasses to provide a method which creates extra products directly.
-    """
+    """Allows subclasses to provide a method which creates extra products directly."""
 
   def register_extra_products_from_contexts(self, targets, compile_contexts):
     """Allows subclasses to register additional products for targets.
