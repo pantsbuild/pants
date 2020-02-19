@@ -92,7 +92,7 @@ class JvmRun(JvmTask):
           classpath=self.classpath([target]),
           main=self.get_options().main or binary.main,
           executor=executor,
-          jvm_options=self.jvm_options + platform.jvm_options + extra_jvm_options,
+          jvm_options=self.jvm_options + list(platform.jvm_options) + list(extra_jvm_options),
           args=self.args,
           cwd=working_dir,
           synthetic_jar_dir=self.workdir,
