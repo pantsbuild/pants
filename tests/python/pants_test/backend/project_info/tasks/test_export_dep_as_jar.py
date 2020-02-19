@@ -282,7 +282,7 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
                            for_task_types=[BootstrapJvmTools])
 
     runtime_classpath = self.create_runtime_classpath_for_targets(self.scala_with_source_dep)
-    context.products.safe_create_data('export_dep_as_jar_classpath',
+    context.products.safe_create_data('runtime_classpath',
                                       init_func=lambda: runtime_classpath)
 
     context.products.safe_create_data('zinc_args', init_func=lambda: MagicMock())

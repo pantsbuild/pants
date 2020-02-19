@@ -1,6 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import itertools
 from dataclasses import dataclass
 from typing import Tuple
 
@@ -14,8 +15,8 @@ from pants.engine.fs import (
 )
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.isolated_process import ExecuteProcessResult
-from pants.engine.legacy.graph import HydratedTargets
-from pants.engine.legacy.structs import TargetAdaptor
+from pants.engine.legacy.graph import HydratedTargetsWithOrigins
+from pants.engine.legacy.structs import TargetAdaptorWithOrigin
 from pants.engine.objects import union
 from pants.engine.rules import UnionMembership, goal_rule
 from pants.engine.selectors import Get, MultiGet
@@ -55,19 +56,21 @@ class AggregatedFmtResults:
 
 @union
 class FormatTarget:
-  """A union for registration of a formattable target type."""
+  """A union for registration of a formattable target type.
+
+  The union members should be subclasses of TargetAdaptorWithOrigin.
+  """
 
   @staticmethod
   def is_formattable(
-    target_adaptor: TargetAdaptor, *, union_membership: UnionMembership
+    adaptor_with_origin: TargetAdaptorWithOrigin, *, union_membership: UnionMembership,
   ) -> bool:
-    return (
-      union_membership.is_member(FormatTarget, target_adaptor)
-      # TODO: make TargetAdaptor return a 'sources' field with an empty snapshot instead of
-      #  raising to remove the hasattr() checks here!
-      and hasattr(target_adaptor, "sources")
-      and target_adaptor.sources.snapshot.files  # i.e., sources is not empty
+    is_fmt_target = union_membership.is_member(FormatTarget, adaptor_with_origin)
+    has_sources = (
+      hasattr(adaptor_with_origin.adaptor, "sources")
+      and bool(adaptor_with_origin.adaptor.sources.snapshot.files)
     )
+    return has_sources and is_fmt_target
 
 
 class FmtOptions(GoalSubsystem):
@@ -87,20 +90,24 @@ class Fmt(Goal):
 @goal_rule
 async def fmt(
   console: Console,
-  targets: HydratedTargets,
+  targets_with_origins: HydratedTargetsWithOrigins,
   workspace: Workspace,
   union_membership: UnionMembership
 ) -> Fmt:
-  aggregated_results = await MultiGet(
-    Get[AggregatedFmtResults](FormatTarget, target.adaptor)
-    for target in targets
-    if FormatTarget.is_formattable(target.adaptor, union_membership=union_membership)
-  )
-  individual_results = [
-    result
-    for aggregated_result in aggregated_results
-    for result in aggregated_result.results
+  adaptors_with_origins = [
+    TargetAdaptorWithOrigin.create(target_with_origin.target.adaptor, target_with_origin.origin)
+    for target_with_origin in targets_with_origins
   ]
+  aggregated_results = await MultiGet(
+    Get[AggregatedFmtResults](FormatTarget, adaptor_with_origin)
+    for adaptor_with_origin in adaptors_with_origins
+    if FormatTarget.is_formattable(adaptor_with_origin, union_membership=union_membership)
+  )
+  individual_results = list(
+    itertools.chain.from_iterable(
+      aggregated_result.results for aggregated_result in aggregated_results
+    )
+  )
 
   if not individual_results:
     return Fmt(exit_code=0)
@@ -126,6 +133,4 @@ async def fmt(
 
 
 def rules():
-  return [
-    fmt,
-  ]
+  return [fmt]

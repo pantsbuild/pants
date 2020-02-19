@@ -4,6 +4,7 @@
 from pants.backend.jvm.subsystems.jvm import JVM
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.jvm_target import JvmTarget
+from pants.backend.jvm.targets.runtime_platform_mixin import RuntimePlatformMixin
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.target_scopes import Scopes
@@ -74,14 +75,21 @@ class JvmTask(Task):
 
   def preferred_jvm_distribution_for_targets(self, targets, jdk=False, strict=False):
     """Find the preferred jvm distribution for running code from the given targets."""
-    return self.preferred_jvm_distribution(self._jvm_platforms_from_targets(targets),
-                                           jdk=jdk, strict=strict)
+    target_platforms = [self._runtime_platform_for_target(target) for target in targets if
+      isinstance(target, JvmTarget)]
+    if not target_platforms:
+      platforms = [JvmPlatform.default_runtime_platform]
+    else:
+      platforms = target_platforms
+    return self.preferred_jvm_distribution(
+      platforms,
+      jdk=jdk, strict=strict)
+
+  def _runtime_platform_for_target(self, target):
+    if isinstance(target, RuntimePlatformMixin):
+      return target.runtime_platform
+    else:
+      return target.platform
 
   def preferred_jvm_distribution(self, platforms, jdk=False, strict=False):
     return JvmPlatform.preferred_jvm_distribution(platforms, jdk=jdk, strict=strict)
-
-  def _jvm_platforms_from_targets(self, targets):
-    # Override this to change platform lookup.
-    # This overriding will be eliminated in the next change.
-    return [target.platform for target in targets
-            if isinstance(target, JvmTarget)]

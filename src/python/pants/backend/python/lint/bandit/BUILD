@@ -36,5 +36,4 @@ python_tests(
     'src/python/pants/testutil/subsystem',
   ],
   tags = {'integration', 'partially_type_checked'},
-  timeout = 210,
 )

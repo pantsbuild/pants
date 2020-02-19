@@ -1,0 +1,10 @@
+{
+  "name": "names_to_greet",
+  "version": "1.0.0",
+  "description": "Outputs a json resource",
+  "scripts": {
+    "names": "node build_names.js"
+  },
+  "author": "",
+  "license": "ISC"
+}

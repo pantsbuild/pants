@@ -6,6 +6,7 @@ from abc import ABCMeta
 from hashlib import sha1
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
+from pants.backend.jvm.targets.runtime_platform_mixin import RuntimePlatformMixin
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import (
@@ -279,7 +280,7 @@ class ManifestEntries(FingerprintedMixin):
     return self.payload.entries
 
 
-class JvmBinary(JvmTarget):
+class JvmBinary(RuntimePlatformMixin, JvmTarget):
   """A JVM binary.
 
   Below are a summary of how key goals affect targets of this type:
@@ -305,6 +306,7 @@ class JvmBinary(JvmTarget):
                manifest_entries=None,
                shading_rules=None,
                extra_jvm_options=None,
+               runtime_platform=None,
                **kwargs):
     """
     :API: public
@@ -336,6 +338,11 @@ class JvmBinary(JvmTarget):
       shading_exclude(), shading_relocate_package(), and shading_exclude_package().
     :param list extra_jvm_options: A list of options to be passed to the jvm when running the
       binary. Example: ['-Dexample.property=1', '-DMyFlag', '-Xmx4G'] If unspecified, no extra jvm options will be added.
+    :param str runtime_platform: The name of the platform (defined under the jvm-platform subsystem)
+      to use for runtime (that is, a key into the --jvm-platform-platforms dictionary). If
+      unspecified, the platform will default to the first one of these that exist: (1) the
+      default_runtime_platform specified for jvm-platform, (2) the platform that would be used for
+      the platform kwarg.
     """
     self.address = address  # Set in case a TargetDefinitionException is thrown early
     if main and not isinstance(main, str):
@@ -361,7 +368,8 @@ class JvmBinary(JvmTarget):
       'extra_jvm_options': PrimitiveField(list(extra_jvm_options or ())),
     })
 
-    super().__init__(name=name, address=address, payload=payload, sources=sources, **kwargs)
+    super().__init__(name=name, address=address, payload=payload, sources=sources,
+      runtime_platform=runtime_platform, **kwargs)
 
   @property
   def basename(self):

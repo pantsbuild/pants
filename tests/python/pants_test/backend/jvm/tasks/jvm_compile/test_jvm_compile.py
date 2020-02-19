@@ -68,44 +68,36 @@ class JvmCompileTest(NailgunTaskTestBase):
     for rp in required_products:
       context.products.require_data(rp)
     self.execute(context)
-    return (context.products.get_data('runtime_classpath'), context.products.get_data('export_dep_as_jar_classpath'))
+    return context.products.get_data('runtime_classpath')
 
   def test_modulized_targets_not_compiled_for_export_classpath(self):
     targets = self.make_linear_graph(['a', 'b', 'c', 'd', 'e'], target_type=JavaLibrary)
-    runtime_classpath, export_dep_as_jar_classpath = self.create_and_return_classpath_products(
-      targets, ['export_dep_as_jar_classpath']
+    runtime_classpath = self.create_and_return_classpath_products(
+      targets, ['runtime_classpath', 'export_dep_as_jar_signal']
     )
     # assert none of the modulized targets have classpaths.
     self.assertEqual(
       len(
-        export_dep_as_jar_classpath.get_for_target(targets['a']) +
-        export_dep_as_jar_classpath.get_for_target(targets['b']) +
-        export_dep_as_jar_classpath.get_for_target(targets['c'])
+        runtime_classpath.get_for_target(targets['a']) +
+        runtime_classpath.get_for_target(targets['b']) +
+        runtime_classpath.get_for_target(targets['c'])
       ),
       0
     )
-    self.assertEqual(len(export_dep_as_jar_classpath.get_for_target(targets['d'])), 1)
-    self.assertEqual(len(export_dep_as_jar_classpath.get_for_target(targets['e'])), 1)
+    self.assertEqual(len(runtime_classpath.get_for_target(targets['d'])), 1)
+    self.assertEqual(len(runtime_classpath.get_for_target(targets['e'])), 1)
 
   def test_modulized_targets_are_compiled_when_runtime_classpath_is_requested(self):
     targets = self.make_linear_graph(['a', 'b', 'c', 'd', 'e'], target_type=JavaLibrary)
     # This should cause the jvm compile execution to exclude target roots and their
     # dependess from the set of relevant targets.
-    runtime_classpath, export_dep_as_jar_classpath = self.create_and_return_classpath_products(
-      targets, ['export_dep_as_jar_classpath', 'runtime_classpath']
-    )
-    self.assertEqual(runtime_classpath, export_dep_as_jar_classpath)
-    # assert all of the modulized targets have classpaths.
-    self.assertEqual(len(export_dep_as_jar_classpath.get_for_target(targets['a'])), 1)
-    self.assertEqual(len(export_dep_as_jar_classpath.get_for_target(targets['b'])), 1)
-    self.assertEqual(len(export_dep_as_jar_classpath.get_for_target(targets['c'])), 1)
-
-  def test_export_dep_as_jar_classpath_not_created(self):
-    targets = self.make_linear_graph(['a', 'b', 'c', 'd', 'e'], target_type=JavaLibrary)
-    runtime_classpath, export_dep_as_jar_classpath = self.create_and_return_classpath_products(
+    runtime_classpath = self.create_and_return_classpath_products(
       targets, ['runtime_classpath']
     )
-    self.assertIsNone(export_dep_as_jar_classpath)
+    # assert all of the modulized targets have classpaths.
+    self.assertEqual(len(runtime_classpath.get_for_target(targets['a'])), 1)
+    self.assertEqual(len(runtime_classpath.get_for_target(targets['b'])), 1)
+    self.assertEqual(len(runtime_classpath.get_for_target(targets['c'])), 1)
 
 
 class BaseZincCompileJDKTest(NailgunTaskTestBase):

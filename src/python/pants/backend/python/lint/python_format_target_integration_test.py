@@ -11,11 +11,11 @@ from pants.backend.python.lint.python_format_target import (
   _ConcretePythonFormatTarget,
   format_python_target,
 )
-from pants.backend.python.rules import download_pex_bin, pex
-from pants.backend.python.subsystems import python_native_code, subprocess_environment
+from pants.backend.python.rules import download_pex_bin
+from pants.base.specs import SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.fs import Digest, FileContent, InputFilesContent, Snapshot
-from pants.engine.legacy.structs import TargetAdaptor
+from pants.engine.legacy.structs import TargetAdaptor, TargetAdaptorWithOrigin
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.rules.core.fmt import AggregatedFmtResults
@@ -39,9 +39,6 @@ class PythonFormatTargetIntegrationTest(TestBase):
       *black_rules(),
       *isort_rules(),
       download_pex_bin.download_pex_bin,
-      *pex.rules(),
-      *python_native_code.rules(),
-      *subprocess_environment.rules(),
       RootRule(_ConcretePythonFormatTarget),
       RootRule(BlackTarget),
       RootRule(IsortTarget),
@@ -53,12 +50,12 @@ class PythonFormatTargetIntegrationTest(TestBase):
     source_files: List[FileContent],
   ) -> AggregatedFmtResults:
     input_snapshot = self.request_single_product(Snapshot, InputFilesContent(source_files))
-    target = _ConcretePythonFormatTarget(
-      TargetAdaptor(
-        sources=EagerFilesetWithSpec('test', {'globs': []}, snapshot=input_snapshot),
-        address=Address.parse("test:target"),
-      ),
+    adaptor = TargetAdaptor(
+      sources=EagerFilesetWithSpec('test', {'globs': []}, snapshot=input_snapshot),
+      address=Address.parse("test:target"),
     )
+    origin = SingleAddress(directory="test", name="target")
+    target = _ConcretePythonFormatTarget(TargetAdaptorWithOrigin(adaptor, origin))
     results = self.request_single_product(
       AggregatedFmtResults,
       Params(

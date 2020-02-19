@@ -323,8 +323,10 @@ class TargetAdaptorWithOrigin:
       TargetAdaptor: TargetAdaptorWithOrigin,
       AppAdaptor: AppAdaptorWithOrigin,
       JvmAppAdaptor: JvmAppAdaptorWithOrigin,
+      JvmBinaryAdaptor: JvmBinaryAdaptorWithOrigin,
       PythonAppAdaptor: PythonAppAdaptorWithOrigin,
       ResourcesAdaptor: ResourcesAdaptorWithOrigin,
+      PageAdaptor: PageAdaptorWithOrigin,
       RemoteSourcesAdaptor: RemoteSourcesAdaptorWithOrigin,
       PythonTargetAdaptor: PythonTargetAdaptorWithOrigin,
       PythonBinaryAdaptor: PythonBinaryAdaptorWithOrigin,
@@ -332,7 +334,7 @@ class TargetAdaptorWithOrigin:
       PythonAWSLambdaAdaptor: PythonAWSLambdaAdaptorWithOrigin,
       PythonRequirementLibraryAdaptor: PythonRequirementLibraryAdaptorWithOrigin,
       PantsPluginAdaptor: PantsPluginAdaptorWithOrigin,
-    }[type(adaptor)]
+    }.get(type(adaptor), TargetAdaptorWithOrigin)
     return adaptor_with_origin_cls(adaptor, origin)
 
 
@@ -347,6 +349,11 @@ class JvmAppAdaptorWithOrigin(TargetAdaptorWithOrigin):
 
 
 @dataclass(frozen=True)
+class JvmBinaryAdaptorWithOrigin(TargetAdaptorWithOrigin):
+  adaptor: JvmBinaryAdaptor
+
+
+@dataclass(frozen=True)
 class PythonAppAdaptorWithOrigin(TargetAdaptorWithOrigin):
   adaptor: PythonAppAdaptor
 
@@ -354,6 +361,11 @@ class PythonAppAdaptorWithOrigin(TargetAdaptorWithOrigin):
 @dataclass(frozen=True)
 class ResourcesAdaptorWithOrigin(TargetAdaptorWithOrigin):
   adaptor: ResourcesAdaptor
+
+
+@dataclass(frozen=True)
+class PageAdaptorWithOrigin(TargetAdaptorWithOrigin):
+  adaptor: PageAdaptor
 
 
 @dataclass(frozen=True)
