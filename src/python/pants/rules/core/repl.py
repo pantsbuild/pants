@@ -50,9 +50,9 @@ async def run_repl(
     union_membership: UnionMembership,
     global_options: GlobalOptions) -> Repl:
 
-  # Once #9142 is merged, we can guarantee that we will only even enter this `goal_rule` if there
-  # exists an implementer of the `ReplImplementation` union, so it's not a problem that this can
-  # in principle throw an exception.
+  # We can guarantee that we will only even enter this `goal_rule` if there exists an implementer
+  # of the `ReplImplementation` union because `LegacyGraphSession.run_goal_rules()` will not
+  # execute this rule's body if there are no implementations registered.
   repl_impl = next(iter(union_membership.union_rules[ReplImplementation]))
   repl_binary = await Get[ReplBinary](ReplImplementation, repl_impl(addresses))
 

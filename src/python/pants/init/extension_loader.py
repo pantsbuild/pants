@@ -111,16 +111,11 @@ def load_build_configuration_from_source(build_configuration, backends1, backend
     the build configuration.
   """
   # pants.build_graph and pants.core_task must always be loaded, and before any other backends.
-  backend_packages1 = OrderedSet([
-      'pants.build_graph',
-      'pants.core_tasks',
-    ] + (backends1 or []))
+  backend_packages1 = OrderedSet(['pants.build_graph', 'pants.core_tasks', *backends1])
   for backend_package in backend_packages1:
     load_backend(build_configuration, backend_package, is_v1_backend=True)
 
-  backend_packages2 = OrderedSet([
-      'pants.rules.core',
-    ] + (backends2 or []))
+  backend_packages2 = OrderedSet(['pants.rules.core', *backends2])
   for backend_package in backend_packages2:
     load_backend(build_configuration, backend_package, is_v1_backend=False)
 
@@ -132,7 +127,7 @@ def load_backend(build_configuration: BuildConfiguration, backend_package: str,
   :param build_configuration: the BuildConfiguration to install the backend plugin into.
   :param backend_package: the package name containing the backend plugin register module that
     provides the plugin entrypoints.
-  :param bool is_v1_backend: Is this a v1 or v2 backend.
+  :param is_v1_backend: Is this a v1 or v2 backend.
   :raises: :class:``pants.base.exceptions.BuildConfigurationError`` if there is a problem loading
     the build configuration."""
   backend_module = backend_package + '.register'

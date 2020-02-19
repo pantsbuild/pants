@@ -76,7 +76,7 @@ class FmtTest(TestBase):
         console,
         HydratedTargetsWithOrigins(targets),
         Workspace(self.scheduler),
-        UnionMembership(union_rules={FormatTarget: [PythonTargetAdaptorWithOrigin]})
+        UnionMembership({FormatTarget: [PythonTargetAdaptorWithOrigin]})
       ],
       mock_gets=[
         MockGet(

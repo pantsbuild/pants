@@ -30,7 +30,7 @@ class LintTest(TestBase):
       rule_args=[
         console,
         HydratedTargetsWithOrigins(targets),
-        UnionMembership(union_rules={LintTarget: [PythonTargetAdaptorWithOrigin]})
+        UnionMembership({LintTarget: [PythonTargetAdaptorWithOrigin]})
       ],
       mock_gets=[
         MockGet(
