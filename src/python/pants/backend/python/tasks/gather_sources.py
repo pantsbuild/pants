@@ -23,9 +23,8 @@ from pants.util.dirutil import safe_concurrent_creation
 class GatherSources(Task):
   """Gather local Python sources.
 
-  Creates an (unzipped) PEX on disk containing the local Python sources. This PEX can be merged
-  with a requirements PEX to create a unified Python environment for running the relevant python
-  code.
+  Creates an (unzipped) PEX on disk containing the local Python sources. This PEX can be merged with
+  a requirements PEX to create a unified Python environment for running the relevant python code.
   """
 
   PYTHON_SOURCES = 'python_sources'

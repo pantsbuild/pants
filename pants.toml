@@ -63,9 +63,14 @@ backend_packages.add = [
   "internal_backend.sitegen",
   "internal_backend.utilities",
 ]
+backend_packages.remove = [
+  # We use the V2 isort implementation.
+  "pants.backend.python.lint.isort",
+]
 backend_packages2 = [
   "pants.backend.project_info",
   "pants.backend.python",
+  "pants.backend.python.lint.docformatter",
   "pants.backend.python.lint.isort",
   "pants.backend.native",
   "internal_backend.rules_for_testing",
@@ -233,6 +238,9 @@ no_warning_args = [
 
 [checkstyle]
 config = "%(pants_supportdir)s/checkstyle/coding_style.xml"
+
+[docformatter]
+args = ["--wrap-summaries=100", "--wrap-descriptions=100"]
 
 [eslint]
 setupdir = "%(pants_supportdir)s/eslint"

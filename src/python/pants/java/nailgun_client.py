@@ -55,8 +55,8 @@ class NailgunClientSession(NailgunProtocol, NailgunProtocol.TimeoutProvider):
     self._exit_reason = None
 
   def _set_exit_timeout(self, timeout, reason):
-    """Set a timeout for the remainder of the session, along with an exception to raise.
-    which is implemented by NailgunProtocol.
+    """Set a timeout for the remainder of the session, along with an exception to raise. which is
+    implemented by NailgunProtocol.
 
     This method may be called by a signal handler to set a timeout for the remainder of the
     session. If the session completes before the timeout does, the exception in `reason` is
@@ -108,7 +108,8 @@ class NailgunClientSession(NailgunProtocol, NailgunProtocol.TimeoutProvider):
     :raises: :class:`NailgunProtocol.ProcessStreamTimeout` if a timeout set from a signal handler
                                                            with .set_exit_timeout() completes.
     :raises: :class:`Exception` if the session completes before the timeout, the `reason` argument
-                                to .set_exit_timeout() will be raised."""
+                                to .set_exit_timeout() will be raised.
+    """
     try:
       for chunk_type, payload in self.iter_chunks(
         MaybeShutdownSocket(self._sock),

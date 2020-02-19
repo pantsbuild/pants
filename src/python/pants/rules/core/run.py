@@ -1,7 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pathlib import Path
+from pathlib import PurePath
 
 from pants.base.build_root import BuildRoot
 from pants.build_graph.address import Address
@@ -50,14 +50,14 @@ async def run(
   address = addresses.expect_single()
   binary = await Get[CreatedBinary](Address, address)
 
-  with temporary_dir(root_dir=str(Path(build_root.path, ".pants.d")), cleanup=True) as tmpdir:
-    path_relative_to_build_root = str(Path(tmpdir).relative_to(build_root.path))
+  with temporary_dir(root_dir=PurePath(build_root.path, ".pants.d").as_posix(), cleanup=True) as tmpdir:
+    path_relative_to_build_root = PurePath(tmpdir).relative_to(build_root.path).as_posix()
     workspace.materialize_directory(
       DirectoryToMaterialize(binary.digest, path_prefix=path_relative_to_build_root)
     )
 
     console.write_stdout(f"Running target: {address}\n")
-    full_path = str(Path(tmpdir, binary.binary_name))
+    full_path = PurePath(tmpdir, binary.binary_name).as_posix()
     run_request = InteractiveProcessRequest(
       argv=(full_path, *options.values.args),
       run_in_workspace=True,

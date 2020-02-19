@@ -208,11 +208,8 @@ class Checkstyle(LintTaskMixin, Task):
                                     stderr=workunit.output('stderr'))
 
   def _constraints_are_whitelisted(self, constraint_tuple):
-    """
-    Detect whether a tuple of compatibility constraints
-    matches constraints imposed by the merged list of the global
-    constraints from PythonSetup and a user-supplied whitelist.
-    """
+    """Detect whether a tuple of compatibility constraints matches constraints imposed by the merged
+    list of the global constraints from PythonSetup and a user-supplied whitelist."""
     if self._acceptable_interpreter_constraints == []:
       # The user wants to lint everything.
       return True

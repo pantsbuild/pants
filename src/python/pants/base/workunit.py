@@ -166,9 +166,10 @@ class WorkUnit:
   def set_outcome(self, outcome):
     """Set the outcome of this work unit.
 
-    We can set the outcome on a work unit directly, but that outcome will also be affected by
-    those of its subunits. The right thing happens: The outcome of a work unit is the
-    worst outcome of any of its subunits and any outcome set on it directly."""
+    We can set the outcome on a work unit directly, but that outcome will also be affected by those
+    of its subunits. The right thing happens: The outcome of a work unit is the worst outcome of any
+    of its subunits and any outcome set on it directly.
+    """
     if outcome not in range(0, 5):
       raise Exception('Invalid outcome: {}'.format(outcome))
 
@@ -247,7 +248,7 @@ class WorkUnit:
     return ret
 
   def is_background(self, background_root_workunit):
-    """ Returns True if this workunit is a background root workunit or its successor.
+    """Returns True if this workunit is a background root workunit or its successor.
 
     :param WorkUnit background_root_workunit: parent of all background workunits.
 

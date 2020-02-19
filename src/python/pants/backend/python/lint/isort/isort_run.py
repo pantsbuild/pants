@@ -5,11 +5,11 @@ import functools
 import logging
 import os
 
+from pants.backend.python.lint.isort.isort_prep import IsortPrep
 from pants.backend.python.lint.isort.subsystem import Isort
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_tests import PythonTests
-from pants.backend.python.tasks.isort_prep import IsortPrep
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel

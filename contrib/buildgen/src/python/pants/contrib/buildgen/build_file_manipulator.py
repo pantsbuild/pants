@@ -19,8 +19,8 @@ class BuildTargetParseError(Exception): pass
 class DependencySpec:
   """A representation of a single dependency spec, including comments around it.
 
-  This is a helper class to aid in deduplicating, sorting, forcing, and formatting
-  dependency specs in a BUILD target's dependencies section.
+  This is a helper class to aid in deduplicating, sorting, forcing, and formatting dependency specs
+  in a BUILD target's dependencies section.
   """
 
   def __init__(self, spec, comments_above=None, side_comment=None):
@@ -345,7 +345,10 @@ class BuildFileManipulator:
       self._dependencies_by_address[dep_address] = dep
 
   def add_dependency(self, address):
-    """Add a dependency to this target.  This will deduplicate existing dependencies."""
+    """Add a dependency to this target.
+
+    This will deduplicate existing dependencies.
+    """
     if address in self._dependencies_by_address:
       if self._dependencies_by_address[address].has_comment():
         logger.warning('BuildFileManipulator would have added {address} as a dependency of '
@@ -358,10 +361,10 @@ class BuildFileManipulator:
   def clear_unforced_dependencies(self):
     """Remove all dependencies not forced by a comment.
 
-    This is useful when existing analysis can infer exactly what the correct dependencies should
-    be.  Typical use is to call `clear_unforced_dependencies`, then call `add_dependency` for each
-    dependency inferred from analysis.  The resulting dependency set should be the pruned set
-    of all dependencies, plus dependencies hand forced by a user comment.
+    This is useful when existing analysis can infer exactly what the correct dependencies should be.
+    Typical use is to call `clear_unforced_dependencies`, then call `add_dependency` for each
+    dependency inferred from analysis.  The resulting dependency set should be the pruned set of all
+    dependencies, plus dependencies hand forced by a user comment.
     """
     self._dependencies_by_address = dict(
       (address, dep) for address, dep in self._dependencies_by_address.items()
@@ -385,8 +388,8 @@ class BuildFileManipulator:
   def target_lines(self):
     """The formatted target_type(...) lines for this target.
 
-    This is just a convenience method for extracting and re-injecting the changed
-    `dependency_lines` into the target text.
+    This is just a convenience method for extracting and re-injecting the changed `dependency_lines`
+    into the target text.
     """
     target_lines = self._target_source_lines[:]
     deps_begin, deps_end = self._dependencies_interval

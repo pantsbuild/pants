@@ -42,8 +42,8 @@ class GoImportMetaTagReader(Subsystem):
   def get_imported_repo(self, import_path):
     """Looks for a go-import meta tag for the provided import_path.
 
-    Returns an ImportedRepo instance with the information in the meta tag,
-    or None if no go-import meta tag is found.
+    Returns an ImportedRepo instance with the information in the meta tag, or None if no go-import
+    meta tag is found.
     """
     try:
       session = requests.session()

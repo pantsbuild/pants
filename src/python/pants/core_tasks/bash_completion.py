@@ -34,8 +34,8 @@ class BashCompletion(ConsoleTask):
   def _get_all_cmd_line_scopes():
     """Return all scopes that may be explicitly specified on the cmd line, in no particular order.
 
-    Note that this includes only task scope, and not, say, subsystem scopes,
-    as those aren't specifiable on the cmd line.
+    Note that this includes only task scope, and not, say, subsystem scopes, as those aren't
+    specifiable on the cmd line.
     """
     all_scopes ={GLOBAL_SCOPE}
     for goal in Goal.all():

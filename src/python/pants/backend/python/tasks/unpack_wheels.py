@@ -24,8 +24,7 @@ class UnpackWheelsFingerprintStrategy(DefaultFingerprintHashingMixin, Fingerprin
 
   def compute_fingerprint(self, target):
     """UnpackedWheels targets need to be re-unpacked if any of its configuration changes or any of
-    the jars they import have changed.
-    """
+    the jars they import have changed."""
     if isinstance(target, UnpackedWheels):
       hasher = sha1()
       for cache_key in sorted(req.cache_key() for req in target.all_imported_requirements):

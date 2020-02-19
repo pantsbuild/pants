@@ -76,7 +76,8 @@ class ChangedOptions:
   """A wrapper for the options from the `Changed` Subsystem.
 
   This is necessary because parsing of these options happens before conventional subsystems are
-  configured, so the normal mechanisms like `subsystem_rule` would not work properly."""
+  configured, so the normal mechanisms like `subsystem_rule` would not work properly.
+  """
   changes_since: Optional[str]
   diffspec: Optional[str]
   include_dependees: IncludeDependeesOption
@@ -102,8 +103,8 @@ class ChangedOptions:
 class Changed(Subsystem):
   """A subsystem for global `changed` functionality.
 
-  This supports the `--changed-*` argument target root replacements, e.g.
-  `./pants --changed-parent=HEAD~3 list`.
+  This supports the `--changed-*` argument target root replacements, e.g. `./pants --changed-
+  parent=HEAD~3 list`.
   """
   options_scope = 'changed'
 

@@ -14,7 +14,7 @@ from pants.util.dirutil import mergetree, safe_mkdir, safe_walk
 
 
 class Scoverage(CoverageEngine):
-  """Class to run coverage tests with scoverage"""
+  """Class to run coverage tests with scoverage."""
 
 
   class Factory(Subsystem, JvmToolMixin):
@@ -104,11 +104,11 @@ class Scoverage(CoverageEngine):
 
   #
   def _iter_datafiles(self, output_dir):
-    """
-    All scoverage instrument files have the name "scoverage.coverage" and
-    all measurement files are called "scoverage.measurements.<Thread ID>".
-    This function is used in [instrument(output_dir)] function below to clean up
-    all pre-existing scoverage files before generating new ones.
+    """All scoverage instrument files have the name "scoverage.coverage" and all measurement files
+    are called "scoverage.measurements.<Thread ID>".
+
+    This function is used in [instrument(output_dir)] function below to clean up all pre-existing
+    scoverage files before generating new ones.
     """
     for root, _, files in safe_walk(output_dir):
       for f in files:
@@ -117,11 +117,11 @@ class Scoverage(CoverageEngine):
 
   #
   def _iter_datadirs(self, output_dir):
-    """
-    Used below for target filtering. Returns the parent directories
-    under which all the scoverage data (for all targets) is stored.
-    Currently, since all scoverage data for a test target is stored under
-    `scoverage/measurements`, path to `scoverage/measurements` is returned.
+    """Used below for target filtering.
+
+    Returns the parent directories under which all the scoverage data (for all targets) is stored.
+    Currently, since all scoverage data for a test target is stored under `scoverage/measurements`,
+    path to `scoverage/measurements` is returned.
     """
     for root, dirs, _ in safe_walk(output_dir):
       for d in dirs:

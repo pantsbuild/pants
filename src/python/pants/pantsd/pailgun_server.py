@@ -109,8 +109,8 @@ class PailgunHandleRequestLock:
     self.available = True
 
   def acquire(self, timeout=0.0):
-    """
-    Try to acquire the lock, blocking until the timeout is reached. Will return immediately if the lock is acquired.
+    """Try to acquire the lock, blocking until the timeout is reached. Will return immediately if
+    the lock is acquired.
 
     :return True if the lock was acquired, False if the timeout was reached.
     """
@@ -193,8 +193,8 @@ class PailgunServer(ThreadingMixIn, TCPServer):
   def process_request(self, request, client_address):
     """Start a new thread to process the request.
 
-    This is lovingly copied and pasted from ThreadingMixIn, with the addition of setting the name
-    of the thread. It's a shame that ThreadingMixIn doesn't provide a customization hook.
+    This is lovingly copied and pasted from ThreadingMixIn, with the addition of setting the name of
+    the thread. It's a shame that ThreadingMixIn doesn't provide a customization hook.
     """
     t = threading.Thread(
       target=self.process_request_thread,
@@ -239,8 +239,7 @@ class PailgunServer(ThreadingMixIn, TCPServer):
 
   @contextmanager
   def ensure_request_is_exclusive(self, environment, request):
-    """
-    Ensure that this is the only pants running.
+    """Ensure that this is the only pants running.
 
     We currently don't allow parallel pants runs, so this function blocks a request thread until
     there are no more requests being handled.

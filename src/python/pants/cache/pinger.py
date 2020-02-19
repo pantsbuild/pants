@@ -96,11 +96,10 @@ class BestUrlSelector:
   def select_best_url(self):
     """Select `best` url.
 
-    Since urls are pre-sorted w.r.t. their ping times, we simply return the first element
-    from the list. And we always return the same url unless we observe greater than max
-    allowed number of consecutive failures. In this case, we would return the next `best`
-    url, and append the previous best one to the end of list (essentially rotate to the left
-    by one element).
+    Since urls are pre-sorted w.r.t. their ping times, we simply return the first element from the
+    list. And we always return the same url unless we observe greater than max allowed number of
+    consecutive failures. In this case, we would return the next `best` url, and append the previous
+    best one to the end of list (essentially rotate to the left by one element).
     """
 
     best_url = self.parsed_urls[0]

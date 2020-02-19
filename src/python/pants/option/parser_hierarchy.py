@@ -28,8 +28,7 @@ def enclosing_scope(scope: str) -> str:
 
 
 def all_enclosing_scopes(scope: str, *, allow_global: bool = True) -> Iterator[str]:
-  """Utility function to return all scopes up to the global scope enclosing a
-  given scope."""
+  """Utility function to return all scopes up to the global scope enclosing a given scope."""
 
   _validate_full_scope(scope)
 
@@ -48,9 +47,8 @@ def all_enclosing_scopes(scope: str, *, allow_global: bool = True) -> Iterator[s
 class ParserHierarchy:
   """A hierarchy of scoped Parser instances.
 
-  A scope is a dotted string: E.g., compile.java. In this example the compile.java scope is
-  enclosed in the compile scope, which is enclosed in the global scope (represented by an
-  empty string.)
+  A scope is a dotted string: E.g., compile.java. In this example the compile.java scope is enclosed
+  in the compile scope, which is enclosed in the global scope (represented by an empty string.)
   """
 
   def __init__(

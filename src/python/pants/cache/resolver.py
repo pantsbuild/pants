@@ -37,7 +37,7 @@ class Resolver(ABC):
 
 
 class NoopResolver(Resolver):
-  """A resolver that always yields nothing
+  """A resolver that always yields nothing.
 
   :API: public
   """

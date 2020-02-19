@@ -208,8 +208,8 @@ class ArgSplitter:
   def likely_a_spec(arg: str) -> bool:
     """Return whether `arg` looks like a spec, rather than a goal name.
 
-    An arg is a spec if it looks like an AddressSpec or a FilesystemSpec.
-    In the future we can expand this heuristic to support other kinds of specs, such as URLs.
+    An arg is a spec if it looks like an AddressSpec or a FilesystemSpec. In the future we can
+    expand this heuristic to support other kinds of specs, such as URLs.
     """
     return (
       any(symbol in arg for symbol in (os.path.sep, ':', '*'))

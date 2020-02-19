@@ -60,8 +60,7 @@ def init_subsystems(subsystem_types, options=None):
 
 
 def init_subsystem(subsystem_type, options=None):
-  """
-  Singular form of :func:`pants_test.subsystem.subsystem_util.init_subsystems`
+  """Singular form of :func:`pants_test.subsystem.subsystem_util.init_subsystems`
 
   :API: public
 

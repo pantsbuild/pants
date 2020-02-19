@@ -25,7 +25,8 @@ class Filespec(_GlobsDict, total=False):
 
   For example: {'globs': ['list', 'of' , 'strings'], 'exclude': [{'globs' : ... }, ...] }
 
-  The globs are in zglobs format."""
+  The globs are in zglobs format.
+  """
   exclude: List[_GlobsDict]
 
 
@@ -69,7 +70,8 @@ class FilesetWithSpec(ABC):
   @property
   @abstractmethod
   def files(self) -> Sequence[str]:
-    """Return the concrete set of files matched by this FilesetWithSpec, relative to `self.rel_root`."""
+    """Return the concrete set of files matched by this FilesetWithSpec, relative to
+    `self.rel_root`."""
 
   @property
   @abstractmethod
@@ -287,8 +289,8 @@ class Globs(FilesetRelPathWrapper):
 class RGlobs(FilesetRelPathWrapper):
   """Matches files recursively under the BUILD file's directory.
 
-  E.g., ``bundle(fileset=rglobs('config/*'))`` to bundle up all files in the config,
-        config/foo, config/foo/bar directories.
+  E.g., ``bundle(fileset=rglobs('config/*'))`` to bundle up all files in the config, config/foo,
+  config/foo/bar directories.
   """
 
   @staticmethod

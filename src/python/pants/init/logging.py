@@ -49,10 +49,7 @@ def init_rust_logger(level, log_show_rust_3rdparty):
 
 
 def setup_logging_to_stderr(python_logger, level):
-  """
-  We setup logging as loose as possible from the Python side,
-  and let Rust do the filtering.
-  """
+  """We setup logging as loose as possible from the Python side, and let Rust do the filtering."""
   native = Native()
   levelno = get_numeric_level(level)
   handler = create_native_stderr_log_handler(levelno, native, stream=sys.stderr)
@@ -121,8 +118,9 @@ def get_numeric_level(level):
 @contextmanager
 def encapsulated_global_logger():
   """Record all the handlers of the current global logger, yield, and reset that logger.
-  This is useful in the case where we want to easily restore state after calling setup_logging.
-  For instance, when DaemonPantsRunner creates an instance of LocalPantsRunner it sets up specific
+
+  This is useful in the case where we want to easily restore state after calling setup_logging. For
+  instance, when DaemonPantsRunner creates an instance of LocalPantsRunner it sets up specific
   nailgunned logging, which we want to undo once the LocalPantsRunner has finished runnnig.
   """
   global_logger = logging.getLogger()

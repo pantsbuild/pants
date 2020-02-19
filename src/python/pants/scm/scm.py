@@ -152,8 +152,8 @@ class Scm(ABC):
 
   @abstractmethod
   def push(self):
-    """Push the current branch of the local repository to the corresponding local branch
-    on the server
+    """Push the current branch of the local repository to the corresponding local branch on the
+    server.
 
     Subclasses should raise RemoteException if there is a problem getting the commit to the
     server.

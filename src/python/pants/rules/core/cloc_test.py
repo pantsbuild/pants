@@ -66,8 +66,7 @@ class ClocTest(GoalRuleTestBase):
 
   def test_filesystem_specs_with_owners(self) -> None:
     """Even if a file belongs to a target which has multiple sources, we should only run over the
-    specified file.
-    """
+    specified file."""
     py_dir = "src/py/foo"
     self.create_file(f"{py_dir}/foo.py", "print('some code')")
     self.create_file(f"{py_dir}/bar.py", "print('some code')\nprint('more code')")
@@ -77,8 +76,7 @@ class ClocTest(GoalRuleTestBase):
 
   def test_filesystem_specs_without_owners(self) -> None:
     """Unlike most goals, cloc works on any readable file in the build root, regardless of whether
-    it's declared in a BUILD file.
-    """
+    it's declared in a BUILD file."""
     self.create_file("test/foo.ex", 'IO.puts("im a free thinker!")')
     self.create_file("test/foo.hs", 'main = putStrLn "Whats Pants, precious?"')
     output = self.execute_rule(args=["test/foo.*"])

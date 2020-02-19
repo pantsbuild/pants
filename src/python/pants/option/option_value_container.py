@@ -81,7 +81,8 @@ class OptionValueContainer:
   def update(self, other: "OptionValueContainer") -> None:
     """Set other's values onto this object.
 
-    For each key, highest ranked value wins. In a tie, other's value wins."""
+    For each key, highest ranked value wins. In a tie, other's value wins.
+    """
     for k, v in other._value_map.items():
       self._set(k, v)
 

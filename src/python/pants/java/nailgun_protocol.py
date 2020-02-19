@@ -54,7 +54,7 @@ class ChunkType:
 
 class NailgunProtocol:
   """A mixin that provides a base implementation of the Nailgun protocol as described on
-     http://martiansoftware.com/nailgun/protocol.html.
+  http://martiansoftware.com/nailgun/protocol.html.
 
   Communications proceed as follows:
 
@@ -73,7 +73,6 @@ class NailgunProtocol:
     9) Server transmits zero or more "stderr" chunks.
 
     Steps 7-9 repeat indefinitely until the server transmits an "exit" chunk.
-
   """
 
   ENVIRON_SEP = '='
@@ -181,13 +180,13 @@ class NailgunProtocol:
   def read_chunk(cls, sock, return_bytes=False):
     """Read a single chunk from the connected client.
 
-     A "chunk" is a variable-length block of data beginning with a 5-byte chunk header and followed
-     by an optional payload. The chunk header consists of:
+    A "chunk" is a variable-length block of data beginning with a 5-byte chunk header and followed
+    by an optional payload. The chunk header consists of:
 
-          1) The length of the chunk's payload (not including the header) as a four-byte big-endian
-             unsigned long. The high-order byte is header[0] and the low-order byte is header[3].
+         1) The length of the chunk's payload (not including the header) as a four-byte big-endian
+            unsigned long. The high-order byte is header[0] and the low-order byte is header[3].
 
-          2) A single byte identifying the type of chunk.
+         2) A single byte identifying the type of chunk.
     """
     try:
       # Read the chunk header from the socket.

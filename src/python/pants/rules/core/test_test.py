@@ -33,6 +33,7 @@ from pants.testutil.engine.util import MockConsole, MockGet, run_rule
 from pants.testutil.test_base import TestBase
 
 
+# TODO(#9141): replace this with a proper util to create `GoalSubsystem`s
 class MockOptions:
   def __init__(self, **values):
     self.values = Mock(**values)

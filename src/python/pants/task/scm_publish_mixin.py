@@ -27,7 +27,7 @@ class Version:
 
 @total_ordering
 class Namedver(Version):
-  """A less restrictive versioning scheme that does not conflict with Semver
+  """A less restrictive versioning scheme that does not conflict with Semver.
 
   Its important to not allow certain characters that are used in maven for performing
   range matching like *><=!  See:
@@ -72,7 +72,10 @@ class Namedver(Version):
 
 @total_ordering
 class Semver(Version):
-  """Semantic versioning. See http://semver.org"""
+  """Semantic versioning.
+
+  See http://semver.org
+  """
 
   @staticmethod
   def parse(version):

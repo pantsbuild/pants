@@ -18,7 +18,7 @@ from pants.util.memo import memoized_property
 
 
 class GrpcioRun(SimpleCodegenTask):
-  """Task to compile protobuf into python code"""
+  """Task to compile protobuf into python code."""
 
   gentarget_type = PythonGrpcioLibrary
   sources_globs = ('**/*',)

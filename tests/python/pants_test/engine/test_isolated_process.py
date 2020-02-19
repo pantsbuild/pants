@@ -44,13 +44,14 @@ class BinaryLocation:
 
 @dataclass(frozen=True)
 class ShellCat:
-  """Wrapper class to show an example of using an auxiliary class (which wraps
-  an executable) to generate an argv instead of doing it all in
-  CatExecutionRequest. This can be used to encapsulate operations such as
-  sanitizing command-line arguments which are specific to the executable, which
-  can reduce boilerplate for generating ExecuteProcessRequest instances if the
-  executable is used in different ways across multiple different types of
-  process execution requests."""
+  """Wrapper class to show an example of using an auxiliary class (which wraps an executable) to
+  generate an argv instead of doing it all in CatExecutionRequest.
+
+  This can be used to encapsulate operations such as sanitizing command-line arguments which are
+  specific to the executable, which can reduce boilerplate for generating ExecuteProcessRequest
+  instances if the executable is used in different ways across multiple different types of process
+  execution requests.
+  """
   binary_location: BinaryLocation
 
   @property

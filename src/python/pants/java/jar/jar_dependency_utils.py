@@ -127,8 +127,8 @@ class M2Coordinate(object):
 
   @property
   def simple_coord(self):
-    """
-    A simple version of coordinate representation with org:name:version without classifier or ext
+    """A simple version of coordinate representation with org:name:version without classifier or
+    ext.
 
     :return: org:name:version
     """

@@ -208,14 +208,14 @@ def read_file(filename: str, binary_mode: bool = False) -> Union[bytes, str]:
 def safe_walk(path: Union[bytes, str], **kwargs: Any) -> Iterator[Tuple[str, List[str], List[str]]]:
   """Just like os.walk, but ensures that the returned values are unicode objects.
 
-    This isn't strictly safe, in that it is possible that some paths
-    will not be decodeable, but that case is rare, and the only
-    alternative is to somehow avoid all interaction between paths and
-    unicode objects, which seems especially tough in the presence of
-    unicode_literals. See e.g.
-    https://mail.python.org/pipermail/python-dev/2008-December/083856.html
+  This isn't strictly safe, in that it is possible that some paths
+  will not be decodeable, but that case is rare, and the only
+  alternative is to somehow avoid all interaction between paths and
+  unicode objects, which seems especially tough in the presence of
+  unicode_literals. See e.g.
+  https://mail.python.org/pipermail/python-dev/2008-December/083856.html
 
-    :API: public
+  :API: public
   """
   # If os.walk is given a text argument, it yields text values; if it
   # is given a binary argument, it yields binary values.
@@ -370,7 +370,10 @@ def safe_open(filename, *args, **kwargs):
 
 
 def safe_delete(filename: str) -> None:
-  """Delete a file safely. If it's not present, no-op."""
+  """Delete a file safely.
+
+  If it's not present, no-op.
+  """
   try:
     os.unlink(filename)
   except OSError as e:
@@ -399,8 +402,9 @@ def safe_concurrent_rename(src: str, dst: str) -> None:
 def safe_rm_oldest_items_in_dir(
   root_dir: str, num_of_items_to_keep: int, excludes: Iterable[str] = frozenset()
 ) -> None:
-  """
-  Keep `num_of_items_to_keep` newly modified items besides `excludes` in `root_dir` then remove the rest.
+  """Keep `num_of_items_to_keep` newly modified items besides `excludes` in `root_dir` then remove
+  the rest.
+
   :param root_dir: the folder to examine
   :param num_of_items_to_keep: number of files/folders/symlinks to keep after the cleanup
   :param excludes: absolute paths excluded from removal (must be prefixed with `root_dir`)
@@ -480,7 +484,7 @@ def absolute_symlink(source_path: str, target_path: str) -> None:
 
 
 def relative_symlink(source_path: str, link_path: str) -> None:
-  """Create a symlink at link_path pointing to relative source
+  """Create a symlink at link_path pointing to relative source.
 
   :param source_path: Absolute path to source file
   :param link_path: Absolute path to intended symlink
@@ -534,11 +538,11 @@ def relativize_paths(paths: Sequence[str], rootdir: str) -> List[str]:
 def touch(path: str, times: Optional[Union[int, Tuple[int, int]]] = None):
   """Equivalent of unix `touch path`.
 
-    :API: public
+  :API: public
 
-    :path: The file to touch.
-    :times Either a tuple of (atime, mtime) or else a single time to use for both.  If not
-           specified both atime and mtime are updated to the current time.
+  :path: The file to touch.
+  :times Either a tuple of (atime, mtime) or else a single time to use for both.  If not
+         specified both atime and mtime are updated to the current time.
   """
   if isinstance(times, tuple) and len(times) > 2:
     raise ValueError(
@@ -553,11 +557,11 @@ def touch(path: str, times: Optional[Union[int, Tuple[int, int]]] = None):
 def recursive_dirname(f: str) -> Iterator[str]:
   """Given a relative path like 'a/b/c/d', yield all ascending path components like:
 
-        'a/b/c/d'
-        'a/b/c'
-        'a/b'
-        'a'
-        ''
+  'a/b/c/d'
+  'a/b/c'
+  'a/b'
+  'a'
+  ''
   """
   prev = None
   while f != prev:

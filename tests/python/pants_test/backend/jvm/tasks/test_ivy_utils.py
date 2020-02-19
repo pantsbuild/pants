@@ -456,7 +456,7 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
       > IvyModuleRef('foo', 'bar', '1.2.4', ext='jar'))
 
   def test_traverse_dep_graph_sorted(self):
-    """Make sure the modules are returned in a deterministic order by name"""
+    """Make sure the modules are returned in a deterministic order by name."""
 
     def make_ref(org, name):
       return  IvyModuleRef(org=org, name=name, rev='1.0')

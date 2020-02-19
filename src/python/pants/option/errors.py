@@ -45,7 +45,10 @@ class InvalidMemberType(RegistrationError):
 
 
 class MemberTypeNotAllowed(RegistrationError):
-  """member_type not allowed on option with type {type_}. It may only be specified if type=list."""
+  """member_type not allowed on option with type {type_}.
+
+  It may only be specified if type=list.
+  """
 
 
 class NoOptionNames(RegistrationError):
@@ -65,7 +68,10 @@ class OptionNameDoubleDash(RegistrationError):
 
 
 class RecursiveSubsystemOption(RegistrationError):
-  """Subsystem option cannot specify 'recursive'. Subsystem options are always recursive."""
+  """Subsystem option cannot specify 'recursive'.
+
+  Subsystem options are always recursive.
+  """
 
 
 class Shadowing(RegistrationError):
@@ -88,4 +94,5 @@ class FromfileError(ParseError):
 
 
 class MutuallyExclusiveOptionError(ParseError):
-  """Raised when more than one option belonging to the same mutually exclusive group is specified."""
+  """Raised when more than one option belonging to the same mutually exclusive group is
+  specified."""

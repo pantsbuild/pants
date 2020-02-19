@@ -96,8 +96,7 @@ class Omega:
 
 @rule(name="rule_one")
 async def rule_one(i: Input) -> Beta:
-  """This rule should be the first one executed by the engine, and
-  thus have no parent."""
+  """This rule should be the first one executed by the engine, and thus have no parent."""
   a = Alpha()
   o = await Get[Omega](Alpha, a)
   b = await Get[Beta](Omega, o)
@@ -105,22 +104,22 @@ async def rule_one(i: Input) -> Beta:
 
 @rule(name="rule_two")
 async def rule_two(a: Alpha) -> Omega:
-  """This rule should be invoked in the body of `rule_one` and
-  therefore its workunit should be a child of `rule_one`'s workunit."""
+  """This rule should be invoked in the body of `rule_one` and therefore its workunit should be a
+  child of `rule_one`'s workunit."""
   await Get[Gamma](Alpha, a)
   return Omega()
 
 @rule(name="rule_three")
 async def rule_three(o: Omega) -> Beta:
-  """This rule should be invoked in the body of `rule_one` and
-  therefore its workunit should be a child of `rule_one`'s workunit."""
+  """This rule should be invoked in the body of `rule_one` and therefore its workunit should be a
+  child of `rule_one`'s workunit."""
   return Beta()
 
 
 @rule(name="rule_four")
 def rule_four(a: Alpha) -> Gamma:
-  """This rule should be invoked in the body of `rule_two` and
-  therefore its workunit should be a child of `rule_two`'s workunit."""
+  """This rule should be invoked in the body of `rule_two` and therefore its workunit should be a
+  child of `rule_two`'s workunit."""
   return Gamma()
 
 

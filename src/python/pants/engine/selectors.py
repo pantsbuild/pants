@@ -21,9 +21,8 @@ _Product = TypeVar("_Product")
 class Get(Generic[_Product]):
   """Experimental synchronous generator API.
 
-  May be called equivalently as either:
-    # verbose form: Get[product](subject_declared_type, subject)
-    # shorthand form: Get[product](subject_declared_type(<constructor args for subject>))
+  May be called equivalently as either:   # verbose form: Get[product](subject_declared_type,
+  subject)   # shorthand form: Get[product](subject_declared_type(<constructor args for subject>))
   """
   product: Type[_Product]
   # TODO: Consider attemping to create a Get[_Product, _Subject] which still allows for the 2-arg

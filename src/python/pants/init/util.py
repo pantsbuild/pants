@@ -14,8 +14,8 @@ def init_workdir(global_options):
   """Given the bootstrap options (generally immediately after bootstrap), initialize the workdir.
 
   If it is in use, the "physical" workdir is a directory under the `pants_physical_workdir_base`
-  that is unique to each working copy (via including the entire path to the working copy in its
-  name using `safe_filename_from_path`).
+  that is unique to each working copy (via including the entire path to the working copy in its name
+  using `safe_filename_from_path`).
   """
   workdir_src = global_options.pants_workdir
   if not global_options.pants_physical_workdir_base:

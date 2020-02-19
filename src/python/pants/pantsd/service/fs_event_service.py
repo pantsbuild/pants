@@ -11,9 +11,9 @@ from pants.pantsd.watchman import Watchman
 class FSEventService(PantsService):
   """Filesystem Event Service.
 
-  This is the primary service coupling to watchman and is responsible for subscribing to and
-  reading events from watchman's UNIX socket and firing callbacks in pantsd. Callbacks are
-  executed in a configurable threadpool but are generally expected to be short-lived.
+  This is the primary service coupling to watchman and is responsible for subscribing to and reading
+  events from watchman's UNIX socket and firing callbacks in pantsd. Callbacks are executed in a
+  configurable threadpool but are generally expected to be short-lived.
   """
 
   ZERO_DEPTH = ['depth', 'eq', 0]
@@ -101,7 +101,10 @@ class FSEventService(PantsService):
     return self._handlers[handler_name].callback(event_data)
 
   def run(self):
-    """Main service entrypoint. Called via Thread.start() via PantsDaemon.run()."""
+    """Main service entrypoint.
+
+    Called via Thread.start() via PantsDaemon.run().
+    """
 
     if not (self._watchman and self._watchman.is_alive()):
       raise PantsService.ServiceError('watchman is not running, bailing!')

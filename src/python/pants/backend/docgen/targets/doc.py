@@ -128,8 +128,7 @@ class Page(Target):
   def provides(self):
     """A tuple of WikiArtifact instances provided by this Page.
 
-    Notably different from JvmTarget.provides, which has only a single Artifact rather than a
-    list.
+    Notably different from JvmTarget.provides, which has only a single Artifact rather than a list.
     """
     return self.payload.provides
 

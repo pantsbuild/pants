@@ -79,8 +79,7 @@ class JvmdocGen(SkipAndTransitiveOptionsRegistrar, HasSkipAndTransitiveOptionsMi
     return [re.compile(x) for x in set(self.get_options().exclude_patterns or [])]
 
   def generate_doc(self, language_predicate, create_jvmdoc_command):
-    """
-    Generate an execute method given a language predicate and command to create documentation
+    """Generate an execute method given a language predicate and command to create documentation.
 
     language_predicate: a function that accepts a target and returns True if the target is of that
                         language

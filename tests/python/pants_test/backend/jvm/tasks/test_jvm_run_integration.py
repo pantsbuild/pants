@@ -7,11 +7,12 @@ from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 class JvmRunIntegrationTest(PantsRunIntegrationTest):
 
   def _exec_run(self, target, *args):
-    ''' invokes pants goal run <target>
+    """invokes pants goal run <target>
+
     :param target: target name to compile
     :param args: list of arguments to append to the command
     :return: stdout as a string on success, raises an Exception on error
-    '''
+    """
     # Avoid some known-to-choke-on interpreters.
     command = ['run',
                target,
@@ -22,10 +23,8 @@ class JvmRunIntegrationTest(PantsRunIntegrationTest):
     return pants_run.stdout_data
 
   def test_run_colliding_resources(self):
-    """
-    Tests that the proper resource is bundled with each of these bundled targets when
-    each project has a different resource with the same path.
-    """
+    """Tests that the proper resource is bundled with each of these bundled targets when each
+    project has a different resource with the same path."""
     for name in ['a', 'b', 'c']:
       target = ('testprojects/maven_layout/resource_collision/example_{name}'
                 '/src/main/java/org/pantsbuild/duplicateres/example{name}/'

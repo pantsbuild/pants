@@ -165,8 +165,9 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
 
   @ensure_cached(JUnitRun, expected_num_artifacts=0)
   def test_junit_runner_raises_no_error_on_non_junit_target(self):
-    """Run pants against a `python_tests` target, but set an option for the `test.junit` task. This
-    should execute without error.
+    """Run pants against a `python_tests` target, but set an option for the `test.junit` task.
+
+    This should execute without error.
     """
     self.add_to_build_file('foo', dedent("""
         python_tests(

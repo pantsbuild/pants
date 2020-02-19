@@ -13,7 +13,7 @@ class EngineTestBase(TestBase):
 
   @classmethod
   def as_goal(cls, goal_name):
-    """Returns a ``Goal`` object of the given name
+    """Returns a ``Goal`` object of the given name.
 
     :API: public
     """

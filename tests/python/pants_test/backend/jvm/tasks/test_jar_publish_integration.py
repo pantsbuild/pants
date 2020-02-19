@@ -296,8 +296,8 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
               self.compare_file_contents(artifact_path, directory)
 
   def compare_file_contents(self, artifact_path, directory):
-    """
-    Tests the ivy.xml and pom
+    """Tests the ivy.xml and pom.
+
     :param artifact_path: Path of the artifact
     :param directory: Directory where the artifact resides.
     :return:

@@ -22,7 +22,7 @@ class PluginLoadOrderError(PluginLoadingError): pass
 
 def load_backends_and_plugins(plugins1, plugins2, working_set, backends1, backends2,
                               build_configuration):
-  """Load named plugins and source backends
+  """Load named plugins and source backends.
 
   :param list<str> plugins1: v1 plugins to load.
   :param list<str> plugins2: v2 plugins to load.
@@ -38,7 +38,7 @@ def load_backends_and_plugins(plugins1, plugins2, working_set, backends1, backen
 
 
 def load_plugins(build_configuration, plugins, working_set, is_v1_plugin):
-  """Load named plugins from the current working_set into the supplied build_configuration
+  """Load named plugins from the current working_set into the supplied build_configuration.
 
   "Loading" a plugin here refers to calling registration methods -- it is assumed each plugin
   is already on the path and an error will be thrown if it is not. Plugins should define their
@@ -111,16 +111,11 @@ def load_build_configuration_from_source(build_configuration, backends1, backend
     the build configuration.
   """
   # pants.build_graph and pants.core_task must always be loaded, and before any other backends.
-  backend_packages1 = OrderedSet([
-      'pants.build_graph',
-      'pants.core_tasks',
-    ] + (backends1 or []))
+  backend_packages1 = OrderedSet(['pants.build_graph', 'pants.core_tasks', *backends1])
   for backend_package in backend_packages1:
     load_backend(build_configuration, backend_package, is_v1_backend=True)
 
-  backend_packages2 = OrderedSet([
-      'pants.rules.core',
-    ] + (backends2 or []))
+  backend_packages2 = OrderedSet(['pants.rules.core', *backends2])
   for backend_package in backend_packages2:
     load_backend(build_configuration, backend_package, is_v1_backend=False)
 
@@ -132,9 +127,10 @@ def load_backend(build_configuration: BuildConfiguration, backend_package: str,
   :param build_configuration: the BuildConfiguration to install the backend plugin into.
   :param backend_package: the package name containing the backend plugin register module that
     provides the plugin entrypoints.
-  :param bool is_v1_backend: Is this a v1 or v2 backend.
+  :param is_v1_backend: Is this a v1 or v2 backend.
   :raises: :class:``pants.base.exceptions.BuildConfigurationError`` if there is a problem loading
-    the build configuration."""
+    the build configuration.
+  """
   backend_module = backend_package + '.register'
   try:
     module = importlib.import_module(backend_module)

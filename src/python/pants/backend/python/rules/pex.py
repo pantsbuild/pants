@@ -94,8 +94,8 @@ async def create_pex(
     pex_build_environment: PexBuildEnvironment,
     platform: Platform,
 ) -> Pex:
-  """Returns a PEX with the given requirements, optional entry point, and optional
-  interpreter constraints."""
+  """Returns a PEX with the given requirements, optional entry point, and optional interpreter
+  constraints."""
 
   argv = ["--output-file", request.output_filename]
   if request.entry_point is not None:

@@ -53,7 +53,7 @@ INCLUDE_PATTERN = r'!inc(\[(?P<params>[^]]*)\])?\((?P<path>[^' + '\n' + r']*)\)'
 
 
 def choose_include_text(s, params, source_path):
-  """Given the contents of a file and !inc[these params], return matching lines
+  """Given the contents of a file and !inc[these params], return matching lines.
 
   If there was a problem matching parameters, return empty list.
 

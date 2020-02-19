@@ -29,7 +29,7 @@ from pants.contrib.python.checks.checker.common import CheckstylePlugin
 # Class internals:
 #   __metaclass__
 class FutureCompatibility(CheckstylePlugin):
-  """Warns about behavior that will likely break when moving to Python 3.x"""
+  """Warns about behavior that will likely break when moving to Python 3.x."""
 
   @classmethod
   def name(cls):

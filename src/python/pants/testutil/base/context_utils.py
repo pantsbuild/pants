@@ -28,13 +28,13 @@ class TestContext(Context):
   class DummyWorkUnit:
     """A workunit stand-in that sends all output to stderr.
 
-   These outputs are typically only used by subprocesses spawned by code under test, not
-   the code under test itself, and would otherwise go into some reporting black hole.  The
-   testing framework will only display the stderr output when a test fails.
+    These outputs are typically only used by subprocesses spawned by code under test, not
+    the code under test itself, and would otherwise go into some reporting black hole.  The
+    testing framework will only display the stderr output when a test fails.
 
-   Provides no other tracking/labeling/reporting functionality. Does not require "opening"
-   or "closing".
-   """
+    Provides no other tracking/labeling/reporting functionality. Does not require "opening"
+    or "closing".
+    """
 
     def output(self, name):
       return sys.stderr.buffer

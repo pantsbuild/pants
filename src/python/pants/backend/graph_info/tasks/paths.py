@@ -15,8 +15,9 @@ def format_path(path):
 def find_paths_breadth_first(from_target, to_target, log):
   """Yields the paths between from_target to to_target if they exist.
 
-  The paths are returned ordered by length, shortest first.
-  If there are cycles, it checks visited edges to prevent recrossing them."""
+  The paths are returned ordered by length, shortest first. If there are cycles, it checks visited
+  edges to prevent recrossing them.
+  """
   log.debug('Looking for all paths from {} to {}'.format(from_target.address.reference(),
                                                          to_target.address.reference()))
 

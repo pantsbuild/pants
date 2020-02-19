@@ -23,8 +23,8 @@ from pants.util.meta import frozen_after_init
 
 
 def side_effecting(cls):
-  """Annotates a class to indicate that it is a side-effecting type, which needs
-  to be handled specially with respect to rule caching semantics."""
+  """Annotates a class to indicate that it is a side-effecting type, which needs to be handled
+  specially with respect to rule caching semantics."""
   cls.__side_effecting = True
   return cls
 
@@ -288,13 +288,21 @@ class UnionRule:
 
 @dataclass(frozen=True)
 class UnionMembership:
-  union_rules: Dict[Type, typing.Iterable[type]]
+  union_rules: Dict[Type, typing.Iterable[Type]]
 
   def is_member(self, union_type, putative_member):
     members = self.union_rules.get(union_type)
     if members is None:
       raise TypeError(f'Not a registered union type: {union_type}')
     return type(putative_member) in members
+
+  def has_members(self, union_type: Type) -> bool:
+    """Check whether the union has an implementation or not."""
+    return bool(self.union_rules.get(union_type))
+
+  def has_members_for_all(self, union_types: typing.Iterable[Type]) -> bool:
+    """Check whether every union given has an implementation or not."""
+    return all(self.has_members(union_type) for union_type in union_types)
 
 
 class Rule(ABC):
@@ -391,9 +399,8 @@ class TaskRule(Rule):
 class RootRule(Rule):
   """Represents a root input to an execution of a rule graph.
 
-  Roots act roughly like parameters, in that in some cases the only source of a
-  particular type might be when a value is provided as a root subject at the beginning
-  of an execution.
+  Roots act roughly like parameters, in that in some cases the only source of a particular type
+  might be when a value is provided as a root subject at the beginning of an execution.
   """
   _output_type: Type
 

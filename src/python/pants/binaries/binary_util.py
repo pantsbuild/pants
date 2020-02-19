@@ -51,7 +51,8 @@ class HostPlatform:
   def binary_path_components(self):
     """These strings are used as consecutive components of the path where a binary is fetched.
 
-    This is also used in generating urls from --binaries-baseurls in PantsHosted."""
+    This is also used in generating urls from --binaries-baseurls in PantsHosted.
+    """
     return [self.os_name, self.arch_or_version]
 
 

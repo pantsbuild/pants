@@ -104,8 +104,8 @@ class PantsReleases(Subsystem):
   def _branch_name(cls, version):
     """Defines a mapping between versions and branches.
 
-    In particular, `-dev` suffixed releases always live on master. Any other (modern) release
-    lives in a branch.
+    In particular, `-dev` suffixed releases always live on master. Any other (modern) release lives
+    in a branch.
     """
     suffix = version.public[len(version.base_version):]
     components = version.base_version.split('.') + [suffix]

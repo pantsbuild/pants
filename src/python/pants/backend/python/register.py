@@ -11,6 +11,7 @@ from pants.backend.python.rules import (
   prepare_chrooted_python_sources,
   python_create_binary,
   python_test_runner,
+  repl,
   run_setup_py,
 )
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
@@ -25,8 +26,6 @@ from pants.backend.python.tasks.build_local_python_distributions import (
   BuildLocalPythonDistributions,
 )
 from pants.backend.python.tasks.gather_sources import GatherSources
-from pants.backend.python.tasks.isort_prep import IsortPrep
-from pants.backend.python.tasks.isort_run import IsortRun
 from pants.backend.python.tasks.local_python_distribution_artifact import (
   LocalPythonDistributionArtifact,
 )
@@ -86,8 +85,6 @@ def register_goals():
   task(name='setup-py', action=SetupPy).install()
   task(name='py', action=PythonBinaryCreate).install('binary')
   task(name='py-wheels', action=LocalPythonDistributionArtifact).install('binary')
-  task(name='isort-prep', action=IsortPrep).install('fmt')
-  task(name='isort', action=IsortRun).install('fmt')
   task(name='py', action=PythonBundle).install('bundle')
   task(name='unpack-wheels', action=UnpackWheels).install()
 
@@ -101,6 +98,7 @@ def rules():
     *python_test_runner.rules(),
     *python_create_binary.rules(),
     *python_native_code.rules(),
+    *repl.rules(),
     *run_setup_py.rules(),
     *subprocess_environment.rules(),
   )

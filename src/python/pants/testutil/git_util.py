@@ -15,7 +15,7 @@ MIN_REQUIRED_GIT_VERSION = Revision.semver('1.7.10')
 
 
 def git_version() -> Revision:
-  """Get a Version() based on installed command-line git's version"""
+  """Get a Version() based on installed command-line git's version."""
   stdout = subprocess.run(
     ['git', '--version'], stdout=subprocess.PIPE, encoding="utf-8", check=True
   ).stdout

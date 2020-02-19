@@ -65,7 +65,7 @@ async def run_cloc(
   cloc_script: DownloadedClocScript,
   sources_snapshots: SourcesSnapshots,
 ) -> CountLinesOfCode:
-  """Runs the cloc perl script in an isolated process"""
+  """Runs the cloc perl script in an isolated process."""
 
   snapshots = [sources_snapshot.snapshot for sources_snapshot in sources_snapshots]
   file_content = '\n'.join(

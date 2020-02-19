@@ -209,10 +209,10 @@ class Context:
   def subproc_map(self, f, items):
     """Map function `f` over `items` in subprocesses and return the result.
 
-      :API: public
+    :API: public
 
-      :param f: A multiproc-friendly (importable) work function.
-      :param items: A iterable of pickleable arguments to f.
+    :param f: A multiproc-friendly (importable) work function.
+    :param items: A iterable of pickleable arguments to f.
     """
     try:
       # Pool.map (and async_map().get() w/o timeout) can miss SIGINT.
@@ -239,8 +239,8 @@ class Context:
       yield workunit
 
   def acquire_lock(self):
-    """ Acquire the global lock for the root directory associated with this context. When
-    a goal requires serialization, it will call this to acquire the lock.
+    """Acquire the global lock for the root directory associated with this context. When a goal
+    requires serialization, it will call this to acquire the lock.
 
     :API: public
     """
@@ -249,8 +249,7 @@ class Context:
         self._lock.acquire()
 
   def release_lock(self):
-    """Release the global lock if it's held.
-    Returns True if the lock was held before this call.
+    """Release the global lock if it's held. Returns True if the lock was held before this call.
 
     :API: public
     """
@@ -360,7 +359,7 @@ class Context:
 
   def dependents(self, on_predicate=None, from_predicate=None):
     """Returns  a map from targets that satisfy the from_predicate to targets they depend on that
-      satisfy the on_predicate.
+    satisfy the on_predicate.
 
     :API: public
     """

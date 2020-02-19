@@ -21,6 +21,7 @@ class JvmRunTest(JvmTaskTestBase):
   @contextmanager
   def setup_cmdline_run(self, extra_jvm_options=None, **options):
     """Run the JvmRun task in command line only mode  with the specified extra options.
+
     :returns: the command line string
     """
     # NB: We must set `--run-args=[]` because the unit test does not properly set up the

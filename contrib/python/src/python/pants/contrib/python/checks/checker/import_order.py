@@ -92,10 +92,9 @@ class ImportOrder(CheckstylePlugin):
 
   @classmethod
   def is_module_on_std_lib_path(cls, module):
-    """
-    Sometimes .py files are symlinked to the real python files, such as the case of virtual
-    env. However the .pyc files are created under the virtual env directory rather than
-    the path in cls.STANDARD_LIB_PATH. Hence this function checks for both.
+    """Sometimes .py files are symlinked to the real python files, such as the case of virtual env.
+    However the .pyc files are created under the virtual env directory rather than the path in
+    cls.STANDARD_LIB_PATH. Hence this function checks for both.
 
     :param module: a module
     :return: True if module is on interpreter's stdlib path. False otherwise.
@@ -123,33 +122,32 @@ class ImportOrder(CheckstylePlugin):
     return errors
 
   def classify_imports(self, chunk):
-    """
-      Possible import statements:
+    """Possible import statements:
 
-      import name
-      from name import subname
-      from name import subname1 as subname2
-      from name import *
-      from name import tuple
+    import name
+    from name import subname
+    from name import subname1 as subname2
+    from name import *
+    from name import tuple
 
-      AST representations:
+    AST representations:
 
-      ImportFrom:
-         module=name
-         names=[alias(name, asname), ...]
-                    name can be '*'
+    ImportFrom:
+       module=name
+       names=[alias(name, asname), ...]
+                  name can be '*'
 
-      Import:
-        names=[alias(name, asname), ...]
+    Import:
+      names=[alias(name, asname), ...]
 
-      Imports are classified into 5 classes:
-        stdlib      => Python standard library
-        twitter.*   => Twitter internal / standard library
-        gen.*       => Thrift gen namespaces
-        .*          => Package-local imports
-        3rdparty    => site-packages or third party
+    Imports are classified into 5 classes:
+      stdlib      => Python standard library
+      twitter.*   => Twitter internal / standard library
+      gen.*       => Thrift gen namespaces
+      .*          => Package-local imports
+      3rdparty    => site-packages or third party
 
-      classify_imports classifies the import into one of these forms.
+    classify_imports classifies the import into one of these forms.
     """
     errors = []
     all_module_types = set()
