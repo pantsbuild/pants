@@ -13,6 +13,6 @@ junit_tests(
     'tests/java/org/pantsbuild/tools/junit/lib:test-dep',
     'tests/scala/org/pantsbuild/tools/junit/lib:scala-test-dep',
   ],
-  sources=globs('*Test.java'),
+  sources=['*Test.java'],
   timeout=180,
 )

@@ -2,11 +2,13 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import sys
-from typing import Optional, cast
+from typing import Dict, Optional, cast
 
 from typing_extensions import Literal
 
 from pants.base.build_environment import pants_release, pants_version
+from pants.engine.goal import GoalSubsystem
+from pants.engine.rules import UnionMembership
 from pants.goal.goal import Goal
 from pants.help.help_formatter import HelpFormatter
 from pants.help.scope_info_iterator import ScopeInfoIterator
@@ -25,9 +27,16 @@ from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 class HelpPrinter:
   """Prints help to the console."""
 
-  def __init__(self, options: Options, *, help_request: Optional[HelpRequest] = None) -> None:
+  def __init__(
+    self,
+    *,
+    options: Options,
+    help_request: Optional[HelpRequest] = None,
+    union_membership: UnionMembership,
+  ) -> None:
     self._options = options
     self._help_request = help_request or self._options.help_request
+    self._union_membership = union_membership
 
   @property
   def bin_name(self) -> str:
@@ -55,15 +64,27 @@ class HelpPrinter:
       return 1
     return 0
 
-  def _print_goals_help(self):
+  def _print_goals_help(self) -> None:
     print(f'\nUse `{self.bin_name} help $goal` to get help for a particular goal.\n')
     global_options = self._options.for_global_scope()
-    goal_descriptions = {}
+    goal_descriptions: Dict[str, str] = {}
     if global_options.v2:
-      for scope_info in self._options.known_scope_to_info.values():
-        if scope_info.category == ScopeInfo.GOAL:
-          description = scope_info.description or "<no description>"
-          goal_descriptions[scope_info.scope] = description
+      goal_scope_infos = [
+        scope_info
+        for scope_info in self._options.known_scope_to_info.values()
+        if scope_info.category == ScopeInfo.GOAL
+      ]
+      for scope_info in goal_scope_infos:
+        optionable_cls = scope_info.optionable_cls
+        if optionable_cls is None or not issubclass(optionable_cls, GoalSubsystem):
+          continue
+        is_implemented = self._union_membership.has_members_for_all(
+          optionable_cls.required_union_implementations
+        )
+        if not is_implemented:
+          continue
+        description = scope_info.description or "<no description>"
+        goal_descriptions[scope_info.scope] = description
     if global_options.v1:
       goal_descriptions.update({goal.name: goal.description_first_line
                                 for goal in Goal.all()
@@ -71,7 +92,7 @@ class HelpPrinter:
 
     max_width = max(len(name) for name in goal_descriptions.keys()) if goal_descriptions else 0
     for name, description in sorted(goal_descriptions.items()):
-      print('  {}: {}'.format(name.rjust(max_width), description))
+      print(f'  {name.rjust(max_width)}: {description}')
     print()
 
   def _print_options_help(self):

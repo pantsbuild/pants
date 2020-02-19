@@ -5,9 +5,10 @@ import json
 import os
 from xml.dom import minidom
 
-from pants.backend.project_info.tasks.idea_plugin_gen import IDEA_PLUGIN_VERSION, IdeaPluginGen
+from pants.backend.project_info.tasks.idea_plugin_gen import IDEA_PLUGIN_VERSION
 from pants.base.build_environment import get_buildroot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
+from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import temporary_file
 
@@ -17,11 +18,11 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
                 incremental_import=None):
     """Check to see that the project contains the expected source folders."""
 
-    iws_file = os.path.join(
-      project_dir_path, f'{IdeaPluginGen.get_project_name(expected_targets)}.iws'
+    workspace_file = os.path.join(
+      project_dir_path, ".idea", 'workspace.xml'
     )
-    self.assertTrue(os.path.exists(iws_file))
-    dom = minidom.parse(iws_file)
+    self.assertTrue(os.path.exists(workspace_file))
+    dom = minidom.parse(workspace_file)
     self.assertEqual(1, len(dom.getElementsByTagName("project")))
     project = dom.getElementsByTagName("project")[0]
 
@@ -66,9 +67,8 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
       return result.readlines()[0].strip()
 
   def _run_and_check(self, address_specs, incremental_import=None):
-    """
-    Invoke idea-plugin goal and check for target specs and project in the
-    generated project and workspace file.
+    """Invoke idea-plugin goal and check for target specs and project in the generated project and
+    workspace file.
 
     :param address_specs: list of address specs
     :return: n/a
@@ -77,7 +77,9 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
     spec_parser = CmdLineSpecParser(get_buildroot())
     # project_path is always the directory of the first target,
     # which is where intellij is going to zoom in under project view.
-    project_path = spec_parser.parse_address_spec(address_specs[0]).directory
+    spec = spec_parser.parse_spec(address_specs[0])
+    assert isinstance(spec, (SingleAddress, SiblingAddresses, DescendantAddresses))
+    project_path = spec.directory
 
     with self.temporary_workdir() as workdir:
       with temporary_file(root_dir=workdir, cleanup=True) as output_file:

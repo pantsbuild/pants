@@ -19,8 +19,8 @@ python_tests(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/project_info/tasks:dependencies',
     'src/python/pants/backend/python/targets',
-    'src/python/pants/backend/python:python_requirement',
     'src/python/pants/build_graph',
+    'src/python/pants/python',
     'src/python/pants/testutil:task_test_base',
   ],
   tags = {"partially_type_checked"},
@@ -74,7 +74,46 @@ python_tests(
 )
 
 python_tests(
-  name = 'test_export_dep_as_jar',
+  name = 'export_integration',
+  sources = ['test_export_integration.py'],
+  dependencies = [
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    'examples/src/java/org/pantsbuild/example:hello_directory',
+    'examples/src/scala/org/pantsbuild/example:scala_with_java_sources_directory',
+    'examples/tests/java/org/pantsbuild/example:usethrift_directory',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/build_graph',
+    'src/python/pants/ivy',
+    'src/python/pants/java/distribution',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/testutil/subsystem',
+    'src/python/pants/testutil:int-test',
+    'testprojects/maven_layout:provided_patching_directory',
+    'testprojects/src/java/org/pantsbuild/testproject:exclude_directory',
+    'testprojects/src/scala/org/pantsbuild/testproject:unicode_directory',
+    'testprojects/tests/java/org/pantsbuild/testproject:ivyclassifier_directory',
+    'testprojects/tests/java/org/pantsbuild/testproject:testjvms_directory',
+    ':resolve_jars_test_mixin',
+  ],
+  tags = {'integration', 'partially_type_checked'},
+  timeout = 630,
+)
+
+python_tests(
+  name = 'export_dep_as_jar_integration',
+  sources = ['test_export_dep_as_jar_integration.py'],
+  dependencies = [
+    'tests/python/pants_test/backend/jvm/tasks/jvm_compile/scala:base_compile_integration_test',
+    'testprojects/src/java/org/pantsbuild/testproject:extra_jvm_options_directory',
+    'examples/src/java/org/pantsbuild/example:javac_directory',
+    'examples/src/scala/org/pantsbuild/example:several_scala_targets_directory'
+  ],
+  tags = {"integration", "partially_type_checked"},
+  timeout = 630,
+)
+
+python_tests(
+  name = 'export_dep_as_jar',
   sources = ['test_export_dep_as_jar.py'],
   dependencies = [
     'src/python/pants/java/jar',
@@ -101,32 +140,6 @@ python_tests(
     'src/python/pants/testutil:task_test_base',
   ],
   tags = {"partially_type_checked"},
-)
-
-python_tests(
-  name = 'export_integration',
-  sources = ['test_export_integration.py'],
-  dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    'examples/src/java/org/pantsbuild/example:hello_directory',
-    'examples/src/scala/org/pantsbuild/example:scala_with_java_sources_directory',
-    'examples/tests/java/org/pantsbuild/example:usethrift_directory',
-    'src/python/pants/base:build_environment',
-    'src/python/pants/build_graph',
-    'src/python/pants/ivy',
-    'src/python/pants/java/distribution',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/testutil/subsystem',
-    'src/python/pants/testutil:int-test',
-    'testprojects/maven_layout:provided_patching_directory',
-    'testprojects/src/java/org/pantsbuild/testproject:exclude_directory',
-    'testprojects/src/scala/org/pantsbuild/testproject:unicode_directory',
-    'testprojects/tests/java/org/pantsbuild/testproject:ivyclassifier_directory',
-    'testprojects/tests/java/org/pantsbuild/testproject:testjvms_directory',
-    ':resolve_jars_test_mixin',
-  ],
-  tags = {'integration', 'partially_type_checked'},
-  timeout = 630,
 )
 
 python_tests(

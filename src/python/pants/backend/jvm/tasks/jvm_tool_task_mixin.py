@@ -32,7 +32,8 @@ class JvmToolTaskMixin(JvmToolMixin, TaskBase):
     return self.tool_jar_from_products(self.context.products, key, scope=self._scope(scope))
 
   def tool_jar_entry(self, key, scope=None):
-    """Get a ClasspathEntry for the jar for the tool previously registered under key in the given scope.
+    """Get a ClasspathEntry for the jar for the tool previously registered under key in the given
+    scope.
 
     :param string key: The key the tool configuration was registered under.
     :param string scope: The scope the tool configuration was registered under; the task scope by

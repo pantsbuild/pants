@@ -25,7 +25,7 @@ class NodeResolverBase(ABC):
 
   @classmethod
   def parse_file_path(cls, file_path):
-    """Parse a file address path without the file specifier"""
+    """Parse a file address path without the file specifier."""
     address = None
     pattern = cls.file_regex.match(file_path)
     if pattern:

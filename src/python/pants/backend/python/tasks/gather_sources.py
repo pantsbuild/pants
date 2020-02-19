@@ -9,13 +9,13 @@ from pex.pex_builder import PEXBuilder
 from twitter.common.collections import OrderedSet
 
 from pants.backend.python.subsystems.pex_build_util import (
-  PexBuilderWrapper,
   has_python_sources,
   has_resources,
   is_python_target,
 )
 from pants.base.exceptions import TaskError
 from pants.invalidation.cache_manager import VersionedTargetSet
+from pants.python.pex_build_util import PexBuilderWrapper
 from pants.task.task import Task
 from pants.util.dirutil import safe_concurrent_creation
 
@@ -23,9 +23,8 @@ from pants.util.dirutil import safe_concurrent_creation
 class GatherSources(Task):
   """Gather local Python sources.
 
-  Creates an (unzipped) PEX on disk containing the local Python sources. This PEX can be merged
-  with a requirements PEX to create a unified Python environment for running the relevant python
-  code.
+  Creates an (unzipped) PEX on disk containing the local Python sources. This PEX can be merged with
+  a requirements PEX to create a unified Python environment for running the relevant python code.
   """
 
   PYTHON_SOURCES = 'python_sources'

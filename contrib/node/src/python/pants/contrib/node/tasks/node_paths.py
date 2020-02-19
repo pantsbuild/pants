@@ -41,13 +41,12 @@ class NodePathsBase(ABC):
 
 
 class NodePaths(NodePathsBase):
-  """Maps Node package targets to their resolved chroot in the pants working dir"""
+  """Maps Node package targets to their resolved chroot in the pants working dir."""
 
 
 class NodePathsLocal(NodePathsBase):
   """Maps Node package targets to the directory that the target is defined in.
 
-  This product is intended to be used with the node-install goal which will
-  "install" node targets in the directory they are defined rather than in the
-  pants working directory.
+  This product is intended to be used with the node-install goal which will "install" node targets
+  in the directory they are defined rather than in the pants working directory.
   """

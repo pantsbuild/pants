@@ -3,7 +3,7 @@ use super::{EntryType, ShrinkBehavior, GIGABYTES};
 use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::Bytes;
 use digest::{Digest as DigestTrait, FixedOutput};
-use futures::future::{self, Future};
+use futures01::{future, Future};
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
 use lmdb::Error::NotFound;
 use lmdb::{self, Cursor, Database, RwTransaction, Transaction, WriteFlags};
@@ -48,9 +48,8 @@ impl ByteStore {
         // travis fail because they can't allocate virtual memory, if there are multiple Stores
         // in memory at the same time. We don't know why they're not efficiently garbage collected
         // by python, but they're not, so...
-        file_dbs: ShardedLmdb::new(files_root.clone(), 100 * GIGABYTES, executor.clone())
-          .map(Arc::new),
-        directory_dbs: ShardedLmdb::new(directories_root.clone(), 5 * GIGABYTES, executor.clone())
+        file_dbs: ShardedLmdb::new(files_root, 100 * GIGABYTES, executor.clone()).map(Arc::new),
+        directory_dbs: ShardedLmdb::new(directories_root, 5 * GIGABYTES, executor.clone())
           .map(Arc::new),
         executor: executor,
       }),
@@ -268,7 +267,7 @@ impl ByteStore {
     self
       .inner
       .executor
-      .spawn_on_io_pool(futures::future::lazy(move || {
+      .spawn_on_io_pool(future::lazy(move || {
         let fingerprint = {
           let mut hasher = Sha256::default();
           hasher.input(&bytes);

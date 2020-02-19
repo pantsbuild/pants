@@ -4,25 +4,21 @@
 import io
 import os
 from collections import abc, defaultdict
-from typing import Dict, Iterator, List, Set, Tuple
+from typing import Dict, Iterable, List, Optional, Set, Tuple, cast
 
-from pants.engine.fs import Snapshot
+from pkg_resources import Requirement
+
+from pants.engine.fs import FilesContent
 from pants.engine.legacy.graph import HydratedTarget
 from pants.engine.legacy.structs import PythonTargetAdaptor, ResourcesAdaptor
-from pants.rules.core.strip_source_root import SourceRootStrippedSources
-from pants.source.source_root import SourceRoots
+from pants.python.python_setup import PythonSetup
+from pants.rules.core.strip_source_roots import SourceRootStrippedSources
+from pants.source.source_root import NoSourceRootError, SourceRoots
 from pants.util.strutil import ensure_text
 
 
 # Convenient type alias for the pair (package name, data files in the package).
 PackageDatum = Tuple[str, Tuple[str, ...]]
-
-
-class NoSourceRootError(Exception):
-  """Indicates we failed to map a source file to a source root.
-
-  This future-proofs us against switching --source-unmatched from 'create' to 'fail'.
-  """
 
 
 def source_root_or_raise(source_roots: SourceRoots, path: str) -> str:
@@ -93,52 +89,120 @@ def distutils_repr(obj):
 
 def find_packages(
     source_roots: SourceRoots,
-    tgts_and_stripped_srcs: Iterator[Tuple[HydratedTarget, SourceRootStrippedSources]],
-    all_sources: Snapshot
+    tgts_and_stripped_srcs: Iterable[Tuple[HydratedTarget, SourceRootStrippedSources]],
+    init_py_contents: FilesContent,
+    py2: bool,
 ) -> Tuple[Tuple[str, ...], Tuple[str, ...], Tuple[PackageDatum, ...]]:
   """Analyze the package structure for the given sources.
 
-  Returns a tuple (packages, namespace_packages, package_data).
+  Returns a tuple (packages, namespace_packages, package_data), suitable for use as setup() kwargs.
   """
-  # Find all packages.
+  # Find all packages implied by the sources.
   packages: Set[str] = set()
   package_data: Dict[str, List[str]] = defaultdict(list)
   for tgt, stripped_srcs in tgts_and_stripped_srcs:
     if isinstance(tgt.adaptor, PythonTargetAdaptor):
       for file in stripped_srcs.snapshot.files:
-        # Any directory containing python source files is a package.
-        packages.add(os.path.dirname(file).replace(os.path.sep, '.'))
-    elif isinstance(tgt.adaptor, ResourcesAdaptor):
-      # Resource targets also define packages, at the target's dir (so resources can be loaded
-      # via pkg_resources, using their relative path to the target as the resource name).
-      source_root = source_root_or_raise(source_roots, tgt.address.spec_path)
-      pkg_relpath = os.path.relpath(tgt.address.spec_path, source_root)
-      package = pkg_relpath.replace(os.path.sep, '.')
-      if package == '.':
-        package = ''
-      # Package data values should be relative to the package.
-      package_data[package].extend(
-        os.path.relpath(file, pkg_relpath) for file in stripped_srcs.snapshot.files)
-      if package:
-        # Resources might come from outside the python source root entirely, in which case
-        # they will be embedded in the chroot relative to the root. This is fine, but we
-        # don't want to list the root package in the metadata.
-        packages.add(package)
+        # Python 2: An __init__.py file denotes a package.
+        # Python 3: Any directory containing python source files is a package.
+        if not py2 or os.path.basename(file) == '__init__.py':
+          packages.add(os.path.dirname(file).replace(os.path.sep, '.'))
 
-  # See which packages are namespace packages.
+  # Add any packages implied by ancestor __init__.py files.
+  # Note that init_py_contents includes all __init__.py files, not just ancestors, but
+  # that's fine - the others will already have been found in tgts_and_stripped_srcs above.
+  for init_py_content in init_py_contents:
+    packages.add(os.path.dirname(init_py_content.path).replace(os.path.sep, '.'))
+
+  # Now find all package_data.
+  for tgt, stripped_srcs in tgts_and_stripped_srcs:
+    if isinstance(tgt.adaptor, ResourcesAdaptor):
+      source_root = source_root_or_raise(source_roots, tgt.address.spec_path)
+      resource_dir_relpath = os.path.relpath(tgt.address.spec_path, source_root)
+      # Find the closest enclosing package, if any.  Resources will be loaded relative to that.
+      package: str = resource_dir_relpath.replace(os.path.sep, '.')
+      while package and package not in packages:
+        package = package.rpartition('.')[0]
+      # If resource is not in a package, ignore it. There's no principled way to load it anyway.
+      if package:
+        package_dir_relpath = package.replace('.', os.path.sep)
+        package_data[package].extend(
+          os.path.relpath(file, package_dir_relpath) for file in stripped_srcs.snapshot.files)
+
+  # See which packages are pkg_resources-style namespace packages.
+  # Note that implicit PEP 420 namespace packages and pkgutil-style namespace packages
+  # should *not* be listed in the setup namespace_packages kwarg. That's for pkg_resources-style
+  # namespace pacakges only. See https://github.com/pypa/sample-namespace-packages/.
   namespace_packages: Set[str] = set()
-  actual_init_pys = {file for file in all_sources.files if os.path.basename(file) == '__init__.py'}
-  for package in packages:
-    init_py_path = os.path.join(package.replace('.', os.path.sep), '__init__.py')
-    if init_py_path not in actual_init_pys:
-      # PEP 420: "Regular packages will ... have an __init__.py and will reside in a single
-      # directory. Namespace packages cannot contain an __init__.py."
-      # TODO: detect old-style, explicit namespace packages? That would require heuristics for
-      #  detecting calls to pkg_resources.declare_namespace, or to pkgutil.extend_path.
-      #  Or, allow exported targets to explicitly enumerate their namespace packages in the
-      #  BUILD file. See https://github.com/pantsbuild/pants/issues/8912.
-      namespace_packages.add(package)
+  init_py_by_path: Dict[str, bytes] = {ipc.path: ipc.content for ipc in init_py_contents}
+  for pkg in packages:
+    path = os.path.join(pkg.replace('.', os.path.sep), '__init__.py')
+    if (path in init_py_by_path and
+        declares_pkg_resources_namespace_package(init_py_by_path[path].decode())):
+      namespace_packages.add(pkg)
 
   return (tuple(sorted(packages)),
           tuple(sorted(namespace_packages)),
           tuple((pkg, tuple(sorted(files))) for pkg, files in package_data.items()))
+
+
+def declares_pkg_resources_namespace_package(python_src: str) -> bool:
+  """Given .py file contents, determine if it declares a pkg_resources-style namespace package.
+
+  Detects pkg_resources-style namespaces. See here for details:
+  https://packaging.python.org/guides/packaging-namespace-packages/.
+
+  Note: Accepted namespace package decls are valid Python syntax in all Python versions,
+  so this code can, e.g., detect namespace packages in Python 2 code while running on Python 3.
+  """
+  import ast
+
+  def is_name(node: ast.AST, name: str) -> bool:
+    return isinstance(node, ast.Name) and node.id == name
+
+  def is_call_to(node: ast.AST, func_name: str) -> bool:
+    if not isinstance(node, ast.Call):
+      return False
+    func = node.func
+    return (isinstance(func, ast.Attribute) and func.attr == func_name) or is_name(func, func_name)
+
+  def has_args(call_node: ast.Call, required_arg_ids: Tuple[str, ...]) -> bool:
+    args = call_node.args
+    if len(args) != len(required_arg_ids):
+      return False
+    actual_arg_ids = tuple(arg.id for arg in args if isinstance(arg, ast.Name))
+    return actual_arg_ids == required_arg_ids
+
+  try:
+    python_src_ast = ast.parse(python_src)
+  except SyntaxError:
+    # The namespace package incantations we check for are valid code in all Python versions.
+    # So if the code isn't parseable we know it isn't a valid namespace package.
+    return False
+
+  # Note that these checks are slightly heuristic. It is possible to construct adversarial code
+  # that would defeat them. But the only consequence would be an incorrect namespace_packages list
+  # in setup.py, and we're assuming our users aren't trying to shoot themselves in the foot.
+  for ast_node in ast.walk(python_src_ast):
+    # pkg_resources-style namespace, e.g.,
+    #   __import__('pkg_resources').declare_namespace(__name__).
+    if (is_call_to(ast_node, 'declare_namespace') and
+        has_args(cast(ast.Call, ast_node), ('__name__',))):
+      return True
+  return False
+
+
+def is_python2(compatibilities: Iterable[Optional[List[str]]], python_setup: PythonSetup) -> bool:
+  """Checks if we should assume python2 code."""
+
+  def iter_reqs():
+    for compatibility in compatibilities:
+      for constraint in python_setup.compatibility_or_constraints(compatibility):
+        yield Requirement.parse(constraint)
+
+  for req in iter_reqs():
+    for python_27_ver in range(0, 17):  # The last python 2.7 version was 2.7.17.
+      if req.specifier.contains(f'2.7.{python_27_ver}'):
+        # At least one constraint limits us to Python 2, so assume that.
+        return True
+  return False

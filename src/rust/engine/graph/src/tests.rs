@@ -8,7 +8,7 @@ use std::thread;
 use std::time::Duration;
 
 use boxfuture::{BoxFuture, Boxable};
-use futures::future::{self, Future};
+use futures01::future::{self, Future};
 use hashing::Digest;
 use parking_lot::Mutex;
 
@@ -19,7 +19,7 @@ use crate::{EntryId, Graph, InvalidationResult, Node, NodeContext, NodeError};
 #[test]
 fn create() {
   let graph = Arc::new(Graph::new());
-  let context = TContext::new(0, graph.clone());
+  let context = TContext::new(graph.clone());
   assert_eq!(
     graph.create(TNode(2), &context).wait(),
     Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
@@ -29,7 +29,7 @@ fn create() {
 #[test]
 fn invalidate_and_clean() {
   let graph = Arc::new(Graph::new());
-  let context = TContext::new(0, graph.clone());
+  let context = TContext::new(graph.clone());
 
   // Create three nodes.
   assert_eq!(
@@ -58,14 +58,14 @@ fn invalidate_and_clean() {
 #[test]
 fn invalidate_and_rerun() {
   let graph = Arc::new(Graph::new());
-  let context0 = TContext::new(0, graph.clone());
+  let context = TContext::new(graph.clone());
 
   // Create three nodes.
   assert_eq!(
-    graph.create(TNode(2), &context0).wait(),
+    graph.create(TNode(2), &context).wait(),
     Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
   );
-  assert_eq!(context0.runs(), vec![TNode(2), TNode(1), TNode(0)]);
+  assert_eq!(context.runs(), vec![TNode(2), TNode(1), TNode(0)]);
 
   // Clear the middle Node, which dirties the upper node.
   assert_eq!(
@@ -76,20 +76,20 @@ fn invalidate_and_rerun() {
     }
   );
 
-  // Request with a new context, which will cause both the middle and upper nodes to rerun since
+  // Request with a different salt, which will cause both the middle and upper nodes to rerun since
   // their input values have changed.
-  let context1 = TContext::new(1, graph.clone());
+  let context = context.new_session(1).with_salt(1);
   assert_eq!(
-    graph.create(TNode(2), &context1).wait(),
+    graph.create(TNode(2), &context).wait(),
     Ok(vec![T(0, 0), T(1, 1), T(2, 1)])
   );
-  assert_eq!(context1.runs(), vec![TNode(1), TNode(2)]);
+  assert_eq!(context.runs(), vec![TNode(1), TNode(2)]);
 }
 
 #[test]
 fn invalidate_with_changed_dependencies() {
   let graph = Arc::new(Graph::new());
-  let context = TContext::new(0, graph.clone());
+  let context = TContext::new(graph.clone());
 
   // Create three nodes.
   assert_eq!(
@@ -107,11 +107,8 @@ fn invalidate_with_changed_dependencies() {
   );
 
   // Request with a new context that truncates execution at the middle Node.
-  let context = TContext::new_with_dependencies(
-    0,
-    vec![(TNode(1), None)].into_iter().collect(),
-    graph.clone(),
-  );
+  let context =
+    TContext::new(graph.clone()).with_dependencies(vec![(TNode(1), None)].into_iter().collect());
   assert_eq!(
     graph.create(TNode(2), &context).wait(),
     Ok(vec![T(1, 0), T(2, 0)])
@@ -160,7 +157,7 @@ fn invalidate_randomly() {
   let mut iterations = 0;
   let mut max_distinct_context_values = 0;
   loop {
-    let context = TContext::new(iterations, graph.clone());
+    let context = TContext::new(graph.clone()).with_salt(iterations);
 
     // Compute the root, and validate its output.
     let node_output = match graph.create(TNode(range), &context).wait() {
@@ -195,6 +192,42 @@ fn invalidate_randomly() {
 }
 
 #[test]
+fn dirty_dependents_of_uncacheable_node() {
+  let graph = Arc::new(Graph::new());
+
+  // Create a context for which the bottommost Node is not cacheable.
+  let context = {
+    let mut uncacheable = HashSet::new();
+    uncacheable.insert(TNode(0));
+    TContext::new(graph.clone()).with_uncacheable(uncacheable)
+  };
+
+  // Create three nodes.
+  assert_eq!(
+    graph.create(TNode(2), &context).wait(),
+    Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
+  );
+  assert_eq!(context.runs(), vec![TNode(2), TNode(1), TNode(0)]);
+
+  // Re-request the root in a new session and confirm that only the bottom node re-runs.
+  let context = context.new_session(1);
+  assert_eq!(
+    graph.create(TNode(2), &context).wait(),
+    Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
+  );
+  assert_eq!(context.runs(), vec![TNode(0)]);
+
+  // Re-request with a new session and different salt, and confirm that everything re-runs bottom
+  // up (the order of node cleaning).
+  let context = context.new_session(2).with_salt(1);
+  assert_eq!(
+    graph.create(TNode(2), &context).wait(),
+    Ok(vec![T(0, 1), T(1, 1), T(2, 1)])
+  );
+  assert_eq!(context.runs(), vec![TNode(0), TNode(1), TNode(2)]);
+}
+
+#[test]
 fn drain_and_resume() {
   // Confirms that after draining a Graph that has running work, we are able to resume the work
   // and have it complete successfully.
@@ -208,7 +241,7 @@ fn drain_and_resume() {
   let context = {
     let mut delays = HashMap::new();
     delays.insert(TNode(1), delay_in_task);
-    TContext::new_with_delays(0, delays, graph.clone())
+    TContext::new(graph.clone()).with_delays(delays)
   };
 
   // Spawn a background thread that will mark the Graph draining after a short delay.
@@ -243,11 +276,9 @@ fn cyclic_failure() {
   // Confirms that an attempt to create a cycle fails.
   let graph = Arc::new(Graph::new());
   let top = TNode(2);
-  let context = TContext::new_with_dependencies(
-    0,
+  let context = TContext::new(graph.clone()).with_dependencies(
     // Request creation of a cycle by sending the bottom most node to the top.
     vec![(TNode(0), Some(top))].into_iter().collect(),
-    graph.clone(),
   );
 
   assert_eq!(graph.create(TNode(2), &context).wait(), Err(TError::Cyclic));
@@ -262,7 +293,7 @@ fn cyclic_dirtying() {
   let initial_bot = TNode(0);
 
   // Request with a context that creates a path downward.
-  let context_down = TContext::new(0, graph.clone());
+  let context_down = TContext::new(graph.clone());
   assert_eq!(
     graph.create(initial_top.clone(), &context_down).wait(),
     Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
@@ -270,13 +301,11 @@ fn cyclic_dirtying() {
 
   // Clear the bottom node, and then clean it with a context that causes the path to reverse.
   graph.invalidate_from_roots(|n| n == &initial_bot);
-  let context_up = TContext::new_with_dependencies(
-    1,
+  let context_up = context_down.with_salt(1).with_dependencies(
     // Reverse the path from bottom to top.
     vec![(TNode(1), None), (TNode(0), Some(TNode(1)))]
       .into_iter()
       .collect(),
-    graph.clone(),
   );
 
   let res = graph.create(initial_bot, &context_up).wait();
@@ -352,7 +381,7 @@ fn critical_path() {
   {
     // The roots are all the sources, so we're covering the entire graph
     let roots = ["download jvm", "download a", "download b", "download c"]
-      .into_iter()
+      .iter()
       .map(|n| tnode(n))
       .collect::<Vec<_>>();
     let (expected_total_duration, expected_critical_path) = (
@@ -370,7 +399,7 @@ fn critical_path() {
   {
     // The roots exclude some nodes ("download jvm", "download a") from the graph.
     let roots = ["download b", "download c"]
-      .into_iter()
+      .iter()
       .map(|n| tnode(n))
       .collect::<Vec<_>>();
     let (expected_total_duration, expected_critical_path) = (
@@ -407,7 +436,7 @@ impl Node for TNode {
 
   fn run(self, context: TContext) -> BoxFuture<Vec<T>, TError> {
     context.ran(self.clone());
-    let token = T(self.0, context.id());
+    let token = T(self.0, context.salt());
     if let Some(dep) = context.dependency_of(&self) {
       context.maybe_delay(&self);
       context
@@ -426,8 +455,8 @@ impl Node for TNode {
     None
   }
 
-  fn cacheable(&self) -> bool {
-    true
+  fn cacheable(&self, context: &Self::Context) -> bool {
+    !context.uncacheable.contains(self)
   }
 }
 
@@ -489,28 +518,41 @@ impl TNode {
 ///
 #[derive(Clone)]
 struct TContext {
-  id: usize,
+  session_id: usize,
+  // A value that is included in every value computed by this context. Stands in for "the state of the
+  // outside world". A test that wants to "change the outside world" and observe its effect on the
+  // graph should change the salt to do so.
+  salt: usize,
   // A mapping from source to optional destination that drives what values each TNode depends on.
   // If there is no entry in this map for a node, then TNode::run will default to requesting
   // the next smallest node. Finally, if a None entry is present, a node will have no
   // dependencies.
   edges: Arc<HashMap<TNode, Option<TNode>>>,
-  delays: HashMap<TNode, Duration>,
+  delays: Arc<HashMap<TNode, Duration>>,
+  uncacheable: Arc<HashSet<TNode>>,
   graph: Arc<Graph<TNode>>,
   runs: Arc<Mutex<Vec<TNode>>>,
   entry_id: Option<EntryId>,
 }
 impl NodeContext for TContext {
   type Node = TNode;
+  type SessionId = usize;
+
   fn clone_for(&self, entry_id: EntryId) -> TContext {
     TContext {
-      id: self.id,
+      session_id: self.session_id,
+      salt: self.salt,
       edges: self.edges.clone(),
       delays: self.delays.clone(),
+      uncacheable: self.uncacheable.clone(),
       graph: self.graph.clone(),
       runs: self.runs.clone(),
       entry_id: Some(entry_id),
     }
+  }
+
+  fn session_id(&self) -> &usize {
+    &self.session_id
   }
 
   fn graph(&self) -> &Graph<TNode> {
@@ -529,49 +571,50 @@ impl NodeContext for TContext {
 }
 
 impl TContext {
-  fn new(id: usize, graph: Arc<Graph<TNode>>) -> TContext {
+  fn new(graph: Arc<Graph<TNode>>) -> TContext {
     TContext {
-      id,
+      session_id: 0,
+      salt: 0,
       edges: Arc::default(),
-      delays: HashMap::default(),
+      delays: Arc::default(),
+      uncacheable: Arc::default(),
       graph,
       runs: Arc::new(Mutex::new(Vec::new())),
       entry_id: None,
     }
   }
 
-  fn new_with_dependencies(
-    id: usize,
-    edges: HashMap<TNode, Option<TNode>>,
-    graph: Arc<Graph<TNode>>,
-  ) -> TContext {
-    TContext {
-      id,
-      edges: Arc::new(edges),
-      delays: HashMap::default(),
-      graph,
-      runs: Arc::new(Mutex::new(Vec::new())),
-      entry_id: None,
-    }
+  fn with_dependencies(mut self, edges: HashMap<TNode, Option<TNode>>) -> TContext {
+    self.edges = Arc::new(edges);
+    self
   }
 
-  fn new_with_delays(
-    id: usize,
-    delays: HashMap<TNode, Duration>,
-    graph: Arc<Graph<TNode>>,
-  ) -> TContext {
-    TContext {
-      id,
-      edges: Arc::default(),
-      delays,
-      graph,
-      runs: Arc::new(Mutex::new(Vec::new())),
-      entry_id: None,
-    }
+  fn with_delays(mut self, delays: HashMap<TNode, Duration>) -> TContext {
+    self.delays = Arc::new(delays);
+    self
   }
 
-  fn id(&self) -> usize {
-    self.id
+  fn with_uncacheable(mut self, uncacheable: HashSet<TNode>) -> TContext {
+    self.uncacheable = Arc::new(uncacheable);
+    self
+  }
+
+  fn with_salt(mut self, salt: usize) -> TContext {
+    self.salt = salt;
+    self
+  }
+
+  fn new_session(mut self, new_session_id: usize) -> TContext {
+    self.session_id = new_session_id;
+    {
+      let mut runs = self.runs.lock();
+      runs.clear();
+    }
+    self
+  }
+
+  fn salt(&self) -> usize {
+    self.salt
   }
 
   fn get(&self, dst: TNode) -> BoxFuture<Vec<T>, TError> {

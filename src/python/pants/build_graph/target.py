@@ -71,7 +71,7 @@ class Target(AbstractTarget):
   _MAX_RECURSION_DEPTH = 250
 
   class WrongNumberOfAddresses(Exception):
-    """Internal error, too many elements in Addresses
+    """Internal error, too many elements in Addresses.
 
     :API: public
     """
@@ -555,8 +555,7 @@ class Target(AbstractTarget):
     return len(self._sources_field.sources.files)
 
   def sources_snapshot(self, scheduler=None):
-    """
-    Get a Snapshot of the sources attribute of this target.
+    """Get a Snapshot of the sources attribute of this target.
 
     This API is experimental, and is subject to change.
     """
@@ -617,6 +616,9 @@ class Target(AbstractTarget):
     :param Payload payload: The post-Target.__init__() Payload object.
     :yields: AddressSpec strings representing dependencies of this target.
     """
+
+    if cls.compute_injectable_specs.__func__ is not Target.compute_injectable_specs.__func__:
+      cls._compute_injectable_specs_warn_or_error()
     cls._validate_target_representation_args(kwargs, payload)
     # N.B. This pattern turns this method into a non-yielding generator, which is helpful for
     # subclassing.
@@ -641,6 +643,8 @@ class Target(AbstractTarget):
     :param Payload payload: The post-Target.__init__() Payload object.
     :yields: AddressSpec strings representing dependencies of this target.
     """
+    if cls.compute_dependency_specs.__func__ is not Target.compute_dependency_specs.__func__:
+      cls._compute_dependency_specs_warn_or_error()
     cls._validate_target_representation_args(kwargs, payload)
     # N.B. This pattern turns this method into a non-yielding generator, which is helpful for
     # subclassing.
@@ -658,6 +662,11 @@ class Target(AbstractTarget):
     :param Payload payload: The post-Target.__init__() Payload object.
     :yields: AddressSpec strings representing dependencies of this target.
     """
+    cls._compute_injectable_specs_warn_or_error()
+    cls.compute_injectable_address_specs(kwargs=kwargs, payload=payload)
+
+  @classmethod
+  def _compute_injectable_specs_warn_or_error(cls):
     warn_or_error(
       removal_version="1.27.0.dev0",
       deprecated_entity_description="Target.compute_injectable_specs()",
@@ -665,7 +674,6 @@ class Target(AbstractTarget):
            "before. This change is to prepare for Pants eventually supporting file system specs, "
            "e.g. `./pants cloc foo.py`. In preparation, we renamed `Spec` to `AddressSpec`."
     )
-    cls.compute_injectable_address_specs(kwargs=kwargs, payload=payload)
 
   @classmethod
   def compute_dependency_specs(cls, kwargs=None, payload=None):
@@ -684,6 +692,11 @@ class Target(AbstractTarget):
     :param Payload payload: The post-Target.__init__() Payload object.
     :yields: AddressSpec strings representing dependencies of this target.
     """
+    cls._compute_dependency_specs_warn_or_error()
+    cls.compute_dependency_address_specs(kwargs=kwargs, payload=payload)
+
+  @classmethod
+  def _compute_dependency_specs_warn_or_error(cls):
     warn_or_error(
       removal_version="1.27.0.dev0",
       deprecated_entity_description="Target.compute_dependency_specs()",
@@ -691,7 +704,6 @@ class Target(AbstractTarget):
            "before. This change is to prepare for Pants eventually supporting file system specs, "
            "e.g. `./pants cloc foo.py`. In preparation, we renamed `Spec` to `AddressSpec`."
     )
-    cls.compute_dependency_address_specs(kwargs=kwargs, payload=payload)
 
   @property
   def dependencies(self):
@@ -815,9 +827,9 @@ class Target(AbstractTarget):
 
   @memoized_property
   def id(self):
-    """A unique and unix safe identifier for the Target.
-    Since other classes use this id to generate new file names and unix system has 255 character
-    limitation on a file name, 200-character limit is chosen as a safe measure.
+    """A unique and unix safe identifier for the Target. Since other classes use this id to generate
+    new file names and unix system has 255 character limitation on a file name, 200-character limit
+    is chosen as a safe measure.
 
     :API: public
     """

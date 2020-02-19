@@ -1,5 +1,5 @@
 use crate::{BackoffConfig, Health, Serverset};
-use futures::{self, Future};
+use futures01::{future, Future};
 use parking_lot::Mutex;
 use std;
 use std::collections::HashSet;
@@ -172,7 +172,7 @@ fn expect_both(runtime: &mut tokio::runtime::Runtime, s: &Serverset<String>, rep
   let visited = Arc::new(Mutex::new(HashSet::new()));
 
   runtime
-    .block_on(futures::future::join_all(
+    .block_on(future::join_all(
       (0..repetitions)
         .into_iter()
         .map(|_| {

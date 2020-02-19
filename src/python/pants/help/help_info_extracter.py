@@ -17,6 +17,8 @@ class OptionHelpInfo:
   registering_class: The type that registered the option.
   display_args: Arg strings suitable for display in help text, including value examples
                 (e.g., [-f, --[no]-foo-bar, --baz=<metavar>].)
+  comma_separated_display_args: Display args as a comma-delimited string, used in
+                                reference documentation.
   scoped_cmd_line_args: The explicitly scoped raw flag names allowed anywhere on the cmd line,
                         (e.g., [--scope-baz, --no-scope-baz, --scope-qux])
   unscoped_cmd_line_args: The unscoped raw flag names allowed on the cmd line in this option's
@@ -32,6 +34,7 @@ class OptionHelpInfo:
   """
   registering_class: Type
   display_args: List[str]
+  comma_separated_display_args: str
   scoped_cmd_line_args: List[str]
   unscoped_cmd_line_args: List[str]
   typ: Type
@@ -41,9 +44,6 @@ class OptionHelpInfo:
   removal_version: Optional[str]
   removal_hint: Optional[str]
   choices: Optional[str]
-
-  def comma_separated_display_args(self):
-    return ', '.join(self.display_args)
 
 
 @dataclass(frozen=True)
@@ -130,6 +130,8 @@ class HelpInfoExtracter:
     advanced_options = []
     # Sort the arguments, so we display the help in alphabetical order.
     for args, kwargs in sorted(option_registrations_iter):
+      if kwargs.get('passive'):
+        continue
       ohi = self.get_option_help_info(args, kwargs)
       if kwargs.get('advanced'):
         advanced_options.append(ohi)
@@ -196,6 +198,7 @@ class HelpInfoExtracter:
 
     ret = OptionHelpInfo(registering_class=kwargs.get('registering_class', type(None)),
                          display_args=display_args,
+                         comma_separated_display_args=', '.join(display_args),
                          scoped_cmd_line_args=scoped_cmd_line_args,
                          unscoped_cmd_line_args=unscoped_cmd_line_args,
                          typ=typ,

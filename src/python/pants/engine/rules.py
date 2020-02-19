@@ -9,7 +9,7 @@ import typing
 from abc import ABC, abstractmethod
 from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Tuple, Type
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type, get_type_hints
 
 from twitter.common.collections import OrderedSet
 
@@ -23,8 +23,8 @@ from pants.util.meta import frozen_after_init
 
 
 def side_effecting(cls):
-  """Annotates a class to indicate that it is a side-effecting type, which needs
-  to be handled specially with respect to rule caching semantics."""
+  """Annotates a class to indicate that it is a side-effecting type, which needs to be handled
+  specially with respect to rule caching semantics."""
   cls.__side_effecting = True
   return cls
 
@@ -156,6 +156,9 @@ def _make_rule(
     else:
       effective_name = name
 
+    # Set our own custom `__line_number__` dunder so that the engine may visualize the line number.
+    func.__line_number__ = func.__code__.co_firstlineno
+
     func.rule = TaskRule(
         return_type,
         tuple(parameter_types),
@@ -191,14 +194,15 @@ class MissingParameterTypeAnnotation(InvalidTypeAnnotation):
 
 
 def _ensure_type_annotation(
-  annotation: Any, name: str, empty_value: Any, raise_type: Type[InvalidTypeAnnotation],
-) -> type:
-  if annotation == empty_value:
+  *, type_annotation: Optional[Type], name: str, raise_type: Type[InvalidTypeAnnotation],
+) -> Type:
+  if type_annotation is None:
     raise raise_type(f'{name} is missing a type annotation.')
-  if not isinstance(annotation, type):
-    raise raise_type(f'The annotation for {name} must be a type, '
-                     f'got {annotation} of type {type(annotation)}.')
-  return annotation
+  if not isinstance(type_annotation, type):
+    raise raise_type(
+      f'The annotation for {name} must be a type, got {type_annotation} of type {type(type_annotation)}.'
+    )
+  return type_annotation
 
 
 PUBLIC_RULE_DECORATOR_ARGUMENTS = {'name'}
@@ -225,22 +229,20 @@ def rule_decorator(*args, **kwargs) -> Callable:
   cacheable: bool = kwargs['cacheable']
   name: Optional[str] = kwargs.get('name')
 
-  signature = inspect.signature(func)
   func_id = f'@rule {func.__module__}:{func.__name__}'
+  type_hints = get_type_hints(func)
   return_type = _ensure_type_annotation(
-    annotation=signature.return_annotation,
+    type_annotation=type_hints.get("return"),
     name=f'{func_id} return',
-    empty_value=inspect.Signature.empty,
-    raise_type=MissingReturnTypeAnnotation
+    raise_type=MissingReturnTypeAnnotation,
   )
   parameter_types = tuple(
     _ensure_type_annotation(
-      annotation=parameter.annotation,
-      name=f'{func_id} parameter {name}',
-      empty_value=inspect.Parameter.empty,
-      raise_type=MissingParameterTypeAnnotation
+      type_annotation=type_hints.get(parameter),
+      name=f'{func_id} parameter {parameter}',
+      raise_type=MissingParameterTypeAnnotation,
     )
-    for name, parameter in signature.parameters.items()
+    for parameter in inspect.signature(func).parameters
   )
   validate_parameter_types(func_id, parameter_types, cacheable)
   return _make_rule(return_type, parameter_types, cacheable=cacheable, name=name)(func)
@@ -286,13 +288,21 @@ class UnionRule:
 
 @dataclass(frozen=True)
 class UnionMembership:
-  union_rules: Dict[Type, typing.Iterable[type]]
+  union_rules: Dict[Type, typing.Iterable[Type]]
 
   def is_member(self, union_type, putative_member):
     members = self.union_rules.get(union_type)
     if members is None:
       raise TypeError(f'Not a registered union type: {union_type}')
     return type(putative_member) in members
+
+  def has_members(self, union_type: Type) -> bool:
+    """Check whether the union has an implementation or not."""
+    return bool(self.union_rules.get(union_type))
+
+  def has_members_for_all(self, union_types: typing.Iterable[Type]) -> bool:
+    """Check whether every union given has an implementation or not."""
+    return all(self.has_members(union_type) for union_type in union_types)
 
 
 class Rule(ABC):
@@ -389,9 +399,8 @@ class TaskRule(Rule):
 class RootRule(Rule):
   """Represents a root input to an execution of a rule graph.
 
-  Roots act roughly like parameters, in that in some cases the only source of a
-  particular type might be when a value is provided as a root subject at the beginning
-  of an execution.
+  Roots act roughly like parameters, in that in some cases the only source of a particular type
+  might be when a value is provided as a root subject at the beginning of an execution.
   """
   _output_type: Type
 

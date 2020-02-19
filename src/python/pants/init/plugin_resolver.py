@@ -12,8 +12,8 @@ from pex.interpreter import PythonInterpreter
 from pkg_resources import working_set as global_working_set
 from wheel.install import WheelFile
 
-from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.option.global_options import GlobalOptionsRegistrar
+from pants.python.python_repos import PythonRepos
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_delete, safe_mkdir, safe_open
 from pants.util.memo import memoized_property
@@ -57,7 +57,8 @@ class PluginResolver:
     self._interpreter = interpreter or PythonInterpreter.get()
 
     bootstrap_options = self._options_bootstrapper.get_bootstrap_options().for_global_scope()
-    self._plugin_requirements = bootstrap_options.plugins
+    self._plugin_requirements = sorted(
+      set(bootstrap_options.plugins) | set(bootstrap_options.plugins2))
     self._plugin_cache_dir = bootstrap_options.plugin_cache_dir
     self._plugins_force_resolve = bootstrap_options.plugins_force_resolve
 

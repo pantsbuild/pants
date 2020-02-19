@@ -1,7 +1,6 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-
 from pants.engine.selectors import Params
 from pants.init.options_initializer import BuildConfigInitializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -12,7 +11,7 @@ from pants.testutil.test_base import TestBase
 class TestEngineOptionsParsing(TestBase):
 
   def _ob(self, args=tuple(), env=tuple()):
-    self.create_file('pants.ini')
+    self.create_file('pants.toml')
     options_bootstrap = OptionsBootstrapper.create(
       args=tuple(args),
       env=dict(env),

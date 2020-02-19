@@ -212,7 +212,7 @@ passing the `--remote-execution-enabled` flag to `ci.py`, such as:
 To use remote execution for a specific test(s), run this:
 
     :::bash
-    $ ./pants --pants-config-files=pants.remote.ini \
+    $ ./pants --pants-config-files=pants.remote.toml \
       --remote-oauth-bearer-token-path=<(gcloud auth application-default print-access-token | perl -p -e 'chomp if eof') \
       --no-v1 --v2 test tests/python/pants_test/util:strutil 
 
@@ -224,16 +224,16 @@ To run Pants under `pdb` and set a breakpoint, you can typically add
     :::python
     import pdb; pdb.set_trace()
 
-...where you first want to break. If the code is in a test, instead use
+...where you first want to break. If the code is in a test, you can use ipdb for a much nicer debugger
 
     :::python
-    import pytest; pytest.set_trace()
+    import ipdb; ipdb.set_trace()
 
-To run tests and bring up `pdb` for failing tests, you can instead pass `--pdb` to
-`test.pytest --options`:
+To run tests and bring up `pdb` for failing tests, you can pass `--pdb` to
+`--pytest-args`:
 
     :::bash
-    $ ./pants test.pytest --options='--pdb' tests/python/pants_test/tasks:
+    $ ./pants --pytest-args='--pdb' test tests/python/pants_test/tasks:
     ... plenty of test output ...
     tests/python/pants_test/tasks/test_targets_help.py E
     >>>>>>>>>>>>>>>>>>>>>>>>>>>>>> traceback >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -251,8 +251,7 @@ To run tests and bring up `pdb` for failing tests, you can instead pass `--pdb` 
     -> super().setUpClass()
     (Pdb)
 
-Debug quickly; that test target will time out in a couple of minutes,
-quitting you out.
+When debugging tests, the test might time out. You can turn off timeouts with `--no-pytest-timeouts`.
 
 To start an interactive Python shell that can `import` Pants modules,
 use the usual `./pants repl` on a `python_library` target that builds (or

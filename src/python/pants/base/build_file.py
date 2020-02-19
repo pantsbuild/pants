@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 class BuildFile(ABC):
 
   class BuildFileError(Exception):
-    """Base class for all exceptions raised in BuildFile to make exception handling easier"""
+    """Base class for all exceptions raised in BuildFile to make exception handling easier."""
 
   class MissingBuildFileError(BuildFileError):
     """Raised when a BUILD file cannot be found at the path in the spec."""
@@ -52,7 +52,8 @@ class BuildFile(ABC):
 
   @staticmethod
   def scan_build_files(project_tree: ProjectTree, base_relpath, build_ignore_patterns=None):
-    """Looks for all BUILD files
+    """Looks for all BUILD files.
+
     :param project_tree: Project tree to scan in.
     :param base_relpath: Directory under root_dir to scan.
     :param build_ignore_patterns: .gitignore like patterns to exclude from BUILD files scan.
@@ -128,7 +129,7 @@ class BuildFile(ABC):
 
   @staticmethod
   def get_build_files_family(project_tree, dir_relpath, build_ignore_patterns=None):
-    """Returns all the BUILD files on a path"""
+    """Returns all the BUILD files on a path."""
     build_files = set()
     for build in sorted(project_tree.glob1(dir_relpath, '{prefix}*'.format(prefix=BuildFile._BUILD_FILE_PREFIX))):
       if BuildFile._is_buildfile_name(build) and project_tree.isfile(os.path.join(dir_relpath, build)):

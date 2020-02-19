@@ -98,9 +98,8 @@ class TestInterpreterCache(TestBase):
       self.assertEqual([], list(cache._setup_cached()))
 
   def test_interpreter_from_relpath_purges_stale_interpreter(self):
-    """
-    Simulates a stale interpreter cache and tests that _interpreter_from_relpath
-    properly detects it and removes the stale dist directory.
+    """Simulates a stale interpreter cache and tests that _interpreter_from_relpath properly detects
+    it and removes the stale dist directory.
 
     See https://github.com/pantsbuild/pants/issues/3416 for more info.
     """

@@ -61,8 +61,18 @@ python_tests(
 )
 
 python_tests(
+  name = 'filesystem_specs_integration',
+  sources = ['test_filesystem_specs_integration.py'],
+  dependencies = [
+    'src/python/pants/testutil:int-test',
+    'testprojects/tests/python:owners_integration_target',
+  ],
+  tags = {'integration', 'partially_type_checked'},
+)
+
+python_tests(
   name = 'owners_integration',
-  sources = [ 'test_owners_integration.py' ],
+  sources = ['test_owners_integration.py'],
   dependencies = [
     'src/python/pants/testutil:int-test',
     'testprojects/tests/python:owners_integration_target',
@@ -76,6 +86,7 @@ python_tests(
   dependencies = [
     'tests/python/pants_test/pantsd:pantsd_integration_test_base',
     'examples/src/scala/org/pantsbuild/example:hello_directory',
+    'testprojects/tests/python/pants:dummies_directory',
   ],
   tags = {'integration', 'partially_type_checked'},
   timeout = 270,

@@ -5,21 +5,26 @@ from typing import List, Optional, Tuple
 
 from pants.backend.python.lint.isort.rules import IsortTarget
 from pants.backend.python.lint.isort.rules import rules as isort_rules
-from pants.backend.python.rules import download_pex_bin, pex
-from pants.backend.python.subsystems import python_native_code, subprocess_environment
+from pants.backend.python.rules import download_pex_bin
+from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.fs import Digest, FileContent, InputFilesContent, Snapshot
-from pants.engine.legacy.structs import TargetAdaptor
+from pants.engine.legacy.structs import TargetAdaptor, TargetAdaptorWithOrigin
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.rules.core.fmt import FmtResult
 from pants.rules.core.lint import LintResult
 from pants.source.wrapped_globs import EagerFilesetWithSpec
 from pants.testutil.option.util import create_options_bootstrapper
+from pants.testutil.subsystem.util import init_subsystems
 from pants.testutil.test_base import TestBase
 
 
 class IsortIntegrationTest(TestBase):
+
+  def setUp(self):
+    super().setUp()
+    init_subsystems([download_pex_bin.DownloadedPexBin.Factory])
 
   good_source = FileContent(path="test/good.py", content=b'from animals import cat, dog\n')
   bad_source = FileContent(path="test/bad.py", content=b'from colors import green, blue\n')
@@ -41,11 +46,9 @@ class IsortIntegrationTest(TestBase):
     return (
       *super().rules(),
       *isort_rules(),
-      *download_pex_bin.rules(),
-      *pex.rules(),
-      *python_native_code.rules(),
-      *subprocess_environment.rules(),
+      download_pex_bin.download_pex_bin,
       RootRule(IsortTarget),
+      RootRule(download_pex_bin.DownloadedPexBin.Factory),
     )
 
   def run_isort(
@@ -55,6 +58,7 @@ class IsortIntegrationTest(TestBase):
     config: Optional[str] = None,
     passthrough_args: Optional[str] = None,
     skip: bool = False,
+    origin: Optional[OriginSpec] = None,
   ) -> Tuple[LintResult, FmtResult]:
     args = ["--backend-packages2=pants.backend.python.lint.isort"]
     if config is not None:
@@ -65,17 +69,26 @@ class IsortIntegrationTest(TestBase):
     if skip:
       args.append(f"--isort-skip")
     input_snapshot = self.request_single_product(Snapshot, InputFilesContent(source_files))
-    target_adaptor = TargetAdaptor(
+    adaptor = TargetAdaptor(
       sources=EagerFilesetWithSpec('test', {'globs': []}, snapshot=input_snapshot),
       address=Address.parse("test:target"),
     )
-    lint_target = IsortTarget(target_adaptor)
-    fmt_target = IsortTarget(
-      target_adaptor, prior_formatter_result_digest=input_snapshot.directory_digest,
-    )
+    if origin is None:
+      origin = SingleAddress(directory="test", name="target")
+    adaptor_with_origin = TargetAdaptorWithOrigin(adaptor, origin)
     options_bootstrapper = create_options_bootstrapper(args=args)
-    lint_result = self.request_single_product(LintResult, Params(lint_target, options_bootstrapper))
-    fmt_result = self.request_single_product(FmtResult, Params(fmt_target, options_bootstrapper))
+    lint_result = self.request_single_product(LintResult, Params(
+      IsortTarget(adaptor_with_origin),
+      options_bootstrapper,
+      download_pex_bin.DownloadedPexBin.Factory.global_instance(),
+    ))
+    fmt_result = self.request_single_product(FmtResult, Params(
+      IsortTarget(
+        adaptor_with_origin, prior_formatter_result_digest=input_snapshot.directory_digest,
+      ),
+      options_bootstrapper,
+      download_pex_bin.DownloadedPexBin.Factory.global_instance(),
+    ))
     return lint_result, fmt_result
 
   def get_digest(self, source_files: List[FileContent]) -> Digest:
@@ -104,6 +117,14 @@ class IsortIntegrationTest(TestBase):
     assert "Fixing" in fmt_result.stdout and "test/bad.py" in fmt_result.stdout
     assert "test/good.py" not in fmt_result.stdout
     assert fmt_result.digest == self.get_digest([self.good_source, self.fixed_bad_source])
+
+  def test_precise_file_args(self) -> None:
+    file_arg = FilesystemLiteralSpec(self.good_source.path)
+    lint_result, fmt_result = self.run_isort([self.good_source, self.bad_source], origin=file_arg)
+    assert lint_result.exit_code == 0
+    assert lint_result.stdout == ""
+    assert fmt_result.stdout == ""
+    assert fmt_result.digest == self.get_digest([self.good_source, self.bad_source])
 
   def test_respects_config_file(self) -> None:
     lint_result, fmt_result = self.run_isort(

@@ -21,9 +21,12 @@ class JvmRunTest(JvmTaskTestBase):
   @contextmanager
   def setup_cmdline_run(self, extra_jvm_options=None, **options):
     """Run the JvmRun task in command line only mode  with the specified extra options.
+
     :returns: the command line string
     """
-    self.set_options(only_write_cmd_line='a', **options)
+    # NB: We must set `--run-args=[]` because the unit test does not properly set up the
+    # `RunOptions(GoalSubsystem)`.
+    self.set_options(only_write_cmd_line='a', args=[], **options)
     jvm_binary = self.make_target('src/java/org/pantsbuild:binary', JvmBinary,
       main='org.pantsbuild.Binary', extra_jvm_options=extra_jvm_options)
     context = self.context(target_roots=[jvm_binary])

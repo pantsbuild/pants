@@ -97,8 +97,7 @@ class JaxbGen(SimpleCodegenTask, NailgunTask):
   @classmethod
   def _guess_package(self, path):
     """Used in execute_codegen to actually invoke the compiler with the proper arguments, and in
-    _sources_to_be_generated to declare what the generated files will be.
-    """
+    _sources_to_be_generated to declare what the generated files will be."""
     supported_prefixes = ('com', 'org', 'net',)
     package = ''
     slash = path.rfind(os.path.sep)

@@ -120,8 +120,9 @@ class ScoveragePlatformTest(TestBase):
       self.assertNotIn('scoverage', list(scala_target.compiler_option_sets))
 
   def test_blacklist(self):
-    """
-    When a target is blacklisted, we do not instrument it. For achieving that, we only
+    """When a target is blacklisted, we do not instrument it.
+
+    For achieving that, we only
     want `scalac_plugins` to not contain `scoverage`. Thus, the target may still have
     `scoverage` in `scalac_plugin_args` and in `dependencies` but it will not be
     instrumented as long as `scalac_plugins` do not contain `scoverage`.

@@ -12,15 +12,15 @@ target(
 
 files(
   name = 'element_directory',
-  sources = rglobs('element/*'),
+  sources = ['element/**/*'],
 )
 
 files(
   name = 'roots_directory',
-  sources = rglobs('roots/*'),
+  sources = ['roots/**/*'],
 )
 
 files(
   name = 'temperature_directory',
-  sources = rglobs('temperature/*'),
+  sources = ['temperature/**/*'],
 )

@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
-  sources=globs('test_*.py', exclude=[globs('*_integration.py')]),
+  sources=['test_*.py', '!*_integration.py'],
   dependencies=[
     'src/python/pants/backend/native',
     'src/python/pants/backend/python/subsystems',
@@ -11,7 +11,6 @@ python_tests(
     'src/python/pants/backend/python:interpreter_cache',
     'src/python/pants/backend/python:plugin',
     'src/python/pants/backend/python:python_artifact',
-    'src/python/pants/backend/python:python_requirement',
     'src/python/pants/base:build_root',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:run_info',
@@ -24,7 +23,7 @@ python_tests(
     'tests/python/pants_test/backend/python/tasks:python_task_test_base',
     'tests/python/pants_test/engine:scheduler_test_base',
     'src/python/pants/testutil/subsystem',
-    'tests/python/pants_test:interpreter_selection_utils',
+    'src/python/pants/testutil:interpreter_selection_utils',
     'src/python/pants/testutil:task_test_base',
   ],
   tags={'platform_specific_behavior', 'partially_type_checked'},
@@ -33,7 +32,7 @@ python_tests(
 
 python_tests(
   name='integration',
-  sources=globs('*_integration.py'),
+  sources=['*_integration.py'],
   dependencies=[
     'src/python/pants/backend/native',
     'src/python/pants/backend/native/targets',

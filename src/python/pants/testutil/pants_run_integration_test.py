@@ -1,7 +1,6 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import configparser
 import glob
 import os
 import re
@@ -21,6 +20,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.fs.archive import ZIP
+from pants.option.config import TomlSerializer
 from pants.subsystem.subsystem import Subsystem
 from pants.testutil.file_test_util import check_symlinks, contains_exact_files
 from pants.util.contextutil import environment_as, pushd, temporary_dir
@@ -182,8 +182,8 @@ class PantsRunIntegrationTest(unittest.TestCase):
 
   @classmethod
   def use_pantsd_env_var(cls):
-    """Subclasses may override to acknowledge that the tests cannot run when pantsd is enabled,
-    or they want to configure pantsd themselves.
+    """Subclasses may override to acknowledge that the tests cannot run when pantsd is enabled, or
+    they want to configure pantsd themselves.
 
     In those cases, --enable-pantsd will not be added to their configuration.
     This approach is coarsely grained, meaning we disable pantsd in some tests that actually run
@@ -202,7 +202,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
   def hermetic(cls):
     """Subclasses may override to acknowledge that they are hermetic.
 
-    That is, that they should run without reading the real pants.ini.
+    That is, that they should run without reading the real pants.toml.
     """
     return False
 
@@ -273,9 +273,8 @@ class PantsRunIntegrationTest(unittest.TestCase):
       return ret
 
   def get_cache_subdir(self, cache_dir, subdir_glob='*/', other_dirs=()):
-    """Check that there is only one entry of `cache_dir` which matches the glob
-    specified by `subdir_glob`, excluding `other_dirs`, and
-    return it.
+    """Check that there is only one entry of `cache_dir` which matches the glob specified by
+    `subdir_glob`, excluding `other_dirs`, and return it.
 
     :param str cache_dir: absolute path to some directory.
     :param str subdir_glob: string specifying a glob for (one level down)
@@ -302,9 +301,12 @@ class PantsRunIntegrationTest(unittest.TestCase):
     args = [
       '--no-pantsrc',
       f'--pants-workdir={workdir}',
-      '--kill-nailguns',
       f'--print-exception-stacktrace={print_exception_stacktrace}',
     ]
+    # TODO: If the default value for `--v1` changes to False then this check will
+    # Have to change to `if '--v1' in command:`.
+    if '--no-v1' not in command:
+      args.append('--kill-nailguns')
 
     if self.hermetic():
       args.extend(['--pants-config-files=[]',
@@ -320,17 +322,10 @@ class PantsRunIntegrationTest(unittest.TestCase):
       args.append("--no-shutdown-pantsd-after-run")
 
     if config:
-      config_data = config.copy()
-      # TODO(#6071): RawConfigParser is legacy. Investigate updating to modern API.
-      ini = configparser.RawConfigParser(defaults=config_data.pop('DEFAULT', None))
-      for section, section_config in config_data.items():
-        ini.add_section(section)
-        for key, value in section_config.items():
-          ini.set(section, key, value)
-      ini_file_name = os.path.join(workdir, 'pants.ini')
-      with safe_open(ini_file_name, mode='w') as fp:
-        ini.write(fp)
-      args.append('--pants-config-files=' + ini_file_name)
+      toml_file_name = os.path.join(workdir, 'pants.toml')
+      with safe_open(toml_file_name, mode='w') as fp:
+        fp.write(TomlSerializer(config).serialize())
+      args.append('--pants-config-files=' + toml_file_name)
 
     pants_script = [sys.executable, '-m', 'pants']
 
@@ -523,11 +518,10 @@ class PantsRunIntegrationTest(unittest.TestCase):
     self.assert_contains_log(msg, level, module, pants_run.stderr_data, pants_run.pid)
 
   def assert_contains_log(self, msg, level, module, log, pid=None):
-    """
-    Asserts that the passed log contains the message logged by the module at the level.
+    """Asserts that the passed log contains the message logged by the module at the level.
 
-    If pid is specified, performs an exact match including the pid of the pants process.
-    Otherwise performs a regex match asserting that some pid is present.
+    If pid is specified, performs an exact match including the pid of the pants process. Otherwise
+    performs a regex match asserting that some pid is present.
     """
     prefix = f"[{level}] {module}:pid="
     suffix = f": {msg}"
@@ -617,8 +611,8 @@ class PantsRunIntegrationTest(unittest.TestCase):
       'pants',
       'pants.pex',
       'pants-plugins',
-      'pants.ini',
-      'pants.travis-ci.ini',
+      'pants.toml',
+      'pants.travis-ci.toml',
       'pyproject.toml',
       'rust-toolchain',
       'src',

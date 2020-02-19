@@ -6,18 +6,20 @@ from collections import defaultdict
 
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_binary_task import JvmBinaryTask
+from pants.base.hash_utils import hash_all
 from pants.build_graph.target_scopes import Scopes
+from pants.util.dirutil import fast_relpath
 
 
 class ConsolidateClasspath(JvmBinaryTask):
-  """Convert loose directories in classpath_products into jars. """
+  """Convert loose directories in classpath_products into jars."""
   # Directory for both internal and external libraries.
   LIBS_DIR = 'libs'
   _target_closure_kwargs = dict(include_scopes=Scopes.JVM_RUNTIME_SCOPES, respect_intransitive=True)
 
   @classmethod
   def implementation_version(cls):
-    return super().implementation_version() + [('ConsolidateClasspath', 1)]
+    return super().implementation_version() + [('ConsolidateClasspath', 2)]
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -44,7 +46,7 @@ class ConsolidateClasspath(JvmBinaryTask):
     self._consolidate_classpath(targets_to_consolidate, consolidated_classpath)
 
   def _consolidate_classpath(self, targets, classpath_products):
-    """Convert loose directories in classpath_products into jars. """
+    """Convert loose directories in classpath_products into jars."""
     # TODO: find a way to not process classpath entries for valid VTs.
 
     # NB: It is very expensive to call to get entries for each target one at a time.
@@ -56,9 +58,11 @@ class ConsolidateClasspath(JvmBinaryTask):
     with self.invalidated(targets=targets, invalidate_dependents=True) as invalidation:
       for vt in invalidation.all_vts:
         entries = entries_map.get(vt.target, [])
-        for index, (conf, entry) in enumerate(entries):
+        for conf, entry in entries:
+          relpath = fast_relpath(entry.path, self.get_options().pants_workdir)
+          suffix = hash_all([relpath])[:6]
           if ClasspathUtil.is_dir(entry.path):
-            jarpath = os.path.join(vt.results_dir, f'output-{index}.jar')
+            jarpath = os.path.join(vt.results_dir, f'output-{suffix}.jar')
 
             # Regenerate artifact for invalid vts.
             if not vt.valid:

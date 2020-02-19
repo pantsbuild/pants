@@ -10,7 +10,6 @@ from pants.backend.awslambda.common.awslambda_common_rules import CreatedAWSLamb
 from pants.backend.awslambda.python.awslambda_python_rules import rules as awslambda_python_rules
 from pants.backend.python.rules import (
   download_pex_bin,
-  inject_init,
   pex,
   pex_from_target_closure,
   prepare_chrooted_python_sources,
@@ -22,27 +21,34 @@ from pants.engine.legacy.graph import HydratedTarget
 from pants.engine.legacy.structs import PythonAWSLambdaAdaptor
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
-from pants.rules.core import strip_source_root
+from pants.rules.core import strip_source_roots
 from pants.testutil.option.util import create_options_bootstrapper
+from pants.testutil.subsystem.util import init_subsystems
 from pants.testutil.test_base import TestBase
 
 
 class TestPythonAWSLambdaCreation(TestBase):
+
+  def setUp(self):
+    super().setUp()
+    init_subsystems([download_pex_bin.DownloadedPexBin.Factory])
 
   @classmethod
   def rules(cls):
     return (
       *super().rules(),
       *awslambda_python_rules(),
-      *download_pex_bin.rules(),
-      *inject_init.rules(),
+      # If we pull in the subsystem_rule() as well from this file, we get an error saying the scope
+      # 'download-pex-bin' was not found when trying to fetch the appropriate scope.
+      download_pex_bin.download_pex_bin,
       *pex.rules(),
       *pex_from_target_closure.rules(),
       *prepare_chrooted_python_sources.rules(),
       *python_native_code.rules(),
-      *strip_source_root.rules(),
+      *strip_source_roots.rules(),
       *subprocess_environment.rules(),
       RootRule(PythonAWSLambdaAdaptor),
+      RootRule(download_pex_bin.DownloadedPexBin.Factory),
     )
 
   def create_python_awslambda(self, addr: str) -> Tuple[str, bytes]:
@@ -52,6 +58,7 @@ class TestPythonAWSLambdaCreation(TestBase):
       Params(
         target.adaptor,
         create_options_bootstrapper(args=["--backend-packages2=pants.backend.awslambda.python"]),
+        download_pex_bin.DownloadedPexBin.Factory.global_instance(),
       ),
     )
     files_content = list(self.request_single_product(FilesContent,

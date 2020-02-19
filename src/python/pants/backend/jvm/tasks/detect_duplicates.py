@@ -19,7 +19,7 @@ EXCLUDED_PATTERNS=[r'^META-INF/[^/]+\.(SF|DSA|RSA)$']  # signature file
 
 
 class DuplicateDetector(JvmBinaryTask):
-  """ Detect JVM classes and resources with the same qualified name on the classpath. """
+  """Detect JVM classes and resources with the same qualified name on the classpath."""
 
   @staticmethod
   def _isdir(name):

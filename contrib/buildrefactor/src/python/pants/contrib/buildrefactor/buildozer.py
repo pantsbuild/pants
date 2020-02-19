@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class Buildozer(Task):
-  """Enables interaction with the Buildozer Go binary
+  """Enables interaction with the Buildozer Go binary.
 
   Behavior:
   1. `./pants buildozer --add-dependencies=<dependencies>`

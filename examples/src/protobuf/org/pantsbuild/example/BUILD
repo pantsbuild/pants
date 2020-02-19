@@ -13,12 +13,12 @@ target(
 
 files(
   name = 'distance_directory',
-  sources = rglobs('distance/*'),
+  sources = ['distance/**/*'],
 )
 
 files(
   name = 'grpcio_directory',
-  sources = rglobs('grpcio/*'),
+  sources = ['grpcio/**/*'],
   dependencies = [
     'examples:3rdparty_directory',
   ],
@@ -26,11 +26,11 @@ files(
 
 files(
   name = 'imports_directory',
-  sources = rglobs('imports/*'),
+  sources = ['imports/**/*'],
 )
 
 files(
   name = 'unpacked_jars_directory',
-  sources = rglobs('unpacked_jars/*'),
+  sources = ['unpacked_jars/**/*'],
 )
 

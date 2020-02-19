@@ -7,7 +7,7 @@ edition = "2018"
 [dependencies]
 bytes = "0.4.5"
 fs = { path = "../fs" }
-futures = "^0.1.16"
+futures01 = { package = "futures", version = "0.1" }
 hashing = { path = "../hashing" }
 lmdb = { git = "https://github.com/pantsbuild/lmdb-rs.git", rev = "06bdfbfc6348f6804127176e561843f214fc17f8" }
 log = "0.4"

@@ -6,13 +6,14 @@ from pants.rules.core import (
   cloc,
   distdir,
   filedeps,
+  find_target_source_files,
   fmt,
-  generate_pants_ini,
   lint,
   list_roots,
   list_targets,
+  repl,
   run,
-  strip_source_root,
+  strip_source_roots,
   test,
 )
 
@@ -22,13 +23,14 @@ def rules():
     *cloc.rules(),
     *binary.rules(),
     *fmt.rules(),
-    *generate_pants_ini.rules(),
     *lint.rules(),
     *list_roots.rules(),
     *list_targets.rules(),
+    *find_target_source_files.rules(),
     *filedeps.rules(),
+    *repl.rules(),
     *run.rules(),
-    *strip_source_root.rules(),
+    *strip_source_roots.rules(),
     *distdir.rules(),
     *test.rules()
   ]

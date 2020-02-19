@@ -7,7 +7,7 @@ publish = false
 
 [dependencies]
 chrono = "0.4.10"
-futures = "0.1.27"
+futures01 = { package = "futures", version = "0.1" }
 lazy_static = "1"
 log = "0.4"
 num_enum = "0.1.1"

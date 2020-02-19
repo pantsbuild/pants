@@ -123,9 +123,8 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
   @pytest.mark.flaky(retries=1)  # https://github.com/pantsbuild/pants/issues/6114
   def test_pantsd_lifecycle_invalidation(self):
-    """Runs pants commands with pantsd enabled, in a loop, alternating between options that
-    should invalidate pantsd and incur a restart and then asserts for pid consistency.
-    """
+    """Runs pants commands with pantsd enabled, in a loop, alternating between options that should
+    invalidate pantsd and incur a restart and then asserts for pid consistency."""
     with self.pantsd_successful_run_context() as (pantsd_run, checker, _, _):
       variants = (
         ['debug', 'help'],
@@ -163,16 +162,16 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
   def test_pantsd_lifecycle_non_invalidation_on_config_string(self):
     with temporary_dir() as dist_dir_root, temporary_dir() as config_dir:
       config_files = [
-        os.path.abspath(os.path.join(config_dir, f'pants.ini.{i}')) for i in range(2)
+        os.path.abspath(os.path.join(config_dir, f'pants.toml.{i}')) for i in range(2)
       ]
       for config_file in config_files:
         print(f'writing {config_file}')
         with open(config_file, 'w') as fh:
-          fh.write(f"[GLOBAL]\npants_distdir: {os.path.join(dist_dir_root, 'v1')}\n")
+          fh.write(f"[GLOBAL]\npants_distdir = \"{os.path.join(dist_dir_root, 'v1')}\"\n")
 
-      invalidating_config = os.path.join(config_dir, 'pants.ini.invalidates')
+      invalidating_config = os.path.join(config_dir, 'pants.toml.invalidates')
       with open(invalidating_config, 'w') as fh:
-        fh.write(f"[GLOBAL]\npants_distdir: {os.path.join(dist_dir_root, 'v2')}\n")
+        fh.write(f"[GLOBAL]\npants_distdir = \"{os.path.join(dist_dir_root, 'v2')}\"\n")
 
       with self.pantsd_successful_run_context() as (pantsd_run, checker, _, _):
         variants = [[f'--pants-config-files={f}', 'help'] for f in config_files]
@@ -340,21 +339,21 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
       self.assertIn('saw file events covered by invalidation globs', full_pantsd_log())
 
-  def test_pantsd_invalidation_pants_ini_file(self):
-    # Test tmp_pants_ini (--pants-config-files=$tmp_pants_ini)'s removal
-    tmp_pants_ini = os.path.abspath("testprojects/test_pants.ini")
+  def test_pantsd_invalidation_pants_toml_file(self):
+    # Test tmp_pants_toml (--pants-config-files=$tmp_pants_toml)'s removal
+    tmp_pants_toml = os.path.abspath("testprojects/test_pants.toml")
 
-    # Create tmp_pants_ini file
-    with safe_open(tmp_pants_ini, 'w') as f:
+    # Create tmp_pants_toml file
+    with safe_open(tmp_pants_toml, 'w') as f:
       f.write("[DEFAULT]\n")
 
     with self.pantsd_successful_run_context() as (pantsd_run, checker, _, _):
-      pantsd_run([f'--pants-config-files={tmp_pants_ini}', 'help'])
+      pantsd_run([f'--pants-config-files={tmp_pants_toml}', 'help'])
       checker.assert_started()
       time.sleep(5)
 
-      # Delete tmp_pants_ini
-      os.unlink(tmp_pants_ini)
+      # Delete tmp_pants_toml
+      os.unlink(tmp_pants_toml)
       time.sleep(10)
       checker.assert_stopped()
 
@@ -604,9 +603,8 @@ Interrupted by user over pailgun client!
 
   @unittest.skip(reason="This started consistently hanging on Jan. 13, 2020 for some unknown reason.")
   def test_sigint_kills_request_waiting_for_lock(self):
-    """
-    Test that, when a pailgun request is blocked waiting for another one to end,
-    sending SIGINT to the blocked run will kill it.
+    """Test that, when a pailgun request is blocked waiting for another one to end, sending SIGINT
+    to the blocked run will kill it.
 
     Regression test for issue: #7920
     """
@@ -735,10 +733,8 @@ Interrupted by user over pailgun client!
         list_and_verify()
 
   def test_concurrent_overrides_pantsd(self):
-    """
-    Tests that the --concurrent flag overrides the --enable-pantsd flag,
-    because we don't allow concurrent runs under pantsd.
-    """
+    """Tests that the --concurrent flag overrides the --enable-pantsd flag, because we don't allow
+    concurrent runs under pantsd."""
     config = {'GLOBAL': {'concurrent': True, 'enable_pantsd': True}}
     with self.temporary_workdir() as workdir:
       pants_run = self.run_pants_with_workdir(['goals'], workdir=workdir, config=config)
@@ -748,9 +744,8 @@ Interrupted by user over pailgun client!
       self.assertFalse(os.path.exists(pantsd_log_location))
 
   def test_unhandled_exceptions_only_log_exceptions_once(self):
-    """
-    Tests that the unhandled exceptions triggered by LocalPantsRunner instances don't manifest
-    as a PantsRunFinishedWithFailureException.
+    """Tests that the unhandled exceptions triggered by LocalPantsRunner instances don't manifest as
+    a PantsRunFinishedWithFailureException.
 
     That is, that we unset the global Exiter override set by LocalPantsRunner before we try to log the exception.
 
@@ -776,15 +771,14 @@ Interrupted by user over pailgun client!
       )
 
   def test_inner_runs_dont_deadlock(self):
-    """
-    Create a pantsd run that calls testprojects/src/python/nested_runs with the appropriate
+    """Create a pantsd run that calls testprojects/src/python/nested_runs with the appropriate
     bootstrap options to avoid restarting pantsd.
 
     Regression test for issue https://github.com/pantsbuild/pants/issues/7881
     When a run under pantsd calls pants with pantsd inside it, the inner run will time out
     waiting for the outer run to end.
 
-    NB: testprojects/src/python/nested_runs assumes that the pants.ini file is in ${workdir}/pants.ini
+    NB: testprojects/src/python/nested_runs assumes that the pants.toml file is in ${workdir}/pants.toml
     """
     config = {
       'GLOBAL': {

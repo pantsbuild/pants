@@ -8,13 +8,13 @@ from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 
-from pants.backend.python.python_requirement import PythonRequirement
-from pants.backend.python.subsystems.pex_build_util import PexBuilderWrapper
 from pants.backend.python.subsystems.python_native_code import PythonNativeCode
-from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.base.hash_utils import hash_all
 from pants.invalidation.cache_manager import VersionedTargetSet
+from pants.python.pex_build_util import PexBuilderWrapper
+from pants.python.python_requirement import PythonRequirement
+from pants.python.python_setup import PythonSetup
 from pants.task.task import Task
 from pants.util.dirutil import safe_concurrent_creation
 from pants.util.memo import memoized_property
@@ -23,9 +23,8 @@ from pants.util.memo import memoized_property
 class ResolveRequirementsTaskBase(Task):
   """Base class for tasks that resolve 3rd-party Python requirements.
 
-  Creates an (unzipped) PEX on disk containing all the resolved requirements.
-  This PEX can be merged with other PEXes to create a unified Python environment
-  for running the relevant python code.
+  Creates an (unzipped) PEX on disk containing all the resolved requirements. This PEX can be merged
+  with other PEXes to create a unified Python environment for running the relevant python code.
   """
 
   @classmethod

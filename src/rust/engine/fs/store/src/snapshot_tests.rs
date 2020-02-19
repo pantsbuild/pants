@@ -1,4 +1,4 @@
-use futures::future::Future;
+use futures01::future::Future;
 use hashing::{Digest, Fingerprint};
 use tempfile;
 use testutil::data::TestDirectory;
@@ -553,7 +553,6 @@ fn expand_all_sorted(posix_fs: Arc<PosixFS>, executor: &task_executor::Executor)
         // Don't error or warn if there are no paths matched -- that is a valid state.
         PathGlobs::create(
           &["**".to_owned()],
-          &[],
           StrictGlobMatching::Ignore,
           GlobExpansionConjunction::AllMatch,
         )

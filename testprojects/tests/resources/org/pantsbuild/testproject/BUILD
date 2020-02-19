@@ -3,25 +3,25 @@
 
 files(
   name='bundleresources_directory',
-  sources=rglobs('bundleresources/*'),
+  sources=['bundleresources/**/*'],
 )
 
 files(
   name='cucumber_directory',
-  sources=rglobs('cucumber/*'),
+  sources=['cucumber/**/*'],
 )
 
 files(
   name='ideacodeandresources_directory',
-  sources=rglobs('ideacodeandresources/*'),
+  sources=['ideacodeandresources/**/*'],
 )
 
 files(
   name='idearesourcesonly_directory',
-  sources=rglobs('idearesourcesonly/*'),
+  sources=['idearesourcesonly/**/*'],
 )
 
 files(
   name='ivyclassifier_directory',
-  sources=rglobs('ivyclassifier/*'),
+  sources=['ivyclassifier/**/*'],
 )

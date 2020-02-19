@@ -65,7 +65,7 @@ fn mark_dir_as_rerun_trigger(dir: &Path) {
   }
 }
 
-const EXTRA_HEADER: &'static str = r#"import "rustproto.proto";
+const EXTRA_HEADER: &str = r#"import "rustproto.proto";
 option (rustproto.carllerche_bytes_for_bytes_all) = true;
 "#;
 
@@ -152,7 +152,7 @@ fn generate_mod_rs(dir: &Path) -> Result<(), String> {
   let mut pub_mod_stmts = listing
     .filter_map(|d| d.ok())
     .map(|d| d.file_name().to_string_lossy().into_owned())
-    .filter(|name| &name != &"mod.rs" && &name != &".gitignore")
+    .filter(|name| name != "mod.rs" && name != ".gitignore")
     .map(|name| format!("pub mod {};", name.trim_end_matches(".rs")))
     .collect::<Vec<_>>();
   pub_mod_stmts.sort();
@@ -178,7 +178,6 @@ fn generate_for_tower(thirdpartyprotobuf: &Path, out_dir: &Path) {
       )],
       &std::fs::read_dir(&thirdpartyprotobuf)
         .unwrap()
-        .into_iter()
         .map(|d| d.unwrap().path())
         .collect::<Vec<_>>(),
     )
@@ -231,7 +230,7 @@ fn generate_for_tower(thirdpartyprotobuf: &Path, out_dir: &Path) {
 fn replace_if_changed<F: FnOnce(&Path)>(path: &Path, f: F) {
   let tempdir = tempfile::TempDir::new().unwrap();
   f(tempdir.path());
-  if !dir_diff::is_different(path, tempdir.path()).unwrap() {
+  if let Ok(false) = dir_diff::is_different(path, tempdir.path()) {
     return;
   }
   if path.exists() {

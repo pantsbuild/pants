@@ -21,7 +21,8 @@ from pants.util.memo import memoized_property
 
 
 class JvmDependencyCheck(Task):
-  """Checks true dependencies of a JVM target and ensures that they are consistent with BUILD files."""
+  """Checks true dependencies of a JVM target and ensures that they are consistent with BUILD
+  files."""
 
   @classmethod
   def register_options(cls, register):

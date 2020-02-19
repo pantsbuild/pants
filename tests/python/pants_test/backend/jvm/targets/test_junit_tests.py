@@ -70,3 +70,9 @@ class JUnitTestsTest(TestBase):
                              dependencies=[junit_target, target])
     self.assertEqual(['JarLibrary(//:junit_library)', 'Target(//:target)'],
                       sorted(str(x) for x in test2.dependencies))
+
+  def test_runtime_and_test_platform_error(self):
+    with self.assertRaisesWithMessage(TargetDefinitionException,
+      'Invalid target JUnitTests(address not yet set): '
+      'Cannot specify runtime_platform and test_platform together.'):
+      self.make_target('//:test1', JUnitTests, sources=[], runtime_platform='a', test_platform='b')

@@ -17,15 +17,14 @@ from pants.backend.python.rules.setup_py_util import (
   PackageDatum,
   distutils_repr,
   find_packages,
+  is_python2,
   source_root_or_raise,
 )
 from pants.backend.python.rules.setuptools import Setuptools
-from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
-from pants.base.specs import AddressSpecs, AscendantAddresses
+from pants.base.specs import AddressSpecs, AscendantAddresses, SingleAddress
 from pants.build_graph.address import Address
-from pants.engine.addressable import BuildFileAddresses
-from pants.engine.build_files import AddressProvenanceMap
+from pants.engine.addressable import Addresses
 from pants.engine.console import Console
 from pants.engine.fs import (
   Digest,
@@ -34,21 +33,29 @@ from pants.engine.fs import (
   DirectoryWithPrefixToAdd,
   DirectoryWithPrefixToStrip,
   FileContent,
+  FilesContent,
   InputFilesContent,
   PathGlobs,
   Snapshot,
+  SnapshotSubset,
   Workspace,
 )
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
-from pants.engine.legacy.graph import HydratedTarget, HydratedTargets, TransitiveHydratedTargets
+from pants.engine.legacy.graph import (
+  HydratedTarget,
+  HydratedTargets,
+  HydratedTargetsWithOrigins,
+  TransitiveHydratedTargets,
+)
 from pants.engine.legacy.structs import PythonBinaryAdaptor, PythonTargetAdaptor, ResourcesAdaptor
 from pants.engine.objects import Collection
 from pants.engine.rules import goal_rule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.option.custom_types import shell_str
+from pants.python.python_setup import PythonSetup
 from pants.rules.core.distdir import DistDir
-from pants.rules.core.strip_source_root import SourceRootStrippedSources
+from pants.rules.core.strip_source_roots import SourceRootStrippedSources
 from pants.source.source_root import SourceRootConfig
 
 
@@ -92,9 +99,9 @@ class ExportedTarget:
 class DependencyOwner:
   """An ExportedTarget in its role as an owner of other targets.
 
-  We need this type to prevent rule ambiguities when computing the list of targets
-  owned by an ExportedTarget (which involves going from ExportedTarget -> dep -> owner (which
-  is itself an ExportedTarget) and checking if owner is this the original ExportedTarget.
+  We need this type to prevent rule ambiguities when computing the list of targets owned by an
+  ExportedTarget (which involves going from ExportedTarget -> dep -> owner (which is itself an
+  ExportedTarget) and checking if owner is this the original ExportedTarget.
   """
   exported_target: ExportedTarget
 
@@ -135,14 +142,15 @@ class AncestorInitPyFiles:
 @dataclass(frozen=True)
 class SetupPySourcesRequest:
   hydrated_targets: HydratedTargets
+  py2: bool  # Whether to use py2 or py3 package semantics.
 
 
 @dataclass(frozen=True)
 class SetupPySources:
   """The sources required by a setup.py command.
 
-  Includes some information derived from analyzing the source, namely the packages,
-  namespace packages and resource files in the source.
+  Includes some information derived from analyzing the source, namely the packages, namespace
+  packages and resource files in the source.
   """
   digest: Digest
   packages: Tuple[str, ...]
@@ -154,7 +162,7 @@ class SetupPySources:
 class SetupPyChrootRequest:
   """A request to create a chroot containing a setup.py and the sources it operates on."""
   exported_target: ExportedTarget
-  py2: bool = False  # Whether to use py2 or py3 namespace package semantics.
+  py2: bool  # Whether to use py2 or py3 package semantics.
 
 
 @dataclass(frozen=True)
@@ -229,9 +237,14 @@ def validate_args(args: Tuple[str, ...]):
 
 
 @goal_rule
-async def run_setup_pys(targets: HydratedTargets, options: SetupPyOptions, console: Console,
-                        provenance_map: AddressProvenanceMap,
-                        distdir: DistDir, workspace: Workspace) -> SetupPy:
+async def run_setup_pys(
+  targets_with_origins: HydratedTargetsWithOrigins,
+  options: SetupPyOptions,
+  console: Console,
+  python_setup: PythonSetup,
+  distdir: DistDir,
+  workspace: Workspace
+) -> SetupPy:
   """Run setup.py commands on all exported targets addressed."""
   args = tuple(options.values.args)
   validate_args(args)
@@ -242,11 +255,12 @@ async def run_setup_pys(targets: HydratedTargets, options: SetupPyOptions, conso
   exported_targets: List[ExportedTarget] = []
   explicit_nonexported_targets: List[HydratedTarget] = []
 
-  for hydrated_target in targets:
-    if _is_exported(hydrated_target):
-      exported_targets.append(ExportedTarget(hydrated_target))
-    elif provenance_map.is_single_address(hydrated_target.address):
-      explicit_nonexported_targets.append(hydrated_target)
+  for hydrated_target_with_origin in targets_with_origins:
+    target = hydrated_target_with_origin.target
+    if _is_exported(target):
+      exported_targets.append(ExportedTarget(target))
+    elif isinstance(hydrated_target_with_origin.origin, SingleAddress):
+      explicit_nonexported_targets.append(target)
   if explicit_nonexported_targets:
     raise TargetNotExported(
       'Cannot run setup.py on these targets, because they have no `provides=` clause: '
@@ -255,15 +269,23 @@ async def run_setup_pys(targets: HydratedTargets, options: SetupPyOptions, conso
   if options.values.transitive:
     # Expand out to all owners of the entire dep closure.
     tht = await Get[TransitiveHydratedTargets](
-      BuildFileAddresses([et.hydrated_target.address for et in exported_targets]))
+      Addresses(et.hydrated_target.address for et in exported_targets))
     owners = await MultiGet(
       Get[ExportedTarget](OwnedDependency(ht)) for ht in tht.closure if is_ownable_target(ht)
     )
     exported_targets = list(set(owners))
 
-  chroots = await MultiGet(Get[SetupPyChroot](SetupPyChrootRequest(target))
-                           for target in exported_targets)
+  py2 = is_python2(
+    (
+      getattr(target_with_origin.target.adaptor, 'compatibility', None)
+      for target_with_origin in targets_with_origins
+    ),
+    python_setup
+  )
+  chroots = await MultiGet(Get[SetupPyChroot](
+    SetupPyChrootRequest(target, py2)) for target in exported_targets)
 
+  # If args were provided, run setup.py with them; Otherwise just dump chroots.
   if args:
     setup_py_results = await MultiGet(
       Get[RunSetupPyResult](RunSetupPyRequest(exported_target, chroot, tuple(args)))
@@ -272,7 +294,7 @@ async def run_setup_pys(targets: HydratedTargets, options: SetupPyOptions, conso
 
     for exported_target, setup_py_result in zip(exported_targets, setup_py_results):
       addr = exported_target.hydrated_target.address.reference()
-      console.print_stderr(f'Writing contents of dist dir for {addr} to {distdir.relpath}')
+      console.print_stderr(f'Writing dist for {addr} under {distdir.relpath}/.')
       workspace.materialize_directory(
         DirectoryToMaterialize(setup_py_result.output, path_prefix=str(distdir.relpath))
       )
@@ -319,8 +341,6 @@ async def run_setup_py(
   )
   # The setuptools dist dir, created by it under the chroot (not to be confused with
   # pants's own dist dir, at the buildroot).
-  # TODO: The user can change this with the --dist-dir flag to the sdist and bdist_wheel commands.
-  #  See https://github.com/pantsbuild/pants/issues/8912.
   dist_dir = 'dist/'
   request = setuptools_setup.requirements_pex.create_execute_request(
     python_setup=python_setup,
@@ -341,15 +361,9 @@ async def run_setup_py(
 
 @rule
 async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
-  if request.py2:
-    # TODO: Implement Python 2 support.  This will involve, among other things: merging ancestor
-    # __init__.py files into the chroot, detecting packages based on the presence of __init__.py,
-    # and inspecting all __init__.py files for the namespace package incantation.
-    raise UnsupportedPythonVersion('Running setup.py commands not supported for Python 2.')
-
   owned_deps = await Get[OwnedDependencies](DependencyOwner(request.exported_target))
   targets = HydratedTargets(od.hydrated_target for od in owned_deps)
-  sources = await Get[SetupPySources](SetupPySourcesRequest(targets))
+  sources = await Get[SetupPySources](SetupPySourcesRequest(targets, py2=request.py2))
   requirements = await Get[ExportedTargetRequirements](DependencyOwner(request.exported_target))
 
   # Nest the sources under the src/ prefix.
@@ -412,9 +426,15 @@ async def get_sources(request: SetupPySourcesRequest,
   ancestor_init_pys = await Get[AncestorInitPyFiles](HydratedTargets, targets)
   sources_digest = await Get[Digest](
     DirectoriesToMerge(directories=tuple([*stripped_srcs_digests, *ancestor_init_pys.digests])))
-  sources_snapshot = await Get[Snapshot](Digest, sources_digest)
+  init_pys_snapshot = await Get[Snapshot](
+    SnapshotSubset(sources_digest, PathGlobs(['**/__init__.py'])))
+  init_py_contents = await Get[FilesContent](Digest, init_pys_snapshot.directory_digest)
+
   packages, namespace_packages, package_data = find_packages(
-    source_root_config.get_source_roots(), zip(targets, stripped_srcs_list), sources_snapshot)
+    source_roots=source_root_config.get_source_roots(),
+    tgts_and_stripped_srcs=list(zip(targets, stripped_srcs_list)),
+    init_py_contents=init_py_contents,
+    py2=request.py2)
   return SetupPySources(digest=sources_digest, packages=packages,
                         namespace_packages=namespace_packages, package_data=package_data)
 
@@ -447,7 +467,7 @@ async def get_ancestor_init_py(
   # we match each result to its originating glob (see use of zip below).
   ancestor_init_py_snapshots = await MultiGet[Snapshot](
     Get[Snapshot](PathGlobs,
-                  PathGlobs(include=(os.path.join(source_dir_ancestor[1], '__init__.py'),)))
+                  PathGlobs([os.path.join(source_dir_ancestor[1], '__init__.py')]))
     for source_dir_ancestor in source_dir_ancestors_list
   )
 
@@ -466,7 +486,7 @@ def _is_exported(target: HydratedTarget) -> bool:
 @rule(name="Compute distribution's 3rd party requirements")
 async def get_requirements(dep_owner: DependencyOwner) -> ExportedTargetRequirements:
   tht = await Get[TransitiveHydratedTargets](
-    BuildFileAddresses([dep_owner.exported_target.hydrated_target.address]))
+    Addresses([dep_owner.exported_target.hydrated_target.address]))
 
   ownable_tgts = [tgt for tgt in tht.closure if is_ownable_target(tgt)]
   owners = await MultiGet(Get[ExportedTarget](OwnedDependency(ht)) for ht in ownable_tgts)
@@ -510,7 +530,7 @@ async def get_owned_dependencies(dependency_owner: DependencyOwner) -> OwnedDepe
   Includes dependency_owner itself.
   """
   tht = await Get[TransitiveHydratedTargets](
-    BuildFileAddresses([dependency_owner.exported_target.hydrated_target.address]))
+    Addresses([dependency_owner.exported_target.hydrated_target.address]))
   ownable_targets = [tgt for tgt in tht.closure
                      if isinstance(tgt.adaptor, (PythonTargetAdaptor, ResourcesAdaptor))]
   owners = await MultiGet(Get[ExportedTarget](OwnedDependency(ht)) for ht in ownable_targets)
@@ -542,7 +562,7 @@ async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarg
     [t for t in ancestor_tgts if _is_exported(t)], key=lambda t: t.address, reverse=True)
   exported_ancestor_iter = iter(exported_ancestor_tgts)
   for exported_ancestor in exported_ancestor_iter:
-    tht = await Get[TransitiveHydratedTargets](BuildFileAddresses([exported_ancestor.address]))
+    tht = await Get[TransitiveHydratedTargets](Addresses([exported_ancestor.address]))
     if hydrated_target in tht.closure:
       owner = exported_ancestor
       # Find any exported siblings of owner that also depend on hydrated_target. They have the
@@ -550,7 +570,7 @@ async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarg
       sibling_owners = []
       sibling = next(exported_ancestor_iter, None)
       while sibling and sibling.address.spec_path == owner.address.spec_path:
-        tht = await Get[TransitiveHydratedTargets](BuildFileAddresses([sibling.address]))
+        tht = await Get[TransitiveHydratedTargets](Addresses([sibling.address]))
         if hydrated_target in tht.closure:
           sibling_owners.append(sibling)
         sibling = next(exported_ancestor_iter, None)

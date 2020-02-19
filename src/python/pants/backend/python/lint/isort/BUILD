@@ -12,6 +12,7 @@ python_library(
     'src/python/pants/engine:rules',
     'src/python/pants/engine:selectors',
     'src/python/pants/option',
+    'src/python/pants/python',
     'src/python/pants/rules/core',
   ],
   tags = {"partially_type_checked"},
@@ -19,7 +20,7 @@ python_library(
 
 python_tests(
   name='integration',
-  sources=globs('*_integration_test.py'),
+  sources=['*_integration_test.py'],
   dependencies=[
     ':isort',
     'src/python/pants/backend/python/lint',

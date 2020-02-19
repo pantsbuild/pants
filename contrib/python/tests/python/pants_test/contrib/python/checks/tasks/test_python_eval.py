@@ -3,8 +3,8 @@
 
 from textwrap import dedent
 
-from pants.backend.python.subsystems.python_repos import PythonRepos
-from pants.backend.python.subsystems.python_setup import PythonSetup
+from pants.python.python_repos import PythonRepos
+from pants.python.python_setup import PythonSetup
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 
 from pants.contrib.python.checks.tasks.python_eval import PythonEval

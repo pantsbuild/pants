@@ -9,7 +9,6 @@
   clippy::expl_impl_clone_on_copy,
   clippy::if_not_else,
   clippy::needless_continue,
-  clippy::single_match_else,
   clippy::unseparated_literal_suffix,
   clippy::used_underscore_binding
 )]
@@ -27,7 +26,7 @@
 #![allow(clippy::mutex_atomic)]
 
 use concrete_time::TimeSpan;
-use futures::task_local;
+use futures01::task_local;
 use parking_lot::Mutex;
 use rand::thread_rng;
 use rand::Rng;
@@ -97,7 +96,7 @@ impl WorkUnitStore {
   }
 
   pub fn add_workunit(&self, workunit: WorkUnit) {
-    self.inner.lock().workunits.push(workunit.clone());
+    self.inner.lock().workunits.push(workunit);
   }
 
   pub fn with_latest_workunits<F, T>(&mut self, f: F) -> T
@@ -131,7 +130,7 @@ task_local! {
 }
 
 pub fn set_parent_id(parent_id: String) {
-  if futures::task::is_in_task() {
+  if futures01::task::is_in_task() {
     TASK_PARENT_ID.with(|task_parent_id| {
       *task_parent_id.lock() = Some(parent_id);
     })
@@ -139,7 +138,7 @@ pub fn set_parent_id(parent_id: String) {
 }
 
 pub fn get_parent_id() -> Option<String> {
-  if futures::task::is_in_task() {
+  if futures01::task::is_in_task() {
     TASK_PARENT_ID.with(|task_parent_id| {
       let task_parent_id = task_parent_id.lock();
       (*task_parent_id).clone()

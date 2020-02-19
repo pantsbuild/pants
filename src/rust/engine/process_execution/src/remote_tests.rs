@@ -2,7 +2,7 @@ use bazel_protos;
 use bazel_protos::operations::Operation;
 use bazel_protos::remote_execution::ExecutedActionMetadata;
 use bytes::Bytes;
-use futures::Future;
+use futures01::{future, Future};
 use grpcio;
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
 use mock;
@@ -2219,7 +2219,7 @@ fn remote_workunits_are_stored() {
 
   let workunit_store_2 = workunit_store.clone();
   runtime
-    .block_on(futures::future::lazy(move || {
+    .block_on(future::lazy(move || {
       command_runner.extract_execute_response(
         OperationOrStatus::Operation(operation),
         &mut ExecutionHistory::default(),

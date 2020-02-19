@@ -3,8 +3,8 @@
 
 from typing import Callable, List, Optional, Tuple
 
-from pants.engine.legacy.graph import HydratedTarget, HydratedTargets
-from pants.engine.legacy.structs import JvmAppAdaptor, PythonTargetAdaptor
+from pants.engine.legacy.graph import HydratedTargetsWithOrigins, HydratedTargetWithOrigin
+from pants.engine.legacy.structs import JvmAppAdaptor, PythonTargetAdaptorWithOrigin
 from pants.engine.rules import UnionMembership
 from pants.rules.core.fmt_test import FmtTest
 from pants.rules.core.lint import Lint, LintResult, LintResults, LintTarget, lint
@@ -17,77 +17,82 @@ class LintTest(TestBase):
   @staticmethod
   def run_lint_rule(
     *,
-    targets: List[HydratedTarget],
-    mock_linters: Optional[Callable[[PythonTargetAdaptor], LintResults]] = None,
+    targets: List[HydratedTargetWithOrigin],
+    mock_linters: Optional[Callable[[PythonTargetAdaptorWithOrigin], LintResults]] = None,
   ) -> Tuple[Lint, str]:
     if mock_linters is None:
-      mock_linters = lambda target_adaptor: LintResults([LintResult(
-        exit_code=1, stdout=f"Linted `{target_adaptor.name}`", stderr=""
+      mock_linters = lambda adaptor_with_origin: LintResults([LintResult(
+        exit_code=1, stdout=f"Linted `{adaptor_with_origin.adaptor.name}`", stderr=""
       )])
     console = MockConsole(use_colors=False)
     result: Lint = run_rule(
       lint,
       rule_args=[
         console,
-        HydratedTargets(targets),
-        UnionMembership(union_rules={LintTarget: [PythonTargetAdaptor]})
+        HydratedTargetsWithOrigins(targets),
+        UnionMembership({LintTarget: [PythonTargetAdaptorWithOrigin]})
       ],
       mock_gets=[
-        MockGet(product_type=LintResults, subject_type=PythonTargetAdaptor, mock=mock_linters),
+        MockGet(
+          product_type=LintResults, subject_type=PythonTargetAdaptorWithOrigin, mock=mock_linters,
+        ),
       ],
     )
     return result, console.stdout.getvalue()
 
   def test_non_union_member_noops(self) -> None:
     result, stdout = self.run_lint_rule(
-      targets=[FmtTest.make_hydrated_target(adaptor_type=JvmAppAdaptor)],
+      targets=[FmtTest.make_hydrated_target_with_origin(adaptor_type=JvmAppAdaptor)],
     )
     assert result.exit_code == 0
     assert stdout == ""
 
   def test_empty_target_noops(self) -> None:
     result, stdout = self.run_lint_rule(
-      targets=[FmtTest.make_hydrated_target(adaptor_type=JvmAppAdaptor)],
+      targets=[FmtTest.make_hydrated_target_with_origin(include_sources=False)],
     )
     assert result.exit_code == 0
     assert stdout == ""
 
   def test_single_target_with_one_linter(self) -> None:
-    result, stdout = self.run_lint_rule(targets=[FmtTest.make_hydrated_target()])
+    result, stdout = self.run_lint_rule(targets=[FmtTest.make_hydrated_target_with_origin()])
     assert result.exit_code == 1
     assert stdout.strip() == "Linted `target`"
 
   def test_single_target_with_multiple_linters(self) -> None:
-    def mock_linters(_: PythonTargetAdaptor) -> LintResults:
+    def mock_linters(_: PythonTargetAdaptorWithOrigin) -> LintResults:
       return LintResults([
         LintResult(exit_code=0, stdout=f"Linter 1", stderr=""),
         LintResult(exit_code=1, stdout=f"Linter 2", stderr=""),
       ])
 
     result, stdout = self.run_lint_rule(
-      targets=[FmtTest.make_hydrated_target()], mock_linters=mock_linters,
+      targets=[FmtTest.make_hydrated_target_with_origin()], mock_linters=mock_linters,
     )
     assert result.exit_code == 1
     assert stdout.splitlines() == ["Linter 1", "Linter 2"]
 
   def test_multiple_targets_with_one_linter(self) -> None:
     # If any single target fails, the error code should propagate to the whole run.
-    def mock_linters(adaptor: PythonTargetAdaptor) -> LintResults:
-      name = adaptor.name
+    def mock_linters(adaptor_with_origin: PythonTargetAdaptorWithOrigin) -> LintResults:
+      name = adaptor_with_origin.adaptor.name
       if name == "bad":
         return LintResults([LintResult(exit_code=127, stdout=f"`{name}` failed", stderr="")])
       return LintResults([LintResult(exit_code=0, stdout=f"`{name}` passed", stderr="")])
 
     result, stdout = self.run_lint_rule(
-      targets=[FmtTest.make_hydrated_target(name="good"), FmtTest.make_hydrated_target(name="bad")],
+      targets=[
+        FmtTest.make_hydrated_target_with_origin(name="good"),
+        FmtTest.make_hydrated_target_with_origin(name="bad"),
+      ],
       mock_linters=mock_linters,
     )
     assert result.exit_code == 127
     assert stdout.splitlines() == ["`good` passed", "`bad` failed"]
 
   def test_multiple_targets_with_multiple_linters(self) -> None:
-    def mock_linters(adaptor: PythonTargetAdaptor) -> LintResults:
-      name = adaptor.name
+    def mock_linters(adaptor_with_origin: PythonTargetAdaptorWithOrigin) -> LintResults:
+      name = adaptor_with_origin.adaptor.name
       if name == "bad":
         return LintResults([
           LintResult(exit_code=0, stdout=f"Linter 1 passed for `{name}`", stderr=""),
@@ -99,7 +104,10 @@ class LintTest(TestBase):
       ])
 
     result, stdout = self.run_lint_rule(
-      targets=[FmtTest.make_hydrated_target(name="good"), FmtTest.make_hydrated_target(name="bad")],
+      targets=[
+        FmtTest.make_hydrated_target_with_origin(name="good"),
+        FmtTest.make_hydrated_target_with_origin(name="bad"),
+      ],
       mock_linters=mock_linters,
     )
     assert result.exit_code == 127

@@ -11,7 +11,7 @@ target(
 
 files(
   name = 'hello_directory',
-  sources = rglobs('hello/*'),
+  sources = ['hello/**/*'],
   dependencies = [
     'examples/src/scala/org/pantsbuild/example:hello_directory',
   ],
@@ -19,5 +19,5 @@ files(
 
 files(
   name = 'specs2_directory',
-  sources = rglobs('specs2/*'),
+  sources = ['specs2/**/*'],
 )

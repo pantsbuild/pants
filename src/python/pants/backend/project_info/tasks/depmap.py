@@ -10,17 +10,19 @@ from pants.task.console_task import ConsoleTask
 class Depmap(ConsoleTask):
   """Depict the target's dependencies.
 
-  Generates either a textual dependency tree or a graphviz digraph dot file for the dependency
-  set of a target.
+  Generates either a textual dependency tree or a graphviz digraph dot file for the dependency set
+  of a target.
   """
   class SourceRootTypes:
-    """Defines SourceRoot Types Constants"""
+    """Defines SourceRoot Types Constants."""
     SOURCE = 'SOURCE'  # Source Target
     TEST = 'TEST'  # Test Target
     SOURCE_GENERATED = 'SOURCE_GENERATED'  # Code Gen Source Targets
     EXCLUDED = 'EXCLUDED'  # Excluded Target
     RESOURCE = 'RESOURCE'  # Resource belonging to Source Target
     TEST_RESOURCE = 'TEST_RESOURCE'  # Resource belonging to Test Target
+
+  _register_console_transitivity_option = False
 
   @classmethod
   def register_options(cls, register):
@@ -44,6 +46,12 @@ class Depmap(ConsoleTask):
     register('--separator', default='-',
              help='Specifies the separator to use between the org/name/rev components of a '
                   'dependency\'s fully qualified name.')
+    register(
+      '--transitive', type=bool, default=True, fingerprint=True,
+      help='If True, use all targets in the build graph, else use only target roots.',
+      removal_version="1.27.0.dev0",
+      removal_hint="This option has no impact on the goal `depmap`.",
+    )
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)

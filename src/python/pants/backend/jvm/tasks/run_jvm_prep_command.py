@@ -39,8 +39,8 @@ class RunJvmPrepCommandBase(Task):
   def register_options(cls, register):
     """Register options for this optionable.
 
-    In this case, there are no special options, but we want to use this opportunity to setup
-    goal validation in JvmPrepCommand before the build graph is parsed.
+    In this case, there are no special options, but we want to use this opportunity to setup goal
+    validation in JvmPrepCommand before the build graph is parsed.
     """
     super().register_options(register)
     JvmPrepCommand.add_goal(cls.goal)
@@ -71,7 +71,7 @@ class RunJvmPrepCommandBase(Task):
 
     with self.context.new_workunit(name='jvm_prep_command', labels=[WorkUnitLabel.PREP]) as workunit:
       for target in targets:
-        distribution = JvmPlatform.preferred_jvm_distribution([target.platform])
+        distribution = JvmPlatform.preferred_jvm_distribution([target.runtime_platform])
         executor = SubprocessExecutor(distribution)
 
         mainclass = target.payload.get_field_value('mainclass')

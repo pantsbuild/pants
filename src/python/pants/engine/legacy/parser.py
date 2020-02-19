@@ -5,15 +5,18 @@ import logging
 import os
 import tokenize
 from io import StringIO
+from pathlib import PurePath
 from typing import Dict, Tuple
 
 from pants.base.build_file_target_factory import BuildFileTargetFactory
+from pants.base.deprecated import warn_or_error
+from pants.base.exceptions import UnaddressableObjectError
 from pants.base.parse_context import ParseContext
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.legacy.structs import BundleAdaptor, Globs, RGlobs, TargetAdaptor, ZGlobs
-from pants.engine.mapper import UnaddressableObjectError
 from pants.engine.objects import Serializable
 from pants.engine.parser import ParseError, Parser, SymbolTable
+from pants.option.global_options import BuildFileImportsBehavior
 from pants.util.memo import memoized_property
 
 
@@ -31,15 +34,17 @@ class LegacyPythonCallbacksParser(Parser):
   """
 
   def __init__(
-    self, symbol_table: SymbolTable, aliases: BuildFileAliases, build_file_imports_behavior: str,
+    self,
+    symbol_table:SymbolTable,
+    aliases: BuildFileAliases,
+    build_file_imports_behavior: BuildFileImportsBehavior,
   ) -> None:
     """
     :param symbol_table: A SymbolTable for this parser, which will be overlaid with the given
       additional aliases.
     :param aliases: Additional BuildFileAliases to register.
     :param build_file_imports_behavior: How to behave if a BUILD file being parsed tries to use
-      import statements. Valid values: "allow", "warn", "error".
-    :type build_file_imports_behavior: string
+      import statements.
     """
     super().__init__()
     self._symbols, self._parse_context = self._generate_symbols(symbol_table, aliases)
@@ -124,6 +129,29 @@ class LegacyPythonCallbacksParser(Parser):
 
     return symbols, parse_context
 
+  @staticmethod
+  def check_for_deprecated_globs_usage(token: str, filepath: str, lineno: int) -> None:
+    # We have this deprecation here, rather than in `engine/legacy/structs.py` where the
+    # `sources` field is parsed, so that we can refer to the line number and filename as that
+    # information is not passed to `structs.py`.
+    if token in ["globs", "rglobs", "zglobs"]:
+      script_instructions = (
+        "curl -L -o fix_deprecated_globs_usage.py 'https://git.io/JvOKD' && chmod +x "
+        "fix_deprecated_globs_usage.py && ./fix_deprecated_globs_usage.py "
+        f"{PurePath(filepath).parent}"
+      )
+      warning = (
+        f"Using deprecated `{token}` in {filepath} at line {lineno}. Instead, use a list "
+        f"of files and globs, like `sources=['f1.py', '*.java']`. Specify excludes by putting "
+        f"an `!` at the start of the value, like `!ignore.py`.\n\nWe recommend using our "
+        f"migration script by running `{script_instructions}`"
+      )
+      warn_or_error(
+        removal_version="1.27.0.dev0",
+        deprecated_entity_description="Using `globs`, `rglobs`, and `zglobs`",
+        hint=warning,
+      )
+
   def parse(self, filepath: str, filecontent: bytes):
     python = filecontent.decode()
 
@@ -140,27 +168,31 @@ class LegacyPythonCallbacksParser(Parser):
     # Note that this is incredibly poor sandboxing. There are many ways to get around it.
     # But it's sufficient to tell most users who aren't being actively malicious that they're doing
     # something wrong, and it has a low performance overhead.
-    if self._build_file_imports_behavior != 'allow' and 'import' in python:
+    if "globs" in python or (self._build_file_imports_behavior != BuildFileImportsBehavior.allow and 'import' in python):
       io_wrapped_python = StringIO(python)
       for token in tokenize.generate_tokens(io_wrapped_python.readline):
-        if token[1] == 'import':
-          line_being_tokenized = token[4]
-          if self._build_file_imports_behavior == 'warn':
-            logger.warning('{} tried to import - import statements should be avoided ({})'.format(
-              filepath,
-              line_being_tokenized
-            ))
-          elif self._build_file_imports_behavior == 'error':
-            raise ParseError(
-              'import statements have been banned, but tried to import: {}'.format(
-                line_being_tokenized
-              )
+        token_str = token[1]
+        lineno, _ = token[2]
+
+        self.check_for_deprecated_globs_usage(token_str, filepath, lineno)
+
+        if token_str == 'import':
+          if self._build_file_imports_behavior == BuildFileImportsBehavior.allow:
+            continue
+          elif self._build_file_imports_behavior == BuildFileImportsBehavior.warn:
+            logger.warning(
+              f'Import used in {filepath} at line {lineno}. Import statements should '
+              f'be avoided in BUILD files because they can easily break Pants caching and lead to '
+              f'stale results. Instead, consider rewriting your code into a Pants plugin: '
+              f'https://www.pantsbuild.org/howto_plugin.html'
             )
           else:
             raise ParseError(
-              "Didn't know what to do for build_file_imports_behavior value {}".format(
-                self._build_file_imports_behavior
-              )
+              f'Import used in {filepath} at line {lineno}. Import statements are banned in '
+              f'BUILD files in this repository and should generally be avoided because '
+              f'they can easily break Pants caching and lead to stale results. Instead, consider '
+              f'rewriting your code into a Pants plugin: '
+              f'https://www.pantsbuild.org/howto_plugin.html'
             )
 
     return list(self._parse_context._storage.objects)

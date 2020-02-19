@@ -23,15 +23,16 @@ In any `jvm_binary` target you must specify the following:
 Here's an example `jvm_binary` definition:
 
     ::python
-    jvm_binary(name='bin',
+    jvm_binary(
+      name='bin',
       basename='myproject-bin',
       main='com.acme.myproject.Main',
       dependencies=[
-        'server-lib/src/main/java',
-        'analytics-lib/src/main/java',
+        'src/java/com/myorg/myproject/server',
+        'src/java/com/myorg/myproject/analytics',
       ],
       bundles=[
-        bundle(fileset=globs('assets/*'))
+        bundle(fileset=['assets/*']),
       ]
     )
 

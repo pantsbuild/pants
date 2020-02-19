@@ -118,9 +118,9 @@ class Scheduler:
   def _root_type_ids(self):
     return self._to_ids_buf(self._root_subject_types)
 
-  def graph_trace(self, execution_request):
+  def graph_trace(self, session, execution_request):
     with temporary_file_path() as path:
-      self._native.lib.graph_trace(self._scheduler, execution_request, path.encode())
+      self._native.lib.graph_trace(self._scheduler, session, execution_request, path.encode())
       with open(path, 'r') as fd:
         for line in fd.readlines():
           yield line.rstrip()
@@ -253,6 +253,7 @@ class Scheduler:
                                                      self._to_type(product))
     self._raise_or_return(res)
 
+  @property
   def visualize_to_dir(self):
     return self._visualize_to_dir
 
@@ -270,6 +271,9 @@ class Scheduler:
 
   def _run_and_return_roots(self, session, execution_request):
     raw_roots = self._native.lib.scheduler_execute(self._scheduler, session, execution_request)
+    if raw_roots == self._native.ffi.NULL:
+      raise KeyboardInterrupt
+
     remaining_runtime_exceptions_to_capture = list(self._native.consume_cffi_extern_method_runtime_exceptions())
     try:
       roots = []
@@ -298,8 +302,8 @@ class Scheduler:
                            '`self._native._peek_cffi_extern_method_runtime_exceptions()`.')
     return roots
 
-  def lease_files_in_graph(self):
-    self._native.lib.lease_files_in_graph(self._scheduler)
+  def lease_files_in_graph(self, session):
+    self._native.lib.lease_files_in_graph(self._scheduler, session)
 
   def garbage_collect_store(self):
     self._native.lib.garbage_collect_store(self._scheduler)
@@ -326,8 +330,7 @@ class _DirectoriesToMaterialize(Collection[DirectoryToMaterialize]):
 class SchedulerSession:
   """A handle to a shared underlying Scheduler and a unique Session.
 
-  Generally a Session corresponds to a single run of pants: some metrics are specific to
-  a Session.
+  Generally a Session corresponds to a single run of pants: some metrics are specific to a Session.
   """
 
   execution_error_type = ExecutionError
@@ -346,7 +349,7 @@ class SchedulerSession:
 
   def trace(self, execution_request):
     """Yields a stringified 'stacktrace' starting from the scheduler's roots."""
-    for line in self._scheduler.graph_trace(execution_request.native):
+    for line in self._scheduler.graph_trace(self._session, execution_request.native):
       yield line
 
   def visualize_graph_to_file(self, filename):
@@ -411,10 +414,10 @@ class SchedulerSession:
     return self._scheduler.with_fork_context(func)
 
   def _maybe_visualize(self):
-    if self._scheduler.visualize_to_dir() is not None:
-      name = 'graph.{0:03d}.dot'.format(self._run_count)
+    if self._scheduler.visualize_to_dir is not None:
+      name = f'graph.{self._run_count:03d}.dot'
       self._run_count += 1
-      self.visualize_graph_to_file(os.path.join(self._scheduler.visualize_to_dir(), name))
+      self.visualize_graph_to_file(os.path.join(self._scheduler.visualize_to_dir, name))
 
   def execute(self, execution_request):
     """Invoke the engine for the given ExecutionRequest, returning Return and Throw states.
@@ -422,8 +425,12 @@ class SchedulerSession:
     :return: A tuple of (root, Return) tuples and (root, Throw) tuples.
     """
     start_time = time.time()
-    roots = list(zip(execution_request.roots,
-                     self._scheduler._run_and_return_roots(self._session, execution_request.native)))
+    roots = list(
+      zip(
+        execution_request.roots,
+        self._scheduler._run_and_return_roots(self._session, execution_request.native),
+      ),
+    )
 
     ExceptionSink.toggle_ignoring_sigint_v2_engine(False)
 
@@ -583,8 +590,11 @@ class SchedulerSession:
   def materialize_directory(
     self, directory_to_materialize: DirectoryToMaterialize
   ) -> MaterializeDirectoryResult:
-    """Materialize one single directory digest to disk. If you need to materialize multiple, you
-    should use the parallel materialize_directories() instead."""
+    """Materialize one single directory digest to disk.
+
+    If you need to materialize multiple, you should use the parallel materialize_directories()
+    instead.
+    """
     return self.materialize_directories((directory_to_materialize,)).dependencies[0]
 
   def materialize_directories(
@@ -605,7 +615,7 @@ class SchedulerSession:
     return result
 
   def lease_files_in_graph(self):
-    self._scheduler.lease_files_in_graph()
+    self._scheduler.lease_files_in_graph(self._session)
 
   def garbage_collect_store(self):
     self._scheduler.garbage_collect_store()

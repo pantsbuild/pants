@@ -3,7 +3,7 @@
 
 use crate::PythonLogLevel;
 use chrono;
-use futures::task_local;
+use futures01::task_local;
 use lazy_static::lazy_static;
 use log::{log, set_logger, set_max_level, LevelFilter, Log, Metadata, Record};
 use parking_lot::Mutex;
@@ -267,7 +267,7 @@ task_local! {
 }
 
 pub fn set_destination(destination: Destination) {
-  if futures::task::is_in_task() {
+  if futures01::task::is_in_task() {
     TASK_DESTINATION.with(|task_destination| {
       *task_destination.lock() = Some(destination);
     })
@@ -287,7 +287,7 @@ pub fn get_destination() -> Destination {
     THREAD_DESTINATION.with(|destination| *destination.lock())
   }
 
-  if futures::task::is_in_task() {
+  if futures01::task::is_in_task() {
     get_task_destination().unwrap_or_else(get_thread_destination)
   } else {
     get_thread_destination()

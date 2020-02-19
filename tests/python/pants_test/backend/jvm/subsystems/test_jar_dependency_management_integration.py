@@ -4,7 +4,6 @@
 import os
 from collections import namedtuple
 from contextlib import contextmanager
-from unittest import expectedFailure
 
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import temporary_dir
@@ -184,10 +183,7 @@ class JarDependencyManagementIntegrationTest(PantsRunIntegrationTest):
     ])
     self.assert_success(run)
 
-  @expectedFailure
   def test_unit_tests_with_different_sets_one_batch(self):
-    # NB(gmalmquist): Currently, junit_run isn't smart enough to partition the targets to run
-    # separately if they depend on jar_libraries which resolve using different managed dependencies.
     run = self.run_pants([
       'test',
       '--test-junit-batch-size=2',

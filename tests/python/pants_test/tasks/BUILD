@@ -59,5 +59,5 @@ python_tests(
 
 files(
   name = 'jar_publish_resources_directory',
-  sources = rglobs('jar_publish_resources/*'),
+  sources = ['jar_publish_resources/**/*'],
 )

@@ -16,8 +16,8 @@ from pants.task.lint_task_mixin import LintTaskMixin
 class ScalafmtTask(RewriteBase):
   """Abstract class to run ScalaFmt commands.
 
-  Classes that inherit from this should override additional_args and
-  process_result to run different scalafmt commands.
+  Classes that inherit from this should override additional_args and process_result to run different
+  scalafmt commands.
   """
 
   def _resolve_conflicting_options(self, *, old_option: str, new_option: str):
@@ -88,15 +88,13 @@ class ScalafmtTask(RewriteBase):
   def additional_args(self):
     """Returns the arguments used to run Scalafmt command.
 
-    The return value should be an array of strings.  For
-    example, to run the Scalafmt help command:
+    The return value should be an array of strings.  For example, to run the Scalafmt help command:
     ['--help']
     """
 
 
 class ScalaFmtCheckFormat(LintTaskMixin, ScalafmtTask):
-  """This Task checks that all scala files in the target are formatted
-  correctly.
+  """This Task checks that all scala files in the target are formatted correctly.
 
   If the files are not formatted correctly an error is raised
   including the command to run to format the files correctly
@@ -118,9 +116,8 @@ class ScalaFmtCheckFormat(LintTaskMixin, ScalafmtTask):
 
 
 class ScalaFmtFormat(FmtTaskMixin, ScalafmtTask):
-  """This Task reads all scala files in the target and emits
-  the source in a standard style as specified by the configuration
-  file.
+  """This Task reads all scala files in the target and emits the source in a standard style as
+  specified by the configuration file.
 
   This task mutates the underlying flies.
 

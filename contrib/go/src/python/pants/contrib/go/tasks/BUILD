@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  sources=globs('*.py'),  # Need explicit sources, because `go_test.py` won't match the default.
+  sources=['*.py'],  # Need explicit sources, because `go_test.py` won't match the default.
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:ansicolors',

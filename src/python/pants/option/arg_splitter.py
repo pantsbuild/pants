@@ -6,7 +6,7 @@ import sys
 from abc import ABC
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 from twitter.common.collections import OrderedSet
 
@@ -128,7 +128,7 @@ class ArgSplitter:
         self._help_request = OptionsHelp(advanced=advanced, all_scopes=all_scopes)
     return True
 
-  def split_args(self, args: Optional[List[str]] = None) -> SplitArgs:
+  def split_args(self, args: Optional[Sequence[str]] = None) -> SplitArgs:
     """Split the specified arg list (or sys.argv if unspecified).
 
     args[0] is ignored.
@@ -180,7 +180,7 @@ class ArgSplitter:
         # We assume any args here are in global scope.
         if not self._check_for_help_request(arg):
           assign_flag_to_scope(arg, GLOBAL_SCOPE)
-      elif self.spec(arg):
+      elif self.likely_a_spec(arg):
         specs.append(arg)
       elif arg not in self._known_scopes:
         self._unknown_scopes.append(arg)
@@ -205,13 +205,17 @@ class ArgSplitter:
     )
 
   @staticmethod
-  def spec(arg: str) -> bool:
-    """Does arg 'look like' a Spec (rather than a goal name).
+  def likely_a_spec(arg: str) -> bool:
+    """Return whether `arg` looks like a spec, rather than a goal name.
 
-    An arg is a spec if it looks like an AddressSpec or a FilesystemSpec.
-    In the future we can expand this heuristic to support other kinds of specs, such as URLs.
+    An arg is a spec if it looks like an AddressSpec or a FilesystemSpec. In the future we can
+    expand this heuristic to support other kinds of specs, such as URLs.
     """
-    return os.path.sep in arg or ':' in arg or '*' in arg or Path(arg).exists()
+    return (
+      any(symbol in arg for symbol in (os.path.sep, ':', '*'))
+      or arg.startswith('!')
+      or Path(arg).exists()
+    )
 
   def _consume_scope(self) -> Tuple[Optional[str], List[str]]:
     """Returns a pair (scope, list of flags encountered in that scope).

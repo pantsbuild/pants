@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 class ProjectTree(ABC):
   """Represents project tree which is used to locate and read build files.
+
   Has two implementations: one backed by file system and one backed by SCM.
   """
 
@@ -24,7 +25,7 @@ class ProjectTree(ABC):
     """Raised when the build_root specified to a ProjectTree is not valid."""
 
   class AccessIgnoredPathError(Exception):
-    """Raised when accessing a path which is ignored by pants"""
+    """Raised when accessing a path which is ignored by pants."""
 
   def __init__(self, build_root, ignore_patterns=None):
     if not os.path.isabs(build_root):
@@ -128,8 +129,7 @@ class ProjectTree(ABC):
   def walk(self, relpath, topdown=True):
     """Walk the file tree rooted at `path`.
 
-    Works like os.walk but returned root value is relative path.
-    Ignored paths will not be returned.
+    Works like os.walk but returned root value is relative path. Ignored paths will not be returned.
     """
     for root, dirs, files in self._walk_raw(relpath, topdown):
       matched_dirs = self.ignore.match_files([os.path.join(root, "{}/".format(d)) for d in dirs])

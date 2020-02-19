@@ -3,32 +3,36 @@
 
 import dataclasses
 import logging
+import os.path
 from collections import defaultdict, deque
 from contextlib import contextmanager
 from dataclasses import dataclass
-from os.path import dirname
-from typing import Any, Dict, Iterable, List, Tuple, cast
+from pathlib import PurePath
+from typing import Any, Dict, Iterable, Iterator, List, Set, Tuple, Type, cast
 
 from twitter.common.collections import OrderedSet
 
-from pants.base.exceptions import TargetDefinitionException
+from pants.base.exceptions import ResolveError, TargetDefinitionException
 from pants.base.parse_context import ParseContext
 from pants.base.specs import (
   AddressSpec,
   AddressSpecs,
   AscendantAddresses,
-  DescendantAddresses,
+  FilesystemLiteralSpec,
+  FilesystemResolvedGlobSpec,
+  FilesystemSpecs,
+  OriginSpec,
   SingleAddress,
 )
-from pants.base.target_roots import TargetRoots
-from pants.build_graph.address import Address
+from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.app_base import AppBase, Bundle
-from pants.build_graph.build_configuration import BuildConfiguration
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.remote_sources import RemoteSources
-from pants.engine.addressable import BuildFileAddresses
-from pants.engine.fs import PathGlobs, Snapshot
+from pants.build_graph.target import Target
+from pants.engine.addressable import Addresses, AddressesWithOrigins, AddressWithOrigin
+from pants.engine.fs import EMPTY_SNAPSHOT, PathGlobs, Snapshot
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.structs import (
   BundleAdaptor,
@@ -37,13 +41,15 @@ from pants.engine.legacy.structs import (
   SourcesField,
   TargetAdaptor,
 )
-from pants.engine.mapper import AddressMapper
 from pants.engine.objects import Collection
 from pants.engine.parser import HydratedStruct
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
-from pants.option.global_options import GlobMatchErrorBehavior
-from pants.scm.subsystems.changed import IncludeDependeesOption
+from pants.option.global_options import (
+  GlobalOptions,
+  GlobMatchErrorBehavior,
+  OwnersNotFoundBehavior,
+)
 from pants.source.filespec import any_matches_filespec
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper, Filespec
 
@@ -51,7 +57,7 @@ from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapp
 logger = logging.getLogger(__name__)
 
 
-def target_types_from_build_file_aliases(aliases):
+def target_types_from_build_file_aliases(aliases: BuildFileAliases) -> Dict[str, Type[Target]]:
   """Given BuildFileAliases, return the concrete target types constructed for each alias."""
   target_types = dict(aliases.target_types)
   for alias, factory in aliases.target_macro_factories.items():
@@ -72,15 +78,16 @@ class _DestWrapper:
 class LegacyBuildGraph(BuildGraph):
   """A directed acyclic graph of Targets and dependencies. Not necessarily connected.
 
-  This implementation is backed by a Scheduler that is able to resolve TransitiveHydratedTargets.
+  This implementation is backed by a Scheduler that is able to resolve
+  LegacyTransitiveHydratedTargets.
   """
 
   @classmethod
-  def create(cls, scheduler, build_file_aliases):
+  def create(cls, scheduler, build_file_aliases: BuildFileAliases) -> "LegacyBuildGraph":
     """Construct a graph given a Scheduler and BuildFileAliases."""
     return cls(scheduler, target_types_from_build_file_aliases(build_file_aliases))
 
-  def __init__(self, scheduler, target_types):
+  def __init__(self, scheduler, target_types: Dict[str, Type[Target]]) -> None:
     """Construct a graph given a Scheduler, and set of target type aliases.
 
     :param scheduler: A Scheduler that is configured to be able to resolve TransitiveHydratedTargets.
@@ -90,31 +97,31 @@ class LegacyBuildGraph(BuildGraph):
     self._target_types = target_types
     super().__init__()
 
-  def clone_new(self):
+  def clone_new(self) -> "LegacyBuildGraph":
     """Returns a new BuildGraph instance of the same type and with the same __init__ params."""
     return LegacyBuildGraph(self._scheduler, self._target_types)
 
-  def _index(self, hydrated_targets):
+  def _index(self, hydrated_targets: Iterable["LegacyHydratedTarget"]) -> Set[BuildFileAddress]:
     """Index from the given roots into the storage provided by the base class.
 
     This is an additive operation: any existing connections involving these nodes are preserved.
     """
-    all_addresses = set()
-    new_targets = list()
+    all_addresses: Set[BuildFileAddress] = set()
+    new_targets: List[Target] = list()
 
     # Index the ProductGraph.
-    for hydrated_target in hydrated_targets:
-      target_adaptor = hydrated_target.adaptor
-      address = target_adaptor.address
+    for legacy_hydrated_target in hydrated_targets:
+      address = legacy_hydrated_target.address
       all_addresses.add(address)
       if address not in self._target_by_address:
-        new_targets.append(self._index_target(target_adaptor))
+        new_targets.append(self._index_target(legacy_hydrated_target))
 
     # Once the declared dependencies of all targets are indexed, inject their
     # additional "traversable_(dependency_)?specs".
     deps_to_inject = OrderedSet()
     addresses_to_inject = set()
-    def inject(target, dep_spec, is_dependency):
+
+    def inject(target: Target, dep_spec: str, is_dependency: bool) -> None:
       address = Address.parse(dep_spec, relative_to=target.address.spec_path)
       if not any(address == t.address for t in target.dependencies):
         addresses_to_inject.add(address)
@@ -137,14 +144,14 @@ class LegacyBuildGraph(BuildGraph):
 
     return all_addresses
 
-  def _index_target(self, target_adaptor):
-    """Instantiate the given TargetAdaptor, index it in the graph, and return a Target."""
+  def _index_target(self, legacy_hydrated_target: "LegacyHydratedTarget") -> Target:
+    """Instantiate the given LegacyHydratedTarget, index it in the graph, and return a Target."""
     # Instantiate the target.
-    address = target_adaptor.address
-    target = self._instantiate_target(target_adaptor)
+    address = legacy_hydrated_target.address
+    target = self._instantiate_target(legacy_hydrated_target)
     self._target_by_address[address] = target
 
-    for dependency in target_adaptor.dependencies:
+    for dependency in legacy_hydrated_target.dependencies:
       if dependency in self._target_dependencies_by_address[address]:
         raise self.DuplicateAddressError(
           'Addresses in dependencies must be unique. '
@@ -156,13 +163,16 @@ class LegacyBuildGraph(BuildGraph):
       self._target_dependees_by_address[dependency].add(address)
     return target
 
-  def _instantiate_target(self, target_adaptor):
-    """Given a TargetAdaptor struct previously parsed from a BUILD file, instantiate a Target."""
-    target_cls = self._target_types[target_adaptor.type_alias]
+  def _instantiate_target(self, legacy_hydrated_target: "LegacyHydratedTarget") -> Target:
+    """Given a LegacyHydratedTarget previously parsed from a BUILD file, instantiate a Target."""
+    target_cls = self._target_types[legacy_hydrated_target.adaptor.type_alias]
     try:
       # Pop dependencies, which were already consumed during construction.
-      kwargs = target_adaptor.kwargs()
+      kwargs = legacy_hydrated_target.adaptor.kwargs()
       kwargs.pop('dependencies')
+
+      # Replace the `address` field of type `Address` with type `BuildFileAddress`.
+      kwargs["address"] = legacy_hydrated_target.address
 
       # Instantiate.
       if issubclass(target_cls, AppBase):
@@ -174,10 +184,11 @@ class LegacyBuildGraph(BuildGraph):
       raise
     except Exception as e:
       raise TargetDefinitionException(
-          target_adaptor.address,
-          'Failed to instantiate Target with type {}: {}'.format(target_cls, e))
+        legacy_hydrated_target.address,
+        'Failed to instantiate Target with type {}: {}'.format(target_cls, e),
+      )
 
-  def _instantiate_app(self, target_cls, kwargs):
+  def _instantiate_app(self, target_cls: Type[Target], kwargs) -> Target:
     """For App targets, convert BundleAdaptor to BundleProps."""
     parse_context = ParseContext(kwargs['address'].spec_path, dict())
     bundleprops_factory = Bundle(parse_context)
@@ -188,15 +199,15 @@ class LegacyBuildGraph(BuildGraph):
 
     return target_cls(build_graph=self, **kwargs)
 
-  def _instantiate_remote_sources(self, kwargs):
+  def _instantiate_remote_sources(self, kwargs) -> RemoteSources:
     """For RemoteSources target, convert "dest" field to its real target type."""
     kwargs['dest'] = _DestWrapper((self._target_types[kwargs['dest']],))
     return RemoteSources(build_graph=self, **kwargs)
 
-  def inject_address_closure(self, address):
+  def inject_address_closure(self, address: Address) -> None:
     self.inject_addresses_closure([address])
 
-  def inject_addresses_closure(self, addresses):
+  def inject_addresses_closure(self, addresses: Iterable[Address]) -> None:
     addresses = set(addresses) - set(self._target_by_address.keys())
     if not addresses:
       return
@@ -204,11 +215,15 @@ class LegacyBuildGraph(BuildGraph):
     for _ in self._inject_address_specs(AddressSpecs(dependencies)):
       pass
 
-  def inject_roots_closure(self, target_roots: TargetRoots, fail_fast=None):
-    for address in self._inject_address_specs(target_roots.specs):
+  def inject_roots_closure(
+    self, address_specs: AddressSpecs, fail_fast=None,
+  ) -> Iterator[BuildFileAddress]:
+    for address in self._inject_address_specs(address_specs):
       yield address
 
-  def inject_address_specs_closure(self, address_specs: Iterable[AddressSpec], fail_fast=None):
+  def inject_address_specs_closure(
+    self, address_specs: Iterable[AddressSpec], fail_fast=None,
+  ) -> Iterator[BuildFileAddress]:
     # Request loading of these address specs.
     for address in self._inject_address_specs(AddressSpecs(address_specs)):
       yield address
@@ -219,7 +234,7 @@ class LegacyBuildGraph(BuildGraph):
     return self.get_target(address)
 
   @contextmanager
-  def _resolve_context(self):
+  def _resolve_context(self) -> Iterator[None]:
     try:
       yield
     except Exception as e:
@@ -227,26 +242,7 @@ class LegacyBuildGraph(BuildGraph):
         'Build graph construction failed: {} {}'.format(type(e).__name__, str(e))
       )
 
-  def _inject_addresses(self, subjects):
-    """Injects targets into the graph for each of the given `Address` objects, and then yields them.
-
-    TODO: See #5606 about undoing the split between `_inject_addresses` and `_inject_address_specs`.
-    """
-    logger.debug('Injecting addresses to %s: %s', self, subjects)
-    with self._resolve_context():
-      addresses = tuple(subjects)
-      thts, = self._scheduler.product_request(TransitiveHydratedTargets,
-                                              [BuildFileAddresses(addresses)])
-
-    self._index(thts.closure)
-
-    yielded_addresses = set()
-    for address in subjects:
-      if address not in yielded_addresses:
-        yielded_addresses.add(address)
-        yield address
-
-  def _inject_address_specs(self, address_specs: AddressSpecs):
+  def _inject_address_specs(self, address_specs: AddressSpecs) -> Iterator[BuildFileAddress]:
     """Injects targets into the graph for the given `AddressSpecs` object.
 
     Yields the resulting addresses.
@@ -256,8 +252,7 @@ class LegacyBuildGraph(BuildGraph):
 
     logger.debug('Injecting address specs to %s: %s', self, address_specs)
     with self._resolve_context():
-      thts, = self._scheduler.product_request(TransitiveHydratedTargets,
-                                              [address_specs])
+      thts, = self._scheduler.product_request(LegacyTransitiveHydratedTargets, [address_specs])
 
     self._index(thts.closure)
 
@@ -361,12 +356,12 @@ class _DependentGraph:
 class HydratedTarget:
   """A wrapper for a fully hydrated TargetAdaptor object.
 
-  Transitive graph walks collect ordered sets of TransitiveHydratedTargets which involve a huge amount
-  of hashing: we implement eq/hash via direct usage of an Address field to speed that up.
+  Transitive graph walks collect ordered sets of TransitiveHydratedTargets which involve a huge
+  amount of hashing: we implement eq/hash via direct usage of an Address field to speed that up.
   """
-  address: Any
+  address: Address
   adaptor: TargetAdaptor
-  dependencies: Tuple
+  dependencies: Tuple[Address, ...]
 
   @property
   def addresses(self) -> Tuple:
@@ -395,20 +390,61 @@ class TransitiveHydratedTargets:
 
 
 @dataclass(frozen=True)
-class SourcesSnapshot:
-  """A light wrapper around source files for Pants to operate on.
+class LegacyHydratedTarget:
+  """A rip on HydratedTarget for the purpose of V1, which must use BuildFileAddress rather than
+  Address."""
+  address: BuildFileAddress
+  adaptor: TargetAdaptor
+  dependencies: Tuple[Address, ...]
 
-  This corresponds 1-to-1 with the `sources` field of a target. When given filesystem specs, ...
-  TODO: what is the mapping for filesystem specs? Should each individual spec -> SourcesSnapshot?
-  Decide this once implementing the hydration of FilesystemSpecs to SourcesSnapshots."""
+  def __hash__(self):
+    return hash(self.address)
+
+  @staticmethod
+  def from_hydrated_target(ht: HydratedTarget, bfa: BuildFileAddress) -> "LegacyHydratedTarget":
+    return LegacyHydratedTarget(address=bfa, adaptor=ht.adaptor, dependencies=ht.dependencies)
+
+
+@dataclass(frozen=True)
+class LegacyTransitiveHydratedTargets:
+  roots: Tuple[LegacyHydratedTarget, ...]
+  closure: OrderedSet  # TODO: this is an OrderedSet[LegacyHydratedTarget]
+
+
+# TODO(#7490): Remove this once we have multiple params support so that rules can do something
+# like `await Get[TestResult](Params(Address(..), Origin(..)))`.
+@dataclass(frozen=True)
+class HydratedTargetWithOrigin:
+  """A wrapper around HydratedTarget that preserves the original spec used to resolve the target.
+
+  This is useful for precise file arguments, where a goal like `./pants test` runs over only the
+  specified file arguments rather than the whole target.
+  """
+  target: HydratedTarget
+  origin: OriginSpec
+
+
+class HydratedTargetsWithOrigins(Collection[HydratedTargetWithOrigin]):
+  pass
+
+
+@dataclass(frozen=True)
+class SourcesSnapshot:
+  """Sources matched by command line specs, either directly via FilesystemSpecs or indirectly via
+  AddressSpecs.
+
+  Note that the resolved sources do not need an owning target. Any source resolvable by `PathGlobs`
+  is valid here.
+  """
   snapshot: Snapshot
 
 
 class SourcesSnapshots(Collection[SourcesSnapshot]):
-  """A set of SourceSnapshots, with each representing the sources for individual targets.
+  """A collection of sources matched by command line specs.
 
-  `@goal_rule`s may request this when they only need source files to operate and do not need
-  any target information."""
+  `@goal_rule`s may request this when they only need source files to operate and do not need any
+  target information.
+  """
 
 
 @dataclass(frozen=True)
@@ -425,28 +461,55 @@ class TopologicallyOrderedTargets:
   hydrated_targets: HydratedTargets
 
 
+class InvalidOwnersOfArgs(Exception):
+  pass
+
+
 @dataclass(frozen=True)
 class OwnersRequest:
-  """A request for the owners (and optionally, transitive dependees) of a set of file paths."""
-  sources: Tuple
-  include_dependees: IncludeDependeesOption
+  """A request for the owners of a set of file paths."""
+  sources: Tuple[str, ...]
+
+  def validate(self, *, pants_bin_name: str) -> None:
+    """Ensure that users are passing valid args."""
+    # Check for improperly trying to use commas to run against multiple files.
+    sources_with_commas = [source for source in self.sources if "," in source]
+    if sources_with_commas:
+      offenders = ', '.join(f"`{source}`" for source in sources_with_commas)
+      raise InvalidOwnersOfArgs(
+        "Rather than using a comma with `--owner-of` to specify multiple files, use "
+        "Pants list syntax: https://www.pantsbuild.org/options.html#list-options. For example, "
+        f"`{pants_bin_name} --owner-of=src/python/example/foo.py --owner-of=src/python/example/test.py list`."
+        f"\n\n(You used commas in these arguments: {offenders})"
+      )
+    # Validate that users aren't using globs. FilesystemSpecs _do_ support globs via PathGlobs,
+    # so it's feasible that a user will then try to also use globs with `--owner-of`.
+    sources_with_globs = [source for source in self.sources if '*' in source]
+    if sources_with_globs:
+      offenders = ', '.join(f"`{source}`" for source in sources_with_globs)
+      raise InvalidOwnersOfArgs(
+        "`--owner-of` does not allow globs. Instead, please directly specify the files you want "
+        f"to operate on, e.g. `{pants_bin_name} --owner-of=src/python/example/foo.py.\n\n"
+        f"(You used globs in these arguments: {offenders})"
+      )
+
+
+@dataclass(frozen=True)
+class Owners:
+  addresses: Addresses
 
 
 @rule
-async def find_owners(
-  build_configuration: BuildConfiguration,
-  address_mapper: AddressMapper,
-  owners_request: OwnersRequest
-) -> BuildFileAddresses:
+async def find_owners(owners_request: OwnersRequest) -> Owners:
   sources_set = OrderedSet(owners_request.sources)
-  dirs_set = OrderedSet(dirname(source) for source in sources_set)
+  dirs_set = OrderedSet(os.path.dirname(source) for source in sources_set)
 
   # Walk up the buildroot looking for targets that would conceivably claim changed sources.
   candidate_specs = tuple(AscendantAddresses(directory=d) for d in dirs_set)
   candidate_targets = await Get[HydratedTargets](AddressSpecs(candidate_specs))
 
   # Match the source globs against the expanded candidate targets.
-  def owns_any_source(legacy_target):
+  def owns_any_source(legacy_target: HydratedTarget) -> bool:
     """Given a `HydratedTarget` instance, check if it owns the given source file."""
     target_kwargs = legacy_target.adaptor.kwargs()
 
@@ -457,50 +520,32 @@ async def find_owners(
     #  1) having two implementations isn't great
     #  2) we're expanding sources via HydratedTarget, but it isn't necessary to do that to match
     target_sources = target_kwargs.get('sources', None)
-    if target_sources and any_matches_filespec(paths=sources_set, spec=target_sources.filespec):
-      return True
-    return False
+    return target_sources and any_matches_filespec(paths=sources_set, spec=target_sources.filespec)
 
-  direct_owners = tuple(ht.adaptor.address
-                        for ht in candidate_targets
-                        if LegacyAddressMapper.any_is_declaring_file(ht.adaptor.address, sources_set) or
-                           owns_any_source(ht))
-
-  # If the OwnersRequest does not require dependees, then we're done.
-  if owners_request.include_dependees == IncludeDependeesOption.NONE:
-    return BuildFileAddresses(direct_owners)
-
-  # Otherwise: find dependees.
-  all_addresses = await Get[BuildFileAddresses](AddressSpecs((DescendantAddresses(''),)))
-  all_structs = [
-    s.value for s in
-    await MultiGet(Get[HydratedStruct](Address, a.to_address()) for a in all_addresses)
-  ]
-
-  bfa = build_configuration.registered_aliases()
-  graph = _DependentGraph.from_iterable(target_types_from_build_file_aliases(bfa),
-                                        address_mapper,
-                                        all_structs)
-  if owners_request.include_dependees == IncludeDependeesOption.DIRECT:
-    return BuildFileAddresses(tuple(graph.dependents_of_addresses(direct_owners)))
-  assert owners_request.include_dependees == IncludeDependeesOption.TRANSITIVE
-  return BuildFileAddresses(tuple(graph.transitive_dependents_of_addresses(direct_owners)))
+  build_file_addresses = await MultiGet(
+    Get[BuildFileAddress](Address, ht.adaptor.address) for ht in candidate_targets
+  )
+  owners = Addresses(
+    ht.adaptor.address
+    for ht, bfa in zip(candidate_targets, build_file_addresses)
+    if LegacyAddressMapper.any_is_declaring_file(bfa, sources_set)
+    or owns_any_source(ht)
+  )
+  return Owners(owners)
 
 
 @rule
-async def transitive_hydrated_targets(
-  build_file_addresses: BuildFileAddresses
-) -> TransitiveHydratedTargets:
-  """Given BuildFileAddresses, kicks off recursion on expansion of TransitiveHydratedTargets.
+async def transitive_hydrated_targets(addresses: Addresses) -> TransitiveHydratedTargets:
+  """Given Addresses, kicks off recursion on expansion of TransitiveHydratedTargets.
 
-  The TransitiveHydratedTarget struct represents a structure-shared graph, which we walk
-  and flatten here. The engine memoizes the computation of TransitiveHydratedTarget, so
-  when multiple TransitiveHydratedTargets objects are being constructed for multiple
-  roots, their structure will be shared.
+  The TransitiveHydratedTarget struct represents a structure-shared graph, which we walk and flatten
+  here. The engine memoizes the computation of TransitiveHydratedTarget, so when multiple
+  TransitiveHydratedTargets objects are being constructed for multiple roots, their structure will
+  be shared.
   """
 
   transitive_hydrated_targets = await MultiGet(
-    Get[TransitiveHydratedTarget](Address, a) for a in build_file_addresses.addresses
+    Get[TransitiveHydratedTarget](Address, a) for a in addresses
   )
 
   closure = OrderedSet()
@@ -514,6 +559,29 @@ async def transitive_hydrated_targets(
     to_visit.extend(tht.dependencies)
 
   return TransitiveHydratedTargets(tuple(tht.root for tht in transitive_hydrated_targets), closure)
+
+
+@rule
+async def legacy_transitive_hydrated_targets(
+  addresses: Addresses,
+) -> LegacyTransitiveHydratedTargets:
+  thts = await Get[TransitiveHydratedTargets](Addresses, addresses)
+  roots_bfas = await MultiGet(
+    Get[BuildFileAddress](Address, hydrated_target.address) for hydrated_target in thts.roots
+  )
+  closure_bfas = await MultiGet(
+    Get[BuildFileAddress](Address, hydrated_target.address) for hydrated_target in thts.closure
+  )
+  return LegacyTransitiveHydratedTargets(
+    roots=tuple(
+      LegacyHydratedTarget.from_hydrated_target(ht, bfa)
+      for ht, bfa in zip(thts.roots, roots_bfas)
+    ),
+    closure=OrderedSet(
+      LegacyHydratedTarget.from_hydrated_target(ht, bfa)
+      for ht, bfa in zip(thts.closure, closure_bfas)
+    ),
+  )
 
 
 @rule
@@ -549,14 +617,6 @@ def topo_sort(targets: Iterable[HydratedTarget]) -> Tuple[HydratedTarget, ...]:
   return tuple(tgt for tgt in res if tgt in input_set)
 
 
-
-@rule
-async def hydrated_targets(build_file_addresses: BuildFileAddresses) -> HydratedTargets:
-  """Requests HydratedTarget instances for BuildFileAddresses."""
-  targets = await MultiGet(Get[HydratedTarget](Address, a) for a in build_file_addresses.addresses)
-  return HydratedTargets(targets)
-
-
 @dataclass(frozen=True)
 class HydratedField:
   """A wrapper for a fully constructed replacement kwarg for a HydratedTarget."""
@@ -575,9 +635,36 @@ async def hydrate_target(hydrated_struct: HydratedStruct) -> HydratedTarget:
   kwargs = target_adaptor.kwargs()
   for field in hydrated_fields:
     kwargs[field.name] = field.value
-  return HydratedTarget(target_adaptor.address,
-                       type(target_adaptor)(**kwargs),
-                       tuple(target_adaptor.dependencies))
+  return HydratedTarget(
+    address=target_adaptor.address,
+    adaptor=type(target_adaptor)(**kwargs),
+    dependencies=tuple(target_adaptor.dependencies),
+  )
+
+
+@rule
+async def hydrate_target_with_origin(
+  address_with_origin: AddressWithOrigin
+) -> HydratedTargetWithOrigin:
+  ht = await Get[HydratedTarget](Address, address_with_origin.address)
+  return HydratedTargetWithOrigin(target=ht, origin=address_with_origin.origin)
+
+
+@rule
+async def hydrated_targets(addresses: Addresses) -> HydratedTargets:
+  targets = await MultiGet(Get[HydratedTarget](Address, a) for a in addresses)
+  return HydratedTargets(targets)
+
+
+@rule
+async def hydrated_targets_with_origins(
+  addresses_with_origins: AddressesWithOrigins,
+) -> HydratedTargetsWithOrigins:
+  targets_with_origins = await MultiGet(
+    Get[HydratedTargetWithOrigin](AddressWithOrigin, address_with_origin)
+    for address_with_origin in addresses_with_origins
+  )
+  return HydratedTargetsWithOrigins(targets_with_origins)
 
 
 def _eager_fileset_with_spec(
@@ -600,18 +687,21 @@ def _eager_fileset_with_spec(
 async def hydrate_sources(
   sources_field: SourcesField, glob_match_error_behavior: GlobMatchErrorBehavior,
 ) -> HydratedField:
-  """Given a SourcesField, request a Snapshot for its path_globs and create an EagerFilesetWithSpec.
-  """
-  # TODO(#5864): merge the target's selection of --glob-expansion-failure (which doesn't exist yet)
-  # with the global default!
+  """Given a SourcesField, request a Snapshot for its path_globs and create an
+  EagerFilesetWithSpec."""
+  address = sources_field.address
   path_globs = dataclasses.replace(
-    sources_field.path_globs, glob_match_error_behavior=glob_match_error_behavior
+    sources_field.path_globs,
+    glob_match_error_behavior=glob_match_error_behavior,
+    # TODO(#9012): add line number referring to the sources field. When doing this, we'll likely
+    # need to `await Get[BuildFileAddress](Address)`.
+    description_of_origin=f"{address}'s `{sources_field.arg}` field",
   )
   snapshot = await Get[Snapshot](PathGlobs, path_globs)
   fileset_with_spec = _eager_fileset_with_spec(
-    sources_field.address.spec_path,
-    sources_field.filespecs,
-    snapshot,
+    spec_path=address.spec_path,
+    filespec=sources_field.filespecs,
+    snapshot=snapshot,
   )
   sources_field.validate_fn(fileset_with_spec)
   return HydratedField(sources_field.arg, fileset_with_spec)
@@ -622,20 +712,27 @@ async def hydrate_bundles(
   bundles_field: BundlesField, glob_match_error_behavior: GlobMatchErrorBehavior,
 ) -> HydratedField:
   """Given a BundlesField, request Snapshots for each of its filesets and create BundleAdaptors."""
+  address = bundles_field.address
   path_globs_with_match_errors = [
-    dataclasses.replace(pg, glob_match_error_behavior=glob_match_error_behavior)
+    dataclasses.replace(
+      pg,
+      glob_match_error_behavior=glob_match_error_behavior,
+      # TODO(#9012): add line number referring to the bundles field. When doing this, we'll likely
+      # need to `await Get[BuildFileAddress](Address)`.
+      description_of_origin=f"{address}'s `bundles` field",
+    )
     for pg in bundles_field.path_globs_list
   ]
-  snapshot_list = await MultiGet(Get[Snapshot](PathGlobs, pg) for pg in path_globs_with_match_errors)
-
-  spec_path = bundles_field.address.spec_path
+  snapshot_list = await MultiGet(
+    Get[Snapshot](PathGlobs, pg) for pg in path_globs_with_match_errors
+  )
 
   bundles = []
   zipped = zip(bundles_field.bundles,
                bundles_field.filespecs_list,
                snapshot_list)
   for bundle, filespecs, snapshot in zipped:
-    rel_spec_path = getattr(bundle, 'rel_path', spec_path)
+    rel_spec_path = getattr(bundle, 'rel_path', address.spec_path)
     kwargs = bundle.kwargs()
     # NB: We `include_dirs=True` because bundle filesets frequently specify directories in order
     # to trigger a (deprecated) default inclusion of their recursive contents. See the related
@@ -649,43 +746,102 @@ async def hydrate_bundles(
 
 
 @rule
-async def hydrate_sources_snapshot(
-  hydrated_struct: HydratedStruct,
-) -> SourcesSnapshot:
+async def hydrate_sources_snapshot(hydrated_struct: HydratedStruct) -> SourcesSnapshot:
   """Construct a SourcesSnapshot from a TargetAdaptor without hydrating any other fields."""
   target_adaptor = cast(TargetAdaptor, hydrated_struct.value)
-  sources_field = next(fa for fa in target_adaptor.field_adaptors if isinstance(fa, SourcesField))
+  sources_field = next(
+    (fa for fa in target_adaptor.field_adaptors if isinstance(fa, SourcesField)), None
+  )
+  if sources_field is None:
+    return SourcesSnapshot(EMPTY_SNAPSHOT)
   hydrated_sources_field = await Get[HydratedField](HydrateableField, sources_field)
   efws = cast(EagerFilesetWithSpec, hydrated_sources_field.value)
   return SourcesSnapshot(efws.snapshot)
 
 
 @rule
-async def sources_snapshots_from_build_file_addresses(
-  build_file_addresses: BuildFileAddresses,
-) -> SourcesSnapshots:
-  """Request SourcesSnapshots for the given BuildFileAddresses.
+async def sources_snapshots_from_address_specs(address_specs: AddressSpecs) -> SourcesSnapshots:
+  """Request SourcesSnapshots for the given address specs.
 
   Each address will map to a corresponding SourcesSnapshot. This rule avoids hydrating any other
-  fields."""
-  snapshots = await MultiGet(
-    Get[SourcesSnapshot](Address, a) for a in build_file_addresses.addresses
-  )
+  fields.
+  """
+  addresses = await Get[Addresses](AddressSpecs, address_specs)
+  snapshots = await MultiGet(Get[SourcesSnapshot](Address, a) for a in addresses)
   return SourcesSnapshots(snapshots)
+
+
+@rule
+async def sources_snapshots_from_filesystem_specs(
+  filesystem_specs: FilesystemSpecs,
+) -> SourcesSnapshots:
+  """Resolve the snapshot associated with the provided filesystem specs."""
+  snapshot = await Get[Snapshot](PathGlobs, filesystem_specs.to_path_globs())
+  return SourcesSnapshots([SourcesSnapshot(snapshot)])
+
+
+@rule
+async def addresses_with_origins_from_filesystem_specs(
+  filesystem_specs: FilesystemSpecs, global_options: GlobalOptions,
+) -> AddressesWithOrigins:
+  """Find the owner(s) for each FilesystemSpec while preserving the original FilesystemSpec those
+  owners come from."""
+  pathglobs_per_include = (
+    filesystem_specs.path_globs_for_spec(spec) for spec in filesystem_specs.includes
+  )
+  snapshot_per_include = await MultiGet(
+    Get[Snapshot](PathGlobs, pg) for pg in pathglobs_per_include
+  )
+  owners_per_include = await MultiGet(
+    Get[Owners](OwnersRequest(sources=snapshot.files)) for snapshot in snapshot_per_include
+  )
+  result: List[AddressWithOrigin] = []
+  for spec, snapshot, owners in zip(
+    filesystem_specs.includes, snapshot_per_include, owners_per_include
+  ):
+    if (
+      global_options.owners_not_found_behavior != OwnersNotFoundBehavior.ignore
+      and isinstance(spec, FilesystemLiteralSpec) and not owners.addresses
+    ):
+      file_path = PurePath(spec.to_spec_string())
+      msg = (
+        f"No owning targets could be found for the file `{file_path}`.\n\nPlease check "
+        f"that there is a BUILD file in `{file_path.parent}` with a target whose `sources` field "
+        f"includes `{file_path}`. See https://www.pantsbuild.org/build_files.html."
+      )
+      if global_options.owners_not_found_behavior == OwnersNotFoundBehavior.warn:
+        logger.warning(msg)
+      else:
+        raise ResolveError(msg)
+    # We preserve what literal files any globs resolved to. This allows downstream goals to be
+    # more precise in which files they operate on.
+    origin = (
+      spec
+      if isinstance(spec, FilesystemLiteralSpec) else
+      FilesystemResolvedGlobSpec(glob=spec.glob, _snapshot=snapshot)
+    )
+    result.extend(AddressWithOrigin(address=address, origin=origin) for address in owners.addresses)
+  return AddressesWithOrigins(result)
 
 
 def create_legacy_graph_tasks():
   """Create tasks to recursively parse the legacy graph."""
   return [
-    transitive_hydrated_targets,
     transitive_hydrated_target,
-    hydrated_targets,
+    transitive_hydrated_targets,
+    legacy_transitive_hydrated_targets,
     hydrate_target,
+    hydrate_target_with_origin,
+    hydrated_targets,
+    hydrated_targets_with_origins,
     find_owners,
     hydrate_sources,
     hydrate_bundles,
     sort_targets,
     hydrate_sources_snapshot,
-    sources_snapshots_from_build_file_addresses,
+    addresses_with_origins_from_filesystem_specs,
+    sources_snapshots_from_address_specs,
+    sources_snapshots_from_filesystem_specs,
+    RootRule(FilesystemSpecs),
     RootRule(OwnersRequest),
   ]

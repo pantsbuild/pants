@@ -62,8 +62,8 @@ def fingerprint_file(workspace, filename):
 def rewrite_record_file(workspace, src_record_file, mutated_file_tuples):
   """Given a RECORD file and list of mutated file tuples, update the RECORD file in place.
 
-  The RECORD file should always be a member of the mutated files, due to both containing
-  versions, and having a version in its filename.
+  The RECORD file should always be a member of the mutated files, due to both containing versions,
+  and having a version in its filename.
   """
   mutated_files = set()
   dst_record_file = None
@@ -148,8 +148,8 @@ def reversion(args):
 def main():
   """Given an input whl file and target version, create a copy of the whl with that version.
 
-  This is accomplished via string replacement in files matching a list of globs. Pass the
-  optional `--glob` argument to add additional globs: ie  `--glob='thing-to-match*.txt'`.
+  This is accomplished via string replacement in files matching a list of globs. Pass the optional
+  `--glob` argument to add additional globs: ie  `--glob='thing-to-match*.txt'`.
   """
   parser = argparse.ArgumentParser()
   parser.add_argument('whl_file',

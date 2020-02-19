@@ -100,7 +100,7 @@ class StatusTable:
 
 
 class ExecutionFailure(Exception):
-  """Raised when work units fail during execution"""
+  """Raised when work units fail during execution."""
 
   def __init__(self, message, cause=None):
     if cause:
@@ -110,7 +110,7 @@ class ExecutionFailure(Exception):
 
 
 class UnexecutableGraphError(Exception):
-  """Base exception class for errors that make an ExecutionGraph not executable"""
+  """Base exception class for errors that make an ExecutionGraph not executable."""
 
   def __init__(self, msg):
     super().__init__(f"Unexecutable graph: {msg}")
@@ -210,8 +210,8 @@ class ExecutionGraph:
       self._dependees[dependency_key].append(key)
 
   def _compute_job_priorities(self, job_list):
-    """Walks the dependency graph breadth-first, starting from the most dependent tasks,
-     and computes the job priority as the sum of the jobs sizes along the critical path."""
+    """Walks the dependency graph breadth-first, starting from the most dependent tasks, and
+    computes the job priority as the sum of the jobs sizes along the critical path."""
 
     job_size = {job.key: job.size for job in job_list}
     job_priority = defaultdict(int)

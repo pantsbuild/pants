@@ -76,7 +76,7 @@ python_binary(
     ':bin',
     '//:build_root',
     '//:build_tools',
-    '//:pants_ini',
+    '//:pants_toml',
     '//:3rdparty_directory',
     '//:isort_cfg',
     '//:pyproject',

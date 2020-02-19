@@ -19,7 +19,8 @@ class ClassFactoring(CheckstylePlugin):
          return os.path.join(Distiller.CONSTANT, value)
 
   recommend using self.CONSTANT instead of Distiller.CONSTANT as otherwise
-  it makes subclassing impossible."""
+  it makes subclassing impossible.
+  """
 
   @classmethod
   def name(cls):

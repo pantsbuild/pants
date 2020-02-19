@@ -8,8 +8,8 @@ from pants.option.custom_types import file_option, shell_str
 
 class Bandit(PythonToolBase):
   options_scope = 'bandit'
-  default_version = 'bandit'
-  default_extra_requirements = ['setuptools']
+  default_version = 'bandit>=1.6.2,<1.7'
+  default_extra_requirements = ['setuptools<45']  # `<45` is for Python 2 support
   default_entry_point = 'bandit'
   default_interpreter_constraints = ["CPython>=2.7,<3", "CPython>=3.0"]
 

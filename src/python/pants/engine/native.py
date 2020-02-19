@@ -30,6 +30,7 @@ from pants.engine.fs import (
   MaterializeDirectoryResult,
   PathGlobs,
   Snapshot,
+  SnapshotSubset,
   UrlToFetch,
 )
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveProcessResult
@@ -199,7 +200,8 @@ def bootstrap_c_source(scheduler_bindings_path, output_dir, module_name=NATIVE_E
 def _replace_file(path, content):
   """Writes a file if it doesn't already exist with the same content.
 
-  This is useful because cargo uses timestamps to decide whether to compile things."""
+  This is useful because cargo uses timestamps to decide whether to compile things.
+  """
   if os.path.exists(path):
     with open(path, 'r') as f:
       if content == f.read():
@@ -313,7 +315,7 @@ class _FFISpecification(object):
 
   @_extern_decl('bool', ['ExternContext*', 'TypeId'])
   def extern_is_union(self, context_handle, type_id):
-    """Return whether or not a type is a member of a union"""
+    """Return whether or not a type is a member of a union."""
     c = self._ffi.from_handle(context_handle)
     input_type = c.from_id(type_id.tup_0)
     return union.is_instance(input_type)
@@ -549,8 +551,9 @@ class EngineTypes(NamedTuple):
   """Python types that need to be passed to the engine.
 
   N.B. EngineTypes needs to correspond field-by-field to the Types struct defined in
-  `src/rust/engine/src/types.rs` in order to avoid breakage
-  (field definition order matters, not just the names of fields!)."""
+  `src/rust/engine/src/types.rs` in order to avoid breakage (field definition order matters, not
+  just the names of fields!).
+  """
 
   construct_directory_digest: Function
   directory_digest: TypeId
@@ -580,6 +583,7 @@ class EngineTypes(NamedTuple):
   construct_interactive_process_result: Function
   interactive_process_request: TypeId
   interactive_process_result: TypeId
+  snapshot_subset: TypeId
 
 
 class PyResult(NamedTuple):
@@ -943,6 +947,7 @@ class Native(metaclass=SingletonMetaclass):
         construct_interactive_process_result=func(InteractiveProcessResult),
         interactive_process_request=ti(InteractiveProcessRequest),
         interactive_process_result=ti(InteractiveProcessResult),
+        snapshot_subset=ti(SnapshotSubset),
     )
 
     scheduler_result = self.lib.scheduler_create(

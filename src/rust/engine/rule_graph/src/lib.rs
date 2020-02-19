@@ -9,7 +9,6 @@
   clippy::expl_impl_clone_on_copy,
   clippy::if_not_else,
   clippy::needless_continue,
-  clippy::single_match_else,
   clippy::unseparated_literal_suffix,
   clippy::used_underscore_binding
 )]
@@ -28,10 +27,11 @@
 
 mod rules;
 
+use std::cmp::Ordering;
 use std::collections::{hash_map, BTreeSet, HashMap, HashSet};
 use std::io;
 
-pub use crate::rules::{DependencyKey, Rule, TypeId};
+pub use crate::rules::{DependencyKey, DisplayForGraph, Rule, TypeId};
 
 // TODO: Consider switching to HashSet and dropping the Ord bound from TypeId.
 type ParamTypes<T> = BTreeSet<T>;
@@ -48,7 +48,7 @@ impl<R: Rule> UnreachableError<R> {
       rule,
       diagnostic: Diagnostic {
         params: ParamTypes::default(),
-        reason: "Was not usable by any other @rule.".to_string(),
+        reason: "Was not reachable, either because no rules could produce the params or because it was shadowed by another @rule.".to_string(),
         details: vec![],
       },
     }
@@ -62,6 +62,13 @@ pub enum EntryWithDeps<R: Rule> {
 }
 
 impl<R: Rule> EntryWithDeps<R> {
+  pub fn rule(&self) -> Option<R> {
+    match self {
+      &EntryWithDeps::Inner(InnerEntry { ref rule, .. }) => Some(rule.clone()),
+      &EntryWithDeps::Root(_) => None,
+    }
+  }
+
   pub fn params(&self) -> &ParamTypes<R::TypeId> {
     match self {
       EntryWithDeps::Inner(ref ie) => &ie.params,
@@ -441,7 +448,7 @@ impl<'t, R: Rule> GraphMaker<'t, R> {
           params: params.clone(),
           reason: if params.is_empty() {
             format!(
-              "No rule was available to compute {}. Maybe declare it as a RootRule({})?",
+              "No rule was available to compute {}. Maybe declare RootRule({})?",
               dependency_key, product,
             )
           } else {
@@ -671,12 +678,16 @@ impl<'t, R: Rule> GraphMaker<'t, R> {
         Entry::WithDeps(ref wd) => wd.params().len(),
         Entry::Param(_) => 1,
       };
-      if param_set_size < minimum_param_set_size {
-        rules.clear();
-        rules.push(satisfiable_entry);
-        minimum_param_set_size = param_set_size;
-      } else if param_set_size == minimum_param_set_size {
-        rules.push(satisfiable_entry);
+      match param_set_size.cmp(&minimum_param_set_size) {
+        Ordering::Less => {
+          rules.clear();
+          rules.push(satisfiable_entry);
+          minimum_param_set_size = param_set_size;
+        }
+        Ordering::Equal => {
+          rules.push(satisfiable_entry);
+        }
+        Ordering::Greater => {}
       }
     }
 
@@ -786,31 +797,87 @@ pub fn params_str<T: TypeId>(params: &ParamTypes<T>) -> String {
   T::display(params.iter().cloned())
 }
 
-///
-/// TODO: Move all of these methods to Display impls.
-///
 pub fn entry_str<R: Rule>(entry: &Entry<R>) -> String {
-  match entry {
-    Entry::WithDeps(ref e) => entry_with_deps_str(e),
-    Entry::Param(type_id) => format!("Param({})", type_id),
+  entry_node_str_with_attrs(entry).entry_str
+}
+
+#[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq)]
+pub struct GraphVizEntryWithAttrs {
+  entry_str: String,
+  attrs_str: Option<String>,
+}
+
+pub enum Palette {
+  Olive,
+  Gray,
+  Orange,
+  Blue,
+}
+
+impl Palette {
+  // https://c.eev.ee/kouyou/ is wonderful for selecting lovely color juxtapositions across multiple
+  // different color axes.
+  fn color_string(&self) -> String {
+    // These color values are all in HSV. See https://www.graphviz.org/doc/info/colors.html for
+    // other methods of specifying
+    // colors. https://renenyffenegger.ch/notes/tools/Graphviz/attributes/_color/index may also be
+    // useful.
+    match self {
+      Self::Olive => "0.2214,0.7179,0.8528".to_string(),
+      Self::Gray => "0.576,0,0.6242".to_string(),
+      Self::Orange => "0.08,0.5,0.976".to_string(),
+      Self::Blue => "0.5,1,0.9".to_string(),
+    }
+  }
+}
+
+impl DisplayForGraph for Palette {
+  fn fmt_for_graph(&self) -> String {
+    format!("[color=\"{}\",style=filled]", self.color_string())
+  }
+}
+
+///
+/// Apply coloration to several nodes.
+pub fn entry_node_str_with_attrs<R: Rule>(entry: &Entry<R>) -> GraphVizEntryWithAttrs {
+  let (entry_str, attrs_str) = match entry {
+    &Entry::WithDeps(ref e) => (
+      entry_with_deps_str(e),
+      // Color "singleton" entries (with no params)!
+      if e.params().is_empty() {
+        Some(Palette::Olive.fmt_for_graph())
+      } else if let Some(color) = e.rule().and_then(|r| r.color()) {
+        // Color "intrinsic" entries (provided by the rust codebase)!
+        Some(color.fmt_for_graph())
+      } else {
+        None
+      },
+    ),
+    &Entry::Param(type_id) => (
+      format!("Param({})", type_id),
+      // Color "Param"s!
+      Some(Palette::Orange.fmt_for_graph()),
+    ),
+  };
+  GraphVizEntryWithAttrs {
+    entry_str,
+    attrs_str,
   }
 }
 
 fn entry_with_deps_str<R: Rule>(entry: &EntryWithDeps<R>) -> String {
   match entry {
-    EntryWithDeps::Inner(InnerEntry {
+    &EntryWithDeps::Inner(InnerEntry {
       ref rule,
       ref params,
-    }) => format!("{} for {}", rule, params_str(params)),
-    EntryWithDeps::Root(ref root) => {
+    }) => format!("{}\nfor {}", rule.fmt_for_graph(), params_str(params)),
+    &EntryWithDeps::Root(ref root) => format!(
       // TODO: Consider dropping this (final) public use of the keyword "Select", while ensuring
       // that error messages remain sufficiently grokkable.
-      format!(
-        "Select({}) for {}",
-        root.dependency_key,
-        params_str(&root.params),
-      )
-    }
+      "Select({})\nfor {}",
+      root.dependency_key,
+      params_str(&root.params)
+    ),
   }
 }
 
@@ -867,20 +934,20 @@ impl<R: Rule> RuleGraph<R> {
           })
           .collect();
         let suggestions_str = if suggestions.is_empty() {
-          ".".to_string()
+          format!(
+            "return the type {}. Is the @rule that you're expecting to run registered?",
+            product,
+          )
         } else {
           suggestions.sort();
           format!(
-            ", but there were @rules that could compute it using:\n  {}",
+            "can compute {} given input Params({}), but there were @rules that could compute it using:\n  {}",
+            product,
+            params_str(&params),
             suggestions.join("\n  ")
           )
         };
-        Err(format!(
-          "No installed @rules can compute {} for input Params({}){}",
-          product,
-          params_str(&params),
-          suggestions_str,
-        ))
+        Err(format!("No installed @rules {}", suggestions_str,))
       }
       0 => {
         // Some Param(s) were not registered.
@@ -972,7 +1039,7 @@ impl<R: Rule> RuleGraph<R> {
           .into_iter()
           .map(|mut d| {
             if d.details.is_empty() {
-              d.reason.clone()
+              d.reason
             } else {
               d.details.sort();
               format!("{}:\n      {}", d.reason, d.details.join("\n      "))
@@ -985,7 +1052,11 @@ impl<R: Rule> RuleGraph<R> {
       .collect();
     msgs.sort();
 
-    Err(format!("Rules with errors: {}\n  {}", msgs.len(), msgs.join("\n  ")).to_string())
+    Err(format!(
+      "Rules with errors: {}\n  {}",
+      msgs.len(),
+      msgs.join("\n  ")
+    ))
   }
 
   pub fn visualize(&self, f: &mut dyn io::Write) -> io::Result<()> {
@@ -1008,13 +1079,28 @@ impl<R: Rule> RuleGraph<R> {
       .filter_map(|(k, deps)| match k {
         EntryWithDeps::Root(_) => {
           let root_str = entry_with_deps_str(k);
+          let mut dep_entries = deps
+            .all_dependencies()
+            .map(|d| entry_node_str_with_attrs(d))
+            .collect::<Vec<_>>();
+          dep_entries.sort();
+          let deps_with_attrs = dep_entries
+            .iter()
+            .cloned()
+            .filter(|d| d.attrs_str.is_some())
+            .map(|d| format!("\"{}\" {}", d.entry_str, d.attrs_str.unwrap()))
+            .collect::<Vec<String>>()
+            .join("\n");
           Some(format!(
-            "    \"{}\" [color=blue]\n    \"{}\" -> {{{}}}",
+            "    \"{}\" {}\n{}    \"{}\" -> {{{}}}",
             root_str,
+            Palette::Blue.fmt_for_graph(),
+            deps_with_attrs,
             root_str,
-            deps
-              .all_dependencies()
-              .map(|d| format!("\"{}\"", entry_str(d)))
+            dep_entries
+              .iter()
+              .cloned()
+              .map(|d| format!("\"{}\"", d.entry_str))
               .collect::<Vec<String>>()
               .join(" ")
           ))
@@ -1030,16 +1116,29 @@ impl<R: Rule> RuleGraph<R> {
       .rule_dependency_edges
       .iter()
       .filter_map(|(k, deps)| match k {
-        EntryWithDeps::Inner(_) => {
-          let mut deps_strs = deps
+        &EntryWithDeps::Inner(_) => {
+          let mut dep_entries = deps
             .all_dependencies()
-            .map(|d| format!("\"{}\"", entry_str(d)))
-            .collect::<Vec<String>>();
-          deps_strs.sort();
+            .map(|d| entry_node_str_with_attrs(d))
+            .collect::<Vec<_>>();
+          dep_entries.sort();
+          let deps_with_attrs = dep_entries
+            .iter()
+            .cloned()
+            .filter(|d| d.attrs_str.is_some())
+            .map(|d| format!("\"{}\" {}", d.entry_str, d.attrs_str.unwrap()))
+            .collect::<Vec<String>>()
+            .join("\n");
           Some(format!(
-            "    \"{}\" -> {{{}}}",
+            "{}    \"{}\" -> {{{}}}",
+            deps_with_attrs,
             entry_with_deps_str(k),
-            deps_strs.join(" ")
+            dep_entries
+              .iter()
+              .cloned()
+              .map(|d| format!("\"{}\"", d.entry_str))
+              .collect::<Vec<String>>()
+              .join(" "),
           ))
         }
         _ => None,

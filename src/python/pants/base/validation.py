@@ -7,8 +7,8 @@ from twitter.common.dirutil.fileset import Fileset
 
 def assert_list(obj, expected_type=str, can_be_none=True, default=(), key_arg=None,
     allowable=(list, Fileset, OrderedSet, set, tuple), raise_type=ValueError):
-  """
-  This function is used to ensure that parameters set by users in BUILD files are of acceptable types.
+  """This function is used to ensure that parameters set by users in BUILD files are of acceptable
+  types.
 
   :API: public
 

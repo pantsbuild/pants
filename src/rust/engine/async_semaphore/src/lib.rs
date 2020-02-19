@@ -9,7 +9,6 @@
   clippy::expl_impl_clone_on_copy,
   clippy::if_not_else,
   clippy::needless_continue,
-  clippy::single_match_else,
   clippy::unseparated_literal_suffix,
   clippy::used_underscore_binding
 )]
@@ -27,16 +26,16 @@
 #![allow(clippy::mutex_atomic)]
 
 use std::collections::VecDeque;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
+use std::task::{Context, Poll, Waker};
 
-use futures::future::Future;
-use futures::task::{self, Task};
-use futures::{Async, Poll};
 use parking_lot::Mutex;
 
 struct Waiter {
   id: usize,
-  task: Task,
+  waker: Waker,
 }
 
 struct Inner {
@@ -71,22 +70,15 @@ impl AsyncSemaphore {
   ///
   /// Runs the given Future-creating function (and the Future it returns) under the semaphore.
   ///
-  pub fn with_acquired<F, B, T, E>(&self, f: F) -> Box<dyn Future<Item = T, Error = E> + Send>
+  pub async fn with_acquired<F, B, O>(self, f: F) -> O
   where
     F: FnOnce() -> B + Send + 'static,
-    B: Future<Item = T, Error = E> + Send + 'static,
+    B: Future<Output = O> + Send + 'static,
   {
-    Box::new(
-      self
-        .acquire()
-        .map_err(|()| panic!("Acquisition is infalliable."))
-        .and_then(|permit| {
-          f().map(move |t| {
-            drop(permit);
-            t
-          })
-        }),
-    )
+    let permit = self.acquire().await;
+    let res = f().await;
+    drop(permit);
+    res
   }
 
   fn acquire(&self) -> PermitFuture {
@@ -106,7 +98,7 @@ impl Drop for Permit {
     let mut inner = self.inner.lock();
     inner.available_permits += 1;
     if let Some(waiter) = inner.waiters.front() {
-      waiter.task.notify()
+      waiter.waker.wake_by_ref()
     }
   }
 }
@@ -134,10 +126,9 @@ impl Drop for PermitFuture {
 }
 
 impl Future for PermitFuture {
-  type Item = Permit;
-  type Error = ();
+  type Output = Permit;
 
-  fn poll(&mut self) -> Poll<Permit, ()> {
+  fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
     let inner = self.inner.clone();
     let acquired = {
       let mut inner = inner.lock();
@@ -145,7 +136,7 @@ impl Future for PermitFuture {
         let waiter_id = inner.next_waiter_id;
         let this_waiter = Waiter {
           id: waiter_id,
-          task: task::current(),
+          waker: cx.waker().clone(),
         };
         self.waiter_id = Some(waiter_id);
         inner.next_waiter_id += 1;
@@ -181,9 +172,9 @@ impl Future for PermitFuture {
       }
     };
     if acquired {
-      Ok(Async::Ready(Permit { inner }))
+      Poll::Ready(Permit { inner })
     } else {
-      Ok(Async::NotReady)
+      Poll::Pending
     }
   }
 }

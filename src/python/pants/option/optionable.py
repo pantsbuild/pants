@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import functools
+import inspect
 import re
 from abc import ABC, ABCMeta, abstractmethod
 from typing import Optional, Type
@@ -21,8 +22,8 @@ async def _construct_optionable(optionable_factory):
 class OptionableFactory(ABC):
   """A mixin that provides a method that returns an @rule to construct subclasses of Optionable.
 
-  Optionable subclasses constructed in this manner must have a particular constructor shape, which is
-  loosely defined by `_construct_optionable` and `OptionableFactory.signature`.
+  Optionable subclasses constructed in this manner must have a particular constructor shape, which
+  is loosely defined by `_construct_optionable` and `OptionableFactory.signature`.
   """
 
   @property
@@ -41,9 +42,17 @@ class OptionableFactory(ABC):
 
     TODO: This indirection avoids a cycle between this module and the `rules` module.
     """
-    snake_scope = cls.options_scope.replace('-', '_')
     partial_construct_optionable = functools.partial(_construct_optionable, cls)
+
+    # NB: We must populate several dunder methods on the partial function because partial functions
+    # do not have these defined by default and the engine uses these values to visualize functions
+    # in error messages and the rule graph.
+    snake_scope = cls.options_scope.replace('-', '_')
     partial_construct_optionable.__name__ = f'construct_scope_{snake_scope}'
+    partial_construct_optionable.__module__ = cls.__module__
+    _, class_definition_lineno = inspect.getsourcelines(cls)
+    partial_construct_optionable.__line_number__ = class_definition_lineno
+
     return dict(
         output_type=cls.optionable_cls,
         input_selectors=tuple(),

@@ -9,7 +9,6 @@
   clippy::expl_impl_clone_on_copy,
   clippy::if_not_else,
   clippy::needless_continue,
-  clippy::single_match_else,
   clippy::unseparated_literal_suffix,
   clippy::used_underscore_binding
 )]
@@ -27,7 +26,7 @@
 #![allow(clippy::mutex_atomic)]
 
 use bytes::Bytes;
-use futures::Future;
+use futures01::{future, Future};
 use hashing::Fingerprint;
 use lmdb::{
   self, Database, DatabaseFlags, Environment, EnvironmentCopyFlags, EnvironmentFlags,
@@ -177,29 +176,27 @@ impl ShardedLmdb {
     initial_lease: bool,
   ) -> impl Future<Item = (), Error = String> {
     let store = self.clone();
-    self
-      .executor
-      .spawn_on_io_pool(futures::future::lazy(move || {
-        let (env, db, lease_database) = store.get(&key);
-        let put_res = env.begin_rw_txn().and_then(|mut txn| {
-          txn.put(db, &key, &bytes, WriteFlags::NO_OVERWRITE)?;
-          if initial_lease {
-            store.lease(
-              lease_database,
-              &key,
-              Self::default_lease_until_secs_since_epoch(),
-              &mut txn,
-            )?;
-          }
-          txn.commit()
-        });
-
-        match put_res {
-          Ok(()) => Ok(()),
-          Err(lmdb::Error::KeyExist) => Ok(()),
-          Err(err) => Err(format!("Error storing key {:?}: {}", key.to_hex(), err)),
+    self.executor.spawn_on_io_pool(future::lazy(move || {
+      let (env, db, lease_database) = store.get(&key);
+      let put_res = env.begin_rw_txn().and_then(|mut txn| {
+        txn.put(db, &key, &bytes, WriteFlags::NO_OVERWRITE)?;
+        if initial_lease {
+          store.lease(
+            lease_database,
+            &key,
+            Self::default_lease_until_secs_since_epoch(),
+            &mut txn,
+          )?;
         }
-      }))
+        txn.commit()
+      });
+
+      match put_res {
+        Ok(()) => Ok(()),
+        Err(lmdb::Error::KeyExist) => Ok(()),
+        Err(err) => Err(format!("Error storing key {:?}: {}", key.to_hex(), err)),
+      }
+    }))
   }
 
   fn lease(
@@ -233,23 +230,21 @@ impl ShardedLmdb {
     f: F,
   ) -> impl Future<Item = Option<T>, Error = String> {
     let store = self.clone();
-    self
-      .executor
-      .spawn_on_io_pool(futures::future::lazy(move || {
-        let (env, db, _) = store.get(&fingerprint);
-        let ro_txn = env
-          .begin_ro_txn()
-          .map_err(|err| format!("Failed to begin read transaction: {}", err));
-        ro_txn.and_then(|txn| match txn.get(db, &fingerprint) {
-          Ok(bytes) => f(Bytes::from(bytes)).map(Some),
-          Err(lmdb::Error::NotFound) => Ok(None),
-          Err(err) => Err(format!(
-            "Error loading fingerprint {:?}: {}",
-            fingerprint.to_hex(),
-            err,
-          )),
-        })
-      }))
+    self.executor.spawn_on_io_pool(future::lazy(move || {
+      let (env, db, _) = store.get(&fingerprint);
+      let ro_txn = env
+        .begin_ro_txn()
+        .map_err(|err| format!("Failed to begin read transaction: {}", err));
+      ro_txn.and_then(|txn| match txn.get(db, &fingerprint) {
+        Ok(bytes) => f(Bytes::from(bytes)).map(Some),
+        Err(lmdb::Error::NotFound) => Ok(None),
+        Err(err) => Err(format!(
+          "Error loading fingerprint {:?}: {}",
+          fingerprint.to_hex(),
+          err,
+        )),
+      })
+    }))
   }
 
   #[allow(clippy::identity_conversion)] // False positive: https://github.com/rust-lang/rust-clippy/issues/3913

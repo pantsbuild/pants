@@ -17,7 +17,10 @@ from pants.util.strutil import safe_shlex_split
 
 
 class ErrorProne(NailgunTask):
-  """Check Java code for Error Prone violations.  See http://errorprone.info/ for more details."""
+  """Check Java code for Error Prone violations.
+
+  See http://errorprone.info/ for more details.
+  """
 
   _ERRORPRONE_MAIN = 'com.google.errorprone.ErrorProneCompiler'
   _JAVA_SOURCE_EXTENSION = '.java'

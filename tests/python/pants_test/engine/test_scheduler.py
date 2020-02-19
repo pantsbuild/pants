@@ -14,7 +14,11 @@ from pants.engine.objects import union
 from pants.engine.rules import RootRule, UnionRule, rule
 from pants.engine.scheduler import ExecutionError, SchedulerSession
 from pants.engine.selectors import Get, Params
-from pants.testutil.engine.util import assert_equal_with_printing, remove_locations_from_traceback
+from pants.testutil.engine.util import (
+  assert_equal_with_printing,
+  fmt_rust_function,
+  remove_locations_from_traceback,
+)
 from pants.testutil.test_base import TestBase
 
 
@@ -121,10 +125,8 @@ async def error_msg_test_rule(union_wrapper: UnionWrapper) -> UnionX:
 
 
 class TypeCheckFailWrapper:
-  """
-  This object wraps another object which will be used to demonstrate a type check failure when the
-  engine processes an `await Get(...)` statement.
-  """
+  """This object wraps another object which will be used to demonstrate a type check failure when
+  the engine processes an `await Get(...)` statement."""
 
   def __init__(self, inner):
     self.inner = inner
@@ -202,7 +204,7 @@ class SchedulerTest(TestBase):
     self.assertEquals(result_str, consumes_a_and_b(a, b))
 
     # But not a subset.
-    expected_msg = ("No installed @rules can compute {} for input Params(A), but"
+    expected_msg = ("No installed @rules can compute {} given input Params(A), but"
                     .format(str.__name__))
     with self.assertRaisesRegex(Exception, re.escape(expected_msg)):
       self.request_single_product(str, Params(a))
@@ -217,10 +219,8 @@ class SchedulerTest(TestBase):
 
     # Test that an inner Get in transitive_coroutine_rule() is able to resolve B from C due to the
     # existence of transitive_b_c().
-    result_d = self.request_single_product(D, Params(c))
-    # We don't need the inner B objects to be the same, and we know the arguments are type-checked,
-    # we're just testing transitively resolving products in this file.
-    self.assertTrue(isinstance(result_d, D))
+    with self.assertDoesNotRaise():
+      _ = self.request_single_product(D, Params(c))
 
   @contextmanager
   def _assert_execution_error(self, expected_msg):
@@ -228,21 +228,16 @@ class SchedulerTest(TestBase):
       yield
 
   def test_union_rules(self):
-    a = self.request_single_product(A, Params(UnionWrapper(UnionA())))
-    # TODO: figure out what to assert here!
-    self.assertTrue(isinstance(a, A))
-    a = self.request_single_product(A, Params(UnionWrapper(UnionB())))
-    self.assertTrue(isinstance(a, A))
+    with self.assertDoesNotRaise():
+      _ = self.request_single_product(A, Params(UnionWrapper(UnionA())))
+    with self.assertDoesNotRaise():
+      _ = self.request_single_product(A, Params(UnionWrapper(UnionB())))
     # Fails due to no union relationship from A -> UnionBase.
-    expected_msg = """\
-Type A is not a member of the UnionBase @union
-"""
-    with self._assert_execution_error(expected_msg):
+    with self._assert_execution_error("Type A is not a member of the UnionBase @union"):
       self.request_single_product(A, Params(UnionWrapper(A())))
 
   def test_union_rules_no_docstring(self):
-    expected_msg = "specific error message for UnionA instance"
-    with self._assert_execution_error(expected_msg):
+    with self._assert_execution_error("specific error message for UnionA instance"):
       self.request_single_product(UnionX, Params(UnionWrapper(UnionA())))
 
 
@@ -263,9 +258,12 @@ class SchedulerWithNestedRaiseTest(TestBase):
   #TODO(#8675) - This test (and others like it) that rely on matching a specific string repr of a complex python object is fragile.
   def test_get_type_match_failure(self):
     """Test that Get(...)s are now type-checked during rule execution, to allow for union types."""
-    expected_msg = """\
-Exception: WithDeps(Inner(InnerEntry { params: {TypeCheckFailWrapper}, rule: Task(Task { product: A, clause: [Select { product: TypeCheckFailWrapper }], gets: [Get { product: A, subject: B }], func: a_typecheck_fail_test(), cacheable: true, display_info: None }) })) did not declare a dependency on JustGet(Get { product: A, subject: A })
-"""
+    expected_msg = (
+      "Exception: WithDeps(Inner(InnerEntry { params: {TypeCheckFailWrapper}, rule: Task(Task { "
+      "product: A, clause: [Select { product: TypeCheckFailWrapper }], gets: [Get { product: A, "
+      f"subject: B }}], func: {fmt_rust_function(a_typecheck_fail_test)}(), cacheable: true, display_info: "
+      "None }) })) did not declare a dependency on JustGet(Get { product: A, subject: A })"
+    )
     with assert_execution_error(self, expected_msg):
       # `a_typecheck_fail_test` above expects `wrapper.inner` to be a `B`.
       self.request_single_product(A, Params(TypeCheckFailWrapper(A())))
@@ -346,16 +344,21 @@ Exception: WithDeps(Inner(InnerEntry { params: {TypeCheckFailWrapper}, rule: Tas
     self.scheduler.execute(request)
 
     trace = remove_locations_from_traceback('\n'.join(self.scheduler.trace(request)))
-    assert_equal_with_printing(self, dedent('''
-                     Computing Select(B(), A)
-                       Computing Task(nested_raise(), B(), A, true)
-                         Throw(An exception for B)
-                           Traceback (most recent call last):
-                             File LOCATION-INFO, in call
-                               val = func(*args)
-                             File LOCATION-INFO, in nested_raise
-                               fn_raises(x)
-                             File LOCATION-INFO, in fn_raises
-                               raise Exception(f'An exception for {type(x).__name__}')
-                           Exception: An exception for B''').lstrip() + '\n\n',  # Traces include two empty lines after.
-                               trace)
+    assert_equal_with_printing(
+      self,
+      dedent(
+        f'''\
+        Computing Select(B(), A)
+          Computing Task({fmt_rust_function(nested_raise)}(), B(), A, true)
+            Throw(An exception for B)
+              Traceback (most recent call last):
+                File LOCATION-INFO, in call
+                  val = func(*args)
+                File LOCATION-INFO, in nested_raise
+                  fn_raises(x)
+                File LOCATION-INFO, in fn_raises
+                  raise Exception(f'An exception for {{type(x).__name__}}')
+              Exception: An exception for B'''
+      ).lstrip() + '\n\n',  # Traces include two empty lines after.
+      trace,
+    )

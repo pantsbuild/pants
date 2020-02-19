@@ -3,16 +3,15 @@
 
 from pants.backend.python.pants_requirement import PantsRequirement
 from pants.backend.python.python_artifact import PythonArtifact
-from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.python_requirements import PythonRequirements
 from pants.backend.python.rules import (
   download_pex_bin,
-  inject_init,
   pex,
   pex_from_target_closure,
   prepare_chrooted_python_sources,
   python_create_binary,
   python_test_runner,
+  repl,
   run_setup_py,
 )
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
@@ -27,8 +26,6 @@ from pants.backend.python.tasks.build_local_python_distributions import (
   BuildLocalPythonDistributions,
 )
 from pants.backend.python.tasks.gather_sources import GatherSources
-from pants.backend.python.tasks.isort_prep import IsortPrep
-from pants.backend.python.tasks.isort_run import IsortRun
 from pants.backend.python.tasks.local_python_distribution_artifact import (
   LocalPythonDistributionArtifact,
 )
@@ -45,6 +42,7 @@ from pants.backend.python.tasks.unpack_wheels import UnpackWheels
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.resources import Resources
 from pants.goal.task_registrar import TaskRegistrar as task
+from pants.python.python_requirement import PythonRequirement
 
 
 def global_subsystems():
@@ -87,8 +85,6 @@ def register_goals():
   task(name='setup-py', action=SetupPy).install()
   task(name='py', action=PythonBinaryCreate).install('binary')
   task(name='py-wheels', action=LocalPythonDistributionArtifact).install('binary')
-  task(name='isort-prep', action=IsortPrep).install('fmt')
-  task(name='isort', action=IsortRun).install('fmt')
   task(name='py', action=PythonBundle).install('bundle')
   task(name='unpack-wheels', action=UnpackWheels).install()
 
@@ -96,13 +92,13 @@ def register_goals():
 def rules():
   return (
     *download_pex_bin.rules(),
-    *inject_init.rules(),
     *prepare_chrooted_python_sources.rules(),
     *pex.rules(),
     *pex_from_target_closure.rules(),
     *python_test_runner.rules(),
     *python_create_binary.rules(),
     *python_native_code.rules(),
+    *repl.rules(),
     *run_setup_py.rules(),
     *subprocess_environment.rules(),
   )

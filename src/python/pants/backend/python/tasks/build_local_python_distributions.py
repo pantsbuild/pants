@@ -11,7 +11,6 @@ from pex.interpreter import PythonInterpreter
 
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.native.tasks.link_shared_libraries import SharedLibrary
-from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.subsystems.pex_build_util import is_local_python_dist
 from pants.backend.python.subsystems.python_native_code import (
   BuildSetupRequiresPex,
@@ -22,6 +21,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.address import Address
+from pants.python.python_requirement import PythonRequirement
 from pants.task.task import Task
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import pushd

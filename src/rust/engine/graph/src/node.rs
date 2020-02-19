@@ -7,7 +7,7 @@ use std::hash::Hash;
 use boxfuture::BoxFuture;
 use hashing::Digest;
 
-use futures::future::Future;
+use futures01::future::Future;
 use petgraph::stable_graph;
 
 use crate::entry::Entry;
@@ -37,7 +37,7 @@ pub trait Node: Clone + Debug + Display + Eq + Hash + Send + 'static {
   ///
   /// If the node result is cacheable, return true.
   ///
-  fn cacheable(&self) -> bool;
+  fn cacheable(&self, context: &Self::Context) -> bool;
 
   /// Nodes optionally have a user-facing name (distinct from their Debug and Display
   /// implementations). This user-facing name is intended to provide high-level information
@@ -74,7 +74,7 @@ pub trait NodeVisualizer<N: Node> {
   ///
   /// Returns a GraphViz color name/id within Self::color_scheme for the given Entry.
   ///
-  fn color(&mut self, entry: &Entry<N>) -> String;
+  fn color(&mut self, entry: &Entry<N>, context: &N::Context) -> String;
 }
 
 ///
@@ -107,11 +107,24 @@ pub trait NodeContext: Clone + Send + 'static {
   type Node: Node;
 
   ///
+  /// The Session ID type for this Context. Some Node behaviours (in particular: Node::cacheable)
+  /// have Session-specific semantics. More than one context object might be associated with a
+  /// single caller "session".
+  ///
+  type SessionId: Clone + Debug + Eq;
+
+  ///
   /// Creates a clone of this NodeContext to be used for a different Node.
   ///
   /// To clone a Context for use for the same Node, `Clone` is used directly.
   ///
   fn clone_for(&self, entry_id: EntryId) -> <Self::Node as Node>::Context;
+
+  ///
+  /// Returns the SessionId for this Context, which should uniquely identify a caller's run for the
+  /// purposes of "once per Session" behaviour.
+  ///
+  fn session_id(&self) -> &Self::SessionId;
 
   ///
   /// Returns a reference to the Graph for this Context.

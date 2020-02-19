@@ -15,30 +15,30 @@ target(
 
 files(
   name = 'junit_resource_collision_directory',
-  sources = rglobs('junit_resource_collision/*'),
+  sources = ['junit_resource_collision/**/*'],
 )
 
 files(
   name = 'maven_and_pants_directory',
-  sources = rglobs('maven_and_pants/*'),
+  sources = ['maven_and_pants/**/*'],
 )
 
 files(
   name = 'protolib-external-test_directory',
-  sources = rglobs('protolib-external-test/*'),
+  sources = ['protolib-external-test/**/*'],
 )
 
 files(
   name = 'protolib-test_directory',
-  sources = rglobs('protolib-test/*'),
+  sources = ['protolib-test/**/*'],
 )
 
 files(
   name = 'provided_patching_directory',
-  sources = rglobs('provided_patching/*'),
+  sources = ['provided_patching/**/*'],
 )
 
 files(
   name = 'resource_collision_directory',
-  sources = rglobs('resource_collision/*'),
+  sources = ['resource_collision/**/*'],
 )

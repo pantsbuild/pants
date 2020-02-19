@@ -24,17 +24,17 @@ python_tests(
 
 files(
   name = 'build_parsing_directory',
-  sources = rglobs('build_parsing/*'),
+  sources = ['build_parsing/**/*'],
 )
 
 files(
   name = 'conf_test_directory',
-  sources = rglobs('conf_test/*'),
+  sources = ['conf_test/**/*'],
 )
 
 files(
   name = 'constants_only_directory',
-  sources = rglobs('constants_only/*'),
+  sources = ['constants_only/**/*'],
   dependencies = [
     'testprojects/src/thrift/org/pantsbuild:constants_only_directory',
   ],
@@ -42,15 +42,15 @@ files(
 
 files(
   name = 'dummies_directory',
-  sources = rglobs('dummies/*'),
+  sources = ['dummies/**/*'],
 )
 
 files(
   name = 'file_sets_directory',
-  sources = rglobs('file_sets/*'),
+  sources = ['file_sets/**/*'],
 )
 
 files(
   name = 'timeout_directory',
-  sources = rglobs('timeout/*'),
+  sources = ['timeout/**/*'],
 )

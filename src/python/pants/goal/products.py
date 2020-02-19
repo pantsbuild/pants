@@ -224,7 +224,7 @@ class MultipleRootedProducts:
     return self._rooted_products_by_root[root]
 
   def __bool__(self):
-    """Return True if any of the roots contains products"""
+    """Return True if any of the roots contains products."""
     for root, products in self.rel_paths():
       if products:
         return True
@@ -235,7 +235,8 @@ class MultipleRootedProducts:
 
 
 class Products:
-  """An out-of-band 'dropbox' where tasks can place build product information for later tasks to use.
+  """An out-of-band 'dropbox' where tasks can place build product information for later tasks to
+  use.
 
   Historically, the only type of product was a ProductMapping. However this had some issues, as not
   all products fit into the (basedir, [files-under-basedir]) paradigm. Also, ProductMapping docs
@@ -281,15 +282,14 @@ class Products:
       return len(self.by_target) == 0
 
     def add(self, target, basedir, product_paths=None):
-      """
-        Adds a mapping of products for the given target, basedir pair.
+      """Adds a mapping of products for the given target, basedir pair.
 
-        If product_paths are specified, these will over-write any existing mapping for this target.
+      If product_paths are specified, these will over-write any existing mapping for this target.
 
-        If product_paths is omitted, the current mutable list of mapped products for this target
-        and basedir is returned for appending.
+      If product_paths is omitted, the current mutable list of mapped products for this target
+      and basedir is returned for appending.
 
-        :API: public
+      :API: public
       """
       if product_paths is not None:
         self.by_target[target][basedir].extend(product_paths)
@@ -304,29 +304,27 @@ class Products:
       return target in self.by_target
 
     def get(self, target):
-      """
-        Returns the product mapping for the given target as a tuple of (basedir, products list).
-        Can return None if there is no mapping for the given target.
+      """Returns the product mapping for the given target as a tuple of (basedir, products list).
+      Can return None if there is no mapping for the given target.
 
-        :API: public
+      :API: public
       """
       return self.by_target.get(target)
 
     def __getitem__(self, target):
-      """
-        Support for subscripting into this mapping. Returns the product mapping for the given target
-        as a map of <basedir> -> <products list>.
-        If no mapping exists, returns an empty map whose values default to empty lists. So you
-        can use the result without checking for None.
+      """Support for subscripting into this mapping.
+
+      Returns the product mapping for the given target as a map of <basedir> -> <products list>. If
+      no mapping exists, returns an empty map whose values default to empty lists. So you can use
+      the result without checking for None.
       """
       return self.by_target[target]
 
     def itermappings(self):
-      """
-        Returns an iterable over all pairs (target, product) in this mapping.
-        Each product is itself a map of <basedir> -> <products list>.
+      """Returns an iterable over all pairs (target, product) in this mapping. Each product is
+      itself a map of <basedir> -> <products list>.
 
-        :API: public
+      :API: public
       """
       return self.by_target.items()
 
@@ -439,8 +437,8 @@ class Products:
     return self.data_products.get(typename)
 
   def get_only(self, product_type, target):
-    """If there is exactly one product for the given product type and target, returns the
-    full filepath of said product.
+    """If there is exactly one product for the given product type and target, returns the full
+    filepath of said product.
 
     Otherwise, raises a ProductError.
 

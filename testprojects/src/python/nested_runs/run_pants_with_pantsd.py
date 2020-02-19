@@ -1,4 +1,3 @@
-import os
 import pathlib
 import subprocess
 import sys
@@ -6,8 +5,8 @@ import sys
 
 def main():
   workdir = sys.argv[1]
-  config_path = pathlib.Path(workdir) / 'pants.ini'
-  config = [f'--pants-config-files={config_path}'] if os.path.isfile(config_path) else []
+  config_path = pathlib.Path(workdir) / 'pants.toml'
+  config = [f'--pants-config-files={config_path}'] if config_path.is_file() else []
 
   cmd = [
     './pants.pex',

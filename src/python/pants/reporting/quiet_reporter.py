@@ -54,5 +54,5 @@ class QuietReporter(PlainTextReporterBase):
     sys.stderr.write(s)
 
   def level_for_workunit(self, workunit, default_level):
-    """Force the reporter to consider every workunit to be logging for level Report.ERROR"""
+    """Force the reporter to consider every workunit to be logging for level Report.ERROR."""
     return Report.ERROR

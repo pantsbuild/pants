@@ -17,6 +17,7 @@ from typing import (
   Dict,
   Iterable,
   List,
+  Mapping,
   Optional,
   Set,
   Tuple,
@@ -110,7 +111,7 @@ class Parser:
 
   def __init__(
     self,
-    env: Dict[str, str],
+    env: Mapping[str, str],
     config: Config,
     scope_info: ScopeInfo,
     parent_parser: Optional["Parser"],
@@ -164,6 +165,12 @@ class Parser:
     namespace: OptionValueContainer
     get_all_scoped_flag_names: Callable[["Parser.ParseArgsRequest"], Iterable]
     levenshtein_max_distance: int
+    # A passive option is one that doesn't affect functionality, or appear in help messages, but
+    # can be provided without failing validation. This allows us to conditionally register options
+    # (e.g., v1 only or v2 only) without having to remove usages when the condition changes.
+    # TODO: This is currently only used for the v1/v2 switch. When everything is v2 we'll probably
+    #  want to get rid of this concept.
+    include_passive_options: bool
 
     def __init__(
       self,
@@ -171,6 +178,7 @@ class Parser:
       namespace: OptionValueContainer,
       get_all_scoped_flag_names: Callable[[], Iterable],
       levenshtein_max_distance: int,
+      include_passive_options: bool = False
     ) -> None:
       """
       :param flags_in_scope: Iterable of arg strings to parse into flag values.
@@ -187,14 +195,15 @@ class Parser:
       self.namespace = namespace
       self.get_all_scoped_flag_names = get_all_scoped_flag_names  # type: ignore[assignment]  # cannot assign a method
       self.levenshtein_max_distance = levenshtein_max_distance
+      self.include_passive_options = include_passive_options
 
     @staticmethod
     def _create_flag_value_map(flags: Iterable[str]) -> DefaultDict[str, List[Optional[str]]]:
       """Returns a map of flag -> list of values, based on the given flag strings.
 
-      None signals no value given (e.g., -x, --foo).
-      The value is a list because the user may specify the same flag multiple times, and that's
-      sometimes OK (e.g., when appending to list-valued options).
+      None signals no value given (e.g., -x, --foo). The value is a list because the user may
+      specify the same flag multiple times, and that's sometimes OK (e.g., when appending to list-
+      valued options).
       """
       flag_value_map: DefaultDict[str, List[Optional[str]]] = defaultdict(list)
       for flag in flags:
@@ -225,6 +234,9 @@ class Parser:
 
     mutex_map: DefaultDict[str, List[str]] = defaultdict(list)
     for args, kwargs in self._unnormalized_option_registrations_iter():
+      if kwargs.get('passive') and not parse_args_request.include_passive_options:
+        continue
+
       self._validate(args, kwargs)
       name, dest = self.parse_name_and_dest(*args, **kwargs)
 
@@ -484,7 +496,7 @@ class Parser:
     'type', 'member_type', 'choices', 'dest', 'default', 'implicit_value', 'metavar',
     'help', 'advanced', 'recursive', 'recursive_root', 'registering_class',
     'fingerprint', 'removal_version', 'removal_hint', 'deprecation_start_version', 'fromfile',
-    'mutually_exclusive_group', 'daemon'
+    'mutually_exclusive_group', 'daemon', 'passive'
   }
 
   # TODO: Remove dict_option from here after deprecation is complete.
@@ -552,8 +564,8 @@ class Parser:
   def parse_name_and_dest(*args, **kwargs):
     """Return the name and dest for an option registration.
 
-    If an explicit `dest` is specified, returns that and otherwise derives a default from the
-    option flags where '--foo-bar' -> 'foo_bar' and '-x' -> 'x'.
+    If an explicit `dest` is specified, returns that and otherwise derives a default from the option
+    flags where '--foo-bar' -> 'foo_bar' and '-x' -> 'x'.
     """
     arg = next((a for a in args if a.startswith('--')), args[0])
     name = arg.lstrip('-').replace('-', '_')
@@ -624,8 +636,10 @@ class Parser:
     config_section = GLOBAL_SCOPE_CONFIG_SECTION if self._scope == GLOBAL_SCOPE else self._scope
     config_default_val_or_str = expand(self._config.get(Config.DEFAULT_SECTION, dest, default=None))
     config_val_or_str = expand(self._config.get(config_section, dest, default=None))
-    config_source_file = (self._config.get_source_for_option(config_section, dest) or
-        self._config.get_source_for_option(Config.DEFAULT_SECTION, dest))
+    config_source_file = (
+      self._config.get_source_for_option(config_section, dest) or
+      self._config.get_source_for_option(Config.DEFAULT_SECTION, dest)
+    )
     if config_source_file is not None:
       config_source_file = os.path.relpath(config_source_file)
       config_details = f'in {config_source_file}'

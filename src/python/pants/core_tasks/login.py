@@ -6,7 +6,6 @@ import getpass
 from colors import cyan, green, red
 
 from pants.auth.basic_auth import BasicAuth, BasicAuthCreds, Challenged
-from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.task.console_task import ConsoleTask
 
@@ -17,13 +16,11 @@ class Login(ConsoleTask):
   :API: public
   """
 
+  _register_console_transitivity_option = False
+
   @classmethod
   def subsystem_dependencies(cls):
     return super().subsystem_dependencies() + (BasicAuth,)
-
-  @classmethod
-  def supports_passthru_args(cls):
-    return True
 
   @classmethod
   def register_options(cls, register):
@@ -36,25 +33,21 @@ class Login(ConsoleTask):
            'could here use the option `--login-to=prod` to login at '
            '`https://app.pantsbuild.org/auth`.'
     )
+    register(
+      '--transitive', type=bool, default=True, fingerprint=True,
+      removal_version="1.27.0.dev0",
+      removal_hint="This option has no impact on the goal `login`.",
+    )
 
   def console_output(self, targets):
     if targets:
       raise TaskError('The login task does not take any target arguments.')
-
-    deprecated_conditional(
-      lambda: self.get_passthru_args(),
-      removal_version='1.26.0.dev1',
-      entity_description='Using passthrough args with `./pants login`',
-      hint_message="Instead of passing the provider through `--login-passthrough-args` or the "
-                   "style `./pants login -- prod`, use the option `--login-to`, such as "
-                   "`./pants login --to=prod`.",
-    )
-
-    # TODO: When we have other auth methods (e.g., OAuth2), select one by provider name.
-    requested_providers = list(filter(None, [self.get_options().to] + self.get_passthru_args()))
-    if len(requested_providers) != 1:
-      raise TaskError('Must specify exactly one provider.')
-    provider = requested_providers[0]
+    provider = self.get_options().to
+    if provider is None:
+      raise TaskError(
+        "Please give the provider with `./pants login --to`. (Run "
+        "`./pants help login` to see what this option expects.)"
+      )
     try:
       BasicAuth.global_instance().authenticate(provider)
       return ['', 'Logged in successfully using .netrc credentials.']

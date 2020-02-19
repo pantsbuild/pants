@@ -9,7 +9,6 @@
   clippy::expl_impl_clone_on_copy,
   clippy::if_not_else,
   clippy::needless_continue,
-  clippy::single_match_else,
   clippy::unseparated_literal_suffix,
   clippy::used_underscore_binding
 )]
@@ -41,10 +40,10 @@ mod cffi_externs;
 
 use engine::externs::*;
 use engine::{
-  externs, nodes, Core, ExecutionRequest, Function, Handle, Key, Params, RootResult, Rule,
-  Scheduler, Session, Tasks, TypeId, Types, Value,
+  externs, nodes, Core, ExecutionRequest, ExecutionTermination, Function, Handle, Key, Params,
+  RootResult, Rule, Scheduler, Session, Tasks, TypeId, Types, Value,
 };
-use futures::Future;
+use futures01::{future, Future};
 use hashing::{Digest, EMPTY_DIGEST};
 use log::{error, warn, Log};
 use logging::logger::LOGGER;
@@ -345,7 +344,7 @@ fn make_core(
 
   let remote_execution_headers = remote_execution_headers_buf.to_map("remote-execution-headers")?;
   Core::new(
-    root_type_ids.clone(),
+    root_type_ids,
     tasks,
     types,
     PathBuf::from(build_root_buf.to_os_string()),
@@ -501,9 +500,13 @@ pub extern "C" fn scheduler_execute(
   with_scheduler(scheduler_ptr, |scheduler| {
     with_execution_request(execution_request_ptr, |execution_request| {
       with_session(session_ptr, |session| {
-        Box::into_raw(RawNodes::create(
-          scheduler.execute(execution_request, session),
-        ))
+        match scheduler.execute(execution_request, session) {
+          Ok(raw_results) => Box::into_raw(RawNodes::create(raw_results)),
+          //TODO: Passing a raw null pointer to Python is a less-than-ideal way
+          //of noting an error condition. When we have a better way to send complicated
+          //error-signaling values over the FFI boundary, we should revisit this.
+          Err(ExecutionTermination::KeyboardInterrupt) => std::ptr::null(),
+        }
       })
     })
   })
@@ -659,18 +662,21 @@ pub extern "C" fn graph_visualize(
 #[no_mangle]
 pub extern "C" fn graph_trace(
   scheduler_ptr: *mut Scheduler,
+  session_ptr: *mut Session,
   execution_request_ptr: *mut ExecutionRequest,
   path_ptr: *const raw::c_char,
 ) {
   let path_str = unsafe { CStr::from_ptr(path_ptr).to_string_lossy().into_owned() };
   let path = PathBuf::from(path_str);
   with_scheduler(scheduler_ptr, |scheduler| {
-    with_execution_request(execution_request_ptr, |execution_request| {
-      scheduler
-        .trace(execution_request, path.as_path())
-        .unwrap_or_else(|e| {
-          println!("Failed to write trace to {}: {:?}", path.display(), e);
-        });
+    with_session(session_ptr, |session| {
+      with_execution_request(execution_request_ptr, |execution_request| {
+        scheduler
+          .trace(session, execution_request, path.as_path())
+          .unwrap_or_else(|e| {
+            println!("Failed to write trace to {}: {:?}", path.display(), e);
+          });
+      });
     });
   });
 }
@@ -767,7 +773,7 @@ fn generate_panic_string(payload: &(dyn Any + Send)) -> String {
   match payload
     .downcast_ref::<String>()
     .cloned()
-    .or_else(|| payload.downcast_ref::<&str>().map(|s| s.to_string()))
+    .or_else(|| payload.downcast_ref::<&str>().map(|&s| s.to_string()))
   {
     Some(ref s) => format!("panic at '{}'", s),
     None => format!("Non-string panic payload at {:p}", payload),
@@ -806,13 +812,15 @@ pub extern "C" fn garbage_collect_store(scheduler_ptr: *mut Scheduler) {
 }
 
 #[no_mangle]
-pub extern "C" fn lease_files_in_graph(scheduler_ptr: *mut Scheduler) {
+pub extern "C" fn lease_files_in_graph(scheduler_ptr: *mut Scheduler, session_ptr: *mut Session) {
   with_scheduler(scheduler_ptr, |scheduler| {
-    let digests = scheduler.core.graph.all_digests();
-    match scheduler.core.store().lease_all(digests.iter()) {
-      Ok(_) => {}
-      Err(err) => error!("{}", &err),
-    }
+    with_session(session_ptr, |session| {
+      let digests = scheduler.all_digests(session);
+      match scheduler.core.store().lease_all(digests.iter()) {
+        Ok(_) => {}
+        Err(err) => error!("{}", &err),
+      }
+    })
   });
 }
 
@@ -831,7 +839,7 @@ pub extern "C" fn match_path_globs(path_globs: Handle, paths_buf: BufferBuffer) 
     .into_iter()
     .map(PathBuf::from)
     .collect::<Vec<_>>();
-  path_globs.matches(&paths).map(externs::store_bool).into()
+  externs::store_bool(path_globs.matches(&paths)).into()
 }
 
 #[no_mangle]
@@ -871,7 +879,7 @@ pub extern "C" fn capture_snapshots(
   with_scheduler(scheduler_ptr, |scheduler| {
     let core = scheduler.core.clone();
     core.executor.block_on(
-      futures::future::join_all(
+      future::join_all(
         path_globs_and_roots
           .into_iter()
           .map(|(path_globs, root, digest_hint)| {
@@ -970,7 +978,7 @@ pub extern "C" fn run_local_interactive_process(
             let write_operation = scheduler.core.store().materialize_directory(
               destination,
               digest,
-              session.workunit_store().clone(),
+              session.workunit_store(),
             );
 
             scheduler.core.executor.spawn_on_io_pool(write_operation).wait()?;
@@ -1050,7 +1058,7 @@ pub extern "C" fn materialize_directories(
     let types = &scheduler.core.types;
     let construct_materialize_directories_results = types.construct_materialize_directories_results;
     let construct_materialize_directory_result = types.construct_materialize_directory_result;
-    let work_future = futures::future::join_all(
+    let work_future = future::join_all(
       digests_and_path_prefixes
         .into_iter()
         .map(|(digest, path_prefix)| {

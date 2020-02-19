@@ -7,15 +7,14 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use boxfuture::{BoxFuture, Boxable};
-use futures::future;
-use futures::Future;
+use futures01::{future, Future};
 use glob::Pattern;
 use log::warn;
 use parking_lot::Mutex;
 
 use crate::{
   Dir, GitignoreStyleExcludes, GlobExpansionConjunction, Link, PathGlob, PathGlobs, PathStat, Stat,
-  VFS,
+  StrictGlobMatching, VFS,
 };
 
 pub trait GlobMatching<E: Display + Send + Sync + 'static>: VFS<E> {
@@ -89,16 +88,12 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: VFS<E> {
               } else {
                 match stat {
                   Stat::Link(l) => context.canonicalize(stat_symbolic_path, l.clone()),
-                  Stat::Dir(d) => future::ok(Some(PathStat::dir(
-                    stat_symbolic_path.to_owned(),
-                    d.clone(),
-                  )))
-                  .to_boxed(),
-                  Stat::File(f) => future::ok(Some(PathStat::file(
-                    stat_symbolic_path.to_owned(),
-                    f.clone(),
-                  )))
-                  .to_boxed(),
+                  Stat::Dir(d) => {
+                    future::ok(Some(PathStat::dir(stat_symbolic_path, d.clone()))).to_boxed()
+                  }
+                  Stat::File(f) => {
+                    future::ok(Some(PathStat::file(stat_symbolic_path, f.clone()))).to_boxed()
+                  }
                 }
               }
             })
@@ -118,6 +113,7 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: VFS<E> {
       exclude,
       strict_match_behavior,
       conjunction,
+      ..
     } = path_globs;
 
     if include.is_empty() {
@@ -167,23 +163,42 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: VFS<E> {
           };
 
           if match_failed {
-            // TODO(#5684): explain what global and/or target-specific option to set to
-            // modify this behavior!
             let mut non_matching_inputs = non_matching_inputs
               .iter()
               .map(|parsed_source| parsed_source.0.clone())
               .collect::<Vec<_>>();
             non_matching_inputs.sort();
+            let single_glob = non_matching_inputs.len() == 1;
+            let prefix = format!("Unmatched glob{}", if single_glob { "" } else { "s" });
+            let origin = match &strict_match_behavior {
+              StrictGlobMatching::Warn(description) | StrictGlobMatching::Error(description) => {
+                format!(" from {}: ", description)
+              }
+              _ => ": ".to_string(),
+            };
+            let unmatched_globs = if single_glob {
+              format!("{:?}", non_matching_inputs[0])
+            } else {
+              format!("{:?}", non_matching_inputs)
+            };
+            let exclude_patterns = exclude.exclude_patterns();
+            let excludes_portion = if exclude_patterns.is_empty() {
+              "".to_string()
+            } else {
+              let single_exclude = exclude_patterns.len() == 1;
+              if single_exclude {
+                format!(", exclude: {:?}", exclude_patterns[0])
+              } else {
+                format!(", excludes: {:?}", exclude_patterns)
+              }
+            };
             let msg = format!(
-              "Globs did not match. Excludes were: {:?}. Unmatched globs were: {:?}.",
-              exclude.exclude_patterns(),
-              non_matching_inputs,
+              "{}{}{}{}",
+              prefix, origin, unmatched_globs, excludes_portion
             );
             if strict_match_behavior.should_throw_on_error() {
               return future::err(Self::mk_error(&msg));
             } else {
-              // TODO(#5683): this doesn't have any useful context (the stack trace) without
-              // being thrown -- this needs to be provided, otherwise this is far less useful.
               warn!("{}", msg);
             }
           }
@@ -212,21 +227,15 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: VFS<E> {
         canonical_dir,
         symbolic_path,
         wildcard,
-      } => self.expand_wildcard(
-        result.clone(),
-        exclude.clone(),
-        canonical_dir,
-        symbolic_path,
-        wildcard,
-      ),
+      } => self.expand_wildcard(result, exclude, canonical_dir, symbolic_path, wildcard),
       PathGlob::DirWildcard {
         canonical_dir,
         symbolic_path,
         wildcard,
         remainder,
       } => self.expand_dir_wildcard(
-        result.clone(),
-        exclude.clone(),
+        result,
+        exclude,
         canonical_dir,
         symbolic_path,
         wildcard,

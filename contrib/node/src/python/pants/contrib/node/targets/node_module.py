@@ -89,7 +89,7 @@ class NodeModule(NodePackage):
 
   @property
   def bin_executables(self):
-    """A normalized map of bin executable names and local path to an executable
+    """A normalized map of bin executable names and local path to an executable.
 
     :rtype: dict
     """

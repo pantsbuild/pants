@@ -135,12 +135,9 @@ class ZincCompileIntegrationTest(BaseCompileIT):
         self.assertEqual(0, pants_run.returncode)
 
   def test_hermetic_incremental_compile(self):
-    """
-    1) create a target containing two scala files
-    2) compile the target, which would be a full compile
-    3) modify a scala file slightly
-    4) recompile, and make sure the compile is incremental by checking the zinc outputs
-    """
+    """1) create a target containing two scala files 2) compile the target, which would be a full
+    compile 3) modify a scala file slightly 4) recompile, and make sure the compile is incremental
+    by checking the zinc outputs."""
     with self.temporary_workdir(cleanup=False) as tmp_build_root:
       # Make sure the tmp build root is recognized by Pants as a build root
       # by touching BUILDROOT.

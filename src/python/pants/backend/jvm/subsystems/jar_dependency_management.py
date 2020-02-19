@@ -33,8 +33,8 @@ class JarDependencyManagement(Subsystem):
     """The given set of targets has an incompatible combination of managed_jar_dependencies."""
 
   class DirectManagedVersionConflict(TaskError):
-    """A directly declared jar_library conflicts with artifact versions in managed_jar_dependencies.
-    """
+    """A directly declared jar_library conflicts with artifact versions in
+    managed_jar_dependencies."""
 
   @classmethod
   def register_options(cls, register):
@@ -302,8 +302,8 @@ class JarDependencyManagementSetup(Task):
       )
 
   class IllegalVersionOverride(TaskError):
-    """An artifact version in a managed_jar_dependencies() target differs from that of a dependency.
-    """
+    """An artifact version in a managed_jar_dependencies() target differs from that of a
+    dependency."""
 
   class MissingVersion(TargetDefinitionException):
     """A jar used to construct a managed_jar_dependencies artifact set is missing a version."""

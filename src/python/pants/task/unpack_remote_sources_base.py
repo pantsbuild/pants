@@ -69,7 +69,7 @@ class UnpackRemoteSourcesBase(Task, metaclass=ABCMeta):
     return True
 
   class InvalidPatternError(Exception):
-    """Raised if a pattern can't be compiled for including or excluding args"""
+    """Raised if a pattern can't be compiled for including or excluding args."""
 
   @classmethod
   def compile_patterns(cls, patterns, field_name="Unknown", spec="Unknown"):

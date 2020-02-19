@@ -8,18 +8,23 @@ use std::path::{Path, PathBuf};
 use std::sync::{mpsc, Arc};
 use std::time::Duration;
 
-use futures::future::{self, Future};
+use futures01::future::{self, Future};
 
 use crate::context::{Context, Core};
 use crate::core::{Failure, Params, TypeId, Value};
 use crate::nodes::{NodeKey, Select, Tracer, Visualizer};
-use graph::{EntryId, Graph, InvalidationResult, NodeContext};
+use graph::{Graph, InvalidationResult};
+use hashing;
 use indexmap::IndexMap;
 use log::{debug, info, warn};
 use logging::logger::LOGGER;
 use parking_lot::Mutex;
-use ui::EngineDisplay;
+use ui::{EngineDisplay, KeyboardCommand};
 use workunit_store::WorkUnitStore;
+
+pub enum ExecutionTermination {
+  KeyboardInterrupt,
+}
 
 ///
 /// A Session represents a related series of requests (generally: one run of the pants CLI) on an
@@ -40,6 +45,7 @@ struct InnerSession {
   should_record_zipkin_spans: bool,
   // A place to store info about workunits in rust part
   workunit_store: WorkUnitStore,
+  // The unique id for this run. Used as the id of the session, and for metrics gathering purposes.
   build_id: String,
   should_report_workunits: bool,
 }
@@ -106,7 +112,7 @@ impl Session {
     self.0.workunit_store.clone()
   }
 
-  pub fn build_id(&self) -> &str {
+  pub fn build_id(&self) -> &String {
     &self.0.build_id
   }
 
@@ -180,17 +186,24 @@ impl Scheduler {
   }
 
   pub fn visualize(&self, session: &Session, path: &Path) -> io::Result<()> {
+    let context = Context::new(self.core.clone(), session.clone());
     self
       .core
       .graph
-      .visualize(Visualizer::default(), &session.root_nodes(), path)
+      .visualize(Visualizer::default(), &session.root_nodes(), path, &context)
   }
 
-  pub fn trace(&self, request: &ExecutionRequest, path: &Path) -> Result<(), String> {
+  pub fn trace(
+    &self,
+    session: &Session,
+    request: &ExecutionRequest,
+    path: &Path,
+  ) -> Result<(), String> {
+    let context = Context::new(self.core.clone(), session.clone());
     self
       .core
       .graph
-      .trace::<Tracer>(&request.root_nodes(), path)?;
+      .trace::<Tracer>(&request.root_nodes(), path, &context)?;
     Ok(())
   }
 
@@ -251,13 +264,14 @@ impl Scheduler {
   /// Return Scheduler and per-Session metrics.
   ///
   pub fn metrics(&self, session: &Session) -> HashMap<&str, i64> {
+    let context = Context::new(self.core.clone(), session.clone());
     let mut m = HashMap::new();
     m.insert(
       "affected_file_count",
       self
         .core
         .graph
-        .reachable_digest_count(&session.root_nodes()) as i64,
+        .reachable_digest_count(&session.root_nodes(), &context) as i64,
     );
     m.insert(
       "preceding_graph_size",
@@ -265,6 +279,14 @@ impl Scheduler {
     );
     m.insert("resulting_graph_size", self.core.graph.len() as i64);
     m
+  }
+
+  ///
+  /// Return all Digests currently in memory in this Scheduler.
+  ///
+  pub fn all_digests(&self, session: &Session) -> Vec<hashing::Digest> {
+    let context = Context::new(self.core.clone(), session.clone());
+    self.core.graph.all_digests(&context)
   }
 
   ///
@@ -278,7 +300,7 @@ impl Scheduler {
   /// give up.
   ///
   fn execute_helper(
-    context: RootContext,
+    context: Context,
     sender: mpsc::Sender<Vec<Result<Value, Failure>>>,
     roots: Vec<Root>,
     count: usize,
@@ -332,7 +354,11 @@ impl Scheduler {
   ///
   /// Compute the results for roots in the given request.
   ///
-  pub fn execute(&self, request: &ExecutionRequest, session: &Session) -> Vec<RootResult> {
+  pub fn execute(
+    &self,
+    request: &ExecutionRequest,
+    session: &Session,
+  ) -> Result<Vec<RootResult>, ExecutionTermination> {
     // Bootstrap tasks for the roots, and then wait for all of them.
     debug!("Launching {} roots.", request.roots.len());
 
@@ -340,10 +366,7 @@ impl Scheduler {
 
     // Wait for all roots to complete. Failure here should be impossible, because each
     // individual Future in the join was (eventually) mapped into success.
-    let context = RootContext {
-      core: self.core.clone(),
-      session: session.clone(),
-    };
+    let context = Context::new(self.core.clone(), session.clone());
     let (sender, receiver) = mpsc::channel();
 
     Scheduler::execute_helper(context, sender, request.roots.clone(), 8);
@@ -359,7 +382,7 @@ impl Scheduler {
     let mut tasks_to_display = IndexMap::new();
     let refresh_interval = Duration::from_millis(100);
 
-    match session.maybe_display() {
+    Ok(match session.maybe_display() {
       Some(display) => {
         {
           let mut display = display.lock();
@@ -371,12 +394,24 @@ impl Scheduler {
           if let Ok(res) = receiver.recv_timeout(refresh_interval) {
             break res;
           } else {
-            Scheduler::display_ongoing_tasks(
+            let render_result = Scheduler::display_ongoing_tasks(
               &self.core.graph,
               &roots,
               display,
               &mut tasks_to_display,
             );
+            match render_result {
+              Err(e) => warn!("{}", e),
+              Ok(KeyboardCommand::CtrlC) => {
+                info!("Exiting early in response to Ctrl-C");
+                {
+                  let mut display = display.lock();
+                  display.finish();
+                }
+                return Err(ExecutionTermination::KeyboardInterrupt);
+              }
+              Ok(KeyboardCommand::None) => (),
+            };
           }
         };
         LOGGER.deregister_engine_display(unique_handle);
@@ -391,7 +426,7 @@ impl Scheduler {
           break res;
         }
       },
-    }
+    })
   }
 
   fn display_ongoing_tasks(
@@ -399,7 +434,7 @@ impl Scheduler {
     roots: &[NodeKey],
     display: &Mutex<EngineDisplay>,
     tasks_to_display: &mut IndexMap<String, Duration>,
-  ) {
+  ) -> Result<KeyboardCommand, String> {
     // Update the graph. To do that, we iterate over heavy hitters.
 
     let worker_count = {
@@ -439,7 +474,7 @@ impl Scheduler {
     for i in tasks_to_display.len()..worker_count {
       d.update(i.to_string(), "".to_string());
     }
-    d.render();
+    d.render()
   }
 }
 
@@ -457,33 +492,3 @@ impl Drop for Scheduler {
 type Root = Select;
 
 pub type RootResult = Result<Value, Failure>;
-
-///
-/// NB: This basic wrapper exists to allow us to implement the `NodeContext` trait (which lives
-/// outside of this crate) for the `Arc` struct (which also lives outside our crate), which is not
-/// possible without the wrapper due to "trait coherence".
-///
-#[derive(Clone)]
-struct RootContext {
-  core: Arc<Core>,
-  session: Session,
-}
-
-impl NodeContext for RootContext {
-  type Node = NodeKey;
-
-  fn clone_for(&self, entry_id: EntryId) -> Context {
-    Context::new(entry_id, self.core.clone(), self.session.clone())
-  }
-
-  fn graph(&self) -> &Graph<NodeKey> {
-    &self.core.graph
-  }
-
-  fn spawn<F>(&self, future: F)
-  where
-    F: Future<Item = (), Error = ()> + Send + 'static,
-  {
-    self.core.executor.spawn_and_ignore(future);
-  }
-}

@@ -75,6 +75,7 @@ python_library(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/backend/jvm/tasks:classpath_products',
+    'src/python/pants/backend/jvm/tasks/jvm_compile:all',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:revision',
@@ -126,5 +127,5 @@ python_library(
 
 resources(
   name = 'idea_resources',
-  sources = globs('templates/idea/*.mustache'),
+  sources = ['templates/idea/*.mustache'],
 )

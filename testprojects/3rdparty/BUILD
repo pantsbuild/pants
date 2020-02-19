@@ -3,40 +3,40 @@
 
 files(
   name = 'checkstyle_directory',
-  sources = rglobs('checkstyle/*'),
+  sources = ['checkstyle/**/*'],
 )
 
 files(
   name = 'com_directory',
-  sources = rglobs('com/*'),
+  sources = ['com/**/*'],
 )
 
 files(
   name = 'cucumber_directory',
-  sources = rglobs('cucumber/*'),
+  sources = ['cucumber/**/*'],
 )
 
 files(
   name = 'javactool_directory',
-  sources = rglobs('javactool/*'),
+  sources = ['javactool/**/*'],
 )
 
 files(
   name = 'jetty_directory',
-  sources = rglobs('jetty/*'),
+  sources = ['jetty/**/*'],
 )
 
 files(
   name = 'managed_directory',
-  sources = rglobs('managed/*'),
+  sources = ['managed/**/*'],
 )
 
 files(
   name = 'org_directory',
-  sources = rglobs('org/*'),
+  sources = ['org/**/*'],
 )
 
 files(
   name = 'python_directory',
-  sources = rglobs('python/*'),
+  sources = ['python/**/*'],
 )

@@ -47,16 +47,6 @@ python_tests(
   tags = {"partially_type_checked"},
 )
 
-python_library(
-  name = 'context_utils',
-  sources = ['context_utils.py'],
-  dependencies = [
-    'src/python/pants/testutil/base:context_utils',
-    'tests/python/pants_test:deprecated_testinfra',
-  ],
-  tags = {'partially_type_checked'},
-)
-
 python_tests(
   name = 'deprecated',
   sources = ['test_deprecated.py'],
@@ -148,8 +138,8 @@ python_tests(
   sources = ['test_payload_field.py'],
   dependencies = [
     'src/python/pants/java/jar',
-    'src/python/pants/backend/python:python_requirement',
     'src/python/pants/base:payload_field',
+    'src/python/pants/python',
     'src/python/pants/testutil:test_base',
   ],
   tags = {"partially_type_checked"},

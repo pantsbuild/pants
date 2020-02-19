@@ -11,5 +11,5 @@ target(
 
 files(
   name = 'build_parsing_directory',
-  sources = rglobs('build_parsing/*'),
+  sources = ['build_parsing/**/*'],
 )

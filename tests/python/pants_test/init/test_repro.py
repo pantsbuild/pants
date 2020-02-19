@@ -33,7 +33,7 @@ class ReproTest(unittest.TestCase):
     self.assertFalse(Path(root, relpath).exists())
 
   def test_repro(self) -> None:
-    """Verify that Repro object creates expected tar.gz file"""
+    """Verify that Repro object creates expected tar.gz file."""
     with temporary_dir() as tmpdir:
       fake_buildroot = Path(tmpdir, 'buildroot')
 
@@ -60,7 +60,7 @@ class ReproTest(unittest.TestCase):
       assert_not_exists('dist')
 
   def test_ignore_dir(self) -> None:
-    """Verify that passing --repro-ignore option ignores the directory"""
+    """Verify that passing --repro-ignore option ignores the directory."""
 
     # Buildroot is is based on your cwd so we need to step into a fresh
     # directory for repro to look at.
@@ -71,7 +71,7 @@ class ReproTest(unittest.TestCase):
       temporary_dir() as capture_dir:
 
       add_file = partial(self.add_file, build_root)
-      add_file('pants.ini')
+      add_file('pants.toml')
       add_file('.git/foo', content='foo')
       add_file('dist/bar', content='bar')
       add_file('foo/bar', content='baz')

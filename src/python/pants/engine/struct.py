@@ -2,8 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from collections.abc import MutableMapping, MutableSequence
-from typing import Any, Dict, Iterable, Optional
+from typing import Any, Dict, Iterable, Optional, cast
 
+from pants.build_graph.address import Address
 from pants.engine.addressable import addressable, addressable_list
 from pants.engine.objects import Serializable, SerializableFactory, Validatable, ValidationError
 from pants.util.objects import SubclassesOf, SuperclassesOf
@@ -12,8 +13,8 @@ from pants.util.objects import SubclassesOf, SuperclassesOf
 class Struct(Serializable, SerializableFactory, Validatable):
   """A serializable object.
 
-  A Struct is composed of basic python builtin types and other high-level Structs.
-  Structs can carry a name in which case they become addressable and can be reused.
+  A Struct is composed of basic python builtin types and other high-level Structs. Structs can carry
+  a name in which case they become addressable and can be reused.
   """
 
   # Fields dealing with inheritance.
@@ -106,19 +107,15 @@ class Struct(Serializable, SerializableFactory, Validatable):
     """
     return self._kwargs.get('name')
 
-  # TODO: this should return Optional[Address], but then we get a bunch of errors in rules using
-  # TargetAdaptor. Possibly, wait for the Target API to deal with this.
   @property
-  def address(self):
+  def address(self) -> Optional[Address]:
     """Return the address of this object, if any.
 
-    In general structs need not be identified by an address, in which case they are
-    generally embedded objects; ie: attributes values of enclosing named structs.
-    Any top-level struct, though, will be identifiable via a unique address.
-
-    :rtype: :class:`pants.build_graph.address.Address`
+    In general structs need not be identified by an address, in which case they are generally
+    embedded objects; ie: attributes values of enclosing named structs. Any top-level struct,
+    though, will be identifiable via a unique address.
     """
-    return self._kwargs.get('address')
+    return cast(Optional[Address], self._kwargs.get('address'))
 
   @property
   def type_alias(self) -> str:
@@ -128,7 +125,8 @@ class Struct(Serializable, SerializableFactory, Validatable):
     For a target constructed in memory, this will be the simple class name, like 'JavaLibrary'.
 
     The end result is that the type alias should be the most natural way to refer to this target's
-    type to the author of the target instance."""
+    type to the author of the target instance.
+    """
     type_alias: Optional[str] = self._kwargs.get(self._TYPE_ALIAS_FIELD, None)
     return type_alias if type_alias is not None else type(self).__name__
 
@@ -136,7 +134,8 @@ class Struct(Serializable, SerializableFactory, Validatable):
   def abstract(self) -> bool:
     """Return `True` if this object has been marked as abstract.
 
-    Abstract objects are not validated. See: `validate_concrete`."""
+    Abstract objects are not validated. See: `validate_concrete`.
+    """
     return self._kwargs.get('abstract', False)
 
   # It only makes sense to inherit a subset of our own fields (we should not inherit new fields!),

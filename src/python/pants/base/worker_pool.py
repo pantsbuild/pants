@@ -28,8 +28,8 @@ class Work:
 class WorkerPool:
   """A pool of workers.
 
-  Workers are threads, and so are subject to GIL constraints. Submitting CPU-bound work
-  may not be effective. Use this class primarily for IO-bound work.
+  Workers are threads, and so are subject to GIL constraints. Submitting CPU-bound work may not be
+  effective. Use this class primarily for IO-bound work.
   """
 
   def __init__(self, parent_workunit, run_tracker, num_workers, thread_name_prefix):
@@ -175,7 +175,7 @@ class WorkerPool:
 
 
 class SubprocPool:
-  """Singleton for managing multiprocessing.Pool instances
+  """Singleton for managing multiprocessing.Pool instances.
 
   Subprocesses (including multiprocessing.Pool workers) can inherit locks in poorly written
   libraries (eg zlib) if other threads in the parent process happen to be holding them at the

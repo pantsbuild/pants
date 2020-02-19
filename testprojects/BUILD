@@ -3,7 +3,7 @@
 
 files(
   name = 'pants_plugins_directory',
-  sources = rglobs('pants-plugins/*'),
+  sources = ['pants-plugins/**/*'],
   dependencies = [
     'src/python/pants/testutil:test_base',
   ],

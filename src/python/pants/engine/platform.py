@@ -5,8 +5,7 @@ from enum import Enum
 from typing import Callable, List
 
 from pants.engine.rules import rule
-from pants.util.enums import match
-from pants.util.memo import memoized_classproperty, memoized_property
+from pants.util.memo import memoized_classproperty
 from pants.util.osutil import get_normalized_os_name
 
 
@@ -18,13 +17,6 @@ class Platform(Enum):
   @memoized_classproperty
   def current(cls) -> 'Platform':
     return Platform(get_normalized_os_name())
-
-  @memoized_property
-  def runtime_lib_path_env_var(self) -> str:
-    return match(self, {
-      Platform.darwin: "DYLD_LIBRARY_PATH",
-      Platform.linux: "LD_LIBRARY_PATH",
-    })
 
 
 class PlatformConstraint(Enum):

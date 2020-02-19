@@ -3,7 +3,7 @@
 
 
 python_tests(
-  sources = globs('*.py', exclude=[globs('*_integration.py')]),
+  sources = ['*.py', '!*_integration.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
     'src/python/pants/backend/codegen/antlr/python',
@@ -18,10 +18,10 @@ python_tests(
 
 python_tests(
   name = 'integration',
-  sources = globs('*_integration.py'),
+  sources = ['*_integration.py'],
   dependencies = [
     'src/python/pants/testutil:int-test',
-    'tests/python/pants_test:interpreter_selection_utils',
+    'src/python/pants/testutil:interpreter_selection_utils',
     'testprojects/src/python:antlr_directory',
     'testprojects/src/antlr/python:test_directory',
   ],

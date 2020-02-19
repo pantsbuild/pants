@@ -17,13 +17,12 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
             '--jvm-platform-default-platform=default']
 
   def _run_pants_get_artifact_dir(self, args, cache_dir, subdir, num_files_to_insert, expected_num_files, config=None, prev_dirs=[]):
-    """Run Pants with the given `args` and `config`, delete the results, add
-    some files, then run pants again and ensure there are exactly
-    `expected_num_files` in the output.
+    """Run Pants with the given `args` and `config`, delete the results, add some files, then run
+    pants again and ensure there are exactly `expected_num_files` in the output.
 
-    Pants needs to be run twice because we don't know what the results directory
-    will be named before we run Pants, and we want to insert files into that
-    specific directory to test cache cleanup procedures.
+    Pants needs to be run twice because we don't know what the results directory will be named
+    before we run Pants, and we want to insert files into that specific directory to test cache
+    cleanup procedures.
     """
     self.assert_success(self.run_pants(args, config=config))
 
@@ -41,7 +40,7 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
     return artifact_base_dir
 
   def test_buildcache_leave_one(self):
-    """Ensure that max-old of 1 removes all but one files"""
+    """Ensure that max-old of 1 removes all but one files."""
 
     with temporary_dir() as cache_dir:
       config = {'cache.compile.rsc': {'write_to': [cache_dir]}}
@@ -80,7 +79,7 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
       )
 
   def test_buildcache_leave_none(self):
-    """Ensure that max-old of zero removes all files
+    """Ensure that max-old of zero removes all files.
 
     This test should ensure that conditional doesn't change to the simpler test of if max_old since
     we need to handle zero as well.
@@ -123,9 +122,8 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
       )
 
   def test_workdir_stale_builds_cleanup(self):
-    """Ensure that current and previous build result_dirs and the newest `--workdir-max-build-entries` number of dirs
-    will be kept, and the rest will be purged.
-    """
+    """Ensure that current and previous build result_dirs and the newest `--workdir-max-build-
+    entries` number of dirs will be kept, and the rest will be purged."""
 
     with self.temporary_workdir() as workdir:
       self.assert_success(self.run_pants_with_workdir([

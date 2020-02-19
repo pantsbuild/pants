@@ -5,8 +5,10 @@ python_library(
   dependencies = [
     '3rdparty/python:dataclasses',
     'src/python/pants:version',
+    'src/python/pants/backend/graph_info/subsystems',
     'src/python/pants/base:build_root',
     'src/python/pants/base:exiter',
+    'src/python/pants/binaries',
     'src/python/pants/build_graph',
     'src/python/pants/engine:goal',
     'src/python/pants/engine:rules',
@@ -24,7 +26,7 @@ python_library(
 
 python_tests(
   name = "tests",
-  sources=globs('*_test.py', exclude=[globs('*_integration_test.py')]),
+  sources=['*_test.py', '!*_integration_test.py'],
   dependencies = [
     ':core',
     'src/python/pants:version',
@@ -46,9 +48,11 @@ python_tests(
 
 python_tests(
   name='integration',
-  sources=globs('*_integration_test.py'),
+  sources=['*_integration_test.py'],
   dependencies=[
     'src/python/pants/testutil:int-test',
+    'src/python/pants/backend/python/rules',
+    'src/python/pants/testutil:goal_rule_test_base',
     'examples/src/java/org/pantsbuild/example:hello_directory',
     'examples/src/scala/org/pantsbuild/example:hello_directory',
     'examples/src/resources/org/pantsbuild/example:hello_directory',

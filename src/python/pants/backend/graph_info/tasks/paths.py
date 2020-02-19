@@ -15,8 +15,9 @@ def format_path(path):
 def find_paths_breadth_first(from_target, to_target, log):
   """Yields the paths between from_target to to_target if they exist.
 
-  The paths are returned ordered by length, shortest first.
-  If there are cycles, it checks visited edges to prevent recrossing them."""
+  The paths are returned ordered by length, shortest first. If there are cycles, it checks visited
+  edges to prevent recrossing them.
+  """
   log.debug('Looking for all paths from {} to {}'.format(from_target.address.reference(),
                                                          to_target.address.reference()))
 
@@ -47,6 +48,19 @@ def find_paths_breadth_first(from_target, to_target, log):
 
 
 class PathFinder(ConsoleTask):
+
+  _register_console_transitivity_option = False
+
+  @classmethod
+  def register_options(cls, register):
+    super().register_options(register)
+    register(
+      '--transitive', type=bool, default=True, fingerprint=True,
+      help='If True, use all targets in the build graph, else use only target roots.',
+      removal_version="1.27.0.dev0",
+      removal_hint="This option has no impact on the goals `path` and `paths`.",
+    )
+
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
     self.log = self.context.log

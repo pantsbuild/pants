@@ -314,7 +314,7 @@ class BuildGraphTest(TestBase):
       self.inject_address_closure('//:a')
 
   def test_synthetic_address(self):
-    """Verify that synthetic targets don't raise an exception on inject_address_closure"""
+    """Verify that synthetic targets don't raise an exception on inject_address_closure."""
     self.build_graph.inject_synthetic_target(
        Address.parse('//:synth_library_address'),
        JarLibrary,

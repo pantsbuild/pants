@@ -10,11 +10,11 @@ from pants.contrib.node.targets.node_module import NodeModule
 class NodePreinstalledModule(NodeModule):
   """A NodeModule which resolves deps by downloading an archived node_modules directory.
 
-  This is basically an example, to demonstrate how additional types of NodeModule targets with
-  their own resolvers (in this case NodePreinstalledModuleResolver), which still work with
-  NodeTest, can be registered. To be generallly correct, this target type and associated resolver
-  would have to use platform- and Node-version-specific node_modules archives, rather than just
-  a single dependencies_archive_url used verbatim. Consider NodePreinstalledModule and
+  This is basically an example, to demonstrate how additional types of NodeModule targets with their
+  own resolvers (in this case NodePreinstalledModuleResolver), which still work with NodeTest, can
+  be registered. To be generallly correct, this target type and associated resolver would have to
+  use platform- and Node-version-specific node_modules archives, rather than just a single
+  dependencies_archive_url used verbatim. Consider NodePreinstalledModule and
   NodePreinstalledModuleResolver subject to future change or removal for now.
   """
 

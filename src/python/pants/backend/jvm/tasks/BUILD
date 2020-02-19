@@ -355,7 +355,7 @@ python_library(
 
 resources(
   name = 'jar_publish_resources',
-  sources = globs('templates/jar_publish/*.mustache'),
+  sources = ['templates/jar_publish/*.mustache'],
 )
 
 python_library(

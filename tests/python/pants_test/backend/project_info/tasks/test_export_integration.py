@@ -205,12 +205,12 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
         json_data['jvm_platforms'])
 
   @ensure_resolver
-  def test_test_platform(self):
+  def test_runtime_platform(self):
     with self.temporary_workdir() as workdir:
-      test_target = 'testprojects/tests/java/org/pantsbuild/testproject/testjvms:eight-test-platform'
+      test_target = 'testprojects/tests/java/org/pantsbuild/testproject/testjvms:eight-runtime-platform'
       json_data = self.run_export(test_target, workdir)
       self.assertEqual('java7', json_data['targets'][test_target]['platform'])
-      self.assertEqual('java8', json_data['targets'][test_target]['test_platform'])
+      self.assertEqual('java8', json_data['targets'][test_target]['runtime_platform'])
 
   @ensure_resolver
   def test_intransitive_and_scope(self):

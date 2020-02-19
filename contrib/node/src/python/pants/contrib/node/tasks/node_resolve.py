@@ -2,11 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-from hashlib import sha1
 from typing import Dict, Optional, Type
 
 from pants.base.build_environment import get_buildroot
-from pants.base.fingerprint_strategy import DefaultFingerprintHashingMixin, FingerprintStrategy
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.build_graph import sort_targets
 from pants.build_graph.target import Target
@@ -15,41 +13,6 @@ from pants.contrib.node.subsystems.resolvers.node_resolver_base import NodeResol
 from pants.contrib.node.targets.node_package import NodePackage
 from pants.contrib.node.tasks.node_paths import NodePaths, NodePathsLocal
 from pants.contrib.node.tasks.node_task import NodeTask
-
-
-class NodeResolveFingerprintStrategy(DefaultFingerprintHashingMixin, FingerprintStrategy):
-  """
-  Fingerprint package lockfiles (e.g. package.json, yarn.lock...),
-  so that we don't automatically run this if none of those have changed.
-
-  We read every file and add its contents to the hash.
-  """
-
-  _package_manager_lockfiles = {
-    'yarn': ['package.json', 'yarn.lock'],
-    'npm': ['package.json', 'package-lock.json', 'npm-shrinkwrap.json']
-  }
-
-  def _get_files_to_watch(self, target):
-    package_manager = target.payload.get_field_value("package_manager", '')
-    # NB: Defaults to empty list for things like scalajs ad-hoc packages.
-    lockfiles = self._package_manager_lockfiles.get(package_manager, [])
-    paths = [os.path.join(target.address.spec_path, name) for name in lockfiles]
-    return paths
-
-  def compute_fingerprint(self, target):
-    if NodeResolve.can_resolve_target(target):
-      hasher = sha1()
-      for lockfile_path in self._get_files_to_watch(target):
-        absolute_lockfile_path = os.path.join(get_buildroot(), lockfile_path)
-        # NB: It should not be up to the caching to decide what happens when a
-        # lockfile is not added in sources.
-        if os.path.exists(absolute_lockfile_path):
-          with open(absolute_lockfile_path, 'r') as lockfile:
-            contents = lockfile.read().encode()
-            hasher.update(contents)
-      return hasher.hexdigest()
-    return None
 
 
 class NodeResolve(NodeTask):
@@ -90,8 +53,10 @@ class NodeResolve(NodeTask):
     cls, node_package_type: Type[NodePackage], resolver: Type[NodeResolverBase]
   ) -> None:
     """Register a NodeResolver instance for a particular subclass of NodePackage.
-    Implementation uses a hash on node_package_type, so the resolver will only be used on the
-    exact NodePackage subclass (not further subclasses of it)."""
+
+    Implementation uses a hash on node_package_type, so the resolver will only be used on the exact
+    NodePackage subclass (not further subclasses of it).
+    """
     cls._resolver_by_type[node_package_type] = resolver
 
   @classmethod
@@ -113,7 +78,7 @@ class NodeResolve(NodeTask):
     return isinstance(target, NodePackage) and cls._resolver_for_target(target) is not None
 
   def _topological_sort(self, targets):
-    """Topologically order a list of targets"""
+    """Topologically order a list of targets."""
 
     target_set = set(targets)
     return [t for t in reversed(sort_targets(targets)) if t in target_set]
@@ -129,7 +94,6 @@ class NodeResolve(NodeTask):
       with self.invalidated(targets,
                             topological_order=True,
                             invalidate_dependents=True,
-                            fingerprint_strategy=NodeResolveFingerprintStrategy()
            ) as invalidation_check:
         with self.context.new_workunit(name='install', labels=[WorkUnitLabel.MULTITOOL]):
           for vt in invalidation_check.all_vts:

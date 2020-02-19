@@ -4,9 +4,8 @@
 import inspect
 import sys
 import warnings
-from contextlib import contextmanager
 from functools import wraps
-from typing import TYPE_CHECKING, Callable, Iterator, Optional
+from typing import TYPE_CHECKING, Callable, Optional
 
 from packaging.version import InvalidVersion, Version
 
@@ -91,43 +90,20 @@ def validate_deprecation_semver(version_string: str, version_description: str) -
                                  '{}'.format(version_description, version_string, e))
 
 
-def _get_frame_info(stacklevel: int, context: int = 1) -> inspect.FrameInfo:
+def _get_frame_info(stacklevel: int) -> inspect.FrameInfo:
   """Get a Traceback for the given `stacklevel`.
 
   For example:
   `stacklevel=0` means this function's frame (_get_frame_info()).
   `stacklevel=1` means the calling function's frame.
-  See https://docs.python.org/2/library/inspect.html#inspect.getouterframes for more info.
+  See https://docs.python.org/3/library/inspect.html#inspect.getouterframes for more info.
 
   NB: If `stacklevel` is greater than the number of actual frames, the outermost frame is used
   instead.
   """
-  frame_list = inspect.getouterframes(inspect.currentframe(), context=context)
+  frame_list = inspect.getouterframes(inspect.currentframe())
   frame_stack_index = stacklevel if stacklevel < len(frame_list) else len(frame_list) - 1
   return frame_list[frame_stack_index]
-
-
-@contextmanager
-def _greater_warnings_context(context_lines_string: str) -> Iterator[None]:
-  """Provide the `line` argument to warnings.showwarning().
-
-  warnings.warn_explicit() doesn't use the `line` argument to showwarning(), but we want to
-  make use of the warning filtering provided by warn_explicit(). This contextmanager overwrites the
-  showwarning() method to pipe in the desired amount of context lines when using warn_explicit().
-  """
-  prev_showwarning = warnings.showwarning
-
-  def wrapped(message, category, filename, lineno, file=None, line=None):
-    return prev_showwarning(
-      message=message,
-      category=category,
-      filename=filename,
-      lineno=lineno,
-      file=file,
-      line=(line or context_lines_string))
-  warnings.showwarning = wrapped
-  yield
-  warnings.showwarning = prev_showwarning
 
 
 # TODO: propagate `deprecation_start_version` to other methods in this file!
@@ -138,7 +114,6 @@ def warn_or_error(
   deprecation_start_version: Optional[str] = None,
   stacklevel: int = 3,
   frame_info: Optional[inspect.FrameInfo] = None,
-  context: int = 1,
   ensure_stderr: bool = False,
   print_warning: bool = True,
 ) -> None:
@@ -155,10 +130,9 @@ def warn_or_error(
                                     begin to display a deprecation warning. This must be less
                                     than the `removal_version`. If not provided, the
                                     deprecation warning is always displayed.
-  :param stacklevel: The stacklevel to pass to warnings.warn.
+  :param stacklevel: The stacklevel to pass to warnings.warn, which determines the file name and
+                     line number of the error message.
   :param frame_info: If provided, use this frame info instead of getting one from `stacklevel`.
-  :param context: The number of lines of source code surrounding the selected frame to display
-                  in a warning message.
   :param ensure_stderr: Whether use warnings.warn, or use warnings.showwarning to print
                         directly to stderr.
   :param print_warning: Whether to print a warning for deprecations *before* their removal.
@@ -184,31 +158,26 @@ def warn_or_error(
     msg += '\n  {}'.format(hint)
 
   # We need to have filename and line_number for warnings.formatwarning, which appears to be the only
-  # way to get a warning message to display to stderr. We get that from frame_info -- it's too bad
-  # we have to reconstruct the `stacklevel` logic ourselves, but we do also gain the ability to have
-  # multiple lines of context, which is neat.
+  # way to get a warning message to display to stderr. We get that from frame_info.
   if frame_info is None:
-    frame_info = _get_frame_info(stacklevel, context=context)
-  _, filename, line_number, _, code_context, _ = frame_info
-  if code_context:
-    context_lines = ''.join(code_context)
-  else:
-    context_lines = '<no code context available>'
+    frame_info = _get_frame_info(stacklevel)
+  _, filename, line_number, _, _, _ = frame_info
 
   if removal_semver > PANTS_SEMVER:
     if ensure_stderr:
       # No warning filters can stop us from printing this message directly to stderr.
       warning_msg = warnings.formatwarning(
-        msg, DeprecationWarning, filename, line_number, line=context_lines)
+        msg, DeprecationWarning, filename, line_number,
+      )
       print(warning_msg, file=sys.stderr)
     elif print_warning:
       # This output is filtered by warning filters.
-      with _greater_warnings_context(context_lines):
-        warnings.warn_explicit(
-          message=msg,
-          category=DeprecationWarning,
-          filename=filename,
-          lineno=line_number)
+      warnings.warn_explicit(
+        message=msg,
+        category=DeprecationWarning,
+        filename=filename,
+        lineno=line_number,
+      )
     return
   else:
     raise CodeRemovedError(msg)
@@ -311,7 +280,8 @@ def resolve_conflicting_options(
 ):
   """Utility for resolving an option that's been migrated to a new location.
 
-  This ensures that the user does not try to specify both options."""
+  This ensures that the user does not try to specify both options.
+  """
   old_configured = not old_container.is_default(old_option)
   new_configured = not new_container.is_default(new_option)
   if old_configured and new_configured:

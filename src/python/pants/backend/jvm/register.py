@@ -175,6 +175,9 @@ def register_goals():
   task(name='services', action=PrepareServices).install('resources')
 
   task(name='export-classpath', action=RuntimeClasspathPublisher).install()
+
+  # This goal affects the contents of the runtime_classpath, and should not be
+  # combined with any other goals on the command line.
   task(name='export-dep-as-jar', action=ExportDepAsJar).install()
 
   task(name='jvm', action=JvmDependencyUsage).install('dep-usage')

@@ -5,5 +5,5 @@ scala_js_binary(
   dependencies=[
     'examples/src/scala/org/pantsbuild/example/fact:fact-js',
   ],
-  sources=globs('*.scala'),
+  sources=['*.scala'],
 )

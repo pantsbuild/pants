@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 junit_tests(
-  sources=globs('*.java'),
+  sources=['*.java'],
   dependencies=[
     '3rdparty:junit',
   ],
@@ -13,8 +13,9 @@ junit_tests(
 # This target runs the same tests as the one above, but doesn't have the concurrency settings.
 # Relies on the test.junit options being set as follows:
 #   --test-junit-default-concurrency=PARALLEL_CLASSES_AND_METHODS --test-junit-parallel-threads=4
-junit_tests(name='cmdline',
-  sources=globs('*.java'),
+junit_tests(
+  name='cmdline',
+  sources=['*.java'],
   dependencies=[
     '3rdparty:junit',
   ],

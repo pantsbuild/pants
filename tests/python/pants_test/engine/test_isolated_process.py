@@ -44,13 +44,14 @@ class BinaryLocation:
 
 @dataclass(frozen=True)
 class ShellCat:
-  """Wrapper class to show an example of using an auxiliary class (which wraps
-  an executable) to generate an argv instead of doing it all in
-  CatExecutionRequest. This can be used to encapsulate operations such as
-  sanitizing command-line arguments which are specific to the executable, which
-  can reduce boilerplate for generating ExecuteProcessRequest instances if the
-  executable is used in different ways across multiple different types of
-  process execution requests."""
+  """Wrapper class to show an example of using an auxiliary class (which wraps an executable) to
+  generate an argv instead of doing it all in CatExecutionRequest.
+
+  This can be used to encapsulate operations such as sanitizing command-line arguments which are
+  specific to the executable, which can reduce boilerplate for generating ExecuteProcessRequest
+  instances if the executable is used in different ways across multiple different types of process
+  execution requests.
+  """
   binary_location: BinaryLocation
 
   @property
@@ -173,7 +174,7 @@ async def javac_compile_process_result(javac_compile_req: JavacCompileRequest) -
   for java_file in java_files:
     if not java_file.endswith(".java"):
       raise ValueError(f"Can only compile .java files but got {java_file}")
-  sources_snapshot = await Get[Snapshot](PathGlobs, PathGlobs(java_files, ()))
+  sources_snapshot = await Get[Snapshot](PathGlobs, PathGlobs(java_files))
   output_dirs = tuple({os.path.dirname(java_file) for java_file in java_files})
   process_request = ExecuteProcessRequest(
     argv=javac_compile_req.argv_from_source_snapshot(sources_snapshot),
@@ -308,7 +309,7 @@ class IsolatedProcessTest(TestBase, unittest.TestCase):
 
     cat_exe_req = CatExecutionRequest(
       ShellCat(BinaryLocation('/bin/cat')),
-      PathGlobs(include=['f*']),
+      PathGlobs(['f*']),
     )
 
     concatted = self.request_single_product(Concatted, cat_exe_req)

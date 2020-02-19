@@ -195,10 +195,6 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
                              include_scopes=Scopes.JVM_TEST_SCOPES,
                              **kwargs)
 
-  def _jvm_platforms_from_targets(self, targets):
-    return [target.test_platform for target in targets
-            if isinstance(target, JUnitTests)]
-
   def _spawn(self, distribution, executor=None, *args, **kwargs):
     """Returns a processhandler to a process executing java.
 
@@ -216,11 +212,12 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
   def execute_java_for_coverage(self, targets, *args, **kwargs):
     """Execute java for targets directly and don't use the test mixin.
 
-    This execution won't be wrapped with timeouts and other test mixin code common
-    across test targets. Used for coverage instrumentation.
+    This execution won't be wrapped with timeouts and other test mixin code common across test
+    targets. Used for coverage instrumentation.
     """
 
-    distribution = self.preferred_jvm_distribution_for_targets(targets,
+    distribution = self.preferred_jvm_distribution_for_targets(
+      [t for t in targets if isinstance(t, JUnitTests)],
       strict=self._strict_jvm_version)
     actual_executor = SubprocessExecutor(distribution)
     return distribution.execute_java(*args, executor=actual_executor, **kwargs)
@@ -252,8 +249,8 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
   def _batched(self):
     return self._batch_size != self._BATCH_ALL
 
-  def run_tests(self, fail_fast, test_targets, output_dir, coverage):
-    test_registry = self._collect_test_targets(test_targets)
+  def run_tests(self, fail_fast, test_targets, output_dir, coverage, complete_test_registry):
+    test_registry = complete_test_registry.filter(test_targets)
     if test_registry.empty:
       return TestResult.successful
 
@@ -278,6 +275,7 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
         batch_output_dir = os.path.join(batch_output_dir, f'batch-{batch_id}')
 
       run_modifications = coverage.run_modifications(batch_output_dir)
+      self.context.log.debug(f'run_modifications: {run_modifications}')
 
       extra_jvm_options = run_modifications.extra_jvm_options
 
@@ -375,7 +373,7 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
   def _iter_batches(self, test_registry):
     tests_by_properties = test_registry.index(
       lambda tgt: tgt.cwd if tgt.cwd is not None else self._working_dir,
-      lambda tgt: tgt.test_platform,
+      lambda tgt: tgt.runtime_platform,
       lambda tgt: tgt.payload.extra_jvm_options,
       lambda tgt: tgt.payload.extra_env_vars,
       lambda tgt: tgt.concurrency,
@@ -451,7 +449,7 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       msg = 'JUnitTests target must include a non-empty set of sources.'
       raise TargetDefinitionException(target, msg)
 
-  def collect_files(self, output_dir, coverage):
+  def collect_files(self, output_dir, coverage, _complete_test_registry):
     def files_iter():
       for dir_path, _, file_names in os.walk(output_dir):
         for filename in file_names:
@@ -460,18 +458,19 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
 
   @contextmanager
   def partitions(self, per_target, all_targets, test_targets):
+    complete_test_registry = self._collect_test_targets(test_targets)
     with self._isolation(per_target, all_targets) as (output_dir, reports, coverage):
       if per_target:
         def iter_partitions():
           for test_target in test_targets:
             partition = (test_target,)
-            args = (os.path.join(output_dir, test_target.id), coverage)
+            args = (os.path.join(output_dir, test_target.id), coverage, complete_test_registry)
             yield partition, args
       else:
         def iter_partitions():
           if test_targets:
             partition = tuple(test_targets)
-            args = (output_dir, coverage)
+            args = (output_dir, coverage, complete_test_registry)
             yield partition, args
 
       try:

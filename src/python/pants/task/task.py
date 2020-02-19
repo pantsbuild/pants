@@ -32,8 +32,8 @@ from pants.util.meta import classproperty
 
 
 class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
-  """Defines a lifecycle that prepares a task for execution and provides the base machinery
-  needed to execute it.
+  """Defines a lifecycle that prepares a task for execution and provides the base machinery needed
+  to execute it.
 
   Provides the base lifecycle methods that allow a task to interact with the command line, other
   tasks and the user.  The lifecycle is linear and run via the following sequence:
@@ -82,9 +82,9 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
   def stable_name(cls):
     """The stable name of this task type.
 
-    We synthesize subclasses of the task types at runtime, and these synthesized subclasses
-    may have random names (e.g., in tests), so this gives us a stable name to use across runs,
-    e.g., in artifact cache references.
+    We synthesize subclasses of the task types at runtime, and these synthesized subclasses may have
+    random names (e.g., in tests), so this gives us a stable name to use across runs, e.g., in
+    artifact cache references.
     """
     return cls._stable_name or cls._compute_stable_name()
 
@@ -100,8 +100,8 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
 
   @classmethod
   def product_types(cls):
-    """The list of products this Task produces. Set the product type(s) for this
-    task i.e. the product type(s) this task creates e.g ['classes'].
+    """The list of products this Task produces. Set the product type(s) for this task i.e. the
+    product type(s) this task creates e.g ['classes'].
 
     By default, each task is considered as creating a unique product type(s).
     Subclasses that create products, should override this to specify their unique product type(s).
@@ -576,8 +576,8 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
   def check_artifact_cache_for(self, invalidation_check):
     """Decides which VTS to check the artifact cache for.
 
-    By default we check for each invalid target. Can be overridden, e.g., to
-    instead check only for a single artifact for the entire target set.
+    By default we check for each invalid target. Can be overridden, e.g., to instead check only for
+    a single artifact for the entire target set.
     """
     return invalidation_check.invalid_vts
 
@@ -585,9 +585,9 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
     """Checks the artifact cache for the specified list of VersionedTargetSets.
 
     Returns a tuple (cached, uncached, uncached_causes) of VersionedTargets that were
-    satisfied/unsatisfied from the cache. Uncached VTS are also attached with their
-    causes for the miss: `False` indicates a legit miss while `UnreadableArtifact`
-    is due to either local or remote cache failures.
+    satisfied/unsatisfied from the cache. Uncached VTS are also attached with their causes for the
+    miss: `False` indicates a legit miss while `UnreadableArtifact` is due to either local or remote
+    cache failures.
     """
     return self.do_check_artifact_cache(vts)
 
@@ -724,8 +724,7 @@ class Task(TaskBase):
   """
 
   def __init__(self, context, workdir):
-    """
-    Add pass-thru Task Constructor for public API visibility.
+    """Add pass-thru Task Constructor for public API visibility.
 
     :API: public
     """

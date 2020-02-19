@@ -3,7 +3,7 @@ use crate::{
   MultiPlatformExecuteProcessRequest,
 };
 use boxfuture::{BoxFuture, Boxable};
-use futures::future::{err, ok, Either, Future};
+use futures01::future::{err, ok, Either, Future};
 use log::{debug, trace};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -93,8 +93,8 @@ impl CommandRunner for SpeculatingCommandRunner {
       self.primary.extract_compatible_request(req),
       self.secondary.extract_compatible_request(req),
     ) {
-      (Some(req), _) => Some(req.clone()),
-      (_, Some(req)) => Some(req.clone()),
+      (Some(req), _) => Some(req),
+      (_, Some(req)) => Some(req),
       _ => None,
     }
   }

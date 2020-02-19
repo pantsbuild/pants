@@ -9,7 +9,6 @@
   clippy::expl_impl_clone_on_copy,
   clippy::if_not_else,
   clippy::needless_continue,
-  clippy::single_match_else,
   clippy::unseparated_literal_suffix,
   clippy::used_underscore_binding
 )]
@@ -29,12 +28,14 @@
 use termion;
 
 use std::collections::{BTreeMap, VecDeque};
+use std::io::Read;
 use std::io::Write;
 use std::io::{stdout, Result, Stdout};
 
 use termion::raw::IntoRawMode;
 use termion::raw::RawTerminal;
 use termion::screen::AlternateScreen;
+use termion::{async_stdin, AsyncReader};
 use termion::{clear, color, cursor};
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -56,6 +57,11 @@ enum PrintableMsgOutput {
   Stderr,
 }
 
+pub enum KeyboardCommand {
+  None,
+  CtrlC,
+}
+
 pub struct EngineDisplay {
   sigil: char,
   divider: String,
@@ -66,6 +72,7 @@ pub struct EngineDisplay {
   printable_msgs: VecDeque<PrintableMsg>,
   cursor_start: (u16, u16),
   terminal_size: (u16, u16),
+  async_stdin: AsyncReader,
 }
 
 // TODO: Prescribe a threading/polling strategy for callers - or implement a built-in one.
@@ -96,6 +103,7 @@ impl EngineDisplay {
       // as we've done here is the safest way to avoid terminal oddness.
       cursor_start: (1, 1),
       terminal_size: EngineDisplay::get_size(),
+      async_stdin: async_stdin(),
     }
   }
 
@@ -267,13 +275,46 @@ impl EngineDisplay {
   }
 
   // Paints one screen of rendering.
-  pub fn render(&mut self) {
+  pub fn render(&mut self) -> std::result::Result<KeyboardCommand, String> {
     self.set_size();
     self.clear();
     let max_log_rows = self.get_max_log_rows();
     let rendered_count = self.render_logs(max_log_rows);
     self.render_actions(rendered_count);
-    self.flush().expect("could not flush terminal!");
+    if let Err(err) = self.flush() {
+      return Err(format!("Could not flush terminal: {}", err));
+    }
+    self.handle_stdin()
+  }
+
+  fn handle_stdin(&mut self) -> std::result::Result<KeyboardCommand, String> {
+    use termion::event::{parse_event, Event, Key};
+    //This buffer must have non-zero size because termion's `read` implementation for
+    //AsyncReader will return early without doing anything if it is of length 0.
+    //(See https://docs.rs/termion/1.5.4/src/termion/async.rs.html#69 )
+    let mut buf: [u8; 32] = [0; 32];
+
+    match self.async_stdin.read(&mut buf) {
+      Ok(0) => Ok(KeyboardCommand::None),
+      Ok(_) => {
+        let initial_byte: u8 = buf[0];
+        let mut iter = buf[1..].iter().map(|byte| Ok(*byte));
+        // TODO: calling `parse_event` in this way means that we will potentially miss keyboard
+        // events - a Ctrl-C event has to be the very first event in each `render` frame, or it
+        // won't be handled. In practice, the refresh interval is 100 ms, which is fast enough
+        // on human timescales that hitting Ctrl-C while the program is running will wind up
+        // at the beginning of some frame.  Note that internally termion uses this function
+        // in the context of the `next()` function of an Iterator:
+        // https://github.com/redox-os/termion/blob/master/src/input.rs .
+        let event_or_err = parse_event(initial_byte, &mut iter);
+        match event_or_err {
+          Ok(Event::Key(Key::Ctrl('c'))) => Ok(KeyboardCommand::CtrlC),
+          Err(err) => Err(format!("EngineDisplay keyboard event error: {}", err)),
+          _ => Ok(KeyboardCommand::None),
+        }
+      }
+      Err(err) => Err(format!("EngineDisplay stdin error: {}", err)),
+    }
   }
 
   // Starts the EngineDisplay at the current cursor position.
@@ -339,7 +380,9 @@ impl EngineDisplay {
   // Initiates one last screen render, then terminates the EngineDisplay and returns the cursor
   // to a static position, then prints all buffered stdout/stderr output.
   pub fn finish(&mut self) {
-    self.render();
+    //We don't care about handling the output from render() here, since we're about to shut down
+    //the EngineDisplay anyway.
+    let _ = self.render();
     {
       self.terminal = Console::Uninitialized; //This forces the AlternateScreen to drop, restoring the original terminal state.
     }

@@ -13,8 +13,7 @@ from pants.util.netrc import Netrc
 class Credentials(Target, metaclass=ABCMeta):
   """Credentials for a maven repository.
 
-  The ``publish.jar`` section of your ``pants.ini`` file can refer to one
-  or more of these.
+  The `publish.jar` section of your `pants.ini` file can refer to one or more of these.
   """
 
   @abstractmethod

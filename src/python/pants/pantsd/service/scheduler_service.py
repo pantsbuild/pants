@@ -9,11 +9,12 @@ import threading
 from typing import List, Optional, Set, Tuple, cast
 
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
-from pants.base.target_roots import TargetRoots
+from pants.base.specs import Specs
 from pants.engine.fs import PathGlobs, Snapshot
+from pants.engine.rules import UnionMembership
 from pants.goal.run_tracker import RunTracker
 from pants.init.engine_initializer import LegacyGraphScheduler, LegacyGraphSession
-from pants.init.target_roots_calculator import TargetRootsCalculator
+from pants.init.specs_calculator import SpecsCalculator
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.pantsd.service.fs_event_service import FSEventService
@@ -30,11 +31,13 @@ class SchedulerService(PantsService):
 
   def __init__(
     self,
+    *,
     fs_event_service: FSEventService,
     legacy_graph_scheduler: LegacyGraphScheduler,
     build_root: str,
     invalidation_globs: List[str],
     pantsd_pidfile: Optional[str],
+    union_membership: UnionMembership,
   ) -> None:
     """
     :param fs_event_service: An unstarted FSEventService instance for setting up filesystem event handlers.
@@ -50,6 +53,7 @@ class SchedulerService(PantsService):
     self._invalidation_globs = invalidation_globs
     self._build_root = build_root
     self._pantsd_pidfile = pantsd_pidfile
+    self._union_membership = union_membership
 
     self._scheduler = legacy_graph_scheduler.scheduler
     # This session is only used for checking whether any invalidation globs have been invalidated.
@@ -67,7 +71,7 @@ class SchedulerService(PantsService):
     self._loop_condition = LoopCondition()
 
   def _get_snapshot(self):
-    """Returns a Snapshot of the input globs"""
+    """Returns a Snapshot of the input globs."""
     return self._scheduler_session.product_request(
       Snapshot, subjects=[PathGlobs(self._invalidation_globs)])[0]
 
@@ -88,7 +92,10 @@ class SchedulerService(PantsService):
       self._fs_event_service.register_pidfile_handler(self._pantsd_pidfile, self._enqueue_fs_event)
 
   def _enqueue_fs_event(self, event):
-    """Watchman filesystem event handler for BUILD/requirements.txt updates. Called via a thread."""
+    """Watchman filesystem event handler for BUILD/requirements.txt updates.
+
+    Called via a thread.
+    """
     self._logger.info('enqueuing {} changes for subscription {}'
                       .format(len(event['files']), event['subscription']))
     self._event_queue.put(event)
@@ -134,7 +141,7 @@ class SchedulerService(PantsService):
     self._maybe_invalidate_scheduler_batch()
 
   def _process_event_queue(self):
-    """File event notification queue processor. """
+    """File event notification queue processor."""
     try:
       event = self._event_queue.get(timeout=0.05)
     except queue.Empty:
@@ -173,11 +180,12 @@ class SchedulerService(PantsService):
 
   def prepare_v1_graph_run_v2(
     self, options: Options, options_bootstrapper: OptionsBootstrapper,
-  ) -> Tuple[LegacyGraphSession, TargetRoots, int]:
-    """For v1 (and v2): computing TargetRoots for a later v1 run
+  ) -> Tuple[LegacyGraphSession, Specs, int]:
+    """For v1 (and v2): computing Specs for a later v1 run.
 
-    For v2: running an entire v2 run
-    The exit_code in the return indicates whether any issue was encountered"""
+    For v2: running an entire v2 run The exit_code in the return indicates whether any issue was
+    encountered
+    """
     # If any nodes exist in the product graph, wait for the initial watchman event to avoid
     # racing watchman startup vs invalidation events.
     graph_len = self._scheduler.graph_len()
@@ -185,28 +193,28 @@ class SchedulerService(PantsService):
       self._logger.debug('graph len was {}, waiting for initial watchman event'.format(graph_len))
       self._watchman_is_running.wait()
     build_id = RunTracker.global_instance().run_id
-    v2_ui = options.for_global_scope().v2_ui
+    v2_ui = options.for_global_scope().get('v2_ui', False)
     zipkin_trace_v2 = options.for_scope('reporting').zipkin_trace_v2
     session = self._graph_helper.new_session(zipkin_trace_v2, build_id, v2_ui)
 
-    if options.for_global_scope().loop:
+    if options.for_global_scope().get('loop', False):
       fn = self._loop
     else:
       fn = self._body
 
-    target_roots, exit_code = fn(session, options, options_bootstrapper)
-    return session, target_roots, exit_code
+    specs, exit_code = fn(session, options, options_bootstrapper)
+    return session, specs, exit_code
 
   def _loop(
     self, session: LegacyGraphSession, options: Options, options_bootstrapper: OptionsBootstrapper,
-  ) -> Tuple[TargetRoots, int]:
+  ) -> Tuple[Specs, int]:
     # TODO: See https://github.com/pantsbuild/pants/issues/6288 regarding Ctrl+C handling.
     iterations = options.for_global_scope().loop_max
-    target_roots = None
+    specs = None
     exit_code = PANTS_SUCCEEDED_EXIT_CODE
     while iterations and not self._state.is_terminating:
       try:
-        target_roots, exit_code = self._body(session, options, options_bootstrapper)
+        specs, exit_code = self._body(session, options, options_bootstrapper)
       except session.scheduler_session.execution_error_type as e:
         # Render retryable exceptions raised by the Scheduler.
         print(e, file=sys.stderr)
@@ -214,13 +222,13 @@ class SchedulerService(PantsService):
       iterations -= 1
       while iterations and not self._state.is_terminating and not self._loop_condition.wait(timeout=1):
         continue
-    return cast(TargetRoots, target_roots), exit_code
+    return cast(Specs, specs), exit_code
 
   def _body(
     self, session: LegacyGraphSession, options: Options, options_bootstrapper: OptionsBootstrapper,
-  ) -> Tuple[TargetRoots, int]:
+  ) -> Tuple[Specs, int]:
     global_options = options.for_global_scope()
-    target_roots = TargetRootsCalculator.create(
+    specs = SpecsCalculator.create(
       options=options,
       session=session.scheduler_session,
       exclude_patterns=tuple(global_options.exclude_target_regexp) if global_options.exclude_target_regexp else tuple(),
@@ -235,13 +243,14 @@ class SchedulerService(PantsService):
 
       # N.B. @goal_rules run pre-fork in order to cache the products they request during execution.
       exit_code = session.run_goal_rules(
-          options_bootstrapper,
-          options,
-          goals,
-          target_roots,
-        )
+        options_bootstrapper=options_bootstrapper,
+        union_membership=self._union_membership,
+        options=options,
+        goals=goals,
+        specs=specs,
+      )
 
-    return target_roots, exit_code
+    return specs, exit_code
 
   def run(self):
     """Main service entrypoint."""
@@ -268,7 +277,8 @@ class LoopCondition:
       self._condition.notify_all()
 
   def wait(self, timeout):
-    """Waits for the condition for at most the given timeout and returns True if the condition triggered.
+    """Waits for the condition for at most the given timeout and returns True if the condition
+    triggered.
 
     Generally called in a loop until the condition triggers.
     """

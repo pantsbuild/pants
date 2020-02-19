@@ -151,11 +151,11 @@ class SetupPyIntegrationTest(PantsRequirementIntegrationTestBase):
       self.assert_sdist(pants_run, 'test_pants_plugin', [
         'test_pants_plugin/',
         'test_pants_plugin/__init__.py',
-        'test_pants_plugin/pants_infra_tests.py',
+        'test_pants_plugin/pants_testutil_tests.py',
         'test_pants_plugin/register.py',
         'test_pants_plugin/subsystems/',
         'test_pants_plugin/subsystems/__init__.py',
-        'test_pants_plugin/subsystems/pants_test_infra.py',
+        'test_pants_plugin/subsystems/pants_testutil_subsystem.py',
         'test_pants_plugin/subsystems/lifecycle_stubs.py',
         'test_pants_plugin/tasks/',
         'test_pants_plugin/tasks/__init__.py',

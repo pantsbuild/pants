@@ -36,10 +36,10 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
 
   @classmethod
   def use_pantsd_env_var(cls):
-    """
-    Some of the tests here expect to read the standard error after an intentional failure.
-    However, when pantsd is enabled, these errors are logged to logs/exceptions.<pid>.log
-    So stderr appears empty. (see #7320)
+    """Some of the tests here expect to read the standard error after an intentional failure.
+
+    However, when pantsd is enabled, these errors are logged to logs/exceptions.<pid>.log So stderr
+    appears empty. (see #7320)
     """
     return False
 
@@ -204,7 +204,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
   def test_pants_native_source_detection_for_local_ctypes_dists_for_current_platform_only(self):
     """Test that `./pants run` respects platforms when the closure contains native sources.
 
-    To do this, we need to setup a pants.ini that contains two platform defaults: (1) "current" and
+    To do this, we need to setup a pants.toml that contains two platform defaults: (1) "current" and
     (2) a different platform than the one we are currently running on. The python_binary() target
     below is declared with `platforms="current"`.
     """
@@ -229,8 +229,8 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
   def test_native_compiler_option_sets_integration(self, toolchain_variant):
     """Test that native compilation includes extra compiler flags from target definitions.
 
-    This target uses the ndebug and asdf option sets.
-    If either of these are not present (disabled), this test will fail.
+    This target uses the ndebug and asdf option sets. If either of these are not present (disabled),
+    this test will fail.
     """
     # TODO(#6848): this fails when run with gcc on osx as it requires gcc's libstdc++.so.6.dylib to
     # be available on the runtime library path.

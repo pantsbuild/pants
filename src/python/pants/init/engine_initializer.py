@@ -14,14 +14,15 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.file_system_project_tree import FileSystemProjectTree
-from pants.base.target_roots import TargetRoots
-from pants.build_graph.address import BuildFileAddress
+from pants.base.specs import Specs
+from pants.binaries.binary_tool import rules as binary_tool_rules
+from pants.binaries.binary_util import rules as binary_util_rules
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.remote_sources import RemoteSources
-from pants.engine.addressable import BuildFileAddresses
 from pants.engine.build_files import create_graph_rules
 from pants.engine.console import Console
 from pants.engine.fs import Workspace, create_fs_rules
@@ -48,7 +49,7 @@ from pants.engine.legacy.structs import (
   TargetAdaptor,
 )
 from pants.engine.legacy.structs import rules as structs_rules
-from pants.engine.mapper import AddressMapper, ResolveError
+from pants.engine.mapper import AddressMapper
 from pants.engine.native import Native
 from pants.engine.parser import SymbolTable
 from pants.engine.platform import create_platform_rules
@@ -58,11 +59,13 @@ from pants.engine.selectors import Params
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
 from pants.option.global_options import (
   DEFAULT_EXECUTION_OPTIONS,
+  BuildFileImportsBehavior,
   ExecutionOptions,
   GlobMatchErrorBehavior,
 )
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.scm.subsystems.changed import rules as changed_rules
 
 
 logger = logging.getLogger(__name__)
@@ -90,7 +93,8 @@ def _compute_default_sources_globs(base_class, target_type):
 
 
 def _apply_default_sources_globs(base_class, target_type):
-  """Mutates the given TargetAdaptor subclass to apply default sources from the given legacy target type."""
+  """Mutates the given TargetAdaptor subclass to apply default sources from the given legacy target
+  type."""
   globs, excludes = _compute_default_sources_globs(base_class, target_type)
   base_class.default_sources_globs = globs
   base_class.default_sources_exclude_globs = excludes
@@ -200,34 +204,47 @@ class LegacyGraphSession:
 
   def run_goal_rules(
     self,
+    *,
     options_bootstrapper: OptionsBootstrapper,
+    union_membership: UnionMembership,
     options: Options,
     goals: Iterable[str],
-    target_roots: TargetRoots,
+    specs: Specs,
   ):
     """Runs @goal_rules sequentially and interactively by requesting their implicit Goal products.
 
     For retryable failures, raises scheduler.ExecutionError.
-
-    :param goals: The list of requested goal names as passed on the commandline.
-    :param target_roots: The targets root of the request.
 
     :returns: An exit code.
     """
 
     global_options = options.for_global_scope()
 
-    address_specs = target_roots.specs
     console = Console(
       use_colors=global_options.colors,
-      session=self.scheduler_session if global_options.v2_ui else None,
+      session=self.scheduler_session if global_options.get('v2_ui') else None,
     )
     workspace = Workspace(self.scheduler_session)
     interactive_runner = InteractiveRunner(self.scheduler_session)
 
     for goal in goals:
       goal_product = self.goal_map[goal]
-      params = Params(address_specs, options_bootstrapper, console, workspace, interactive_runner)
+      # NB: We no-op for goals that have no V2 implementation because no relevant backends are
+      # registered. This allows us to safely set `--v1 --v2`, even if no V2 backends are registered.
+      # Once V1 is removed, we might want to reconsider the behavior to instead warn or error when
+      # trying to run something like `./pants run` without any backends registered.
+      is_implemented = union_membership.has_members_for_all(
+        goal_product.subsystem_cls.required_union_implementations
+      )
+      if not is_implemented:
+        continue
+      params = Params(
+        specs.provided_specs,
+        options_bootstrapper,
+        console,
+        workspace,
+        interactive_runner,
+      )
       logger.debug(f'requesting {goal_product} to satisfy execution of `{goal}` goal')
       try:
         exit_code = self.scheduler_session.run_goal_rule(goal_product, params)
@@ -240,14 +257,14 @@ class LegacyGraphSession:
     return PANTS_SUCCEEDED_EXIT_CODE
 
   def create_build_graph(
-    self, target_roots: TargetRoots, build_root: Optional[str] = None,
+    self, specs: Specs, build_root: Optional[str] = None,
   ) -> Tuple[LegacyBuildGraph, LegacyAddressMapper]:
     """Construct and return a `BuildGraph` given a set of input specs."""
-    logger.debug('target_roots are: %r', target_roots)
+    logger.debug('specs are: %r', specs)
     graph = LegacyBuildGraph.create(self.scheduler_session, self.build_file_aliases)
     logger.debug('build_graph is: %s', graph)
     # Ensure the entire generator is unrolled.
-    for _ in graph.inject_roots_closure(target_roots):
+    for _ in graph.inject_roots_closure(specs.address_specs):
       pass
 
     address_mapper = LegacyAddressMapper(self.scheduler_session, build_root or get_buildroot())
@@ -285,6 +302,49 @@ class EngineInitializer:
     """Construct and return the components necessary for LegacyBuildGraph construction."""
     build_root = get_buildroot()
     bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
+
+    glob_expansion_failure_configured = not bootstrap_options.is_default("glob_expansion_failure")
+    files_not_found_behavior_configured = not bootstrap_options.is_default("files_not_found_behavior")
+    if glob_expansion_failure_configured and files_not_found_behavior_configured:
+      raise ValueError(
+        "Conflicting options used. You used the new, preferred `--files-not-found-behavior`, but "
+        "also used the deprecated `--glob-expansion-failure`.\n\nPlease "
+        "specify only one of these (preferably `--files-not-found-behavior`).")
+    glob_match_error_behavior = (
+      bootstrap_options.files_not_found_behavior.to_glob_match_error_behavior()
+      if files_not_found_behavior_configured else
+      bootstrap_options.glob_expansion_failure
+    )
+
+    deprecated_conditional(
+      lambda: cast(bool, bootstrap_options.build_file_imports == BuildFileImportsBehavior.allow),
+      removal_version="1.27.0.dev0",
+      entity_description="Using `--build-file-imports=allow`",
+      hint_message=(
+        "Import statements should be avoided in BUILD files because they can easily break Pants "
+        "caching and lead to stale results. It is not safe to ignore warnings of imports, so the "
+        "`allow` option is being removed.\n\nTo prepare for this change, either set "
+        "`--build-file-imports=warn` or `--build-file-imports=error` (we recommend using `error`)."
+        "\n\nIf you still need to keep the functionality you have from the import statement, "
+        "consider rewriting your code into a Pants plugin: "
+        "https://www.pantsbuild.org/howto_plugin.html"
+      )
+    )
+    deprecated_conditional(
+      lambda: bootstrap_options.is_default("build_file_imports"),
+      removal_version="1.27.0.dev0",
+      entity_description="Defaulting to `--build-file-imports=warn`",
+      hint_message=(
+        "Import statements should be avoided in BUILD files because they can easily break Pants "
+        "caching and lead to stale results. The default behavior will change from warning to "
+        "erroring in 1.27.0.dev0, and the option will be removed in 1.29.0.dev0.\n\nTo prepare for "
+        "this change, please explicitly set the option `--build-file-imports=warn` or "
+        "`--build-file-imports=error` (we recommend using `error`).\n\nIf you still need to keep "
+        "the functionality you have from import statements, consider rewriting your code into a "
+        "Pants plugin: https://www.pantsbuild.org/howto_plugin.html"
+      )
+    )
+
     return EngineInitializer.setup_legacy_graph_extended(
       OptionsInitializer.compute_pants_ignore(build_root, bootstrap_options),
       bootstrap_options.local_store_dir,
@@ -293,7 +353,7 @@ class EngineInitializer:
       build_configuration,
       build_root=build_root,
       native=native,
-      glob_match_error_behavior=bootstrap_options.glob_expansion_failure,
+      glob_match_error_behavior=glob_match_error_behavior,
       build_ignore_patterns=bootstrap_options.build_ignore,
       exclude_target_regexps=bootstrap_options.exclude_target_regexp,
       subproject_roots=bootstrap_options.subproject_roots,
@@ -305,12 +365,12 @@ class EngineInitializer:
   def setup_legacy_graph_extended(
     pants_ignore_patterns,
     local_store_dir,
-    build_file_imports_behavior,
+    build_file_imports_behavior: BuildFileImportsBehavior,
     options_bootstrapper: OptionsBootstrapper,
     build_configuration: BuildConfiguration,
     build_root: Optional[str] = None,
     native: Optional[Native] = None,
-    glob_match_error_behavior: Optional[GlobMatchErrorBehavior] = None,
+    glob_match_error_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.warn,
     build_ignore_patterns=None,
     exclude_target_regexps=None,
     subproject_roots=None,
@@ -323,8 +383,7 @@ class EngineInitializer:
                                        usually taken from the '--pants-ignore' global option.
     :param local_store_dir: The directory to use for storing the engine's LMDB store in.
     :param build_file_imports_behavior: How to behave if a BUILD file being parsed tries to use
-      import statements. Valid values: "allow", "warn", "error".
-    :type build_file_imports_behavior: string
+                                        import statements.
     :param build_root: A path to be used as the build root. If None, then default is used.
     :param native: An instance of the native-engine subsystem.
     :param options_bootstrapper: A `OptionsBootstrapper` object containing bootstrap options.
@@ -367,7 +426,7 @@ class EngineInitializer:
 
     @rule
     def glob_match_error_behavior_singleton() -> GlobMatchErrorBehavior:
-      return glob_match_error_behavior or GlobMatchErrorBehavior.ignore
+      return glob_match_error_behavior
 
     @rule
     def build_configuration_singleton() -> BuildConfiguration:
@@ -385,43 +444,29 @@ class EngineInitializer:
     def build_root_singleton() -> BuildRoot:
       return cast(BuildRoot, BuildRoot.instance)
 
-    @rule
-    async def single_build_file_address(
-      build_file_addresses: BuildFileAddresses,
-    ) -> BuildFileAddress:
-      if len(build_file_addresses.dependencies) == 0:
-        raise ResolveError("No targets were matched")
-      if len(build_file_addresses.dependencies) > 1:
-        targets = [bfa.to_address() for bfa in build_file_addresses]
-        output = '\n '.join(str(target) for target in targets)
-
-        raise ResolveError(
-          "Expected a single target, but was given multiple targets:\n"
-          f"Did you mean one of:\n {output}"
-        )
-      return build_file_addresses.dependencies[0]
-
     # Create a Scheduler containing graph and filesystem rules, with no installed goals. The
     # LegacyBuildGraph will explicitly request the products it needs.
     rules = (
-      [
+      *(
         RootRule(Console),
         glob_match_error_behavior_singleton,
         build_configuration_singleton,
         symbol_table_singleton,
         union_membership_singleton,
         build_root_singleton,
-        single_build_file_address,
-      ] +
-      create_legacy_graph_tasks() +
-      create_fs_rules() +
-      create_interactive_runner_rules() +
-      create_process_rules() +
-      create_platform_rules() +
-      create_graph_rules(address_mapper) +
-      create_options_parsing_rules() +
-      structs_rules() +
-      rules
+      ),
+      *create_legacy_graph_tasks(),
+      *create_fs_rules(),
+      *create_interactive_runner_rules(),
+      *create_process_rules(),
+      *create_platform_rules(),
+      *create_graph_rules(address_mapper),
+      *create_options_parsing_rules(),
+      *structs_rules(),
+      *changed_rules(),
+      *binary_tool_rules(),
+      *binary_util_rules(),
+      *rules,
     )
 
     goal_map = EngineInitializer._make_goal_map_from_rules(rules)

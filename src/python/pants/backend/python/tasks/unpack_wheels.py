@@ -7,12 +7,12 @@ from hashlib import sha1
 from pex.pex_builder import PEXBuilder
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
-from pants.backend.python.subsystems.pex_build_util import PexBuilderWrapper
-from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.unpacked_whls import UnpackedWheels
 from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import DefaultFingerprintHashingMixin, FingerprintStrategy
 from pants.fs.archive import ZIP
+from pants.python.pex_build_util import PexBuilderWrapper
+from pants.python.python_setup import PythonSetup
 from pants.task.unpack_remote_sources_base import UnpackRemoteSourcesBase
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import mergetree, safe_concurrent_creation
@@ -24,8 +24,7 @@ class UnpackWheelsFingerprintStrategy(DefaultFingerprintHashingMixin, Fingerprin
 
   def compute_fingerprint(self, target):
     """UnpackedWheels targets need to be re-unpacked if any of its configuration changes or any of
-    the jars they import have changed.
-    """
+    the jars they import have changed."""
     if isinstance(target, UnpackedWheels):
       hasher = sha1()
       for cache_key in sorted(req.cache_key() for req in target.all_imported_requirements):

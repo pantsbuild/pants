@@ -70,8 +70,7 @@ class Fetcher:
 
     def wrap(self, listener=None):
       """Returns a Listener that wraps both the given listener and this listener, calling each in
-      turn for each callback method.
-      """
+      turn for each callback method."""
       if not listener:
         return self
 

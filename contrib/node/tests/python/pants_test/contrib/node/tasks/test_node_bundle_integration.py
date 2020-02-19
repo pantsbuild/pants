@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from pants.fs.archive import archiver_for_path, create_archiver
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import temporary_dir
+from pants.util.dirutil import read_file
 
 
 class NodeBundleIntegrationTest(PantsRunIntegrationTest):
@@ -28,6 +29,7 @@ class NodeBundleIntegrationTest(PantsRunIntegrationTest):
   PREINSTALLED_BUNDLE = 'preinstalled-project-bundle'
 
   JVM_PROJECT = 'jsresources'
+  JVM_UNPROCESSED_PROJECT = 'jsresources-unprocessed'
   JVM_WITH_ARTIFACTS_PROJECT = 'jsresources-with-dependency-artifacts'
   JVM_PROJECT_DIR = 'contrib/node/examples/src/java/org/pantsbuild/testproject/jsresources'
 
@@ -39,6 +41,7 @@ class NodeBundleIntegrationTest(PantsRunIntegrationTest):
     DIST_DIR, PREINSTALLED_BUNDLE + TGZ_SUFFIX)
 
   JVM_PROJECT_ARTIFACT = os.path.join(DIST_DIR, JVM_PROJECT + JAR_SUFFIX)
+  JVM_UNPROCESSED_ARTIFACT = os.path.join(DIST_DIR, JVM_UNPROCESSED_PROJECT + JAR_SUFFIX)
   JVM_WITH_ARTIFACTS_ARTIFACT = os.path.join(DIST_DIR, JVM_WITH_ARTIFACTS_PROJECT + JAR_SUFFIX)
 
   def test_bundle_node_module(self):
@@ -91,6 +94,28 @@ class NodeBundleIntegrationTest(PantsRunIntegrationTest):
       self.assertTrue('node_modules' not in os.listdir(temp_dir))
       # Transitive dependency that marked as not generating artifacts should not be included.
       self.assertTrue('web-build-tool' not in os.listdir(temp_dir))
+
+  def test_bundle_jvm_binary_with_node_module_invalidation(self):
+    input_filename = os.path.join(self.PROJECT_DIR, 'src', 'Button.js')
+    with self.temporary_workdir() as workdir:
+      # Build the binary, and confirm that the bundle content matches the on-disk content.
+      def bundle_and_validate():
+        command = [
+          'binary',
+          ':'.join([self.JVM_PROJECT_DIR, self.JVM_UNPROCESSED_PROJECT])
+          ]
+        pants_run = self.run_pants_with_workdir(command=command, workdir=workdir)
+        self.assert_success(pants_run)
+
+        with self._extract_archive(self.JVM_UNPROCESSED_ARTIFACT) as temp_dir:
+          workspace_content = read_file(input_filename)
+          bundle_content = read_file(os.path.join(temp_dir, self.WEB_COMPONENT_BUTTON_PROJECT, 'src', 'Button.js'))
+          self.assertEqual(workspace_content, bundle_content)
+
+      # We run twice with the same workdir to test that the bundle is invalidated as content changes.
+      bundle_and_validate()
+      with self.with_overwritten_file_content(input_filename, temporary_content='something else'):
+        bundle_and_validate()
 
   def test_bundle_jvm_binary_with_node_module_and_dependencies(self):
     command = [

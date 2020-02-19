@@ -25,14 +25,18 @@ class ScoveragePlatform(InjectablesMixin, Subsystem):
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--enable-scoverage',
+    register(
+      '--enable-scoverage',
       default=False,
+      fingerprint=True,
       type=bool,
       help='Specifies whether to generate scoverage reports for scala test targets. '
            'Default value is False. If True, '
            'implies --test-junit-coverage-processor=scoverage.')
 
-    register('--blacklist-targets',
+    register(
+      '--blacklist-targets',
+      fingerprint=True,
       type=list,
       member_type=target_option,
       help='List of targets not to be instrumented. Accepts Regex patterns. All '
@@ -71,9 +75,7 @@ class ScoveragePlatform(InjectablesMixin, Subsystem):
     }
 
   def is_blacklisted(self, target_address_spec) -> bool:
-    """
-    Checks if the [target] is blacklisted or not.
-    """
+    """Checks if the [target] is blacklisted or not."""
     # No blacklisted targets specified.
     if not self.get_options().blacklist_targets:
       return False

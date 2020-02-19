@@ -78,7 +78,7 @@ been tallied, the committer should reply to the thread with the conclusion of th
 Releaser
 --------
 
-A Releaser is a Committer who has permission to publish releases to the pantsbuild.pants PyPi repository.  A Committer who wishes to participate in the pants release rotation may additionally become a Releaser.   A Releaser is responsible for updating the release documentation, creating release builds, and shepherding them through the review and release process.
+A Releaser is a Committer who has permission to publish releases to the pantsbuild.pants PyPI repository.  A Committer who wishes to participate in the pants release rotation may additionally become a Releaser.   A Releaser is responsible for updating the release documentation, creating release builds, and shepherding them through the review and release process.
 
 Committer Emeritus
 ------------------

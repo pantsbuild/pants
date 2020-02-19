@@ -5,34 +5,50 @@ import inspect
 from collections.abc import MutableMapping, MutableSequence
 from dataclasses import dataclass
 from functools import update_wrapper
-from typing import Any, List, Set, Tuple, Type
+from typing import Any, Sequence, Set, Tuple, Type
 
-from pants.base.specs import AddressSpec
+from pants.base.exceptions import ResolveError
+from pants.base.specs import OriginSpec
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.objects import Collection, Resolvable, Serializable
 from pants.util.objects import TypeConstraintError
 
 
+def _assert_single_address(addresses: Sequence[Address]) -> None:
+  """Assert that exactly one address must be contained in the collection."""
+  if len(addresses) == 0:
+    raise ResolveError("No targets were matched.")
+  if len(addresses) > 1:
+    output = '\n  * '.join(address.spec for address in addresses)
+    raise ResolveError(
+      "Expected a single target, but was given multiple targets.\n\n"
+      f"Did you mean one of:\n  * {output}"
+    )
+
+
 class Addresses(Collection[Address]):
-  pass
+  def expect_single(self) -> Address:
+    _assert_single_address(self.dependencies)
+    return self.dependencies[0]
 
 
 @dataclass(frozen=True)
-class ProvenancedBuildFileAddress:
+class AddressWithOrigin:
   """A BuildFileAddress along with the cmd-line spec it was generated from."""
-  build_file_address: BuildFileAddress
-  provenance: AddressSpec
+  address: Address
+  origin: OriginSpec
+
+
+class AddressesWithOrigins(Collection[AddressWithOrigin]):
+  def expect_single(self) -> AddressWithOrigin:
+    _assert_single_address(
+      [address_with_origin.address for address_with_origin in self.dependencies]
+    )
+    return self.dependencies[0]
 
 
 class BuildFileAddresses(Collection[BuildFileAddress]):
-  @property
-  def addresses(self) -> List[Address]:
-    """Converts the BuildFileAddress objects in this collection to Address objects."""
-    return [bfa.to_address() for bfa in self]
-
-
-class ProvenancedBuildFileAddresses(Collection[ProvenancedBuildFileAddress]):
-  pass
+  """NB: V2 should generally use Addresses instead of BuildFileAddresses."""
 
 
 class NotSerializableError(TypeError):
@@ -44,7 +60,8 @@ class MutationError(AttributeError):
 
 
 class AddressableTypeValidationError(TypeConstraintError):
-  """Indicates a value provided to an `AddressableDescriptor` failed to satisfy a type constraint."""
+  """Indicates a value provided to an `AddressableDescriptor` failed to satisfy a type
+  constraint."""
 
 
 class AddressableDescriptor:

@@ -11,4 +11,4 @@ repository = "https://github.com/pantsbuild/pants/tree/master/src/rust/engine/bo
 license = "Apache-2.0"
 
 [dependencies]
-futures = "^0.1.16"
+futures01 = { package = "futures", version = "0.1" }

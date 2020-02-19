@@ -9,6 +9,16 @@ page(
 # TODO: Get rid of all these microtargets. The entire package should be one target,
 # or be split into multiple packages.
 
+python_tests(
+  name = 'tests',
+  dependencies = [
+    ':console',
+    ':goal',
+    ':rules',
+    'src/python/pants/testutil/engine:util',
+  ],
+)
+
 python_library(
   name = 'legacy_engine',
   sources = ['legacy_engine.py', 'round_engine.py', 'round_manager.py'],

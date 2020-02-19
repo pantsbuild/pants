@@ -31,7 +31,7 @@ class NodeRun(NodeTask):
         result, command = self.run_script(
           self.get_options().script_name,
           target=target,
-          script_args=self.get_passthru_args(),
+          script_args=[*self.get_passthru_args(), *self.get_options().args],
           node_paths=node_paths.all_node_paths,
           workunit_name=target.address.reference(),
           workunit_labels=[WorkUnitLabel.RUN])

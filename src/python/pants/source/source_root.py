@@ -26,6 +26,10 @@ class SourceRoot:
   category: str
 
 
+class NoSourceRootError(Exception):
+  """Indicates we failed to map a source file to a source root."""
+
+
 class AllSourceRoots(Collection[SourceRoot]):
   pass
 
@@ -69,9 +73,9 @@ class SourceRoots:
   def add_source_root(self, path, langs=tuple(), category=SourceRootCategories.UNKNOWN):
     """Add the specified fixed source root, which must be relative to the buildroot.
 
-    Useful in a limited set of circumstances, e.g., when unpacking sources from a jar with
-    unknown structure.  Tests should prefer to use dirs that match our source root patterns
-    instead of explicitly setting source roots here.
+    Useful in a limited set of circumstances, e.g., when unpacking sources from a jar with unknown
+    structure.  Tests should prefer to use dirs that match our source root patterns instead of
+    explicitly setting source roots here.
     """
     self._trie.add_fixed(path, langs, category)
 
@@ -97,6 +101,12 @@ class SourceRoots:
     # If no source root is found, use the path directly.
     # TODO: Remove this logic. It should be an error to have no matching source root.
     return SourceRoot(path, (), SourceRootCategories.UNKNOWN)
+
+  # TODO: this is how find_by_path should behave. Figure out how to deprecate the behavior of
+  # find_by_path so that this method becomes redundant.
+  def safe_find_by_path(self, path: str) -> Optional[SourceRoot]:
+    """Find the source root for the given path, if any."""
+    return self._trie.find(path)
 
   def traverse(self) -> Set[str]:
     return self._trie.traverse()

@@ -3,7 +3,7 @@
 
 
 junit_tests(
-  sources=globs('*'),
+  sources=['*'],
   dependencies=[
     '3rdparty:junit',
     # causes the `@Deprecated` annotation to result in a resource file during compilation

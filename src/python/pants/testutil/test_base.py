@@ -16,20 +16,20 @@ from typing import Any, List, Optional, Type, TypeVar, Union, cast
 from pants.base.build_root import BuildRoot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.exceptions import TaskError
-from pants.base.specs import AddressSpecs
-from pants.base.target_roots import TargetRoots
-from pants.build_graph.address import Address
+from pants.base.specs import AddressSpec, AddressSpecs, FilesystemSpecs, Specs
+from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
 from pants.engine.fs import PathGlobs, PathGlobsAndRoot
 from pants.engine.legacy.graph import HydratedField
-from pants.engine.legacy.structs import SourcesField
+from pants.engine.legacy.structs import Files, SourcesField
 from pants.engine.rules import RootRule
 from pants.engine.scheduler import SchedulerSession
 from pants.engine.selectors import Params
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.util import clean_global_runtime_state
+from pants.option.global_options import BuildFileImportsBehavior
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source.source_root import SourceRootConfig
 from pants.source.wrapped_globs import EagerFilesetWithSpec
@@ -68,7 +68,6 @@ class AbstractTestGenerator(ABC):
         ...
 
       ThingTest.generate_tests()
-
     """
 
   @classmethod
@@ -133,8 +132,8 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
   def invalidate_for(self, *relpaths):
     """Invalidates all files from the relpath, recursively up to the root.
 
-    Many python operations implicitly create parent directories, so we assume that touching a
-    file located below directories that do not currently exist will result in their creation.
+    Many python operations implicitly create parent directories, so we assume that touching a file
+    located below directories that do not currently exist will result in their creation.
     """
     if self._scheduler is None:
       return
@@ -266,10 +265,12 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     self, package_relative_path_globs: List[str], package_dir: str = '',
   ) -> EagerFilesetWithSpec:
     sources_field = SourcesField(
-      address=Address.parse(f'{package_dir}:_bogus_target_for_test'),
+      address=BuildFileAddress(
+        rel_path=os.path.join(package_dir, "BUILD"), target_name="_bogus_target_for_test",
+      ),
       arg='sources',
       filespecs={'globs': package_relative_path_globs},
-      base_globs=None,
+      base_globs=Files(spec_path=package_dir),
       path_globs=PathGlobs(
         tuple(os.path.join(package_dir, path) for path in package_relative_path_globs),
       ),
@@ -400,7 +401,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     graph_session = EngineInitializer.setup_legacy_graph_extended(
       pants_ignore_patterns=None,
       local_store_dir=local_store_dir,
-      build_file_imports_behavior='allow',
+      build_file_imports_behavior=BuildFileImportsBehavior.error,
       native=init_native(),
       options_bootstrapper=options_bootstrapper,
       build_root=self.build_root,
@@ -409,8 +410,9 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     ).new_session(zipkin_trace_v2=False, build_id="buildid_for_test")
     self._scheduler = graph_session.scheduler_session
     self._build_graph, self._address_mapper = graph_session.create_build_graph(
-        TargetRoots(AddressSpecs([])), self._build_root()
-      )
+      Specs(address_specs=AddressSpecs([]), filesystem_specs=FilesystemSpecs([])),
+      self._build_root()
+    )
 
   @property
   def scheduler(self) -> SchedulerSession:
@@ -420,7 +422,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     return cast(SchedulerSession, self._scheduler)
 
   def post_scheduler_init(self):
-    """Run after initializing the Scheduler, it will have the same lifetime"""
+    """Run after initializing the Scheduler, it will have the same lifetime."""
     pass
 
   @property
@@ -573,14 +575,15 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     Returns the set of all Targets found.
     """
 
-    address_spec = CmdLineSpecParser(self.build_root).parse_address_spec(address_spec)
+    address_spec = CmdLineSpecParser(self.build_root).parse_spec(address_spec)
+    assert isinstance(address_spec, AddressSpec)
     targets = []
     for address in self.build_graph.inject_address_specs_closure([address_spec]):
       targets.append(self.build_graph.get_target(address))
     return targets
 
   def create_library(self, path, target_type, name, sources=None, **kwargs):
-    """Creates a library target of given type at the BUILD file at path with sources
+    """Creates a library target of given type at the BUILD file at path with sources.
 
     :API: public
 
@@ -637,7 +640,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     self.assertEqual(expected, list(itertools.islice(actual_iter, len(expected))))
 
   def assertInFile(self, string, file_path):
-    """Verifies that a string appears in a file
+    """Verifies that a string appears in a file.
 
     :API: public
     """
@@ -670,6 +673,17 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     with self.assertRaises(exception_type) as cm:
       yield cm
     self.assertIn(error_text, str(cm.exception))
+
+  @contextmanager
+  def assertDoesNotRaise(self, exc_class: Type[BaseException] = Exception):
+    """Verifies that the block does not raise an exception of the specified type.
+
+    :API: public
+    """
+    try:
+      yield
+    except exc_class as e:
+      raise AssertionError(f'section should not have raised, but did: {e}') from e
 
   def get_bootstrap_options(self, cli_options=()):
     """Retrieves bootstrap options.

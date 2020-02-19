@@ -6,8 +6,9 @@ from textwrap import dedent
 
 from pytest import fail
 
-from pants.backend.python.tasks.isort_prep import IsortPrep
-from pants.backend.python.tasks.isort_run import IsortRun
+from pants.backend.python.lint.isort.isort_prep import IsortPrep
+from pants.backend.python.lint.isort.isort_run import IsortRun
+from pants.backend.python.lint.isort.subsystem import Isort
 from pants.base.exceptions import TaskError
 from pants.util.contextutil import stdio_as, temporary_dir
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
@@ -73,10 +74,12 @@ class PythonIsortTest(PythonTaskTestBase):
     if options:
       self.set_options(**options)
 
+    if passthru_args:
+      self.set_options_for_scope(Isort.options_scope, args=passthru_args)
+
     isort_prep_task_type = self.synthesize_task_subtype(IsortPrep, 'ip')
     context = self.context(for_task_types=[isort_prep_task_type],
-                           target_roots=target_roots,
-                           passthru_args=passthru_args)
+                           target_roots=target_roots)
 
     isort_prep = isort_prep_task_type(context, os.path.join(self.pants_workdir, 'ip'))
     isort_prep.execute()

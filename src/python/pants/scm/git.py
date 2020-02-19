@@ -117,6 +117,7 @@ class Git(Scm):
     self._remote = remote
     self._branch = branch
 
+  @property
   def current_rev_identifier(self):
     return 'HEAD'
 
@@ -209,11 +210,12 @@ class Git(Scm):
     return self._check_output(['merge-base', left, right], raise_type=Scm.LocalException)
 
   def refresh(self, leave_clean=False):
-    """Attempt to pull-with-rebase from upstream.  This is implemented as fetch-plus-rebase
-       so that we can distinguish between errors in the fetch stage (likely network errors)
-       and errors in the rebase stage (conflicts).  If leave_clean is true, then in the event
-       of a rebase failure, the branch will be rolled back.  Otherwise, it will be left in the
-       conflicted state.
+    """Attempt to pull-with-rebase from upstream.
+
+    This is implemented as fetch-plus-rebase so that we can distinguish between errors in the fetch
+    stage (likely network errors) and errors in the rebase stage (conflicts).  If leave_clean is
+    true, then in the event of a rebase failure, the branch will be rolled back.  Otherwise, it will
+    be left in the conflicted state.
     """
     remote, merge = self._get_upstream()
     self._check_call(['fetch', '--tags', remote, merge], raise_type=Scm.RemoteException)
@@ -259,7 +261,7 @@ class Git(Scm):
     self._check_call(['checkout', rev])
 
   def _get_upstream(self):
-    """Return the remote and remote merge branch for the current branch"""
+    """Return the remote and remote merge branch for the current branch."""
     if not self._remote or not self._branch:
       branch = self.branch_name
       if not branch:
@@ -300,10 +302,9 @@ class Git(Scm):
 
 
 class GitRepositoryReader:
-  """
-  Allows reading from files and directory information from an arbitrary git
-  commit. This is useful for pants-aware git sparse checkouts.
+  """Allows reading from files and directory information from an arbitrary git commit.
 
+  This is useful for pants-aware git sparse checkouts.
   """
 
   def __init__(self, scm, rev):
@@ -455,9 +456,9 @@ class GitRepositoryReader:
   def open(self, relpath):
     """Read a file out of the repository at a certain revision.
 
-    This is complicated because, unlike vanilla git cat-file, this follows symlinks in
-    the repo.  If a symlink points outside repo, the file is read from the filesystem;
-    that's because presumably whoever put that symlink there knew what they were doing.
+    This is complicated because, unlike vanilla git cat-file, this follows symlinks in the repo.  If
+    a symlink points outside repo, the file is read from the filesystem; that's because presumably
+    whoever put that symlink there knew what they were doing.
     """
 
     path = self._realpath(relpath)
@@ -598,6 +599,7 @@ class GitRepositoryReader:
 
   def _read_object_from_repo(self, rev=None, relpath=None, sha=None):
     """Read an object from the git repo.
+
     This is implemented via a pipe to git cat-file --batch
     """
     if sha:

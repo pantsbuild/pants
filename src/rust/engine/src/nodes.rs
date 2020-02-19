@@ -10,8 +10,8 @@ use std::sync::Arc;
 use std::time::Duration;
 use std::{self, fmt};
 
-use futures::future::{self, Future};
-use futures::Stream;
+use futures01::future::{self, Future};
+use futures01::Stream;
 use url::Url;
 
 use crate::context::{Context, Core};
@@ -71,7 +71,7 @@ impl VFS<Failure> for Context {
 
 impl StoreFileByDigest<Failure> for Context {
   fn store_by_digest(&self, file: File, _: WorkUnitStore) -> BoxFuture<hashing::Digest, Failure> {
-    self.get(DigestFile(file.clone()))
+    self.get(DigestFile(file))
   }
 }
 
@@ -149,7 +149,7 @@ impl Select {
         ))
       });
     let context = context.clone();
-    Select::new_from_edges(self.params.clone(), product, &try_future!(edges)).run(context.clone())
+    Select::new_from_edges(self.params.clone(), product, &try_future!(edges)).run(context)
   }
 }
 
@@ -465,7 +465,7 @@ impl Snapshot {
     // and store::Snapshot::from_path_stats tracking dependencies for file digests.
     context
       .expand(path_globs)
-      .map_err(|e| format!("PathGlobs expansion failed: {}", e))
+      .map_err(|e| format!("{}", e))
       .and_then(move |path_stats| {
         store::Snapshot::from_path_stats(
           context.core.store(),
@@ -480,24 +480,27 @@ impl Snapshot {
   }
 
   pub fn lift_path_globs(item: &Value) -> Result<PathGlobs, String> {
-    let include = externs::project_multi_strs(item, "include");
-    let exclude = externs::project_multi_strs(item, "exclude");
+    let globs = externs::project_multi_strs(item, "globs");
+
+    let description_of_origin_field = externs::project_str(item, "description_of_origin");
+    let description_of_origin = if description_of_origin_field.is_empty() {
+      None
+    } else {
+      Some(description_of_origin_field)
+    };
 
     let glob_match_error_behavior =
       externs::project_ignoring_type(item, "glob_match_error_behavior");
     let failure_behavior = externs::project_str(&glob_match_error_behavior, "value");
-    let strict_glob_matching = StrictGlobMatching::create(failure_behavior.as_str())?;
+    let strict_glob_matching =
+      StrictGlobMatching::create(failure_behavior.as_str(), description_of_origin)?;
 
     let conjunction_obj = externs::project_ignoring_type(item, "conjunction");
     let conjunction_string = externs::project_str(&conjunction_obj, "value");
     let conjunction = GlobExpansionConjunction::create(&conjunction_string)?;
 
-    PathGlobs::create(&include, &exclude, strict_glob_matching, conjunction).map_err(|e| {
-      format!(
-        "Failed to parse PathGlobs for include({:?}), exclude({:?}): {}",
-        include, exclude, e
-      )
-    })
+    PathGlobs::create(&globs, strict_glob_matching, conjunction)
+      .map_err(|e| format!("Failed to parse PathGlobs for globs({:?}): {}", globs, e))
   }
 
   pub fn store_directory(core: &Arc<Core>, item: &hashing::Digest) -> Value {
@@ -767,7 +770,7 @@ impl Task {
       .into_iter()
       .map(|get| {
         let context = context.clone();
-        let params = params.clone();
+        let mut params = params.clone();
         let entry = entry.clone();
         let dependency_key = selectors::DependencyKey::JustGet(selectors::Get {
           product: get.product,
@@ -808,7 +811,6 @@ impl Task {
           });
         // The subject of the get is a new parameter that replaces an existing param of the same
         // type.
-        let mut params = params.clone();
         params.put(get.subject);
         future::result(entry)
           .and_then(move |entry| Select::new(params, get.product, entry).run(context.clone()))
@@ -921,9 +923,9 @@ impl NodeVisualizer<NodeKey> for Visualizer {
     "set312"
   }
 
-  fn color(&mut self, entry: &Entry<NodeKey>) -> String {
+  fn color(&mut self, entry: &Entry<NodeKey>, context: &<NodeKey as Node>::Context) -> String {
     let max_colors = 12;
-    match entry.peek() {
+    match entry.peek(context) {
       None => "white".to_string(),
       Some(Err(Failure::Throw(..))) => "4".to_string(),
       Some(Err(Failure::Invalidated)) => "12".to_string(),
@@ -1033,14 +1035,12 @@ impl Node for NodeKey {
       let user_facing_name = self.user_facing_name();
       let span_id = generate_random_64bit_string();
       let parent_id = workunit_store::get_parent_id();
-      let maybe_started_workunit = user_facing_name
-        .as_ref()
-        .map(|ref node_name| StartedWorkUnit {
-          name: node_name.to_string(),
-          start_time: std::time::SystemTime::now(),
-          span_id: span_id.clone(),
-          parent_id,
-        });
+      let maybe_started_workunit = user_facing_name.as_ref().map(|node_name| StartedWorkUnit {
+        name: node_name.to_string(),
+        start_time: std::time::SystemTime::now(),
+        span_id: span_id.clone(),
+        parent_id,
+      });
       let maybe_span_id = if user_facing_name.is_some() {
         Some(span_id)
       } else {
@@ -1052,7 +1052,7 @@ impl Node for NodeKey {
     };
 
     let context2 = context.clone();
-    futures::future::lazy(|| {
+    future::lazy(|| {
       if let Some(span_id) = maybe_span_id {
         set_parent_id(span_id);
       }
@@ -1087,11 +1087,9 @@ impl Node for NodeKey {
     }
   }
 
-  fn cacheable(&self) -> bool {
+  fn cacheable(&self, _context: &Self::Context) -> bool {
     match self {
       &NodeKey::Task(ref s) => s.task.cacheable,
-      // TODO Select nodes are made uncacheable as a workaround to #6146. Will be worked on in #6598
-      &NodeKey::Select(_) => false,
       _ => true,
     }
   }

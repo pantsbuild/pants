@@ -19,9 +19,8 @@ MIN_OSX_VERSION_ARG = f'-mmacosx-version-min={MIN_OSX_SUPPORTED_VERSION}'
 class XCodeCLITools(Subsystem):
   """Subsystem to detect and provide the XCode command line developer tools.
 
-  This subsystem exists to give a useful error message if the tools aren't
-  installed, and because the install location may not be on the PATH when Pants
-  is invoked.
+  This subsystem exists to give a useful error message if the tools aren't installed, and because
+  the install location may not be on the PATH when Pants is invoked.
   """
 
   options_scope = 'xcode-cli-tools'

@@ -24,8 +24,8 @@ class SyntheticTargetNotFound(Exception):
 class DependencyContext(Subsystem, DependencyContextBase):
   """Implements calculating `exports` and exception (compiler-plugin) aware dependencies.
 
-  This is a subsystem because in future the compiler plugin types should be injected
-  via subsystem or option dependencies rather than declared statically.
+  This is a subsystem because in future the compiler plugin types should be injected via subsystem
+  or option dependencies rather than declared statically.
   """
 
   options_scope = 'jvm-dependency-context'

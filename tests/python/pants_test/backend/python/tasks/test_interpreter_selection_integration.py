@@ -112,8 +112,7 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
   @skip_unless_python27_and_python3_present
   def test_binary_uses_own_compatibility(self):
     """Tests that a binary target uses its own compatiblity, rather than including that of its
-    transitive dependencies.
-    """
+    transitive dependencies."""
     # This target depends on a 2.7 minimum library, but does not declare its own compatibility.
     # By specifying a version on the CLI, we ensure that the binary target will use that, and then
     # test that it ends up with the version we request (and not the lower version specified on its

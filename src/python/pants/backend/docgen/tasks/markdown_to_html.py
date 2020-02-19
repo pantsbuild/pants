@@ -23,8 +23,8 @@ from pants.util.rwbuf import StringWriter
 def util():
   """Indirection function so we can lazy-import our utils.
 
-  It's an expensive import that invokes re.compile a lot (via markdown and pygments),
-  so we don't want to incur that cost unless we must.
+  It's an expensive import that invokes re.compile a lot (via markdown and pygments), so we don't
+  want to incur that cost unless we must.
   """
   from pants.backend.docgen.tasks import markdown_to_html_utils
   return markdown_to_html_utils

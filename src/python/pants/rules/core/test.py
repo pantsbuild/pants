@@ -7,15 +7,16 @@ from enum import Enum
 from typing import Optional
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
-from pants.build_graph.address import Address, BuildFileAddress
-from pants.engine.addressable import BuildFileAddresses
-from pants.engine.build_files import AddressProvenanceMap
+from pants.base.specs import FilesystemLiteralSpec, SingleAddress
+from pants.build_graph.address import Address
+from pants.engine.addressable import AddressesWithOrigins, AddressWithOrigin
 from pants.engine.console import Console
 from pants.engine.fs import Digest
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
 from pants.engine.isolated_process import FallibleExecuteProcessResult
-from pants.engine.legacy.graph import HydratedTarget
+from pants.engine.legacy.graph import HydratedTargetWithOrigin
+from pants.engine.legacy.structs import TargetAdaptorWithOrigin
 from pants.engine.objects import union
 from pants.engine.rules import UnionMembership, goal_rule, rule
 from pants.engine.selectors import Get, MultiGet
@@ -64,9 +65,12 @@ class TestDebugRequest:
 
 @union
 class TestTarget:
-  """A union for registration of a testable target type."""
+  """A union for registration of a testable target type.
 
-  # Prevent this class from being detected by pytest as a test class.
+  The union members should be subclasses of TargetAdaptorWithOrigin.
+  """
+
+  # Prevent this class from being detected by Pytest as a test class.
   __test__ = False
 
   @staticmethod
@@ -76,9 +80,35 @@ class TestTarget:
     return None
 
 
+@dataclass(frozen=True)
+class AddressAndTestResult:
+  address: Address
+  test_result: Optional[TestResult]  # If None, target was not a test target.
+
+  @staticmethod
+  def is_testable(
+    adaptor_with_origin: TargetAdaptorWithOrigin, *, union_membership: UnionMembership,
+  ) -> bool:
+    is_test_target = union_membership.is_member(TestTarget, adaptor_with_origin)
+    is_not_a_glob = isinstance(adaptor_with_origin.origin, (SingleAddress, FilesystemLiteralSpec))
+    has_sources = (
+      hasattr(adaptor_with_origin.adaptor, "sources")
+      and bool(adaptor_with_origin.adaptor.sources.snapshot.files)
+    )
+    return has_sources and (is_test_target or is_not_a_glob)
+
+
+@dataclass(frozen=True)
+class AddressAndDebugRequest:
+  address: Address
+  request: TestDebugRequest
+
+
 class TestOptions(GoalSubsystem):
   """Runs tests."""
   name = "test"
+
+  required_union_implementations = (TestTarget,)
 
   # Prevent this class from being detected by pytest as a test class.
   __test__ = False
@@ -105,41 +135,23 @@ class Test(Goal):
   subsystem_cls = TestOptions
 
 
-@dataclass(frozen=True)
-class AddressAndTestResult:
-  address: BuildFileAddress
-  test_result: Optional[TestResult]  # If None, target was not a test target.
-
-  @staticmethod
-  def is_testable(
-    target: HydratedTarget,
-    *,
-    union_membership: UnionMembership,
-    provenance_map: AddressProvenanceMap
-  ) -> bool:
-    is_valid_target_type = (
-      provenance_map.is_single_address(target.address)
-      or union_membership.is_member(TestTarget, target.adaptor)
-    )
-    has_sources = hasattr(target.adaptor, "sources") and target.adaptor.sources.snapshot.files
-    return is_valid_target_type and has_sources
-
-
-@dataclass(frozen=True)
-class AddressAndDebugRequest:
-  address: BuildFileAddress
-  request: TestDebugRequest
-
-
 @goal_rule
-async def run_tests(console: Console, options: TestOptions, runner: InteractiveRunner, addresses: BuildFileAddresses) -> Test:
+async def run_tests(
+  console: Console,
+  options: TestOptions,
+  runner: InteractiveRunner,
+  addresses_with_origins: AddressesWithOrigins,
+) -> Test:
   if options.values.debug:
-    address = await Get[BuildFileAddress](BuildFileAddresses, addresses)
-    addr_debug_request = await Get[AddressAndDebugRequest](Address, address.to_address())
+    address_with_origin = addresses_with_origins.expect_single()
+    addr_debug_request = await Get[AddressAndDebugRequest](AddressWithOrigin, address_with_origin)
     result = runner.run_local_interactive_process(addr_debug_request.request.ipr)
     return Test(result.process_exit_code)
 
-  results = await MultiGet(Get[AddressAndTestResult](Address, addr.to_address()) for addr in addresses)
+  results = await MultiGet(
+    Get[AddressAndTestResult](AddressWithOrigin, address_with_origin)
+    for address_with_origin in addresses_with_origins
+  )
   did_any_fail = False
   filtered_results = [(x.address, x.test_result) for x in results if x.test_result is not None]
 
@@ -169,24 +181,24 @@ async def run_tests(console: Console, options: TestOptions, runner: InteractiveR
 
 @rule
 async def coordinator_of_tests(
-  target: HydratedTarget,
-  union_membership: UnionMembership,
-  provenance_map: AddressProvenanceMap
+  target_with_origin: HydratedTargetWithOrigin, union_membership: UnionMembership,
 ) -> AddressAndTestResult:
+  target = target_with_origin.target
+  adaptor_with_origin = TargetAdaptorWithOrigin.create(
+    adaptor=target.adaptor, origin=target_with_origin.origin
+  )
 
-  if not AddressAndTestResult.is_testable(
-    target, union_membership=union_membership, provenance_map=provenance_map
-  ):
+  if not AddressAndTestResult.is_testable(adaptor_with_origin, union_membership=union_membership):
     return AddressAndTestResult(target.address, None)
 
   # TODO(#6004): when streaming to live TTY, rely on V2 UI for this information. When not a
   # live TTY, periodically dump heavy hitters to stderr. See
   # https://github.com/pantsbuild/pants/issues/6004#issuecomment-492699898.
   logger.info(f"Starting tests: {target.address.reference()}")
-  # NB: This has the effect of "casting" a TargetAdaptor to a member of the TestTarget union.
-  # The adaptor will always be a member because of the union membership check above, but if
-  # it were not it would fail at runtime with a useful error message.
-  result = await Get[TestResult](TestTarget, target.adaptor)
+  # NB: This has the effect of "casting" a TargetAdaptorWithOrigin to a member of the TestTarget
+  # union. If the adaptor is not a member of the union, the engine will fail at runtime with a
+  # useful error message.
+  result = await Get[TestResult](TestTarget, adaptor_with_origin)
   logger.info(
     f"Tests {'succeeded' if result.status == Status.SUCCESS else 'failed'}: "
     f"{target.address.reference()}"
@@ -195,15 +207,21 @@ async def coordinator_of_tests(
 
 
 @rule
-async def coordinator_of_debug_tests(target: HydratedTarget) -> AddressAndDebugRequest:
+async def coordinator_of_debug_tests(
+  target_with_origin: HydratedTargetWithOrigin,
+) -> AddressAndDebugRequest:
+  target = target_with_origin.target
+  adaptor_with_origin = TargetAdaptorWithOrigin.create(
+    adaptor=target.adaptor, origin=target_with_origin.origin
+  )
   logger.info(f"Starting tests in debug mode: {target.address.reference()}")
-  request = await Get[TestDebugRequest](TestTarget, target.adaptor)
+  request = await Get[TestDebugRequest](TestTarget, adaptor_with_origin)
   return AddressAndDebugRequest(target.address, request)
 
 
 def rules():
   return [
-      coordinator_of_tests,
-      coordinator_of_debug_tests,
-      run_tests,
-    ]
+    coordinator_of_tests,
+    coordinator_of_debug_tests,
+    run_tests,
+  ]

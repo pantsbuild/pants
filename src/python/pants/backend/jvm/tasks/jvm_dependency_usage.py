@@ -155,10 +155,9 @@ class JvmDependencyUsage(Task):
                                  self.context.products.get_data('runtime_classpath'))
 
   def calculating_node_creator(self, target_to_vts):
-    """Strategy directly computes dependency graph node based on
-    `classes_by_source`, `runtime_classpath`, `product_deps_by_src` parameters and
-    stores the result to the build cache.
-    """
+    """Strategy directly computes dependency graph node based on `classes_by_source`,
+    `runtime_classpath`, `product_deps_by_src` parameters and stores the result to the build
+    cache."""
     targets = self.context.targets()
     targets_by_file = self._analyzer.targets_by_file(targets)
     transitive_deps_by_target = self._analyzer.compute_transitive_deps_by_target(targets)
@@ -175,8 +174,7 @@ class JvmDependencyUsage(Task):
     return creator
 
   def cached_node_creator(self, target_to_vts):
-    """Strategy restores dependency graph node from the build cache.
-    """
+    """Strategy restores dependency graph node from the build cache."""
     def creator(target):
       vt = target_to_vts[target]
       if vt.valid and os.path.exists(self.nodes_json(vt.results_dir)):

@@ -14,22 +14,9 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
     'src/python/pants/option',
+    'src/python/pants/python',
     'src/python/pants/subsystem',
     'src/python/pants/util:memo',
   ],
   tags = {"partially_type_checked"},
-)
-
-python_tests(
-  name='tests',
-  dependencies=[
-    '3rdparty/python:pex',
-    ':subsystems',
-    'src/python/pants/backend/python/targets',
-    'src/python/pants/build_graph',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/testutil/subsystem',
-    'src/python/pants/testutil:test_base',
-  ],
-  tags = {'partially_type_checked'},
 )

@@ -19,8 +19,8 @@ def parse_spec(
   relative_to: Optional[str] = None,
   subproject_roots: Optional[Sequence[str]] = None,
 ) -> Tuple[str, str]:
-  """Parses a target address spec and returns the path from the root of the repo to this Target
-  and Target name.
+  """Parses a target address spec and returns the path from the root of the repo to this Target and
+  Target name.
 
   :API: public
 
@@ -95,7 +95,7 @@ def parse_spec(
 # It's unclear, though, in a deprecation warning what should be the alternative that we recommend
 # people use?
 class Addresses(namedtuple('Addresses', ['addresses', 'rel_path'])):
-  """ Used as a sentinel type for identifying a list of string specs.
+  """Used as a sentinel type for identifying a list of string specs.
 
   addresses: list of string specs
   rel_path: addresses might be relative specs, so they need to be interpreted
@@ -211,25 +211,21 @@ class Address:
 
     :API: public
     """
-    # TODO(pl): Maybe we should just always start with // for simplicity?
-    return '{spec_path}:{target_name}'.format(spec_path=self._spec_path or '//',
-                                              target_name=self._target_name)
+    return f"{self._spec_path or '//'}:{self._target_name}"
 
   @property
   def path_safe_spec(self) -> str:
     """
     :API: public
     """
-    return ('{safe_spec_path}.{target_name}'
-            .format(safe_spec_path=self._spec_path.replace(os.sep, '.'),
-                    target_name=self._target_name.replace(os.sep, '.')))
+    return f"{self._spec_path.replace(os.sep, '.')}.{self._target_name.replace(os.sep, '.')}"
 
   @property
   def relative_spec(self) -> str:
     """
     :API: public
     """
-    return ':{target_name}'.format(target_name=self._target_name)
+    return f':{self._target_name}'
 
   def reference(self, referencing_path: Optional[str] = None) -> str:
     """How to reference this address in a BUILD file.
@@ -256,6 +252,9 @@ class Address:
     return not self == other
 
   def __repr__(self) -> str:
+    return f"Address({self.spec_path}, {self.target_name})"
+
+  def __str__(self) -> str:
     return self.spec
 
   def __lt__(self, other):

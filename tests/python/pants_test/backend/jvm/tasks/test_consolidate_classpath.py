@@ -2,6 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+import re
+from typing import List
 
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
@@ -21,7 +23,7 @@ class TestConsolidateClasspath(JvmBinaryTaskTestBase):
     return ConsolidateClasspath
 
   def setUp(self):
-    """Prepare targets, context, runtime classpath. """
+    """Prepare targets, context, runtime classpath."""
     super().setUp()
     self.task = self.prepare_execute(self.context())
 
@@ -64,9 +66,8 @@ class TestConsolidateClasspath(JvmBinaryTaskTestBase):
     self.dist_root = os.path.join(self.build_root, 'dist')
 
   def _setup_classpath(self, task_context):
-    """As a separate prep step because to test different option settings, this needs to rerun
-    after context is re-created.
-    """
+    """As a separate prep step because to test different option settings, this needs to rerun after
+    context is re-created."""
     self.ensure_classpath_products(task_context)
     self.add_to_runtime_classpath(task_context, self.binary_target,
                                   {'Foo.class': '', 'foo.txt': '', 'foo/file': ''})
@@ -85,13 +86,14 @@ class TestConsolidateClasspath(JvmBinaryTaskTestBase):
       'pants_backend_jvm_tasks_consolidate_classpath_ConsolidateClasspath'
     )
     found_files = [os.path.basename(f) for f in self.iter_files(task_dir)]
+    consolidate_classpath_jar = self.find_consolidate_classpath_jar(found_files)
     self.assertEqual(
-      sorted(['output-0.jar', 'Foo.class', 'foo.txt', 'file']),
+      sorted([consolidate_classpath_jar, 'Foo.class', 'foo.txt', 'file']),
       sorted(found_files)
     )
 
     # Confirm that we haven't destroyed deps.
-    expected_non_deps = {'output-0.jar', 'Foo.class', 'foo.txt', 'file'}
+    expected_non_deps = {consolidate_classpath_jar, 'Foo.class', 'foo.txt', 'file'}
     found = set(os.listdir(self.pants_workdir))
     print(expected_non_deps - found)
     self.assertTrue(expected_non_deps - found == expected_non_deps)
@@ -110,8 +112,9 @@ class TestConsolidateClasspath(JvmBinaryTaskTestBase):
       'pants_backend_jvm_tasks_consolidate_classpath_ConsolidateClasspath'
     )
     found_files = [os.path.basename(f) for f in self.iter_files(task_dir)]
+    consolidate_classpath_jar = self.find_consolidate_classpath_jar(found_files)
     self.assertEqual(
-      sorted(['output-0.jar', 'Foo.class', 'foo.txt', 'file']),
+      sorted([consolidate_classpath_jar, 'Foo.class', 'foo.txt', 'file']),
       sorted(found_files)
     )
 
@@ -122,3 +125,10 @@ class TestConsolidateClasspath(JvmBinaryTaskTestBase):
                      'org.pantsbuild-bar-2.0.0.zip'}
     found = set(os.listdir(self.pants_workdir))
     self.assertTrue(expected_deps - found == set())
+
+  @staticmethod
+  def find_consolidate_classpath_jar(files: List[str]) -> str:
+    matching = [f for f in files if re.match("output-[0-9a-f]{6}\.jar", f)]
+    if len(matching) == 1:
+      return matching[0]
+    raise ValueError(f"Could not find single consolidate classpath jar in {files}.")

@@ -13,15 +13,15 @@ target(
 
 files(
   name='cp-directories_directory',
-  sources=rglobs('cp-directories/*'),
+  sources=['cp-directories/**/*'],
 )
 
 files(
   name='exports_directory',
-  sources=rglobs('exports/*'),
+  sources=['exports/**/*'],
 )
 
 files(
   name='non_exports_directory',
-  sources=rglobs('non_exports/*'),
+  sources=['non_exports/**/*'],
 )
