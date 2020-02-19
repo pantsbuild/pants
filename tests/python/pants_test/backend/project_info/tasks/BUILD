@@ -106,6 +106,7 @@ python_tests(
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile/scala:base_compile_integration_test',
     'testprojects/src/java/org/pantsbuild/testproject:extra_jvm_options_directory',
     'examples/src/java/org/pantsbuild/example:javac_directory',
+    'examples/src/scala/org/pantsbuild/example:several_scala_targets_directory'
   ],
   tags = {"integration", "partially_type_checked"},
   timeout = 630,

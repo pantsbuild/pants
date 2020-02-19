@@ -342,6 +342,10 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     The runtime_classpath is constructed by default.
     """
 
+  def create_extra_products_for_targets(self, targets):
+    """Allows subclasses to provide a method which creates extra products directly.
+    """
+
   def register_extra_products_from_contexts(self, targets, compile_contexts):
     """Allows subclasses to register additional products for targets.
 
@@ -428,55 +432,53 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
 
     relevant_targets = list(self.context.targets(predicate=self.select))
 
-    # If we are only exporting jars then we can omit some targets from the runtime_classpath.
-    if (
-        self.context.products.is_required_data("export_dep_as_jar_classpath") and
-        not self.context.products.is_required_data("runtime_classpath")
-    ):
-      # Filter modulized targets from invalid targets list.
-      target_root_addresses = [t.address for t in set(self.context.target_roots)]
-      dependees_of_target_roots = self.context.build_graph.transitive_dependees_of_addresses(target_root_addresses)
-      relevant_targets = list(set(relevant_targets) - dependees_of_target_roots)
-
-    if not relevant_targets:
-      return
-
     # Clone the compile_classpath to the runtime_classpath.
     classpath_product = self.create_classpath_product()
 
     fingerprint_strategy = DependencyContext.global_instance().create_fingerprint_strategy(
         classpath_product)
-    # Note, JVM targets are validated (`vts.update()`) as they succeed.  As a result,
-    # we begin writing artifacts out to the cache immediately instead of waiting for
-    # all targets to finish.
-    with self.invalidated(relevant_targets,
-                          invalidate_dependents=True,
-                          fingerprint_strategy=fingerprint_strategy,
-                          topological_order=True) as invalidation_check:
 
-      compile_contexts = {vt.target: self.create_compile_context(vt.target, vt.results_dir)
-                          for vt in invalidation_check.all_vts}
-
-      self.do_compile(
-        invalidation_check,
-        compile_contexts,
-        classpath_product,
+    dependees_of_target_roots = None
+    # If we are only exporting jars then we can omit some targets from the runtime_classpath.
+    if self.context.products.is_required_data("export_dep_as_jar_signal"):
+      # Filter modulized targets from invalid targets list.
+      target_roots_in_play = set(relevant_targets) & set(self.context.target_roots)
+      addresses_in_play = [t.address for t in target_roots_in_play]
+      dependees_of_target_roots = set(
+        t for t in self.context.build_graph.transitive_dependees_of_addresses(addresses_in_play)
+        if self.select(t)
       )
+      relevant_targets = list(set(relevant_targets) - dependees_of_target_roots)
 
-      if not self.get_options().use_classpath_jars:
-        # Once compilation has completed, replace the classpath entry for each target with
-        # its jar'd representation.
-        for ccs in compile_contexts.values():
-          cc = self.select_runtime_context(ccs)
-          for conf in self._confs:
-            classpath_product.remove_for_target(cc.target, [(conf, cc.classes_dir)])
-            classpath_product.add_for_target(cc.target, [(conf, cc.jar_file)])
+    if relevant_targets:
+      # Note, JVM targets are validated (`vts.update()`) as they succeed.  As a result,
+      # we begin writing artifacts out to the cache immediately instead of waiting for
+      # all targets to finish.
+      with self.invalidated(relevant_targets,
+                            invalidate_dependents=True,
+                            fingerprint_strategy=fingerprint_strategy,
+                            topological_order=True) as invalidation_check:
 
-      # The runtime classpath will always be a superset of the export_dep_as_jar_classpath
-      # so however we compute runtime_classpath it will contain all the nescessary jars for
-      # the export_dep_as_jar_classpath.export_dep_as_jar_classpath.
-      if self.context.products.is_required_data('export_dep_as_jar_classpath'):
-        self.context.products.get_data('export_dep_as_jar_classpath', classpath_product.copy)
+        compile_contexts = {vt.target: self.create_compile_context(vt.target, vt.results_dir)
+                            for vt in invalidation_check.all_vts}
+
+        self.do_compile(
+          invalidation_check,
+          compile_contexts,
+          classpath_product,
+        )
+
+        if not self.get_options().use_classpath_jars:
+          # Once compilation has completed, replace the classpath entry for each target with
+          # its jar'd representation.
+          for ccs in compile_contexts.values():
+            cc = self.select_runtime_context(ccs)
+            for conf in self._confs:
+              classpath_product.remove_for_target(cc.target, [(conf, cc.classes_dir)])
+              classpath_product.add_for_target(cc.target, [(conf, cc.jar_file)])
+
+    if dependees_of_target_roots is not None:
+      self.create_extra_products_for_targets(dependees_of_target_roots)
 
   def _classpath_for_context(self, context):
     if self.get_options().use_classpath_jars:
