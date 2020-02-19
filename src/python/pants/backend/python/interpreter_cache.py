@@ -102,14 +102,15 @@ class PythonInterpreterCache(Subsystem):
             raise self.UnsatisfiableInterpreterConstraintsError(
                 dedent(
                     """\
-        Unable to detect a suitable interpreter for compatibilities: {} (Conflicting targets: {})
-
-        Pants detected these interpreter versions on your system: {}
-
-        Possible ways to fix this:
-        * Modify your Python interpreter constraints by following https://www.pantsbuild.org/python_readme.html#configure-the-python-version.
-        * Ensure the targeted Python version is installed and discoverable.
-        * Modify Pants' interpreter search paths via --pants-setup-interpreter-search-paths.""".format(
+                    Unable to detect a suitable interpreter for compatibilities: {} (Conflicting targets: {})
+            
+                    Pants detected these interpreter versions on your system: {}
+            
+                    Possible ways to fix this:
+                    * Modify your Python interpreter constraints by following https://www.pantsbuild.org/python_readme.html#configure-the-python-version.
+                    * Ensure the targeted Python version is installed and discoverable.
+                    * Modify Pants' interpreter search paths via --pants-setup-interpreter-search-paths.
+                    """.format(
                         " && ".join(sorted(unique_compatibilities_strs)),
                         ", ".join(tgts_by_compatibilities_strs),
                         ", ".join(all_interpreter_version_strings),

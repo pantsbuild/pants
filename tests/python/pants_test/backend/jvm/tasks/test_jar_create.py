@@ -75,11 +75,11 @@ class JarCreateExecuteTest(JarCreateTestBase):
             path,
             dedent(
                 """
-          jvm_binary(name=%(name)r,
-            source=%(source)r,
-            dependencies=[%(dependencies)r],
-          )
-        """
+                jvm_binary(name=%(name)r,
+                  source=%(source)r,
+                  dependencies=[%(dependencies)r],
+                )
+                """
                 % dict(name=name, source=source, dependencies=dependencies)
             ),
         )

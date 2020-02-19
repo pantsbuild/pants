@@ -29,22 +29,22 @@ class AntlrPyGenTest(NailgunTaskTestBase):
             relpath="foo/bar/baz/Baz.g",
             contents=dedent(
                 """
-        grammar Baz;
-
-        options {
-          language=Python;
-          output=template;
-        }
-
-        a : ID INT
-            -> template(id={$ID.text}, int={$INT.text})
-               "id=<id>, int=<int>"
-          ;
-
-        ID : 'a'..'z'+;
-        INT : '0'..'9'+;
-        WS : (' '|'\n') {$channel=HIDDEN;} ;
-      """
+                grammar Baz;
+        
+                options {
+                  language=Python;
+                  output=template;
+                }
+        
+                a : ID INT
+                    -> template(id={$ID.text}, int={$INT.text})
+                       "id=<id>, int=<int>"
+                  ;
+        
+                ID : 'a'..'z'+;
+                INT : '0'..'9'+;
+                WS : (' '|'\n') {$channel=HIDDEN;} ;
+                """
             ),
         )
 
@@ -52,12 +52,12 @@ class AntlrPyGenTest(NailgunTaskTestBase):
             "foo/bar/baz/BUILD",
             dedent(
                 """
-        python_antlr_library(
-          name='baz',
-          module='foo.bar.baz',
-          sources=['Baz.g'],
-        )
-      """
+                python_antlr_library(
+                  name='baz',
+                  module='foo.bar.baz',
+                  sources=['Baz.g'],
+                )
+                """
             ),
         )
 

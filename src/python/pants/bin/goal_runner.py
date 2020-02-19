@@ -41,15 +41,15 @@ class GoalRunnerFactory:
         exiter=sys.exit,
     ) -> None:
         """
-    :param root_dir: The root directory of the pants workspace (aka the "build root").
-    :param options: The global, pre-initialized Options instance.
-    :param build_config: A pre-initialized BuildConfiguration instance.
-    :param run_tracker: The global, pre-initialized/running RunTracker instance.
-    :param reporting: The global, pre-initialized Reporting instance.
-    :param graph_session: The graph session for this run.
-    :param specs: The specs for this run, i.e. either the address or filesystem specs.
-    :param func exiter: A function that accepts an exit code value and exits. (for tests, Optional)
-    """
+        :param root_dir: The root directory of the pants workspace (aka the "build root").
+        :param options: The global, pre-initialized Options instance.
+        :param build_config: A pre-initialized BuildConfiguration instance.
+        :param run_tracker: The global, pre-initialized/running RunTracker instance.
+        :param reporting: The global, pre-initialized Reporting instance.
+        :param graph_session: The graph session for this run.
+        :param specs: The specs for this run, i.e. either the address or filesystem specs.
+        :param func exiter: A function that accepts an exit code value and exits. (for tests, Optional)
+        """
         self._root_dir = root_dir
         self._options_bootstrapper = options_bootstrapper
         self._options = options
@@ -161,11 +161,11 @@ class GoalRunner:
 
     def __init__(self, context, goals, run_tracker, kill_nailguns):
         """
-    :param Context context: The global, pre-initialized Context as created by GoalRunnerFactory.
-    :param list[Goal] goals: The list of goals to act on.
-    :param Runtracker run_tracker: The global, pre-initialized/running RunTracker instance.
-    :param bool kill_nailguns: Whether or not to kill nailguns after the run.
-    """
+        :param Context context: The global, pre-initialized Context as created by GoalRunnerFactory.
+        :param list[Goal] goals: The list of goals to act on.
+        :param Runtracker run_tracker: The global, pre-initialized/running RunTracker instance.
+        :param bool kill_nailguns: Whether or not to kill nailguns after the run.
+        """
         self._context = context
         self._goals = goals
         self._run_tracker = run_tracker

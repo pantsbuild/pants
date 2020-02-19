@@ -34,14 +34,14 @@ class Watchman(ProcessManager):
         socket_path_override=None,
     ):
         """
-    :param str watchman_path: The path to the watchman binary.
-    :param str metadata_base_dir: The metadata base dir for `ProcessMetadataManager`.
-    :param float startup_timeout: The timeout for the initial `watch-project` query (in seconds).
-    :param float timeout: The watchman socket timeout for all subsequent queries (in seconds).
-    :param str log_level: The watchman log level. Watchman has 3 log levels: '0' for no logging,
-                          '1' for standard logging and '2' for verbose logging.
-    :param str socket_path_override: The overridden target path of the watchman socket, if any.
-    """
+        :param str watchman_path: The path to the watchman binary.
+        :param str metadata_base_dir: The metadata base dir for `ProcessMetadataManager`.
+        :param float startup_timeout: The timeout for the initial `watch-project` query (in seconds).
+        :param float timeout: The watchman socket timeout for all subsequent queries (in seconds).
+        :param str log_level: The watchman log level. Watchman has 3 log levels: '0' for no logging,
+                              '1' for standard logging and '2' for verbose logging.
+        :param str socket_path_override: The overridden target path of the watchman socket, if any.
+        """
         super().__init__(
             name="watchman",
             process_name="watchman",

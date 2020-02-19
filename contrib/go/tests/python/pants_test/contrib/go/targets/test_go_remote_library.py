@@ -27,8 +27,8 @@ class GoRemoteLibraryTest(TestBase):
             "3rdparty/go/github.com/foo/bar",
             dedent(
                 """
-        go_remote_library()
-      """
+                  go_remote_library()
+                """
             ),
         )
 
@@ -43,8 +43,8 @@ class GoRemoteLibraryTest(TestBase):
             "3rdparty/go/github.com/foo/bar",
             dedent(
                 """
-        go_remote_library(pkg='baz')
-      """
+                  go_remote_library(pkg='baz')
+                """
             ),
         )
 
@@ -59,15 +59,15 @@ class GoRemoteLibraryTest(TestBase):
             "3rdparty/go/github.com/foo/bar",
             dedent(
                 """
-        go_remote_libraries(
-          rev='v42',
-          packages=[
-            '',
-            'baz',
-            'baz/bip',
-            'bee/bop'
-          ])
-      """
+                  go_remote_libraries(
+                    rev='v42',
+                    packages=[
+                      '',
+                      'baz',
+                      'baz/bip',
+                      'bee/bop'
+                    ])
+                """
             ),
         )
 
@@ -104,8 +104,8 @@ class GoRemoteLibraryTest(TestBase):
             "3rdparty/go/github.com/foo/bar",
             dedent(
                 """
-        go_remote_library(name='bob')
-      """
+                  go_remote_library(name='bob')
+                """
             ),
         )
 
@@ -117,8 +117,8 @@ class GoRemoteLibraryTest(TestBase):
             "3rdparty/go/github.com/foo/bar",
             dedent(
                 """
-        go_remote_library(dependencies=[])
-      """
+                  go_remote_library(dependencies=[])
+                """
             ),
         )
 

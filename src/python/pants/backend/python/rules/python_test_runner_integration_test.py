@@ -65,12 +65,12 @@ class PythonTestRunnerIntegrationTest(TestBase):
             relpath=self.source_root,
             target=dedent(
                 f"""\
-        python_tests(
-          name='target',
-          dependencies={dependencies or []},
-          compatibility={[interpreter_constraints] if interpreter_constraints else []},
-        )
-        """
+                python_tests(
+                  name='target',
+                  dependencies={dependencies or []},
+                  compatibility={[interpreter_constraints] if interpreter_constraints else []},
+                )
+                """
             ),
         )
         for source_file in source_files:
@@ -81,11 +81,11 @@ class PythonTestRunnerIntegrationTest(TestBase):
             relpath="3rdparty/python",
             target=dedent(
                 """\
-        python_requirement_library(
-          name='ordered-set',
-          requirements=[python_requirement('ordered-set==3.1.1')],
-        )
-        """
+                python_requirement_library(
+                  name='ordered-set',
+                  requirements=[python_requirement('ordered-set==3.1.1')],
+                )
+                """
             ),
         )
 
@@ -186,11 +186,11 @@ class PythonTestRunnerIntegrationTest(TestBase):
             path="test_absolute_import.py",
             content=dedent(
                 """\
-        from pants_test.library import add_two
-
-        def test():
-          assert add_two(2) == 4
-        """
+                from pants_test.library import add_two
+        
+                def test():
+                  assert add_two(2) == 4
+                """
             ).encode(),
         )
         self.create_python_test_target([source], dependencies=[":library"])
@@ -204,11 +204,11 @@ class PythonTestRunnerIntegrationTest(TestBase):
             path="test_relative_import.py",
             content=dedent(
                 """\
-        from .library import add_two
-
-        def test():
-          assert add_two(2) == 4
-        """
+                from .library import add_two
+        
+                def test():
+                  assert add_two(2) == 4
+                """
             ).encode(),
         )
         self.create_python_test_target([source], dependencies=[":library"])
@@ -226,11 +226,11 @@ class PythonTestRunnerIntegrationTest(TestBase):
                 path="transitive_dep.py",
                 content=dedent(
                     """\
-          from pants_test.library import add_two
-  
-          def add_four(x):
-            return add_two(x) + 2
-          """
+                    from pants_test.library import add_two
+
+                    def add_four(x):
+                      return add_two(x) + 2
+                    """
                 ).encode(),
             )
         )
@@ -238,11 +238,11 @@ class PythonTestRunnerIntegrationTest(TestBase):
             path="test_transitive_dep.py",
             content=dedent(
                 """\
-        from pants_test.transitive_dep import add_four
-
-        def test():
-          assert add_four(2) == 6
-        """
+                from pants_test.transitive_dep import add_four
+        
+                def test():
+                  assert add_four(2) == 6
+                """
             ).encode(),
         )
         self.create_python_test_target([source], dependencies=[":transitive_dep"])
@@ -256,11 +256,11 @@ class PythonTestRunnerIntegrationTest(TestBase):
             path="test_3rdparty_dep.py",
             content=dedent(
                 """\
-        from ordered_set import OrderedSet
+                from ordered_set import OrderedSet
 
-        def test():
-          assert OrderedSet((1, 2)) == OrderedSet([1, 2])
-        """
+                def test():
+                  assert OrderedSet((1, 2)) == OrderedSet([1, 2])
+                """
             ).encode(),
         )
         self.create_python_test_target([source], dependencies=["3rdparty/python:ordered-set"])
@@ -278,11 +278,11 @@ class PythonTestRunnerIntegrationTest(TestBase):
                 path="library.py",
                 content=dedent(
                     """\
-          import string
-          from ordered_set import OrderedSet
-          
-          alphabet = OrderedSet(string.ascii_lowercase)
-          """
+                    import string
+                    from ordered_set import OrderedSet
+
+                    alphabet = OrderedSet(string.ascii_lowercase)
+                    """
                 ).encode(),
             )
         )
@@ -290,11 +290,11 @@ class PythonTestRunnerIntegrationTest(TestBase):
             path="test_3rdparty_transitive_dep.py",
             content=dedent(
                 """\
-        from pants_test.library import alphabet
+                from pants_test.library import alphabet
 
-        def test():
-          assert 'a' in alphabet and 'z' in alphabet
-        """
+                def test():
+                  assert 'a' in alphabet and 'z' in alphabet
+                """
             ).encode(),
         )
         self.create_python_test_target([source], dependencies=[":library"])
@@ -325,12 +325,12 @@ class PythonTestRunnerIntegrationTest(TestBase):
             path="test_config.py",
             content=dedent(
                 """\
-        def test_run_me():
-          pass
-        
-        def test_ignore_me():
-          pass
-        """
+                def test_run_me():
+                  pass
+
+                def test_ignore_me():
+                  pass
+                """
             ).encode(),
         )
         self.create_python_test_target([source])

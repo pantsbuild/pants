@@ -526,9 +526,8 @@ def relative_symlink(source_path: str, link_path: str) -> None:
 
 def relativize_path(path: str, rootdir: str) -> str:
     """
-
-  :API: public
-  """
+    :API: public
+    """
     # Note that we can't test for length and return the shorter of the two, because we need these
     # paths to be stable across systems (e.g., because they get embedded in analysis files),
     # and this choice might be inconsistent across systems. So we assume the relpath is always

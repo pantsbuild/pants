@@ -32,13 +32,13 @@ class ScalaLibraryTest(TestBase):
             "3rdparty",
             dedent(
                 """
-        jar_library(
-          name='hub-and-spoke',
-          jars=[
-            jar('org.jalopy', 'hub-and-spoke', '0.0.1')
-          ]
-        )
-        """
+                jar_library(
+                  name='hub-and-spoke',
+                  jars=[
+                    jar('org.jalopy', 'hub-and-spoke', '0.0.1')
+                  ]
+                )
+                """
             ),
         )
 
@@ -46,15 +46,15 @@ class ScalaLibraryTest(TestBase):
             "scala",
             dedent(
                 """
-        scala_library(
-          name='lib',
-          sources=[],
-          java_sources=[
-            'java:explicit_scala_dep',
-            'java:no_scala_dep',
-          ]
-        )
-        """
+                scala_library(
+                  name='lib',
+                  sources=[],
+                  java_sources=[
+                    'java:explicit_scala_dep',
+                    'java:no_scala_dep',
+                  ]
+                )
+                """
             ),
         )
 
@@ -62,21 +62,21 @@ class ScalaLibraryTest(TestBase):
             "java",
             dedent(
                 """
-        java_library(
-          name='explicit_scala_dep',
-          sources=[],
-          dependencies=[
-            'scala:lib',
-            '3rdparty:hub-and-spoke',
-          ]
-        )
-
-        java_library(
-          name='no_scala_dep',
-          sources=[],
-          dependencies=[]
-        )
-        """
+                java_library(
+                  name='explicit_scala_dep',
+                  sources=[],
+                  dependencies=[
+                    'scala:lib',
+                    '3rdparty:hub-and-spoke',
+                  ]
+                )
+        
+                java_library(
+                  name='no_scala_dep',
+                  sources=[],
+                  dependencies=[]
+                )
+                """
             ),
         )
 

@@ -89,9 +89,9 @@ class NodeTaskTest(TaskTestBase):
                 fp.write(
                     dedent(
                         """
-          var fs = require('fs');
-          fs.writeFile("{proof}", "Hello World!", function(err) {{}});
-          """
+                        var fs = require('fs');
+                        fs.writeFile("{proof}", "Hello World!", function(err) {{}});
+                        """
                     ).format(proof=proof)
                 )
             self.assertFalse(os.path.exists(proof))

@@ -18,36 +18,36 @@ class CheckstyleTest(NailgunTaskTestBase):
 
     _RULE_XML_FILE_TAB_CHECKER = dedent(
         """
-      <module name="FileTabCharacter"/>
-  """
+        <module name="FileTabCharacter"/>
+        """
     )
 
     _RULE_XML_SUPPRESSION_FILTER = dedent(
         """
-    <module name="SuppressionFilter">
-      <property name="file" value="${checkstyle.suppression.file}"/>
-    </module>
-  """
+        <module name="SuppressionFilter">
+          <property name="file" value="${checkstyle.suppression.file}"/>
+        </module>
+        """
     )
 
     _TEST_JAVA_SOURCE_WITH_NO_TAB = dedent(
         """
-    public class HelloMain {
-      public static void main(String[] args) throws IOException {
-        System.out.println("A test.");
-      }
-    }
-  """
+        public class HelloMain {
+          public static void main(String[] args) throws IOException {
+            System.out.println("A test.");
+          }
+        }
+        """
     )
 
     _TEST_JAVA_SOURCE_WITH_TAB = dedent(
         """
-    public class HelloMain {
-      public static void main(String[] args) throws IOException {
-        \tSystem.out.println("A test.");
-      }
-    }
-  """
+        public class HelloMain {
+          public static void main(String[] args) throws IOException {
+            \tSystem.out.println("A test.");
+          }
+        }
+        """
     )
 
     @classmethod
@@ -71,12 +71,12 @@ class CheckstyleTest(NailgunTaskTestBase):
             relpath="coding_style.xml",
             contents=dedent(
                 """<?xml version="1.0"?>
-           <!DOCTYPE module PUBLIC
-             "-//Puppy Crawl//DTD Check Configuration 1.3//EN"
-             "http://www.puppycrawl.com/dtds/configuration_1_3.dtd">
-           <module name="Checker">
-             {rules_xml}
-           </module>""".format(
+               <!DOCTYPE module PUBLIC
+                 "-//Puppy Crawl//DTD Check Configuration 1.3//EN"
+                 "http://www.puppycrawl.com/dtds/configuration_1_3.dtd">
+               <module name="Checker">
+                 {rules_xml}
+               </module>""".format(
                     rules_xml="\n".join(rules_xml)
                 )
             ),
@@ -87,13 +87,13 @@ class CheckstyleTest(NailgunTaskTestBase):
             relpath="suppression.xml",
             contents=dedent(
                 """<?xml version="1.0"?>
-           <!DOCTYPE suppressions PUBLIC
-             "-//Puppy Crawl//DTD Suppressions 1.1//EN"
-            "http://www.puppycrawl.com/dtds/suppressions_1_1.dtd">
-           <suppressions>
-             {suppresses_xml}
-           </suppressions>
-        """.format(
+                <!DOCTYPE suppressions PUBLIC
+                  "-//Puppy Crawl//DTD Suppressions 1.1//EN"
+                  "http://www.puppycrawl.com/dtds/suppressions_1_1.dtd">
+                <suppressions>
+                  {suppresses_xml}
+                </suppressions>
+                """.format(
                     suppresses_xml="\n".join(suppresses_xml)
                 )
             ),

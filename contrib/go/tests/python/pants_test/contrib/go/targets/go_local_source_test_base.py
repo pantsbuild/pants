@@ -42,8 +42,8 @@ class GoLocalSourceTestBase(ABC):
             "src/go/src/foo",
             dedent(
                 """
-        {target_alias}()
-      """.format(
+                  {target_alias}()
+                """.format(
                     target_alias=self.target_type.alias()
                 )
             ),
@@ -61,8 +61,8 @@ class GoLocalSourceTestBase(ABC):
             "src/go/src/foo",
             dedent(
                 """
-        {target_alias}(name='bob')
-      """.format(
+                  {target_alias}(name='bob')
+                """.format(
                     target_alias=self.target_type.alias()
                 )
             ),
@@ -77,8 +77,8 @@ class GoLocalSourceTestBase(ABC):
             "src/go/src/foo",
             dedent(
                 """
-        {target_alias}(sources=['sub/jane.go'])
-      """.format(
+                  {target_alias}(sources=['sub/jane.go'])
+                """.format(
                     target_alias=self.target_type.alias()
                 )
             ),

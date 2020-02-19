@@ -275,9 +275,9 @@ class SchedulerWithNestedRaiseTest(TestBase):
                 exc_str.startswith(
                     dedent(
                         """\
-        1 Exception raised in CFFI extern methods:
-        Traceback (most recent call last):
-        """
+                        1 Exception raised in CFFI extern methods:
+                        Traceback (most recent call last):
+                        """
                     )
                 ),
                 f"exc_str was: {exc_str}",
@@ -287,14 +287,14 @@ class SchedulerWithNestedRaiseTest(TestBase):
             self.assertIn(
                 dedent(
                     """\
-        Traceback (most recent call last):
-          File LOCATION-INFO, in extern_identify
-            return c.identify(obj)
-          File LOCATION-INFO, in identify
-            hash_ = hash(obj)
-          File "<string>", line 2, in __hash__
-        TypeError: unhashable type: 'list'
-        """
+                    Traceback (most recent call last):
+                      File LOCATION-INFO, in extern_identify
+                        return c.identify(obj)
+                      File LOCATION-INFO, in identify
+                        hash_ = hash(obj)
+                      File "<string>", line 2, in __hash__
+                    TypeError: unhashable type: 'list'
+                    """
                 ),
                 exc_str,
                 f"exc_str was: {exc_str}",
@@ -302,8 +302,8 @@ class SchedulerWithNestedRaiseTest(TestBase):
 
         resulting_engine_error = dedent(
             """\
-        Exception: Types that will be passed as Params at the root of a graph need to be registered via RootRule:
-          Any\n\n\n"""
+            Exception: Types that will be passed as Params at the root of a graph need to be registered via RootRule:
+              Any\n\n\n"""
         )
 
         # Test that the error contains the full traceback from within the CFFI context as well
@@ -318,9 +318,9 @@ class SchedulerWithNestedRaiseTest(TestBase):
         self.assertIn(
             dedent(
                 """\
-      The engine execution request raised this error, which is probably due to the errors in the
-      CFFI extern methods listed above, as CFFI externs return None upon error:
-      """
+                The engine execution request raised this error, which is probably due to the errors in the
+                CFFI extern methods listed above, as CFFI externs return None upon error:
+                """
             ),
             exc_str,
         )
@@ -373,17 +373,17 @@ class SchedulerWithNestedRaiseTest(TestBase):
             self,
             dedent(
                 f"""\
-        Computing Select(B(), A)
-          Computing Task({fmt_rust_function(nested_raise)}(), B(), A, true)
-            Throw(An exception for B)
-              Traceback (most recent call last):
-                File LOCATION-INFO, in call
-                  val = func(*args)
-                File LOCATION-INFO, in nested_raise
-                  fn_raises(x)
-                File LOCATION-INFO, in fn_raises
-                  raise Exception(f'An exception for {{type(x).__name__}}')
-              Exception: An exception for B"""
+                Computing Select(B(), A)
+                  Computing Task({fmt_rust_function(nested_raise)}(), B(), A, true)
+                    Throw(An exception for B)
+                      Traceback (most recent call last):
+                        File LOCATION-INFO, in call
+                          val = func(*args)
+                        File LOCATION-INFO, in nested_raise
+                          fn_raises(x)
+                        File LOCATION-INFO, in fn_raises
+                          raise Exception(f'An exception for {{type(x).__name__}}')
+                      Exception: An exception for B"""
             ).lstrip()
             + "\n\n",  # Traces include two empty lines after.
             trace,

@@ -18,10 +18,10 @@ class ManagedJarDependencies(Target):
 
     def __init__(self, payload=None, artifacts=None, **kwargs):
         """
-    :param artifacts: List of `jar <#jar>`_\\s or specs to jar_library targets with pinned versions.
-      Versions are pinned per (org, name, classifier, ext) artifact coordinate (excludes, etc are
-      ignored for the purposes of pinning).
-    """
+        :param artifacts: List of `jar <#jar>`_\\s or specs to jar_library targets with pinned versions.
+          Versions are pinned per (org, name, classifier, ext) artifact coordinate (excludes, etc are
+          ignored for the purposes of pinning).
+        """
         jar_objects, library_specs = self._split_jars_and_specs(artifacts or ())
         payload = payload or Payload()
         payload.add_fields(

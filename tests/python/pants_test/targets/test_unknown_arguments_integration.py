@@ -18,10 +18,10 @@ class TestUnknownArgumentsIntegration(PantsRunIntegrationTest):
                 f.write(
                     dedent(
                         """
-          java_library(name='{name}',
-            {parameters}
-          )
-        """
+                        java_library(name='{name}',
+                          {parameters}
+                        )
+                        """
                     ).format(
                         name=spec,
                         parameters="".join(

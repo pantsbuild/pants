@@ -92,14 +92,14 @@ class GoBuildgenTest(TaskTestBase):
             relpath="src/go/src/fred/foo.go",
             contents=dedent(
                 """
-      package main
+                package main
 
-      import "fmt"
+                import "fmt"
 
-      func main() {
-              fmt.Printf("Hello World!")
-      }
-    """
+                func main() {
+                        fmt.Printf("Hello World!")
+                }
+                """
             ),
         )
         context = self.context(target_roots=[self.make_target("src/go/src/fred", GoLibrary)])
@@ -115,14 +115,14 @@ class GoBuildgenTest(TaskTestBase):
             relpath="src/go/src/fred/foo.go",
             contents=dedent(
                 """
-      package main
+                package main
 
-      import "fmt"
+                import "fmt"
 
-      func main() {
-              fmt.Printf("Hello World!")
-      }
-    """
+                func main() {
+                        fmt.Printf("Hello World!")
+                }
+                """
             ),
         )
         context = self.context(target_roots=[self.make_target("src/go/src/fred", GoBinary)])
@@ -136,10 +136,10 @@ class GoBuildgenTest(TaskTestBase):
             relpath="src/go/src/jane/bar.go",
             contents=dedent(
                 """
-      package jane
-
-      var PublicConstant = 42
-    """
+                package jane
+        
+                var PublicConstant = 42
+                """
             ),
         )
         jane = self.make_target("src/go/src/jane", GoLibrary)
@@ -147,17 +147,17 @@ class GoBuildgenTest(TaskTestBase):
             relpath="src/go/src/fred/foo.go",
             contents=dedent(
                 """
-      package main
+                package main
 
-      import (
-        "fmt"
-        "jane"
-      )
+                import (
+                  "fmt"
+                  "jane"
+                )
 
-      func main() {
-              fmt.Printf("Hello %s!", jane.PublicConstant)
-      }
-    """
+                func main() {
+                        fmt.Printf("Hello %s!", jane.PublicConstant)
+                }
+                """
             ),
         )
         fred = self.make_target("src/go/src/fred", GoBinary, dependencies=[jane])
@@ -178,27 +178,27 @@ class GoBuildgenTest(TaskTestBase):
             relpath="src/go/src/jane/bar.go",
             contents=dedent(
                 """
-        package jane
+                package jane
 
-        var PublicConstant = 42
-      """
+                var PublicConstant = 42
+                """
             ),
         )
         self.create_file(
             relpath="src/go/src/fred/foo.go",
             contents=dedent(
                 """
-        package main
-
-        import (
-          "fmt"
-          "jane"
-        )
-
-        func main() {
-                fmt.Printf("Hello %s!", jane.PublicConstant)
-        }
-      """
+                package main
+        
+                import (
+                  "fmt"
+                  "jane"
+                )
+        
+                func main() {
+                        fmt.Printf("Hello %s!", jane.PublicConstant)
+                }
+                """
             ),
         )
         if materialize:
@@ -251,29 +251,29 @@ class GoBuildgenTest(TaskTestBase):
             relpath="src/go/src/jane/bar.go",
             contents=dedent(
                 """
-        package jane
-
-        import "pantsbuild.org/fake/prod"
-
-        var PublicConstant = prod.DoesNotExistButWeShouldNotCareWhenCheckingDepsAndNotInstalling
-      """
+                package jane
+        
+                import "pantsbuild.org/fake/prod"
+        
+                var PublicConstant = prod.DoesNotExistButWeShouldNotCareWhenCheckingDepsAndNotInstalling
+                """
             ),
         )
         self.create_file(
             relpath="src/go/src/fred/foo.go",
             contents=dedent(
                 """
-        package main
-
-        import (
-          "fmt"
-          "jane"
-        )
-
-        func main() {
-                fmt.Printf("Hello %s!", jane.PublicConstant)
-        }
-      """
+                package main
+        
+                import (
+                  "fmt"
+                  "jane"
+                )
+        
+                func main() {
+                        fmt.Printf("Hello %s!", jane.PublicConstant)
+                }
+                """
             ),
         )
         if materialize:
@@ -367,12 +367,12 @@ class GoBuildgenTest(TaskTestBase):
             relpath="src/go/src/jane/bar.go",
             contents=dedent(
                 """
-        package jane
-
-        import "pantsbuild.org/fake"
-
-        var PublicConstant = fake.DoesNotExistButWeShouldNotCareWhenCheckingDepsAndNotInstalling
-      """
+                package jane
+        
+                import "pantsbuild.org/fake"
+        
+                var PublicConstant = fake.DoesNotExistButWeShouldNotCareWhenCheckingDepsAndNotInstalling
+                """
             ),
         )
         self.add_to_build_file(relpath="src/go/src/jane", target="go_library()")
@@ -393,33 +393,33 @@ class GoBuildgenTest(TaskTestBase):
             relpath="src/go/src/jane/bar.go",
             contents=dedent(
                 """
-        package jane
-
-        var PublicConstant = 42
-      """
+                package jane
+        
+                var PublicConstant = 42
+                """
             ),
         )
         self.create_file(
             relpath="src/go/src/fred/foo.go",
             contents=dedent(
                 """
-        package main
-
-        /*
-        #include <stdlib.h>
-        */
-        import "C" // C was erroneously categorized as a remote lib in issue 2616.
-
-        import (
-          "fmt"
-          "jane"
-        )
-
-        func main() {
-          fmt.Printf("Hello %s!", jane.PublicConstant)
-          fmt.Printf("Random from C: %d", int(C.random()))
-        }
-      """
+                package main
+        
+                /*
+                #include <stdlib.h>
+                */
+                import "C" // C was erroneously categorized as a remote lib in issue 2616.
+        
+                import (
+                  "fmt"
+                  "jane"
+                )
+        
+                func main() {
+                  fmt.Printf("Hello %s!", jane.PublicConstant)
+                  fmt.Printf("Random from C: %d", int(C.random()))
+                }
+                """
             ),
         )
         fred = self.make_target("src/go/src/fred", GoBinary)
@@ -443,10 +443,10 @@ class GoBuildgenTest(TaskTestBase):
             relpath="src/go/src/helper/helper.go",
             contents=dedent(
                 """
-        package helper
-
-        const PublicConstant = 42
-      """
+                package helper
+        
+                const PublicConstant = 42
+                """
             ),
         )
 
@@ -454,10 +454,10 @@ class GoBuildgenTest(TaskTestBase):
             relpath="src/go/src/lib/lib.go",
             contents=dedent(
                 """
-        package lib
-
-        const privateConstant = 42
-      """
+                package lib
+        
+                const privateConstant = 42
+                """
             ),
         )
 
@@ -465,19 +465,19 @@ class GoBuildgenTest(TaskTestBase):
             relpath="src/go/src/lib/lib_test.go",
             contents=dedent(
                 """
-        package lib_test
-
-        import (
-          "helper"
-          "testing"
-        )
-
-        func TestAdd(t *testing.T) {
-          if privateConstant != helper.PublicConstant {
-            t.Fatalf("got: %d, expected: %d", privateConstant, helper.PublicConstant)
-          }
-        }
-      """
+                package lib_test
+        
+                import (
+                  "helper"
+                  "testing"
+                )
+        
+                func TestAdd(t *testing.T) {
+                  if privateConstant != helper.PublicConstant {
+                    t.Fatalf("got: %d, expected: %d", privateConstant, helper.PublicConstant)
+                  }
+                }
+                """
             ),
         )
 

@@ -45,11 +45,11 @@ class BaseReverseDepmapTest(ConsoleTaskTestBase):
                 path,
                 dedent(
                     """
-          {type}(name='{name}',
-            dependencies=[{deps}],
-            {sources}
-          )
-          """.format(
+                    {type}(name='{name}',
+                      dependencies=[{deps}],
+                      {sources}
+                    )
+                    """.format(
                         type="target" if alias else "python_library",
                         name=name,
                         deps=",".join("'{0}'".format(dep) for dep in list(deps)),
@@ -73,11 +73,11 @@ class BaseReverseDepmapTest(ConsoleTaskTestBase):
             "resources/a",
             dedent(
                 """
-      resources(
-        name='a_resources',
-        sources=['a.resource']
-      )
-    """
+                resources(
+                  name='a_resources',
+                  sources=['a.resource']
+                )
+                """
             ),
         )
 
@@ -85,12 +85,12 @@ class BaseReverseDepmapTest(ConsoleTaskTestBase):
             "src/java/a",
             dedent(
                 """
-      java_library(
-        name='a_java',
-        sources=[],
-        dependencies=['resources/a:a_resources']
-      )
-    """
+                java_library(
+                  name='a_java',
+                  sources=[],
+                  dependencies=['resources/a:a_resources']
+                )
+                """
             ),
         )
 
@@ -99,13 +99,13 @@ class BaseReverseDepmapTest(ConsoleTaskTestBase):
             "src/thrift/example",
             dedent(
                 """
-      java_thrift_library(
-        name='mybird',
-        compiler='scrooge',
-        language='scala',
-        sources=['1.thrift']
-      )
-      """
+                java_thrift_library(
+                  name='mybird',
+                  compiler='scrooge',
+                  language='scala',
+                  sources=['1.thrift']
+                )
+                """
             ),
         )
 
@@ -113,13 +113,13 @@ class BaseReverseDepmapTest(ConsoleTaskTestBase):
             "src/thrift/example",
             dedent(
                 """
-      target(
-        name='compiled_scala',
-        dependencies=[
-          ':mybird',
-        ]
-      )
-      """
+                target(
+                  name='compiled_scala',
+                  dependencies=[
+                    ':mybird',
+                  ]
+                )
+                """
             ),
         )
 
@@ -127,14 +127,14 @@ class BaseReverseDepmapTest(ConsoleTaskTestBase):
             "src/thrift/example",
             dedent(
                 """
-      java_library(
-        name='compiled_java_user',
-        dependencies=[
-          ':compiled_scala'
-        ],
-        sources=['1.java'],
-      )
-      """
+                java_library(
+                  name='compiled_java_user',
+                  dependencies=[
+                    ':compiled_scala'
+                  ],
+                  sources=['1.java'],
+                )
+                """
             ),
         )
 
@@ -144,13 +144,13 @@ class BaseReverseDepmapTest(ConsoleTaskTestBase):
             "src/java/example",
             dedent(
                 """
-      jar_library(
-        name='mybird-jars',
-        jars=[
-          jar(org='com', name='twitter')
-        ],
-      )
-      """
+                jar_library(
+                  name='mybird-jars',
+                  jars=[
+                    jar(org='com', name='twitter')
+                  ],
+                )
+                """
             ),
         )
 
@@ -159,12 +159,12 @@ class BaseReverseDepmapTest(ConsoleTaskTestBase):
             "src/java/example",
             dedent(
                 """
-      java_library(
-        name='mybird',
-        dependencies=[':mybird-jars'],
-        sources=['1.java'],
-      )
-      """
+                java_library(
+                  name='mybird',
+                  dependencies=[':mybird-jars'],
+                  sources=['1.java'],
+                )
+                """
             ),
         )
 
@@ -172,14 +172,14 @@ class BaseReverseDepmapTest(ConsoleTaskTestBase):
             "src/java/example",
             dedent(
                 """
-      java_library(
-        name='example2',
-        dependencies=[
-          ':mybird',
-        ],
-        sources=['2.java']
-      )
-      """
+                java_library(
+                  name='example2',
+                  dependencies=[
+                    ':mybird',
+                  ],
+                  sources=['2.java']
+                )
+                """
             ),
         )
 
@@ -213,12 +213,12 @@ class ReverseDepmapTest(BaseReverseDepmapTest):
         self.assert_console_output(
             dedent(
                 """
-      {
-          "common/c:c": [
-              "common/c:c",
-              "overlaps:two"
-          ]
-      }"""
+                {
+                    "common/c:c": [
+                        "common/c:c",
+                        "overlaps:two"
+                    ]
+                }"""
             ).lstrip("\n"),
             targets=[self.target("common/c")],
             options={"closed": True, "output_format": "json"},
@@ -238,14 +238,14 @@ class ReverseDepmapTest(BaseReverseDepmapTest):
         self.assert_console_output(
             dedent(
                 """
-      {
-          "common/b:b": [
-              "overlaps:five",
-              "overlaps:four",
-              "overlaps:one",
-              "overlaps:three"
-          ]
-      }"""
+                {
+                    "common/b:b": [
+                        "overlaps:five",
+                        "overlaps:four",
+                        "overlaps:one",
+                        "overlaps:three"
+                    ]
+                }"""
             ).lstrip("\n"),
             targets=[self.target("common/b")],
             options={"transitive": True, "output_format": "json"},
@@ -255,16 +255,16 @@ class ReverseDepmapTest(BaseReverseDepmapTest):
         self.assert_console_output(
             dedent(
                 """
-      {
-          "common/a:a": [
-              "overlaps:one",
-              "overlaps:three",
-              "overlaps:two"
-          ],
-          "overlaps:one": [
-              "overlaps:three"
-          ]
-      }"""
+                {
+                    "common/a:a": [
+                        "overlaps:one",
+                        "overlaps:three",
+                        "overlaps:two"
+                    ],
+                    "overlaps:one": [
+                        "overlaps:three"
+                    ]
+                }"""
             ).lstrip("\n"),
             targets=[self.target("common/a"), self.target("overlaps:one")],
             options={"output_format": "json"},

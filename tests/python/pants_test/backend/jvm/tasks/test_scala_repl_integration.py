@@ -22,9 +22,9 @@ class ScalaReplIntegrationTest(PantsRunIntegrationTest):
             "examples/src/scala/org/pantsbuild/example/hello/welcome",
             dedent(
                 """
-            import org.pantsbuild.example.hello.welcome.WelcomeEverybody
-            println(WelcomeEverybody("World" :: Nil).head)
-          """
+                import org.pantsbuild.example.hello.welcome.WelcomeEverybody
+                println(WelcomeEverybody("World" :: Nil).head)
+                """
             ),
             repl_args=repl_args,
         )
@@ -51,9 +51,9 @@ class ScalaReplIntegrationTest(PantsRunIntegrationTest):
             "testprojects/src/scala/org/pantsbuild/testproject/unicode",
             dedent(
                 """
-          import org.pantsbuild.testproject.unicode.shapeless.ShapelessExample
-          println(ShapelessExample.greek())
-        """
+                import org.pantsbuild.testproject.unicode.shapeless.ShapelessExample
+                println(ShapelessExample.greek())
+                """
             ),
         )
         self.assertIn("shapeless success", output_lines)

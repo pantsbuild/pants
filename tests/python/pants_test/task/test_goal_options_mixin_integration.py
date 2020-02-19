@@ -22,9 +22,9 @@ class TestGoalOptionsMixinIntegration(PantsRunIntegrationTest):
                 fp.write(
                     textwrap.dedent(
                         """
-        target(name='a', dependencies=[':b'])
-        target(name='b')
-        """
+                        target(name='a', dependencies=[':b'])
+                        target(name='b')
+                        """
                     )
                 )
 

@@ -51,15 +51,15 @@ class Jacoco(CoverageEngine):
 
         def create(self, settings, targets, execute_java_for_targets):
             """
-      :param settings: Generic code coverage settings.
-      :type settings: :class:`CodeCoverageSettings`
-      :param list targets: A list of targets to instrument and record code coverage for.
-      :param execute_java_for_targets: A function that accepts a list of targets whose JVM platform
-                                       constraints are used to pick a JVM `Distribution`. The
-                                       function should also accept `*args` and `**kwargs` compatible
-                                       with the remaining parameters accepted by
-                                       `pants.java.util.execute_java`.
-      """
+            :param settings: Generic code coverage settings.
+            :type settings: :class:`CodeCoverageSettings`
+            :param list targets: A list of targets to instrument and record code coverage for.
+            :param execute_java_for_targets: A function that accepts a list of targets whose JVM platform
+                                             constraints are used to pick a JVM `Distribution`. The
+                                             function should also accept `*args` and `**kwargs` compatible
+                                             with the remaining parameters accepted by
+                                             `pants.java.util.execute_java`.
+            """
 
             agent_path = self.tool_jar_from_products(
                 settings.context.products, "jacoco-agent", scope="jacoco"
@@ -79,15 +79,15 @@ class Jacoco(CoverageEngine):
         self, settings, agent_path, cli_path, targets, target_filters, execute_java_for_targets
     ):
         """
-    :param settings: Generic code coverage settings.
-    :type settings: :class:`CodeCoverageSettings`
-    :param list targets: A list of targets to instrument and record code coverage for.
-    :param execute_java_for_targets: A function that accepts a list of targets whose JVM platform
-                                     constraints are used to pick a JVM `Distribution`. The function
-                                     should also accept `*args` and `**kwargs` compatible with the
-                                     remaining parameters accepted by
-                                     `pants.java.util.execute_java`.
-    """
+        :param settings: Generic code coverage settings.
+        :type settings: :class:`CodeCoverageSettings`
+        :param list targets: A list of targets to instrument and record code coverage for.
+        :param execute_java_for_targets: A function that accepts a list of targets whose JVM platform
+                                         constraints are used to pick a JVM `Distribution`. The function
+                                         should also accept `*args` and `**kwargs` compatible with the
+                                         remaining parameters accepted by
+                                         `pants.java.util.execute_java`.
+        """
         self._settings = settings
         options = settings.options
         self._context = settings.context

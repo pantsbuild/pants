@@ -92,8 +92,8 @@ class StringWriter:
 
     def __init__(self, underlying):
         """
-    :param underlying: Any file-like object which has a write(binary_string) function.
-    """
+        :param underlying: Any file-like object which has a write(binary_string) function.
+        """
         # Called buffer to mirror how sys.stdout and sys.stderr expose this.
         self.buffer = underlying
 

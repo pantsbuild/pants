@@ -45,9 +45,9 @@ class TestPythonAWSLambdaCreation(TestBase):
             "src/python/foo/bar/hello_world.py",
             textwrap.dedent(
                 """
-      def handler(event, context):
-        print('Hello, World!')
-    """
+                def handler(event, context):
+                  print('Hello, World!')
+                """
             ),
         )
 
@@ -55,17 +55,17 @@ class TestPythonAWSLambdaCreation(TestBase):
             "src/python/foo/bar/BUILD",
             textwrap.dedent(
                 """
-      python_library(
-        name='hello_world',
-        sources=['hello_world.py']
-      )
+                python_library(
+                  name='hello_world',
+                  sources=['hello_world.py']
+                )
 
-      python_awslambda(
-        name='hello_world_lambda',
-        dependencies=[':hello_world'],
-        handler='foo.bar.hello_world'
-      )
-    """
+                python_awslambda(
+                  name='hello_world_lambda',
+                  dependencies=[':hello_world'],
+                  handler='foo.bar.hello_world'
+                )
+                """
             ),
         )
 

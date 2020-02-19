@@ -400,29 +400,29 @@ class BaseZincCompileIntegrationTest:
                 buildfile,
                 dedent(
                     """
-                  scala_library(name='a',
-                               sources=['A.scala'])
-                  scala_library(name='b',
-                               sources=['B.scala'],
-                               dependencies=[':a'])
-                  jvm_binary(name='bin',
-                   main='org.pantsbuild.cachetest.B',
-                   dependencies=[':b']
-                  )
-                  """
+                    scala_library(name='a',
+                                 sources=['A.scala'])
+                    scala_library(name='b',
+                                 sources=['B.scala'],
+                                 dependencies=[':a'])
+                    jvm_binary(name='bin',
+                     main='org.pantsbuild.cachetest.B',
+                     dependencies=[':b']
+                    )
+                    """
                 ),
             )
             self.create_file(
                 srcfile,
                 dedent(
                     """
-                          package org.pantsbuild.cachetest
-                          object A {
-                            def x(y: Option[Int] = None) = {
-                              println("x");
-                            }
-                          }
-                          """
+                    package org.pantsbuild.cachetest
+                    object A {
+                      def x(y: Option[Int] = None) = {
+                        println("x");
+                      }
+                    }
+                    """
                 ),
             )
 
@@ -430,12 +430,12 @@ class BaseZincCompileIntegrationTest:
                 srcfile_b,
                 dedent(
                     """
-                                package org.pantsbuild.cachetest
-                                object B extends App {
-                                  A.x();
-                                  System.exit(0);
-                                }
-                                """
+                    package org.pantsbuild.cachetest
+                    object B extends App {
+                      A.x();
+                      System.exit(0);
+                    }
+                    """
                 ),
             )
 
@@ -451,13 +451,13 @@ class BaseZincCompileIntegrationTest:
                 srcfile,
                 dedent(
                     """
-                          package org.pantsbuild.cachetest;
-                          object A {
-                            def x(y: Option[Int] = None, z:Option[Int]=None) = {
-                              println("x");
-                            }
-                          }
-                          """
+                    package org.pantsbuild.cachetest;
+                    object A {
+                      def x(y: Option[Int] = None, z:Option[Int]=None) = {
+                        println("x");
+                      }
+                    }
+                    """
                 ),
             )
             self.run_run(cachetest_bin_spec, config, workdir)
@@ -480,29 +480,29 @@ class BaseZincCompileIntegrationTest:
                 buildfile,
                 dedent(
                     """
-                  java_library(name='cachetest',
-                               sources=['A.java'])
-                  java_library(name='b',
-                               sources=['B.java'],
-                               dependencies=[':a']
-                               )
-                  jvm_binary(name='bin',
-                      main='org.pantsbuild.cachetest.B',
-                      dependencies=[':b']
-                     )
-                  """
+                    java_library(name='cachetest',
+                                 sources=['A.java'])
+                    java_library(name='b',
+                                 sources=['B.java'],
+                                 dependencies=[':a']
+                                 )
+                    jvm_binary(name='bin',
+                        main='org.pantsbuild.cachetest.B',
+                        dependencies=[':b']
+                    )
+                    """
                 ),
             )
             self.create_file(
                 srcfile,
                 dedent(
                     """package org.pantsbuild.cachetest;
-                          class A {
-                            public static void x() {
-                              System.out.println("x");
-                            }
-                          }
-                          """
+                    class A {
+                      public static void x() {
+                        System.out.println("x");
+                      }
+                    }
+                    """
                 ),
             )
 
@@ -510,12 +510,12 @@ class BaseZincCompileIntegrationTest:
                 srcfile_b,
                 dedent(
                     """package org.pantsbuild.cachetest;
-                                class B {
-                                  public static void main(String[] args) {
-                                    A.x();
-                                  }
-                                }
-                                """
+                    class B {
+                      public static void main(String[] args) {
+                        A.x();
+                      }
+                    }
+                    """
                 ),
             )
 
@@ -529,13 +529,13 @@ class BaseZincCompileIntegrationTest:
                 srcfile,
                 dedent(
                     """package org.pantsbuild.cachetest;
-                                class A {
-                                  public static int x() {
-                                    System.out.println("x");
-                                    return 0;
-                                  }
-                                }
-                                """
+                    class A {
+                      public static int x() {
+                        System.out.println("x");
+                        return 0;
+                      }
+                    }
+                    """
                 ),
             )
 

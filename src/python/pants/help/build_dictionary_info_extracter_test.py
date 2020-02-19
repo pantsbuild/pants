@@ -127,12 +127,12 @@ class BuildDictionaryInfoExtracterTest(unittest.TestCase):
         # Test *args, **kwargs situation.
         def generic_func(arg1, arg2=42, *args, **kwargs):
             """
-      :param arg1: The first arg.
-      :param arg2: The second arg.
-      :param args: Some extra varargs.
-      :param arg3: The third arg.
-      :param arg4: The fourth arg (default: 'Foo').
-      """
+            :param arg1: The first arg.
+            :param arg2: The second arg.
+            :param args: Some extra varargs.
+            :param arg3: The third arg.
+            :param arg4: The fourth arg (default: 'Foo').
+            """
 
         self.assertEqual(
             [
@@ -149,9 +149,9 @@ class BuildDictionaryInfoExtracterTest(unittest.TestCase):
         class Target1(Target):
             def __init__(self, arg1, arg2=42, **kwargs):
                 """
-        :param arg1: The first arg.
-        :param arg2: The second arg.
-        """
+                :param arg1: The first arg.
+                :param arg2: The second arg.
+                """
                 super(Target1, self).__init__(**kwargs)
 
         class Target2(Target1):
@@ -225,9 +225,9 @@ class BuildDictionaryInfoExtracterTest(unittest.TestCase):
 
             def __init__(self, bar, baz=42):
                 """
-        :param bar: Bar details.
-        :param int baz: Baz details.
-        """
+                :param bar: Bar details.
+                :param int baz: Baz details.
+                """
 
         bfa = BuildFileAliases(targets={}, objects={"foo": Foo}, context_aware_object_factories={},)
         extracter = BuildDictionaryInfoExtracter(bfa)
@@ -252,9 +252,9 @@ class BuildDictionaryInfoExtracterTest(unittest.TestCase):
 
             def __call__(self, bar, baz=42):
                 """
-        :param bar: Bar details.
-        :param int baz: Baz details.
-        """
+                :param bar: Bar details.
+                :param int baz: Baz details.
+                """
 
         bfa = BuildFileAliases(targets={}, objects={}, context_aware_object_factories={"foo": Foo})
         extracter = BuildDictionaryInfoExtracter(bfa)

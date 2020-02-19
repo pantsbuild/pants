@@ -27,14 +27,14 @@ class SourceMapperTest(TestBase):
             "path",
             dedent(
                 """
-    java_library(name='target',
-                 sources=['BUILD'],
-                 dependencies=[':buildholder']
-    )
-    java_library(name='buildholder',
-                 sources=['BUILD']
-    )
-    """
+                java_library(name='target',
+                             sources=['BUILD'],
+                             dependencies=[':buildholder']
+                )
+                java_library(name='buildholder',
+                             sources=['BUILD']
+                )
+                """
             ),
         )
 

@@ -12,8 +12,8 @@ from pants.util.contextutil import temporary_dir
 
 class BaseCompileIT(PantsRunIntegrationTest):
     """
-  :API: public
-  """
+    :API: public
+    """
 
     _EXTRA_TASK_ARGS: List[str] = []
 
@@ -72,8 +72,8 @@ class BaseCompileIT(PantsRunIntegrationTest):
         self, workdir, cacheurl, target, clean_all=False, extra_args=None, test=False
     ):
         """
-    :API: public
-    """
+        :API: public
+        """
         config = {
             "cache": {"write": True, "write_to": [cacheurl],},
         }

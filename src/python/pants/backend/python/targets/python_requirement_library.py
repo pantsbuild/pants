@@ -16,9 +16,9 @@ class PythonRequirementLibrary(Target):
 
     def __init__(self, payload=None, requirements=None, **kwargs):
         """
-    :param requirements: pip requirements as `python_requirement <#python_requirement>`_\\s.
-    :type requirements: List of python_requirement calls
-    """
+        :param requirements: pip requirements as `python_requirement <#python_requirement>`_\\s.
+        :type requirements: List of python_requirement calls
+        """
         payload = payload or Payload()
 
         assert_list(requirements, expected_type=PythonRequirement, key_arg="requirements")

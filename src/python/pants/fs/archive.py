@@ -66,16 +66,16 @@ class TarArchiver(Archiver):
 
     def __init__(self, mode, extension):
         """
-    :API: public
-    """
+        :API: public
+        """
         super().__init__(extension)
         self.mode = mode
         self.extension = extension
 
     def create(self, basedir, outdir, name, prefix=None, dereference=True):
         """
-    :API: public
-    """
+        :API: public
+        """
 
         basedir = ensure_text(basedir)
         tarpath = os.path.join(outdir, "{}.{}".format(ensure_text(name), self.extension))
@@ -155,8 +155,8 @@ class XZCompressedTarArchiver(TarArchiver):
     # TODO: implement this method, if we ever need it.
     def create(self, *args, **kwargs):
         """
-    :raises: :class:`NotImplementedError`
-    """
+        :raises: :class:`NotImplementedError`
+        """
         raise NotImplementedError("XZCompressedTarArchiver can only extract, not create archives!")
 
 
@@ -182,16 +182,16 @@ class ZipArchiver(Archiver):
 
     def __init__(self, compression, extension):
         """
-    :API: public
-    """
+        :API: public
+        """
         super().__init__(extension)
         self.compression = compression
         self.extension = extension
 
     def create(self, basedir, outdir, name, prefix=None):
         """
-    :API: public
-    """
+        :API: public
+        """
         zippath = os.path.join(outdir, "{}.{}".format(name, self.extension))
         with open_zip(zippath, "w", compression=self.compression) as zip:
             # For symlinks, we want to archive the actual content of linked files but

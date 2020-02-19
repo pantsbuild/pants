@@ -1,6 +1,8 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from textwrap import dedent
+
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -12,11 +14,14 @@ class ClocIntegrationTest(PantsRunIntegrationTest):
         stdout = "\n".join(pants_run.stdout_data.split("\n")[1:])
         self.assertEqual(
             stdout,
-            """-------------------------------------------------------------------------------
-Language                     files          blank        comment           code
--------------------------------------------------------------------------------
-Python                           1              2              2              2
--------------------------------------------------------------------------------
+            dedent(
+                """\
+                -------------------------------------------------------------------------------
+                Language                     files          blank        comment           code
+                -------------------------------------------------------------------------------
+                Python                           1              2              2              2
+                -------------------------------------------------------------------------------
 
-""",
+                """
+            ),
         )

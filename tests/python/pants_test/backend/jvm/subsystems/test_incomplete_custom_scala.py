@@ -97,9 +97,9 @@ class IncompleteCustomScalaIntegrationTest(PantsRunIntegrationTest):
                 "testprojects/src/scala/org/pantsbuild/testproject/custom_scala_platform",
                 dedent(
                     """
-            import org.pantsbuild.testproject.custom_scala_platform
-            Hello.main(Seq("World").toArray))
-          """
+                    import org.pantsbuild.testproject.custom_scala_platform
+                    Hello.main(Seq("World").toArray))
+                    """
                 ),
                 options=[
                     "--scala-version=custom",

@@ -13,10 +13,10 @@ from common import die
 
 EXPECTED_HEADER = dedent(
     """\
-  # Copyright YYYY Pants project contributors (see CONTRIBUTORS.md).
-  # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-  """
+    # Copyright YYYY Pants project contributors (see CONTRIBUTORS.md).
+    # Licensed under the Apache License, Version 2.0 (see LICENSE).
+    
+    """
 )
 
 EXPECTED_NUM_LINES = 3

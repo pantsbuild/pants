@@ -105,9 +105,9 @@ def fmt_param_edge(
     param_color_fmt_str = GraphVertexType.param.graph_vertex_color_fmt_str()
     return dedent(
         f"""\
-    "Param({param.__name__})" {param_color_fmt_str}    "{via_func_str}
-    for {product_name}" -> {{{return_str}}}\
-    """
+        "Param({param.__name__})" {param_color_fmt_str}    "{via_func_str}
+        for {product_name}" -> {{{return_str}}}\
+        """
     )
 
 
@@ -176,8 +176,8 @@ def fmt_non_param_edge(
 
     return dedent(
         f"""\
-    {spacing}"{via_func_subject}{before_return}" {via_return_func}\
-    """
+        {spacing}"{via_func_subject}{before_return}" {via_return_func}\
+        """
     )
 
 
@@ -386,10 +386,10 @@ class RuleGraphTest(TestBase):
         self.assert_equal_with_printing(
             dedent(
                 f"""\
-        Rules with errors: 1
-          {fmt_rule(a_from_b_noop)}:
-            No rule was available to compute B with parameter type SubA
-        """
+                Rules with errors: 1
+                  {fmt_rule(a_from_b_noop)}:
+                    No rule was available to compute B with parameter type SubA
+                """
             ).strip(),
             str(cm.exception),
         )
@@ -422,18 +422,18 @@ class RuleGraphTest(TestBase):
             self,
             dedent(
                 f"""\
-      Rules with errors: 3
-        {fmt_rule(a_from_b_and_c)}:
-          Was not reachable, either because no rules could produce the params or because it was shadowed by another @rule.
-        {fmt_rule(a_from_c_and_b)}:
-          Was not reachable, either because no rules could produce the params or because it was shadowed by another @rule.
-        {fmt_rule(d_from_a)}:
-          Ambiguous rules to compute A with parameter types (B, C):
-            {fmt_graph_rule(a_from_b_and_c)}
-      for (B, C)
-            {fmt_graph_rule(a_from_c_and_b)}
-      for (B, C)
-      """
+                Rules with errors: 3
+                  {fmt_rule(a_from_b_and_c)}:
+                    Was not reachable, either because no rules could produce the params or because it was shadowed by another @rule.
+                  {fmt_rule(a_from_c_and_b)}:
+                    Was not reachable, either because no rules could produce the params or because it was shadowed by another @rule.
+                  {fmt_rule(d_from_a)}:
+                    Ambiguous rules to compute A with parameter types (B, C):
+                      {fmt_graph_rule(a_from_b_and_c)}
+                for (B, C)
+                      {fmt_graph_rule(a_from_c_and_b)}
+                for (B, C)
+                """
             ),
             str(cm.exception),
         )
@@ -450,11 +450,11 @@ class RuleGraphTest(TestBase):
         self.assert_equal_with_printing(
             dedent(
                 f"""\
-        Rules with errors: 1
-          {fmt_rule(a_from_b_and_c)}:
-            No rule was available to compute B with parameter type SubA
-            No rule was available to compute C with parameter type SubA
-        """
+                Rules with errors: 1
+                  {fmt_rule(a_from_b_and_c)}:
+                    No rule was available to compute B with parameter type SubA
+                    No rule was available to compute C with parameter type SubA
+                """
             ).strip(),
             str(cm.exception),
         )
@@ -487,12 +487,12 @@ class RuleGraphTest(TestBase):
         self.assert_equal_with_printing(
             dedent(
                 f"""\
-        Rules with errors: 2
-          {fmt_rule(a_from_b)}:
-            No rule was available to compute B with parameter type C
-          {fmt_rule(b_from_suba)}:
-            No rule was available to compute SubA with parameter type C
-        """
+                Rules with errors: 2
+                  {fmt_rule(a_from_b)}:
+                    No rule was available to compute B with parameter type C
+                  {fmt_rule(b_from_suba)}:
+                    No rule was available to compute SubA with parameter type C
+                """
             ).strip(),
             str(cm.exception),
         )
@@ -519,10 +519,10 @@ class RuleGraphTest(TestBase):
         self.assert_equal_with_printing(
             dedent(
                 f"""\
-        Rules with errors: 1
-          {fmt_rule(d_from_c)}:
-            No rule was available to compute C with parameter type A
-        """
+                Rules with errors: 1
+                  {fmt_rule(d_from_c)}:
+                    No rule was available to compute C with parameter type A
+                """
             ).strip(),
             str(cm.exception),
         )
@@ -556,14 +556,14 @@ class RuleGraphTest(TestBase):
             self,
             dedent(
                 f"""\
-      Rules with errors: 3
-        {fmt_rule(a_from_c)}:
-          Was not reachable, either because no rules could produce the params or because it was shadowed by another @rule.
-        {fmt_rule(b_from_d)}:
-          No rule was available to compute D with parameter type SubA
-        {fmt_rule(d_from_a_and_suba, gets=[("A", "C")])}:
-          No rule was available to compute A with parameter type SubA
-      """
+                Rules with errors: 3
+                  {fmt_rule(a_from_c)}:
+                    Was not reachable, either because no rules could produce the params or because it was shadowed by another @rule.
+                  {fmt_rule(b_from_d)}:
+                    No rule was available to compute D with parameter type SubA
+                  {fmt_rule(d_from_a_and_suba, gets=[("A", "C")])}:
+                    No rule was available to compute A with parameter type SubA
+                """
             ).strip(),
             str(cm.exception),
         )
@@ -591,10 +591,10 @@ class RuleGraphTest(TestBase):
         self.assert_equal_with_printing(
             dedent(
                 f"""\
-        Rules with errors: 1
-          {fmt_rule(d_for_b)}:
-            Was not reachable, either because no rules could produce the params or because it was shadowed by another @rule.
-        """
+                Rules with errors: 1
+                  {fmt_rule(d_for_b)}:
+                    Was not reachable, either because no rules could produce the params or because it was shadowed by another @rule.
+                """
             ).strip(),
             str(cm.exception),
         )
@@ -614,14 +614,14 @@ class RuleGraphTest(TestBase):
             self,
             dedent(
                 f"""\
-      digraph {{
-        // root subject types: SubA
-        // root entries
-      {fmt_non_param_edge(A, SubA)}
-      {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_suba))}
-        // internal entries
-      {fmt_param_edge(SubA, SubA, RuleFormatRequest(a_from_suba))}
-      }}"""
+                digraph {{
+                  // root subject types: SubA
+                  // root entries
+                {fmt_non_param_edge(A, SubA)}
+                {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_suba))}
+                  // internal entries
+                {fmt_param_edge(SubA, SubA, RuleFormatRequest(a_from_suba))}
+                }}"""
             ).strip(),
             fullgraph,
         )
@@ -677,22 +677,22 @@ class RuleGraphTest(TestBase):
             self,
             dedent(
                 f"""\
-      digraph {{
-        // root subject types: A, SubA
-        // root entries
-      {fmt_non_param_edge(A, A)}
-      {fmt_param_edge(A, A, A)}
-      {fmt_non_param_edge(A, SubA)}
-      {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_suba))}
-      {fmt_non_param_edge(B, A)}
-      {fmt_non_param_edge(B, A, RuleFormatRequest(b_from_a))}
-      {fmt_non_param_edge(B, SubA)}
-      {fmt_non_param_edge(B, SubA, RuleFormatRequest(b_from_a))}
-        // internal entries
-      {fmt_non_param_edge(b_from_a, SubA, RuleFormatRequest(a_from_suba))}
-      {fmt_param_edge(A, A, RuleFormatRequest(b_from_a))}
-      {fmt_param_edge(SubA, SubA, RuleFormatRequest(a_from_suba))}
-      }}"""
+                digraph {{
+                  // root subject types: A, SubA
+                  // root entries
+                {fmt_non_param_edge(A, A)}
+                {fmt_param_edge(A, A, A)}
+                {fmt_non_param_edge(A, SubA)}
+                {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_suba))}
+                {fmt_non_param_edge(B, A)}
+                {fmt_non_param_edge(B, A, RuleFormatRequest(b_from_a))}
+                {fmt_non_param_edge(B, SubA)}
+                {fmt_non_param_edge(B, SubA, RuleFormatRequest(b_from_a))}
+                  // internal entries
+                {fmt_non_param_edge(b_from_a, SubA, RuleFormatRequest(a_from_suba))}
+                {fmt_param_edge(A, A, RuleFormatRequest(b_from_a))}
+                {fmt_param_edge(SubA, SubA, RuleFormatRequest(a_from_suba))}
+                }}"""
             ).strip(),
             fullgraph,
         )
@@ -712,14 +712,14 @@ class RuleGraphTest(TestBase):
             self,
             dedent(
                 f"""\
-      digraph {{
-        // root subject types: SubA
-        // root entries
-      {fmt_non_param_edge(A, SubA)}
-      {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_suba))}
-        // internal entries
-      {fmt_param_edge(SubA, SubA, RuleFormatRequest(a_from_suba))}
-      }}"""
+                digraph {{
+                  // root subject types: SubA
+                  // root entries
+                {fmt_non_param_edge(A, SubA)}
+                {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_suba))}
+                  // internal entries
+                {fmt_param_edge(SubA, SubA, RuleFormatRequest(a_from_suba))}
+                }}"""
             ).strip(),
             subgraph,
         )
@@ -744,16 +744,16 @@ class RuleGraphTest(TestBase):
             self,
             dedent(
                 f"""\
-      digraph {{
-        // root subject types: SubA
-        // root entries
-      {fmt_non_param_edge(A, SubA)}
-      {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_suba_and_b))}
-        // internal entries
-      {fmt_non_param_edge(b, (), rule_type=GraphVertexType.inner)}
-      {fmt_non_param_edge(b, (), rule_type=GraphVertexType.singleton)}
-      {fmt_param_edge(SubA, SubA, RuleFormatRequest(a_from_suba_and_b), RuleFormatRequest(b, ()))}
-      }}"""
+                digraph {{
+                  // root subject types: SubA
+                  // root entries
+                {fmt_non_param_edge(A, SubA)}
+                {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_suba_and_b))}
+                  // internal entries
+                {fmt_non_param_edge(b, (), rule_type=GraphVertexType.inner)}
+                {fmt_non_param_edge(b, (), rule_type=GraphVertexType.singleton)}
+                {fmt_param_edge(SubA, SubA, RuleFormatRequest(a_from_suba_and_b), RuleFormatRequest(b, ()))}
+                }}"""
             ).strip(),
             subgraph,
         )
@@ -789,18 +789,18 @@ class RuleGraphTest(TestBase):
             self,
             dedent(
                 f"""\
-      digraph {{
-        // root subject types: SubA
-        // root entries
-      {fmt_non_param_edge(A, SubA)}
-      {fmt_non_param_edge(A, SubA, return_func=RuleFormatRequest(a, gets=[("B", "C")]))}
-        // internal entries
-      {fmt_non_param_edge(b_from_suba, C, return_func=RuleFormatRequest(suba_from_c))}
-      {fmt_param_edge(C, C, RuleFormatRequest(suba_from_c))}
-      {fmt_param_edge(SubA, SubA, via_func=RuleFormatRequest(a, gets=[("B", "C")]), return_func=RuleFormatRequest(b_from_suba, C))}
-      {fmt_param_edge(SubA, SubA, RuleFormatRequest(b_from_suba))}
-      }}
-      """
+                digraph {{
+                  // root subject types: SubA
+                  // root entries
+                {fmt_non_param_edge(A, SubA)}
+                {fmt_non_param_edge(A, SubA, return_func=RuleFormatRequest(a, gets=[("B", "C")]))}
+                  // internal entries
+                {fmt_non_param_edge(b_from_suba, C, return_func=RuleFormatRequest(suba_from_c))}
+                {fmt_param_edge(C, C, RuleFormatRequest(suba_from_c))}
+                {fmt_param_edge(SubA, SubA, via_func=RuleFormatRequest(a, gets=[("B", "C")]), return_func=RuleFormatRequest(b_from_suba, C))}
+                {fmt_param_edge(SubA, SubA, RuleFormatRequest(b_from_suba))}
+                }}
+                """
             ).strip(),
             subgraph,
         )
@@ -825,15 +825,15 @@ class RuleGraphTest(TestBase):
             self,
             dedent(
                 f"""\
-      digraph {{
-        // root subject types: SubA
-        // root entries
-      {fmt_non_param_edge(A, SubA)}
-      {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_b))}
-        // internal entries
-      {fmt_non_param_edge(a_from_b, SubA, RuleFormatRequest(b_from_suba))}
-      {fmt_param_edge(SubA, SubA, via_func=RuleFormatRequest(b_from_suba))}
-      }}"""
+                digraph {{
+                  // root subject types: SubA
+                  // root entries
+                {fmt_non_param_edge(A, SubA)}
+                {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_b))}
+                  // internal entries
+                {fmt_non_param_edge(a_from_b, SubA, RuleFormatRequest(b_from_suba))}
+                {fmt_param_edge(SubA, SubA, via_func=RuleFormatRequest(b_from_suba))}
+                }}"""
             ).strip(),
             subgraph,
         )
@@ -863,15 +863,15 @@ class RuleGraphTest(TestBase):
             self,
             dedent(
                 f"""\
-      digraph {{
-        // root subject types: SubA
-        // root entries
-      {fmt_non_param_edge(A, ())}
-      {fmt_non_param_edge(a, (), rule_type=GraphVertexType.singleton)}
-      {fmt_non_param_edge(A, (), RuleFormatRequest(a))}
-        // internal entries
-      {fmt_non_param_edge(a, (), rule_type=GraphVertexType.inner)}
-      }}"""
+                digraph {{
+                  // root subject types: SubA
+                  // root entries
+                {fmt_non_param_edge(A, ())}
+                {fmt_non_param_edge(a, (), rule_type=GraphVertexType.singleton)}
+                {fmt_non_param_edge(A, (), RuleFormatRequest(a))}
+                  // internal entries
+                {fmt_non_param_edge(a, (), rule_type=GraphVertexType.inner)}
+                }}"""
             ).strip(),
             subgraph,
         )
@@ -896,15 +896,15 @@ class RuleGraphTest(TestBase):
             self,
             dedent(
                 f"""\
-      digraph {{
-        // root subject types: SubA
-        // root entries
-      {fmt_non_param_edge(A, ())}
-      {fmt_non_param_edge(a, (), rule_type=GraphVertexType.singleton)}
-      {fmt_non_param_edge(A, (), RuleFormatRequest(a))}
-        // internal entries
-      {fmt_non_param_edge(a, (), rule_type=GraphVertexType.inner)}
-      }}"""
+                digraph {{
+                  // root subject types: SubA
+                  // root entries
+                {fmt_non_param_edge(A, ())}
+                {fmt_non_param_edge(a, (), rule_type=GraphVertexType.singleton)}
+                {fmt_non_param_edge(A, (), RuleFormatRequest(a))}
+                  // internal entries
+                {fmt_non_param_edge(a, (), rule_type=GraphVertexType.inner)}
+                }}"""
             ).strip(),
             fullgraph,
         )
@@ -931,17 +931,17 @@ class RuleGraphTest(TestBase):
             self,
             dedent(
                 f"""\
-      digraph {{
-        // root subject types: C, D
-        // root entries
-      {fmt_non_param_edge(A, C)}
-      {fmt_non_param_edge(A, C, RuleFormatRequest(a_from_c))}
-      {fmt_non_param_edge(B, (C, D))}
-      {fmt_non_param_edge(B, (C, D), RuleFormatRequest(b_from_d_and_a))}
-        // internal entries
-      {fmt_param_edge(C, C, RuleFormatRequest(a_from_c))}
-      {fmt_param_edge(D, (C, D), RuleFormatRequest(b_from_d_and_a), return_func=RuleFormatRequest(a_from_c, C))}
-      }}"""
+                digraph {{
+                  // root subject types: C, D
+                  // root entries
+                {fmt_non_param_edge(A, C)}
+                {fmt_non_param_edge(A, C, RuleFormatRequest(a_from_c))}
+                {fmt_non_param_edge(B, (C, D))}
+                {fmt_non_param_edge(B, (C, D), RuleFormatRequest(b_from_d_and_a))}
+                  // internal entries
+                {fmt_param_edge(C, C, RuleFormatRequest(a_from_c))}
+                {fmt_param_edge(D, (C, D), RuleFormatRequest(b_from_d_and_a), return_func=RuleFormatRequest(a_from_c, C))}
+                }}"""
             ).strip(),
             fullgraph,
         )
@@ -973,15 +973,15 @@ class RuleGraphTest(TestBase):
             self,
             dedent(
                 f"""\
-      digraph {{
-        // root subject types: SubA
-        // root entries
-      {fmt_non_param_edge(A, ())}
-      {fmt_non_param_edge(a, (), rule_type=GraphVertexType.singleton)}
-      {fmt_non_param_edge(A, (), RuleFormatRequest(a))}
-        // internal entries
-      {fmt_non_param_edge(a, (), rule_type=GraphVertexType.inner)}
-      }}"""
+                digraph {{
+                  // root subject types: SubA
+                  // root entries
+                {fmt_non_param_edge(A, ())}
+                {fmt_non_param_edge(a, (), rule_type=GraphVertexType.singleton)}
+                {fmt_non_param_edge(A, (), RuleFormatRequest(a))}
+                  // internal entries
+                {fmt_non_param_edge(a, (), rule_type=GraphVertexType.inner)}
+                }}"""
             ).strip(),
             subgraph,
         )
@@ -1006,16 +1006,16 @@ class RuleGraphTest(TestBase):
             self,
             dedent(
                 f"""\
-      digraph {{
-        // root subject types: SubA
-        // root entries
-      {fmt_non_param_edge(A, SubA)}
-      {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_suba))}
-        // internal entries
-      {fmt_non_param_edge(b_singleton, (), rule_type=GraphVertexType.inner)}
-      {fmt_non_param_edge(b_singleton, (), rule_type=GraphVertexType.singleton)}
-      {fmt_param_edge(SubA, SubA, via_func=RuleFormatRequest(a_from_suba), return_func=RuleFormatRequest(b_singleton, ()))}
-      }}"""
+                digraph {{
+                  // root subject types: SubA
+                  // root entries
+                {fmt_non_param_edge(A, SubA)}
+                {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_suba))}
+                  // internal entries
+                {fmt_non_param_edge(b_singleton, (), rule_type=GraphVertexType.inner)}
+                {fmt_non_param_edge(b_singleton, (), rule_type=GraphVertexType.singleton)}
+                {fmt_param_edge(SubA, SubA, via_func=RuleFormatRequest(a_from_suba), return_func=RuleFormatRequest(b_singleton, ()))}
+                }}"""
             ).strip(),
             subgraph,
         )
@@ -1045,15 +1045,15 @@ class RuleGraphTest(TestBase):
             self,
             dedent(
                 f"""\
-      digraph {{
-        // root subject types: SubA
-        // root entries
-      {fmt_non_param_edge(B, SubA)}
-      {fmt_non_param_edge(B, SubA, RuleFormatRequest(b_from_a))}
-        // internal entries
-      {fmt_non_param_edge(RuleFormatRequest(b_from_a), SubA, RuleFormatRequest(a_from_suba))}
-      {fmt_param_edge(SubA, SubA, RuleFormatRequest(a_from_suba))}
-      }}"""
+                digraph {{
+                  // root subject types: SubA
+                  // root entries
+                {fmt_non_param_edge(B, SubA)}
+                {fmt_non_param_edge(B, SubA, RuleFormatRequest(b_from_a))}
+                  // internal entries
+                {fmt_non_param_edge(RuleFormatRequest(b_from_a), SubA, RuleFormatRequest(a_from_suba))}
+                {fmt_param_edge(SubA, SubA, RuleFormatRequest(a_from_suba))}
+                }}"""
             ).strip(),
             subgraph,
         )
@@ -1083,20 +1083,20 @@ class RuleGraphTest(TestBase):
             self,
             dedent(
                 f"""\
-      digraph {{
-        // root subject types: SubA
-        // root entries
-      {fmt_non_param_edge(A, SubA)}
-      {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_suba))}
-      {fmt_non_param_edge(B, SubA)}
-      {fmt_non_param_edge(B, SubA, RuleFormatRequest(b_from_a))}
-      {fmt_non_param_edge(C, SubA)}
-      {fmt_non_param_edge(C, SubA, RuleFormatRequest(c_from_a))}
-        // internal entries
-      {fmt_non_param_edge(b_from_a, SubA, RuleFormatRequest(a_from_suba))}
-      {fmt_non_param_edge(c_from_a, SubA, RuleFormatRequest(a_from_suba))}
-      {fmt_param_edge(SubA, SubA, RuleFormatRequest(a_from_suba))}
-      }}"""
+                digraph {{
+                  // root subject types: SubA
+                  // root entries
+                {fmt_non_param_edge(A, SubA)}
+                {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_suba))}
+                {fmt_non_param_edge(B, SubA)}
+                {fmt_non_param_edge(B, SubA, RuleFormatRequest(b_from_a))}
+                {fmt_non_param_edge(C, SubA)}
+                {fmt_non_param_edge(C, SubA, RuleFormatRequest(c_from_a))}
+                  // internal entries
+                {fmt_non_param_edge(b_from_a, SubA, RuleFormatRequest(a_from_suba))}
+                {fmt_non_param_edge(c_from_a, SubA, RuleFormatRequest(a_from_suba))}
+                {fmt_param_edge(SubA, SubA, RuleFormatRequest(a_from_suba))}
+                }}"""
             ).strip(),
             subgraph,
         )
@@ -1121,17 +1121,17 @@ class RuleGraphTest(TestBase):
             self,
             dedent(
                 f"""\
-      digraph {{
-        // root subject types: SubA
-        // root entries
-      {fmt_non_param_edge(A, ())}
-      {fmt_non_param_edge(RuleFormatRequest(a, gets=[("B", "D")]), (), rule_type=GraphVertexType.singleton)}
-      {fmt_non_param_edge(A, (), RuleFormatRequest(a, gets=[("B", "D")]))}
-        // internal entries
-      {fmt_non_param_edge(RuleFormatRequest(a, (), gets=[("B", "D")]), D, RuleFormatRequest(b_from_d),
-                          append_for_product=False)}
-      {fmt_param_edge(D, D, RuleFormatRequest(b_from_d))}
-      }}"""
+                digraph {{
+                  // root subject types: SubA
+                  // root entries
+                {fmt_non_param_edge(A, ())}
+                {fmt_non_param_edge(RuleFormatRequest(a, gets=[("B", "D")]), (), rule_type=GraphVertexType.singleton)}
+                {fmt_non_param_edge(A, (), RuleFormatRequest(a, gets=[("B", "D")]))}
+                  // internal entries
+                {fmt_non_param_edge(RuleFormatRequest(a, (), gets=[("B", "D")]), D, RuleFormatRequest(b_from_d),
+                                    append_for_product=False)}
+                {fmt_param_edge(D, D, RuleFormatRequest(b_from_d))}
+                }}"""
             ).strip(),
             subgraph,
         )

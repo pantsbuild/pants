@@ -128,16 +128,16 @@ class Bundle:
 
     def __call__(self, rel_path=None, mapper=None, relative_to=None, fileset=None):
         """
-    :param rel_path: Base path of the "source" file paths. By default, path of the
-      BUILD file. Useful for assets that don't live in the source code repo.
-    :param mapper: Function that takes a path string and returns a path string. Takes a path in
-      the source tree, returns a path to use in the resulting bundle. By default, an identity
-      mapper.
-    :param string relative_to: Set up a simple mapping from source path to bundle path.
-    :param fileset: The set of files to include in the bundle.  A string filename, or list of
-      filenames, or a Fileset object (e.g. globs()).
-      E.g., ``relative_to='common'`` removes that prefix from all files in the application bundle.
-    """
+        :param rel_path: Base path of the "source" file paths. By default, path of the
+          BUILD file. Useful for assets that don't live in the source code repo.
+        :param mapper: Function that takes a path string and returns a path string. Takes a path in
+          the source tree, returns a path to use in the resulting bundle. By default, an identity
+          mapper.
+        :param string relative_to: Set up a simple mapping from source path to bundle path.
+        :param fileset: The set of files to include in the bundle.  A string filename, or list of
+          filenames, or a Fileset object (e.g. globs()).
+          E.g., ``relative_to='common'`` removes that prefix from all files in the application bundle.
+        """
 
         if fileset is None:
             raise ValueError(
@@ -230,17 +230,17 @@ class AppBase(Target):
         **kwargs
     ):
         """
-    :param string binary: Target spec of the ``jvm_binary`` or the ``python_binary``
-      that contains the app main.
-    :param bundles: One or more ``bundle``\\s
-      describing "extra files" that should be included with this app
-      (e.g.: config files, startup scripts).
-    :param string basename: Name of this application, if different from the
-      ``name``. Optionally pants uses this in the ``bundle`` goal to name the distribution
-      artifact.  Note this is unsafe because of the possible conflict when multiple bundles
-      are built.
-    :param string archive: Create an archive of this type from the bundle.
-    """
+        :param string binary: Target spec of the ``jvm_binary`` or the ``python_binary``
+          that contains the app main.
+        :param bundles: One or more ``bundle``\\s
+          describing "extra files" that should be included with this app
+          (e.g.: config files, startup scripts).
+        :param string basename: Name of this application, if different from the
+          ``name``. Optionally pants uses this in the ``bundle`` goal to name the distribution
+          artifact.  Note this is unsafe because of the possible conflict when multiple bundles
+          are built.
+        :param string archive: Create an archive of this type from the bundle.
+        """
         if name == basename:
             raise TargetDefinitionException(self, "basename must not equal name.")
 

@@ -58,15 +58,15 @@ class TestJvmAppIntegrationTest(PantsRunIntegrationTest):
         original_content = build_path.read_text()
         new_content = dedent(
             """\
-      jvm_app(
-        name='missing-files',
-        basename = 'bundle-example',
-        binary=':bundle-bin',
-        bundles=[
-          bundle(fileset=['data/no-such-file']),
-        ]
-      )
-      """
+            jvm_app(
+              name='missing-files',
+              basename = 'bundle-example',
+              binary=':bundle-bin',
+              bundles=[
+                bundle(fileset=['data/no-such-file']),
+              ]
+            )
+            """
         )
         with self.with_overwritten_file_content(
             str(build_path), f"{original_content}\n{new_content}"

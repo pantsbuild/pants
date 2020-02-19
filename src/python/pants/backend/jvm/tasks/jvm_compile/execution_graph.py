@@ -34,15 +34,16 @@ class Job:
     ):
         """
 
-    :param key: Key used to reference and look up jobs
-    :param fn callable: The work to perform
-    :param dependencies: List of keys for dependent jobs
-    :param size: Estimated job size used for prioritization
-    :param on_success: Zero parameter callback to run if job completes successfully. Run on main
-                       thread.
-    :param on_failure: Zero parameter callback to run if job completes successfully. Run on main
-                       thread.
-    :param run_asap: Boolean indicating whether or not to queue job immediately once unblocked."""
+        :param key: Key used to reference and look up jobs
+        :param fn callable: The work to perform
+        :param dependencies: List of keys for dependent jobs
+        :param size: Estimated job size used for prioritization
+        :param on_success: Zero parameter callback to run if job completes successfully. Run on main
+                           thread.
+        :param on_failure: Zero parameter callback to run if job completes successfully. Run on main
+                           thread.
+        :param run_asap: Boolean indicating whether or not to queue job immediately once unblocked.
+        """
         self.key = key
         self.fn = fn
         self.dependencies = dependencies
@@ -174,8 +175,8 @@ class ExecutionGraph:
     def __init__(self, job_list, print_stack_trace):
         """
 
-    :param job_list Job: list of Jobs to schedule and run.
-    """
+        :param job_list Job: list of Jobs to schedule and run.
+        """
         self._print_stack_trace = print_stack_trace
         self._dependencies = defaultdict(list)
         self._dependees = defaultdict(list)

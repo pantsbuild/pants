@@ -13,8 +13,8 @@ class ScopeInfoIterator:
 
     def __init__(self, scope_to_info):
         """
-    :param dict scope_to_info: A map of scope name -> ScopeInfo instance.
-    """
+        :param dict scope_to_info: A map of scope name -> ScopeInfo instance.
+        """
         self._scope_to_info = scope_to_info
 
     def iterate(self, scopes):

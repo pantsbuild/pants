@@ -41,21 +41,21 @@ class NodeResolveIntegrationTest(PantsRunIntegrationTest):
         return dedent(
             (
                 """{{
-        "name": "{target_name}",
-        "version": "1.0.1",
-        "description": "Pantsbuild hello for Node.js",
-        "main": "index.js",
-        "repository": "https://github.com/pantsbuild/pants.git",
-        "author": "pantsbuild",
-        "scripts": {{
-          "start": "babel-node index.js"
-        }},
-        "devDependencies": {{
-          "babel-cli": "^6.22.2",
-          "babel-preset-latest": "^6.22.0"
-        }}
-      }}
-      """
+                  "name": "{target_name}",
+                  "version": "1.0.1",
+                  "description": "Pantsbuild hello for Node.js",
+                  "main": "index.js",
+                  "repository": "https://github.com/pantsbuild/pants.git",
+                  "author": "pantsbuild",
+                  "scripts": {{
+                    "start": "babel-node index.js"
+                  }},
+                  "devDependencies": {{
+                    "babel-cli": "^6.22.2",
+                    "babel-preset-latest": "^6.22.0"
+                  }}
+                }}
+                """
             ).format(target_name=target_name)
         )
 

@@ -49,8 +49,8 @@ class RunJvmPrepCommandBase(Task):
     @classmethod
     def prepare(cls, options, round_manager):
         """
-    :API: public
-    """
+        :API: public
+        """
         super().prepare(options, round_manager)
         round_manager.require_data("compile_classpath")
         if not cls.classpath_product_only:

@@ -34,11 +34,11 @@ class SortTargetsTest(BaseSortTargetsTest):
                 path,
                 dedent(
                     """
-          python_library(name='{name}',
-            sources=[],
-            dependencies=[{all_deps}]
-          )
-          """.format(
+                    python_library(name='{name}',
+                      sources=[],
+                      dependencies=[{all_deps}]
+                    )
+                    """.format(
                         name=name, all_deps=",".join(all_deps)
                     )
                 ),

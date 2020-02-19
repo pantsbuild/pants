@@ -89,65 +89,65 @@ class HtmlReporter(Reporter):
     # below allows us to show a running timer in the browser while the workunit is executing.
     _start_workunit_fmt_string = dedent(
         """
-    <div id="__{id}__content">
-      <div id="{id}">
-        <div class="toggle-header" id="{id}-header">
-          <div class="toggle-header-icon" onclick="pants.collapsible.toggle('{id}')">
-            <i id="{id}-icon" class="visibility-icon icon-large icon-caret-{icon_caret} hidden"></i>
-          </div>
-          <div class="toggle-header-text">
-            <div class="timeprefix">
-              <span class="timestamp">{workunit.start_time_string}</span>
-              <span class="timedelta">{workunit.start_delta_string}</span>
+        <div id="__{id}__content">
+          <div id="{id}">
+            <div class="toggle-header" id="{id}-header">
+              <div class="toggle-header-icon" onclick="pants.collapsible.toggle('{id}')">
+                <i id="{id}-icon" class="visibility-icon icon-large icon-caret-{icon_caret} hidden"></i>
+              </div>
+              <div class="toggle-header-text">
+                <div class="timeprefix">
+                  <span class="timestamp">{workunit.start_time_string}</span>
+                  <span class="timedelta">{workunit.start_delta_string}</span>
+                </div>
+                [<span id="{id}-header-text">{workunit.name}</span>]
+                <span class="timer" id="{id}-timer"></span>
+                <i class="icon-{icon}"></i>
+                <span class="aborted nodisplay" id="{id}-aborted">ctrl-c</span>
+                <span class="unaccounted-time nodisplay" id="{id}-unaccounted-time"></span>
+              </div>
+              <div id="{id}-spinner"><i class="icon-spinner icon-spin icon-large"></i></div>
             </div>
-            [<span id="{id}-header-text">{workunit.name}</span>]
-            <span class="timer" id="{id}-timer"></span>
-            <i class="icon-{icon}"></i>
-            <span class="aborted nodisplay" id="{id}-aborted">ctrl-c</span>
-            <span class="unaccounted-time nodisplay" id="{id}-unaccounted-time"></span>
+            <div class="toggle-content {display_class}" id="{id}-content"></div>
           </div>
-          <div id="{id}-spinner"><i class="icon-spinner icon-spin icon-large"></i></div>
         </div>
-        <div class="toggle-content {display_class}" id="{id}-content"></div>
-      </div>
-    </div>
-    <script>
-      $(function() {{
-        if ('{parent_id}' !== '') {{
-          pants.append('#__{id}__content', '#{parent_id}-content');
-          $('#{parent_id}-icon').removeClass('hidden');
-          pants.timerManager.startTimer('{id}', '#{id}-timer', 1000 * {workunit.start_time});
-        }}
-      }});
-    </script>
-  """
+        <script>
+          $(function() {{
+            if ('{parent_id}' !== '') {{
+              pants.append('#__{id}__content', '#{parent_id}-content');
+              $('#{parent_id}-icon').removeClass('hidden');
+              pants.timerManager.startTimer('{id}', '#{id}-timer', 1000 * {workunit.start_time});
+            }}
+          }});
+        </script>
+        """
     )
 
     _start_tool_invocation_fmt_string = dedent(
         """
-    <div id="__{id}__tool_invocation">
-    {tool_invocation_details}
-    </div>
-    <script>
-      $(function() {{
-        pants.collapsible.hasContent('{id}');
-        pants.collapsible.hasContent('{id}-cmd');
-        pants.append('#__{id}__tool_invocation', '#{id}-content');
-        pants.appendString('{cmd}', '#{id}-cmd-content');
-        var startTailing = function() {{
-          pants.poller.startTailing('{id}_stdout', '{html_path_base}/{id}.stdout',
-          '#{id}-stdout-content', function() {{ pants.collapsible.hasContent('{id}-stdout'); }});
-          pants.poller.startTailing('{id}_stderr', '{html_path_base}/{id}.stderr',
-          '#{id}-stderr-content', function() {{ pants.collapsible.hasContent('{id}-stderr'); }});
-        }}
-        if ($('#{id}-content').is(':visible')) {{
-          startTailing();
-        }} else {{
-          $('#{id}-header').one('click', startTailing);
-        }}
-      }});
-    </script>
-  """
+        <div id="__{id}__tool_invocation">
+        {tool_invocation_details}
+        </div>
+        <script>
+          $(function() {{
+            pants.collapsible.hasContent('{id}');
+            pants.collapsible.hasContent('{id}-cmd');
+            pants.append('#__{id}__tool_invocation', '#{id}-content');
+            pants.appendString('{cmd}', '#{id}-cmd-content');
+            var startTailing = function() {{
+              pants.poller.startTailing('{id}_stdout', '{html_path_base}/{id}.stdout',
+              '#{id}-stdout-content', function() {{ pants.collapsible.hasContent('{id}-stdout'); }});
+              pants.poller.startTailing('{id}_stderr', '{html_path_base}/{id}.stderr',
+              '#{id}-stderr-content', function() {{ pants.collapsible.hasContent('{id}-stderr'); }});
+            }}
+            if ($('#{id}-content').is(':visible')) {{
+              startTailing();
+            }} else {{
+              $('#{id}-header').one('click', startTailing);
+            }}
+          }});
+        </script>
+        """
     )
 
     def start_workunit(self, workunit):
@@ -204,30 +204,30 @@ class HtmlReporter(Reporter):
 
     _end_tool_invocation_fmt_string = dedent(
         """
-    <script>
-      $('#{id}-header-text').addClass('{status}'); $('#{id}-spinner').hide();
-      pants.poller.stopTailing('{id}_stdout');
-      pants.poller.stopTailing('{id}_stderr');
-    </script>
-  """
+        <script>
+          $('#{id}-header-text').addClass('{status}'); $('#{id}-spinner').hide();
+          pants.poller.stopTailing('{id}_stdout');
+          pants.poller.stopTailing('{id}_stderr');
+        </script>
+        """
     )
 
     _end_workunit_fmt_string = dedent(
         """
-    <script>
-      $('#{id}-header-text').addClass('{status}');
-      $('#{id}-spinner').hide();
-      $('#{id}-timer').html('{timing}s');
-      if ({aborted}) {{
-        $('#{id}-aborted').show();
-      }} else if ('{unaccounted_time}' !== '') {{
-        $('#{id}-unaccounted-time').html('(Unaccounted: {unaccounted_time}s)').show();
-      }}
-      $(function(){{
-        pants.timerManager.stopTimer('{id}');
-      }});
-    </script>
-  """
+        <script>
+          $('#{id}-header-text').addClass('{status}');
+          $('#{id}-spinner').hide();
+          $('#{id}-timer').html('{timing}s');
+          if ({aborted}) {{
+            $('#{id}-aborted').show();
+          }} else if ('{unaccounted_time}' !== '') {{
+            $('#{id}-unaccounted-time').html('(Unaccounted: {unaccounted_time}s)').show();
+          }}
+          $(function(){{
+            pants.timerManager.stopTimer('{id}');
+          }});
+        </script>
+        """
     )
 
     def end_workunit(self, workunit):
@@ -352,13 +352,13 @@ class HtmlReporter(Reporter):
 
     _log_fmt_string = dedent(
         """
-    <div id="__{content_id}"><span class="{css_class}">{message}</span></div>
-    <script>
-      $(function(){{
-        pants.append('#__{content_id}', '#{workunit_id}-content');
-      }});
-    </script>
-  """
+        <div id="__{content_id}"><span class="{css_class}">{message}</span></div>
+        <script>
+          $(function(){{
+            pants.append('#__{content_id}', '#{workunit_id}-content');
+          }});
+        </script>
+        """
     )
 
     def do_handle_log(self, workunit, level, *msg_elements):
@@ -376,15 +376,15 @@ class HtmlReporter(Reporter):
 
     _detail_a_fmt_string = dedent(
         """
-      <a href="#" onclick="$('.{detail_class}').not('#{detail_id}').hide();
-                           $('#{detail_id}').toggle(); return false;">{text}</a>
-  """
+        <a href="#" onclick="$('.{detail_class}').not('#{detail_id}').hide();
+                             $('#{detail_id}').toggle(); return false;">{text}</a>
+        """
     )
 
     _detail_div_fmt_string = dedent(
         """
-      <div id="{detail_id}" class="{detail_class} {detail_visibility_class}">{detail}</div>
-  """
+        <div id="{detail_id}" class="{detail_class} {detail_visibility_class}">{detail}</div>
+        """
     )
 
     def _render_message(self, *msg_elements):
@@ -444,19 +444,19 @@ class HtmlReporter(Reporter):
 
     _tool_detail_fmt_string = dedent(
         """
-    <div class="{class_prefix}" id="{id}">
-      <div class="{class_prefix}-header toggle-header" id="{id}-header">
-        <div class="{class_prefix}-header-icon toggle-header-icon"
-             onclick="pants.collapsible.toggle('{id}')">
-          <i id="{id}-icon" class="visibility-icon icon-large icon-caret-{icon_caret} hidden"></i>
+        <div class="{class_prefix}" id="{id}">
+          <div class="{class_prefix}-header toggle-header" id="{id}-header">
+            <div class="{class_prefix}-header-icon toggle-header-icon"
+                 onclick="pants.collapsible.toggle('{id}')">
+              <i id="{id}-icon" class="visibility-icon icon-large icon-caret-{icon_caret} hidden"></i>
+            </div>
+            <div class="{class_prefix}-header-text toggle-header-text">
+              [<span id="{id}-header-text">{title}</span>]
+            </div>
+          </div>
+          <div class="{class_prefix}-content toggle-content {display_class}" id="{id}-content"></div>
         </div>
-        <div class="{class_prefix}-header-text toggle-header-text">
-          [<span id="{id}-header-text">{title}</span>]
-        </div>
-      </div>
-      <div class="{class_prefix}-content toggle-content {display_class}" id="{id}-content"></div>
-    </div>
-  """
+        """
     )
 
     def _render_tool_detail(self, workunit, title, class_prefix="greyed", initially_open=False):

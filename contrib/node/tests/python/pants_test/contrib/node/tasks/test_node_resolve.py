@@ -85,20 +85,20 @@ class NodeResolveTest(TaskTestBase):
             "src/node/util/package.json",
             contents=dedent(
                 """
-      {
-        "name": "util",
-        "version": "0.0.1"
-      }
-    """
+                {
+                  "name": "util",
+                  "version": "0.0.1"
+                }
+                """
             ),
         )
         self.create_file(
             "src/node/util/util.js",
             contents=dedent(
                 """
-      var typ = require('typ');
-      console.log("type of boolean is: " + typ.BOOLEAN);
-    """
+                var typ = require('typ');
+                console.log("type of boolean is: " + typ.BOOLEAN);
+                """
             ),
         )
         target = self.make_target(
@@ -150,22 +150,22 @@ class NodeResolveTest(TaskTestBase):
             "src/node/util/package.json",
             contents=dedent(
                 """
-      {
-        "name": "util",
-        "version": "0.0.1"
-      }
-    """
+                {
+                  "name": "util",
+                  "version": "0.0.1"
+                }
+                """
             ),
         )
         self.create_file(
             "src/node/util/typ.js",
             contents=dedent(
                 """
-      var typ = require('typ');
-      module.exports = {
-        BOOL: typ.BOOLEAN
-      };
-    """
+                var typ = require('typ');
+                module.exports = {
+                  BOOL: typ.BOOLEAN
+                };
+                """
             ),
         )
         util = self.make_target(
@@ -179,22 +179,22 @@ class NodeResolveTest(TaskTestBase):
             "src/node/leaf/package.json",
             contents=dedent(
                 """
-      {
-        "name": "leaf",
-        "version": "0.0.1"
-      }
-    """
+                {
+                  "name": "leaf",
+                  "version": "0.0.1"
+                }
+                """
             ),
         )
         self.create_file(
             "src/node/leaf/leaf.js",
             contents=dedent(
                 """
-      var typ = require('typ');
-      var util_typ = require('util/typ');
-      console.log("type of boolean is: " + typ.BOOLEAN);
-      console.log("type of bool is: " + util_typ.BOOL);
-    """
+                var typ = require('typ');
+                var util_typ = require('util/typ');
+                console.log("type of boolean is: " + typ.BOOLEAN);
+                console.log("type of bool is: " + util_typ.BOOL);
+                """
             ),
         )
         leaf = self.make_target(
@@ -260,11 +260,11 @@ class NodeResolveTest(TaskTestBase):
             "src/node/util/package.json",
             contents=dedent(
                 """
-      {
-        "name": "util",
-        "version": "0.0.1"
-      }
-    """
+                {
+                  "name": "util",
+                  "version": "0.0.1"
+                }
+                """
             ),
         )
         util = self.make_target(
@@ -275,18 +275,18 @@ class NodeResolveTest(TaskTestBase):
             "src/node/scripts_project/package.json",
             contents=dedent(
                 """
-      {
-        "name": "scripts_project",
-        "version": "1.2.3",
-        "dependencies": { "A": "file://A" },
-        "devDependencies": { "B": "file://B" },
-        "peerDependencies": { "C": "file://C" },
-        "optionalDependencies": { "D": "file://D" },
-        "scripts": {
-          "test": "mocha */dist.js"
-        }
-      }
-    """
+                {
+                  "name": "scripts_project",
+                  "version": "1.2.3",
+                  "dependencies": { "A": "file://A" },
+                  "devDependencies": { "B": "file://B" },
+                  "peerDependencies": { "C": "file://C" },
+                  "optionalDependencies": { "D": "file://D" },
+                  "scripts": {
+                    "test": "mocha */dist.js"
+                  }
+                }
+                """
             ),
         )
         scripts_project = self.make_target(
@@ -380,19 +380,19 @@ class NodeResolveTest(TaskTestBase):
             "src/node/util/package.json",
             contents=dedent(
                 """\
-    {
-      "name": "util",
-      "version": "0.0.1"
-    }
-    """
+                {
+                  "name": "util",
+                  "version": "0.0.1"
+                }
+                """
             ),
         )
         self.create_file(
             "src/node/util/util.js",
             contents=dedent(
                 """\
-    console.log('2 + 2 = 4');
-    """
+                console.log('2 + 2 = 4');
+                """
             ),
         )
         target = self.make_target(
@@ -416,8 +416,8 @@ class NodeResolveTest(TaskTestBase):
             "src/node/util/util.js",
             contents=dedent(
                 """\
-    console.log('2 + 2 = 5');
-    """
+                console.log('2 + 2 = 5');
+                """
             ),
         )
 
@@ -452,20 +452,20 @@ class NodeResolveTest(TaskTestBase):
             "src/node/util/package.json",
             contents=dedent(
                 """
-      {
-        "name": "util",
-        "version": "0.0.1"
-      }
-    """
+                {
+                  "name": "util",
+                  "version": "0.0.1"
+                }
+                """
             ),
         )
         self.create_file(
             "src/node/util/util.js",
             contents=dedent(
                 """
-      var typ = require('typ');
-      console.log("type of boolean is: " + typ.BOOLEAN);
-    """
+                var typ = require('typ');
+                console.log("type of boolean is: " + typ.BOOLEAN);
+                """
             ),
         )
         sources = ["util.js", "package.json"]

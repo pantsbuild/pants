@@ -61,14 +61,14 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
             "src/java/targets",
             dedent(
                 """
-            jar_library(
-              name='a',
-              jars=[
-                jar('org1', 'name1', 'rev1'),
-                jar('org2', 'name2', 'rev2', force=True),
-              ],
-            )
-        """
+                jar_library(
+                  name='a',
+                  jars=[
+                    jar('org1', 'name1', 'rev1'),
+                    jar('org2', 'name2', 'rev2', force=True),
+                  ],
+                )
+                """
             ),
         )
 
@@ -78,13 +78,13 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
             "src/java/targets",
             dedent(
                 """
-            java_library(
-              name='b',
-              dependencies=[':a'],
-              provides=artifact('{org}', '{name}', repo=repository()),
-              sources=['z.java'],
-            )
-        """.format(
+                java_library(
+                  name='b',
+                  dependencies=[':a'],
+                  provides=artifact('{org}', '{name}', repo=repository()),
+                  sources=['z.java'],
+                )
+                """.format(
                     org=self.b_org, name=self.b_name
                 )
             ),
@@ -94,19 +94,19 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
             "3rdparty",
             dedent(
                 """
-            jar_library(
-              name='example-morx',
-              jars = [
-                jar(org='commons-lang', name='commons-lang', rev='2.5', classifier='morx'),
-              ]
-            )
-            jar_library(
-              name='example-fleem',
-              jars = [
-                jar(org='commons-lang', name='commons-lang', rev='2.5', classifier='fleem'),
-              ]
-            )
-        """
+                jar_library(
+                  name='example-morx',
+                  jars = [
+                    jar(org='commons-lang', name='commons-lang', rev='2.5', classifier='morx'),
+                  ]
+                )
+                jar_library(
+                  name='example-fleem',
+                  jars = [
+                    jar(org='commons-lang', name='commons-lang', rev='2.5', classifier='fleem'),
+                  ]
+                )
+                """
             ),
         )
 
@@ -114,15 +114,15 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
             "src/java/targets",
             dedent(
                 """
-            java_library(
-              name='c',
-              dependencies=[
-                '3rdparty:example-morx',
-                '3rdparty:example-fleem',
-              ],
-              sources=['w.java'],
-            )
-        """
+                java_library(
+                  name='c',
+                  dependencies=[
+                    '3rdparty:example-morx',
+                    '3rdparty:example-fleem',
+                  ],
+                  sources=['w.java'],
+                )
+                """
             ),
         )
 
@@ -130,16 +130,16 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
             "src/java/targets",
             dedent(
                 """
-            java_library(
-              name='e',
-              dependencies=[
-                '3rdparty:example-morx',
-                '3rdparty:example-fleem',
-              ],
-              excludes=[exclude(org='commons-lang', name='commons-lang')],
-              sources=['w.java'],
-            )
-        """
+                java_library(
+                  name='e',
+                  dependencies=[
+                    '3rdparty:example-morx',
+                    '3rdparty:example-fleem',
+                  ],
+                  excludes=[exclude(org='commons-lang', name='commons-lang')],
+                  sources=['w.java'],
+                )
+                """
             ),
         )
 

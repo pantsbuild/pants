@@ -24,18 +24,18 @@ class TestSubprocessProcessHandler(unittest.TestCase):
                 "/bin/bash",
                 "-c",
                 """
-  echo "1out"
-  echo >&2 "1err"
-  sleep 0.05
-  echo >&2 "2err"
-  echo "2out"
-  sleep 0.05
-  echo "3out"
-  sleep 0.05
-  echo >&2 "3err"
-  sleep 0.05
-exit 1
-""",
+                echo "1out"
+                echo >&2 "1err"
+                sleep 0.05
+                echo >&2 "2err"
+                echo "2out"
+                sleep 0.05
+                echo "3out"
+                sleep 0.05
+                echo >&2 "3err"
+                sleep 0.05
+                exit 1
+                """,
             ],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -45,13 +45,13 @@ exit 1
             process_handler.communicate_teeing_stdout_and_stderr(),
             (
                 b"""1out
-2out
-3out
-""",
+                2out
+                3out
+                """,
                 b"""1err
-2err
-3err
-""",
+                2err
+                3err
+                """,
             ),
         )
         # Sadly, this test doesn't test that sys.std{out,err} also receive the output.

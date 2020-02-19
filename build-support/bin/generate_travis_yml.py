@@ -9,10 +9,10 @@ import yaml
 
 HEADER = dedent(
     """\
-  # GENERATED, DO NOT EDIT!
-  # To change, edit `build-support/bin/generate_travis_yml.py` and run:
-  # ./pants --quiet run build-support/bin:generate_travis_yml > .travis.yml
-  """
+    # GENERATED, DO NOT EDIT!
+    # To change, edit `build-support/bin/generate_travis_yml.py` and run:
+    # ./pants --quiet run build-support/bin:generate_travis_yml > .travis.yml
+    """
 )
 
 # ----------------------------------------------------------------------

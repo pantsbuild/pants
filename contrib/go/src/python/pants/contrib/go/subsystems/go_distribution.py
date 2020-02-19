@@ -66,12 +66,12 @@ class GoDistribution(NativeTool):
 
         def spawn(self, env=None, **kwargs):
             """
-      :param dict env: A custom environment to launch the Go command in.  If `None` the current
-                       environment is used.
-      :param kwargs: Keyword arguments to pass through to `subprocess.Popen`.
-      :returns: A handle to the spawned go command subprocess.
-      :rtype: :class:`subprocess.Popen`
-      """
+            :param dict env: A custom environment to launch the Go command in.  If `None` the
+                             current environment is used.
+            :param kwargs: Keyword arguments to pass through to `subprocess.Popen`.
+            :returns: A handle to the spawned go command subprocess.
+            :rtype: :class:`subprocess.Popen`
+            """
             env = (env or os.environ).copy()
             env.update(self.env)
             return subprocess.Popen(self.cmdline, env=env, **kwargs)

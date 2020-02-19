@@ -45,16 +45,16 @@ class ConanRequirement:
         lib_names: Optional[Sequence[str]] = None,
     ) -> None:
         """
-    :param pkg_spec: A string specifying a conan package at a specific version, as per
-                     https://docs.conan.io/en/latest/using_packages/conanfile_txt.html#requires
-    :param include_relpath: The relative path from the package root directory to where C/C++
-                            headers are located.
-    :param lib_relpath: The relative path from the package root directory to where native
-                        libraries are located.
-    :param lib_names: Strings containing the libraries to add to the linker command
-                      line. Collected into the `native_lib_names` field of a
-                      `packaged_native_library()` target.
-    """
+        :param pkg_spec: A string specifying a conan package at a specific version, as per
+                         https://docs.conan.io/en/latest/using_packages/conanfile_txt.html#requires
+        :param include_relpath: The relative path from the package root directory to where C/C++
+                                headers are located.
+        :param lib_relpath: The relative path from the package root directory to where native
+                            libraries are located.
+        :param lib_names: Strings containing the libraries to add to the linker command
+                          line. Collected into the `native_lib_names` field of a
+                          `packaged_native_library()` target.
+        """
         self.pkg_spec = pkg_spec
         self.include_relpath = include_relpath or "include"
         self.lib_relpath = lib_relpath or "lib"
@@ -97,8 +97,8 @@ class ExternalNativeLibrary(Target):
 
     def __init__(self, payload=None, packages=None, **kwargs):
         """
-    :param list packages: the `ConanRequirement`s to resolve into a `packaged_native_library()` target.
-    """
+        :param list packages: the `ConanRequirement`s to resolve into a `packaged_native_library()` target.
+        """
         payload = payload or Payload()
 
         assert_list(

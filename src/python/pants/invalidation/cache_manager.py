@@ -27,8 +27,8 @@ class VersionedTargetSet:
     @staticmethod
     def from_versioned_targets(versioned_targets):
         """
-    :API: public
-    """
+        :API: public
+        """
         first_target = versioned_targets[0]
         cache_manager = first_target._cache_manager
 
@@ -179,8 +179,8 @@ class VersionedTarget(VersionedTargetSet):
 
     def __init__(self, cache_manager, target, cache_key):
         """
-    :API: public
-    """
+        :API: public
+        """
         if not isinstance(target, Target):
             raise ValueError(
                 "The target {} must be an instance of Target but is not.".format(target.id)
@@ -287,8 +287,8 @@ class InvalidationCacheManager:
         artifact_write_callback=lambda _: None,
     ):
         """
-    :API: public
-    """
+        :API: public
+        """
         self._cache_key_generator = cache_key_generator
         self._task_name = task_name or "UNKNOWN"
         self._invalidate_dependents = invalidate_dependents

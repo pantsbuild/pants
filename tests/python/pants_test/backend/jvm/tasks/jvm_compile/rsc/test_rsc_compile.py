@@ -76,21 +76,21 @@ class RscCompileTest(NailgunTaskTestBase):
             self.assertEqual(
                 dedent(
                     """
-                     double_check_cache(java/classpath:java_lib) <- {
-                       zinc[zinc-java](java/classpath:java_lib)
-                     }
-                     zinc[zinc-java](java/classpath:java_lib) <- {
-                       write_to_cache(java/classpath:java_lib)
-                     }
-                     write_to_cache(java/classpath:java_lib) <- {}
-                     double_check_cache(scala/classpath:scala_lib) <- {
-                       zinc[zinc-only](scala/classpath:scala_lib)
-                     }
-                     zinc[zinc-only](scala/classpath:scala_lib) <- {
-                       write_to_cache(scala/classpath:scala_lib)
-                     }
-                     write_to_cache(scala/classpath:scala_lib) <- {}
-                     """
+                    double_check_cache(java/classpath:java_lib) <- {
+                      zinc[zinc-java](java/classpath:java_lib)
+                    }
+                    zinc[zinc-java](java/classpath:java_lib) <- {
+                      write_to_cache(java/classpath:java_lib)
+                    }
+                    write_to_cache(java/classpath:java_lib) <- {}
+                    double_check_cache(scala/classpath:scala_lib) <- {
+                      zinc[zinc-only](scala/classpath:scala_lib)
+                    }
+                    zinc[zinc-only](scala/classpath:scala_lib) <- {
+                      write_to_cache(scala/classpath:scala_lib)
+                    }
+                    write_to_cache(scala/classpath:scala_lib) <- {}
+                    """
                 ).strip(),
                 dependee_graph,
             )
@@ -129,25 +129,25 @@ class RscCompileTest(NailgunTaskTestBase):
             self.assertEqual(
                 dedent(
                     """
-                     double_check_cache(java/classpath:java_lib) <- {
-                       zinc[zinc-java](java/classpath:java_lib)
-                     }
-                     zinc[zinc-java](java/classpath:java_lib) <- {
-                       write_to_cache(java/classpath:java_lib)
-                     }
-                     write_to_cache(java/classpath:java_lib) <- {}
-                     double_check_cache(scala/classpath:scala_lib) <- {
-                       rsc(scala/classpath:scala_lib),
-                       zinc[rsc-and-zinc](scala/classpath:scala_lib)
-                     }
-                     rsc(scala/classpath:scala_lib) <- {
-                       write_to_cache(scala/classpath:scala_lib)
-                     }
-                     zinc[rsc-and-zinc](scala/classpath:scala_lib) <- {
-                       write_to_cache(scala/classpath:scala_lib)
-                     }
-                     write_to_cache(scala/classpath:scala_lib) <- {}
-                     """
+                    double_check_cache(java/classpath:java_lib) <- {
+                      zinc[zinc-java](java/classpath:java_lib)
+                    }
+                    zinc[zinc-java](java/classpath:java_lib) <- {
+                      write_to_cache(java/classpath:java_lib)
+                    }
+                    write_to_cache(java/classpath:java_lib) <- {}
+                    double_check_cache(scala/classpath:scala_lib) <- {
+                      rsc(scala/classpath:scala_lib),
+                      zinc[rsc-and-zinc](scala/classpath:scala_lib)
+                    }
+                    rsc(scala/classpath:scala_lib) <- {
+                      write_to_cache(scala/classpath:scala_lib)
+                    }
+                    zinc[rsc-and-zinc](scala/classpath:scala_lib) <- {
+                      write_to_cache(scala/classpath:scala_lib)
+                    }
+                    write_to_cache(scala/classpath:scala_lib) <- {}
+                    """
                 ).strip(),
                 dependee_graph,
             )
@@ -348,28 +348,28 @@ class RscCompileTest(NailgunTaskTestBase):
             self.assertEqual(
                 dedent(
                     """
-                     double_check_cache(java/classpath:java_lib) <- {
-                       zinc[zinc-java](java/classpath:java_lib)
-                     }
-                     zinc[zinc-java](java/classpath:java_lib) <- {
-                       write_to_cache(java/classpath:java_lib)
-                     }
-                     write_to_cache(java/classpath:java_lib) <- {}
-                     double_check_cache(scala/classpath:scala_with_direct_java_sources) <- {
-                       zinc[zinc-java](scala/classpath:scala_with_direct_java_sources)
-                     }
-                     zinc[zinc-java](scala/classpath:scala_with_direct_java_sources) <- {
-                       write_to_cache(scala/classpath:scala_with_direct_java_sources)
-                     }
-                     write_to_cache(scala/classpath:scala_with_direct_java_sources) <- {}
-                     double_check_cache(scala/classpath:scala_with_indirect_java_sources) <- {
-                       zinc[zinc-java](scala/classpath:scala_with_indirect_java_sources)
-                     }
-                     zinc[zinc-java](scala/classpath:scala_with_indirect_java_sources) <- {
-                       write_to_cache(scala/classpath:scala_with_indirect_java_sources)
-                     }
-                     write_to_cache(scala/classpath:scala_with_indirect_java_sources) <- {}
-                     """
+                    double_check_cache(java/classpath:java_lib) <- {
+                      zinc[zinc-java](java/classpath:java_lib)
+                    }
+                    zinc[zinc-java](java/classpath:java_lib) <- {
+                      write_to_cache(java/classpath:java_lib)
+                    }
+                    write_to_cache(java/classpath:java_lib) <- {}
+                    double_check_cache(scala/classpath:scala_with_direct_java_sources) <- {
+                      zinc[zinc-java](scala/classpath:scala_with_direct_java_sources)
+                    }
+                    zinc[zinc-java](scala/classpath:scala_with_direct_java_sources) <- {
+                      write_to_cache(scala/classpath:scala_with_direct_java_sources)
+                    }
+                    write_to_cache(scala/classpath:scala_with_direct_java_sources) <- {}
+                    double_check_cache(scala/classpath:scala_with_indirect_java_sources) <- {
+                      zinc[zinc-java](scala/classpath:scala_with_indirect_java_sources)
+                    }
+                    zinc[zinc-java](scala/classpath:scala_with_indirect_java_sources) <- {
+                      write_to_cache(scala/classpath:scala_with_indirect_java_sources)
+                    }
+                    write_to_cache(scala/classpath:scala_with_indirect_java_sources) <- {}
+                    """
                 ).strip(),
                 dependee_graph,
             )

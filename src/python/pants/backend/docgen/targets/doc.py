@@ -16,14 +16,14 @@ class WikiArtifact:
 
     def __init__(self, wiki, **kwargs):
         """
-    :param wiki: target spec of a ``wiki``.
-    :param kwargs: a dictionary that may contain configuration directives for your particular wiki.
-      For example, the following keys are supported for Atlassian's Confluence:
+        :param wiki: target spec of a ``wiki``.
+        :param kwargs: a dictionary that may contain configuration directives for your particular wiki.
+          For example, the following keys are supported for Atlassian's Confluence:
 
-      * ``space`` -- A wiki space in which to place the page (used in Confluence)
-      * ``title`` -- A title for the wiki page
-      * ``parent`` -- The title of a wiki page that will denote this page as a child.
-    """
+          * ``space`` -- A wiki space in which to place the page (used in Confluence)
+          * ``title`` -- A title for the wiki page
+          * ``parent`` -- The title of a wiki page that will denote this page as a child.
+        """
         self.wiki = wiki
         self.config = kwargs
 
@@ -39,8 +39,8 @@ class Wiki:
 
     def __init__(self, name, url_builder):
         """
-    :param url_builder: Function that accepts a page target and an optional wiki config dict.
-    """
+        :param url_builder: Function that accepts a page target and an optional wiki config dict.
+        """
         self.name = name
         self.url_builder = url_builder
 
@@ -77,15 +77,15 @@ class Page(Target):
         self, sources, address=None, payload=None, format=None, links=None, provides=None, **kwargs
     ):
         """
-    :param sources: Page source file. Exactly one will be present.
-    :param format: Page's format, ``md`` or ``rst``. By default, Pants infers from ``source`` file
-       extension: ``.rst`` is ReStructured Text; anything else is Markdown.
-    :param links: Other ``page`` targets that this `page` links to.
-    :type links: List of address specs
-    :param provides: Optional "Addresses" at which this page is published.
-       E.g., a wiki location.
-    :type provides: List of ``wiki_artifact``s
-    """
+        :param sources: Page source file. Exactly one will be present.
+        :param format: Page's format, ``md`` or ``rst``. By default, Pants infers from ``source`` file
+           extension: ``.rst`` is ReStructured Text; anything else is Markdown.
+        :param links: Other ``page`` targets that this `page` links to.
+        :type links: List of address specs
+        :param provides: Optional "Addresses" at which this page is published.
+           E.g., a wiki location.
+        :type provides: List of ``wiki_artifact``s
+        """
         payload = payload or Payload()
         if not format:
             if sources.files[0].lower().endswith(".rst"):

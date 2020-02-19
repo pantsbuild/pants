@@ -49,16 +49,16 @@ class ScalaLibrary(ExportableJvmLibrary):
         **kwargs,
     ):
         """
-    :param java_sources: Java libraries this library has a *circular*
-      dependency on.
-      If you don't have the particular problem of circular dependencies
-      forced by splitting interdependent java and scala into multiple targets,
-      don't use this at all.
-      Prefer using ``dependencies`` to express non-circular dependencies.
-    :type java_sources: address spec or list of address specs
-    :param resources: An optional list of paths (DEPRECATED) or ``resources``
-      targets containing resources that belong on this library's classpath.
-    """
+        :param java_sources: Java libraries this library has a *circular*
+          dependency on.
+          If you don't have the particular problem of circular dependencies
+          forced by splitting interdependent java and scala into multiple targets,
+          don't use this at all.
+          Prefer using ``dependencies`` to express non-circular dependencies.
+        :type java_sources: address spec or list of address specs
+        :param resources: An optional list of paths (DEPRECATED) or ``resources``
+          targets containing resources that belong on this library's classpath.
+        """
         payload = payload or Payload()
         payload.add_fields(
             {

@@ -12,22 +12,22 @@ class MissingContextManagerTest(CheckstylePluginTestBase):
 
     def test_missing_contextmanager(self):
         statement = """
-      with open("derp.txt"):
-        pass
+        with open("derp.txt"):
+          pass
 
-      with open("herp.txt") as fp:
-        fp.read()
-    """
+        with open("herp.txt") as fp:
+          fp.read()
+        """
         self.assertNoNits(statement)
 
         statement = """
-      foo = open("derp.txt")
-    """
+        foo = open("derp.txt")
+        """
         self.assertNit(statement, "T802", Nit.WARNING)
 
         # TODO(wickman): In these cases suggest using contextlib.closing.
         statement = """
-      from urllib2 import urlopen
-      the_googs = urlopen("http://www.google.com").read()
-    """
+        from urllib2 import urlopen
+        the_googs = urlopen("http://www.google.com").read()
+        """
         self.assertNoNits(statement)

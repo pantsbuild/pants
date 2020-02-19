@@ -43,41 +43,41 @@ class ScalaFmtTestBase(NailgunTaskTestBase):
             relpath="build-support/scalafmt/config",
             contents=dedent(
                 """
-      align.arrowEnumeratorGenerator = true
-      align.openParenCallSite = false
-      align.openParenDefnSite = false
-      assumeStandardLibraryStripMargin = false
-      binPack.parentConstructors = false
-      continuationIndent.callSite = 4
-      continuationIndent.defnSite = 4
-      maxColumn = 100
-      newlines.sometimesBeforeColonInMethodReturnType = true
-      spaces.afterTripleEquals = true
-      spaces.inImportCurlyBraces = false
-      """
+                align.arrowEnumeratorGenerator = true
+                align.openParenCallSite = false
+                align.openParenDefnSite = false
+                assumeStandardLibraryStripMargin = false
+                binPack.parentConstructors = false
+                continuationIndent.callSite = 4
+                continuationIndent.defnSite = 4
+                maxColumn = 100
+                newlines.sometimesBeforeColonInMethodReturnType = true
+                spaces.afterTripleEquals = true
+                spaces.inImportCurlyBraces = false
+                """
             ),
         )
 
         self.test_file_contents = dedent(
             """
-      package org.pantsbuild.badscalastyle
+            package org.pantsbuild.badscalastyle
 
-      /**
-       * These comments are formatted incorrectly
-       * and the parameter list is too long for one line
-       */
-      case class ScalaStyle(one: String,two: String,three: String,four: String,
-          five: String,six: String,seven: String,eight: String,  nine: String)
-
-      class Person(name: String,age: Int,astrologicalSign: String,
-          shoeSize: Int,
-          favoriteColor: java.awt.Color) {
-        def getAge:Int={return age}
-        def sum(longvariablename: List[String]): Int = {
-          longvariablename.map(_.toInt).foldLeft(0)(_ + _)
-        }
-      }
-      """
+            /**
+             * These comments are formatted incorrectly
+             * and the parameter list is too long for one line
+             */
+            case class ScalaStyle(one: String,two: String,three: String,four: String,
+                five: String,six: String,seven: String,eight: String,  nine: String)
+    
+            class Person(name: String,age: Int,astrologicalSign: String,
+                shoeSize: Int,
+                favoriteColor: java.awt.Color) {
+              def getAge:Int={return age}
+              def sum(longvariablename: List[String]): Int = {
+                longvariablename.map(_.toInt).foldLeft(0)(_ + _)
+              }
+            }
+            """
         )
         self.test_file = self.create_file(
             relpath="src/scala/org/pantsbuild/badscalastyle/BadScalaStyle.scala",

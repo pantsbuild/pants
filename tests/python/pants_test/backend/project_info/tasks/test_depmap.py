@@ -32,11 +32,11 @@ class DepmapTest(BaseDepmapTest):
                 path,
                 dedent(
                     """
-          {type}(name='{name}',
-            dependencies=[{deps}],
-            {extra}
-          )
-          """.format(
+                    {type}(name='{name}',
+                      dependencies=[{deps}],
+                      {extra}
+                    )
+                    """.format(
                         type=type,
                         name=name,
                         deps=",".join("'{0}'".format(dep) for dep in list(deps)),
@@ -54,11 +54,11 @@ class DepmapTest(BaseDepmapTest):
                 path,
                 dedent(
                     """
-          {type}(name='{name}',
-            entry_point='{entry_point}',
-            dependencies=[{deps}]
-          )
-          """.format(
+                    {type}(name='{name}',
+                      entry_point='{entry_point}',
+                      dependencies=[{deps}]
+                    )
+                    """.format(
                         type=type,
                         entry_point=entry_point,
                         name=name,
@@ -72,11 +72,11 @@ class DepmapTest(BaseDepmapTest):
                 path,
                 dedent(
                     """
-          {type}(name='{name}',
-            dependencies=['{binary}'],
-            bundles={deps}
-          )
-          """.format(
+                    {type}(name='{name}',
+                      dependencies=['{binary}'],
+                      bundles={deps}
+                    )
+                    """.format(
                         type=type, name=name, binary=binary, deps=deps
                     )
                 ),
@@ -88,10 +88,10 @@ class DepmapTest(BaseDepmapTest):
             "common/c",
             dedent(
                 """
-      java_library(name='c',
-        sources=[],
-      )
-    """
+                java_library(name='c',
+                  sources=[],
+                )
+                """
             ),
         )
         add_to_build_file("common/d", "d", "python_library", sources=[])
@@ -109,45 +109,45 @@ class DepmapTest(BaseDepmapTest):
             "overlaps",
             dedent(
                 """
-      java_library(name='two',
-        dependencies=['overlaps:one'],
-        sources=[],
-      )
-    """
+                java_library(name='two',
+                  dependencies=['overlaps:one'],
+                  sources=[],
+                )
+                """
             ),
         )
         self.add_to_build_file(
             "resources/a",
             dedent(
                 """
-      resources(
-        name='a_resources',
-        sources=['a.resource']
-      )
-    """
+                resources(
+                  name='a_resources',
+                  sources=['a.resource']
+                )
+                """
             ),
         )
         self.add_to_build_file(
             "src/java/a",
             dedent(
                 """
-      java_library(
-        name='a_java',
-        sources=[],
-        dependencies=['resources/a:a_resources']
-      )
-    """
+                java_library(
+                  name='a_java',
+                  sources=[],
+                  dependencies=['resources/a:a_resources']
+                )
+                """
             ),
         )
         self.add_to_build_file(
             "src/java/a",
             dedent(
                 """
-      target(
-        name='a_dep',
-        dependencies=[':a_java']
-      )
-    """
+                target(
+                  name='a_dep',
+                  dependencies=[':a_java']
+                )
+                """
             ),
         )
 
@@ -155,20 +155,20 @@ class DepmapTest(BaseDepmapTest):
             "src/java/b",
             dedent(
                 """
-      java_library(
-        name='b_java',
-        dependencies=[':b_dep'],
-        sources=[],
-      )
-      target(
-        name='b_dep',
-        dependencies=[':b_lib']
-      )
-      java_library(
-        name='b_lib',
-        sources=[],
-      )
-    """
+                java_library(
+                  name='b_java',
+                  dependencies=[':b_dep'],
+                  sources=[],
+                )
+                target(
+                  name='b_dep',
+                  dependencies=[':b_lib']
+                )
+                java_library(
+                  name='b_lib',
+                  sources=[],
+                )
+                """
             ),
         )
 
@@ -176,14 +176,14 @@ class DepmapTest(BaseDepmapTest):
             "src/java/c",
             dedent(
                 """
-      jar_library(
-        name='c_jar_lib',
-        jars=[
-          jar(org='org.pantsbuild.test', name='c_test', rev='1.0'),
-          jar(org='org.pantsbuild.test', name='d_test', rev=''),
-        ]
-      )
-    """
+                jar_library(
+                  name='c_jar_lib',
+                  jars=[
+                    jar(org='org.pantsbuild.test', name='c_test', rev='1.0'),
+                    jar(org='org.pantsbuild.test', name='d_test', rev=''),
+                  ]
+                )
+                """
             ),
         )
 
@@ -195,12 +195,12 @@ class DepmapTest(BaseDepmapTest):
             "src/java/java_depends_on_python",
             dedent(
                 """
-      java_library(
-        name='java_depends_on_python',
-        dependencies=['common/d:d'],
-        sources=[],
-      )
-    """
+                java_library(
+                  name='java_depends_on_python',
+                  dependencies=['common/d:d'],
+                  sources=[],
+                )
+                """
             ),
         )
 

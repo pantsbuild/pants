@@ -24,11 +24,11 @@ class ThriftUtilTest(unittest.TestCase):
             main = self.write(
                 os.path.join(a, "main.thrift"),
                 """
-        include "sub/a_included.thrift" //Todo commet
-        include "b_included.thrift"
-        include "c_included.thrift" #jibberish
-        include "d_included.thrift" some ramdon
-      """,
+                include "sub/a_included.thrift" //Todo commet
+                include "b_included.thrift"
+                include "c_included.thrift" #jibberish
+                include "d_included.thrift" some ramdon
+                """,
             )
 
             a_included = self.write(os.path.join(a, "sub", "a_included.thrift"), "# noop")
@@ -46,9 +46,9 @@ class ThriftUtilTest(unittest.TestCase):
             main = self.write(
                 os.path.join(a, "main.thrift"),
                 """
-        include "sub/a_included.thrift # Todo"
-        include "b_included.thrift"
-      """,
+                include "sub/a_included.thrift # Todo"
+                include "b_included.thrift"
+                """,
             )
             self.write(os.path.join(a, "sub", "a_included.thrift"), "# noop")
             self.assertRaises(ValueError, find_includes, basedirs={a}, source=main)

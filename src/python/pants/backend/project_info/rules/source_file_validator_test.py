@@ -46,12 +46,12 @@ class MultiMatcherTest(unittest.TestCase):
                 "python_header": {
                     "pattern": textwrap.dedent(
                         r"""
-            ^# coding=utf-8
-            # Copyright 20\d\d Pants project contributors \(see CONTRIBUTORS.md\)\.
-            # Licensed under the Apache License, Version 2\.0 \(see LICENSE\)\.
-        
-            from __future__ import absolute_import, division, print_function, unicode_literals
-          """
+                        ^# coding=utf-8
+                        # Copyright 20\d\d Pants project contributors \(see CONTRIBUTORS.md\)\.
+                        # Licensed under the Apache License, Version 2\.0 \(see LICENSE\)\.
+
+                        from __future__ import absolute_import, division, print_function, unicode_literals
+                        """
                     ).lstrip()
                 },
                 "no_six": {
@@ -61,9 +61,9 @@ class MultiMatcherTest(unittest.TestCase):
                 "jvm_header": {
                     "pattern": textwrap.dedent(
                         r"""
-            // Copyright 20\d\d Pants project contributors (see CONTRIBUTORS.md).
-            // Licensed under the Apache License, Version 2.0 (see LICENSE).
-          """
+                        // Copyright 20\d\d Pants project contributors (see CONTRIBUTORS.md).
+                        // Licensed under the Apache License, Version 2.0 (see LICENSE).
+                        """
                     ).lstrip()
                 },
                 "dummy": {"pattern": "dummy"},
@@ -94,18 +94,18 @@ class MultiMatcherTest(unittest.TestCase):
         py_file_content = (
             textwrap.dedent(
                 """
-      # coding=utf-8
-      # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
-      # Licensed under the Apache License, Version 2.0 (see LICENSE).
-      
-      from __future__ import absolute_import, division, print_function, unicode_literals
-      
-      from foo import bar
-      from six.blah import something
-      
-      def baz():
-        return bar()
-    """
+                # coding=utf-8
+                # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
+                # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+                from __future__ import absolute_import, division, print_function, unicode_literals
+
+                from foo import bar
+                from six.blah import something
+
+                def baz():
+                  return bar()
+                """
             )
             .lstrip()
             .encode("utf8")

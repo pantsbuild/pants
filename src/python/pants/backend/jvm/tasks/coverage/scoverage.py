@@ -71,15 +71,15 @@ class Scoverage(CoverageEngine):
 
         def create(self, settings, targets, execute_java_for_targets):
             """
-      :param settings: Generic code coverage settings.
-      :type settings: :class:`CodeCoverageSettings`
-      :param list targets: A list of targets to instrument and record code coverage for.
-      :param execute_java_for_targets: A function that accepts a list of targets whose JVM platform
-                                       constraints are used to pick a JVM `Distribution`. The
-                                       function should also accept `*args` and `**kwargs` compatible
-                                       with the remaining parameters accepted by
-                                       `pants.java.util.execute_java`.
-      """
+            :param settings: Generic code coverage settings.
+            :type settings: :class:`CodeCoverageSettings`
+            :param list targets: A list of targets to instrument and record code coverage for.
+            :param execute_java_for_targets: A function that accepts a list of targets whose JVM platform
+                                             constraints are used to pick a JVM `Distribution`. The
+                                             function should also accept `*args` and `**kwargs` compatible
+                                             with the remaining parameters accepted by
+                                             `pants.java.util.execute_java`.
+            """
 
             report_path = self.tool_classpath_from_products(
                 settings.context.products, "scoverage-report", scope="scoverage-report"
@@ -108,16 +108,16 @@ class Scoverage(CoverageEngine):
         coverage_output_dir=None,
     ):
         """
-    :param settings: Generic code coverage settings.
-    :type settings: :class:`CodeCoverageSettings`
-    :param list targets: A list of targets to instrument and record code coverage for.
-    :param execute_java_for_targets: A function that accepts a list of targets whose JVM platform
-                                     constraints are used to pick a JVM `Distribution`. The function
-                                     should also accept `*args` and `**kwargs` compatible with the
-                                     remaining parameters accepted by
-                                     `pants.java.util.execute_java`.
-    :param str coverage_output_dir: An optional output directory to copy coverage reports to.
-    """
+        :param settings: Generic code coverage settings.
+        :type settings: :class:`CodeCoverageSettings`
+        :param list targets: A list of targets to instrument and record code coverage for.
+        :param execute_java_for_targets: A function that accepts a list of targets whose JVM platform
+                                         constraints are used to pick a JVM `Distribution`. The function
+                                         should also accept `*args` and `**kwargs` compatible with the
+                                         remaining parameters accepted by
+                                         `pants.java.util.execute_java`.
+        :param str coverage_output_dir: An optional output directory to copy coverage reports to.
+        """
         self._settings = settings
         self._context = settings.context
         self._targets = targets

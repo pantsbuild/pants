@@ -165,8 +165,8 @@ class TaskTest(TaskTestBase):
     @classmethod
     def alias_groups(cls):
         """
-    :API: public
-    """
+        :API: public
+        """
         return BuildFileAliases(targets={"files": Files})
 
     def assertContent(self, vt, content):

@@ -32,12 +32,12 @@ class PantsRequirement:
 
     def __call__(self, name=None, dist=None):
         """
-    :param string name: The name to use for the target, defaults to the dist name if specified and
-                        otherwise the parent dir name.
-    :param string dist: The pants dist to create a requirement for. This must be a
-                        'pantsbuild.pants*' distribution; eg:
-                        'pantsbuild.pants.contrib.python.checks'.
-    """
+        :param string name: The name to use for the target, defaults to the dist name if specified and
+                            otherwise the parent dir name.
+        :param string dist: The pants dist to create a requirement for. This must be a
+                            'pantsbuild.pants*' distribution; eg:
+                            'pantsbuild.pants.contrib.python.checks'.
+        """
         name = name or dist or os.path.basename(self._parse_context.rel_path)
         dist = dist or "pantsbuild.pants"
         if not (dist == "pantsbuild.pants" or dist.startswith("pantsbuild.pants.")):

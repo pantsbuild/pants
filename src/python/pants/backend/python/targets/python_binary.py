@@ -76,28 +76,28 @@ class PythonBinary(PythonTarget):
         **kwargs
     ):
         """
-    :param string entry_point: the default entry point for this binary.  if None, drops into the entry
-      point that is defined by source. Something like
-      "pants.bin.pants_exe:main", where "pants.bin.pants_exe" is the package
-      name and "main" is the function name (if omitted, the module is
-      executed directly, presuming it has a ``__main.py__``).
-    :param sources: Zero or one source files. If more than one file is required, it should be put in
-      a python_library which should be added to dependencies.
-    :param inherit_path: inherit the sys.path of the environment that this binary runs in
-    :param zip_safe: whether or not this binary is safe to run in compacted (zip-file) form
-    :param always_write_cache: whether or not the .deps cache of this PEX file should always
-      be written to disk.
-    :param repositories: a list of repositories to query for dependencies.
-    :param indices: a list of indices to use for packages.
-    :param ignore_errors: should we ignore inability to resolve dependencies?
-    :param str shebang: Use this shebang for the generated pex.
-    :param bool emit_warnings: Whether or not to emit pex warnings.
-    :param platforms: extra platforms to target when building this binary. If this is, e.g.,
-      ``['current', 'linux-x86_64', 'macosx-10.4-x86_64']``, then when building the pex, then
-      for any platform-dependent modules, Pants will include ``egg``\\s for Linux (64-bit Intel),
-      Mac OS X (version 10.4 or newer), and the current platform (whatever is being used when
-      making the PEX).
-    """
+        :param string entry_point: the default entry point for this binary.  if None, drops into the entry
+          point that is defined by source. Something like
+          "pants.bin.pants_exe:main", where "pants.bin.pants_exe" is the package
+          name and "main" is the function name (if omitted, the module is
+          executed directly, presuming it has a ``__main.py__``).
+        :param sources: Zero or one source files. If more than one file is required, it should be put in
+          a python_library which should be added to dependencies.
+        :param inherit_path: inherit the sys.path of the environment that this binary runs in
+        :param zip_safe: whether or not this binary is safe to run in compacted (zip-file) form
+        :param always_write_cache: whether or not the .deps cache of this PEX file should always
+          be written to disk.
+        :param repositories: a list of repositories to query for dependencies.
+        :param indices: a list of indices to use for packages.
+        :param ignore_errors: should we ignore inability to resolve dependencies?
+        :param str shebang: Use this shebang for the generated pex.
+        :param bool emit_warnings: Whether or not to emit pex warnings.
+        :param platforms: extra platforms to target when building this binary. If this is, e.g.,
+          ``['current', 'linux-x86_64', 'macosx-10.4-x86_64']``, then when building the pex, then
+          for any platform-dependent modules, Pants will include ``egg``\\s for Linux (64-bit Intel),
+          Mac OS X (version 10.4 or newer), and the current platform (whatever is being used when
+          making the PEX).
+        """
 
         if inherit_path is False:
             inherit_path = "false"

@@ -106,12 +106,12 @@ class TestNodeBuild(TaskTestBase):
             "src/node/build_test/package.json",
             contents=dedent(
                 """
-        {
-          "scripts": {
-            "my_build": "mkdir myOutput; echo 'Hello, world!' >myOutput/output_file"
-          }
-        }
-      """
+                {
+                  "scripts": {
+                    "my_build": "mkdir myOutput; echo 'Hello, world!' >myOutput/output_file"
+                  }
+                }
+              """
             ),
         )
         target = self.make_target(
@@ -154,12 +154,12 @@ class TestNodeBuild(TaskTestBase):
             "src/node/build_test/package.json",
             contents=dedent(
                 """
-        {
-          "scripts": {
-            "my_build": "echo 'Hello, world!'"
-          }
-        }
-      """
+                {
+                  "scripts": {
+                    "my_build": "echo 'Hello, world!'"
+                  }
+                }
+              """
             ),
         )
         output_dir = "not_exist"

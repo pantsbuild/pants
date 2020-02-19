@@ -12,10 +12,10 @@ class CppBinary(CppTarget):
 
     def __init__(self, libraries=None, payload=None, **kwargs):
         """
-    :param libraries: Libraries that this target depends on that are not pants targets.
-    For example, 'm' or 'rt' that are expected to be installed on the local system.
-    :type libraries: List of libraries to link against.
-    """
+        :param libraries: Libraries that this target depends on that are not pants targets.
+        For example, 'm' or 'rt' that are expected to be installed on the local system.
+        :type libraries: List of libraries to link against.
+        """
         payload = payload or Payload()
         payload.add_field("libraries", PrimitiveField(libraries))
         super().__init__(payload=payload, **kwargs)

@@ -181,16 +181,16 @@ class Parser:
             include_passive_options: bool = False,
         ) -> None:
             """
-      :param flags_in_scope: Iterable of arg strings to parse into flag values.
-      :param namespace: The object to register the flag values on
-      :param get_all_scoped_flag_names: A 0-argument function which returns an iterable of
-                                        all registered option names in all their scopes. This
-                                        is used to create an error message with suggestions
-                                        when raising a `ParseError`.
-      :param levenshtein_max_distance: The maximum Levenshtein edit distance between option names
-                                       to determine similarly named options when an option name
-                                       hasn't been registered.
-      """
+            :param flags_in_scope: Iterable of arg strings to parse into flag values.
+            :param namespace: The object to register the flag values on
+            :param get_all_scoped_flag_names: A 0-argument function which returns an iterable of
+                                              all registered option names in all their scopes. This
+                                              is used to create an error message with suggestions
+                                              when raising a `ParseError`.
+            :param levenshtein_max_distance: The maximum Levenshtein edit distance between option names
+                                             to determine similarly named options when an option name
+                                             hasn't been registered.
+            """
             self.flag_value_map = self._create_flag_value_map(flags_in_scope)
             self.namespace = namespace
             self.get_all_scoped_flag_names = get_all_scoped_flag_names  # type: ignore[assignment]  # cannot assign a method

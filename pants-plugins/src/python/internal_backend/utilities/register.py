@@ -168,21 +168,21 @@ class PantsPlugin(PythonLibrary):
         **kwargs,
     ):
         """
-    :param str distribution_name: The name of the plugin package; must start with
-                                  'pantsbuild.pants.'.
-    :param str description: A brief description of what the plugin provides.
-    :param list additional_classifiers: Any additional trove classifiers that apply to the plugin,
-                                        see: https://pypi.org/pypi?%3Aaction=list_classifiers
-    :param bool build_file_aliases: If `True`, register.py:build_file_aliases must be defined and
-                                    registers the 'build_file_aliases' 'pantsbuild.plugin'
-                                    entrypoint.
-    :param bool global_subsystems: If `True`, register.py:global_subsystems must be defined and
-                                   registers the 'global_subsystems' 'pantsbuild.plugin' entrypoint.
-    :param bool register_goals: If `True`, register.py:register_goals must be defined and
-                                registers the 'register_goals' 'pantsbuild.plugin' entrypoint.
-    :param bool rules: If `True`, register.py:rules must be defined and registers the 'rules'
-                       'pantsbuild.plugin' entrypoint.
-    """
+        :param str distribution_name: The name of the plugin package; must start with
+                                      'pantsbuild.pants.'.
+        :param str description: A brief description of what the plugin provides.
+        :param list additional_classifiers: Any additional trove classifiers that apply to the plugin,
+                                            see: https://pypi.org/pypi?%3Aaction=list_classifiers
+        :param bool build_file_aliases: If `True`, register.py:build_file_aliases must be defined and
+                                        registers the 'build_file_aliases' 'pantsbuild.plugin'
+                                        entrypoint.
+        :param bool global_subsystems: If `True`, register.py:global_subsystems must be defined and
+                                       registers the 'global_subsystems' 'pantsbuild.plugin' entrypoint.
+        :param bool register_goals: If `True`, register.py:register_goals must be defined and
+                                    registers the 'register_goals' 'pantsbuild.plugin' entrypoint.
+        :param bool rules: If `True`, register.py:rules must be defined and registers the 'rules'
+                           'pantsbuild.plugin' entrypoint.
+        """
         if not distribution_name.startswith("pantsbuild.pants."):
             raise ValueError(
                 "Pants plugin package distribution names must start with 'pantsbuild.pants.', given "

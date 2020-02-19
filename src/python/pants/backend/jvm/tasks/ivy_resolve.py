@@ -143,17 +143,17 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
         def make_empty_report(report, organisation, module, conf):
             no_deps_xml_template = dedent(
                 """<?xml version="1.0" encoding="UTF-8"?>
-        <?xml-stylesheet type="text/xsl" href="ivy-report.xsl"?>
-        <ivy-report version="1.0">
-          <info
-            organisation="{organisation}"
-            module="{module}"
-            revision="latest.integration"
-            conf="{conf}"
-            confs="{conf}"
-            date="{timestamp}"/>
-        </ivy-report>
-        """
+                <?xml-stylesheet type="text/xsl" href="ivy-report.xsl"?>
+                <ivy-report version="1.0">
+                  <info
+                    organisation="{organisation}"
+                    module="{module}"
+                    revision="latest.integration"
+                    conf="{conf}"
+                    confs="{conf}"
+                    date="{timestamp}"/>
+                </ivy-report>
+                """
             ).format(
                 organisation=organisation,
                 module=module,

@@ -193,15 +193,15 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
 
     DEFAULT_COVERAGE_CONFIG = dedent(
         """
-    [run]
-    branch = True
-    timid = False
-
-    [report]
-    exclude_lines =
-        def __repr__
-        raise NotImplementedError
-    """
+        [run]
+        branch = True
+        timid = False
+    
+        [report]
+        exclude_lines =
+            def __repr__
+            raise NotImplementedError
+        """
     )
 
     @staticmethod

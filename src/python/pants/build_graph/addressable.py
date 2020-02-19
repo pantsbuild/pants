@@ -19,8 +19,8 @@ class AddressableCallProxy(BuildFileTargetFactory):
     @property
     def target_types(self):
         """
-    :API: public
-    """
+        :API: public
+        """
         return self._addressable_factory.target_types
 
     def __call__(self, *args, **kwargs):

@@ -62,8 +62,8 @@ class ResponseParser:
 
     def __init__(self, format="json_map", encoding="utf-8", index="hostlist"):
         """
-    :API: public
-    """
+        :API: public
+        """
         self.format = format
         self.encoding = encoding
         self.index = index
@@ -115,8 +115,8 @@ class RESTfulResolver(Resolver):
 
     def resolve(self, resolve_from):
         """
-    :API: public
-    """
+        :API: public
+        """
         session = requests.Session()
         session.mount(resolve_from, requests.adapters.HTTPAdapter(max_retries=self._tries))
         content = self._safe_get_content(session, resolve_from)

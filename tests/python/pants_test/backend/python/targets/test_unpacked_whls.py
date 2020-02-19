@@ -68,22 +68,22 @@ class UnpackedWheelsTest(TestBase):
             "BUILD",
             dedent(
                 """
-    python_requirement_library(name='lib1',
-      requirements=[
-        python_requirement('testName1==123'),
-      ],
-    )
-    python_requirement_library(name='lib2',
-      requirements=[
-        python_requirement('testName2==456'),
-        python_requirement('testName3==789'),
-      ],
-    )
-    unpacked_whls(name='unpacked-lib',
-      libraries=[':lib1', ':lib2'],
-      module_name='foo',
-    )
-    """
+                python_requirement_library(name='lib1',
+                  requirements=[
+                    python_requirement('testName1==123'),
+                  ],
+                )
+                python_requirement_library(name='lib2',
+                  requirements=[
+                    python_requirement('testName2==456'),
+                    python_requirement('testName3==789'),
+                  ],
+                )
+                unpacked_whls(name='unpacked-lib',
+                  libraries=[':lib1', ':lib2'],
+                  module_name='foo',
+                )
+                """
             ),
         )
         lib1 = self.target("//:lib1")

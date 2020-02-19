@@ -96,8 +96,8 @@ class _PantsRunFinishedWithFailureException(Exception):
 
     def __init__(self, exit_code: ExitCode = PANTS_FAILED_EXIT_CODE):
         """
-    :param int exit_code: an optional exit code (defaults to PANTS_FAILED_EXIT_CODE)
-    """
+        :param int exit_code: an optional exit code (defaults to PANTS_FAILED_EXIT_CODE)
+        """
         super(_PantsRunFinishedWithFailureException, self).__init__(
             "Terminated with {}".format(exit_code)
         )
@@ -134,12 +134,12 @@ class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
 
     def __init__(self, maybe_shutdown_socket, args, env, services, scheduler_service):
         """
-    :param MaybeShutdownSocket maybe_shutdown_socket: A connected socket capable of speaking the nailgun protocol.
-    :param list args: The arguments (i.e. sys.argv) for this run.
-    :param dict env: The environment (i.e. os.environ) for this run.
-    :param PantsServices services: The PantsServices that are currently running.
-    :param SchedulerService scheduler_service: The SchedulerService that holds the warm graph.
-    """
+        :param MaybeShutdownSocket maybe_shutdown_socket: A connected socket capable of speaking the nailgun protocol.
+        :param list args: The arguments (i.e. sys.argv) for this run.
+        :param dict env: The environment (i.e. os.environ) for this run.
+        :param PantsServices services: The PantsServices that are currently running.
+        :param SchedulerService scheduler_service: The SchedulerService that holds the warm graph.
+        """
         self._maybe_shutdown_socket = maybe_shutdown_socket
         self._args = args
         self._env = env

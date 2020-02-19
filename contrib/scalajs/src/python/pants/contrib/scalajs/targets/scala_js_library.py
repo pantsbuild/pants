@@ -16,10 +16,10 @@ class ScalaJSLibrary(ScalaJSTarget, Target):
 
     def __init__(self, sources=None, address=None, payload=None, **kwargs):
         """
-    :param sources: Scala source that makes up this module; paths are relative to the BUILD
-                    file's directory.
-    :type sources: `globs`, `rglobs` or a list of strings
-    """
+        :param sources: Scala source that makes up this module; paths are relative to the BUILD
+                        file's directory.
+        :type sources: `globs`, `rglobs` or a list of strings
+        """
         payload = payload or Payload()
         payload.add_fields(
             {

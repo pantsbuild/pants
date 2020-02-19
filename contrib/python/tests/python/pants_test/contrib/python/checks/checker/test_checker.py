@@ -51,9 +51,9 @@ class CheckstyleTest(unittest.TestCase):
     def test_failure_print_nit(self):
         contents = dedent(
             """
-      class lower_case(object):
-        pass
-    """
+            class lower_case(object):
+              pass
+            """
         )
 
         msg = (
@@ -68,8 +68,8 @@ class CheckstyleTest(unittest.TestCase):
     def test_syntax_error_nit(self):
         contents = dedent(
             """
-      invalid python
-    """
+            invalid python
+            """
         )
 
         msg = (
@@ -87,9 +87,9 @@ class CheckstyleTest(unittest.TestCase):
         def content(noqa):
             return dedent(
                 """
-        SHORT_ENOUGH = True
-        TOO_LONG = '{too_long}'{noqa}
-      """.format(
+                SHORT_ENOUGH = True
+                TOO_LONG = '{too_long}'{noqa}
+                """.format(
                     too_long="a" * self._MAX_LENGTH, noqa="  # noqa" if noqa else ""
                 )
             )
@@ -112,10 +112,10 @@ class CheckstyleTest(unittest.TestCase):
         def content(noqa):
             return dedent(
                 """
-        {noqa}
-        SHORT_ENOUGH = True
-        TOO_LONG = '{too_long}'
-      """.format(
+                {noqa}
+                SHORT_ENOUGH = True
+                TOO_LONG = '{too_long}'
+                """.format(
                     noqa="# checkstyle: noqa" if noqa else "", too_long="a" * self._MAX_LENGTH
                 )
             )

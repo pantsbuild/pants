@@ -119,11 +119,11 @@ class BootstrapJvmTools(IvyTaskMixin, CoursierMixin, JarTask):  # type: ignore[m
     def _tool_resolve_error(cls, error, dep_spec, jvm_tool):
         msg = dedent(
             """
-        Failed to resolve target for tool: {tool}. This target was obtained from
-        option {option} in scope {scope}. You probably need to add this target to your tools
-        BUILD file(s), usually located in BUILD.tools in the workspace root.
-        Exception {etype}: {error}
-      """.format(
+            Failed to resolve target for tool: {tool}. This target was obtained from
+            option {option} in scope {scope}. You probably need to add this target to your tools
+            BUILD file(s), usually located in BUILD.tools in the workspace root.
+            Exception {etype}: {error}
+            """.format(
                 tool=dep_spec,
                 etype=type(error).__name__,
                 error=error,
@@ -157,21 +157,21 @@ class BootstrapJvmTools(IvyTaskMixin, CoursierMixin, JarTask):  # type: ignore[m
                             raise cls.ToolResolveError(
                                 dedent(
                                     """
-                  Failed to resolve target for tool: {tool}. This target was obtained from
-                  option {option} in scope {scope}.
+                                    Failed to resolve target for tool: {tool}. This target was obtained from
+                                    option {option} in scope {scope}.
 
-                  Make sure you didn't make a typo in the tool's address. You specified that the
-                  tool should use the target found at "{tool}".
+                                    Make sure you didn't make a typo in the tool's address. You specified that the
+                                    tool should use the target found at "{tool}".
 
-                  This target has a default classpath configured, so you can simply remove:
-                    [{scope}]
-                    {option}: {tool}
-                  from pants.ini (or any other config file) to use the default tool.
+                                    This target has a default classpath configured, so you can simply remove:
+                                      [{scope}]
+                                      {option}: {tool}
+                                    from pants.ini (or any other config file) to use the default tool.
 
-                  The default classpath is: {default_classpath}
+                                    The default classpath is: {default_classpath}
 
-                  Note that tool target addresses in pants.ini should be specified *without* quotes.
-                """
+                                    Note that tool target addresses in pants.ini should be specified *without* quotes.
+                                    """
                                 )
                                 .strip()
                                 .format(
@@ -262,10 +262,10 @@ class BootstrapJvmTools(IvyTaskMixin, CoursierMixin, JarTask):  # type: ignore[m
             raise self.ToolUnderspecified(
                 textwrap.dedent(
                     """
-        Unable to bootstrap tool: '{}' because no rev was specified.  This usually
-        means that the tool was not defined properly in your build files and no
-        default option was provided to use for bootstrap.
-        """.format(
+                    Unable to bootstrap tool: '{}' because no rev was specified.  This usually
+                    means that the tool was not defined properly in your build files and no
+                    default option was provided to use for bootstrap.
+                    """.format(
                         jvm_tool.key
                     )
                 )

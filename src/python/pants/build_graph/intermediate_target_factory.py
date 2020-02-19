@@ -32,10 +32,10 @@ class IntermediateTargetFactoryBase(ABC):
 
     def _create_intermediate_target(self, address, suffix):
         """
-    :param string address: A target address.
-    :param string suffix: A string used as a suffix of the intermediate target name.
-    :returns: The address of a synthetic intermediary target.
-    """
+        :param string address: A target address.
+        :param string suffix: A string used as a suffix of the intermediate target name.
+        :returns: The address of a synthetic intermediary target.
+        """
         if not isinstance(address, str):
             raise self.ExpectedAddressError(
                 f"Expected str address argument, got type {type(address)}"

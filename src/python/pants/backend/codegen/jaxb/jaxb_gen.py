@@ -39,9 +39,9 @@ class JaxbGen(SimpleCodegenTask, NailgunTask):
 
     def __init__(self, *args, **kwargs):
         """
-    :param context: inherited parameter from Task
-    :param workdir: inherited parameter from Task
-    """
+        :param context: inherited parameter from Task
+        :param workdir: inherited parameter from Task
+        """
         super().__init__(*args, **kwargs)
         self.set_distribution(jdk=True)
         self.gen_langs = set()

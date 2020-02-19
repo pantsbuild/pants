@@ -26,13 +26,13 @@ class CustomScalaTest(NailgunTaskTestBase):
             relpath="a/scala/pass.scala",
             contents=dedent(
                 """
-        import java.util
-        object HelloWorld {
-           def main(args: Array[String]) {
-              println("Hello, world!")
-           }
-        }
-      """
+                import java.util
+                object HelloWorld {
+                   def main(args: Array[String]) {
+                      println("Hello, world!")
+                   }
+                }
+                """
             ),
         )
 
@@ -50,8 +50,8 @@ class CustomScalaTest(NailgunTaskTestBase):
         for rule in rules:
             rule_section_xml += dedent(
                 """
-        <check level="error" class="{rule}" enabled="true"></check>
-      """.format(
+                <check level="error" class="{rule}" enabled="true"></check>
+                """.format(
                     rule=rule
                 )
             )
@@ -59,11 +59,11 @@ class CustomScalaTest(NailgunTaskTestBase):
             relpath="scalastyle_config.xml",
             contents=dedent(
                 """
-        <scalastyle commentFilter="enabled">
-          <name>Test Scalastyle configuration</name>
-          {rule_section_xml}
-        </scalastyle>
-      """.format(
+                <scalastyle commentFilter="enabled">
+                  <name>Test Scalastyle configuration</name>
+                  {rule_section_xml}
+                </scalastyle>
+                """.format(
                     rule_section_xml=rule_section_xml
                 )
             ),

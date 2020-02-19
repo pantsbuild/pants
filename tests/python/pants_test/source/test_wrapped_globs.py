@@ -96,8 +96,8 @@ class FilesetRelPathWrapperTest(TestBase):
             "y/BUILD",
             dedent(
                 """
-      dummy_target(name="y", sources=globs("*.java", exclude=[["fleem.java"]]))
-      """
+                dummy_target(name="y", sources=globs("*.java", exclude=[["fleem.java"]]))
+                """
             ),
         )
         graph = self.context().scan()
@@ -110,8 +110,8 @@ class FilesetRelPathWrapperTest(TestBase):
             "y/BUILD",
             dedent(
                 """
-      dummy_target(name="y", sources=globs("*.java", exclude="fleem.java"))
-      """
+                dummy_target(name="y", sources=globs("*.java", exclude="fleem.java"))
+                """
             ),
         )
         with self.assertRaisesWithMessageContaining(
@@ -124,8 +124,8 @@ class FilesetRelPathWrapperTest(TestBase):
             "y/BUILD",
             dedent(
                 """
-      dummy_target(name="y", sources=globs("*.java", exclude=["fleem.java"]))
-      """
+                dummy_target(name="y", sources=globs("*.java", exclude=["fleem.java"]))
+                """
             ),
         )
         self.context().scan()
@@ -135,8 +135,8 @@ class FilesetRelPathWrapperTest(TestBase):
             "z/BUILD",
             dedent(
                 """
-      dummy_target(name="z", sources=globs("*", exclude=["BUILD"]))
-      """
+                dummy_target(name="z", sources=globs("*", exclude=["BUILD"]))
+                """
             ),
         )
         graph = self.context().scan()
@@ -149,10 +149,10 @@ class FilesetRelPathWrapperTest(TestBase):
             "y/BUILD",
             dedent(
                 """
-      list_of_files = ["fleem.java"]
-      dummy_target(name="y", sources=globs("*.java", exclude=list_of_files))
-      dummy_target(name="z", sources=list_of_files)
-      """
+                list_of_files = ["fleem.java"]
+                dummy_target(name="y", sources=globs("*.java", exclude=list_of_files))
+                dummy_target(name="z", sources=list_of_files)
+                """
             ),
         )
 
@@ -168,8 +168,8 @@ class FilesetRelPathWrapperTest(TestBase):
             "y/BUILD",
             dedent(
                 """
-      dummy_target(name="y", sources=globs("*.java", invalid_keyword=["fleem.java"]))
-      """
+                dummy_target(name="y", sources=globs("*.java", invalid_keyword=["fleem.java"]))
+                """
             ),
         )
         with self.assertRaises(AddressLookupError):
@@ -180,11 +180,11 @@ class FilesetRelPathWrapperTest(TestBase):
             "y/BUILD",
             dedent(
                 """
-      dummy_target(
-        name="y",
-        sources=globs("*.java", follow_links=True, invalid_keyword=["fleem.java"])
-      )
-      """
+                dummy_target(
+                  name="y",
+                  sources=globs("*.java", follow_links=True, invalid_keyword=["fleem.java"])
+                )
+                """
             ),
         )
         with self.assertRaises(AddressLookupError):
@@ -203,8 +203,8 @@ class FilesetRelPathWrapperTest(TestBase):
             "y/BUILD",
             dedent(
                 """
-      dummy_target(name="y", sources=globs("dir/[dir1, dir2]/*.scala"))
-      """
+                dummy_target(name="y", sources=globs("dir/[dir1, dir2]/*.scala"))
+                """
             ),
         )
         self.context().scan()
@@ -231,8 +231,8 @@ class FilesetRelPathWrapperTest(TestBase):
             "y/BUILD",
             dedent(
                 """
-      dummy_target(name="y", sources=globs("../[dir1, dir2]/?.scala"))
-      """
+                dummy_target(name="y", sources=globs("../[dir1, dir2]/?.scala"))
+                """
             ),
         )
         with self.assertRaises(AddressLookupError):
@@ -244,8 +244,8 @@ class FilesetRelPathWrapperTest(TestBase):
             "y/BUILD",
             dedent(
                 """
-      dummy_target(name="y", sources=globs("../[dir1, dir2]/File.scala"))
-      """
+                dummy_target(name="y", sources=globs("../[dir1, dir2]/File.scala"))
+                """
             ),
         )
         with self.assertRaises(AddressLookupError):

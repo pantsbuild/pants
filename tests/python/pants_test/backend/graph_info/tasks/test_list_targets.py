@@ -52,12 +52,12 @@ class ListTargetsTest(GoalRuleTestBase):
                 self.provides = (
                     dedent(
                         f"""
-            artifact(
-              org='com.example',
-              name='{name}',
-              repo=public
-            )
-            """
+                        artifact(
+                          org='com.example',
+                          name='{name}',
+                          repo=public
+                        )
+                        """
                     ).strip()
                     if provides
                     else "None"
@@ -78,18 +78,18 @@ class ListTargetsTest(GoalRuleTestBase):
             "f",
             dedent(
                 '''
-        target(
-          name='alias',
-          dependencies=[
-            'a/b/c:c3',
-            'a/b/d:d',
-          ],
-          description = """
-        Exercises alias resolution.
-        Further description.
-          """,
-        )
-        '''
+                target(
+                  name='alias',
+                  dependencies=[
+                    'a/b/c:c3',
+                    'a/b/d:d',
+                  ],
+                  description = """
+                Exercises alias resolution.
+                Further description.
+                  """,
+                )
+                '''
             ),
         )
 

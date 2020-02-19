@@ -22,34 +22,34 @@ class NailgunTaskTest(JvmToolTaskTestBase):
                 fp.write(
                     dedent(
                         """
-        import java.io.IOException;
-        import java.nio.charset.Charset;
-        import java.nio.file.Files;
-        import java.nio.file.Paths;
-        import java.util.Arrays;
-        
-        import com.martiansoftware.nailgun.NGContext;
-        
-        public class Cwd {
-          public static void nailMain(NGContext context) throws IOException {
-            String comm_file = context.getArgs()[0];
-            String cwd = context.getWorkingDirectory();
-            communicate(comm_file, cwd, "nailMain");
-          }
-          
-          public static void main(String[] args) throws IOException {
-            String comm_file = args[0];
-            String cwd = System.getProperty("user.dir");
-            communicate(comm_file, cwd, "main"); 
-          }
-          
-          private static void communicate(String comm_file, String cwd, String source)
-              throws IOException {
-
-            Files.write(Paths.get(comm_file), Arrays.asList(source, cwd), Charset.forName("UTF-8"));
-          }
-        }
-        """
+                        import java.io.IOException;
+                        import java.nio.charset.Charset;
+                        import java.nio.file.Files;
+                        import java.nio.file.Paths;
+                        import java.util.Arrays;
+                        
+                        import com.martiansoftware.nailgun.NGContext;
+                        
+                        public class Cwd {
+                          public static void nailMain(NGContext context) throws IOException {
+                            String comm_file = context.getArgs()[0];
+                            String cwd = context.getWorkingDirectory();
+                            communicate(comm_file, cwd, "nailMain");
+                          }
+                          
+                          public static void main(String[] args) throws IOException {
+                            String comm_file = args[0];
+                            String cwd = System.getProperty("user.dir");
+                            communicate(comm_file, cwd, "main"); 
+                          }
+                          
+                          private static void communicate(String comm_file, String cwd, String source)
+                              throws IOException {
+                
+                            Files.write(Paths.get(comm_file), Arrays.asList(source, cwd), Charset.forName("UTF-8"));
+                          }
+                        }
+                        """
                     )
                 )
 

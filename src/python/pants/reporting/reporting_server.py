@@ -82,18 +82,18 @@ class PantsHandler(http.server.BaseHTTPRequestHandler):
 
     _collapsible_fmt_string = dedent(
         """
-    <div class="{class_prefix}" id="{id}">
-      <div class="{class_prefix}-header toggle-header" id="{id}-header">
-        <div class="{class_prefix}-header-icon toggle-header-icon" onclick="pants.collapsible.toggle('{id}')">
-          <i id="{id}-icon" class="visibility-icon icon-large icon-caret-right hidden"></i>
+        <div class="{class_prefix}" id="{id}">
+          <div class="{class_prefix}-header toggle-header" id="{id}-header">
+            <div class="{class_prefix}-header-icon toggle-header-icon" onclick="pants.collapsible.toggle('{id}')">
+              <i id="{id}-icon" class="visibility-icon icon-large icon-caret-right hidden"></i>
+            </div>
+            <div class="{class_prefix}-header-text toggle-header-text">
+              [<span id="{id}-header-text">{title}</span>]
+            </div>
+          </div>
+          <div class="{class_prefix}-content toggle-content nodisplay" id="{id}-content"></div>
         </div>
-        <div class="{class_prefix}-header-text toggle-header-text">
-          [<span id="{id}-header-text">{title}</span>]
-        </div>
-      </div>
-      <div class="{class_prefix}-content toggle-content nodisplay" id="{id}-content"></div>
-    </div>
-  """
+        """
     )
 
     def _handle_run(self, relpath, params):

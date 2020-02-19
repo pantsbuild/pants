@@ -29,11 +29,11 @@ from pants.rules.core.test import TestDebugRequest, TestOptions, TestResult, Tes
 
 DEFAULT_COVERAGE_CONFIG = dedent(
     f"""
-  [run]
-  branch = True
-  timid = False
-  relative_files = True
-  """
+    [run]
+    branch = True
+    timid = False
+    relative_files = True
+    """
 )
 
 

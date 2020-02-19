@@ -23,30 +23,30 @@ class MockLogger:
 
     def debug(self, *msg_elements):
         """
-    :API: public
-    """
+        :API: public
+        """
         self._maybe_log(Report.DEBUG, *msg_elements)
 
     def info(self, *msg_elements):
         """
-    :API: public
-    """
+        :API: public
+        """
         self._maybe_log(Report.INFO, *msg_elements)
 
     def warn(self, *msg_elements):
         """
-    :API: public
-    """
+        :API: public
+        """
         self._maybe_log(Report.WARN, *msg_elements)
 
     def error(self, *msg_elements):
         """
-    :API: public
-    """
+        :API: public
+        """
         self._maybe_log(Report.ERROR, *msg_elements)
 
     def fatal(self, *msg_elements):
         """
-    :API: public
-    """
+        :API: public
+        """
         self._maybe_log(Report.FATAL, *msg_elements)

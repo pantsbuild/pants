@@ -183,8 +183,8 @@ class Context:
 
     def submit_background_work_chain(self, work_chain, parent_workunit_name=None):
         """
-    :API: public
-    """
+        :API: public
+        """
         background_root_workunit = self.run_tracker.get_background_root_workunit()
         if parent_workunit_name:
             # We have to keep this workunit alive until all its child work is done, so

@@ -19,25 +19,25 @@ class TestBase(NailgunTaskTestBase):
 
     _BADFORMAT = dedent(
         """
-    package org.pantsbuild.contrib.googlejavaformat;
-    class MyClass {
-        public static void main(String[] args) {
-            System.out.println("Hello google-java-format!");
+        package org.pantsbuild.contrib.googlejavaformat;
+        class MyClass {
+            public static void main(String[] args) {
+                System.out.println("Hello google-java-format!");
+            }
         }
-    }
-    """
+        """
     )
 
     _GOODFORMAT = dedent(
         """\
-    package org.pantsbuild.contrib.googlejavaformat;
-    
-    class MyClass {
-      public static void main(String[] args) {
-        System.out.println("Hello google-java-format!");
-      }
-    }
-  """
+        package org.pantsbuild.contrib.googlejavaformat;
+        
+        class MyClass {
+          public static void main(String[] args) {
+            System.out.println("Hello google-java-format!");
+          }
+        }
+      """
     )
 
     @classmethod

@@ -50,28 +50,28 @@ class JUnitTests(RuntimePlatformMixin, JvmTarget):
         **kwargs
     ):
         """
-    :param str cwd: working directory (relative to the build root) for the tests under this
-      target. If unspecified (None), the working directory will be controlled by junit_run's --cwd
-      and --chroot options.
-    :param str test_platform: Deprecated. The name of the platform (defined under the jvm-platform subsystem) to
-      use for running tests (that is, a key into the --jvm-platform-platforms dictionary). If
-      unspecified, the platform will default to the same one used for compilation.
-    :param int timeout: A timeout (in seconds) which covers the total runtime of all tests in this
-      target. Only applied if `--test-junit-timeouts` is set to True.
-    :param list extra_jvm_options: A list of options to be passed to the jvm when running the
-      tests. Example: ['-Dexample.property=1', '-DMyFlag', '-Xmx4g'] If unspecified, no extra jvm options will be added.
-    :param dict extra_env_vars: A map of environment variables to set when running the tests, e.g.
-      { 'FOOBAR': 12 }. Using `None` as the value will cause the variable to be unset.
-    :param string concurrency: One of 'SERIAL', 'PARALLEL_CLASSES', 'PARALLEL_METHODS',
-      or 'PARALLEL_CLASSES_AND_METHODS'.  Overrides the setting of --test-junit-default-concurrency.
-    :param int threads: Use the specified number of threads when running the test. Overrides
-      the setting of --test-junit-parallel-threads.
-    :param str runtime_platform: The name of the platform (defined under the jvm-platform subsystem)
-      to use for runtime (that is, a key into the --jvm-platform-platforms dictionary). If
-      unspecified, the platform will default to the first one of these that exist: (1) the
-      default_runtime_platform specified for jvm-platform, (2) the platform that would be used for
-      the platform kwarg.
-    """
+        :param str cwd: working directory (relative to the build root) for the tests under this
+          target. If unspecified (None), the working directory will be controlled by junit_run's --cwd
+          and --chroot options.
+        :param str test_platform: Deprecated. The name of the platform (defined under the jvm-platform subsystem) to
+          use for running tests (that is, a key into the --jvm-platform-platforms dictionary). If
+          unspecified, the platform will default to the same one used for compilation.
+        :param int timeout: A timeout (in seconds) which covers the total runtime of all tests in this
+          target. Only applied if `--test-junit-timeouts` is set to True.
+        :param list extra_jvm_options: A list of options to be passed to the jvm when running the
+          tests. Example: ['-Dexample.property=1', '-DMyFlag', '-Xmx4g'] If unspecified, no extra jvm options will be added.
+        :param dict extra_env_vars: A map of environment variables to set when running the tests, e.g.
+          { 'FOOBAR': 12 }. Using `None` as the value will cause the variable to be unset.
+        :param string concurrency: One of 'SERIAL', 'PARALLEL_CLASSES', 'PARALLEL_METHODS',
+          or 'PARALLEL_CLASSES_AND_METHODS'.  Overrides the setting of --test-junit-default-concurrency.
+        :param int threads: Use the specified number of threads when running the test. Overrides
+          the setting of --test-junit-parallel-threads.
+        :param str runtime_platform: The name of the platform (defined under the jvm-platform subsystem)
+          to use for runtime (that is, a key into the --jvm-platform-platforms dictionary). If
+          unspecified, the platform will default to the first one of these that exist: (1) the
+          default_runtime_platform specified for jvm-platform, (2) the platform that would be used for
+          the platform kwarg.
+        """
 
         payload = payload or Payload()
 

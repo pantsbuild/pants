@@ -28,17 +28,17 @@ class XmlTestBase(unittest.TestCase):
             fp.write(
                 textwrap.dedent(
                     """<?xml version="1.0" encoding="utf-8"?>
-        <{manifest} xmlns:android="http://schemas.android.com/apk/res/android"
-                    xmlns:unrelated="http://schemas.android.com/apk/res/android"
-            {package}="{package_name}" >
-            <{uses_sdk}
-                {android}="19" />
-            <application >
-                <{activity}
-                    {android_name}="{application_name}" >
-                </{activity}>
-            </application>
-        </{manifest}>""".format(
+                    <{manifest} xmlns:android="http://schemas.android.com/apk/res/android"
+                                xmlns:unrelated="http://schemas.android.com/apk/res/android"
+                        {package}="{package_name}" >
+                        <{uses_sdk}
+                            {android}="19" />
+                        <application >
+                            <{activity}
+                                {android_name}="{application_name}" >
+                            </{activity}>
+                        </application>
+                    </{manifest}>""".format(
                         manifest=manifest_element,
                         package=package_attribute,
                         package_name=package_value,

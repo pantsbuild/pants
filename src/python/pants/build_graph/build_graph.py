@@ -154,8 +154,8 @@ class BuildGraph(ABC):
 
     def contains_address(self, address):
         """
-    :API: public
-    """
+        :API: public
+        """
         return address in self._target_by_address
 
     def get_target_from_spec(self, spec, relative_to=""):
@@ -365,10 +365,10 @@ class BuildGraph(ABC):
 
     def sorted_targets(self):
         """
-    :API: public
+        :API: public
 
-    :return: targets ordered from most dependent to least.
-    """
+        :return: targets ordered from most dependent to least.
+        """
         return sort_targets(self.targets())
 
     def _walk_factory(self, dep_predicate):
@@ -673,10 +673,10 @@ class CycleException(Exception):
 
 def invert_dependencies(targets):
     """
-  :API: public
+    :API: public
 
-  :return: the full graph of dependencies for `targets` and the list of roots.
-  """
+    :return: the full graph of dependencies for `targets` and the list of roots.
+    """
     roots = set()
     inverted_deps = defaultdict(OrderedSet)  # target -> dependent targets
     visited = set()
@@ -708,10 +708,10 @@ def invert_dependencies(targets):
 
 def sort_targets(targets):
     """
-  :API: public
+    :API: public
 
-  :return: the targets that `targets` depend on sorted from most dependent to least.
-  """
+    :return: the targets that `targets` depend on sorted from most dependent to least.
+    """
 
     roots, inverted_deps = invert_dependencies(targets)
     ordered = []

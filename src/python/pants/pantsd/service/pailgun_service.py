@@ -14,14 +14,14 @@ class PailgunService(PantsService):
 
     def __init__(self, bind_addr, runner_class, scheduler_service, shutdown_after_run):
         """
-    :param tuple bind_addr: The (hostname, port) tuple to bind the Pailgun server to.
-    :param class runner_class: The `PantsRunner` class to be used for Pailgun runs. Generally this
-      will be `DaemonPantsRunner`, but this decoupling avoids a cycle between the `pants.pantsd` and
-      `pants.bin` packages.
-    :param SchedulerService scheduler_service: The SchedulerService instance for access to the
-                                               resident scheduler.
-    :param bool shutdown_after_run: PailgunService should shut down after running the first request.
-    """
+        :param tuple bind_addr: The (hostname, port) tuple to bind the Pailgun server to.
+        :param class runner_class: The `PantsRunner` class to be used for Pailgun runs. Generally this
+          will be `DaemonPantsRunner`, but this decoupling avoids a cycle between the `pants.pantsd` and
+          `pants.bin` packages.
+        :param SchedulerService scheduler_service: The SchedulerService instance for access to the
+                                                   resident scheduler.
+        :param bool shutdown_after_run: PailgunService should shut down after running the first request.
+        """
         super().__init__()
         self._bind_addr = bind_addr
         self._runner_class = runner_class

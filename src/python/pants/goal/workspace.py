@@ -30,8 +30,8 @@ class ScmWorkspace(Workspace):
 
     def __init__(self, scm):
         """
-    :API: public
-    """
+        :API: public
+        """
         super().__init__()
 
         if scm is None:
@@ -42,8 +42,8 @@ class ScmWorkspace(Workspace):
 
     def touched_files(self, parent):
         """
-    :API: public
-    """
+        :API: public
+        """
         try:
             return self._scm.changed_files(
                 from_commit=parent, include_untracked=True, relative_to=get_buildroot()
@@ -53,8 +53,8 @@ class ScmWorkspace(Workspace):
 
     def changes_in(self, rev_or_range):
         """
-    :API: public
-    """
+        :API: public
+        """
         try:
             return self._scm.changes_in(rev_or_range, relative_to=get_buildroot())
         except Scm.ScmException as e:

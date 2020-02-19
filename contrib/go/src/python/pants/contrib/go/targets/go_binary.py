@@ -16,7 +16,7 @@ class GoBinary(GoLocalSource):
 
     def __init__(self, build_flags=None, **kwargs):
         """
-    :param string build_flags: Build flags to pass to Go compiler.
-    """
+        :param string build_flags: Build flags to pass to Go compiler.
+        """
         super().__init__(**kwargs)
         self.build_flags = build_flags

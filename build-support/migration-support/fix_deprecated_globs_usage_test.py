@@ -33,29 +33,29 @@ class ModernizeSourcesTest(TestBase):
     ) -> None:
         template = dedent(
             """\
-      # A stray comment
-      
-      python_library(
-        name="lib",
-        {sources_field}
-        {dependencies_field}
-      )
-    
-      python_binary(
-        name="bin",
-        dependencies=[
-          ':lib',
-        ],
-      )
-      """
+            # A stray comment
+
+            python_library(
+              name="lib",
+              {sources_field}
+              {dependencies_field}
+            )
+
+            python_binary(
+              name="bin",
+              dependencies=[
+                ':lib',
+              ],
+            )
+            """
         )
         dependencies_field = (
             dedent(
                 """\
-      dependencies=[
-        'src/python/pants/util',
-      ],
-      """
+                dependencies=[
+                  'src/python/pants/util',
+                ],
+                """
             )
             if include_field_after_sources
             else ""
@@ -237,10 +237,10 @@ class ModernizeSourcesTest(TestBase):
         assert_warning(
             build_file_content=dedent(
                 """\
-        files(
-          name='bad', sources=globs('foo.py'),
-        )
-        """
+                files(
+                  name='bad', sources=globs('foo.py'),
+                )
+                """
             ),
             line_number=2,
         )
@@ -256,14 +256,14 @@ class ModernizeSourcesTest(TestBase):
         assert_warning(
             build_file_content=dedent(
                 """\
-        files(
-          name='bad',
-          sources=globs(
-            "foo.py",
-            "bar.py",
-          ),
-        )
-        """
+                files(
+                  name='bad',
+                  sources=globs(
+                    "foo.py",
+                    "bar.py",
+                  ),
+                )
+                """
             ),
             # We can't easily infer whether to use single vs. double quotes
             replacement='["foo.py", "bar.py"]',
@@ -271,12 +271,12 @@ class ModernizeSourcesTest(TestBase):
         assert_warning(
             build_file_content=dedent(
                 """\
-        files(
-          name='bad',
-          sources=globs('foo.py',
-                        'bar.py'),
-        )
-        """
+                files(
+                  name='bad',
+                  sources=globs('foo.py',
+                                'bar.py'),
+                )
+                """
             ),
             replacement="['foo.py', 'bar.py']",
         )
@@ -285,10 +285,10 @@ class ModernizeSourcesTest(TestBase):
         self.assert_warning_raised(
             build_file_content=dedent(
                 """\
-        files(
-          sources=globs('foo.py'),  # a comment
-        )
-        """
+                files(
+                  sources=globs('foo.py'),  # a comment
+                )
+                """
             ),
             line_number=2,
             replacement="['foo.py']",
@@ -304,44 +304,44 @@ class ModernizeSourcesTest(TestBase):
         assert_no_op(
             dedent(
                 """\
-        jvm_app(
-          bundles=[],
-        )
-        """
+                jvm_app(
+                  bundles=[],
+                )
+                """
             )
         )
         assert_no_op(
             dedent(
                 """\
-        jvm_app(
-          bundles=[
-            bundle(fileset=[]),
-          ],
-        )
-        """
+                jvm_app(
+                  bundles=[
+                    bundle(fileset=[]),
+                  ],
+                )
+                """
             )
         )
         assert_no_op(
             dedent(
                 """\
-        jvm_app(
-          bundles=[
-            bundle(fileset=['foo.java', '!ignore.java']),
-          ],
-        )
-        """
+                jvm_app(
+                  bundles=[
+                    bundle(fileset=['foo.java', '!ignore.java']),
+                  ],
+                )
+                """
             )
         )
 
         self.assert_warning_raised(
             build_file_content=dedent(
                 """\
-        jvm_app(
-          bundles=[
-            bundle(fileset=globs('foo.java')),
-          ],
-        )
-        """
+                jvm_app(
+                  bundles=[
+                    bundle(fileset=globs('foo.java')),
+                  ],
+                )
+                """
             ),
             field_name="bundle(fileset=)",
             line_number=3,
@@ -369,23 +369,23 @@ class ModernizeSourcesTest(TestBase):
         check_multiple_bad_bundle_entries(
             dedent(
                 """\
-        jvm_app(
-          bundles=[
-            bundle(fileset=globs('foo.java')),
-            bundle(fileset=globs('bar.java')),
-          ],
-        )
-        """
+                jvm_app(
+                  bundles=[
+                    bundle(fileset=globs('foo.java')),
+                    bundle(fileset=globs('bar.java')),
+                  ],
+                )
+                """
             ),
             replacements_and_line_numbers=[("['foo.java']", 3), ("['bar.java']", 4)],
         )
         check_multiple_bad_bundle_entries(
             dedent(
                 """\
-        jvm_app(
-          bundles=[bundle(fileset=globs('foo.java')), bundle(fileset=globs('bar.java'))],
-        )
-        """
+                jvm_app(
+                  bundles=[bundle(fileset=globs('foo.java')), bundle(fileset=globs('bar.java'))],
+                )
+                """
             ),
             replacements_and_line_numbers=[("['foo.java']", 2), ("['bar.java']", 2)],
         )
@@ -394,10 +394,10 @@ class ModernizeSourcesTest(TestBase):
         result, build, warnings = self.capture_warnings(
             build_file_content=dedent(
                 """\
-        files(
-          sources=globs(VARIABLE, VAR2),
-        )
-        """
+                files(
+                  sources=globs(VARIABLE, VAR2),
+                )
+                """
             )
         )
         assert result is None
@@ -406,10 +406,10 @@ class ModernizeSourcesTest(TestBase):
         result, build, warnings = self.capture_warnings(
             build_file_content=dedent(
                 """\
-        files(
-          sources=globs('foo.py', exclude=[VAR1, [VAR2], glob(VAR3)]),
-        )
-        """
+                files(
+                  sources=globs('foo.py', exclude=[VAR1, [VAR2], glob(VAR3)]),
+                )
+                """
             )
         )
         assert result is None

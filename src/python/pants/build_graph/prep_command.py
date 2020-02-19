@@ -52,17 +52,17 @@ class PrepCommand(Target):
         **kwargs
     ):
         """
-    :API: public
+        :API: public
 
-    :param prep_executable: The path to the executable that should be run.
-    :param prep_args: A list of command-line args to the excutable.
-    :param prep_environ: If True, the output of the command will be treated as
-      a \\\\0-separated list of key=value pairs to insert into the environment.
-      Note that this will pollute the environment for all future tests, so
-      avoid it if at all possible.
-    :param goals: One or more pants goals to run this command in [test, binary or compile]. If not
-      specified, runs in the 'test' goal.
-    """
+        :param prep_executable: The path to the executable that should be run.
+        :param prep_args: A list of command-line args to the excutable.
+        :param prep_environ: If True, the output of the command will be treated as
+          a \\\\0-separated list of key=value pairs to insert into the environment.
+          Note that this will pollute the environment for all future tests, so
+          avoid it if at all possible.
+        :param goals: One or more pants goals to run this command in [test, binary or compile]. If not
+          specified, runs in the 'test' goal.
+        """
 
         def raise_bad_target(msg):
             raise TargetDefinitionException(address.spec, msg)

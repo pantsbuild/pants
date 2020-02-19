@@ -24,8 +24,8 @@ class SyntheticClasspathTest(NailgunTaskTestBase):
 
     def test_execute_java_no_error_weird_path(self):
         """
-    :API: public
-    """
+        :API: public
+        """
         with temporary_file(suffix=".jar") as temp_path:
             fetcher = Fetcher(get_buildroot())
             try:

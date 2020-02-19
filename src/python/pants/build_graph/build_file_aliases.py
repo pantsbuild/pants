@@ -192,13 +192,13 @@ class BuildFileAliases:
         context_aware_object_factories: Optional[Dict] = None,
     ) -> None:
         """
-    :API: public
+        :API: public
 
-    :param targets: A mapping from string aliases to Target subclasses or TargetMacro.Factory instances
-    :param objects: A mapping from string aliases to arbitrary objects.
-    :param context_aware_object_factories: A mapping from string aliases to context aware
-                                           object factory callables.
-    """
+        :param targets: A mapping from string aliases to Target subclasses or TargetMacro.Factory instances
+        :param objects: A mapping from string aliases to arbitrary objects.
+        :param context_aware_object_factories: A mapping from string aliases to context aware
+                                               object factory callables.
+        """
         self._target_types, self._target_macro_factories = self._validate_targets(targets)
         self._objects = self._validate_objects(objects)
         self._context_aware_object_factories = self._validate_context_aware_object_factories(

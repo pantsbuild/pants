@@ -14,40 +14,40 @@ class GrpcioGenTest(GrpcioTestBase):
             "src/grpcio/com/foo/foo_example.proto",
             contents=dedent(
                 """
-    syntax = "proto3";
-    package com.foo;
-
-    service FooService {
-        rpc Foo(FooRequest) returns (FooReply) {}
-    }
-    message FooRequest {
-        string foo = 1;
-    }
-    message FooReply {
-        string bar = 1;
-    }
-    """
+                syntax = "proto3";
+                package com.foo;
+            
+                service FooService {
+                    rpc Foo(FooRequest) returns (FooReply) {}
+                }
+                message FooRequest {
+                    string foo = 1;
+                }
+                message FooReply {
+                    string bar = 1;
+                }
+                """
             ),
         )
         self.create_file(
             "src/grpcio/com/bar/bar_example.proto",
             contents=dedent(
                 """
-    syntax = "proto3";
-    package com.bar;
-
-    import "com/foo/foo_example.proto";
-
-    service BarService {
-        rpc Bar(BarRequest) returns (BarReply) {}
-    }
-    message BarRequest {
-        com.foo.FooRequest foo_request = 1;
-    }
-    message BarReply {
-        com.foo.FooReply foo_reply = 1;
-    }
-    """
+                syntax = "proto3";
+                package com.bar;
+            
+                import "com/foo/foo_example.proto";
+            
+                service BarService {
+                    rpc Bar(BarRequest) returns (BarReply) {}
+                }
+                message BarRequest {
+                    com.foo.FooRequest foo_request = 1;
+                }
+                message BarReply {
+                    com.foo.FooReply foo_reply = 1;
+                }
+                """
             ),
         )
         foo_target = self.make_target(

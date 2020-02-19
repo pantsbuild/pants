@@ -34,19 +34,19 @@ class JavaWireLibrary(JvmTarget):
         **kwargs
     ):
         """
-    :param string service_writer: the name of the class to pass as the --service_writer option to
-    the Wire compiler (For wire 1.0 only)
-    :param list service_writer_options: A list of options to pass to the service writer (For
-    wire 1.x only)
-    :param list roots: passed through to the --roots option of the Wire compiler
-    :param string registry_class: fully qualified class name of RegistryClass to create. If in
-    doubt, specify com.squareup.wire.SimpleServiceWriter
-    :param list enum_options: list of enums to pass to as the --enum-enum_options option, # optional
-    :param boolean no_options: boolean that determines if --no_options flag is passed
-    :param boolean ordered_sources: boolean that declares whether the sources argument represents
-      literal ordered sources to be passed directly to the compiler. If false, no ordering is
-      guaranteed for the sources passed to an individual compiler invoke.
-    """
+        :param string service_writer: the name of the class to pass as the --service_writer option to
+        the Wire compiler (For wire 1.0 only)
+        :param list service_writer_options: A list of options to pass to the service writer (For
+        wire 1.x only)
+        :param list roots: passed through to the --roots option of the Wire compiler
+        :param string registry_class: fully qualified class name of RegistryClass to create. If in
+        doubt, specify com.squareup.wire.SimpleServiceWriter
+        :param list enum_options: list of enums to pass to as the --enum-enum_options option, # optional
+        :param boolean no_options: boolean that determines if --no_options flag is passed
+        :param boolean ordered_sources: boolean that declares whether the sources argument represents
+          literal ordered sources to be passed directly to the compiler. If false, no ordering is
+          guaranteed for the sources passed to an individual compiler invoke.
+        """
 
         if not service_writer and service_writer_options:
             raise TargetDefinitionException(

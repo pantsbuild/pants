@@ -18,8 +18,9 @@ class PythonArtifact(PayloadField):
 
     def __init__(self, **kwargs):
         """
-    :param kwargs: Passed to `setuptools.setup
-       <https://pythonhosted.org/setuptools/setuptools.html>`_."""
+        :param kwargs: Passed to `setuptools.setup
+          <https://pythonhosted.org/setuptools/setuptools.html>`_.
+       """
         self._kw = kwargs
         self._binaries = {}
 

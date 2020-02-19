@@ -32,10 +32,10 @@ class Storage(threading.local):
 class ParseContext:
     """The build file context that context aware objects - aka BUILD macros - operate against.
 
-  All fields of the ParseContext must be assumed to be mutable by macros, and should
-  thus only be consumed in the context of a macro's `__call__` method (rather than
-  in its `__init__`).
-  """
+    All fields of the ParseContext must be assumed to be mutable by macros, and should
+    thus only be consumed in the context of a macro's `__call__` method (rather than
+    in its `__init__`).
+    """
 
     def __init__(self, rel_path, type_aliases):
         """Create a ParseContext.

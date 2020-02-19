@@ -16,7 +16,7 @@ from pants.util.dirutil import safe_mkdir, safe_mkdtemp, touch
 class ExecuteJavaTest(unittest.TestCase):
     """
     :API: public
-  """
+    """
 
     EXECUTOR_ERROR = Executor.Error()
     TEST_MAIN = "foo.bar.main"
@@ -26,8 +26,8 @@ class ExecuteJavaTest(unittest.TestCase):
 
     def setUp(self):
         """
-    :API: public
-    """
+        :API: public
+        """
         self.executor = Mock(spec=Executor)
         self.runner = Mock(spec=Executor.Runner)
         self.executor.runner = Mock(return_value=self.runner)
@@ -36,8 +36,8 @@ class ExecuteJavaTest(unittest.TestCase):
     @contextmanager
     def mock_safe_classpath_helper(self, create_synthetic_jar=True):
         """
-    :API: public
-    """
+        :API: public
+        """
         with patch("pants.java.util.safe_classpath") as mock_safe_classpath:
             mock_safe_classpath.side_effect = fake_safe_classpath
             yield mock_safe_classpath
@@ -56,8 +56,8 @@ class ExecuteJavaTest(unittest.TestCase):
 
     def test_execute_java_no_error(self):
         """
-    :API: public
-    """
+        :API: public
+        """
         with self.mock_safe_classpath_helper():
             self.assertEqual(
                 0,
@@ -71,8 +71,8 @@ class ExecuteJavaTest(unittest.TestCase):
 
     def test_execute_java_executor_error(self):
         """
-    :API: public
-    """
+        :API: public
+        """
         with self.mock_safe_classpath_helper():
             self.runner.run.side_effect = self.EXECUTOR_ERROR
 
@@ -86,8 +86,8 @@ class ExecuteJavaTest(unittest.TestCase):
 
     def test_execute_java_no_synthentic_jar(self):
         """
-    :API: public
-    """
+        :API: public
+        """
         with self.mock_safe_classpath_helper(create_synthetic_jar=False):
             self.assertEqual(
                 0,

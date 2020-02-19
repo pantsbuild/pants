@@ -71,13 +71,13 @@ class BuildFileParserBasicsTest(TestWithBuildFileParser):
             "d/BUILD",
             dedent(
                 """
-      java_library(
-        name="foo",
-        dependencies=[
-          object(),
-        ]
-      )
-      """
+                java_library(
+                  name="foo",
+                  dependencies=[
+                    object(),
+                  ]
+                )
+                """
             ),
         )
         build_file_d = self.create_buildfile("d/BUILD")
@@ -97,11 +97,11 @@ class BuildFileParserBasicsTest(TestWithBuildFileParser):
             "BUILD",
             dedent(
                 """
-      jvm_binary(name = ‘hello’,  # Parse error due to smart quotes (non ascii characters)
-        source = 'HelloWorld.java'
-        main = 'foo.HelloWorld',
-      )
-      """
+                jvm_binary(name = ‘hello’,  # Parse error due to smart quotes (non ascii characters)
+                  source = 'HelloWorld.java'
+                  main = 'foo.HelloWorld',
+                )
+                """
             ),
         )
         build_file = self.create_buildfile("BUILD")
@@ -113,11 +113,11 @@ class BuildFileParserBasicsTest(TestWithBuildFileParser):
             "BUILD",
             dedent(
                 """
-        java_library(
-          name='foo',
-          sources=['א.java']
-        )
-        """
+                java_library(
+                  name='foo',
+                  sources=['א.java']
+                )
+                """
             ),
         )
         build_file = self.create_buildfile("BUILD")
@@ -148,11 +148,11 @@ class BuildFileParserTargetTest(TestWithBuildFileParser):
             "BUILD",
             dedent(
                 """
-      fake(name="base",
-           dependencies=[
-             ':foo',
-           ])
-      """
+                fake(name="base",
+                     dependencies=[
+                       ':foo',
+                     ])
+                """
             ),
         )
 
@@ -160,11 +160,11 @@ class BuildFileParserTargetTest(TestWithBuildFileParser):
             "BUILD.foo",
             dedent(
                 """
-      fake(name="foo",
-           dependencies=[
-             ':bat',
-           ])
-      """
+                fake(name="foo",
+                     dependencies=[
+                       ':bat',
+                     ])
+                """
             ),
         )
 
@@ -172,8 +172,8 @@ class BuildFileParserTargetTest(TestWithBuildFileParser):
             "./BUILD.bar",
             dedent(
                 """
-      fake(name="bat")
-      """
+                fake(name="bat")
+                """
             ),
         )
 
@@ -206,11 +206,11 @@ class BuildFileParserTargetTest(TestWithBuildFileParser):
             "BUILD",
             dedent(
                 """
-      fake(name="base",
-           dependencies=[
-             ':foo',
-           ])
-      """
+                fake(name="base",
+                     dependencies=[
+                       ':foo',
+                     ])
+                """
             ),
         )
 
@@ -218,11 +218,11 @@ class BuildFileParserTargetTest(TestWithBuildFileParser):
             "BUILD.foo",
             dedent(
                 """
-      fake(name="foo",
-           dependencies=[
-             ':bat',
-           ])
-      """
+                fake(name="foo",
+                     dependencies=[
+                       ':bat',
+                     ])
+                """
             ),
         )
 
@@ -230,8 +230,8 @@ class BuildFileParserTargetTest(TestWithBuildFileParser):
             "./BUILD.bar",
             dedent(
                 """
-      fake(name="base")
-      """
+                fake(name="base")
+                """
             ),
         )
 
@@ -344,12 +344,12 @@ class BuildFileParserExposedContextAwareObjectFactoryTest(TestWithBuildFileParse
     def test_context_aware_object_factories(self):
         contents = dedent(
             """
-                 create_java_libraries(base_name="create-java-libraries",
-                                       provides_java_name="test-java",
-                                       provides_scala_name="test-scala")
-                 make_lib("com.foo.test", "does_not_exist", "1.0")
-                 path_util("baz")
-               """
+            create_java_libraries(base_name="create-java-libraries",
+                                  provides_java_name="test-java",
+                                  provides_scala_name="test-scala")
+            make_lib("com.foo.test", "does_not_exist", "1.0")
+            path_util("baz")
+           """
         )
         self.create_file("3rdparty/BUILD", contents)
 
@@ -383,14 +383,14 @@ class BuildFileParserExposedContextAwareObjectFactoryTest(TestWithBuildFileParse
             "begin/BUILD",
             dedent(
                 """
-      *?&INVALID! = 'foo'
-      target(
-        name='bar',
-        dependencies= [
-          ':baz',
-        ],
-      )
-      """
+                *?&INVALID! = 'foo'
+                target(
+                  name='bar',
+                  dependencies= [
+                    ':baz',
+                  ],
+                )
+                """
             ),
         )
         with self.assertRaises(BuildFileParser.ParseError):
@@ -401,14 +401,14 @@ class BuildFileParserExposedContextAwareObjectFactoryTest(TestWithBuildFileParse
             "end/BUILD",
             dedent(
                 """
-      target(
-        name='bar',
-        dependencies= [
-          ':baz',
-        ],
-      )
-      *?&INVALID! = 'foo'
-      """
+                target(
+                  name='bar',
+                  dependencies= [
+                    ':baz',
+                  ],
+                )
+                *?&INVALID! = 'foo'
+                """
             ),
         )
         with self.assertRaises(BuildFileParser.ParseError):
@@ -419,16 +419,16 @@ class BuildFileParserExposedContextAwareObjectFactoryTest(TestWithBuildFileParse
             "middle/BUILD",
             dedent(
                 """
-      target(
-        name='bar',
-
-              *?&INVALID! = 'foo'
-
-        dependencies = [
-          ':baz',
-        ],
-      )
-      """
+                target(
+                  name='bar',
+        
+                        *?&INVALID! = 'foo'
+        
+                  dependencies = [
+                    ':baz',
+                  ],
+                )
+                """
             ),
         )
         with self.assertRaises(BuildFileParser.ParseError):
@@ -439,8 +439,8 @@ class BuildFileParserExposedContextAwareObjectFactoryTest(TestWithBuildFileParse
             "short/BUILD",
             dedent(
                 """
-      target(name='bar', dependencies = [':baz'],) *?&INVALID! = 'foo'
-      """
+                target(name='bar', dependencies = [':baz'],) *?&INVALID! = 'foo'
+                """
             ),
         )
         with self.assertRaises(BuildFileParser.ParseError):

@@ -11,22 +11,22 @@ class NewStyleClassesTest(CheckstylePluginTestBase):
 
     def test_new_style_classes(self):
         statement = """
-      class OldStyle:
-        pass
+        class OldStyle:
+          pass
 
-      class NewStyle(object):
-        pass
-    """
+        class NewStyle(object):
+          pass
+        """
         self.assertNit(statement, "T606")
 
         statement = """
-      class NewStyle(OtherThing, ThatThing, WhatAmIDoing):
-        pass
-    """
+        class NewStyle(OtherThing, ThatThing, WhatAmIDoing):
+          pass
+        """
         self.assertNoNits(statement)
 
         statement = """
-      class OldStyle():  # unspecified mro
-        pass
-    """
+        class OldStyle():  # unspecified mro
+          pass
+        """
         self.assertNit(statement, "T606")

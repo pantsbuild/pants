@@ -27,17 +27,17 @@ class GoFetchTest(TaskTestBase):
         self.create_file(
             "src/github.com/u/a/a.go",
             contents="""
-      package a
+                package a
 
-      import (
-        "fmt"
-        "math"
-        "sync"
+                import (
+                  "fmt"
+                  "math"
+                  "sync"
 
-        "bitbucket.org/u/b"
-        "github.com/u/c"
-      )
-    """,
+                  "bitbucket.org/u/b"
+                  "github.com/u/c"
+                )
+                """,
         )
         remote_import_ids = go_fetch._get_remote_import_paths(
             "github.com/u/a", gopath=self.build_root
@@ -85,8 +85,8 @@ class GoFetchTest(TaskTestBase):
         self.create_file(
             f,
             contents="""package {name}
-        {imports}
-      """.format(
+                {imports}
+                """.format(
                 name=name, imports="\n".join(imports)
             ),
         )
@@ -189,33 +189,33 @@ class GoFetchTest(TaskTestBase):
         self.create_file(
             "src/github.com/u/a/a.go",
             contents="""
-      package a
-
-      import (
-        "fmt"
-        "math"
-        "sync"
-
-        "bitbucket.org/u/b"
-      )
-    """,
+              package a
+        
+              import (
+                "fmt"
+                "math"
+                "sync"
+        
+                "bitbucket.org/u/b"
+              )
+              """,
         )
         self.create_file(
             "src/github.com/u/a/b.go",
             contents="""
-      package a
-
-      /*
-       #include <stdlib.h>
-       */
-      import "C" // C was erroneously categorized as a remote lib in issue 2616.
-
-      import (
-        "fmt"
-
-        "github.com/u/c"
-      )
-    """,
+              package a
+        
+              /*
+               #include <stdlib.h>
+               */
+              import "C" // C was erroneously categorized as a remote lib in issue 2616.
+        
+              import (
+                "fmt"
+        
+                "github.com/u/c"
+              )
+              """,
         )
         remote_import_ids = go_fetch._get_remote_import_paths(
             "github.com/u/a", gopath=self.build_root

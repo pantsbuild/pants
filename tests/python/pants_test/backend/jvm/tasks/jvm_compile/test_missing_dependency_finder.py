@@ -17,57 +17,57 @@ from pants.backend.jvm.tasks.jvm_compile.missing_dependency_finder import (
 class CompileErrorExtractorTest(unittest.TestCase):
     ERROR_MESSAGES = [
         r"""
-      [error] /path/to/file/Hello.java:3:1: cannot find symbol
-      [error]   symbol:   class Nullable
-      [error]   location: package javax.annotation
-      [error] import javax.annotation.Nullable;""",
+        [error] /path/to/file/Hello.java:3:1: cannot find symbol
+        [error]   symbol:   class Nullable
+        [error]   location: package javax.annotation
+        [error] import javax.annotation.Nullable;""",
         r"""
-      [error] /path/to/file/Hello.java:63:1: cannot access org.apache.thrift.TBase
-      [error]   class file for org.apache.thrift.TBase not found""",
+        [error] /path/to/file/Hello.java:63:1: cannot access org.apache.thrift.TBase
+        [error]   class file for org.apache.thrift.TBase not found""",
         r"""
-      [error] /path/to/file/Hello.java:6:1: package a.b.c does not exist
-      [error] import a.b.c.ImmutableMap;""",
+        [error] /path/to/file/Hello.java:6:1: package a.b.c does not exist
+        [error] import a.b.c.ImmutableMap;""",
         r"""
-      [error] /path/to/file/Hello.java:36:1: cannot find symbol
-      [error]   symbol:   class XYZ
-      [error]   location: package a.b.c""",
+        [error] /path/to/file/Hello.java:36:1: cannot find symbol
+        [error]   symbol:   class XYZ
+        [error]   location: package a.b.c""",
         r"""
-      [error] /path/to/file/Hello.java:102:1: package a.b.c does not exist
-      [error]     public static final A<a.b.c.XYZ> xyz = new ...;    """,
+        [error] /path/to/file/Hello.java:102:1: package a.b.c does not exist
+        [error]     public static final A<a.b.c.XYZ> xyz = new ...;    """,
         r"""
-      [error] ## Exception when compiling /path/to/file/Hello.java and others...
-      [error] Type com.twitter.util.lint.Rule not present""",
+        [error] ## Exception when compiling /path/to/file/Hello.java and others...
+        [error] Type com.twitter.util.lint.Rule not present""",
         r"""
-      [error] ## Exception when compiling /path/to/file/Hello.java and others...
-      [error] java.lang.NoClassDefFoundError: a.b.c.XYZ""",
+        [error] ## Exception when compiling /path/to/file/Hello.java and others...
+        [error] java.lang.NoClassDefFoundError: a.b.c.XYZ""",
         r"""
-      [error] /path/to/file/Hello.scala:211:26: exception during macro expansion:
-      [error] java.lang.ClassNotFoundException: com.twitter.x.thrift.thriftscala.Y""",
+        [error] /path/to/file/Hello.scala:211:26: exception during macro expansion:
+        [error] java.lang.ClassNotFoundException: com.twitter.x.thrift.thriftscala.Y""",
         r"""
-      [error] /path/to/file/Hello.scala:7:33: object x is not a member of package a.b.c
-      [error] import a.b.c.x.Y""",
+        [error] /path/to/file/Hello.scala:7:33: object x is not a member of package a.b.c
+        [error] import a.b.c.x.Y""",
         r"""
-      java.lang.NoClassDefFoundError: org/apache/thrift/TEnum""",
+        java.lang.NoClassDefFoundError: org/apache/thrift/TEnum""",
         r"""
-      [error] missing or invalid dependency detected while loading class file 'Logging.class'.
-      [error] Could not access type Future in value com.twitter.util,""",
+        [error] missing or invalid dependency detected while loading class file 'Logging.class'.
+        [error] Could not access type Future in value com.twitter.util,""",
         r"""
-      [error] Class a.b.c.X not found - continuing with a stub.""",
+        [error] Class a.b.c.X not found - continuing with a stub.""",
         r"""
-      [error] /path/to/file/Hello.scala:34:6: Symbol 'type <none>.w.XYZ' is missing from the classpath.
-      [error] This symbol is required by 'class a.b.c.DEF'.
-      [error] Make sure that type XYZ is in your classpath and check for conflicting dependencies with `-Ylog-classpath`.
-      [error] A full rebuild may help if 'DEF.class' was compiled against an incompatible version of <none>.w.""",
+        [error] /path/to/file/Hello.scala:34:6: Symbol 'type <none>.w.XYZ' is missing from the classpath.
+        [error] This symbol is required by 'class a.b.c.DEF'.
+        [error] Make sure that type XYZ is in your classpath and check for conflicting dependencies with `-Ylog-classpath`.
+        [error] A full rebuild may help if 'DEF.class' was compiled against an incompatible version of <none>.w.""",
         r"""
-      [error] /path/to/file/Hello.scala:34:6: Symbol 'class u.v.w.XYZ' is missing from the classpath.
-      [error] This symbol is required by 'class a.b.c.DEF'.
-      [error] Make sure that class XYZ is in your classpath and check for conflicting dependencies with `-Ylog-classpath`.
-      [error] A full rebuild may help if 'DEF.class' was compiled against an incompatible version of u.v.w.""",
+        [error] /path/to/file/Hello.scala:34:6: Symbol 'class u.v.w.XYZ' is missing from the classpath.
+        [error] This symbol is required by 'class a.b.c.DEF'.
+        [error] Make sure that class XYZ is in your classpath and check for conflicting dependencies with `-Ylog-classpath`.
+        [error] A full rebuild may help if 'DEF.class' was compiled against an incompatible version of u.v.w.""",
         r"""
-      [error] Symbol 'type u.v.w.XYZ' is missing from the classpath.
-      [error] This symbol is required by 'method DEF.method'.
-      [error] Make sure that type XYZ is in your classpath and check for conflicting dependencies with `-Ylog-classpath`.
-      [error] A full rebuild may help if 'DEF.class' was compiled against an incompatible version of u.v.w.""",
+        [error] Symbol 'type u.v.w.XYZ' is missing from the classpath.
+        [error] This symbol is required by 'method DEF.method'.
+        [error] Make sure that type XYZ is in your classpath and check for conflicting dependencies with `-Ylog-classpath`.
+        [error] A full rebuild may help if 'DEF.class' was compiled against an incompatible version of u.v.w.""",
     ]
 
     EXPECTED_ERRORS = [

@@ -472,9 +472,9 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
                 fp.write(
                     textwrap.dedent(
                         """
-          #!/bin/sh
-          echo java.version={version}
-        """.format(
+                        #!/bin/sh
+                        echo java.version={version}
+                        """.format(
                             version=version
                         )
                     ).strip()

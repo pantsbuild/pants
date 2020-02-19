@@ -136,10 +136,10 @@ class AllTheThingsTestCase(unittest.TestCase):
             self.soups,
             self.precomputed,
             """
-                                   {{#page_toc}}
-                                   DEPTH={{depth}} LINK={{link}} TEXT={{text}}
-                                   {{/page_toc}}
-                                   """,
+            {{#page_toc}}
+            DEPTH={{depth}} LINK={{link}} TEXT={{text}}
+            {{/page_toc}}
+            """,
         )
         self.assertIn("DEPTH=1 LINK=one TEXT=Section One", rendered)
         self.assertIn("DEPTH=1 LINK=two TEXT=Section Two", rendered)
@@ -152,10 +152,10 @@ class AllTheThingsTestCase(unittest.TestCase):
             self.soups,
             self.precomputed,
             """
-                                   {{#page_toc}}
-                                   DEPTH={{depth}} LINK={{link}} TEXT={{text}}
-                                   {{/page_toc}}
-                                   """,
+            {{#page_toc}}
+            DEPTH={{depth}} LINK={{link}} TEXT={{text}}
+            {{/page_toc}}
+            """,
         )
         self.assertNotIn("DEPTH=1 LINK=one TEXT=Section One", rendered)
         self.assertNotIn("DEPTH=1 LINK=two TEXT=Section Two", rendered)
@@ -170,10 +170,10 @@ class AllTheThingsTestCase(unittest.TestCase):
             self.soups,
             self.precomputed,
             """
-                                   {{#page_toc}}
-                                   DEPTH={{depth}} LINK={{link}} TEXT={{text}}
-                                   {{/page_toc}}
-                                   """,
+            {{#page_toc}}
+            DEPTH={{depth}} LINK={{link}} TEXT={{text}}
+            {{/page_toc}}
+            """,
         )
         self.assertIn("DEPTH=1 LINK=one TEXT=Section One", rendered)
         self.assertIn("DEPTH=1 LINK=two TEXT=Section Two", rendered)
@@ -188,10 +188,10 @@ class AllTheThingsTestCase(unittest.TestCase):
             self.soups,
             self.precomputed,
             """
-                                   {{#site_toc}}
-                                   DEPTH={{depth}} LINK={{links}} HEADING={{heading}} 
-                                   {{/site_toc}}
-                                   """,
+            {{#site_toc}}
+            DEPTH={{depth}} LINK={{links}} HEADING={{heading}} 
+            {{/site_toc}}
+            """,
         )
         self.assertIn("DEPTH=1 LINK=None HEADING=non_collapse", rendered)
         escaped_single_quote = "&#x27;"

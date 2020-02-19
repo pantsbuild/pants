@@ -63,7 +63,7 @@ class FilemapIntegrationTest(PantsRunIntegrationTest):
     def test_exclude_invalid_string(self):
         build_path = os.path.join(self.PATH_PREFIX, "BUILD.invalid")
         build_content = """python_library(name='exclude_strings_disallowed',
-                                      sources=rglobs('*.py', exclude='aa.py'))"""
+                                          sources=rglobs('*.py', exclude='aa.py'))"""
 
         with self.temporary_file_content(build_path, build_content, binary_mode=False):
             pants_run = self.do_command(

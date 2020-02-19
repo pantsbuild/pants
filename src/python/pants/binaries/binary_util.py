@@ -179,13 +179,13 @@ class BinaryToolFetcher:
 
     def __init__(self, bootstrap_dir, timeout_secs, fetcher=None, ignore_cached_download=False):
         """
-    :param str bootstrap_dir: The root directory where Pants downloads binaries to.
-    :param int timeout_secs: The number of seconds to wait before timing out on a request for some
-                             url.
-    :param fetcher: object to fetch urls with, overridden in testing.
-    :type fetcher: :class:`pants.net.http.fetcher.Fetcher`
-    :param bool ignore_cached_download: whether to fetch a binary even if it already exists on disk.
-    """
+        :param str bootstrap_dir: The root directory where Pants downloads binaries to.
+        :param int timeout_secs: The number of seconds to wait before timing out on a request for some
+                                 url.
+        :param fetcher: object to fetch urls with, overridden in testing.
+        :type fetcher: :class:`pants.net.http.fetcher.Fetcher`
+        :param bool ignore_cached_download: whether to fetch a binary even if it already exists on disk.
+        """
         self._bootstrap_dir = bootstrap_dir
         self._timeout_secs = timeout_secs
         self._fetcher = fetcher or self._default_http_fetcher()
@@ -268,8 +268,8 @@ class BinaryUtil:
 
     class Factory(Subsystem):
         """
-    :API: public
-    """
+        :API: public
+        """
 
         # N.B. `BinaryUtil` sources all of its options from bootstrap options, so that
         # `BinaryUtil` instances can be created prior to `Subsystem` bootstrapping. So

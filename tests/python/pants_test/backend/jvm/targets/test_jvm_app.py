@@ -217,20 +217,20 @@ class BundleTest(TestBase):
             "src/java/org/archimedes/volume/BUILD",
             dedent(
                 """
-      jvm_app(name='volume',
-        dependencies=[':unused'],
-        bundles=[
-          bundle(relative_to='config', fileset='config/stone/dense.xml')
-        ]
-      )
+                jvm_app(name='volume',
+                  dependencies=[':unused'],
+                  bundles=[
+                    bundle(relative_to='config', fileset='config/stone/dense.xml')
+                  ]
+                )
 
-      jvm_app(name='bathtub',
-        dependencies=[':unused'],
-        bundles=[
-          bundle(fileset='config/metal/dense.xml')
-        ]
-      )
-    """
+                jvm_app(name='bathtub',
+                  dependencies=[':unused'],
+                  bundles=[
+                    bundle(fileset='config/metal/dense.xml')
+                  ]
+                )
+                """
             ),
         )
 

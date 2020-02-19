@@ -11,22 +11,22 @@ class IndentationTest(CheckstylePluginTestBase):
 
     def test_indentation(self):
         statement = """
-      def foo():
-          pass
-    """
+        def foo():
+            pass
+        """
         self.assertNit(statement, "T100")
 
         statement = """
-      def foo():
-        pass
-    """
+        def foo():
+          pass
+        """
         self.assertNoNits(statement)
 
         statement = """
-      def foo():
-        baz = (
-            "this "
-            "is "
-            "ok")
-    """
+        def foo():
+          baz = (
+              "this "
+              "is "
+              "ok")
+        """
         self.assertNoNits(statement)

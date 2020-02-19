@@ -17,8 +17,8 @@ class GoBinaryFingerprintStrategy(FingerprintStrategy):
 
     def __init__(self, get_build_flags_func):
         """
-    :param func get_build_flags_func: Partial function that merges build_flags
-    """
+        :param func get_build_flags_func: Partial function that merges build_flags
+        """
         self._get_build_flags_func = get_build_flags_func
 
     def compute_fingerprint(self, target):

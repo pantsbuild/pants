@@ -65,8 +65,8 @@ class GoalExecutor:
 
 class RoundEngine(Engine):
     """
-  :API: public
-  """
+    :API: public
+    """
 
     class DependencyError(ValueError):
         """Indicates a Task has an unsatisfiable data dependency."""
@@ -230,8 +230,8 @@ class RoundEngine(Engine):
 
     def attempt(self, context, goals):
         """
-    :API: public
-    """
+        :API: public
+        """
         sorted_goal_infos = self.sort_goals(context, goals)
         self._propose_alternative_target_roots(context, sorted_goal_infos)
         goal_executors = list(self._prepare(context, sorted_goal_infos))

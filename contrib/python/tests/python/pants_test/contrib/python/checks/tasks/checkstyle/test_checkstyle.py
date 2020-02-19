@@ -111,9 +111,9 @@ class CheckstyleTest(PythonTaskTestBase):
             "a/python/fail_py2.py",
             contents=dedent(
                 """
-                         x=2+3
-                         print x+7
-                       """
+                x=2+3
+                print x+7
+                """
             ),
         )
         return self.make_target(
@@ -129,9 +129,9 @@ class CheckstyleTest(PythonTaskTestBase):
             "a/python/fail_py3.py",
             contents=dedent(
                 """
-                         x=2+3
-                         print(x+7)
-                       """
+                x=2+3
+                print(x+7)
+                """
             ),
         )
         return self.make_target(
@@ -151,9 +151,9 @@ class CheckstyleTest(PythonTaskTestBase):
             "a/python/pass.py",
             contents=dedent(
                 """
-                       class UpperCase(object):
-                         pass
-                     """
+                class UpperCase(object):
+                  pass
+                """
             ),
         )
         target = self.make_target("a/python:pass", PythonLibrary, sources=["pass.py"])
@@ -165,9 +165,9 @@ class CheckstyleTest(PythonTaskTestBase):
             "a/python/fail.py",
             contents=dedent(
                 """
-                        class lower_case(object):
-                          pass
-                       """
+                class lower_case(object):
+                  pass
+                """
             ),
         )
         target = self.make_target("a/python:fail", PythonLibrary, sources=["fail.py"])
@@ -181,16 +181,16 @@ class CheckstyleTest(PythonTaskTestBase):
             "a/python/fail.py",
             contents=dedent(
                 """
-                        class lower_case(object):
-                          pass
-                       """
+                class lower_case(object):
+                  pass
+                """
             ),
         )
         suppression_file = self.create_file(
             "suppress.txt",
             contents=dedent(
                 """
-    a/python/fail\.py::variable-names"""
+                a/python/fail\.py::variable-names"""
             ),
         )
         target = self.make_target("a/python:fail", PythonLibrary, sources=["fail.py"])
@@ -203,9 +203,9 @@ class CheckstyleTest(PythonTaskTestBase):
             "a/python/fail.py",
             contents=dedent(
                 """
-                        class lower_case(object):
-                          pass
-                     """
+                class lower_case(object):
+                  pass
+                """
             ),
         )
         target = self.make_target("a/python:fail", PythonLibrary, sources=["fail.py"])
@@ -218,8 +218,8 @@ class CheckstyleTest(PythonTaskTestBase):
             "a/python/error.py",
             contents=dedent(
                 """
-                         invalid python
-                       """
+                invalid python
+                """
             ),
         )
         target = self.make_target("a/python:error", PythonLibrary, sources=["error.py"])

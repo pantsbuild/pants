@@ -31,30 +31,30 @@ class WikiPageTest(TestBase):
             dedent(
                 """
 
-        page(name='readme',
-          source='README.md',
-          links=[':readme2'],
-          provides=[
-            wiki_artifact(
-              wiki=confluence,
-              space='~areitz',
-              title='test_page',
-            ),
-          ],
-        )
+                page(name='readme',
+                  source='README.md',
+                  links=[':readme2'],
+                  provides=[
+                    wiki_artifact(
+                      wiki=confluence,
+                      space='~areitz',
+                      title='test_page',
+                    ),
+                  ],
+                )
 
-        page(name='readme2',
-          sources=['README2.md'],
-          links=[':readme'],
-          provides=[
-            wiki_artifact(
-              wiki=confluence,
-              space='~areitz',
-              title='test_page2',
-            ),
-          ],
-        )
-    """
+                page(name='readme2',
+                  sources=['README2.md'],
+                  links=[':readme'],
+                  provides=[
+                    wiki_artifact(
+                      wiki=confluence,
+                      space='~areitz',
+                      title='test_page2',
+                    ),
+                  ],
+                )
+                """
             ),
         )
 
@@ -62,15 +62,15 @@ class WikiPageTest(TestBase):
             "src/docs/README.md",
             contents=dedent(
                 """
-some text
+                some text
 
-* [[Link to the other readme file|pants('src/docs:readme2')]]
+                * [[Link to the other readme file|pants('src/docs:readme2')]]
 
-some text
+                some text
 
-* [[Link AGAIN to the other readme file|pants('src/docs:readme2')]]
+                * [[Link AGAIN to the other readme file|pants('src/docs:readme2')]]
 
-    """
+                """
             ),
         )
 
@@ -78,10 +78,10 @@ some text
             "src/docs/README2.md",
             contents=dedent(
                 """
-This is the second readme file! Isn't it exciting?
+                This is the second readme file! Isn't it exciting?
 
-[[link to the first readme file|pants('src/docs:readme')]]
-    """
+                [[link to the first readme file|pants('src/docs:readme')]]
+                """
             ),
         )
 
@@ -113,19 +113,19 @@ This is the second readme file! Isn't it exciting?
                 "src/docs",
                 dedent(
                     """
-        page(name='readme3',
-          source='README.md',
-          provides=[
-            wiki_artifact(
-              wiki=confluence,
-              space='~"""
+                    page(name='readme3',
+                      source='README.md',
+                      provides=[
+                        wiki_artifact(
+                          wiki=confluence,
+                          space='~"""
                     + space
                     + """',
-              title='test_page3',
-            ),
-          ],
-        )
-      """
+                          title='test_page3',
+                        ),
+                      ],
+                    )
+                  """
                 ),
             )
             return self.target("src/docs:readme3")

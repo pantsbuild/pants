@@ -79,15 +79,15 @@ class Get(Generic[_Product]):
                 raise TypeError(
                     dedent(
                         """\
-          The two-argument form of Get does not accept a type as its second argument.
+                        The two-argument form of Get does not accept a type as its second argument.
 
-          args were: Get({args!r})
+                        args were: Get({args!r})
 
-          Get.create_statically_for_rule_graph() should be used to generate a Get() for
-          the `input_gets` field of a rule. If you are using a `await Get(...)` in a rule
-          and a type was intended, use the 3-argument version:
-          Get({product!r}, {subject_type!r}, {subject!r})
-          """.format(
+                        Get.create_statically_for_rule_graph() should be used to generate a Get() for
+                        the `input_gets` field of a rule. If you are using a `await Get(...)` in a rule
+                        and a type was intended, use the 3-argument version:
+                        Get({product!r}, {subject_type!r}, {subject!r})
+                        """.format(
                             args=args, product=product, subject_type=type(subject), subject=subject
                         )
                     )

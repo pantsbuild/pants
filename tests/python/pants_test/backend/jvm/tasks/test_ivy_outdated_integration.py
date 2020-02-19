@@ -16,8 +16,8 @@ class IvyOutdatedIntegrationTest(PantsRunIntegrationTest):
                 f.write(
                     dedent(
                         """
-        java_library(name='lib')
-        """
+                        java_library(name='lib')
+                        """
                     )
                 )
             pants_run = self.run_pants(["outdated.ivy", f"{tmpdir}:lib"])
@@ -32,13 +32,13 @@ class IvyOutdatedIntegrationTest(PantsRunIntegrationTest):
                 f.write(
                     dedent(
                         """
-        jar_library(name='lib',
-          jars=[
-            jar(org='commons-io', name='commons-io', rev='2.4',),
-            jar(org='org.scala-lang', name='scala-library', rev='2.11.8',)
-          ],
-        )
-        """
+                        jar_library(name='lib',
+                          jars=[
+                            jar(org='commons-io', name='commons-io', rev='2.4',),
+                            jar(org='org.scala-lang', name='scala-library', rev='2.11.8',)
+                          ],
+                        )
+                        """
                     )
                 )
             pants_run = self.run_pants(["outdated.ivy", f"{tmpdir}:lib"])
@@ -55,13 +55,13 @@ class IvyOutdatedIntegrationTest(PantsRunIntegrationTest):
                 f.write(
                     dedent(
                         """
-        jar_library(name='lib',
-          jars=[
-            jar(org='commons-io', name='commons-io', rev='2.4',),
-            jar(org='org.scala-lang', name='scala-library', rev='2.11.8',)
-          ],
-        )
-        """
+                        jar_library(name='lib',
+                          jars=[
+                            jar(org='commons-io', name='commons-io', rev='2.4',),
+                            jar(org='org.scala-lang', name='scala-library', rev='2.11.8',)
+                          ],
+                        )
+                        """
                     )
                 )
             pants_run = self.run_pants(

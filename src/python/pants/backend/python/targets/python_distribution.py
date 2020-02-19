@@ -20,18 +20,18 @@ class PythonDistribution(PythonTarget):
 
     def __init__(self, address=None, payload=None, sources=None, setup_requires=None, **kwargs):
         """
-    :param address: The Address that maps to this Target in the BuildGraph.
-    :type address: :class:`pants.build_graph.address.Address`
-    :param payload: The configuration encapsulated by this target.  Also in charge of most
-                    fingerprinting details.
-    :type payload: :class:`pants.base.payload.Payload`
-    :param sources: Files to "include". Paths are relative to the
-      BUILD file's directory.
-    :type sources: :class:`twitter.common.dirutil.Fileset` or list of strings. Must include
-                   setup.py.
-    :param list setup_requires: A list of python requirements to provide during the invocation of
-                                setup.py.
-    """
+        :param address: The Address that maps to this Target in the BuildGraph.
+        :type address: :class:`pants.build_graph.address.Address`
+        :param payload: The configuration encapsulated by this target.  Also in charge of most
+                        fingerprinting details.
+        :type payload: :class:`pants.base.payload.Payload`
+        :param sources: Files to "include". Paths are relative to the
+          BUILD file's directory.
+        :type sources: :class:`twitter.common.dirutil.Fileset` or list of strings. Must include
+                       setup.py.
+        :param list setup_requires: A list of python requirements to provide during the invocation of
+                                    setup.py.
+        """
         if not "setup.py" in sources:
             raise TargetDefinitionException(
                 self,

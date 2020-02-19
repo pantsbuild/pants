@@ -417,17 +417,17 @@ class SetupPy(Task):
                     fp.write(
                         textwrap.dedent(
                             """
-            import sys
+                            import sys
 
 
-            {declares_namespace_package_code}
+                            {declares_namespace_package_code}
 
 
-            if __name__ == '__main__':
-              for path in sys.argv[1:]:
-                if declares_namespace_package(path):
-                  print(path)
-          """
+                            if __name__ == '__main__':
+                              for path in sys.argv[1:]:
+                                if declares_namespace_package(path):
+                                  print(path)
+                            """
                         )
                         .strip()
                         .format(declares_namespace_package_code=declares_namespace_package_code)

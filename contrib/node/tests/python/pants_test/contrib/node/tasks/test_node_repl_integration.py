@@ -11,14 +11,14 @@ class NodeReplIntegrationTest(PantsRunIntegrationTest):
         command = ["-q", "repl", "contrib/node/examples/3rdparty/node/react"]
         program = dedent(
             """
-        var React = require('react');
-        var HelloWorldClass = React.createClass({
-          render: function() {
-            return React.createElement("div", null, "Hello World");
-          }
-        });
-        console.log(React.renderToStaticMarkup(React.createElement(HelloWorldClass)));
-      """
+            var React = require('react');
+            var HelloWorldClass = React.createClass({
+              render: function() {
+                return React.createElement("div", null, "Hello World");
+              }
+            });
+            console.log(React.renderToStaticMarkup(React.createElement(HelloWorldClass)));
+            """
         )
         pants_run = self.run_pants(command=command, stdin_data=program)
 
@@ -52,13 +52,13 @@ class NodeReplIntegrationTest(PantsRunIntegrationTest):
         ]
         program = dedent(
             """
-        var React = require('react');
-        var Calculator = require('preinstalled-project');
-        var reactElem = React.renderToStaticMarkup(React.createElement("div", null, "Hello World"));
-        var calc = new Calculator(0);
-        calc.add(1);
-        console.log('React: ' + reactElem + ', Calc + 1: ' + calc.number);
-      """
+            var React = require('react');
+            var Calculator = require('preinstalled-project');
+            var reactElem = React.renderToStaticMarkup(React.createElement("div", null, "Hello World"));
+            var calc = new Calculator(0);
+            calc.add(1);
+            console.log('React: ' + reactElem + ', Calc + 1: ' + calc.number);
+            """
         ).encode()
         pants_run = self.run_pants(command=command, stdin_data=program)
 

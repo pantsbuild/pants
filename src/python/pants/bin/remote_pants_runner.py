@@ -79,14 +79,14 @@ class RemotePantsRunner:
         stderr=None,
     ) -> None:
         """
-    :param Exiter exiter: The Exiter instance to use for this run.
-    :param args: The arguments (e.g. sys.argv) for this run.
-    :param env: The environment (e.g. os.environ) for this run.
-    :param options_bootstrapper: The bootstrap options.
-    :param file stdin: The stream representing stdin.
-    :param file stdout: The stream representing stdout.
-    :param file stderr: The stream representing stderr.
-    """
+        :param Exiter exiter: The Exiter instance to use for this run.
+        :param args: The arguments (e.g. sys.argv) for this run.
+        :param env: The environment (e.g. os.environ) for this run.
+        :param options_bootstrapper: The bootstrap options.
+        :param file stdin: The stream representing stdin.
+        :param file stdout: The stream representing stdout.
+        :param file stderr: The stream representing stderr.
+        """
         self._start_time = time.time()
         self._exiter = exiter
         self._args = args

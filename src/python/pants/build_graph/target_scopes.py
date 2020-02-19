@@ -135,10 +135,10 @@ class ScopedDependencyFactory(IntermediateTargetFactoryBase):
 
     def __call__(self, address, scope=None):
         """
-    :param string address: A target address.
-    :param string scope: The scope of this dependency.
-    :returns: The address of a synthetic intermediary target.
-    """
+        :param string address: A target address.
+        :param string scope: The scope of this dependency.
+        :returns: The address of a synthetic intermediary target.
+        """
         scope = Scope(scope)
         self._scope = str(scope)
         return self._create_intermediate_target(address, self._scope)

@@ -213,8 +213,8 @@ class BundleAdaptor(Struct):
 class AppAdaptor(TargetAdaptor):
     def __init__(self, bundles=None, **kwargs):
         """
-    :param list bundles: A list of `BundleAdaptor` objects
-    """
+        :param list bundles: A list of `BundleAdaptor` objects
+        """
         super().__init__(**kwargs)
         self.bundles = bundles
 
@@ -265,8 +265,8 @@ class ResourcesAdaptor(TargetAdaptor):
 class RemoteSourcesAdaptor(TargetAdaptor):
     def __init__(self, dest=None, **kwargs):
         """
-    :param dest: A target constructor.
-    """
+        :param dest: A target constructor.
+        """
         if not isinstance(dest, str):
             dest = dest._type_alias
         super().__init__(dest=dest, **kwargs)

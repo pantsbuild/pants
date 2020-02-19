@@ -35,12 +35,12 @@ class NailgunClientSession(NailgunProtocol, NailgunProtocol.TimeoutProvider):
         remote_pgrp_callback=None,
     ):
         """
-    :param bool exit_on_broken_pipe: whether or not to exit when `Broken Pipe` errors are
-                encountered
-    :param remote_pid_callback: Callback to run when a pid chunk is received from a remote client.
-    :param remote_pgrp_callback: Callback to run when a pgrp (process group) chunk is received from
-                                 a remote client.
-    """
+        :param bool exit_on_broken_pipe: whether or not to exit when `Broken Pipe` errors are
+                    encountered
+        :param remote_pid_callback: Callback to run when a pid chunk is received from a remote client.
+        :param remote_pgrp_callback: Callback to run when a pgrp (process group) chunk is received from
+                                     a remote client.
+        """
         self._sock = sock
         self._input_writer = (
             None

@@ -16,12 +16,12 @@ class TestExcluder(TestBase):
         super().setUp()
         excludes_text = textwrap.dedent(
             """
-      # ignore C++
-      .*\.cpp::.*
+            # ignore C++
+            .*\.cpp::.*
 
-      # ignore python
-      .*\.py::Flake8
-    """
+            # ignore python
+            .*\.py::Flake8
+            """
         )
         self.excluder = FileExcluder(self._create_scalastyle_excludes_file([excludes_text]), logger)
 

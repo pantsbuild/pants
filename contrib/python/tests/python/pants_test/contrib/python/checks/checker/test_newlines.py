@@ -10,11 +10,11 @@ class NewlinesTest(CheckstylePluginTestBase):
     plugin_type = Newlines
 
     TOPLEVEL = """
-  def foo():
-    pass{}
-  {}
-    pass
-  """
+    def foo():
+      pass{}
+    {}
+      pass
+    """
 
     def test_newlines(self):
         for toplevel_def in ("def bar():", "class Bar(object):"):
@@ -25,57 +25,57 @@ class NewlinesTest(CheckstylePluginTestBase):
             self.assertNoNits(statement)
 
     GOOD_CLASS_DEF_1 = """
-  class Foo(object):
-    def __init__(self):
-      pass
+    class Foo(object):
+      def __init__(self):
+        pass
 
-    def bar(self):
-      pass
-  """
+      def bar(self):
+        pass
+    """
 
     GOOD_CLASS_DEF_2 = """
-  class Foo(object):
-    def __init__(self):
-      pass
+    class Foo(object):
+      def __init__(self):
+        pass
 
-    # this should be fine
-    def bar(self):
-      pass
-  """
+      # this should be fine
+      def bar(self):
+        pass
+    """
 
     GOOD_CLASS_DEF_3 = """
-  class Foo(object):
-    class Error(Exception): pass
-    class SomethingError(Error): pass
+    class Foo(object):
+      class Error(Exception): pass
+      class SomethingError(Error): pass
 
-    def __init__(self):
-      pass
+      def __init__(self):
+        pass
 
-    def bar(self):
-      pass
-  """
+      def bar(self):
+        pass
+    """
 
     BAD_CLASS_DEF_1 = """
-  class Foo(object):
-    class Error(Exception): pass
-    class SomethingError(Error): pass
-    def __init__(self):
-      pass
+    class Foo(object):
+      class Error(Exception): pass
+      class SomethingError(Error): pass
+      def __init__(self):
+        pass
 
-    def bar(self):
-      pass
-  """
+      def bar(self):
+        pass
+    """
 
     BAD_CLASS_DEF_2 = """
-  class Foo(object):
-    class Error(Exception): pass
-    class SomethingError(Error): pass
+    class Foo(object):
+      class Error(Exception): pass
+      class SomethingError(Error): pass
 
-    def __init__(self):
-      pass
-    def bar(self):
-      pass
-  """
+      def __init__(self):
+        pass
+      def bar(self):
+        pass
+    """
 
     def test_classdefs(self):
         self.assertNoNits(self.GOOD_CLASS_DEF_1)

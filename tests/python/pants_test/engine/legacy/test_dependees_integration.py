@@ -58,13 +58,13 @@ class DependeesIntegrationTest(PantsRunIntegrationTest):
         self.assertEqual(
             dedent(
                 """
-      {
-          "examples/src/scala/org/pantsbuild/example/hello/welcome:welcome": [
-              "examples/src/scala/org/pantsbuild/example/hello/exe:exe",
-              "examples/src/scala/org/pantsbuild/example/jvm_run:jvm-run-example-lib",
-              "examples/tests/scala/org/pantsbuild/example/hello/welcome:welcome"
-          ]
-      }"""
+                {
+                    "examples/src/scala/org/pantsbuild/example/hello/welcome:welcome": [
+                        "examples/src/scala/org/pantsbuild/example/hello/exe:exe",
+                        "examples/src/scala/org/pantsbuild/example/jvm_run:jvm-run-example-lib",
+                        "examples/tests/scala/org/pantsbuild/example/hello/welcome:welcome"
+                    ]
+                }"""
             ).lstrip("\n"),
             pants_stdout,
         )

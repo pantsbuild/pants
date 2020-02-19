@@ -18,9 +18,9 @@ class AliasTargetMacro(TargetMacro):
 
     def expand(self, name=None, target=None, **kwargs):
         """
-    :param string name: The name for this alias.
-    :param string target: The address of the destination target.
-    """
+        :param string name: The name for this alias.
+        :param string target: The address of the destination target.
+        """
         if name is None:
             raise TargetDefinitionException(
                 "{}:?".format(self._parse_context.rel_path), "The alias() must have a name!"

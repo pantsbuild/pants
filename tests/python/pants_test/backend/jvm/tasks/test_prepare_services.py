@@ -20,8 +20,8 @@ class PrepareServicesTest(TaskTestBase):
     @classmethod
     def alias_groups(cls):
         """
-    :API: public
-    """
+        :API: public
+        """
         return BuildFileAliases(targets={"java_library": JavaLibrary})
 
     def test_find_all_relevant_resources_targets(self):

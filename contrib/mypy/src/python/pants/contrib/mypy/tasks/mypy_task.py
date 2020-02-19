@@ -227,16 +227,16 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
                     exe_fp.write(
                         dedent(
                             """
-            import runpy
-            import site
-            import sys
-
-
-            site.getsitepackages = lambda: sys.path[:]
-
-            
-            runpy.run_module('mypy', run_name='__main__')
-          """
+                            import runpy
+                            import site
+                            import sys
+                
+                
+                            site.getsitepackages = lambda: sys.path[:]
+                
+                            
+                            runpy.run_module('mypy', run_name='__main__')
+                            """
                         )
                     )
                     exe_fp.flush()

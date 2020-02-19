@@ -40,13 +40,13 @@ class SchedulerService(PantsService):
         union_membership: UnionMembership,
     ) -> None:
         """
-    :param fs_event_service: An unstarted FSEventService instance for setting up filesystem event handlers.
-    :param legacy_graph_scheduler: The LegacyGraphScheduler instance for graph construction.
-    :param build_root: The current build root.
-    :param invalidation_globs: A list of `globs` that when encountered in filesystem event
-                               subscriptions will tear down the daemon.
-    :param pantsd_pidfile: The path to the pantsd pidfile for fs event monitoring.
-    """
+        :param fs_event_service: An unstarted FSEventService instance for setting up filesystem event handlers.
+        :param legacy_graph_scheduler: The LegacyGraphScheduler instance for graph construction.
+        :param build_root: The current build root.
+        :param invalidation_globs: A list of `globs` that when encountered in filesystem event
+                                   subscriptions will tear down the daemon.
+        :param pantsd_pidfile: The path to the pantsd pidfile for fs event monitoring.
+        """
         super().__init__()
         self._fs_event_service = fs_event_service
         self._graph_helper = legacy_graph_scheduler

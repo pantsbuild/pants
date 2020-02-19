@@ -298,8 +298,8 @@ class StructWithDeps(Struct):
 
     def __init__(self, dependencies=None, **kwargs):
         """
-    :param list dependencies: The direct dependencies of this struct.
-    """
+        :param list dependencies: The direct dependencies of this struct.
+        """
         # TODO: enforce the type of variants using the Addressable framework.
         super().__init__(**kwargs)
         self.dependencies = dependencies

@@ -18,12 +18,12 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
             f.write(
                 dedent(
                     """<?xml version="1.0"?>
-           <!DOCTYPE module PUBLIC
-             "-//Puppy Crawl//DTD Check Configuration 1.3//EN"
-             "http://www.puppycrawl.com/dtds/configuration_1_3.dtd">
-           <module name="Checker">
-             {rules_xml}
-           </module>""".format(
+                   <!DOCTYPE module PUBLIC
+                     "-//Puppy Crawl//DTD Check Configuration 1.3//EN"
+                     "http://www.puppycrawl.com/dtds/configuration_1_3.dtd">
+                   <module name="Checker">
+                     {rules_xml}
+                   </module>""".format(
                         rules_xml=rules_xml
                     )
                 )
@@ -36,17 +36,17 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
                 configs = [
                     dedent(
                         """
-              <module name="TreeWalker">
-                <property name="tabWidth" value="2"/>
-              </module>"""
+                        <module name="TreeWalker">
+                          <property name="tabWidth" value="2"/>
+                        </module>"""
                     ),
                     dedent(
                         """
-              <module name="TreeWalker">
-                <module name="LineLength">
-                  <property name="max" value="100"/>
-                </module>
-              </module>"""
+                        <module name="TreeWalker">
+                          <module name="LineLength">
+                            <property name="max" value="100"/>
+                          </module>
+                        </module>"""
                     ),
                 ]
 
@@ -72,9 +72,9 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
                 config_names = ["one.xml", "two.xml"]
                 config = dedent(
                     """
-          <module name="TreeWalker">
-            <property name="tabWidth" value="2"/>
-          </module>"""
+                    <module name="TreeWalker">
+                      <property name="tabWidth" value="2"/>
+                    </module>"""
                 )
 
                 for config_name in config_names:
@@ -143,9 +143,9 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
                 os.mkdir(tmp)
                 config = dedent(
                     """
-          <module name="TreeWalker">
-            <property name="tabWidth" value="2"/>
-          </module>"""
+                    <module name="TreeWalker">
+                      <property name="tabWidth" value="2"/>
+                    </module>"""
                 )
 
                 # Ensure that even though the config files have the same name, their
@@ -170,15 +170,15 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
                 suppression_names = ["one-supress.xml", "two-supress.xml"]
                 suppression_data = dedent(
                     """
-          <?xml version="1.0"?>
-          <!DOCTYPE suppressions PUBLIC
-              "-//Puppy Crawl//DTD Suppressions 1.1//EN"
-              "http://www.puppycrawl.com/dtds/suppressions_1_1.dtd">
+                    <?xml version="1.0"?>
+                    <!DOCTYPE suppressions PUBLIC
+                        "-//Puppy Crawl//DTD Suppressions 1.1//EN"
+                        "http://www.puppycrawl.com/dtds/suppressions_1_1.dtd">
 
-          <suppressions>
-            <suppress files=".*/bad-files/.*\\.java" checks=".*"/>
-          </suppressions>
-          """
+                    <suppressions>
+                      <suppress files=".*/bad-files/.*\\.java" checks=".*"/>
+                    </suppressions>
+                    """
                 ).strip()
 
                 for suppression_name in suppression_names:
@@ -203,28 +203,28 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
                 suppression_files = [
                     dedent(
                         """
-            <?xml version="1.0"?>
-            <!DOCTYPE suppressions PUBLIC
-                "-//Puppy Crawl//DTD Suppressions 1.1//EN"
-                "http://www.puppycrawl.com/dtds/suppressions_1_1.dtd">
+                        <?xml version="1.0"?>
+                        <!DOCTYPE suppressions PUBLIC
+                            "-//Puppy Crawl//DTD Suppressions 1.1//EN"
+                            "http://www.puppycrawl.com/dtds/suppressions_1_1.dtd">
 
-            <suppressions>
-              <suppress files=".*/bad-files/.*\\.java" checks=".*"/>
-            </suppressions>
-          """
+                        <suppressions>
+                          <suppress files=".*/bad-files/.*\\.java" checks=".*"/>
+                        </suppressions>
+                        """
                     ).strip(),
                     dedent(
                         """
-            <?xml version="1.0"?>
-            <!DOCTYPE suppressions PUBLIC
-                "-//Puppy Crawl//DTD Suppressions 1.1//EN"
-                "http://www.puppycrawl.com/dtds/suppressions_1_1.dtd">
+                        <?xml version="1.0"?>
+                        <!DOCTYPE suppressions PUBLIC
+                            "-//Puppy Crawl//DTD Suppressions 1.1//EN"
+                            "http://www.puppycrawl.com/dtds/suppressions_1_1.dtd">
 
-            <suppressions>
-              <suppress files=".*/bad-files/.*\\.java" checks=".*"/>
-              <suppress files=".*/really-bad-files/.*\\.java" checks=".*"/>
-            </suppressions>
-          """
+                        <suppressions>
+                          <suppress files=".*/bad-files/.*\\.java" checks=".*"/>
+                          <suppress files=".*/really-bad-files/.*\\.java" checks=".*"/>
+                        </suppressions>
+                        """
                     ).strip(),
                 ]
 

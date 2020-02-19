@@ -52,17 +52,17 @@ class AddressMapTest(unittest.TestCase):
         with self.parse_address_map(
             dedent(
                 """
-      {
-        "type_alias": "thing",
-        "name": "one",
-        "age": 42
-      }
-      {
-        "type_alias": "thing",
-        "name": "two",
-        "age": 37
-      }
-      """
+                {
+                  "type_alias": "thing",
+                  "name": "one",
+                  "age": 42
+                }
+                {
+                  "type_alias": "thing",
+                  "name": "two",
+                  "age": 37
+                }
+                """
             )
         ) as address_map:
 

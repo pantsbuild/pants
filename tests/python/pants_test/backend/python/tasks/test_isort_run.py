@@ -17,42 +17,42 @@ from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTest
 class PythonIsortTest(PythonTaskTestBase):
     BAD_IMPORT_ORDER = dedent(
         """
-  from __future__ import division, absolute_import, unicode_literals, print_function
-  
-  """
+        from __future__ import division, absolute_import, unicode_literals, print_function
+
+        """
     )
 
     CONFIG_A = dedent(
         """
-    [settings]
-    line_length=100
-    known_future_library=future,pies
-    multi_line_output=0
-  """
+        [settings]
+        line_length=100
+        known_future_library=future,pies
+        multi_line_output=0
+        """
     )
 
     RESULT_A = dedent(
         """
-    from __future__ import absolute_import, division, print_function, unicode_literals
-  """
+        from __future__ import absolute_import, division, print_function, unicode_literals
+        """
     )
 
     CONFIG_B = dedent(
         """
-    [settings]
-    line_length=100
-    known_future_library=future,pies
-    multi_line_output=1
-  """
+        [settings]
+        line_length=100
+        known_future_library=future,pies
+        multi_line_output=1
+        """
     )
 
     RESULT_B = dedent(
         """
-    from __future__ import (absolute_import, 
-                            division, 
-                            print_function, 
-                            unicode_literals)
-  """
+        from __future__ import (absolute_import, 
+                                division, 
+                                print_function, 
+                                unicode_literals)
+        """
     )
 
     @classmethod

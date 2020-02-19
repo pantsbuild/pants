@@ -26,37 +26,37 @@ class ImportRemoteSourcesMixin(Target, metaclass=ABCMeta):
     @abstractmethod
     def expected_target_constraint(cls):
         """
-    :returns: A type constraint which is used to validate the targets containing remote sources,
-              specified `imported_target_kwargs_field` in a BUILD file.
-    :rtype: TypeConstraint
-    """
+        :returns: A type constraint which is used to validate the targets containing remote sources,
+                  specified `imported_target_kwargs_field` in a BUILD file.
+        :rtype: TypeConstraint
+        """
 
     @classproperty
     @abstractmethod
     def imported_target_kwargs_field(cls):
         """
-    :returns: string representing the keyword argument of an uninitialized target representing
-              source target specs to be imported.
-    :rtype: str
-    """
+        :returns: string representing the keyword argument of an uninitialized target representing
+                  source target specs to be imported.
+        :rtype: str
+        """
 
     @classproperty
     @abstractmethod
     def imported_target_payload_field(cls):
         """
-    :returns: string representing the payload field of an already-initialized target containing
-              source target specs to be imported.
-    :rtype: str
-    """
+        :returns: string representing the payload field of an already-initialized target containing
+                  source target specs to be imported.
+        :rtype: str
+        """
 
     @classmethod
     def imported_target_specs(cls, kwargs=None, payload=None):
         """
-    :param kwargs: A kwargs dict representing Target.__init__(**kwargs) (Optional).
-    :param payload: A Payload object representing the Target.__init__(payload=...) param.  (Optional).
-    :returns: list of target specs to be imported.
-    :rtype: list of str
-    """
+        :param kwargs: A kwargs dict representing Target.__init__(**kwargs) (Optional).
+        :param payload: A Payload object representing the Target.__init__(payload=...) param.  (Optional).
+        :returns: list of target specs to be imported.
+        :rtype: list of str
+        """
         if kwargs is not None:
             assert payload is None, "may not provide both kwargs and payload"
             field = cls.imported_target_kwargs_field
@@ -81,9 +81,9 @@ class ImportRemoteSourcesMixin(Target, metaclass=ABCMeta):
     @memoized_property
     def imported_targets(self):
         """
-    :returns: target instances for specs referenced by imported_target_specs.
-    :rtype: list of Target
-    """
+        :returns: target instances for specs referenced by imported_target_specs.
+        :rtype: list of Target
+        """
         libs = []
         for spec in self.imported_target_specs(payload=self.payload):
             resolved_target = self._build_graph.get_target_from_spec(

@@ -146,8 +146,8 @@ class Confluence:
             content = "{html}\n\n%s\n\n{html}" % html
         elif self._content_format == "xhtml":
             content = f"""<ac:macro ac:name="html">
-          <ac:plain-text-body><![CDATA[{html}]]></ac:plain-text-body>
-          </ac:macro>"""
+                <ac:plain-text-body><![CDATA[{html}]]></ac:plain-text-body>
+                </ac:macro>"""
         else:
             raise ConfluenceError(f"Don't know how to convert {self._content_format} to HTML")
         return self.create(space, title, content, parent_page, **pageoptions)

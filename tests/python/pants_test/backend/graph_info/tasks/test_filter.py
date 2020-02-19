@@ -61,12 +61,12 @@ class FilterTest(BaseFilterTest):
                 path,
                 dedent(
                     """
-          python_library(name='{name}',
-            sources=[],
-            dependencies=[{all_deps}],
-            tags=['{tag}']
-          )
-          """.format(
+                    python_library(name='{name}',
+                      sources=[],
+                      dependencies=[{all_deps}],
+                      tags=['{tag}']
+                    )
+                    """.format(
                         name=name, tag=name + "_tag", all_deps=",".join(all_deps)
                     )
                 ),

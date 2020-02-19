@@ -122,23 +122,23 @@ class ShaderIntegrationTest(PantsRunIntegrationTest):
                 f.write(
                     dedent(
                         """
-          java_library(name='lib',
-            sources=['Foo.java'],
-          )
-        """
+                        java_library(name='lib',
+                          sources=['Foo.java'],
+                        )
+                        """
                     )
                 )
             with open(os.path.join(tmpdir, "BUILD"), "w+") as f:
                 f.write(
                     dedent(
                         """
-          jvm_binary(name='{name}',
-            basename='{name}',
-            dependencies=[
-              ':lib',
-            ],
-          )
-        """
+                        jvm_binary(name='{name}',
+                          basename='{name}',
+                          dependencies=[
+                            ':lib',
+                          ],
+                        )
+                        """
                     ).format(name=tmp_name)
                 )
 
@@ -153,16 +153,16 @@ class ShaderIntegrationTest(PantsRunIntegrationTest):
                 f.write(
                     dedent(
                         """
-          jvm_binary(name='{name}',
-            basename='{name}',
-            dependencies=[
-              ':lib',
-            ],
-            shading_rules=[
-              shading_relocate_package('org.foo.bar'),
-            ],
-          )
-        """
+                        jvm_binary(name='{name}',
+                          basename='{name}',
+                          dependencies=[
+                            ':lib',
+                          ],
+                          shading_rules=[
+                            shading_relocate_package('org.foo.bar'),
+                          ],
+                        )
+                        """
                     ).format(name=tmp_name)
                 )
 

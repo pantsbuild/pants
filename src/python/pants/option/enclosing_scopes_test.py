@@ -17,10 +17,10 @@ class TestEnclosingScopeTraversal(unittest.TestCase):
 
     def test_all_enclosing_scopes(self) -> None:
         """`all_enclosing_scopes` should repeatedly apply `enclosing_scope` to any valid single- or
-    multiple- component scope.
+        multiple- component scope.
 
-    `all_enclosing_scopes` should not yield the global scope if `allow_global=False`.
-    """
+        `all_enclosing_scopes` should not yield the global scope if `allow_global=False`.
+        """
         global_closure = list(all_enclosing_scopes(GLOBAL_SCOPE, allow_global=True))
         self.assertEqual(global_closure, [GLOBAL_SCOPE])
 

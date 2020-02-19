@@ -99,16 +99,16 @@ def create_isolated_git_repo():
         create_file(
             "pants.toml",
             """
-      [GLOBAL]
-      pythonpath = [
-        "{0}/contrib/go/src/python",
-        "{0}/pants-plugins/src/python"
-      ]
-      backend_packages.add = [
-        "internal_backend.utilities",
-        "pants.contrib.go"
-      ]
-      """.format(
+            [GLOBAL]
+            pythonpath = [
+                "{0}/contrib/go/src/python",
+                "{0}/pants-plugins/src/python"
+            ]
+            backend_packages.add = [
+                "internal_backend.utilities",
+                "pants.contrib.go"
+            ]
+            """.format(
                 get_buildroot()
             ),
         )
@@ -126,12 +126,12 @@ def create_isolated_git_repo():
                 create_file(
                     "src/go/tester/main.go",
                     """
-          package main
-          import "fmt"
-          func main() {
-            fmt.Println("hello, world")
-          }
-          """,
+                    package main
+                    import "fmt"
+                    func main() {
+                      fmt.Println("hello, world")
+                    }
+                    """,
                 ),
             )
 
@@ -140,11 +140,11 @@ def create_isolated_git_repo():
                 create_file(
                     "src/resources/org/pantsbuild/resourceonly/BUILD",
                     """
-          resources(
-            name='resource',
-            sources=['README.md']
-          )
-          """,
+                    resources(
+                      name='resource',
+                      sources=['README.md']
+                    )
+                    """,
                 ),
                 create_file(
                     "src/resources/org/pantsbuild/resourceonly/README.md", "Just a resource."
@@ -156,26 +156,26 @@ def create_isolated_git_repo():
                 create_file(
                     "src/java/org/pantsbuild/helloworld/BUILD",
                     """
-          jvm_binary(
-            dependencies=[
-              'src/resources/org/pantsbuild/resourceonly:resource',
-            ],
-            source='helloworld.java',
-            main='org.pantsbuild.helloworld.HelloWorld',
-          )
-          """,
+                    jvm_binary(
+                      dependencies=[
+                        'src/resources/org/pantsbuild/resourceonly:resource',
+                      ],
+                      source='helloworld.java',
+                      main='org.pantsbuild.helloworld.HelloWorld',
+                    )
+                    """,
                 ),
                 create_file(
                     "src/java/org/pantsbuild/helloworld/helloworld.java",
                     """
-          package org.pantsbuild.helloworld;
+                    package org.pantsbuild.helloworld;
 
-          class HelloWorld {
-            public static void main(String[] args) {
-              System.out.println("Hello, World!\n");
-            }
-          }
-          """,
+                    class HelloWorld {
+                      public static void main(String[] args) {
+                        System.out.println("Hello, World!\n");
+                      }
+                    }
+                    """,
                 ),
             )
 

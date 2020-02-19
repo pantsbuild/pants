@@ -20,11 +20,11 @@ class JvmApp(AppBase):
 
     def __init__(self, payload=None, deployjar=None, **kwargs):
         """
-    :param boolean deployjar: If True, pack all 3rdparty and internal jar classfiles into
-      a single deployjar in the bundle's root dir. If unset, all jars will go into the
-      bundle's libs directory, the root will only contain a synthetic jar with its manifest's
-      Class-Path set to those jars.
-    """
+        :param boolean deployjar: If True, pack all 3rdparty and internal jar classfiles into
+          a single deployjar in the bundle's root dir. If unset, all jars will go into the
+          bundle's libs directory, the root will only contain a synthetic jar with its manifest's
+          Class-Path set to those jars.
+        """
         payload = payload or Payload()
         payload.add_field("deployjar", PrimitiveField(deployjar))
         super().__init__(payload=payload, **kwargs)

@@ -58,9 +58,10 @@ class Bootstrapper:
 
     @classmethod
     def instance(cls):
-        """:returns: the default global ivy bootstrapper.
-    :rtype: Bootstrapper
-    """
+        """
+        :returns: the default global ivy bootstrapper.
+        :rtype: Bootstrapper
+        """
         if cls._INSTANCE is None:
             cls._INSTANCE = Bootstrapper()
         return cls._INSTANCE

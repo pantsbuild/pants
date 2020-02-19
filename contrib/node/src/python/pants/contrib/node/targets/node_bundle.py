@@ -14,10 +14,10 @@ class NodeBundle(NodePackage):
 
     def __init__(self, node_module=None, archive="tgz", address=None, payload=None, **kwargs):
         """
-    :param dependencies: a list of node_modules
+        :param dependencies: a list of node_modules
 
-    :param archive: a string, select from tar, tgz, tbz2, default to tgz
-    """
+        :param archive: a string, select from tar, tgz, tbz2, default to tgz
+        """
         if archive not in archive_lib.TYPE_NAMES_PRESERVE_SYMLINKS:
             raise TargetDefinitionException(
                 self,

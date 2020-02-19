@@ -119,13 +119,13 @@ class CustomTypesTest(unittest.TestCase):
         self.assert_list_parsed(
             dedent(
                 """
-         [
-           'Hi there!',
-           # This is a comment with ‘sneaky‘ unicode characters.
-           'This is an element in a list of strings.',
-           # This is a comment with an obvious unicode character ☺.
-           ]
-         """
+                [
+                    'Hi there!',
+                    # This is a comment with ‘sneaky‘ unicode characters.
+                    'This is an element in a list of strings.',
+                    # This is a comment with an obvious unicode character ☺.
+                ]
+                """
             ).strip(),
             expected=["Hi there!", "This is an element in a list of strings."],
         )

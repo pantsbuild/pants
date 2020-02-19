@@ -68,52 +68,52 @@ class AddressableTypeValidationError(TypeConstraintError):
 class AddressableDescriptor:
     """A data descriptor for fields containing one or more addressable items.
 
-  An addressable descriptor has lifecycle expectations tightly coupled with the contract of
-  Serializable objects and the 2-phase hydration of AddressMap.parse, Graph.resolve.
+    An addressable descriptor has lifecycle expectations tightly coupled with the contract of
+    Serializable objects and the 2-phase hydration of AddressMap.parse, Graph.resolve.
 
-  Decorated accessors are write-once, and then read-only.  They are intended to be written in a
-  constructor such that objects containing them have immutable semantics. In other words, the
-  descriptor is intended to be used like a type-checked `@property` with possibly lazily resolved
-  values.
+    Decorated accessors are write-once, and then read-only.  They are intended to be written in a
+    constructor such that objects containing them have immutable semantics. In other words, the
+    descriptor is intended to be used like a type-checked `@property` with possibly lazily resolved
+    values.
 
-  The written value is type-checked against a :class:`TypeConstraint` and can only be one of 3
-  types:
+    The written value is type-checked against a :class:`TypeConstraint` and can only be one of 3
+    types:
 
-  1. An opaque string address.
-  2. A Resolvable for the address that, when resolved, will meet the type constraint.
-  3. A concrete value that meets the type constraint.
+    1. An opaque string address.
+    2. A Resolvable for the address that, when resolved, will meet the type constraint.
+    3. A concrete value that meets the type constraint.
 
-  The 1st type, an opaque string address, is also the type associated with the 1st stage of the
-  2-stage lifecycle of Serializable objects containing addressable values.  In the second and final
-  stage, the Serializable object is re-constructed with addressable values of the second or third
-  types; ie: reconstructed with either resolvables or concrete values in place of the first stage
-  address.
+    The 1st type, an opaque string address, is also the type associated with the 1st stage of the
+    2-stage lifecycle of Serializable objects containing addressable values.  In the second and final
+    stage, the Serializable object is re-constructed with addressable values of the second or third
+    types; ie: reconstructed with either resolvables or concrete values in place of the first stage
+    address.
 
-  Two affordances are made in type constraint handling:
+    Two affordances are made in type constraint handling:
 
-  1. Either a :class:`TypeConstraint` instance can be given if the type constraint is fully known or
-     else a type constraint class can be given if the type constraint should apply to the type of
-     the enclosing class.  This is useful for declaring an addressable property in a baseclass that
-     should be type-constrained based on the type of the derived class.
-  2. Decorators for addressables (see `addressable`, `addressable_list` and `addressable_dict`)
-     allow wrapping of either class functions - typical - or @property descriptors.  The property
-     descriptor case sets up an idiom for recursive addressables.  The idiom looks like:
+    1. Either a :class:`TypeConstraint` instance can be given if the type constraint is fully known or
+       else a type constraint class can be given if the type constraint should apply to the type of
+       the enclosing class.  This is useful for declaring an addressable property in a baseclass that
+       should be type-constrained based on the type of the derived class.
+    2. Decorators for addressables (see `addressable`, `addressable_list` and `addressable_dict`)
+       allow wrapping of either class functions - typical - or @property descriptors.  The property
+       descriptor case sets up an idiom for recursive addressables.  The idiom looks like:
 
-     >>> class Thing(Struct):
-     ...   def __init__(self, thing):
-     ...     super().__init__()
-     ...     self.thing = thing
-     ...   @property
-     ...   def parent(self):
-     ...     '''Return this thing's parent.
-     ...
-     ...     :rtype: :class:`Thing`
-     ...     '''
-     ...
-     >>> Thing.parent = addressable(Exactly(Thing))(Thing.parent)
+       >>> class Thing(Struct):
+       ...   def __init__(self, thing):
+       ...     super().__init__()
+       ...     self.thing = thing
+       ...   @property
+       ...   def parent(self):
+       ...     '''Return this thing's parent.
+       ...
+       ...     :rtype: :class:`Thing`
+       ...     '''
+       ...
+       >>> Thing.parent = addressable(Exactly(Thing))(Thing.parent)
 
-     Here the `Thing.parent` property is re-assigned with a type-constrained addressable descriptor
-     after the class is defined so the class can be referred to in the type constraint.
+    Here the `Thing.parent` property is re-assigned with a type-constrained addressable descriptor
+    after the class is defined so the class can be referred to in the type constraint.
     """
 
     _descriptors: Set[Tuple[Type, str]] = set()
@@ -257,26 +257,26 @@ def _addressable_wrapper(addressable_descriptor, type_constraint):
 def addressable(type_constraint):
     """Return an addressable attribute for Serializable classes.
 
-  The attribute should have no implementation (it will be ignored), but can carry a docstring.
-  The implementation is provided by this wrapper.  Idiomatic use assigns the value, which can
-  either be an opaque address string or a resolved value that meets the type constraint, in the
-  constructor::
+    The attribute should have no implementation (it will be ignored), but can carry a docstring.
+    The implementation is provided by this wrapper.  Idiomatic use assigns the value, which can
+    either be an opaque address string or a resolved value that meets the type constraint, in the
+    constructor::
 
-  >>> class Employee(Serializable):
-  ...   def __init__(self, person):
-  ...     self.person = person
-  ...   @addressable(SubclassesOf(Person))
-  ...   def person(self):
-  ...     '''The person that is this employee.'''
+    >>> class Employee(Serializable):
+    ...   def __init__(self, person):
+    ...     self.person = person
+    ...   @addressable(SubclassesOf(Person))
+    ...   def person(self):
+    ...     '''The person that is this employee.'''
 
-  Addressable attributes are only assignable once, so this pattern yields an immutable `Employee`
-  whose `person` attribute is either a `Person` instance or
-  :class:`pants.engine.objects.Resolvable` person or else a string address pointing to one.
+    Addressable attributes are only assignable once, so this pattern yields an immutable `Employee`
+    whose `person` attribute is either a `Person` instance or
+    :class:`pants.engine.objects.Resolvable` person or else a string address pointing to one.
 
-  See :class:`AddressableDescriptor` for more details.
+    See :class:`AddressableDescriptor` for more details.
 
-  :param type_constraint: The type constraint the value must satisfy.
-  :type type_constraint: :class:`TypeConstraint`
+    :param type_constraint: The type constraint the value must satisfy.
+    :type type_constraint: :class:`TypeConstraint`
     """
     return _addressable_wrapper(AddressableDescriptor, type_constraint)
 

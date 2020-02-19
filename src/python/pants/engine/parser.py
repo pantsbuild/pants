@@ -35,10 +35,10 @@ class Parser(ABC):
     @abstractmethod
     def parse(self, filepath: str, filecontent: bytes):
         """
-    :param filepath: The name of the file being parsed. The parser should not assume that the path
-                     is accessible, and should consume the filecontent.
-    :param filecontent: The raw byte content to parse.
-    :returns: A list of decoded addressable, Serializable objects. The callable will
-              raise :class:`ParseError` if there were any problems encountered parsing the filecontent.
-    :rtype: :class:`collections.Callable`
-    """
+        :param filepath: The name of the file being parsed. The parser should not assume that the path
+                         is accessible, and should consume the filecontent.
+        :param filecontent: The raw byte content to parse.
+        :returns: A list of decoded addressable, Serializable objects. The callable will
+                  raise :class:`ParseError` if there were any problems encountered parsing the filecontent.
+        :rtype: :class:`collections.Callable`
+        """

@@ -252,14 +252,14 @@ class JarBuilderTest(BaseJarTaskTest):
             "src/java/pants/agents",
             dedent(
                 """
-        java_agent(
-          name='fake_agent',
-          premain='bob',
-          agent_class='fred',
-          can_redefine=True,
-          can_retransform=True,
-          can_set_native_method_prefix=True
-        )"""
+                java_agent(
+                  name='fake_agent',
+                  premain='bob',
+                  agent_class='fred',
+                  can_redefine=True,
+                  can_retransform=True,
+                  can_set_native_method_prefix=True
+                )"""
             ).strip(),
         )
         java_agent = self.target("src/java/pants/agents:fake_agent")
@@ -298,14 +298,14 @@ class JarBuilderTest(BaseJarTaskTest):
             "src/java/hello",
             dedent(
                 """
-        jvm_binary(
-          name='hello',
-          main='hello.Hello',
-          manifest_entries = {
-            'Foo': 'foo-value',
-            'Implementation-Version': '1.2.3',
-          },
-        )"""
+                jvm_binary(
+                  name='hello',
+                  main='hello.Hello',
+                  manifest_entries = {
+                    'Foo': 'foo-value',
+                    'Implementation-Version': '1.2.3',
+                  },
+                )"""
             ).strip(),
         )
         binary_target = self.target("src/java/hello:hello")

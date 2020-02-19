@@ -50,12 +50,12 @@ class JsonParserTest(unittest.TestCase):
     def test_comments(self):
         document = dedent(
             """
-    # Top level comment.
-    {
-      # Nested comment
-      "hobbies": [1, 2, 3]
-    }
-    """
+            # Top level comment.
+            {
+              # Nested comment
+              "hobbies": [1, 2, 3]
+            }
+            """
         )
         results = self.parse(document)
         self.assertEqual(1, len(results))
@@ -64,12 +64,12 @@ class JsonParserTest(unittest.TestCase):
     def test_single(self):
         document = dedent(
             """
-    # A simple example with a single Bob.
-    {
-      "type_alias": "pants_test.engine.test_parsers.Bob",
-      "hobbies": [1, 2, 3]
-    }
-    """
+            # A simple example with a single Bob.
+            {
+              "type_alias": "pants_test.engine.test_parsers.Bob",
+              "hobbies": [1, 2, 3]
+            }
+            """
         )
         results = self.parse(document)
         self.assertEqual(1, len(results))
@@ -79,12 +79,12 @@ class JsonParserTest(unittest.TestCase):
     def test_symbol_table(self):
         document = dedent(
             """
-    # An simple example with a single Bob.
-    {
-      "type_alias": "bob",
-      "hobbies": [1, 2, 3]
-    }
-    """
+            # An simple example with a single Bob.
+            {
+              "type_alias": "bob",
+              "hobbies": [1, 2, 3]
+            }
+            """
         )
         results = self.parse(document, symbol_table=TEST_TABLE)
         self.assertEqual(1, len(results))
@@ -96,16 +96,16 @@ class JsonParserTest(unittest.TestCase):
     def test_nested_single(self):
         document = dedent(
             """
-    # An example with nested Bobs.
-    {
-      "type_alias": "pants_test.engine.test_parsers.Bob",
-      "uncle": {
-        "type_alias": "pants_test.engine.test_parsers.Bob",
-        "age": 42
-      },
-      "hobbies": [1, 2, 3]
-    }
-    """
+            # An example with nested Bobs.
+            {
+              "type_alias": "pants_test.engine.test_parsers.Bob",
+              "uncle": {
+                "type_alias": "pants_test.engine.test_parsers.Bob",
+                "age": 42
+              },
+              "hobbies": [1, 2, 3]
+            }
+            """
         )
         results = self.parse(document)
         self.assertEqual(1, len(results))
@@ -114,21 +114,21 @@ class JsonParserTest(unittest.TestCase):
     def test_nested_deep(self):
         document = dedent(
             """
-    # An example with deeply nested Bobs.
-    {
-      "type_alias": "pants_test.engine.test_parsers.Bob",
-      "configs": [
-        {
-          "mappings": {
-            "uncle": {
+            # An example with deeply nested Bobs.
+            {
               "type_alias": "pants_test.engine.test_parsers.Bob",
-              "age": 42
+              "configs": [
+                {
+                  "mappings": {
+                    "uncle": {
+                      "type_alias": "pants_test.engine.test_parsers.Bob",
+                      "age": 42
+                    }
+                  }
+                }
+              ]
             }
-          }
-        }
-      ]
-    }
-    """
+            """
         )
         results = self.parse(document)
         self.assertEqual(1, len(results))
@@ -139,23 +139,23 @@ class JsonParserTest(unittest.TestCase):
     def test_nested_many(self):
         document = dedent(
             """
-    # An example with many nested Bobs.
-    {
-      "type_alias": "pants_test.engine.test_parsers.Bob",
-      "cousins": [
-        {
-          "type_alias": "pants_test.engine.test_parsers.Bob",
-          "name": "Jake",
-          "age": 42
-        },
-        {
-          "type_alias": "pants_test.engine.test_parsers.Bob",
-          "name": "Jane",
-          "age": 37
-        }
-      ]
-    }
-    """
+            # An example with many nested Bobs.
+            {
+              "type_alias": "pants_test.engine.test_parsers.Bob",
+              "cousins": [
+                {
+                  "type_alias": "pants_test.engine.test_parsers.Bob",
+                  "name": "Jake",
+                  "age": 42
+                },
+                {
+                  "type_alias": "pants_test.engine.test_parsers.Bob",
+                  "name": "Jane",
+                  "age": 37
+                }
+              ]
+            }
+            """
         )
         results = self.parse(document)
         self.assertEqual(1, len(results))
@@ -167,20 +167,20 @@ class JsonParserTest(unittest.TestCase):
     def test_multiple(self):
         document = dedent(
             """
-    # An example with several Bobs.
-
-    # One with hobbies.
-    {
-      "type_alias": "pants_test.engine.test_parsers.Bob",
-      "hobbies": [1, 2, 3]
-    }
-
-    # Another that is aged.
-    {
-      "type_alias": "pants_test.engine.test_parsers.Bob",
-      "age": 42
-    }
-    """
+            # An example with several Bobs.
+        
+            # One with hobbies.
+            {
+              "type_alias": "pants_test.engine.test_parsers.Bob",
+              "hobbies": [1, 2, 3]
+            }
+        
+            # Another that is aged.
+            {
+              "type_alias": "pants_test.engine.test_parsers.Bob",
+              "age": 42
+            }
+            """
         )
         results = self.parse(document)
         self.assertEqual([Bob(hobbies=[1, 2, 3]), Bob(age=42)], results)
@@ -188,21 +188,21 @@ class JsonParserTest(unittest.TestCase):
     def test_tricky_spacing(self):
         document = dedent(
             """
-    # An example with several Bobs.
-
-    # One with hobbies.
-      {
-        "type_alias": "pants_test.engine.test_parsers.Bob",
-
-        # And internal comment and blank lines.
-
-        "hobbies": [1, 2, 3]} {
-      # This comment is inside an empty object that started on the prior line!
-    }
-
-    # Another that is aged.
-    {"type_alias": "pants_test.engine.test_parsers.Bob","age": 42}
-    """
+            # An example with several Bobs.
+        
+            # One with hobbies.
+              {
+                "type_alias": "pants_test.engine.test_parsers.Bob",
+        
+                # And internal comment and blank lines.
+        
+                "hobbies": [1, 2, 3]} {
+              # This comment is inside an empty object that started on the prior line!
+            }
+        
+            # Another that is aged.
+            {"type_alias": "pants_test.engine.test_parsers.Bob","age": 42}
+            """
         ).strip()
         results = self.parse(document)
         self.assertEqual([Bob(hobbies=[1, 2, 3]), {}, Bob(age=42)], results)
@@ -210,31 +210,31 @@ class JsonParserTest(unittest.TestCase):
     def test_error_presentation(self):
         document = dedent(
             """
-    # An example with several Bobs.
-
-    # One with hobbies.
-      {
-        "type_alias": "pants_test.engine.test_parsers.Bob",
-
-        # And internal comment and blank lines.
-
-        "hobbies": [1, 2, 3]} {
-      # This comment is inside an empty object that started on the prior line!
-    }
-
-    # Another that is imaginary aged.
-    {
-      "type_alias": "pants_test.engine.test_parsers.Bob",
-      "age": 42i,
-
-      "four": 1,
-      "five": 1,
-      "six": 1,
-      "seven": 1,
-      "eight": 1,
-      "nine": 1
-    }
-    """
+            # An example with several Bobs.
+        
+            # One with hobbies.
+              {
+                "type_alias": "pants_test.engine.test_parsers.Bob",
+        
+                # And internal comment and blank lines.
+        
+                "hobbies": [1, 2, 3]} {
+              # This comment is inside an empty object that started on the prior line!
+            }
+        
+            # Another that is imaginary aged.
+            {
+              "type_alias": "pants_test.engine.test_parsers.Bob",
+              "age": 42i,
+        
+              "four": 1,
+              "five": 1,
+              "six": 1,
+              "seven": 1,
+              "eight": 1,
+              "nine": 1
+            }
+            """
         ).strip()
         filepath = "/dev/null"
         with self.assertRaises(parser.ParseError) as exc:
@@ -252,32 +252,32 @@ class JsonParserTest(unittest.TestCase):
         self.assertEqual(
             dedent(
                 """
-      In document at {filepath}:
-          # An example with several Bobs.
-
-          # One with hobbies.
-            {{
-              "type_alias": "pants_test.engine.test_parsers.Bob",
-
-              # And internal comment and blank lines.
-
-              "hobbies": [1, 2, 3]}} {{
-            # This comment is inside an empty object that started on the prior line!
-          }}
-
-          # Another that is imaginary aged.
-       1: {{
-       2:   "type_alias": "pants_test.engine.test_parsers.Bob",
-       3:   "age": 42i,
-
-       4:   "four": 1,
-       5:   "five": 1,
-       6:   "six": 1,
-       7:   "seven": 1,
-       8:   "eight": 1,
-       9:   "nine": 1
-      10: }}
-      """.format(
+                In document at {filepath}:
+                    # An example with several Bobs.
+        
+                    # One with hobbies.
+                      {{
+                        "type_alias": "pants_test.engine.test_parsers.Bob",
+        
+                        # And internal comment and blank lines.
+        
+                        "hobbies": [1, 2, 3]}} {{
+                      # This comment is inside an empty object that started on the prior line!
+                    }}
+        
+                    # Another that is imaginary aged.
+                 1: {{
+                 2:   "type_alias": "pants_test.engine.test_parsers.Bob",
+                 3:   "age": 42i,
+        
+                 4:   "four": 1,
+                 5:   "five": 1,
+                 6:   "six": 1,
+                 7:   "seven": 1,
+                 8:   "eight": 1,
+                 9:   "nine": 1
+                10: }}
+                """.format(
                     filepath=filepath
                 )
             ).strip(),
@@ -304,16 +304,16 @@ class JsonEncoderTest(unittest.TestCase):
     def test_shallow_encoding(self):
         expected_json = dedent(
             """
-    {
-      "name": "bob",
-      "type_alias": "pants_test.engine.test_parsers.Bob",
-      "friend": {
-        "name": "bill",
-        "type_alias": "pants_test.engine.test_parsers.Bob"
-      },
-      "relative": "::an opaque address::"
-    }
-    """
+            {
+              "name": "bob",
+              "type_alias": "pants_test.engine.test_parsers.Bob",
+              "friend": {
+                "name": "bill",
+                "type_alias": "pants_test.engine.test_parsers.Bob"
+              },
+              "relative": "::an opaque address::"
+            }
+            """
         ).strip()
         self.assertEqual(
             json.dumps(json.loads(expected_json), sort_keys=True),
@@ -323,19 +323,19 @@ class JsonEncoderTest(unittest.TestCase):
     def test_inlined_encoding(self):
         expected_json = dedent(
             """
-    {
-      "name": "bob",
-      "type_alias": "pants_test.engine.test_parsers.Bob",
-      "friend": {
-        "name": "bill",
-        "type_alias": "pants_test.engine.test_parsers.Bob"
-      },
-      "relative": {
-        "name": "bill",
-        "type_alias": "pants_test.engine.test_parsers.Bob"
-      }
-    }
-    """
+            {
+              "name": "bob",
+              "type_alias": "pants_test.engine.test_parsers.Bob",
+              "friend": {
+                "name": "bill",
+                "type_alias": "pants_test.engine.test_parsers.Bob"
+              },
+              "relative": {
+                "name": "bill",
+                "type_alias": "pants_test.engine.test_parsers.Bob"
+              }
+            }
+            """
         ).strip()
         self.assertEqual(
             json.dumps(json.loads(expected_json), sort_keys=True),
@@ -347,12 +347,12 @@ class PythonAssignmentsParserTest(unittest.TestCase):
     def test_no_symbol_table(self):
         document = dedent(
             """
-    from pants_test.engine.test_parsers import Bob
-
-    nancy = Bob(
-      hobbies=[1, 2, 3]
-    )
-    """
+            from pants_test.engine.test_parsers import Bob
+        
+            nancy = Bob(
+              hobbies=[1, 2, 3]
+            )
+            """
         )
         results = parse(parsers.PythonAssignmentsParser(EMPTY_TABLE), document)
         self.assertEqual([Bob(name="nancy", hobbies=[1, 2, 3])], results)
@@ -363,10 +363,10 @@ class PythonAssignmentsParserTest(unittest.TestCase):
     def test_symbol_table(self):
         document = dedent(
             """
-    bill = nancy(
-      hobbies=[1, 2, 3]
-    )
-    """
+            bill = nancy(
+              hobbies=[1, 2, 3]
+            )
+            """
         )
         results = parse(parsers.PythonAssignmentsParser(TEST_TABLE2), document)
         self.assertEqual([Bob(name="bill", hobbies=[1, 2, 3])], results)
@@ -377,11 +377,11 @@ class PythonCallbacksParserTest(unittest.TestCase):
     def test(self):
         document = dedent(
             """
-    nancy(
-      name='bill',
-      hobbies=[1, 2, 3]
-    )
-    """
+            nancy(
+              name='bill',
+              hobbies=[1, 2, 3]
+            )
+            """
         )
         results = parse(parsers.PythonCallbacksParser(TEST_TABLE2), document)
         self.assertEqual([Bob(name="bill", hobbies=[1, 2, 3])], results)

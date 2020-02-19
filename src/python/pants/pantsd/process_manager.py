@@ -84,8 +84,8 @@ class ProcessMetadataManager:
 
     def __init__(self, metadata_base_dir=None):
         """
-    :param str metadata_base_dir: The base directory for process metadata.
-    """
+        :param str metadata_base_dir: The base directory for process metadata.
+        """
         super().__init__()
 
         self._metadata_base_dir = (
@@ -273,13 +273,13 @@ class ProcessManager(ProcessMetadataManager):
         metadata_base_dir=None,
     ):
         """
-    :param string name: The process identity/name (e.g. 'pantsd' or 'ng_Zinc').
-    :param int pid: The process pid. Overrides fetching of the self.pid @property.
-    :param string socket: The socket metadata. Overrides fetching of the self.socket @property.
-    :param string process_name: The process name for cmdline executable name matching.
-    :param type socket_type: The type to be used for socket type casting (e.g. int).
-    :param str metadata_base_dir: The overridden base directory for process metadata.
-    """
+        :param string name: The process identity/name (e.g. 'pantsd' or 'ng_Zinc').
+        :param int pid: The process pid. Overrides fetching of the self.pid @property.
+        :param string socket: The socket metadata. Overrides fetching of the self.socket @property.
+        :param string process_name: The process name for cmdline executable name matching.
+        :param type socket_type: The type to be used for socket type casting (e.g. int).
+        :param str metadata_base_dir: The overridden base directory for process metadata.
+        """
         super().__init__(metadata_base_dir)
         self._name = name.lower().strip()
         self._pid = pid

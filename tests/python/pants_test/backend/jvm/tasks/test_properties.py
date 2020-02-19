@@ -29,24 +29,24 @@ class PropertiesTest(unittest.TestCase):
     def test_comments(self):
         self.assertLoaded(
             """
-# not=a prop
-a=prop
- ! more non prop
-    """,
+            # not=a prop
+            a=prop
+             ! more non prop
+            """,
             {"a": "prop"},
         )
 
     def test_kv_sep(self):
         self.assertLoaded(
             """
-    a=b
-    c   d\=
-    e\: :f
-    jack spratt = \tbob barker
-    g
-    h=
-    i :
-    """,
+            a=b
+            c   d\=
+            e\: :f
+            jack spratt = \tbob barker
+            g
+            h=
+            i :
+            """,
             {
                 "a": "b",
                 "c": "d=",
@@ -61,19 +61,19 @@ a=prop
     def test_line_continuation(self):
         self.assertLoaded(
             """
-    # A 3 line continuation
-    a\\\\
-        \\
-           \\b
-    c=\
-    d
-    e: \
-    f
-    g\
-    :h
-    i\
-    = j
-    """,
+            # A 3 line continuation
+            a\\\\
+                \\
+                   \\b
+            c=\
+            d
+            e: \
+            f
+            g\
+            :h
+            i\
+            = j
+            """,
             {"a\\": "\\b", "c": "d", "e": "f", "g": "h", "i": "j"},
         )
 
@@ -81,8 +81,8 @@ a=prop
         with NamedTemporaryFile() as props_out:
             props_out.write(
                 b"""
-      it's a = file
-      """
+                it's a = file
+                """
             )
             props_out.flush()
             with open(props_out.name, "r") as props_in:
@@ -94,10 +94,7 @@ a=prop
     def test_dump(self):
         props = OrderedDict()
         props["a"] = 1
-        props[
-            "b"
-        ] = """2
-"""
+        props["b"] = "2\n"
         props["c"] = " 3 : ="
         out = StringIO()
         Properties.dump(props, out)

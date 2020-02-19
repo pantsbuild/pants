@@ -43,16 +43,16 @@ class FileDepsTest(ConsoleTaskTestBase, AbstractTestGenerator):
             path="src/scala/core",
             definition=dedent(
                 """
-                    scala_library(
-                      name='core',
-                      sources=[
-                        'core1.scala'
-                      ],
-                      java_sources=[
-                        'src/java/core'
-                      ]
-                    )
-                  """
+                scala_library(
+                  name='core',
+                  sources=[
+                    'core1.scala'
+                  ],
+                  java_sources=[
+                    'src/java/core'
+                  ]
+                )
+                """
             ),
             sources=["core1.scala"],
         )
@@ -61,16 +61,16 @@ class FileDepsTest(ConsoleTaskTestBase, AbstractTestGenerator):
             path="src/java/core",
             definition=dedent(
                 """
-                    java_library(
-                      name='core',
-                      sources=globs(
-                        'core*.java',
-                      ),
-                      dependencies=[
-                        'src/scala/core'
-                      ]
-                    )
-                  """
+                java_library(
+                  name='core',
+                  sources=globs(
+                    'core*.java',
+                  ),
+                  dependencies=[
+                    'src/scala/core'
+                  ]
+                )
+                """
             ),
             sources=["core1.java", "core2.java"],
         )
@@ -79,11 +79,11 @@ class FileDepsTest(ConsoleTaskTestBase, AbstractTestGenerator):
             path="src/resources/lib",
             definition=dedent(
                 """
-                    resources(
-                      name='lib',
-                      sources=globs('*.json')
-                    )
-                  """
+                resources(
+                  name='lib',
+                  sources=globs('*.json')
+                )
+                """
             ),
             sources=["data.json"],
         )
@@ -92,13 +92,13 @@ class FileDepsTest(ConsoleTaskTestBase, AbstractTestGenerator):
             path="src/thrift/storage",
             definition=dedent(
                 """
-                    java_thrift_library(
-                      name='storage',
-                      sources=[
-                        'data_types.thrift'
-                      ]
-                    )
-                  """
+                java_thrift_library(
+                  name='storage',
+                  sources=[
+                    'data_types.thrift'
+                  ]
+                )
+                """
             ),
             sources=["data_types.thrift"],
         )
@@ -107,18 +107,18 @@ class FileDepsTest(ConsoleTaskTestBase, AbstractTestGenerator):
             path="src/java/lib",
             definition=dedent(
                 """
-                    java_library(
-                      name='lib',
-                      sources=[
-                        'lib1.java'
-                      ],
-                      dependencies=[
-                        'src/resources/lib',
-                        'src/scala/core',
-                        'src/thrift/storage'
-                      ],
-                    )
-                  """
+                java_library(
+                  name='lib',
+                  sources=[
+                    'lib1.java'
+                  ],
+                  dependencies=[
+                    'src/resources/lib',
+                    'src/scala/core',
+                    'src/thrift/storage'
+                  ],
+                )
+                """
             ),
             sources=["lib1.java"],
         )
@@ -140,15 +140,15 @@ class FileDepsTest(ConsoleTaskTestBase, AbstractTestGenerator):
             path="src/java/bin",
             definition=dedent(
                 """
-                    jvm_binary(
-                      name='bin',
-                      source='main.java',
-                      main='bin.Main',
-                      dependencies=[
-                        'src/java/lib'
-                      ]
-                    )
-                  """
+                jvm_binary(
+                  name='bin',
+                  source='main.java',
+                  main='bin.Main',
+                  dependencies=[
+                    'src/java/lib'
+                  ]
+                )
+                """
             ),
             sources=["main.java"],
         )
@@ -157,14 +157,14 @@ class FileDepsTest(ConsoleTaskTestBase, AbstractTestGenerator):
             path="project",
             definition=dedent(
                 """
-                    jvm_app(
-                      name='app',
-                      binary='src/java/bin',
-                      bundles=[
-                        bundle(fileset=['config/app.yaml'])
-                      ]
-                    )
-                  """
+                jvm_app(
+                  name='app',
+                  binary='src/java/bin',
+                  bundles=[
+                    bundle(fileset=['config/app.yaml'])
+                  ]
+                )
+                """
             ),
             sources=["config/app.yaml"],
         )

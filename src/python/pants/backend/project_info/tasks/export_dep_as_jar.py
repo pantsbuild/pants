@@ -87,8 +87,8 @@ class ExportDepAsJar(ConsoleTask):
     @staticmethod
     def _source_roots_for_target(target):
         """
-    :type target:pants.build_graph.target.Target
-    """
+        :type target:pants.build_graph.target.Target
+        """
 
         def root_package_prefix(source_file):
             source = os.path.dirname(source_file)
@@ -194,9 +194,9 @@ class ExportDepAsJar(ConsoleTask):
         self, t, modulizable_target_set, dependencies_needed_in_classpath
     ):
         """
-    NB: We need to pass dependencies_needed_in_classpath here to make sure we're being strict_deps-aware
-        when computing the dependencies.
-    """
+        NB: We need to pass dependencies_needed_in_classpath here to make sure we're being strict_deps-aware
+            when computing the dependencies.
+        """
 
         dependencies_to_include = []
         self.context.build_graph.walk_transitive_dependency_graph(
@@ -221,8 +221,8 @@ class ExportDepAsJar(ConsoleTask):
         zinc_args_for_target,
     ):
         """
-    :type current_target:pants.build_graph.target.Target
-    """
+        :type current_target:pants.build_graph.target.Target
+        """
         info = {
             # this means 'dependencies'
             "targets": [],
@@ -248,10 +248,10 @@ class ExportDepAsJar(ConsoleTask):
 
         def iter_transitive_jars(jar_lib):
             """
-      :type jar_lib: :class:`pants.backend.jvm.targets.jar_library.JarLibrary`
-      :rtype: :class:`collections.Iterator` of
-              :class:`pants.java.jar.M2Coordinate`
-      """
+            :type jar_lib: :class:`pants.backend.jvm.targets.jar_library.JarLibrary`
+            :rtype: :class:`collections.Iterator` of
+                  :class:`pants.java.jar.M2Coordinate`
+            """
             if runtime_classpath:
                 jar_products = runtime_classpath.get_artifact_classpath_entries_for_targets(
                     (jar_lib,)

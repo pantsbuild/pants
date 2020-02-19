@@ -55,21 +55,21 @@ class UnpackedJarsTest(TestBase):
             "BUILD",
             dedent(
                 """
-    jar_library(name='lib1',
-      jars=[
-        jar(org='testOrg1', name='testName1', rev='123'),
-      ],
-    )
-    jar_library(name='lib2',
-      jars=[
-        jar(org='testOrg2', name='testName2', rev='456'),
-        jar(org='testOrg3', name='testName3', rev='789'),
-      ],
-    )
-    unpacked_jars(name='unpacked-lib',
-      libraries=[':lib1', ':lib2'],
-    )
-    """
+                jar_library(name='lib1',
+                  jars=[
+                    jar(org='testOrg1', name='testName1', rev='123'),
+                  ],
+                )
+                jar_library(name='lib2',
+                  jars=[
+                    jar(org='testOrg2', name='testName2', rev='456'),
+                    jar(org='testOrg3', name='testName3', rev='789'),
+                  ],
+                )
+                unpacked_jars(name='unpacked-lib',
+                  libraries=[':lib1', ':lib2'],
+                )
+                """
             ),
         )
         lib1 = self.target("//:lib1")

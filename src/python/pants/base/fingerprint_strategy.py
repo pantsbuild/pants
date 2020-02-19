@@ -61,6 +61,6 @@ class DefaultFingerprintStrategy(DefaultFingerprintHashingMixin, FingerprintStra
 
     def compute_fingerprint(self, target):
         """
-    :API: public
-    """
+        :API: public
+        """
         return target.payload.fingerprint()

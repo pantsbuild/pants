@@ -86,62 +86,62 @@ class PEP8VariableNamesTest(CheckstylePluginTestBase):
 
     def test_class_names(self):
         statement = """
-      class dhis_not_right(object):
-        pass
-    """
+        class dhis_not_right(object):
+          pass
+        """
         self.assertNit(statement, "T000", expected_line_number="001")
 
     def test_class_globals(self):
         statement = """
-      class DhisRight(object):
-        RIGHT = 123
-        notRight = 321
-    """
+        class DhisRight(object):
+          RIGHT = 123
+          notRight = 321
+        """
         self.assertNit(statement, "T001", expected_line_number="003")
 
     def test_builtin_overrides(self):
         statement = """
-      def range():
-        print("Not in a class body")
+        def range():
+          print("Not in a class body")
 
-      class DhisRight(object):
-        def any(self):
-          print("In a class body")
-    """
+        class DhisRight(object):
+          def any(self):
+            print("In a class body")
+        """
         self.assertNit(statement, "T801", expected_line_number="001")
 
     def test_lower_snake_method_names(self):
         statement = """
-      def totally_fine():
-        print("Not in a class body")
+        def totally_fine():
+          print("Not in a class body")
 
-      class DhisRight(object):
-        def clearlyNotThinking(self):
-          print("In a class body")
-    """
+        class DhisRight(object):
+          def clearlyNotThinking(self):
+            print("In a class body")
+        """
         self.assertNit(statement, "T002", expected_line_number="005")
 
         statement = """
-      class DhisRight:
-        def clearlyNotThinking(self):
-          print("In a class body")
-    """
+        class DhisRight:
+          def clearlyNotThinking(self):
+            print("In a class body")
+        """
         self.assertNit(statement, "T002", expected_line_number="002")
 
         # Allow derivations from other modules to be ok.
         statement = """
-      class TestCase(unittest.TestCase):
-        def setUp(self):
-          pass
-    """
+        class TestCase(unittest.TestCase):
+          def setUp(self):
+            pass
+        """
         self.assertNoNits(statement)
 
         statement = """
-      def clearlyNotThinking():
-        print("Not in a class body")
+        def clearlyNotThinking():
+          print("Not in a class body")
 
-      class DhisRight(object):
-        def totally_fine(self):
-          print("In a class body")
-    """
+        class DhisRight(object):
+          def totally_fine(self):
+            print("In a class body")
+        """
         self.assertNit(statement, "T002", expected_line_number="001")

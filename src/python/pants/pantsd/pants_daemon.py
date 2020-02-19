@@ -46,11 +46,11 @@ class _LoggerStream(object):
 
     def __init__(self, logger, log_level, handler):
         """
-    :param logging.Logger logger: The logger instance to emit writes to.
-    :param int log_level: The log level to use for the given logger.
-    :param Handler handler: The underlying log handler, for determining the fileno
-                            to support faulthandler logging.
-    """
+        :param logging.Logger logger: The logger instance to emit writes to.
+        :param int log_level: The log level to use for the given logger.
+        :param Handler handler: The underlying log handler, for determining the fileno
+                                to support faulthandler logging.
+        """
         self._logger = logger
         self._log_level = log_level
         self._handler = handler
@@ -149,13 +149,13 @@ class PantsDaemon(FingerprintedProcessManager):
         @classmethod
         def create(cls, options_bootstrapper, full_init=True):
             """
-      :param OptionsBootstrapper options_bootstrapper: The bootstrap options.
-      :param bool full_init: Whether or not to fully initialize an engine et al for the purposes
-                             of spawning a new daemon. `full_init=False` is intended primarily
-                             for lightweight lifecycle checks (since there is a ~1s overhead to
-                             initialize the engine). See the impl of `maybe_launch` for an example
-                             of the intended usage.
-      """
+            :param OptionsBootstrapper options_bootstrapper: The bootstrap options.
+            :param bool full_init: Whether or not to fully initialize an engine et al for the purposes
+                                   of spawning a new daemon. `full_init=False` is intended primarily
+                                   for lightweight lifecycle checks (since there is a ~1s overhead to
+                                   initialize the engine). See the impl of `maybe_launch` for an example
+                                   of the intended usage.
+            """
             bootstrap_options = options_bootstrapper.bootstrap_options
             bootstrap_options_values = bootstrap_options.for_global_scope()
             # TODO: https://github.com/pantsbuild/pants/issues/3479
@@ -254,14 +254,14 @@ class PantsDaemon(FingerprintedProcessManager):
         bootstrap_options=None,
     ):
         """
-    :param Native native: A `Native` instance.
-    :param string build_root: The pants build root.
-    :param string work_dir: The pants work directory.
-    :param string log_level: The log level to use for daemon logging.
-    :param PantsServices services: A registry of services to use in this run.
-    :param string metadata_base_dir: The ProcessManager metadata base dir.
-    :param Options bootstrap_options: The bootstrap options, if available.
-    """
+        :param Native native: A `Native` instance.
+        :param string build_root: The pants build root.
+        :param string work_dir: The pants work directory.
+        :param string log_level: The log level to use for daemon logging.
+        :param PantsServices services: A registry of services to use in this run.
+        :param string metadata_base_dir: The ProcessManager metadata base dir.
+        :param Options bootstrap_options: The bootstrap options, if available.
+        """
         super().__init__(name="pantsd", metadata_base_dir=metadata_base_dir)
         self._native = native
         self._build_root = build_root

@@ -51,16 +51,16 @@ class AvroJavaGenTest(NailgunTaskTestBase):
             "avro-build",
             dedent(
                 """
-      java_avro_library(name='avro-schema',
-        sources=['src/avro/schema.avsc'],
-      )
-      java_avro_library(name='avro-protocol',
-        sources=['src/avro/protocol.avpl'],
-      )
-      java_avro_library(name='avro-idl',
-        sources=['src/avro/record.avdl'],
-      )
-    """
+                java_avro_library(name='avro-schema',
+                  sources=['src/avro/schema.avsc'],
+                )
+                java_avro_library(name='avro-protocol',
+                  sources=['src/avro/protocol.avpl'],
+                )
+                java_avro_library(name='avro-idl',
+                  sources=['src/avro/record.avdl'],
+                )
+            """
             ),
         )
 
@@ -68,16 +68,16 @@ class AvroJavaGenTest(NailgunTaskTestBase):
             relpath="avro-build/src/avro/schema.avsc",
             contents=dedent(
                 """
-      {
-        "namespace": "",
-        "type": "record",
-        "name": "Person",
-        "fields": [
-          {"name": "name", "type": "string"},
-          {"name": "age", "type": "int"}
-        ]
-      }
-    """
+                {
+                  "namespace": "",
+                  "type": "record",
+                  "name": "Person",
+                  "fields": [
+                    {"name": "name", "type": "string"},
+                    {"name": "age", "type": "int"}
+                  ]
+                }
+                """
             ),
         )
 
@@ -85,10 +85,10 @@ class AvroJavaGenTest(NailgunTaskTestBase):
             relpath="avro-build/src/avro/record.avdl",
             contents=dedent(
                 """
-      protocol Test {
-        void test();
-      }
-    """
+                protocol Test {
+                  void test();
+                }
+                """
             ),
         )
 

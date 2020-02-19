@@ -15,9 +15,9 @@ class NodePackage(Target):
 
     def __init__(self, package_name=None, address=None, payload=None, **kwargs):
         """
-    :param string package_name: The remote module package name, if not supplied the target name is
-                                used.
-    """
+        :param string package_name: The remote module package name, if not supplied the target name is
+                                    used.
+        """
         payload = payload or Payload()
         payload.add_fields(
             {"package_name": PrimitiveField(package_name or address.target_name),}

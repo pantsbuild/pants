@@ -60,10 +60,10 @@ class JvmCompileTest(NailgunTaskTestBase):
 
     def create_and_return_classpath_products(self, targets, required_products):
         """Executes our mocked out JvmCompile class, with certain required products
-    args:
-      required_products: list of str. The products to declare a dependency on.f
-    rtype: tuple(ClasspathProducts)
-    """
+        args:
+          required_products: list of str. The products to declare a dependency on.f
+        rtype: tuple(ClasspathProducts)
+        """
         init_subsystems([JvmPlatform])
         context = self.context(
             target_roots=[targets["a"], targets["c"]],

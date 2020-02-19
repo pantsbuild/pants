@@ -12,13 +12,13 @@ from pants.util.dirutil import safe_file_dump, safe_mkdir, safe_mkdtemp
 
 class JvmTaskTestBase(TaskTestBase):
     """
-  :API: public
-  """
+    :API: public
+    """
 
     def setUp(self):
         """
-    :API: public
-    """
+        :API: public
+        """
         super().setUp()
         init_subsystem(JvmResolveSubsystem)
         self.set_options_for_scope("resolver", resolver="ivy")
@@ -56,8 +56,8 @@ class JvmTaskTestBase(TaskTestBase):
 
     def get_runtime_classpath(self, context):
         """
-    :API: public
-    """
+        :API: public
+        """
         return context.products.get_data(
             "runtime_classpath", init_func=ClasspathProducts.init_func(self.pants_workdir)
         )

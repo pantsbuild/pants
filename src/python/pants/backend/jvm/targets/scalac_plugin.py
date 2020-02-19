@@ -14,9 +14,9 @@ class ScalacPlugin(ScalaLibrary):
 
     def __init__(self, classname=None, plugin=None, *args, **kwargs):
         """
-    :param classname: The fully qualified plugin class name - required.
-    :param plugin: The name of the plugin. Defaults to name if not supplied.
-    """
+        :param classname: The fully qualified plugin class name - required.
+        :param plugin: The name of the plugin. Defaults to name if not supplied.
+        """
 
         super().__init__(*args, **kwargs)
 

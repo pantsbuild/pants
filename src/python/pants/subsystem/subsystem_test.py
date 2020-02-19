@@ -151,16 +151,16 @@ class SubsystemTest(TestBase):
 
     def test_scoping_complex(self) -> None:
         """
-    Subsystem dep structure is (-s-> = scoped dep, -g-> = global dep):
+        Subsystem dep structure is (-s-> = scoped dep, -g-> = global dep):
 
-    D -s-> E
-    |
-    + -s->
-          \
-    A -s-> B -s-> C
-           |
-           + -g-> E
-    """
+        D -s-> E
+        |
+        + -s->
+              \
+        A -s-> B -s-> C
+               |
+               + -g-> E
+        """
 
         class SubsystemE(Subsystem):
             options_scope = "e"

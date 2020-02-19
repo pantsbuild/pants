@@ -24,96 +24,96 @@ class BuildFileManipulatorTest(TestBase):
         self.project_tree = FileSystemProjectTree(self.build_root)
         self.complicated_dep_comments = dedent(
             """\
-      target_type(
-        # This comment should be okay
-        name = 'no_bg_no_cry',  # Side comments here will stay
-        # This comment should be okay
-        dependencies = [
-          # nbgbc_above1
-          # nbgnc_above2
-          'really/need/this:dep', #nobgnc_side
+            target_type(
+              # This comment should be okay
+              name = 'no_bg_no_cry',  # Side comments here will stay
+              # This comment should be okay
+              dependencies = [
+                # nbgbc_above1
+                # nbgnc_above2
+                'really/need/this:dep', #nobgnc_side
 
-          ':whitespace_above',
-          ':only_side',#only_side
-          #only_above
-          ':only_above'
-        ],
-        # This comment is also fine
-        thing = object()
-        # And finally this comment survives
-      )"""
+                ':whitespace_above',
+                ':only_side',#only_side
+                #only_above
+                ':only_above'
+              ],
+              # This comment is also fine
+              thing = object()
+              # And finally this comment survives
+            )"""
         )
 
         self.multi_target_build_string = dedent(
             """\
-      # This comment should stay
-      target_type(
-        name = 'target_top',
-        dependencies = [
-          ':dep_a',
-        ]
-      )
+            # This comment should stay
+            target_type(
+              name = 'target_top',
+              dependencies = [
+                ':dep_a',
+              ]
+            )
 
 
 
-      target_type(
-        name = 'target_middle',
-        dependencies = [
-          ':dep_b',
-        ]
-      )
-      # This comment should be okay
-      target_type(
-        name = 'target_bottom',
-      )
-      # Also this one though it's weird"""
+            target_type(
+              name = 'target_middle',
+              dependencies = [
+                ':dep_b',
+              ]
+            )
+            # This comment should be okay
+            target_type(
+              name = 'target_bottom',
+            )
+            # Also this one though it's weird"""
         )
 
     def test_malformed_targets(self):
         bad_targets = dedent(
             """
-      target_type(name='name_on_line')
+            target_type(name='name_on_line')
+    
+            target_type(
+              name=
+              'dangling_kwarg_value'
+            )
 
-      target_type(
-        name=
-        'dangling_kwarg_value'
-      )
+            # TODO(pl):  Split this out.  Right now it fails
+            # the test for all of the targets and masks other
+            # expected failures
+            # target_type(
+            #   name=str('non_str_literal')
+            # )
 
-      # TODO(pl):  Split this out.  Right now it fails
-      # the test for all of the targets and masks other
-      # expected failures
-      # target_type(
-      #   name=str('non_str_literal')
-      # )
+            target_type(
+              name='end_paren_not_on_own_line')
+    
+            target_type(
+              object(),
+              name='has_non_kwarg'
+            )
 
-      target_type(
-        name='end_paren_not_on_own_line')
+            target_type(
+              name='non_list_deps',
+              dependencies=object(),
+            )
 
-      target_type(
-        object(),
-        name='has_non_kwarg'
-      )
+            target_type(
+              name='deps_not_on_own_lines1',
+              dependencies=['some_dep'],
+            )
 
-      target_type(
-        name='non_list_deps',
-        dependencies=object(),
-      )
+            target_type(
+              name='deps_not_on_own_lines2',
+              dependencies=[
+                'some_dep', 'some_other_dep'],
+            )
 
-      target_type(
-        name='deps_not_on_own_lines1',
-        dependencies=['some_dep'],
-      )
-
-      target_type(
-        name='deps_not_on_own_lines2',
-        dependencies=[
-          'some_dep', 'some_other_dep'],
-      )
-
-      target_type(
-        name = 'sentinel',
-      )
-      """
+            target_type(
+              name = 'sentinel',
+            )
+            """
         )
 
         build_file = self.set_build_file_contents(bad_targets)
@@ -138,21 +138,21 @@ class BuildFileManipulatorTest(TestBase):
     def test_simple_targets(self):
         simple_targets = dedent(
             """
-      target_type(
-        name = 'no_deps',
-      )
+            target_type(
+              name = 'no_deps',
+            )
 
-      target_type(
-        name = 'empty_deps',
-        dependencies = [
-        ]
-      )
+            target_type(
+              name = 'empty_deps',
+              dependencies = [
+              ]
+            )
 
-      target_type(
-        name = 'empty_deps_inline',
-        dependencies = []
-      )
-      """
+            target_type(
+              name = 'empty_deps_inline',
+              dependencies = []
+            )
+            """
         )
 
         build_file = self.set_build_file_contents(simple_targets)
@@ -198,24 +198,24 @@ class BuildFileManipulatorTest(TestBase):
     def test_comment_rules(self):
         expected_target_str = dedent(
             """\
-      target_type(
-        # This comment should be okay
-        name = 'no_bg_no_cry',  # Side comments here will stay
-        # This comment should be okay
-        dependencies = [
-          # only_above
-          ':only_above',
-          ':only_side',  # only_side
+            target_type(
+              # This comment should be okay
+              name = 'no_bg_no_cry',  # Side comments here will stay
+              # This comment should be okay
+              dependencies = [
+                # only_above
+                ':only_above',
+                ':only_side',  # only_side
 
-          ':whitespace_above',
-          # nbgbc_above1
-          # nbgnc_above2
-          'really/need/this:dep',  # nobgnc_side
-        ],
-        # This comment is also fine
-        thing = object()
-        # And finally this comment survives
-      )"""
+                ':whitespace_above',
+                # nbgbc_above1
+                # nbgnc_above2
+                'really/need/this:dep',  # nobgnc_side
+              ],
+              # This comment is also fine
+              thing = object()
+              # And finally this comment survives
+            )"""
         )
 
         build_file = self.set_build_file_contents(self.complicated_dep_comments)
@@ -227,22 +227,22 @@ class BuildFileManipulatorTest(TestBase):
     def test_forced_target_rules(self):
         expected_target_str = dedent(
             """\
-      target_type(
-        # This comment should be okay
-        name = 'no_bg_no_cry',  # Side comments here will stay
-        # This comment should be okay
-        dependencies = [
-          # only_above
-          ':only_above',
-          ':only_side',  # only_side
-          # nbgbc_above1
-          # nbgnc_above2
-          'really/need/this:dep',  # nobgnc_side
-        ],
-        # This comment is also fine
-        thing = object()
-        # And finally this comment survives
-      )"""
+            target_type(
+              # This comment should be okay
+              name = 'no_bg_no_cry',  # Side comments here will stay
+              # This comment should be okay
+              dependencies = [
+                # only_above
+                ':only_above',
+                ':only_side',  # only_side
+                # nbgbc_above1
+                # nbgnc_above2
+                'really/need/this:dep',  # nobgnc_side
+              ],
+              # This comment is also fine
+              thing = object()
+              # And finally this comment survives
+            )"""
         )
 
         build_file = self.set_build_file_contents(self.complicated_dep_comments)
@@ -255,30 +255,30 @@ class BuildFileManipulatorTest(TestBase):
     def test_target_insertion_bottom(self):
         expected_build_string = dedent(
             """\
-      # This comment should stay
-      target_type(
-        name = 'target_top',
-        dependencies = [
-          ':dep_a',
-        ]
-      )
+            # This comment should stay
+            target_type(
+              name = 'target_top',
+              dependencies = [
+                ':dep_a',
+              ]
+            )
 
 
 
-      target_type(
-        name = 'target_middle',
-        dependencies = [
-          ':dep_b',
-        ]
-      )
-      # This comment should be okay
-      target_type(
-        name = 'target_bottom',
-        dependencies = [
-          ':new_dep',
-        ],
-      )
-      # Also this one though it's weird"""
+            target_type(
+              name = 'target_middle',
+              dependencies = [
+                ':dep_b',
+              ]
+            )
+            # This comment should be okay
+            target_type(
+              name = 'target_bottom',
+              dependencies = [
+                ':new_dep',
+              ],
+            )
+            # Also this one though it's weird"""
         )
 
         build_file = self.set_build_file_contents(self.multi_target_build_string)
@@ -291,28 +291,28 @@ class BuildFileManipulatorTest(TestBase):
     def test_target_insertion_top(self):
         expected_build_string = dedent(
             """\
-      # This comment should stay
-      target_type(
-        name = 'target_top',
-        dependencies = [
-          ':dep_a',
-          ':new_dep',
-        ],
-      )
+            # This comment should stay
+            target_type(
+              name = 'target_top',
+              dependencies = [
+                ':dep_a',
+                ':new_dep',
+              ],
+            )
 
 
 
-      target_type(
-        name = 'target_middle',
-        dependencies = [
-          ':dep_b',
-        ]
-      )
-      # This comment should be okay
-      target_type(
-        name = 'target_bottom',
-      )
-      # Also this one though it's weird"""
+            target_type(
+              name = 'target_middle',
+              dependencies = [
+                ':dep_b',
+              ]
+            )
+            # This comment should be okay
+            target_type(
+              name = 'target_bottom',
+            )
+            # Also this one though it's weird"""
         )
 
         build_file = self.set_build_file_contents(self.multi_target_build_string)
@@ -325,28 +325,28 @@ class BuildFileManipulatorTest(TestBase):
     def test_target_insertion_middle(self):
         expected_build_string = dedent(
             """\
-      # This comment should stay
-      target_type(
-        name = 'target_top',
-        dependencies = [
-          ':dep_a',
-        ]
-      )
+            # This comment should stay
+            target_type(
+              name = 'target_top',
+              dependencies = [
+                ':dep_a',
+              ]
+            )
 
 
 
-      target_type(
-        name = 'target_middle',
-        dependencies = [
-          ':dep_b',
-          ':new_dep',
-        ],
-      )
-      # This comment should be okay
-      target_type(
-        name = 'target_bottom',
-      )
-      # Also this one though it's weird"""
+            target_type(
+              name = 'target_middle',
+              dependencies = [
+                ':dep_b',
+                ':new_dep',
+              ],
+            )
+            # This comment should be okay
+            target_type(
+              name = 'target_bottom',
+            )
+            # Also this one though it's weird"""
         )
 
         build_file = self.set_build_file_contents(self.multi_target_build_string)
@@ -359,29 +359,29 @@ class BuildFileManipulatorTest(TestBase):
     def test_target_write(self):
         expected_build_string = dedent(
             """\
-      # This comment should stay
-      target_type(
-        name = 'target_top',
-        dependencies = [
-          ':dep_a',
-        ]
-      )
+            # This comment should stay
+            target_type(
+              name = 'target_top',
+              dependencies = [
+                ':dep_a',
+              ]
+            )
 
 
 
-      target_type(
-        name = 'target_middle',
-        dependencies = [
-          ':dep_b',
-          ':new_dep',
-        ],
-      )
-      # This comment should be okay
-      target_type(
-        name = 'target_bottom',
-      )
-      # Also this one though it's weird
-      """
+            target_type(
+              name = 'target_middle',
+              dependencies = [
+                ':dep_b',
+                ':new_dep',
+              ],
+            )
+            # This comment should be okay
+            target_type(
+              name = 'target_bottom',
+            )
+            # Also this one though it's weird
+            """
         )
 
         build_file = self.set_build_file_contents(self.multi_target_build_string + "\n")

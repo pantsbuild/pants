@@ -71,8 +71,8 @@ class StringSimilarityRanker:
 
     def __init__(self, base_str):
         """
-    :param base_str: the given string to compute similarity against.
-    """
+        :param base_str: the given string to compute similarity against.
+        """
         self._base_str = base_str
 
     def sort(self, strings):

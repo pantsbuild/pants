@@ -28,13 +28,13 @@ class JaxbGenJavaTest(NailgunTaskTestBase):
 
     def create_complex_type(self, name):
         return """<xsd:complexType name="{name}">
-              <xsd:sequence>
-                <xsd:element name="commonName" type="xsd:string"/>
-                <xsd:element name="scientificName" type="xsd:string"/>
-                <xsd:element name="colorRGB" type="xsd:integer"/>
-                <xsd:element name="tasty" type="xsd:boolean"/>
-              </xsd:sequence>
-            </xsd:complexType>""".format(
+                  <xsd:sequence>
+                    <xsd:element name="commonName" type="xsd:string"/>
+                    <xsd:element name="scientificName" type="xsd:string"/>
+                    <xsd:element name="colorRGB" type="xsd:integer"/>
+                    <xsd:element name="tasty" type="xsd:boolean"/>
+                  </xsd:sequence>
+                </xsd:complexType>""".format(
             name=name
         )
 

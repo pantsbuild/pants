@@ -16,9 +16,9 @@ class PythonAWSLambda(Target):
 
     def __init__(self, binary=None, handler=None, **kwargs):
         """
-    :param string binary: Target spec of the ``python_binary`` that contains the handler.
-    :param string handler: Lambda handler entrypoint (module.dotted.name:handler_func).
-    """
+        :param string binary: Target spec of the ``python_binary`` that contains the handler.
+        :param string handler: Lambda handler entrypoint (module.dotted.name:handler_func).
+        """
         payload = Payload()
         payload.add_fields(
             {"binary": PrimitiveField(binary), "handler": PrimitiveField(handler),}

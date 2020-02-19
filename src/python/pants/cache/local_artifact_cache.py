@@ -22,12 +22,12 @@ logger = logging.getLogger(__name__)
 class BaseLocalArtifactCache(ArtifactCache):
     def __init__(self, artifact_root, compression, permissions=None, dereference=True):
         """
-    :param str artifact_root: The path under which cacheable products will be read/written.
-    :param int compression: The gzip compression level for created artifacts.
-                            Valid values are 0-9.
-    :param str permissions: File permissions to use when creating artifact files.
-    :param bool dereference: Dereference symlinks when creating the cache tarball.
-    """
+        :param str artifact_root: The path under which cacheable products will be read/written.
+        :param int compression: The gzip compression level for created artifacts.
+                                Valid values are 0-9.
+        :param str permissions: File permissions to use when creating artifact files.
+        :param bool dereference: Dereference symlinks when creating the cache tarball.
+        """
         super().__init__(artifact_root)
         self._compression = compression
         self._cache_root = None
@@ -108,13 +108,13 @@ class LocalArtifactCache(BaseLocalArtifactCache):
         dereference=True,
     ):
         """
-    :param str artifact_root: The path under which cacheable products will be read/written.
-    :param str cache_root: The locally cached files are stored under this directory.
-    :param int compression: The gzip compression level for created artifacts (1-9 or false-y).
-    :param int max_entries_per_target: The maximum number of old cache files to leave behind on a cache miss.
-    :param str permissions: File permissions to use when creating artifact files.
-    :param bool dereference: Dereference symlinks when creating the cache tarball.
-    """
+        :param str artifact_root: The path under which cacheable products will be read/written.
+        :param str cache_root: The locally cached files are stored under this directory.
+        :param int compression: The gzip compression level for created artifacts (1-9 or false-y).
+        :param int max_entries_per_target: The maximum number of old cache files to leave behind on a cache miss.
+        :param str permissions: File permissions to use when creating artifact files.
+        :param bool dereference: Dereference symlinks when creating the cache tarball.
+        """
         super().__init__(
             artifact_root,
             compression,
@@ -194,8 +194,8 @@ class TempLocalArtifactCache(BaseLocalArtifactCache):
 
     def __init__(self, artifact_root, compression, permissions=None):
         """
-    :param str artifact_root: The path under which cacheable products will be read/written.
-    """
+        :param str artifact_root: The path under which cacheable products will be read/written.
+        """
         super().__init__(artifact_root, compression=compression, permissions=permissions)
 
     def _store_tarball(self, cache_key, src):

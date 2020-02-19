@@ -203,8 +203,8 @@ class Options:
     @property
     def help_request(self) -> Optional[HelpRequest]:
         """
-    :API: public
-    """
+        :API: public
+        """
         return self._help_request
 
     @property

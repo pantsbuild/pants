@@ -21,15 +21,15 @@ class JavaAntlrLibrary(JvmTarget):
     ):
 
         """
-    :param provides: The ``artifact``
-      to publish that represents this target outside the repo.
-    :param compiler: The name of the compiler used to compile the ANTLR files.
-        Currently only supports 'antlr3' and 'antlr4'
-    :param package: (antlr4 only) A string which specifies the package to be used on the dependent
-        sources.  If unset, the package will be based on the path to the sources. Note that if
-        the sources are spread among different files, this must be set as the package cannot be
-        inferred.
-    """
+        :param provides: The ``artifact``
+          to publish that represents this target outside the repo.
+        :param compiler: The name of the compiler used to compile the ANTLR files.
+            Currently only supports 'antlr3' and 'antlr4'
+        :param package: (antlr4 only) A string which specifies the package to be used on the dependent
+            sources.  If unset, the package will be based on the path to the sources. Note that if
+            the sources are spread among different files, this must be set as the package cannot be
+            inferred.
+        """
         if compiler not in ("antlr3", "antlr4"):
             raise TargetDefinitionException(
                 self, "Illegal value for 'compiler': {}.".format(compiler)

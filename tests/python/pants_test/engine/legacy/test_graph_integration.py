@@ -56,43 +56,43 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
         original_content = build_path.read_text()
         new_content = dedent(
             """\
-      scala_library(
-        name='missing-sources',
-      )
+            scala_library(
+              name='missing-sources',
+            )
 
-      resources(
-        name='missing-globs',
-        sources=globs('*.a'),
-      )
+            resources(
+              name='missing-globs',
+              sources=globs('*.a'),
+            )
 
-      resources(
-        name='missing-rglobs',
-        sources=rglobs('*.a'),
-      )
-  
-      resources(
-        name='missing-zglobs',
-        sources=zglobs('**/*.a'),
-      )
-      
-      resources(
-        name='missing-literal-files',
-        sources=[
-          'nonexistent_test_file.txt',
-          'another_nonexistent_file.txt',
-        ],
-      )
-      
-      resources(
-        name='some-missing-some-not',
-        sources=globs('*.txt', '*.rs'),
-      )
+            resources(
+              name='missing-rglobs',
+              sources=rglobs('*.a'),
+            )
 
-      resources(
-        name='overlapping-globs',
-        sources=globs('sources.txt', '*.txt'),
-      )
-      """
+            resources(
+              name='missing-zglobs',
+              sources=zglobs('**/*.a'),
+            )
+          
+            resources(
+              name='missing-literal-files',
+              sources=[
+                'nonexistent_test_file.txt',
+                'another_nonexistent_file.txt',
+              ],
+            )
+          
+            resources(
+              name='some-missing-some-not',
+              sources=globs('*.txt', '*.rs'),
+            )
+    
+            resources(
+              name='overlapping-globs',
+              sources=globs('sources.txt', '*.txt'),
+            )
+            """
         )
         with self.with_overwritten_file_content(build_path, f"{original_content}\n{new_content}"):
             yield
@@ -103,18 +103,18 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
         original_content = build_path.read_text()
         new_content = dedent(
             """\
-      jvm_app(
-        name='missing-bundle-fileset',
-        binary=':bundle-bin',
-        bundles=[
-          bundle(fileset=['a/b/file1.txt']),
-          bundle(fileset=rglobs('*.aaaa', '*.bbbb')),
-          bundle(fileset=globs('*.aaaa')),
-          bundle(fileset=zglobs('**/*.abab')),
-          bundle(fileset=['file1.aaaa', 'file2.aaaa']),
-        ],
-      )
-      """
+            jvm_app(
+              name='missing-bundle-fileset',
+              binary=':bundle-bin',
+              bundles=[
+                bundle(fileset=['a/b/file1.txt']),
+                bundle(fileset=rglobs('*.aaaa', '*.bbbb')),
+                bundle(fileset=globs('*.aaaa')),
+                bundle(fileset=zglobs('**/*.abab')),
+                bundle(fileset=['file1.aaaa', 'file2.aaaa']),
+              ],
+            )
+            """
         )
         with self.with_overwritten_file_content(build_path, f"{original_content}\n{new_content}"):
             yield

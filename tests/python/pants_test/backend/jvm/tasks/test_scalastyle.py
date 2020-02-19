@@ -37,8 +37,8 @@ class ScalastyleTest(NailgunTaskTestBase):
         for rule in rules:
             rule_section_xml += dedent(
                 """
-        <check level="error" class="{rule}" enabled="true"></check>
-      """.format(
+                <check level="error" class="{rule}" enabled="true"></check>
+                """.format(
                     rule=rule
                 )
             )
@@ -46,11 +46,11 @@ class ScalastyleTest(NailgunTaskTestBase):
             relpath="scalastyle_config.xml",
             contents=dedent(
                 """
-        <scalastyle commentFilter="enabled">
-          <name>Test Scalastyle configuration</name>
-          {rule_section_xml}
-        </scalastyle>
-      """.format(
+                <scalastyle commentFilter="enabled">
+                  <name>Test Scalastyle configuration</name>
+                  {rule_section_xml}
+                </scalastyle>
+                """.format(
                     rule_section_xml=rule_section_xml
                 )
             ),
@@ -95,11 +95,11 @@ class ScalastyleTest(NailgunTaskTestBase):
     def test_excludes_parsed_loaded_correctly(self):
         excludes_text = dedent(
             """
-      # ignore C++
-      .*\.cpp
+            # ignore C++
+            .*\.cpp
 
-      # ignore python
-      .*\.py"""
+            # ignore python
+            .*\.py"""
         )
         excluder = FileExcluder(self._create_scalastyle_excludes_file([excludes_text]), logger)
         self.assertEqual(2, len(excluder.excludes))
@@ -190,13 +190,13 @@ class ScalastyleTest(NailgunTaskTestBase):
             relpath="a/scala/pass.scala",
             contents=dedent(
                 """
-        import java.util
-        object HelloWorld {
-           def main(args: Array[String]) {
-              println("Hello, world!")
-           }
-        }
-      """
+                import java.util
+                object HelloWorld {
+                   def main(args: Array[String]) {
+                      println("Hello, world!")
+                   }
+                }
+                """
             ),
         )
         scala_target = self.make_target("a/scala:pass", ScalaLibrary, sources=["pass.scala"])
@@ -215,13 +215,13 @@ class ScalastyleTest(NailgunTaskTestBase):
             relpath="a/scala/pass.scala",
             contents=dedent(
                 """
-        import java.util
-        object HelloWorld {
-           def main(args: Array[String]) {
-              println("Hello, world!")
-           }
-        }
-      """
+                import java.util
+                object HelloWorld {
+                   def main(args: Array[String]) {
+                      println("Hello, world!")
+                   }
+                }
+                """
             ),
         )
         scala_target = self.make_target("a/scala:pass", ScalaLibrary, sources=["pass.scala"])
@@ -238,14 +238,14 @@ class ScalastyleTest(NailgunTaskTestBase):
             relpath="a/scala/fail.scala",
             contents=dedent(
                 """
-        import java.io._
-        object HelloWorld {
-           def main(args: Array[String]) {
-              println("Hello, world!")
-           }
-        }
-        import java.util._
-      """
+                import java.io._
+                object HelloWorld {
+                   def main(args: Array[String]) {
+                      println("Hello, world!")
+                   }
+                }
+                import java.util._
+                """
             ),
         )
         scala_target = self.make_target("a/scala:fail", ScalaLibrary, sources=["fail.scala"])

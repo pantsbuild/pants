@@ -18,12 +18,12 @@ class InvalidationReport:
             )
         ):
             """
-      :param targets_hash: A manufactured id for the versioned target set
-      :param target_ids: list of string target ids
-      :param cache_key_id: cache key from the InvalidationCheck
-      :param cache_key_hash: hash of cache_key from the InvalidationCheck
-      :param valid: True if the cache_key is valid
-      """
+            :param targets_hash: A manufactured id for the versioned target set
+            :param target_ids: list of string target ids
+            :param cache_key_id: cache key from the InvalidationCheck
+            :param cache_key_hash: hash of cache_key from the InvalidationCheck
+            :param valid: True if the cache_key is valid
+            """
 
         def __init__(self, task_name, invocation_id):
             self._task_name = task_name
@@ -46,8 +46,8 @@ class InvalidationReport:
 
         def report(self, writer):
             """
-      :param BufferedWriter writer: output for the report
-      """
+            :param BufferedWriter writer: output for the report
+            """
             for entry in self._entries:
                 for target_id in entry.target_ids:
                     writer.write(

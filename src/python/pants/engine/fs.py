@@ -72,15 +72,15 @@ class PathGlobs:
         description_of_origin: Optional[str] = None,
     ) -> None:
         """
-    :param globs: globs to match, e.g. `foo.txt` or `**/*.txt`. To exclude something, prefix it
-                  with `!`, e.g. `!ignore.py`.
-    :param glob_match_error_behavior: whether to warn or error upon match failures
-    :param conjunction: whether all `include`s must match or only at least one must match
-    :param description_of_origin: a human-friendly description of where this PathGlobs request is
-                                  coming from, used to improve the error message for unmatched
-                                  globs. For example, this might be
-                                  "the option `--isort-config`".
-    """
+        :param globs: globs to match, e.g. `foo.txt` or `**/*.txt`. To exclude something, prefix it
+                      with `!`, e.g. `!ignore.py`.
+        :param glob_match_error_behavior: whether to warn or error upon match failures
+        :param conjunction: whether all `include`s must match or only at least one must match
+        :param description_of_origin: a human-friendly description of where this PathGlobs request is
+                                      coming from, used to improve the error message for unmatched
+                                      globs. For example, this might be
+                                      "the option `--isort-config`".
+        """
         self.globs = tuple(globs)
         self.glob_match_error_behavior = glob_match_error_behavior
         self.conjunction = conjunction

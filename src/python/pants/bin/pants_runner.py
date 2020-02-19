@@ -27,9 +27,9 @@ class PantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         start_time: Optional[float] = None,
     ) -> None:
         """
-    :param args: The arguments (sys.argv) for this run. (Optional, default: sys.argv)
-    :param env: The environment for this run. (Optional, default: os.environ)
-    """
+        :param args: The arguments (sys.argv) for this run. (Optional, default: sys.argv)
+        :param env: The environment for this run. (Optional, default: os.environ)
+        """
         self._args = args or sys.argv
         self._env = env or os.environ
         self._start_time = start_time

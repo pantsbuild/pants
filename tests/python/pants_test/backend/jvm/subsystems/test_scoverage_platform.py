@@ -76,13 +76,13 @@ class ScoveragePlatformTest(TestBase):
             relpath="a/scala/pass.scala",
             contents=dedent(
                 """
-        import java.util
-        object HelloWorld {
-           def main(args: Array[String]) {
-              println("Hello, world!")
-           }
-        }
-      """
+                import java.util
+                object HelloWorld {
+                   def main(args: Array[String]) {
+                      println("Hello, world!")
+                   }
+                }
+                """
             ),
         )
 
@@ -103,13 +103,13 @@ class ScoveragePlatformTest(TestBase):
             relpath="a/scala/pass.scala",
             contents=dedent(
                 """
-        import java.util
-        object HelloWorld {
-           def main(args: Array[String]) {
-              println("Hello, world!")
-           }
-        }
-      """
+                import java.util
+                object HelloWorld {
+                   def main(args: Array[String]) {
+                      println("Hello, world!")
+                   }
+                }
+                """
             ),
         )
 
@@ -141,13 +141,13 @@ class ScoveragePlatformTest(TestBase):
             relpath="a/scala/pass.scala",
             contents=dedent(
                 """
-        import java.util
-        object HelloWorld {
-           def main(args: Array[String]) {
-              println("Hello, world!")
-           }
-        }
-      """
+                import java.util
+                object HelloWorld {
+                   def main(args: Array[String]) {
+                      println("Hello, world!")
+                   }
+                }
+                """
             ),
         )
 

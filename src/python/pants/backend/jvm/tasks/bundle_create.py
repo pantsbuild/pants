@@ -21,8 +21,8 @@ from pants.util.dirutil import safe_mkdir
 
 class BundleCreate(BundleMixin, JvmBinaryTask):
     """
-  :API: public
-  """
+    :API: public
+    """
 
     # Directory for both internal and external libraries.
     LIBS_DIR = "libs"

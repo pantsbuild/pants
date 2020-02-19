@@ -23,13 +23,13 @@ class PythonRequirementListTest(TestBase):
             "lib",
             dedent(
                 """
-          python_requirement_library(
-            name='pyunit',
-            requirements=[
-              'argparse==1.2.1'
-            ]
-          )
-        """
+                python_requirement_library(
+                  name='pyunit',
+                  requirements=[
+                    'argparse==1.2.1'
+                  ]
+                )
+                """
             ),
         )
         with self.assertRaises(TargetDefinitionException):
@@ -40,13 +40,13 @@ class PythonRequirementListTest(TestBase):
             "lib",
             dedent(
                 """
-          python_requirement_library(
-            name='pyunit',
-            requirements=[
-              python_requirement('argparse==1.2.1')
-            ]
-          )
-        """
+                python_requirement_library(
+                  name='pyunit',
+                  requirements=[
+                    python_requirement('argparse==1.2.1')
+                  ]
+                )
+                """
             ),
         )
 

@@ -29,8 +29,8 @@ class Exiter:
 
     def __init__(self, exiter: Callable[[Union[ExitCode, str, object]], None] = sys.exit):
         """
-    :param exiter: A function to be called to conduct the final exit of the runtime. (Optional)
-    """
+        :param exiter: A function to be called to conduct the final exit of the runtime. (Optional)
+        """
         # Since we have some exit paths that run via the sys.excepthook,
         # symbols we use can become garbage collected before we use them; ie:
         # we can find `sys` and `traceback` are `None`.  As a result we capture

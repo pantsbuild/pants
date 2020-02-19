@@ -37,11 +37,11 @@ class PluginResolverTest(unittest.TestCase):
             fp.write(
                 dedent(
                     f"""
-        from setuptools import setup
-
-
-        setup(name="{plugin}", version="{version or '0.0.0'}")
-      """
+                    from setuptools import setup
+            
+            
+                    setup(name="{plugin}", version="{version or '0.0.0'}")
+                    """
                 )
             )
         packager_cls = packager_cls or Packager

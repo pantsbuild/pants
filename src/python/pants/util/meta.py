@@ -60,22 +60,22 @@ with an @classproperty decorator.""".format(
 def classproperty(func: Callable[..., T]) -> T:
     """Use as a decorator on a method definition to make it a class-level attribute.
 
-  This decorator can be applied to a method, a classmethod, or a staticmethod. This decorator will
-  bind the first argument to the class object.
+    This decorator can be applied to a method, a classmethod, or a staticmethod. This decorator will
+    bind the first argument to the class object.
 
-  Usage:
-  >>> class Foo:
-  ...   @classproperty
-  ...   def name(cls):
-  ...     return cls.__name__
-  ...
-  >>> Foo.name
-  'Foo'
+    Usage:
+    >>> class Foo:
+    ...   @classproperty
+    ...   def name(cls):
+    ...     return cls.__name__
+    ...
+    >>> Foo.name
+    'Foo'
 
-  Setting or deleting the attribute of this name will overwrite this property.
+    Setting or deleting the attribute of this name will overwrite this property.
 
-  The docstring of the classproperty `x` for a class `C` can be obtained by
-  `C.__dict__['x'].__doc__`.
+    The docstring of the classproperty `x` for a class `C` can be obtained by
+    `C.__dict__['x'].__doc__`.
     """
     doc = func.__doc__
 
@@ -94,23 +94,23 @@ def staticproperty(func: Callable[..., T]) -> T:
     """Use as a decorator on a method definition to make it a class-level attribute (without
     binding).
 
-  This decorator can be applied to a method or a staticmethod. This decorator does not bind any
-  arguments.
+    This decorator can be applied to a method or a staticmethod. This decorator does not bind any
+    arguments.
 
-  Usage:
-  >>> other_x = 'value'
-  >>> class Foo:
-  ...   @staticproperty
-  ...   def x():
-  ...     return other_x
-  ...
-  >>> Foo.x
-  'value'
+    Usage:
+    >>> other_x = 'value'
+    >>> class Foo:
+    ...   @staticproperty
+    ...   def x():
+    ...     return other_x
+    ...
+    >>> Foo.x
+    'value'
 
-  Setting or deleting the attribute of this name will overwrite this property.
+    Setting or deleting the attribute of this name will overwrite this property.
 
-  The docstring of the classproperty `x` for a class `C` can be obtained by
-  `C.__dict__['x'].__doc__`.
+    The docstring of the classproperty `x` for a class `C` can be obtained by
+    `C.__dict__['x'].__doc__`.
     """
     doc = func.__doc__
 

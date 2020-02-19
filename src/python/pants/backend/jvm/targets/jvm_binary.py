@@ -85,13 +85,11 @@ class Duplicate(JarRule):
 
     CONCAT_TEXT = "CONCAT_TEXT"
     """Concatenates the contents of all duplicate entries encountered in the order encountered,
-  separating entries with newlines if needed.
-  """
+    separating entries with newlines if needed."""
 
     FAIL = "FAIL"
     """Raises a :class:``Duplicate.Error`` when a duplicate entry is
-  encountered.
-  """
+    encountered."""
 
     _VALID_ACTIONS = frozenset({SKIP, REPLACE, CONCAT, CONCAT_TEXT, FAIL})
 
@@ -261,10 +259,10 @@ class ManifestEntries(FingerprintedMixin):
 
     def __init__(self, entries=None):
         """
-    :param entries: Additional headers, value pairs to add to the MANIFEST.MF.
-      You can just add fixed string header / value pairs.
-    :type entries: dictionary of string : string
-    """
+        :param entries: Additional headers, value pairs to add to the MANIFEST.MF.
+          You can just add fixed string header / value pairs.
+        :type entries: dictionary of string : string
+        """
         self.payload = Payload()
         if entries:
             if not isinstance(entries, dict):
@@ -319,41 +317,41 @@ class JvmBinary(RuntimePlatformMixin, JvmTarget):
         **kwargs,
     ):
         """
-    :API: public
+        :API: public
 
-    :param string main: The name of the ``main`` class, e.g.,
-      ``'org.pantsbuild.example.hello.main.HelloMain'``. This class may be
-      present as the source of this target or depended-upon library.
-    :param string basename: Base name for the generated ``.jar`` file, e.g.,
-      ``'hello'``. (By default, uses ``name`` param)  Note this is unsafe
-      because of the possible conflict when multiple binaries are built.
-    :param EagerFilesetWithSpec sources: Zero or one source files. If more than one source is
-      required, they should be put in a library target which should be added to dependencies.
-    :param dependencies: Targets (probably ``java_library`` and
-     ``scala_library`` targets) to "link" in.
-    :type dependencies: list of target specs
-    :param deploy_excludes: List of `exclude <#exclude>`_\\s to apply
-      at deploy time.
-      If you, for example, deploy a java servlet that has one version of
-      ``servlet.jar`` onto a Tomcat environment that provides another version,
-      they might conflict. ``deploy_excludes`` gives you a way to build your
-      code but exclude the conflicting ``jar`` when deploying.
-    :param deploy_jar_rules: `Jar rules <#jar_rules>`_ for packaging this binary in a
-      deploy jar.
-    :param manifest_entries: dict that specifies entries for `ManifestEntries <#manifest_entries>`_
-      for adding to MANIFEST.MF when packaging this binary.
-    :param list shading_rules: Optional list of shading rules to apply when building a shaded
-      (aka monolithic aka fat) binary jar. The order of the rules matters: the first rule which
-      matches a fully-qualified class name is used to shade it. See shading_relocate(),
-      shading_exclude(), shading_relocate_package(), and shading_exclude_package().
-    :param list extra_jvm_options: A list of options to be passed to the jvm when running the
-      binary. Example: ['-Dexample.property=1', '-DMyFlag', '-Xmx4G'] If unspecified, no extra jvm options will be added.
-    :param str runtime_platform: The name of the platform (defined under the jvm-platform subsystem)
-      to use for runtime (that is, a key into the --jvm-platform-platforms dictionary). If
-      unspecified, the platform will default to the first one of these that exist: (1) the
-      default_runtime_platform specified for jvm-platform, (2) the platform that would be used for
-      the platform kwarg.
-    """
+        :param string main: The name of the ``main`` class, e.g.,
+          ``'org.pantsbuild.example.hello.main.HelloMain'``. This class may be
+          present as the source of this target or depended-upon library.
+        :param string basename: Base name for the generated ``.jar`` file, e.g.,
+          ``'hello'``. (By default, uses ``name`` param)  Note this is unsafe
+          because of the possible conflict when multiple binaries are built.
+        :param EagerFilesetWithSpec sources: Zero or one source files. If more than one source is
+          required, they should be put in a library target which should be added to dependencies.
+        :param dependencies: Targets (probably ``java_library`` and
+         ``scala_library`` targets) to "link" in.
+        :type dependencies: list of target specs
+        :param deploy_excludes: List of `exclude <#exclude>`_\\s to apply
+          at deploy time.
+          If you, for example, deploy a java servlet that has one version of
+          ``servlet.jar`` onto a Tomcat environment that provides another version,
+          they might conflict. ``deploy_excludes`` gives you a way to build your
+          code but exclude the conflicting ``jar`` when deploying.
+        :param deploy_jar_rules: `Jar rules <#jar_rules>`_ for packaging this binary in a
+          deploy jar.
+        :param manifest_entries: dict that specifies entries for `ManifestEntries <#manifest_entries>`_
+          for adding to MANIFEST.MF when packaging this binary.
+        :param list shading_rules: Optional list of shading rules to apply when building a shaded
+          (aka monolithic aka fat) binary jar. The order of the rules matters: the first rule which
+          matches a fully-qualified class name is used to shade it. See shading_relocate(),
+          shading_exclude(), shading_relocate_package(), and shading_exclude_package().
+        :param list extra_jvm_options: A list of options to be passed to the jvm when running the
+          binary. Example: ['-Dexample.property=1', '-DMyFlag', '-Xmx4G'] If unspecified, no extra jvm options will be added.
+        :param str runtime_platform: The name of the platform (defined under the jvm-platform subsystem)
+          to use for runtime (that is, a key into the --jvm-platform-platforms dictionary). If
+          unspecified, the platform will default to the first one of these that exist: (1) the
+          default_runtime_platform specified for jvm-platform, (2) the platform that would be used for
+          the platform kwarg.
+        """
         self.address = address  # Set in case a TargetDefinitionException is thrown early
         if main and not isinstance(main, str):
             raise TargetDefinitionException(self, "main must be a fully qualified classname")

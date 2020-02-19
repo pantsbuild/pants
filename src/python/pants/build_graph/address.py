@@ -188,9 +188,9 @@ class Address:
 
     def __init__(self, spec_path: str, target_name: str) -> None:
         """
-    :param spec_path: The path from the root of the repo to this Target.
-    :param target_name: The name of a target this Address refers to.
-    """
+        :param spec_path: The path from the root of the repo to this Target.
+        :param target_name: The name of a target this Address refers to.
+        """
         self._spec_path = self.sanitize_path(spec_path)
         self.check_target_name(spec_path, target_name)
         self._target_name = target_name
@@ -199,15 +199,15 @@ class Address:
     @property
     def spec_path(self) -> str:
         """
-    :API: public
-    """
+        :API: public
+        """
         return self._spec_path
 
     @property
     def target_name(self) -> str:
         """
-    :API: public
-    """
+        :API: public
+        """
         return self._target_name
 
     @property
@@ -224,15 +224,15 @@ class Address:
     @property
     def path_safe_spec(self) -> str:
         """
-    :API: public
-    """
+        :API: public
+        """
         return f"{self._spec_path.replace(os.sep, '.')}.{self._target_name.replace(os.sep, '.')}"
 
     @property
     def relative_spec(self) -> str:
         """
-    :API: public
-    """
+        :API: public
+        """
         return f":{self._target_name}"
 
     def reference(self, referencing_path: Optional[str] = None) -> str:

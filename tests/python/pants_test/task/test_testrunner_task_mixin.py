@@ -409,19 +409,19 @@ class TestRunnerTaskMixinXmlParsing(TestRunnerTaskMixin, TestCase):
             with open(os.path.join(xml_dir, "TEST-a.xml"), "w") as fp:
                 fp.write(
                     """
-        <testsuite failures="1" errors="1">
-          <testcase classname="org.pantsbuild.Green" name="testOK" time="1.290"/>
-          <testcase classname="org.pantsbuild.Failure" name="testFailure" time="0.27">
-            <failure/>
-          </testcase>
-          <testcase classname="org.pantsbuild.Error" name="testError" time="0.932">
-            <error/>
-          </testcase>
-          <testcase classname="org.pantsbuild.Skipped" name="testSkipped" time="0.1">
-            <skipped/>
-          </testcase>
-        </testsuite>
-        """
+                    <testsuite failures="1" errors="1">
+                      <testcase classname="org.pantsbuild.Green" name="testOK" time="1.290"/>
+                      <testcase classname="org.pantsbuild.Failure" name="testFailure" time="0.27">
+                        <failure/>
+                      </testcase>
+                      <testcase classname="org.pantsbuild.Error" name="testError" time="0.932">
+                        <error/>
+                      </testcase>
+                      <testcase classname="org.pantsbuild.Skipped" name="testSkipped" time="0.1">
+                        <skipped/>
+                      </testcase>
+                    </testsuite>
+                    """
                 )
 
             tests_info = self.parse_test_info(xml_dir, self._raise_handler)
@@ -440,16 +440,16 @@ class TestRunnerTaskMixinXmlParsing(TestRunnerTaskMixin, TestCase):
             with open(os.path.join(xml_dir, "TEST-a.xml"), "w") as fp:
                 fp.write(
                     """
-        <testsuite failures="1">
-          <testcase classname="org.pantsbuild.Green" name="testOK"/>
-          <testcase classname="org.pantsbuild.Failure" time="0.27">
-            <failure/>
-          </testcase>
-          <testcase classname="org.pantsbuild.Skipped" name="testSkipped" time="0.1" extra="">
-            <skipped/>
-          </testcase>
-        </testsuite>
-        """
+                    <testsuite failures="1">
+                      <testcase classname="org.pantsbuild.Green" name="testOK"/>
+                      <testcase classname="org.pantsbuild.Failure" time="0.27">
+                        <failure/>
+                      </testcase>
+                      <testcase classname="org.pantsbuild.Skipped" name="testSkipped" time="0.1" extra="">
+                        <skipped/>
+                      </testcase>
+                    </testsuite>
+                    """
                 )
 
             tests_info = self.parse_test_info(xml_dir, self._raise_handler)
@@ -496,12 +496,12 @@ class TestRunnerTaskMixinXmlParsing(TestRunnerTaskMixin, TestCase):
             with open(os.path.join(xml_dir, "TEST-good.xml"), "w") as fp:
                 fp.write(
                     """
-        <testsuite failures="0" errors="1">
-          <testcase classname="org.pantsbuild.Error" name="testError" time="1.2">
-            <error/>
-          </testcase>
-        </testsuite>
-        """
+                    <testsuite failures="0" errors="1">
+                      <testcase classname="org.pantsbuild.Error" name="testError" time="1.2">
+                        <error/>
+                      </testcase>
+                    </testsuite>
+                    """
                 )
 
             collect_handler = self.CollectHandler()
@@ -516,17 +516,17 @@ class TestRunnerTaskMixinXmlParsing(TestRunnerTaskMixin, TestCase):
             with open(os.path.join(xml_dir, "TEST-a.xml"), "w") as fp:
                 fp.write(
                     """
-        <testsuite errors="1">
-          <testcase classname="org.pantsbuild.Green" name="testOK1" time="1.290" file="file.py"/>
-          <testcase classname="org.pantsbuild.Green" name="testOK2" time="1.12"/>
-          <testcase classname="org.pantsbuild.Green" name="testOK3" file="file.py"/>
-          <testcase name="testOK4" time="1.79" file="file.py"/>
-          <testcase name="testOK5" time="0.832"/>
-          <testcase classname="org.pantsbuild.Error" name="testError" time="0.27" file="file.py">
-            <error/>
-          </testcase>
-        </testsuite>
-        """
+                    <testsuite errors="1">
+                      <testcase classname="org.pantsbuild.Green" name="testOK1" time="1.290" file="file.py"/>
+                      <testcase classname="org.pantsbuild.Green" name="testOK2" time="1.12"/>
+                      <testcase classname="org.pantsbuild.Green" name="testOK3" file="file.py"/>
+                      <testcase name="testOK4" time="1.79" file="file.py"/>
+                      <testcase name="testOK5" time="0.832"/>
+                      <testcase classname="org.pantsbuild.Error" name="testError" time="0.27" file="file.py">
+                        <error/>
+                      </testcase>
+                    </testsuite>
+                    """
                 )
 
             tests_info = self.parse_test_info(xml_dir, self._raise_handler, ["file", "classname"])

@@ -130,29 +130,29 @@ class TestJUnitHtmlReport(TestCase):
             write_xml(
                 "a-1",
                 """
-      <testsuite name="suite-a" errors="0" failures="0" skipped="0" tests="1" time="0.01">
-        <testcase name="test-a" time="0.01" />
-      </testsuite>
-      """,
+                <testsuite name="suite-a" errors="0" failures="0" skipped="0" tests="1" time="0.01">
+                  <testcase name="test-a" time="0.01" />
+                </testsuite>
+                """,
             )
 
             write_xml(
                 "a-2",
                 """
-      <testsuite name="suite-a" errors="0" failures="0" skipped="0" tests="1" time="0.01">
-        <testcase name="test-b" time="0.01" />
-      </testsuite>
-      """,
+                <testsuite name="suite-a" errors="0" failures="0" skipped="0" tests="1" time="0.01">
+                  <testcase name="test-b" time="0.01" />
+                </testsuite>
+                """,
             )
 
             write_xml(
                 "b",
                 """
-      <testsuite name="suite-b" errors="0" failures="0" skipped="0" tests="2" time="0.04">
-        <testcase name="test-a" time="0.01" />
-        <testcase name="test-b" time="0.03" />
-      </testsuite>
-      """,
+                <testsuite name="suite-b" errors="0" failures="0" skipped="0" tests="2" time="0.04">
+                  <testcase name="test-a" time="0.01" />
+                  <testcase name="test-b" time="0.03" />
+                </testsuite>
+                """,
             )
 
             testsuites = list(
@@ -190,22 +190,22 @@ class TestJUnitHtmlReport(TestCase):
             write_xml(
                 "a-1",
                 """
-      <testsuite name="suite-a" errors="0" failures="0" skipped="0" tests="1" time="0.02">
-        <testcase name="test-a" time="0.02" />
-      </testsuite>
-      """,
+                <testsuite name="suite-a" errors="0" failures="0" skipped="0" tests="1" time="0.02">
+                  <testcase name="test-a" time="0.02" />
+                </testsuite>
+                """,
             )
 
             write_xml(
                 "a-2",
                 """
-      <testsuite name="suite-a" errors="1" failures="0" skipped="1" tests="2" time="0.03">
-        <testcase name="test-a" time="0.01" />
-        <testcase name="test-b" time="0.02">
-          <error type="java.lang.RuntimeException">java.lang.RuntimeException!</error>
-        </testcase>
-      </testsuite>
-      """,
+                <testsuite name="suite-a" errors="1" failures="0" skipped="1" tests="2" time="0.03">
+                  <testcase name="test-a" time="0.01" />
+                  <testcase name="test-b" time="0.02">
+                    <error type="java.lang.RuntimeException">java.lang.RuntimeException!</error>
+                  </testcase>
+                </testsuite>
+                """,
             )
 
             yield xml_dir

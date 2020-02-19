@@ -21,11 +21,11 @@ class PythonTests(PythonTarget):
 
     def __init__(self, coverage=None, timeout=None, **kwargs):
         """
-    :param coverage: the module(s) whose coverage should be generated, e.g.
-      'twitter.common.log' or ['twitter.common.log', 'twitter.common.http']
-    :param int timeout: A timeout (in seconds) which covers the total runtime of all tests in this
-      target. Only applied if `--test-pytest-timeouts` is set to True.
-    """
+        :param coverage: the module(s) whose coverage should be generated, e.g.
+          'twitter.common.log' or ['twitter.common.log', 'twitter.common.http']
+        :param int timeout: A timeout (in seconds) which covers the total runtime of all tests in this
+          target. Only applied if `--test-pytest-timeouts` is set to True.
+        """
         self._coverage = maybe_list(coverage) if coverage is not None else []
         self._timeout = timeout
         super().__init__(**kwargs)
@@ -33,8 +33,8 @@ class PythonTests(PythonTarget):
     @property
     def coverage(self):
         """
-    :API: public
-    """
+        :API: public
+        """
         return self._coverage
 
     @property

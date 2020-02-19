@@ -8,8 +8,8 @@ from pants.testutil.test_base import TestBase
 
 class EngineTestBase(TestBase):
     """
-  :API: public
-  """
+    :API: public
+    """
 
     @classmethod
     def as_goal(cls, goal_name):
@@ -46,8 +46,8 @@ class EngineTestBase(TestBase):
 
     def setUp(self):
         """
-    :API: public
-    """
+        :API: public
+        """
         super().setUp()
 
         # TODO(John Sirois): Now that the BuildFileParser controls goal registration by iterating
@@ -57,8 +57,8 @@ class EngineTestBase(TestBase):
 
     def tearDown(self):
         """
-    :API: public
-    """
+        :API: public
+        """
         Goal.clear()
 
         super().tearDown()

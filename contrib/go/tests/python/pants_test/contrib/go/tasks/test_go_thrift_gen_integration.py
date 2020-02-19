@@ -42,11 +42,11 @@ class GoThriftGenIntegrationTest(PantsRunIntegrationTest):
                 fp.write(
                     dedent(
                         """
-            go_thrift_library(
-              name='fleem',
-              sources=globs('*.thrift'),
-            )
-            """
+                        go_thrift_library(
+                          name='fleem',
+                          sources=globs('*.thrift'),
+                        )
+                        """
                     ).strip()
                 )
 
@@ -54,28 +54,28 @@ class GoThriftGenIntegrationTest(PantsRunIntegrationTest):
                 fp.write(
                     dedent(
                         """
-            package usethrift
-
-            import "thrifttest/duck"
-
-            func whatevs(f duck.Feeder) string {
-              d := duck.NewDuck()
-              f.Feed(d)
-              return d.GetQuack()
-            }
-            """
+                        package usethrift
+            
+                        import "thrifttest/duck"
+            
+                        func whatevs(f duck.Feeder) string {
+                          d := duck.NewDuck()
+                          f.Feed(d)
+                          return d.GetQuack()
+                        }
+                        """
                     ).strip()
                 )
             with safe_open(os.path.join(srcdir, "src/go/usethrift/BUILD"), "w") as fp:
                 fp.write(
                     dedent(
                         """
-            go_library(
-              dependencies=[
-                '{srcdir}/src/thrift/thrifttest:fleem'
-              ]
-            )
-            """.format(
+                        go_library(
+                          dependencies=[
+                            '{srcdir}/src/thrift/thrifttest:fleem'
+                          ]
+                        )
+                        """.format(
                             srcdir=os.path.relpath(srcdir, get_buildroot())
                         )
                     ).strip()
@@ -147,8 +147,8 @@ class GoThriftGenIntegrationTest(PantsRunIntegrationTest):
         # Compile with a namespace split across thrift files.
         duck_include = dedent(
             """
-        include "thrifttest/duck.thrift"
-        """
+            include "thrifttest/duck.thrift"
+            """
         )
         thrift_files = {
             "src/thrift/thrifttest/duck.thrift": _NAMESPACE + _DUCK_STRUCT,

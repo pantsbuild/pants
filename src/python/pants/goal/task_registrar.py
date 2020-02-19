@@ -10,18 +10,18 @@ from pants.goal.goal import Goal
 
 class TaskRegistrar:
     """
-  :API: public
-  """
+    :API: public
+    """
 
     def __init__(self, name, action, dependencies=None, serialize=True):
         """
-    :param name: the name of the task.
-    :param action: the Task action object to invoke this task.
-    :param dependencies: DEPRECATED
-      the names of other goals which must be achieved before invoking this task's goal.
-    :param serialize: a flag indicating whether or not the action to achieve this goal requires
-      the global lock. If true, the action will block until it can acquire the lock.
-    """
+        :param name: the name of the task.
+        :param action: the Task action object to invoke this task.
+        :param dependencies: DEPRECATED
+          the names of other goals which must be achieved before invoking this task's goal.
+        :param serialize: a flag indicating whether or not the action to achieve this goal requires
+          the global lock. If true, the action will block until it can acquire the lock.
+        """
         self.serialize = serialize
         self.name = name
         self._task = action
@@ -53,8 +53,8 @@ class TaskRegistrar:
     @property
     def task_type(self):
         """
-    :API: public
-    """
+        :API: public
+        """
         return self._task
 
     def install(self, goal=None, first=False, replace=False, before=None, after=None):

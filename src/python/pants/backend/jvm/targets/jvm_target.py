@@ -49,47 +49,47 @@ class JvmTarget(Target, Jarable):
         **kwargs
     ):
         """
-    :API: public
+        :API: public
 
-    :param excludes: List of `exclude <#exclude>`_\\s to filter this target's
-      transitive dependencies against.
-    :param sources: Source code files to build. Paths are relative to the BUILD
-      file's directory.
-    :type sources: ``Fileset`` (from globs or rglobs) or list of strings
-    :param services: A dict mapping service interface names to the classes owned by this target
-                     that implement them.  Keys are fully qualified service class names, values are
-                     lists of strings, each string the fully qualified class name of a class owned
-                     by this target that implements the service interface and should be
-                     discoverable by the jvm service provider discovery mechanism described here:
-                     https://docs.oracle.com/javase/6/docs/api/java/util/ServiceLoader.html
-    :param str platform: The name of the platform (defined under the jvm-platform subsystem) to use
-                         for compilation (that is, a key into the --jvm-platform-platforms
-                         dictionary). If unspecified, the platform will default to the first one of
-                         these that exist: (1) the default_platform specified for jvm-platform,
-                         (2) a platform constructed from whatever java version is returned by
-                         DistributionLocator.cached().version.
-    :param bool strict_deps: When True, only the directly declared deps of the target will be used
-                             at compilation time. This enforces that all direct deps of the target
-                             are declared, and can improve compilation speed due to smaller
-                             classpaths. Transitive deps are always provided at runtime.
-    :param list exports: A list of exported targets, which will be accessible to dependents even
-                         with strict_deps turned on. A common use case is for library targets to
-                         to export dependencies that it knows its dependents will need. Then any
-                         dependents of that library target will have access to those dependencies
-                         even when strict_deps is True. Note: exports is transitive, which means
-                         dependents have access to the closure of exports. An example will be that
-                         if A exports B, and B exports C, then any targets that depends on A will
-                         have access to both B and C.
-    :param list compiler_option_sets: A list of compiler_option_sets keys for the target. Platform
-      dependent.
-    :param bool zinc_file_manager: Whether to use zinc provided file manager that allows
-                                   transactional rollbacks, but in certain cases may conflict with
-                                   user libraries.
-    :param javac_plugins: names of compiler plugins to use when compiling this target with javac.
-    :param dict javac_plugin_args: Map from javac plugin name to list of arguments for that plugin.
-    :param scalac_plugins: names of compiler plugins to use when compiling this target with scalac.
-    :param dict scalac_plugin_args: Map from scalac plugin name to list of arguments for that plugin.
-    """
+        :param excludes: List of `exclude <#exclude>`_\\s to filter this target's
+          transitive dependencies against.
+        :param sources: Source code files to build. Paths are relative to the BUILD
+          file's directory.
+        :type sources: ``Fileset`` (from globs or rglobs) or list of strings
+        :param services: A dict mapping service interface names to the classes owned by this target
+                         that implement them.  Keys are fully qualified service class names, values are
+                         lists of strings, each string the fully qualified class name of a class owned
+                         by this target that implements the service interface and should be
+                         discoverable by the jvm service provider discovery mechanism described here:
+                         https://docs.oracle.com/javase/6/docs/api/java/util/ServiceLoader.html
+        :param str platform: The name of the platform (defined under the jvm-platform subsystem) to use
+                             for compilation (that is, a key into the --jvm-platform-platforms
+                             dictionary). If unspecified, the platform will default to the first one of
+                             these that exist: (1) the default_platform specified for jvm-platform,
+                             (2) a platform constructed from whatever java version is returned by
+                             DistributionLocator.cached().version.
+        :param bool strict_deps: When True, only the directly declared deps of the target will be used
+                                 at compilation time. This enforces that all direct deps of the target
+                                 are declared, and can improve compilation speed due to smaller
+                                 classpaths. Transitive deps are always provided at runtime.
+        :param list exports: A list of exported targets, which will be accessible to dependents even
+                             with strict_deps turned on. A common use case is for library targets to
+                             to export dependencies that it knows its dependents will need. Then any
+                             dependents of that library target will have access to those dependencies
+                             even when strict_deps is True. Note: exports is transitive, which means
+                             dependents have access to the closure of exports. An example will be that
+                             if A exports B, and B exports C, then any targets that depends on A will
+                             have access to both B and C.
+        :param list compiler_option_sets: A list of compiler_option_sets keys for the target. Platform
+          dependent.
+        :param bool zinc_file_manager: Whether to use zinc provided file manager that allows
+                                       transactional rollbacks, but in certain cases may conflict with
+                                       user libraries.
+        :param javac_plugins: names of compiler plugins to use when compiling this target with javac.
+        :param dict javac_plugin_args: Map from javac plugin name to list of arguments for that plugin.
+        :param scalac_plugins: names of compiler plugins to use when compiling this target with scalac.
+        :param dict scalac_plugin_args: Map from scalac plugin name to list of arguments for that plugin.
+        """
 
         self.address = address  # Set in case a TargetDefinitionException is thrown early
         payload = payload or Payload()

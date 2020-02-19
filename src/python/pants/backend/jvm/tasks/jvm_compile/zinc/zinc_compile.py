@@ -324,11 +324,11 @@ class BaseZincCompile(JvmCompile):
         if isinstance(target, ScalacPlugin):
             result[_SCALAC_PLUGIN_INFO_FILE] = textwrap.dedent(
                 """
-          <plugin>
-            <name>{}</name>
-            <classname>{}</classname>
-          </plugin>
-        """.format(
+                <plugin>
+                  <name>{}</name>
+                  <classname>{}</classname>
+                </plugin>
+                """.format(
                     target.plugin, target.classname
                 )
             )

@@ -162,13 +162,13 @@ class TestSetupPy(SetupPyTestBase):
             name="foo",
             provides=dedent(
                 """
-      setup_py(
-        name='foo',
-        version='0.0.0'
-      ).with_binaries(
-        foo_binary='foo/bin'
-      )
-      """
+                setup_py(
+                    name='foo',
+                    version='0.0.0'
+                ).with_binaries(
+                    foo_binary='foo/bin'
+                )
+                """
             ),
         )
 
@@ -190,11 +190,11 @@ class TestSetupPy(SetupPyTestBase):
             name="dep",
             provides=dedent(
                 """
-      setup_py(
-        name='bar_bin_dep',
-        version='0.0.0'
-      )
-      """
+                setup_py(
+                    name='bar_bin_dep',
+                    version='0.0.0'
+                )
+                """
             ),
         )
 
@@ -207,13 +207,13 @@ class TestSetupPy(SetupPyTestBase):
             name="bar",
             provides=dedent(
                 """
-      setup_py(
-        name='bar',
-        version='0.0.0'
-      ).with_binaries(
-        bar_binary='bar/bin'
-      )
-      """
+                setup_py(
+                  name='bar',
+                  version='0.0.0'
+                ).with_binaries(
+                  bar_binary='bar/bin'
+                )
+                """
             ),
         )
 
@@ -257,14 +257,14 @@ class TestSetupPy(SetupPyTestBase):
             name="pants_packaged",
             provides=dedent(
                 """
-      setup_py(
-        name='pants_packaged',
-        version='0.0.0'
-      ).with_binaries(
-        # Should be stripped in reduced_dependencies since pants_packaged provides this.
-        pants_bin='src/python/pants/bin'
-      )
-      """
+                setup_py(
+                  name='pants_packaged',
+                  version='0.0.0'
+                ).with_binaries(
+                  # Should be stripped in reduced_dependencies since pants_packaged provides this.
+                  pants_bin='src/python/pants/bin'
+                )
+                """
             ),
         )
         contrib_lib = self.create_python_library(
@@ -281,11 +281,11 @@ class TestSetupPy(SetupPyTestBase):
             name="plugin",
             provides=dedent(
                 """
-      setup_py(
-        name='contrib',
-        version='0.0.0'
-      )
-      """
+                setup_py(
+                  name='contrib',
+                  version='0.0.0'
+                )
+                """
             ),
             dependencies=[
                 "contrib/lib/src/python/pants/contrib/lib",
@@ -311,11 +311,11 @@ class TestSetupPy(SetupPyTestBase):
             dependencies=["foo"],
             provides=dedent(
                 """
-      setup_py(
-        name='bar',
-        version='0.0.0'
-      )
-      """
+                setup_py(
+                  name='bar',
+                  version='0.0.0'
+                )
+                """
             ),
         )
         # `foo` is not in `bar`'s address space and has no owner in its own address space.
@@ -328,27 +328,27 @@ class TestSetupPy(SetupPyTestBase):
             "foo",
             dedent(
                 """
-    python_library(
-      name='foo1',
-      dependencies=[
-        'foo/bar'
-      ],
-      provides=setup_py(
-        name='foo1',
-        version='0.0.0'
-      )
-    )
-    python_library(
-      name='foo2',
-      dependencies=[
-        'foo/bar'
-      ],
-      provides=setup_py(
-        name='foo2',
-        version='0.0.0'
-      )
-    )
-    """
+                python_library(
+                  name='foo1',
+                  dependencies=[
+                    'foo/bar'
+                  ],
+                  provides=setup_py(
+                    name='foo1',
+                    version='0.0.0'
+                  )
+                )
+                python_library(
+                  name='foo2',
+                  dependencies=[
+                    'foo/bar'
+                  ],
+                  provides=setup_py(
+                    name='foo2',
+                    version='0.0.0'
+                  )
+                )
+                """
             ),
         )
 
@@ -394,23 +394,23 @@ class TestSetupPy(SetupPyTestBase):
             "src/python/monster",
             dedent(
                 """
-      python_library(
-        name='conway',
-        sources=['__init__.py', 'research_programme.py'],
-        dependencies=[
-          ':j-function',
-        ],
-        provides=setup_py(
-          name='monstrous.moonshine',
-          version='0.0.0',
-        )
-      )
-
-      resources(
-        name='j-function',
-        sources=['j-function.res']
-      )
-      """
+                python_library(
+                  name='conway',
+                  sources=['__init__.py', 'research_programme.py'],
+                  dependencies=[
+                    ':j-function',
+                  ],
+                  provides=setup_py(
+                    name='monstrous.moonshine',
+                    version='0.0.0',
+                  )
+                )
+        
+                resources(
+                  name='j-function',
+                  sources=['j-function.res']
+                )
+                """
             ),
         )
         conway = self.target("src/python/monster:conway")
@@ -453,23 +453,23 @@ class TestSetupPy(SetupPyTestBase):
             "src/python/monster",
             dedent(
                 """
-      python_library(
-        name='conway',
-        sources=['__init__.py', 'research_programme.py'],
-        dependencies=[
-          ':group_res',
-        ],
-        provides=setup_py(
-          name='monstrous.moonshine',
-          version='0.0.0',
-        )
-      )
-
-      resources(
-        name='group_res',
-        sources=['group.res']
-      )
-      """
+                python_library(
+                  name='conway',
+                  sources=['__init__.py', 'research_programme.py'],
+                  dependencies=[
+                    ':group_res',
+                  ],
+                  provides=setup_py(
+                    name='monstrous.moonshine',
+                    version='0.0.0',
+                  )
+                )
+        
+                resources(
+                  name='group_res',
+                  sources=['group.res']
+                )
+                """
             ),
         )
         conway = self.target("src/python/monster:conway")
@@ -511,26 +511,26 @@ class TestSetupPy(SetupPyTestBase):
             "build-support/thrift",
             dedent(
                 """
-                           prep_command(
-                             name='prepare_binary_compile',
-                             goals=['compile'],
-                             prep_executable='/bin/true',
-                           )
+                prep_command(
+                  name='prepare_binary_compile',
+                  goals=['compile'],
+                  prep_executable='/bin/true',
+                )
 
-                           prep_command(
-                             name='prepare_binary_test',
-                             goals=['test'],
-                             prep_executable='/bin/true',
-                           )
+                prep_command(
+                  name='prepare_binary_test',
+                  goals=['test'],
+                  prep_executable='/bin/true',
+                )
 
-                           target(
-                             name='prepare_binary',
-                             dependencies=[
-                               ':prepare_binary_compile',
-                               ':prepare_binary_test',
-                             ],
-                           )
-                           """
+                target(
+                  name='prepare_binary',
+                  dependencies=[
+                    ':prepare_binary_compile',
+                    ':prepare_binary_test',
+                  ],
+                )
+                """
             ),
         )
         prepare_binary_compile = self.make_target(

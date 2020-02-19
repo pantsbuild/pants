@@ -33,31 +33,31 @@ class NativeCompileTestMixin:
             "src/cpp/test/test.hpp",
             contents=dedent(
                 """
-      #ifndef __TEST_HPP__
-      #define __TEST_HPP__
+                #ifndef __TEST_HPP__
+                #define __TEST_HPP__
 
-      int test(int);
+                int test(int);
 
-      extern "C" int test_exported(int);
+                extern "C" int test_exported(int);
 
-      #endif
-    """
+                #endif
+                """
             ),
         )
         self.create_file(
             "src/cpp/test/test.cpp",
             contents=dedent(
                 """
-      #include "test.hpp"
+                #include "test.hpp"
 
-      int test(int x) {
-        return x / 137;
-      }
+                int test(int x) {
+                  return x / 137;
+                }
 
-      extern "C" int test_exported(int x) {
-        return test(x * 42);
-      }
-    """
+                extern "C" int test_exported(int x) {
+                  return test(x * 42);
+                }
+                """
             ),
         )
         return self.make_target(

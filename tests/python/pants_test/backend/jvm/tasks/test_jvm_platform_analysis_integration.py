@@ -58,29 +58,29 @@ class JvmPlatformAnalysisIntegrationTest(PantsRunIntegrationTest):
     def _good_one_two(self):
         return dedent(
             """
-      java_library(name='one',
-        platform='java8',
-      )
+            java_library(name='one',
+              platform='java8',
+            )
 
-      java_library(name='two',
-        platform='java9',
-      )
-    """
+            java_library(name='two',
+              platform='java9',
+            )
+            """
         )
 
     @property
     def _bad_one_two(self):
         return dedent(
             """
-      java_library(name='one',
-        platform='java8',
-        dependencies=[':two'],
-      )
+            java_library(name='one',
+              platform='java8',
+              dependencies=[':two'],
+            )
 
-      java_library(name='two',
-        platform='java9',
-      )
-    """
+            java_library(name='two',
+              platform='java9',
+            )
+            """
         )
 
     def test_good_targets_works_fresh(self):

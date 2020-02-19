@@ -23,13 +23,13 @@ class CCompileTest(NativeTaskTestBase, NativeCompileTestMixin):
             f"src/c/test/{header_filename}",
             contents=dedent(
                 """
-      #ifndef __TEST_H__
-      #define __TEST_H__
+                #ifndef __TEST_H__
+                #define __TEST_H__
 
-      int test(int);
+                int test(int);
 
-      #endif
-"""
+                #endif
+                """
             ),
         )
         return self.make_target(
@@ -41,25 +41,25 @@ class CCompileTest(NativeTaskTestBase, NativeCompileTestMixin):
             "src/c/test/test.h",
             contents=dedent(
                 """
-      #ifndef __TEST_H__
-      #define __TEST_H__
+                #ifndef __TEST_H__
+                #define __TEST_H__
 
-      int test(int);
+                int test(int);
 
-      #endif
-    """
+                #endif
+                """
             ),
         )
         self.create_file(
             "src/c/test/test.c",
             contents=dedent(
                 """
-      #include "test.h"
+                #include "test.h"
 
-      int test(int x) {
-        return x / 137;
-      }
-    """
+                int test(int x) {
+                  return x / 137;
+                }
+                """
             ),
         )
         return self.make_target(

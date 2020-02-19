@@ -225,55 +225,55 @@ class ExportTest(ConsoleTaskTestBase):
         self.add_to_build_file(
             "src/python/x/BUILD",
             """
-       python_library(name="x", sources=globs("*.py"))
-    """.strip(),
+            python_library(name="x", sources=globs("*.py"))
+            """.strip(),
         )
 
         self.add_to_build_file(
             "src/python/y/BUILD",
             dedent(
                 """
-      python_library(name="y", sources=rglobs("*.py"))
-      python_library(name="y2", sources=rglobs("subdir/*.py"))
-      python_library(name="y3", sources=rglobs("Test*.py"))
-    """
+                python_library(name="y", sources=rglobs("*.py"))
+                python_library(name="y2", sources=rglobs("subdir/*.py"))
+                python_library(name="y3", sources=rglobs("Test*.py"))
+                """
             ),
         )
 
         self.add_to_build_file(
             "src/python/z/BUILD",
             """
-      python_library(name="z", sources=zglobs("**/*.py"))
-    """.strip(),
+            python_library(name="z", sources=zglobs("**/*.py"))
+            """.strip(),
         )
 
         self.add_to_build_file(
             "src/python/exclude/BUILD",
             """
-      python_library(name="exclude", sources=globs("*.py", exclude=[['foo.py']]))
-    """.strip(),
+            python_library(name="exclude", sources=globs("*.py", exclude=[['foo.py']]))
+            """.strip(),
         )
 
         self.add_to_build_file(
             "src/BUILD",
             """
-      target(name="alias")
-    """.strip(),
+            target(name="alias")
+            """.strip(),
         )
 
         self.add_to_build_file(
             "src/python/has_reqs/BUILD",
             textwrap.dedent(
                 """
-       python_library(name="has_reqs", sources=globs("*.py"), dependencies=[':six'])
+                python_library(name="has_reqs", sources=globs("*.py"), dependencies=[':six'])
 
-       python_requirement_library(
-         name='six',
-         requirements=[
-           python_requirement('six==1.9.0')
-         ]
-       )
-    """
+                python_requirement_library(
+                    name='six',
+                    requirements=[
+                        python_requirement('six==1.9.0')
+                    ]
+                )
+                """
             ),
         )
 
@@ -549,9 +549,9 @@ class ExportTest(ConsoleTaskTestBase):
                 fp.write(
                     textwrap.dedent(
                         """
-          #!/bin/sh
-          echo java.version={version}
-        """.format(
+                        #!/bin/sh
+                        echo java.version={version}
+                        """.format(
                             version=version
                         )
                     ).strip()

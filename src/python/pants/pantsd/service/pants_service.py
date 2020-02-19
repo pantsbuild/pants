@@ -213,14 +213,14 @@ class PantsServices:
         lifecycle_lock=None,
     ) -> None:
         """
-    :param port_map: A dict of (port_name -> port_info) for named ports hosted by the services.
-    :param lifecycle_lock: A lock to guard lifecycle changes for the services. This can be used by
-                           individual services to safeguard daemon-synchronous sections that should
-                           be protected from abrupt teardown. Notably, this lock is currently
-                           acquired for an entire pailgun request (by PailgunServer). NB: This is a
-                           `threading.RLock` instance, but the constructor for RLock is an alias for
-                           a native function, rather than an actual type.
-    """
+        :param port_map: A dict of (port_name -> port_info) for named ports hosted by the services.
+        :param lifecycle_lock: A lock to guard lifecycle changes for the services. This can be used by
+                               individual services to safeguard daemon-synchronous sections that should
+                               be protected from abrupt teardown. Notably, this lock is currently
+                               acquired for an entire pailgun request (by PailgunServer). NB: This is a
+                               `threading.RLock` instance, but the constructor for RLock is an alias for
+                               a native function, rather than an actual type.
+        """
         self.services = services or tuple()
         self.port_map = port_map or dict()
         self.lifecycle_lock = lifecycle_lock or threading.RLock()

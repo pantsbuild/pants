@@ -74,12 +74,12 @@ class PythonBinaryCreateTest(PythonTaskTestBase):
             {
                 "lib.py": dedent(
                     """
-    import os
-
-
-    def main():
-      os.getcwd()
-    """
+                    import os
+                
+                
+                    def main():
+                      os.getcwd()
+                    """
                 )
             },
         )
@@ -98,17 +98,17 @@ class PythonBinaryCreateTest(PythonTaskTestBase):
             {
                 "lib.py": dedent(
                     """
-    import io
-    import os
-    import sys
-
-
-    def main():
-      here = os.path.dirname(__file__)
-      loose_file = os.path.join(here, '../src/things/loose_file')
-      with io.open(os.path.realpath(loose_file), 'r') as fp:
-        sys.stdout.write(fp.read())
-    """
+                    import io
+                    import os
+                    import sys
+                
+                
+                    def main():
+                      here = os.path.dirname(__file__)
+                      loose_file = os.path.join(here, '../src/things/loose_file')
+                      with io.open(os.path.realpath(loose_file), 'r') as fp:
+                        sys.stdout.write(fp.read())
+                    """
                 )
             },
         )
@@ -125,9 +125,9 @@ class PythonBinaryCreateTest(PythonTaskTestBase):
             {
                 "lib.py": dedent(
                     """
-    def main():
-      print('Hello World!')
-    """
+                    def main():
+                      print('Hello World!')
+                    """
                 )
             },
         )

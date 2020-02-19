@@ -140,8 +140,8 @@ class RunTracker(Subsystem):
 
     def __init__(self, *args, **kwargs):
         """
-    :API: public
-    """
+        :API: public
+        """
         super().__init__(*args, **kwargs)
         self._run_timestamp = time.time()
         self._cmd_line = " ".join(["pants"] + sys.argv[1:])

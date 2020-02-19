@@ -30,10 +30,10 @@ class FilemapTest(ConsoleTaskTestBase):
                 path,
                 dedent(
                     """
-          python_library(name='{name}',
-            sources=[{sources}]
-          )
-          """.format(
+                    python_library(name='{name}',
+                      sources=[{sources}]
+                    )
+                    """.format(
                         name=name, sources=",".join(repr(f) for f in files)
                     )
                 ),

@@ -36,15 +36,15 @@ class EXE:
     def contents(self, java_home):
         return textwrap.dedent(
             """
-        #!/bin/sh
-        if [ $# -ne 3 ]; then
-          # Sanity check a classpath switch with a value plus the classname for main
-          echo "Expected 3 arguments, got $#: $@" >&2
-          exit 1
-        fi
-        echo "java.home={}"
-        {}
-      """.format(
+            #!/bin/sh
+            if [ $# -ne 3 ]; then
+              # Sanity check a classpath switch with a value plus the classname for main
+              echo "Expected 3 arguments, got $#: $@" >&2
+              exit 1
+            fi
+            echo "java.home={}"
+            {}
+            """.format(
                 java_home, 'echo "java.version={}"'.format(self._version) if self._version else ""
             )
         ).strip()
@@ -337,24 +337,24 @@ class DistributionOSXLocationTest(unittest.TestCase):
                     osx_java_home_exe.write(
                         textwrap.dedent(
                             """
-                #!/bin/sh
-                echo '<?xml version="1.0" encoding="UTF-8"?>
-                <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
-                                       "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-                <plist version="1.0">
-                <array>
-                  <dict>
-                    <key>JVMHomePath</key>
-                    <string>{jdk1_home}</string>
-                  </dict>
-                  <dict>
-                    <key>JVMHomePath</key>
-                    <string>{jdk2_home}</string>
-                  </dict>
-                </array>
-                </plist>
-                '
-              """.format(
+                            #!/bin/sh
+                            echo '<?xml version="1.0" encoding="UTF-8"?>
+                            <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+                                                   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+                            <plist version="1.0">
+                            <array>
+                              <dict>
+                                <key>JVMHomePath</key>
+                                <string>{jdk1_home}</string>
+                              </dict>
+                              <dict>
+                                <key>JVMHomePath</key>
+                                <string>{jdk2_home}</string>
+                              </dict>
+                            </array>
+                            </plist>
+                            '
+                            """.format(
                                 jdk1_home=jdk1_home, jdk2_home=jdk2_home
                             )
                         ).strip()

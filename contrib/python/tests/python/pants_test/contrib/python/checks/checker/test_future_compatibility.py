@@ -8,12 +8,12 @@ from pants.contrib.python.checks.checker.future_compatibility import FutureCompa
 
 BAD_CLASS = PythonFile.from_statement(
     """
-class Distiller(object):
-  CONSTANT = "foo"
+    class Distiller(object):
+      CONSTANT = "foo"
 
-  def foo(self, value):
-    return os.path.join(Distiller.CONSTANT, value)
-"""
+      def foo(self, value):
+        return os.path.join(Distiller.CONSTANT, value)
+    """
 )
 
 
@@ -31,18 +31,18 @@ class FutureCompatibilityTest(CheckstylePluginTestBase):
             "T603",
             Nit.ERROR,
             """
-      for k in range(5):
-        pass
-      for k in xrange(10):
-        pass
-    """,
+            for k in range(5):
+              pass
+            for k in xrange(10):
+              pass
+            """,
         )
 
         self.exemplar_pass(
             """
-      for k in obj.xrange(10):
-        pass
-    """
+            for k in obj.xrange(10):
+              pass
+            """
         )
 
     def test_iters(self):
@@ -51,12 +51,12 @@ class FutureCompatibilityTest(CheckstylePluginTestBase):
                 "T602",
                 Nit.ERROR,
                 """
-        d = {1: 2, 2: 3, 3: 4}
-        for k in d.%s():
-          pass
-        for k in d.values():
-          pass
-      """
+                d = {1: 2, 2: 3, 3: 4}
+                for k in d.%s():
+                  pass
+                for k in d.values():
+                  pass
+                """
                 % function_name,
             )
 
@@ -66,11 +66,11 @@ class FutureCompatibilityTest(CheckstylePluginTestBase):
                 "T604",
                 Nit.ERROR,
                 """
-        if isinstance(k, %s):
-          pass
-        if isinstance(k, str):
-          pass
-      """
+                if isinstance(k, %s):
+                  pass
+                if isinstance(k, str):
+                  pass
+                """
                 % class_name,
             )
 
@@ -79,11 +79,11 @@ class FutureCompatibilityTest(CheckstylePluginTestBase):
             "T605",
             Nit.WARNING,
             """
-      class Singleton(object):
-        __metaclass__ = SingletonMetaclass
-        CONSTANT = 2 + 3
+            class Singleton(object):
+              __metaclass__ = SingletonMetaclass
+              CONSTANT = 2 + 3
 
-        def __init__(self):
-          pass
-    """,
+              def __init__(self):
+                pass
+            """,
         )

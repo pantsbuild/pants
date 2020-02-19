@@ -173,38 +173,38 @@ class TestParseFailedTargets(unittest.TestCase):
             with open(os.path.join(junit_xml_dir, "TEST-a.xml"), "w") as fp:
                 fp.write(
                     """
-        <testsuite failures="1" errors="1">
-          <testcase classname="org.pantsbuild.Green" name="testOK"/>
-          <testcase classname="org.pantsbuild.Failure" name="testFailure">
-            <failure/>
-          </testcase>
-          <testcase classname="org.pantsbuild.Error" name="testError">
-            <error/>
-          </testcase>
-        </testsuite>
-        """
+                    <testsuite failures="1" errors="1">
+                      <testcase classname="org.pantsbuild.Green" name="testOK"/>
+                      <testcase classname="org.pantsbuild.Failure" name="testFailure">
+                        <failure/>
+                      </testcase>
+                      <testcase classname="org.pantsbuild.Error" name="testError">
+                        <error/>
+                      </testcase>
+                    </testsuite>
+                    """
                 )
             with open(os.path.join(junit_xml_dir, "TEST-b.xml"), "w") as fp:
                 fp.write(
                     """
-        <testsuite failures="0" errors="1">
-          <testcase classname="org.pantsbuild.AnotherError" name="testAnotherError">
-            <error/>
-          </testcase>
-        </testsuite>
-        """
+                    <testsuite failures="0" errors="1">
+                      <testcase classname="org.pantsbuild.AnotherError" name="testAnotherError">
+                        <error/>
+                      </testcase>
+                    </testsuite>
+                    """
                 )
             with open(os.path.join(junit_xml_dir, "random.xml"), "w") as fp:
                 fp.write("<invalid></xml>")
             with safe_open(os.path.join(junit_xml_dir, "subdir", "TEST-c.xml"), "w") as fp:
                 fp.write(
                     """
-        <testsuite failures="1" errors="0">
-          <testcase classname="org.pantsbuild.subpackage.AnotherFailure" name="testAnotherFailue">
-            <failure/>
-          </testcase>
-        </testsuite>
-        """
+                    <testsuite failures="1" errors="0">
+                      <testcase classname="org.pantsbuild.subpackage.AnotherFailure" name="testAnotherFailue">
+                        <failure/>
+                      </testcase>
+                    </testsuite>
+                    """
                 )
 
             failed_targets = parse_failed_targets(registry, junit_xml_dir, self._raise_handler)
@@ -242,12 +242,12 @@ class TestParseFailedTargets(unittest.TestCase):
             with open(os.path.join(junit_xml_dir, "TEST-good.xml"), "w") as fp:
                 fp.write(
                     """
-        <testsuite failures="0" errors="1">
-          <testcase classname="org.pantsbuild.Error" name="testError">
-            <error/>
-          </testcase>
-        </testsuite>
-        """
+                    <testsuite failures="0" errors="1">
+                      <testcase classname="org.pantsbuild.Error" name="testError">
+                        <error/>
+                      </testcase>
+                    </testsuite>
+                    """
                 )
             bad_file2 = os.path.join(junit_xml_dir, "TEST-bad2.xml")
             with open(bad_file2, "w") as fp:

@@ -36,8 +36,8 @@ class JarDependencyParseContextWrapper:
 
     def __init__(self, parse_context):
         """
-    :param parse_context: The BUILD file parse context.
-    """
+        :param parse_context: The BUILD file parse context.
+        """
         self._parse_context = parse_context
 
     def __call__(
@@ -55,27 +55,27 @@ class JarDependencyParseContextWrapper:
         excludes=None,
     ):
         """
-    :param string org: The Maven ``groupId`` of this dependency.
-    :param string name: The Maven ``artifactId`` of this dependency.
-    :param string rev: The Maven ``version`` of this dependency.
-      If unspecified the latest available version is used.
-    :param boolean force: Force this specific artifact revision even if other transitive
-      dependencies specify a different revision. This requires specifying the ``rev`` parameter.
-    :param string ext: Extension of the artifact if different from the artifact type.
-      This is sometimes needed for artifacts packaged with Maven bundle type but stored as jars.
-    :param string url: URL of this artifact, if different from the Maven repo standard location
-      (specifying this parameter is unusual). Path of file URL can be either absolute or relative
-      to the belonging BUILD file.
-    :param string apidocs: URL of existing javadocs, which if specified, pants-generated javadocs
-      will properly hyperlink {\\ @link}s.
-    :param string classifier: Classifier specifying the artifact variant to use.
-    :param boolean mutable: Inhibit caching of this mutable artifact. A common use is for
-      Maven -SNAPSHOT style artifacts in an active development/integration cycle.
-    :param boolean intransitive: Declares this Dependency intransitive, indicating only the jar for
-      the dependency itself should be downloaded and placed on the classpath
-    :param list excludes: Transitive dependencies of this jar to exclude.
-    :type excludes: list of :class:`pants.backend.jvm.targets.exclude.Exclude`
-    """
+        :param string org: The Maven ``groupId`` of this dependency.
+        :param string name: The Maven ``artifactId`` of this dependency.
+        :param string rev: The Maven ``version`` of this dependency.
+          If unspecified the latest available version is used.
+        :param boolean force: Force this specific artifact revision even if other transitive
+          dependencies specify a different revision. This requires specifying the ``rev`` parameter.
+        :param string ext: Extension of the artifact if different from the artifact type.
+          This is sometimes needed for artifacts packaged with Maven bundle type but stored as jars.
+        :param string url: URL of this artifact, if different from the Maven repo standard location
+          (specifying this parameter is unusual). Path of file URL can be either absolute or relative
+          to the belonging BUILD file.
+        :param string apidocs: URL of existing javadocs, which if specified, pants-generated javadocs
+          will properly hyperlink {\\ @link}s.
+        :param string classifier: Classifier specifying the artifact variant to use.
+        :param boolean mutable: Inhibit caching of this mutable artifact. A common use is for
+          Maven -SNAPSHOT style artifacts in an active development/integration cycle.
+        :param boolean intransitive: Declares this Dependency intransitive, indicating only the jar for
+          the dependency itself should be downloaded and placed on the classpath
+        :param list excludes: Transitive dependencies of this jar to exclude.
+        :type excludes: list of :class:`pants.backend.jvm.targets.exclude.Exclude`
+        """
         return JarDependency(
             org,
             name,

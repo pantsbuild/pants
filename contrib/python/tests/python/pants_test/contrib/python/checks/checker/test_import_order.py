@@ -121,8 +121,8 @@ class ImportOrderTest(CheckstylePluginTestBase):
 
         io = self.get_plugin(
             """
-      import io, pkg_resources
-    """
+            import io, pkg_resources
+            """
         )
         import_chunks = list(io.iter_import_chunks())
         self.assertEqual(1, len(import_chunks))
@@ -136,12 +136,12 @@ class ImportOrderTest(CheckstylePluginTestBase):
 
     def test_import_lexical_order(self):
         imp = """
-      from twitter.common.dirutil import safe_rmtree, safe_mkdtemp
-    """
+        from twitter.common.dirutil import safe_rmtree, safe_mkdtemp
+        """
         self.assertNit(imp, "T401")
 
     def test_import_wildcard(self):
         imp = """
-      from twitter.common.dirutil import *
-    """
+        from twitter.common.dirutil import *
+        """
         self.assertNit(imp, "T400")

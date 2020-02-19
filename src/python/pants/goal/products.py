@@ -12,8 +12,8 @@ from pants.util.dirutil import fast_relpath
 
 class ProductError(Exception):
     """
-  :API: public
-  """
+    :API: public
+    """
 
     pass
 
@@ -28,8 +28,8 @@ class UnionProducts:
 
     def __init__(self, products_by_target=None):
         """
-    :API: public
-    """
+        :API: public
+        """
         # A map of target to OrderedSet of product members.
         self._products_by_target = products_by_target or defaultdict(OrderedSet)
 
@@ -144,40 +144,40 @@ class RootedProducts:
 
     def __init__(self, root):
         """
-    :API: public
-    """
+        :API: public
+        """
         self._root = root
         self._rel_paths = OrderedSet()
 
     def add_abs_paths(self, abs_paths):
         """
-    :API: public
-    """
+        :API: public
+        """
         for abs_path in abs_paths:
             self._rel_paths.add(fast_relpath(abs_path, self._root))
 
     def add_rel_paths(self, rel_paths):
         """
-    :API: public
-    """
+        :API: public
+        """
         self._rel_paths.update(rel_paths)
 
     def root(self):
         """
-    :API: public
-    """
+        :API: public
+        """
         return self._root
 
     def rel_paths(self):
         """
-    :API: public
-    """
+        :API: public
+        """
         return self._rel_paths
 
     def abs_paths(self):
         """
-    :API: public
-    """
+        :API: public
+        """
         for relpath in self._rel_paths:
             yield os.path.join(self._root, relpath)
 
@@ -193,33 +193,33 @@ class MultipleRootedProducts:
 
     def __init__(self):
         """
-    :API: public
-    """
+        :API: public
+        """
         self._rooted_products_by_root = factory_dict(RootedProducts)
 
     def add_rel_paths(self, root, rel_paths):
         """
-    :API: public
-    """
+        :API: public
+        """
         self._get_products_for_root(root).add_rel_paths(rel_paths)
 
     def add_abs_paths(self, root, abs_paths):
         """
-    :API: public
-    """
+        :API: public
+        """
         self._get_products_for_root(root).add_abs_paths(abs_paths)
 
     def rel_paths(self):
         """
-    :API: public
-    """
+        :API: public
+        """
         for root, products in self._rooted_products_by_root.items():
             yield root, products.rel_paths()
 
     def abs_paths(self):
         """
-    :API: public
-    """
+        :API: public
+        """
         for root, products in self._rooted_products_by_root.items():
             yield root, products.abs_paths()
 
@@ -274,15 +274,15 @@ class Products:
 
         def __init__(self, typename):
             """
-      :API: public
-      """
+            :API: public
+            """
             self.typename = typename
             self.by_target = defaultdict(lambda: defaultdict(list))
 
         def empty(self):
             """
-      :API: public
-      """
+            :API: public
+            """
             return len(self.by_target) == 0
 
         def add(self, target, basedir, product_paths=None):

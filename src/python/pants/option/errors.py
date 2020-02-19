@@ -27,7 +27,7 @@ class RegistrationError(OptionsError):
 
 
 class BooleanOptionNameWithNo(RegistrationError):
-    """"Boolean option names cannot start with --no."""
+    """Boolean option names cannot start with --no."""
 
 
 class ImplicitValIsNone(RegistrationError):

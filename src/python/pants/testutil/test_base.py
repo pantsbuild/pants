@@ -289,8 +289,8 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     @classmethod
     def alias_groups(cls):
         """
-    :API: public
-    """
+        :API: public
+        """
         return BuildFileAliases(targets={"target": Target})
 
     @classmethod
@@ -307,8 +307,8 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
 
     def setUp(self):
         """
-    :API: public
-    """
+        :API: public
+        """
         super().setUp()
         # Avoid resetting the Runtracker here, as that is specific to fork'd process cleanup.
         clean_global_runtime_state(reset_subsystem=True)
@@ -484,10 +484,10 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         **kwargs,
     ):
         """
-    :API: public
+        :API: public
 
-    :param dict **kwargs: keyword arguments passed in to `create_options_for_optionables`.
-    """
+        :param dict **kwargs: keyword arguments passed in to `create_options_for_optionables`.
+        """
         # Many tests use source root functionality via the SourceRootConfig.global_instance().
         # (typically accessed via Target.target_base), so we always set it up, for convenience.
         for_subsystems = set(for_subsystems or ())
@@ -556,8 +556,8 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
 
     def tearDown(self):
         """
-    :API: public
-    """
+        :API: public
+        """
         super().tearDown()
         Subsystem.reset()
 
@@ -662,8 +662,8 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
 
     def create_resources(self, path, name, *sources):
         """
-    :API: public
-    """
+        :API: public
+        """
         return self.create_library(path, "resources", name, sources)
 
     def assertUnorderedPrefixEqual(self, expected, actual_iter):

@@ -61,11 +61,11 @@ class TestBinaryCreate(JvmBinaryTaskTestBase):
         self.add_to_build_file(
             "bar",
             """jvm_binary(
-  name = "bar-binary",
-  source = "Bar.java",
-  dependencies = ["3rdparty/jvm/org/example:foo"],
-  deploy_excludes = [exclude(org = "org.pantsbuild")],
-)""",
+              name = "bar-binary",
+              source = "Bar.java",
+              dependencies = ["3rdparty/jvm/org/example:foo"],
+              deploy_excludes = [exclude(org = "org.pantsbuild")],
+            )""",
         )
         binary_target = self.target("//bar:bar-binary")
         context = self.context(target_roots=[binary_target])

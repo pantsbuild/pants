@@ -12,9 +12,9 @@ class Repository:
 
     def __init__(self, name=None, url=None, push_db_basedir=None, **kwargs):
         """
-    :param string url: Optional URL of the repository.
-    :param string push_db_basedir: Push history file base directory.
-    """
+        :param string url: Optional URL of the repository.
+        :param string push_db_basedir: Push history file base directory.
+        """
         self.name = name
         self.url = url
         self.push_db_basedir = push_db_basedir

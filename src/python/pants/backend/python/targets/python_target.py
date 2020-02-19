@@ -24,25 +24,25 @@ class PythonTarget(Target):
         self, address=None, payload=None, sources=None, provides=None, compatibility=None, **kwargs
     ):
         """
-    :param dependencies: The addresses of targets that this target depends on.
-      These dependencies may
-      be ``python_library``-like targets (``python_library``,
-      ``python_thrift_library``, ``python_antlr_library`` and so forth) or
-      ``python_requirement_library`` targets.
-    :type dependencies: list of strings
-    :param sources: Files to "include". Paths are relative to the
-      BUILD file's directory.
-    :type sources: ``EagerFilesetWithSpec``
-    :param provides:
-      The `setup_py <#setup_py>`_ to publish that represents this
-      target outside the repo.
-    :param compatibility: either a string that represents interpreter compatibility for this target
-      using the Requirement-style format, e.g. ``'CPython>=2.7,<3'`` (Select a CPython interpreter
-      with version ``>=2.7`` AND version ``<3``) or a list of Requirement-style strings which will
-      be OR'ed together. If the compatibility requirement is agnostic to interpreter class, using
-      the example above, a Requirement-style compatibility constraint like '>=2.7,<3' (N.B.: not
-      prefixed with CPython) can be used.
-    """
+        :param dependencies: The addresses of targets that this target depends on.
+          These dependencies may
+          be ``python_library``-like targets (``python_library``,
+          ``python_thrift_library``, ``python_antlr_library`` and so forth) or
+          ``python_requirement_library`` targets.
+        :type dependencies: list of strings
+        :param sources: Files to "include". Paths are relative to the
+          BUILD file's directory.
+        :type sources: ``EagerFilesetWithSpec``
+        :param provides:
+          The `setup_py <#setup_py>`_ to publish that represents this
+          target outside the repo.
+        :param compatibility: either a string that represents interpreter compatibility for this target
+          using the Requirement-style format, e.g. ``'CPython>=2.7,<3'`` (Select a CPython interpreter
+          with version ``>=2.7`` AND version ``<3``) or a list of Requirement-style strings which will
+          be OR'ed together. If the compatibility requirement is agnostic to interpreter class, using
+          the example above, a Requirement-style compatibility constraint like '>=2.7,<3' (N.B.: not
+          prefixed with CPython) can be used.
+        """
         self.address = address
         payload = payload or Payload()
         payload.add_fields(

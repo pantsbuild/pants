@@ -47,10 +47,10 @@ def parse_expression(
         raise raise_type(
             dedent(
                 f"""\
-        The {get_name()} cannot be evaluated as a literal expression: {e!r}
-        Given raw value:
-        {format_raw_value()}
-        """
+                The {get_name()} cannot be evaluated as a literal expression: {e!r}
+                Given raw value:
+                {format_raw_value()}
+                """
             )
         )
 
@@ -72,10 +72,10 @@ def parse_expression(
         raise raise_type(
             dedent(
                 f"""\
-        The {get_name()} is not of the expected type(s): {expected_types}:
-        Given the following raw value that evaluated to type {format_type(type(parsed_value))}:
-        {format_raw_value()}
-        """
+                The {get_name()} is not of the expected type(s): {expected_types}:
+                Given the following raw value that evaluated to type {format_type(type(parsed_value))}:
+                {format_raw_value()}
+                """
             )
         )
     return parsed_value

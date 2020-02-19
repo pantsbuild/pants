@@ -65,8 +65,8 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
     @classmethod
     def implementation_version(cls):
         """
-    :API: public
-    """
+        :API: public
+        """
         return [("TaskBase", 2)]
 
     @classmethod

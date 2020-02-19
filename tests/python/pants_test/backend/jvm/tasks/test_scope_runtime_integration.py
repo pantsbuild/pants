@@ -134,20 +134,20 @@ class ScopeChangesCacheInvalidationIntegrationTest(PantsRunIntegrationTest):
                         f.write(
                             dedent(
                                 """
-              java_library(name='foo',
-                sources=['Foo.java'],
-              )
-              java_library(name='bar',
-                sources=['Bar.java'],
-                dependencies=[
-                  scoped(scope='{scope}', address=':foo'),
-                ],
-              )
-              jvm_binary(name='bin',
-                main='Foo',
-                dependencies=[':foo'],
-              )
-            """
+                                java_library(name='foo',
+                                  sources=['Foo.java'],
+                                )
+                                java_library(name='bar',
+                                  sources=['Bar.java'],
+                                  dependencies=[
+                                    scoped(scope='{scope}', address=':foo'),
+                                  ],
+                                )
+                                jvm_binary(name='bin',
+                                  main='Foo',
+                                  dependencies=[':foo'],
+                                )
+                                """
                             )
                             .strip()
                             .format(scope=scope)

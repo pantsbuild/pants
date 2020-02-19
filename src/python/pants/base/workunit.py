@@ -14,8 +14,8 @@ from pants.util.rwbuf import FileBackedRWBuf
 
 class WorkUnitLabel:
     """
-  :API: public
-  """
+    :API: public
+    """
 
     # Labels describing a workunit.  Reporting code can use this to decide how to display
     # information about this workunit.
@@ -49,8 +49,8 @@ class WorkUnitLabel:
     @memoized_method
     def keys(cls):
         """
-    :API: public
-    """
+        :API: public
+        """
         return [key for key in dir(cls) if not key.startswith("_") and key.isupper()]
 
 
@@ -90,16 +90,16 @@ class WorkUnit:
 
     def __init__(self, run_info_dir, parent, name, labels=None, cmd="", log_config=None):
         """
-    - run_info_dir: The path of the run_info_dir from the RunTracker that tracks this WorkUnit.
-    - parent: The containing workunit, if any. E.g., 'compile' might contain 'java', 'scala' etc.,
-              'scala' might contain 'compile', 'split' etc.
-    - name: A short name for this work. E.g., 'resolve', 'compile', 'scala', 'zinc'.
-    - labels: An optional iterable of labels. The reporters can use this to decide how to
-              display information about this work.
-    - cmd: An optional longer string representing this work.
-            E.g., the cmd line of a compiler invocation.
-    - log_config: An optional tuple of registered options affecting reporting output.
-    """
+        - run_info_dir: The path of the run_info_dir from the RunTracker that tracks this WorkUnit.
+        - parent: The containing workunit, if any. E.g., 'compile' might contain 'java', 'scala' etc.,
+                  'scala' might contain 'compile', 'split' etc.
+        - name: A short name for this work. E.g., 'resolve', 'compile', 'scala', 'zinc'.
+        - labels: An optional iterable of labels. The reporters can use this to decide how to
+                  display information about this work.
+        - cmd: An optional longer string representing this work.
+                E.g., the cmd line of a compiler invocation.
+        - log_config: An optional tuple of registered options affecting reporting output.
+        """
         self._outcome = WorkUnit.UNKNOWN
 
         self.run_info_dir = run_info_dir
@@ -138,8 +138,8 @@ class WorkUnit:
 
     def has_label(self, label):
         """
-    :API: public
-    """
+        :API: public
+        """
         return label in self.labels
 
     def start(self, start_time=None):
@@ -244,8 +244,8 @@ class WorkUnit:
 
     def root(self):
         """
-    :API: public
-    """
+        :API: public
+        """
         ret = self
         while ret.parent is not None:
             ret = ret.parent

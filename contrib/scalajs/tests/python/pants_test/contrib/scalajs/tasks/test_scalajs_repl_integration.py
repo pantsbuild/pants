@@ -18,10 +18,10 @@ class ScalaJSReplIntegrationTest(PantsRunIntegrationTest):
         ]
         program = dedent(
             """
-        var _ = require('factfinder');
-        var tenFactorial = org.pantsbuild.scalajs.example.factfinder.Factfinder().fact(10);
-        console.log(tenFactorial)
-      """
+            var _ = require('factfinder');
+            var tenFactorial = org.pantsbuild.scalajs.example.factfinder.Factfinder().fact(10);
+            console.log(tenFactorial)
+            """
         ).encode()
         pants_run = self.run_pants(command=command, stdin_data=program)
 

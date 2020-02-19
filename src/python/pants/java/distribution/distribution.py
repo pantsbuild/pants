@@ -42,15 +42,15 @@ def _parse_java_version(name, version):
 class Distribution:
     """Represents a java distribution - either a JRE or a JDK installed on the local system.
 
-  In particular provides access to the distribution's binaries; ie: java while ensuring basic
-  constraints are met.  For example a minimum version can be specified if you know need to compile
-  source code or run bytecode that exercise features only available in that version forward.
+    In particular provides access to the distribution's binaries; ie: java while ensuring basic
+    constraints are met.  For example a minimum version can be specified if you know need to compile
+    source code or run bytecode that exercise features only available in that version forward.
 
-  :API: public
+    :API: public
 
-  TODO(John Sirois): This class has a broken API, its not reasonably useful with no methods exposed.
-  Expose reasonable methods: https://github.com/pantsbuild/pants/issues/3263
-  """
+    TODO(John Sirois): This class has a broken API, its not reasonably useful with no methods exposed.
+    Expose reasonable methods: https://github.com/pantsbuild/pants/issues/3263
+    """
 
     class Error(Exception):
         """Indicates an invalid java distribution."""
@@ -169,16 +169,16 @@ class Distribution:
     def binary(self, name):
         """Returns the path to the command of the given name for this distribution.
 
-    For example: ::
+        For example: ::
 
-        >>> d = Distribution()
-        >>> jar = d.binary('jar')
-        >>> jar
-        '/usr/bin/jar'
-        >>>
+            >>> d = Distribution()
+            >>> jar = d.binary('jar')
+            >>> jar
+            '/usr/bin/jar'
+            >>>
 
-    If this distribution has no valid command of the given name raises Distribution.Error.
-    If this distribution is a JDK checks both `bin` and `jre/bin` for the binary.
+        If this distribution has no valid command of the given name raises Distribution.Error.
+        If this distribution is a JDK checks both `bin` and `jre/bin` for the binary.
         """
         if not isinstance(name, str):
             raise ValueError(

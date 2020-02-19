@@ -73,8 +73,8 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
 
     def __init__(self, *args, **kwargs):
         """
-    :API: public
-    """
+        :API: public
+        """
         super().__init__(*args, **kwargs)
 
         id_tuple = (self.ID_PREFIX, self.__class__.__name__)
@@ -154,8 +154,8 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
 # TODO(John Sirois): This just prevents ripple - maybe inline
 class NailgunTask(NailgunTaskBase, Task):
     """
-  :API: public
-  """
+    :API: public
+    """
 
     pass
 

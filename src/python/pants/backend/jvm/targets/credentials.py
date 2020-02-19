@@ -32,10 +32,10 @@ def _ignored_repository(value, repository):
 class LiteralCredentials(Credentials):
     def __init__(self, username=None, password=None, **kwargs):
         """
-    :param string name: The name of these credentials.
-    :param username: A constant username value.
-    :param password: A constant password value.
-    """
+        :param string name: The name of these credentials.
+        :param username: A constant username value.
+        :param password: A constant password value.
+        """
         super().__init__(**kwargs)
 
         if callable(username) or callable(password):

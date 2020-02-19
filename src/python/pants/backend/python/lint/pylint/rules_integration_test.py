@@ -136,10 +136,10 @@ class PylintIntegrationTest(TestBase):
                 path=f"{self.source_root}/dependency.py",
                 content=dedent(
                     """\
-          # No docstring because Pylint doesn't lint dependencies
-          from transitive_dep import doesnt_matter_if_variable_exists
-          THIS_VARIABLE_EXISTS = ''
-          """
+                    # No docstring because Pylint doesn't lint dependencies
+                    from transitive_dep import doesnt_matter_if_variable_exists
+                    THIS_VARIABLE_EXISTS = ''
+                    """
                 ).encode(),
             )
         )
@@ -147,10 +147,10 @@ class PylintIntegrationTest(TestBase):
             path=f"{self.source_root}/test_dependency.py",
             content=dedent(
                 """\
-        '''Code is not executed, but Pylint will check that variables exist and are used'''
-        from dependency import THIS_VARIABLE_EXISTS
-        print(THIS_VARIABLE_EXISTS)
-        """
+                '''Code is not executed, but Pylint will check that variables exist and are used'''
+                from dependency import THIS_VARIABLE_EXISTS
+                print(THIS_VARIABLE_EXISTS)
+                """
             ).encode(),
         )
         self.create_python_library(sources=["test_dependency.py"], dependencies=[":dependency"])

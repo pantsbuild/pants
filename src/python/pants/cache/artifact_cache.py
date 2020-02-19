@@ -28,9 +28,9 @@ class UnreadableArtifact:
 
     def __init__(self, key, err=None):
         """
-    :param CacheKey key: The key of the artifact that encountered an error
-    :param err: Any additional information on the nature of the read error.
-    """
+        :param CacheKey key: The key of the artifact that encountered an error
+        :param err: Any additional information on the nature of the read error.
+        """
         self.key = key
         self.err = err
 

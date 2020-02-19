@@ -98,12 +98,12 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
                 f.write(
                     dedent(
                         """
-          [options]
-          colors: False
-          scope: options
-          only_overridden: True
-          show_history: True
-        """
+                        [options]
+                        colors: False
+                        scope: options
+                        only_overridden: True
+                        show_history: True
+                        """
                     )
                 )
             pants_run = self.run_pants([f"--pants-config-files={config_path}", "options"])
@@ -118,19 +118,19 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
                 f.write(
                     dedent(
                         """
-          [GLOBAL]
-          verify_config: False
-          pythonpath: [
-              "%(buildroot)s/testprojects/src/python",
-            ]
+                        [GLOBAL]
+                        verify_config: False
+                        pythonpath: [
+                            "%(buildroot)s/testprojects/src/python",
+                          ]
 
-          backend_packages: [
-              "plugins.dummy_options",
-            ]
+                        backend_packages: [
+                            "plugins.dummy_options",
+                          ]
 
-          [options]
-          colors: False
-        """
+                        [options]
+                        colors: False
+                        """
                     )
                 )
             pants_run = self.run_pants([f"--pants-config-files={config_path}", "options"])
@@ -148,17 +148,17 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
                 f.write(
                     dedent(
                         """
-          [DEFAULT]
-          some_crazy_thing: 123
+                        [DEFAULT]
+                        some_crazy_thing: 123
 
-          [invalid_scope]
-          colors: False
-          scope: options
+                        [invalid_scope]
+                        colors: False
+                        scope: options
 
-          [another_invalid_scope]
-          colors: False
-          scope: options
-        """
+                        [another_invalid_scope]
+                        colors: False
+                        scope: options
+                        """
                     )
                 )
             pants_run = self.run_pants([f"--pants-config-files={config_path}", "goals"])
@@ -173,13 +173,13 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
                 f.write(
                     dedent(
                         """
-          [DEFAULT]
-          some_crazy_thing: 123
+                        [DEFAULT]
+                        some_crazy_thing: 123
 
-          [test.junit]
-          fail_fast: True
-          invalid_option: True
-        """
+                        [test.junit]
+                        fail_fast: True
+                        invalid_option: True
+                        """
                     )
                 )
             pants_run = self.run_pants([f"--pants-config-files={config_path}", "goals"])
@@ -200,16 +200,16 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
                 f.write(
                     dedent(
                         """
-          [DEFAULT]
-          some_crazy_thing: 123
+                        [DEFAULT]
+                        some_crazy_thing: 123
 
-          [GLOBAL]
-          invalid_global: True
-          another_invalid_global: False
+                        [GLOBAL]
+                        invalid_global: True
+                        another_invalid_global: False
 
-          [test.junit]
-          fail_fast: True
-        """
+                        [test.junit]
+                        fail_fast: True
+                        """
                     )
                 )
             pants_run = self.run_pants([f"--pants-config-files={config_path}", "goals"])
@@ -230,12 +230,12 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
                 f.write(
                     dedent(
                         """
-          [test.junit]
-          bad_option: True
+                        [test.junit]
+                        bad_option: True
 
-          [invalid_scope]
-          abc: 123
-        """
+                        [invalid_scope]
+                        abc: 123
+                        """
                     )
                 )
 
@@ -309,9 +309,9 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
                 f.write(
                     dedent(
                         """
-          [GLOBAL]
-          pants_ignore: +['some/random/dir']
-        """
+                        [GLOBAL]
+                        pants_ignore: +['some/random/dir']
+                        """
                     )
                 )
             pants_run = self.run_pants(

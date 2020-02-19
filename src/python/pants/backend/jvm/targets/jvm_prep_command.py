@@ -65,17 +65,17 @@ class JvmPrepCommand(RuntimePlatformMixin, JvmTarget):
         **kwargs
     ):
         """
-    :param args: A list of command-line args to the excutable.
-    :param goal: Pants goal to run this command in [test, binary or compile]. If not specified,
-                 runs in 'test'
-    :param jvm_options: extra options to pass the JVM
-    :param mainclass: The path to the executable that should be run.
-    :param str runtime_platform: The name of the platform (defined under the jvm-platform subsystem)
-      to use for runtime (that is, a key into the --jvm-platform-platforms dictionary). If
-      unspecified, the platform will default to the first one of these that exist: (1) the
-      default_runtime_platform specified for jvm-platform, (2) the platform that would be used for
-      the platform kwarg.
-      """
+        :param args: A list of command-line args to the excutable.
+        :param goal: Pants goal to run this command in [test, binary or compile]. If not specified,
+                     runs in 'test'
+        :param jvm_options: extra options to pass the JVM
+        :param mainclass: The path to the executable that should be run.
+        :param str runtime_platform: The name of the platform (defined under the jvm-platform subsystem)
+          to use for runtime (that is, a key into the --jvm-platform-platforms dictionary). If
+          unspecified, the platform will default to the first one of these that exist: (1) the
+          default_runtime_platform specified for jvm-platform, (2) the platform that would be used for
+          the platform kwarg.
+          """
         payload = payload or Payload()
         goal = goal or "test"
         payload.add_fields(

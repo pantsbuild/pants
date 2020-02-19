@@ -10,12 +10,12 @@ class ResolvedJar:
 
     def __init__(self, coordinate, cache_path, pants_path=None, directory_digest=None):
         """
-    :param coordinate: Coordinate representing this resolved jar.
-    :type coordinate: :class:`M2Coordinate`
-    :param string cache_path: Path to the artifact in the ivy cache
-    :param string pants_path: Path to the symlink for the artifact in the pants work directory.
-    :param Digest directory_digest: Digest of the artifact.
-    """
+        :param coordinate: Coordinate representing this resolved jar.
+        :type coordinate: :class:`M2Coordinate`
+        :param string cache_path: Path to the artifact in the ivy cache
+        :param string pants_path: Path to the symlink for the artifact in the pants work directory.
+        :param Digest directory_digest: Digest of the artifact.
+        """
         self.coordinate = coordinate
         self.cache_path = cache_path
         self.pants_path = pants_path
@@ -47,15 +47,15 @@ class M2Coordinate(object):
 
     def __init__(self, org, name, rev=None, classifier=None, ext=None):
         """
-    :param string org: The maven dependency `groupId`.
-    :param string name: The maven dependency `artifactId`.
-    :param string rev: The maven dependency `version`.
-    :param string classifier: The maven dependency `classifier`.
-    :param string ext: There is no direct maven parallel, but the maven `packaging` value of the
-                       depended-on artifact for simple cases, and in more complex cases the
-                       extension of the artifact.  For example, 'bundle' packaging implies an
-                       extension of 'jar'.  Defaults to 'jar'.
-    """
+        :param string org: The maven dependency `groupId`.
+        :param string name: The maven dependency `artifactId`.
+        :param string rev: The maven dependency `version`.
+        :param string classifier: The maven dependency `classifier`.
+        :param string ext: There is no direct maven parallel, but the maven `packaging` value of the
+                           depended-on artifact for simple cases, and in more complex cases the
+                           extension of the artifact.  For example, 'bundle' packaging implies an
+                           extension of 'jar'.  Defaults to 'jar'.
+        """
         self.org = org
         self.name = name
         self.rev = rev

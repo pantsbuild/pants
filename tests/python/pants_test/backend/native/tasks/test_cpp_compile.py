@@ -27,16 +27,16 @@ class CppCompileTest(NativeTaskTestBase, NativeCompileTestMixin):
             "src/cpp/test/test.hpp",
             contents=dedent(
                 """
-      #ifndef __TEST_HPP__
-      #define __TEST_HPP__
+                #ifndef __TEST_HPP__
+                #define __TEST_HPP__
 
-      template <typename T>
-      T add(T a, T b) {
-        return a + b;
-      }
+                template <typename T>
+                T add(T a, T b) {
+                  return a + b;
+                }
 
-      #endif
-"""
+                #endif
+                """
             ),
         )
         return self.make_target(

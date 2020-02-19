@@ -48,15 +48,15 @@ class IvyResolutionStep:
         ivy_workdir,
     ):
         """
-    :param confs: A tuple of string ivy confs to resolve for.
-    :param hash_name: A unique string name for this resolve.
-    :param pinned_artifacts: A tuple of "artifact-alikes" to force the versions of.
-    :param soft_excludes: A flag marking whether to pass excludes to Ivy or to apply them after the
-                          fact.
-    :param ivy_repository_cache_dir: The cache directory used by Ivy for repository cache data.
-    :param ivy_resolution_cache_dir: The cache directory used by Ivy for resolution cache data.
-    :param ivy_workdir: A task-specific workdir that all ivy outputs live in.
-    """
+        :param confs: A tuple of string ivy confs to resolve for.
+        :param hash_name: A unique string name for this resolve.
+        :param pinned_artifacts: A tuple of "artifact-alikes" to force the versions of.
+        :param soft_excludes: A flag marking whether to pass excludes to Ivy or to apply them after the
+                              fact.
+        :param ivy_repository_cache_dir: The cache directory used by Ivy for repository cache data.
+        :param ivy_resolution_cache_dir: The cache directory used by Ivy for resolution cache data.
+        :param ivy_workdir: A task-specific workdir that all ivy outputs live in.
+        """
 
         self.confs = confs
         self.hash_name = hash_name
@@ -592,8 +592,8 @@ class IvyResolveMappingError(Exception):
 @total_ordering
 class IvyModuleRef:
     """
-  :API: public
-  """
+    :API: public
+    """
 
     # latest.integration is ivy magic meaning "just get the latest version"
     _ANY_REV = "latest.integration"
@@ -660,8 +660,8 @@ class IvyModuleRef:
 
 class IvyInfo:
     """
-  :API: public
-  """
+    :API: public
+    """
 
     def __init__(self, conf):
         self._conf = conf

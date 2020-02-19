@@ -35,10 +35,10 @@ class ProtobufGenTest(TaskTestBase):
             relpath="test_proto/test.proto",
             contents=dedent(
                 """
-      package com.example.test_proto;
-      enum Foo { foo=1;}
-      message Bar {}
-    """
+                package com.example.test_proto;
+                enum Foo { foo=1;}
+                message Bar {}
+                """
             ),
         )
 
@@ -46,19 +46,19 @@ class ProtobufGenTest(TaskTestBase):
             "test_proto",
             dedent(
                 """
-      java_protobuf_library(name='proto',
-        sources=['test.proto'],
-        dependencies=[]
-      )
-    """
+                java_protobuf_library(name='proto',
+                  sources=['test.proto'],
+                  dependencies=[]
+                )
+                """
             ),
         )
         self.add_to_build_file(
             "3rdparty",
             dedent(
                 """
-      target(name='protobuf-java')
-    """
+                target(name='protobuf-java')
+                """
             ),
         )
         context = self.context(target_roots=[self.target("test_proto:proto")])
@@ -73,10 +73,10 @@ class ProtobufGenTest(TaskTestBase):
             "proto-lib",
             dedent(
                 """
-      java_protobuf_library(name='proto-target',
-        sources=['foo.proto'],
-      )
-      """
+                java_protobuf_library(name='proto-target',
+                  sources=['foo.proto'],
+                )
+                """
             ),
         )
         target = self.target("proto-lib:proto-target")
@@ -92,10 +92,10 @@ class ProtobufGenTest(TaskTestBase):
             "project/src/main/proto/proto-lib",
             dedent(
                 """
-      java_protobuf_library(name='proto-target',
-        sources=['foo.proto'],
-      )
-      """
+                java_protobuf_library(name='proto-target',
+                  sources=['foo.proto'],
+                )
+                """
             ),
         )
         target = self.target("project/src/main/proto/proto-lib:proto-target")

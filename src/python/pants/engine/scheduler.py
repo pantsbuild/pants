@@ -73,18 +73,18 @@ class Scheduler:
         visualize_to_dir=None,
     ):
         """
-    :param native: An instance of engine.native.Native.
-    :param project_tree: An instance of ProjectTree for the current build root.
-    :param work_dir: The pants work dir.
-    :param local_store_dir: The directory to use for storing the engine's LMDB store in.
-    :param rules: A set of Rules which is used to compute values in the graph.
-    :param union_rules: A dict mapping union base types to member types so that rules can be written
-                        against abstract union types without knowledge of downstream rulesets.
-    :param execution_options: Execution options for (remote) processes.
-    :param include_trace_on_error: Include the trace through the graph upon encountering errors.
-    :type include_trace_on_error: bool
-    :param validate: True to assert that the ruleset is valid.
-    """
+        :param native: An instance of engine.native.Native.
+        :param project_tree: An instance of ProjectTree for the current build root.
+        :param work_dir: The pants work dir.
+        :param local_store_dir: The directory to use for storing the engine's LMDB store in.
+        :param rules: A set of Rules which is used to compute values in the graph.
+        :param union_rules: A dict mapping union base types to member types so that rules can be written
+                            against abstract union types without knowledge of downstream rulesets.
+        :param execution_options: Execution options for (remote) processes.
+        :param include_trace_on_error: Include the trace through the graph upon encountering errors.
+        :type include_trace_on_error: bool
+        :param validate: True to assert that the ruleset is valid.
+        """
         self._native = native
         self.include_trace_on_error = include_trace_on_error
         self._visualize_to_dir = visualize_to_dir
@@ -488,10 +488,10 @@ class SchedulerSession:
 
     def run_goal_rule(self, product, subject):
         """
-    :param product: A Goal subtype.
-    :param subject: subject for the request.
-    :returns: An exit_code for the given Goal.
-    """
+        :param product: A Goal subtype.
+        :param subject: subject for the request.
+        :returns: An exit_code for the given Goal.
+        """
         request = self.execution_request([product], [subject])
         returns, throws = self.execute(request)
 
@@ -545,10 +545,10 @@ class SchedulerSession:
                 exc_type, exc_value, tb = raised_exception
                 raised_exception_message = dedent(
                     """\
-          The engine execution request raised this error, which is probably due to the errors in the
-          CFFI extern methods listed above, as CFFI externs return None upon error:
-          {}
-        """
+                    The engine execution request raised this error, which is probably due to the errors in the
+                    CFFI extern methods listed above, as CFFI externs return None upon error:
+                    {}
+                    """
                 ).format(
                     "".join(traceback.format_exception(etype=exc_type, value=exc_value, tb=tb))
                 )
@@ -556,9 +556,9 @@ class SchedulerSession:
             raise ExecutionError(
                 dedent(
                     """\
-        {error_description} raised in CFFI extern methods:
-        {joined_tracebacks}{raised_exception_message}
-        """
+                    {error_description} raised in CFFI extern methods:
+                    {joined_tracebacks}{raised_exception_message}
+                    """
                 ).format(
                     error_description=pluralize(len(internal_errors), "Exception"),
                     joined_tracebacks="\n+++++++++\n".join(

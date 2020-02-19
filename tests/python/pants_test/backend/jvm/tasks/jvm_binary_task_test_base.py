@@ -10,8 +10,8 @@ from pants.testutil.jvm.nailgun_task_test_base import NailgunTaskTestBase
 
 class JvmBinaryTaskTestBase(NailgunTaskTestBase):
     """
-  :API: public
-  """
+    :API: public
+    """
 
     def create_artifact(self, org, name, rev, classifier=None, ext=None, materialize=True):
         """

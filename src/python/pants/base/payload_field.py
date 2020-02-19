@@ -60,8 +60,8 @@ class PayloadField(ABC):
     @property
     def value(self):
         """
-    :API: public
-    """
+        :API: public
+        """
         return self
 
 

@@ -31,13 +31,13 @@ class GoImportMetaTagReader(Subsystem):
 
     _META_IMPORT_REGEX = re.compile(
         r"""
-      <meta
-          \s+
-          name=['"]go-import['"]
-          \s+
-          content=['"](?P<root>[^\s]+)\s+(?P<vcs>[^\s]+)\s+(?P<url>[^\s]+)['"]
-          \s*
-      /?>""",
+        <meta
+            \s+
+            name=['"]go-import['"]
+            \s+
+            content=['"](?P<root>[^\s]+)\s+(?P<vcs>[^\s]+)\s+(?P<url>[^\s]+)['"]
+            \s*
+        /?>""",
         flags=re.VERBOSE,
     )
 

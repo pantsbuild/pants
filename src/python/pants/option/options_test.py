@@ -846,9 +846,9 @@ class OptionsTest(TestBase):
             tmp.write(
                 dedent(
                     """
-        foo
-        bar
-        """
+                    foo
+                    bar
+                    """
                 )
             )
             tmp.flush()
@@ -1273,14 +1273,14 @@ class OptionsTest(TestBase):
             expected={"a": 42, "b": (1, 2)},
             contents=dedent(
                 """
-      {
-        'a': 42,
-        'b': (
-          1,
-          2
-        )
-      }
-      """
+                {
+                  'a': 42,
+                  'b': (
+                    1,
+                    2
+                  )
+                }
+                """
             ),
         )
         _do_assert_fromfile(
@@ -1288,22 +1288,22 @@ class OptionsTest(TestBase):
             expected=["a", "1", "2"],
             contents=dedent(
                 """
-      ['a',
-       1,
-       2]
-      """
+                ['a',
+                 1,
+                 2]
+                """
             ),
         )
 
         expected_append = expected_append or [1, 2, 42]
         append_contents = append_contents or dedent(
             """
-      [
-       1,
-       2,
-       42
-      ]
-      """
+            [
+             1,
+             2,
+             42
+            ]
+            """
         )
         _do_assert_fromfile(dest="appendvalue", expected=expected_append, contents=append_contents)
 
@@ -1418,10 +1418,10 @@ class OptionsTest(TestBase):
             ParseError,
             dedent(
                 """\
-      Unrecognized command line flags on global scope: -v, --config-overide, --c. Suggestions:
-      -v: [--v2, --verbose, --a, --b, --y, -n, -z, --compile-c]
-      --config-overide: [--config-override]
-      --c: [--compile-c, --compile-scala-modifycompile, --compile-scala-modifylogs, --config-override, --a, --b, --y, -n, -z, --v2]"""
+                Unrecognized command line flags on global scope: -v, --config-overide, --c. Suggestions:
+                -v: [--v2, --verbose, --a, --b, --y, -n, -z, --compile-c]
+                --config-overide: [--config-override]
+                --c: [--compile-c, --compile-scala-modifycompile, --compile-scala-modifylogs, --config-override, --a, --b, --y, -n, -z, --v2]"""
             ),
         ):
             parse_joined_command_line(
@@ -1439,8 +1439,8 @@ class OptionsTest(TestBase):
             ParseError,
             dedent(
                 """\
-      Unrecognized command line flags on scope 'simple': --sam. Suggestions:
-      --sam: [--simple-spam, --simple-dashed-spam, --a, --num, --scoped-a-bit-spam, --scoped-and-dashed-spam]"""
+                Unrecognized command line flags on scope 'simple': --sam. Suggestions:
+                --sam: [--simple-spam, --simple-dashed-spam, --a, --num, --scoped-a-bit-spam, --scoped-and-dashed-spam]"""
             ),
         ):
             parse_joined_command_line(
@@ -1452,8 +1452,8 @@ class OptionsTest(TestBase):
             ParseError,
             dedent(
                 """\
-      Unrecognized command line flags on scope 'compile': --modifylogs. Suggestions:
-      --modifylogs: [--compile-scala-modifylogs]"""
+                Unrecognized command line flags on scope 'compile': --modifylogs. Suggestions:
+                --modifylogs: [--compile-scala-modifylogs]"""
             ),
         ):
             parse_joined_command_line(
@@ -1465,8 +1465,8 @@ class OptionsTest(TestBase):
             ParseError,
             dedent(
                 """\
-      Unrecognized command line flags on scope 'cache.compile.scala': --modifylogs. Suggestions:
-      --modifylogs: [--compile-scala-modifylogs]"""
+                Unrecognized command line flags on scope 'cache.compile.scala': --modifylogs. Suggestions:
+                --modifylogs: [--compile-scala-modifylogs]"""
             ),
         ):
             parse_joined_command_line(

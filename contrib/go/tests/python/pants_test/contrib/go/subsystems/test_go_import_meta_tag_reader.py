@@ -24,19 +24,19 @@ class FetchersTest(unittest.TestCase):
 
     def test_find_meta_tag_typical(self):
         test_html = """
-    <!DOCTYPE html>
-    <html>
-    <head>
-    <meta name="go-import" content="google.golang.org/api git https://code.googlesource.com/google-api-go-client">
-    <meta name="go-source" content="google.golang.org/api https://github.com/google/google-api-go-client https://github.com/google/google-api-go-client/tree/master{/dir} https://github.com/google/google-api-go-client/tree/master{/dir}/{file}#L{line}">
-    <meta http-equiv="refresh" content="0; url=https://godoc.org/google.golang.org/api/googleapi">
-    </head>
-    <body>
-    Nothing to see here.
-    Please <a href="https://godoc.org/google.golang.org/api/googleapi">move along</a>.
-    </body>
-    </html>
-    """
+        <!DOCTYPE html>
+        <html>
+        <head>
+        <meta name="go-import" content="google.golang.org/api git https://code.googlesource.com/google-api-go-client">
+        <meta name="go-source" content="google.golang.org/api https://github.com/google/google-api-go-client https://github.com/google/google-api-go-client/tree/master{/dir} https://github.com/google/google-api-go-client/tree/master{/dir}/{file}#L{line}">
+        <meta http-equiv="refresh" content="0; url=https://godoc.org/google.golang.org/api/googleapi">
+        </head>
+        <body>
+        Nothing to see here.
+        Please <a href="https://godoc.org/google.golang.org/api/googleapi">move along</a>.
+        </body>
+        </html>
+        """
 
         meta_tag_content = GoImportMetaTagReader.find_meta_tags(test_html)
         self.assertEqual(
@@ -52,21 +52,21 @@ class FetchersTest(unittest.TestCase):
 
     def test_find_multiline_meta_tag(self):
         test_html = """
-    <!DOCTYPE html>
-    <html>
-    <head>
-    <meta name="go-import"
-          content="google.golang.org/api
-                   git
-                   https://code.googlesource.com/google-api-go-client">
-    <meta http-equiv="refresh" content="0; url=https://godoc.org/google.golang.org/api/googleapi">
-    </head>
-    <body>
-    Nothing to see here.
-    Please <a href="https://godoc.org/google.golang.org/api/googleapi">move along</a>.
-    </body>
-    </html>
-    """
+        <!DOCTYPE html>
+        <html>
+        <head>
+        <meta name="go-import"
+              content="google.golang.org/api
+                       git
+                       https://code.googlesource.com/google-api-go-client">
+        <meta http-equiv="refresh" content="0; url=https://godoc.org/google.golang.org/api/googleapi">
+        </head>
+        <body>
+        Nothing to see here.
+        Please <a href="https://godoc.org/google.golang.org/api/googleapi">move along</a>.
+        </body>
+        </html>
+        """
 
         meta_tag_content = GoImportMetaTagReader.find_meta_tags(test_html)
         self.assertEqual(
@@ -82,29 +82,29 @@ class FetchersTest(unittest.TestCase):
 
     def test_find_multiple_go_import_meta_tag(self):
         test_html = """
-    <!DOCTYPE html>
-    <html>
-    <head>
-    <meta name="go-import"
-          content="google.golang.org/notapi
-                   git
-                   https://code.googlesource.com/google-notapi-go-client">
-    <meta name="go-import"
-          content="google.golang.org/api
-                   git
-                   https://code.googlesource.com/google-api-go-client">
-    <meta name="go-import"
-          content="google.golang.org/otherapi
-                   git
-                   https://code.googlesource.com/google-otherapi-go-client">
-    <meta http-equiv="refresh" content="0; url=https://godoc.org/google.golang.org/api/googleapi">
-    </head>
-    <body>
-    Nothing to see here.
-    Please <a href="https://godoc.org/google.golang.org/api/googleapi">move along</a>.
-    </body>
-    </html>
-    """
+        <!DOCTYPE html>
+        <html>
+        <head>
+        <meta name="go-import"
+              content="google.golang.org/notapi
+                       git
+                       https://code.googlesource.com/google-notapi-go-client">
+        <meta name="go-import"
+              content="google.golang.org/api
+                       git
+                       https://code.googlesource.com/google-api-go-client">
+        <meta name="go-import"
+              content="google.golang.org/otherapi
+                       git
+                       https://code.googlesource.com/google-otherapi-go-client">
+        <meta http-equiv="refresh" content="0; url=https://godoc.org/google.golang.org/api/googleapi">
+        </head>
+        <body>
+        Nothing to see here.
+        Please <a href="https://godoc.org/google.golang.org/api/googleapi">move along</a>.
+        </body>
+        </html>
+        """
 
         meta_tag_content = GoImportMetaTagReader.find_meta_tags(test_html)
         self.assertEqual(
@@ -136,20 +136,20 @@ class FetchersTest(unittest.TestCase):
 
     def test_meta_tag_end_with_forward_slash(self):
         test_html = """
-    <!DOCTYPE html>
-    <html>
-    <head>
-    <meta name="go-import"
-          content="google.golang.org/notapi
-                   git
-                   https://code.googlesource.com/google-notapi-go-client" />
-    </head>
-    <body>
-    Nothing to see here.
-    Please <a href="https://godoc.org/google.golang.org/api/googleapi">move along</a>.
-    </body>
-    </html>
-    """
+        <!DOCTYPE html>
+        <html>
+        <head>
+        <meta name="go-import"
+              content="google.golang.org/notapi
+                       git
+                       https://code.googlesource.com/google-notapi-go-client" />
+        </head>
+        <body>
+        Nothing to see here.
+        Please <a href="https://godoc.org/google.golang.org/api/googleapi">move along</a>.
+        </body>
+        </html>
+        """
 
         meta_tag_content = GoImportMetaTagReader.find_meta_tags(test_html)
         self.assertEqual(

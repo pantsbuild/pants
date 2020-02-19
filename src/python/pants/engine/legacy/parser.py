@@ -39,12 +39,12 @@ class LegacyPythonCallbacksParser(Parser):
         build_file_imports_behavior: BuildFileImportsBehavior,
     ) -> None:
         """
-    :param symbol_table: A SymbolTable for this parser, which will be overlaid with the given
-      additional aliases.
-    :param aliases: Additional BuildFileAliases to register.
-    :param build_file_imports_behavior: How to behave if a BUILD file being parsed tries to use
-      import statements.
-    """
+        :param symbol_table: A SymbolTable for this parser, which will be overlaid with the given
+          additional aliases.
+        :param aliases: Additional BuildFileAliases to register.
+        :param build_file_imports_behavior: How to behave if a BUILD file being parsed tries to use
+          import statements.
+        """
         super().__init__()
         self._symbols, self._parse_context = self._generate_symbols(symbol_table, aliases)
         self._build_file_imports_behavior = build_file_imports_behavior

@@ -147,10 +147,10 @@ class SimpleCodegenTaskTest(TaskTestBase):
                 spec_path,
                 dedent(
                     """
-          dummy_library(name='{name}',
-            sources=[],
-          )
-        """.format(
+                    dummy_library(name='{name}',
+                      sources=[],
+                    )
+                    """.format(
                         name=spec_name
                     )
                 ),
@@ -167,10 +167,10 @@ class SimpleCodegenTaskTest(TaskTestBase):
             "\n".join(
                 dedent(
                     """
-        dummy_library(name='{suffix}',
-          sources=['org/pantsbuild/example/foo{suffix}.dummy'],
-        )
-      """
+                    dummy_library(name='{suffix}',
+                      sources=['org/pantsbuild/example/foo{suffix}.dummy'],
+                    )
+                    """
                 ).format(suffix=suffix)
                 for suffix in dummy_suffixes
             ),
@@ -211,10 +211,10 @@ class SimpleCodegenTaskTest(TaskTestBase):
             "gen-parent",
             dedent(
                 """
-      dummy_library(name='gen-parent',
-        sources=['org/pantsbuild/example/parent.dummy'],
-      )
-    """
+                dummy_library(name='gen-parent',
+                  sources=['org/pantsbuild/example/parent.dummy'],
+                )
+                """
             ),
         )
 
@@ -222,16 +222,16 @@ class SimpleCodegenTaskTest(TaskTestBase):
             "gen-child",
             dedent(
                 """
-      dummy_library(name='good',
-        sources=['org/pantsbuild/example/good-child.dummy'],
-        dependencies=['gen-parent'],
-      )
-
-      dummy_library(name='bad',
-        sources=['org/pantsbuild/example/bad-child.dummy'],
-        dependencies=['gen-parent'],
-      )
-    """
+                dummy_library(name='good',
+                  sources=['org/pantsbuild/example/good-child.dummy'],
+                  dependencies=['gen-parent'],
+                )
+        
+                dummy_library(name='bad',
+                  sources=['org/pantsbuild/example/bad-child.dummy'],
+                  dependencies=['gen-parent'],
+                )
+                """
             ),
         )
 
@@ -313,11 +313,11 @@ class SimpleCodegenTaskTest(TaskTestBase):
             "fleem",
             dedent(
                 """
-      dummy_library(name='fleem',
-        sources=['org/pantsbuild/example/fleem.dummy'],
-        copied='copythis'
-      )
-    """
+                dummy_library(name='fleem',
+                  sources=['org/pantsbuild/example/fleem.dummy'],
+                  copied='copythis'
+                )
+                """
             ),
         )
 
@@ -454,8 +454,8 @@ class ExportSimpleCodegenTaskTest(TaskTestBase):
             "marionette",
             dedent(
                 """
-      dummy_library(name='no-strings', sources=[])
-    """
+                dummy_library(name='no-strings', sources=[])
+                """
             ),
         )
         self.target("marionette:no-strings")
@@ -465,10 +465,10 @@ class ExportSimpleCodegenTaskTest(TaskTestBase):
             "fleem",
             dedent(
                 """
-      exporting_dummy_library(name='fleem',
-        sources=['org/pantsbuild/example/fleem.dummy'],
-      )
-    """
+                exporting_dummy_library(name='fleem',
+                  sources=['org/pantsbuild/example/fleem.dummy'],
+                )
+                """
             ),
         )
 
@@ -483,8 +483,8 @@ class ExportSimpleCodegenTaskTest(TaskTestBase):
             "marionette",
             dedent(
                 """
-      dummy_library(name='no-strings', sources=[])
-    """
+                dummy_library(name='no-strings', sources=[])
+                """
             ),
         )
         self.target("marionette:no-strings")
@@ -494,10 +494,10 @@ class ExportSimpleCodegenTaskTest(TaskTestBase):
             "fleem",
             dedent(
                 """
-      exporting_dummy_library(name='fleem',
-        sources=['org/pantsbuild/example/fleem.dummy'],
-      )
-    """
+                exporting_dummy_library(name='fleem',
+                    sources=['org/pantsbuild/example/fleem.dummy'],
+                )
+                """
             ),
         )
 
@@ -512,8 +512,8 @@ class ExportSimpleCodegenTaskTest(TaskTestBase):
             "marionette",
             dedent(
                 """
-      dummy_library(name='no-strings', sources=[])
-    """
+                dummy_library(name='no-strings', sources=[])
+                """
             ),
         )
         self.target("marionette:no-strings")
@@ -523,14 +523,14 @@ class ExportSimpleCodegenTaskTest(TaskTestBase):
             "fleem",
             dedent(
                 """
-      dummy_library(name='flaam', sources=[])
-
-      exporting_dummy_library(name='fleem',
-        sources=['org/pantsbuild/example/fleem.dummy'],
-        dependencies=[':flaam'],
-        exports=[':flaam']
-      )
-    """
+                dummy_library(name='flaam', sources=[])
+        
+                exporting_dummy_library(name='fleem',
+                  sources=['org/pantsbuild/example/fleem.dummy'],
+                  dependencies=[':flaam'],
+                  exports=[':flaam']
+                )
+                """
             ),
         )
 
@@ -546,8 +546,8 @@ class ExportSimpleCodegenTaskTest(TaskTestBase):
             "marionette",
             dedent(
                 """
-      dummy_library(name='no-strings', sources=[])
-    """
+                dummy_library(name='no-strings', sources=[])
+                """
             ),
         )
         self.target("marionette:no-strings")
@@ -557,14 +557,14 @@ class ExportSimpleCodegenTaskTest(TaskTestBase):
             "fleem",
             dedent(
                 """
-      dummy_library(name='flaam', sources=[])
-
-      exporting_dummy_library(name='fleem',
-        sources=['org/pantsbuild/example/fleem.dummy'],
-        dependencies=[':flaam'],
-        exports=[':flaam']
-      )
-    """
+                dummy_library(name='flaam', sources=[])
+        
+                exporting_dummy_library(name='fleem',
+                  sources=['org/pantsbuild/example/fleem.dummy'],
+                  dependencies=[':flaam'],
+                  exports=[':flaam']
+                )
+                """
             ),
         )
 
@@ -580,8 +580,8 @@ class ExportSimpleCodegenTaskTest(TaskTestBase):
             "marionette",
             dedent(
                 """
-      dummy_library(name='no-strings', sources=[])
-    """
+                dummy_library(name='no-strings', sources=[])
+                """
             ),
         )
         self.target("marionette:no-strings")
@@ -591,12 +591,12 @@ class ExportSimpleCodegenTaskTest(TaskTestBase):
             "fleem",
             dedent(
                 """
-      dummy_library(name='flaam', sources=[])
+                dummy_library(name='flaam', sources=[])
 
-      exporting_dummy_library(name='fleem',
-        sources=['org/pantsbuild/example/fleem.dummy'],
-      )
-    """
+                exporting_dummy_library(name='fleem',
+                  sources=['org/pantsbuild/example/fleem.dummy'],
+                )
+                """
             ),
         )
 
@@ -615,8 +615,8 @@ class ExportSimpleCodegenTaskTest(TaskTestBase):
             "marionette",
             dedent(
                 """
-      dummy_library(name='no-strings', sources=[])
-    """
+                dummy_library(name='no-strings', sources=[])
+                """
             ),
         )
         self.target("marionette:no-strings")
@@ -626,12 +626,12 @@ class ExportSimpleCodegenTaskTest(TaskTestBase):
             "fleem",
             dedent(
                 """
-      dummy_library(name='flaam', sources=[])
-
-      exporting_dummy_library(name='fleem',
-        sources=['org/pantsbuild/example/fleem.dummy'],
-      )
-    """
+                dummy_library(name='flaam', sources=[])
+        
+                exporting_dummy_library(name='fleem',
+                  sources=['org/pantsbuild/example/fleem.dummy'],
+                )
+                """
             ),
         )
 

@@ -164,18 +164,18 @@ class GoFetch(GoTask):
     def _transitive_download_remote_libs(self, go_remote_libs, all_known_remote_libs=None):
         """Recursively attempt to resolve / download all remote transitive deps of go_remote_libs.
 
-    Returns a dict<GoRemoteLibrary, set<tuple<str, Address>>>, which maps a go remote library to a
-    set of unresolved remote dependencies, each dependency expressed as a tuple containing the
-    the import path of the dependency and the expected target address. If all transitive
-    dependencies were successfully resolved, returns an empty dict.
+        Returns a dict<GoRemoteLibrary, set<tuple<str, Address>>>, which maps a go remote library to a
+        set of unresolved remote dependencies, each dependency expressed as a tuple containing the
+        the import path of the dependency and the expected target address. If all transitive
+        dependencies were successfully resolved, returns an empty dict.
 
-    Downloads as many invalidated transitive dependencies as possible, and returns as many
-    undeclared dependencies as possible. However, because the dependencies of a remote library
-    can only be determined _after_ it has been downloaded, a transitive dependency of an undeclared
-    remote library will never be detected.
+        Downloads as many invalidated transitive dependencies as possible, and returns as many
+        undeclared dependencies as possible. However, because the dependencies of a remote library
+        can only be determined _after_ it has been downloaded, a transitive dependency of an undeclared
+        remote library will never be detected.
 
-    Because go_remote_libraries do not declare dependencies (rather, they are inferred), injects
-    all successfully resolved transitive dependencies into the build graph.
+        Because go_remote_libraries do not declare dependencies (rather, they are inferred), injects
+        all successfully resolved transitive dependencies into the build graph.
         """
         if not go_remote_libs:
             return {}

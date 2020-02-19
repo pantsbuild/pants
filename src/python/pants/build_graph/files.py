@@ -14,11 +14,11 @@ class Files(Target):
 
     def __init__(self, address=None, payload=None, sources=None, **kwargs):
         """
-    :API: public
+        :API: public
 
-    :param sources: Files to "include". Paths are relative to the BUILD file's directory.
-    :type sources: :class:`pants.source.wrapped_globs.FilesetWithSpec` or list of strings
-    """
+        :param sources: Files to "include". Paths are relative to the BUILD file's directory.
+        :type sources: :class:`pants.source.wrapped_globs.FilesetWithSpec` or list of strings
+        """
         payload = payload or Payload()
         payload.add_fields(
             {

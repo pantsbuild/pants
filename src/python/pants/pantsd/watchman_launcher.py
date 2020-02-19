@@ -14,8 +14,8 @@ class WatchmanLauncher:
     @classmethod
     def create(cls, bootstrap_options):
         """
-    :param Options bootstrap_options: The bootstrap options bag.
-    """
+        :param Options bootstrap_options: The bootstrap options bag.
+        """
         binary_tool_fetcher = BinaryToolFetcher(
             bootstrap_dir=bootstrap_options.pants_bootstrapdir,
             timeout_secs=bootstrap_options.binaries_fetch_timeout_secs,
@@ -50,14 +50,14 @@ class WatchmanLauncher:
         metadata_base_dir=None,
     ):
         """
-    :param binary_util: The BinaryUtil subsystem instance for binary retrieval.
-    :param log_level: The current log level of pants.
-    :param watchman_version: The watchman binary version to retrieve using BinaryUtil.
-    :param watchman_supportdir: The supportdir for BinaryUtil.
-    :param socket_timeout: The watchman client socket timeout (in seconds).
-    :param socket_path_override: The overridden target path of the watchman socket, if any.
-    :param metadata_base_dir: The ProcessManager metadata base directory.
-    """
+        :param binary_util: The BinaryUtil subsystem instance for binary retrieval.
+        :param log_level: The current log level of pants.
+        :param watchman_version: The watchman binary version to retrieve using BinaryUtil.
+        :param watchman_supportdir: The supportdir for BinaryUtil.
+        :param socket_timeout: The watchman client socket timeout (in seconds).
+        :param socket_path_override: The overridden target path of the watchman socket, if any.
+        :param metadata_base_dir: The ProcessManager metadata base directory.
+        """
         self._binary_util = binary_util
         self._watchman_version = watchman_version
         self._watchman_supportdir = watchman_supportdir

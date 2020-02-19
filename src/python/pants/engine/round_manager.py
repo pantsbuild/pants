@@ -14,8 +14,8 @@ class ProducerInfo(namedtuple("ProducerInfo", ["product_type", "task_type", "goa
 
 class RoundManager:
     """
-  :API: public
-  """
+    :API: public
+    """
 
     class MissingProductError(KeyError):
         """Indicates a required product type is provided by non-one."""

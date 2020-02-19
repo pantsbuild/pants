@@ -36,8 +36,8 @@ from pants.util.strutil import pluralize
 
 class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     """
-  :API: public
-  """
+    :API: public
+    """
 
     @classmethod
     def implementation_version(cls):
@@ -537,9 +537,9 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
 
     def _calculate_tests_from_targets(self, targets):
         """
-    :param list targets: list of targets to calculate test classes for.
-    generates tuples (Test, Target).
-    """
+        :param list targets: list of targets to calculate test classes for.
+        generates tuples (Test, Target).
+        """
         classpath_products = self.context.products.get_data("runtime_classpath")
         for target in targets:
             contents = ClasspathUtil.classpath_contents(

@@ -31,34 +31,34 @@ class ResolveJarsTestMixin:
                         f.write(
                             dedent(
                                 """
-              jvm_binary(name='synthetic',
-                source='Main.java',
-              )
-            """
+                                jvm_binary(name='synthetic',
+                                  source='Main.java',
+                                )
+                                """
                             )
                         )
                     with open(os.path.join(source_dir, "src", "Main.java"), "w+") as f:
                         f.write(
                             dedent(
                                 """
-              public class Main {
-                public static void main(String[] args) {
-                  System.out.println("Hello.");
-                }
-              }
-            """
+                                public class Main {
+                                  public static void main(String[] args) {
+                                    System.out.println("Hello.");
+                                  }
+                                }
+                                """
                             )
                         )
                     with open(os.path.join(source_dir, "src", "Foo.java"), "w+") as f:
                         f.write(
                             dedent(
                                 """
-              public class Foo {
-                public static void main(String[] args) {
-                  Main.main(args);
-                }
-              }
-            """
+                                public class Foo {
+                                  public static void main(String[] args) {
+                                    Main.main(args);
+                                  }
+                                }
+                                """
                             )
                         )
 
@@ -75,18 +75,18 @@ class ResolveJarsTestMixin:
                         f.write(
                             dedent(
                                 """
-              jar_library(name='lib_with_url',
-                jars=[
-                  jar(org='org.pantsbuild', name='synthetic-test-jar', rev='1.2.3',
-                  url='{jar_url}')
-                ],
-              )
+                                jar_library(name='lib_with_url',
+                                  jars=[
+                                    jar(org='org.pantsbuild', name='synthetic-test-jar', rev='1.2.3',
+                                    url='{jar_url}')
+                                  ],
+                                )
 
-              java_library(name='src',
-                sources=['Foo.java'],
-                dependencies=[':lib_with_url'],
-              )
-            """
+                                java_library(name='src',
+                                  sources=['Foo.java'],
+                                  dependencies=[':lib_with_url'],
+                                )
+                                """
                             ).format(jar_url=jar_url)
                         )
 

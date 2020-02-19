@@ -208,8 +208,8 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):  # t
 
         def process_target(current_target):
             """
-      :type current_target:pants.build_graph.target.Target
-      """
+            :type current_target:pants.build_graph.target.Target
+            """
 
             def get_target_type(tgt):
                 def is_test(t):
@@ -268,10 +268,10 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):  # t
 
             def iter_transitive_jars(jar_lib):
                 """
-        :type jar_lib: :class:`pants.backend.jvm.targets.jar_library.JarLibrary`
-        :rtype: :class:`collections.Iterator` of
-                :class:`pants.java.jar.M2Coordinate`
-        """
+                :type jar_lib: :class:`pants.backend.jvm.targets.jar_library.JarLibrary`
+                :rtype: :class:`collections.Iterator` of
+                        :class:`pants.java.jar.M2Coordinate`
+                """
                 if classpath_products:
                     jar_products = classpath_products.get_artifact_classpath_entries_for_targets(
                         (jar_lib,)
@@ -450,8 +450,8 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):  # t
     @staticmethod
     def _source_roots_for_target(target):
         """
-    :type target:pants.build_graph.target.Target
-    """
+        :type target:pants.build_graph.target.Target
+        """
 
         def root_package_prefix(source_file):
             source = os.path.dirname(source_file)

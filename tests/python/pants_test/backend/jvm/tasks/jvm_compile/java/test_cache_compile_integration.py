@@ -53,28 +53,28 @@ class CacheCompileIntegrationTest(BaseCompileIT):
                 a_srcfile,
                 dedent(
                     """package org.pantsbuild.cachetest;
-                          class A {}
-                          """
+                    class A {}
+                    """
                 ),
             )
             self.create_file(
                 b_srcfile,
                 dedent(
                     """package org.pantsbuild.cachetest;
-                          class B {
-                            A a;
-                          }
-                          """
+                    class B {
+                      A a;
+                    }
+                    """
                 ),
             )
             self.create_file(
                 c_srcfile,
                 dedent(
                     """package org.pantsbuild.cachetest;
-                          class C {
-                            A a;
-                          }
-                          """
+                    class C {
+                      A a;
+                    }
+                    """
                 ),
             )
 
@@ -82,20 +82,20 @@ class CacheCompileIntegrationTest(BaseCompileIT):
                 buildfile,
                 dedent(
                     """
-                          java_library(name='a',
-                                       sources=['A.java']
-                          )
+                    java_library(name='a',
+                                 sources=['A.java']
+                    )
 
-                          java_library(name='b',
-                                       sources=['B.java'],
-                                       dependencies=[':a']
-                          )
+                    java_library(name='b',
+                                 sources=['B.java'],
+                                 dependencies=[':a']
+                    )
 
-                          java_library(name='c',
-                                       sources=['C.java'],
-                                       dependencies=[':b']
-                          )
-                          """
+                    java_library(name='c',
+                                 sources=['C.java'],
+                                 dependencies=[':b']
+                    )
+                    """
                 ),
             )
 
@@ -137,16 +137,16 @@ class CacheCompileIntegrationTest(BaseCompileIT):
                 srcfile,
                 dedent(
                     """package org.pantsbuild.cachetest;
-                          class A {}
-                          class Main {}"""
+                    class A {}
+                    class Main {}"""
                 ),
             )
             self.create_file(
                 buildfile,
                 dedent(
                     """java_library(name='cachetest',
-                                       sources=['A.java']
-                          )"""
+                                 sources=['A.java']
+                    )"""
                 ),
             )
 
@@ -161,8 +161,8 @@ class CacheCompileIntegrationTest(BaseCompileIT):
                 srcfile,
                 dedent(
                     """package org.pantsbuild.cachetest;
-                            class A {}
-                            class NotMain {}"""
+                    class A {}
+                    class NotMain {}"""
                 ),
             )
             # Caches values A.class, NotMain.class and leaves them on the filesystem
@@ -172,8 +172,8 @@ class CacheCompileIntegrationTest(BaseCompileIT):
                 srcfile,
                 dedent(
                     """package org.pantsbuild.cachetest;
-                          class A {}
-                          class Main {}"""
+                    class A {}
+                    class Main {}"""
                 ),
             )
 
@@ -234,8 +234,8 @@ class CacheCompileIntegrationTest(BaseCompileIT):
                 con_src_file,
                 dedent(
                     """package org.pantsbuild.consumer
-           import org.pantsbuild.dep.A
-           class B { def mkA: A = new A() }"""
+                    import org.pantsbuild.dep.A
+                    class B { def mkA: A = new A() }"""
                 ),
             )
             self.create_file(con_build_file, f"scala_library(dependencies=['{dep_spec}'])")

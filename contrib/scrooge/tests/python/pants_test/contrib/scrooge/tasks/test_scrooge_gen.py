@@ -54,11 +54,11 @@ class ScroogeGenTest(NailgunTaskTestBase):
             "test_validate",
             dedent(
                 """
-      java_thrift_library(name='one',
-        sources=[],
-        dependencies=[],
-      )
-    """
+                java_thrift_library(name='one',
+                  sources=[],
+                  dependencies=[],
+                )
+                """
             ),
         )
 
@@ -66,11 +66,11 @@ class ScroogeGenTest(NailgunTaskTestBase):
             "test_validate",
             dedent(
                 """
-      java_thrift_library(name='two',
-        sources=[],
-        dependencies=[':one'],
-      )
-    """
+                java_thrift_library(name='two',
+                  sources=[],
+                  dependencies=[':one'],
+                )
+                """
             ),
         )
 
@@ -109,16 +109,16 @@ class ScroogeGenTest(NailgunTaskTestBase):
         compiler_args_str = self.compiler_args_to_string(compiler_args)
         return dedent(
             """
-      java_thrift_library(name='a',
-        sources=['a.thrift'],
-        dependencies=[],
-        compiler='scrooge',
-        language='{language}',
-        compiler_args={compiler_args},
-        strict_deps=True,
-        tags=['my_tag'],
-      )
-    """.format(
+            java_thrift_library(name='a',
+              sources=['a.thrift'],
+              dependencies=[],
+              compiler='scrooge',
+              language='{language}',
+              compiler_args={compiler_args},
+              strict_deps=True,
+              tags=['my_tag'],
+            )
+            """.format(
                 language=language, compiler_args=compiler_args_str
             )
         )
@@ -126,11 +126,11 @@ class ScroogeGenTest(NailgunTaskTestBase):
     def _test_help(self, language, library_type, compiler_args, sources):
         contents = dedent(
             """#@namespace android org.pantsbuild.android_example
-      namespace java org.pantsbuild.example
-      struct Example {
-      1: optional i64 number
-      }
-    """
+            namespace java org.pantsbuild.example
+            struct Example {
+              1: optional i64 number
+            }
+            """
         )
 
         self.create_file(relpath="test_smoke/a.thrift", contents=contents)
@@ -168,33 +168,33 @@ class ScroogeGenTest(NailgunTaskTestBase):
     def test_basic_deps(self):
         contents = dedent(
             """#@namespace android org.pantsbuild.android_example
-      namespace java org.pantsbuild.example
-      struct Example {
-      1: optional i64 number
-      }
-    """
+            namespace java org.pantsbuild.example
+            struct Example {
+              1: optional i64 number
+            }
+            """
         )
         self._test_dependencies_help(contents, False, False)
 
     def test_service_deps(self):
         contents = dedent(
             """#@namespace android org.pantsbuild.android_example
-      namespace java org.pantsbuild.example
-      service MultiplicationService
-      {
-        int multiply(1:int n1, 2:int n2),
-      }"""
+            namespace java org.pantsbuild.example
+            service MultiplicationService
+            {
+              int multiply(1:int n1, 2:int n2),
+            }"""
         )
         self._test_dependencies_help(contents, True, False)
 
     def test_exception_deps(self):
         contents = dedent(
             """#@namespace android org.pantsbuild.android_example
-      namespace java org.pantsbuild.example
-      exception InvalidOperation {
-        1: i32 what,
-        2: string why
-      }"""
+            namespace java org.pantsbuild.example
+            exception InvalidOperation {
+              1: i32 what,
+              2: string why
+            }"""
         )
         self._test_dependencies_help(contents, False, True)
 

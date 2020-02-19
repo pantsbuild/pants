@@ -40,22 +40,22 @@ class PythonRequirement:
 
     def should_build(self, python, platform):
         """
-    :API: public
-    """
+        :API: public
+        """
         return True
 
     @property
     def use_2to3(self):
         """
-    :API: public
-    """
+        :API: public
+        """
         return self._use_2to3
 
     @property
     def repository(self):
         """
-    :API: public
-    """
+        :API: public
+        """
         return self._repository
 
     # duck-typing Requirement interface for Resolver, since Requirement cannot be
@@ -63,36 +63,36 @@ class PythonRequirement:
     @property
     def key(self):
         """
-    :API: public
-    """
+        :API: public
+        """
         return self._requirement.key
 
     @property
     def extras(self):
         """
-    :API: public
-    """
+        :API: public
+        """
         return self._requirement.extras
 
     @property
     def specs(self):
         """
-    :API: public
-    """
+        :API: public
+        """
         return self._requirement.specs
 
     @property
     def project_name(self):
         """
-    :API: public
-    """
+        :API: public
+        """
         return self._requirement.project_name
 
     @property
     def requirement(self):
         """
-    :API: public
-    """
+        :API: public
+        """
         return self._requirement
 
     def __contains__(self, item):
@@ -100,8 +100,8 @@ class PythonRequirement:
 
     def cache_key(self):
         """
-    :API: public
-    """
+        :API: public
+        """
         return str(self._requirement)
 
     def __repr__(self):

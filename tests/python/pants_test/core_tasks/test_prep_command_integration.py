@@ -25,13 +25,13 @@ class PrepCommandIntegrationTest(PantsRunIntegrationTest):
                 fp.write(
                     dedent(
                         """
-          prep_command(
-            name='{name}',
-            goals=['{goal}'],
-            prep_executable='touch',
-            prep_args=['{tmpdir}/{touch_target}'],
-          )
-        """.format(
+                        prep_command(
+                          name='{name}',
+                          goals=['{goal}'],
+                          prep_executable='touch',
+                          prep_args=['{tmpdir}/{touch_target}'],
+                        )
+                        """.format(
                             name=name, goal=name, tmpdir=workdir, touch_target=touch_target
                         )
                     )

@@ -78,10 +78,10 @@ class JvmBinaryTest(TestBase):
         self.add_to_build_file(
             "",
             """jvm_binary(
-  name = "foo",
-  main = "com.example.Foo",
-  deploy_excludes=[exclude(org = "example.com", name = "foo-lib")],
-)""",
+            name = "foo",
+            main = "com.example.Foo",
+            deploy_excludes=[exclude(org = "example.com", name = "foo-lib")],
+            )""",
         )
         target = self.target(":foo")
         self.assertEqual([Exclude(org="example.com", name="foo-lib")], target.deploy_excludes)
@@ -90,13 +90,13 @@ class JvmBinaryTest(TestBase):
         self.add_to_build_file(
             "",
             """jvm_binary(
-  name = "foo",
-  main = "com.example.Foo",
-  deploy_jar_rules = jar_rules(
-    [duplicate("foo", duplicate.SKIP)],
-    default_dup_action = duplicate.FAIL,
-  ),
-)""",
+              name = "foo",
+              main = "com.example.Foo",
+              deploy_jar_rules = jar_rules(
+                [duplicate("foo", duplicate.SKIP)],
+                default_dup_action = duplicate.FAIL,
+              ),
+            )""",
         )
         target = self.target(":foo")
         jar_rules = target.deploy_jar_rules
@@ -185,10 +185,10 @@ class JvmBinaryTest(TestBase):
         self.add_to_build_file(
             "",
             """jvm_binary(
-  name = "foo",
-  main = "com.example.Foo",
-  manifest_entries = {"Foo-Field": "foo"},
-)""",
+              name = "foo",
+              main = "com.example.Foo",
+              manifest_entries = {"Foo-Field": "foo"},
+            )""",
         )
         target = self.target(":foo")
         self.assertTrue(isinstance(target.payload.manifest_entries, ManifestEntries))
@@ -199,10 +199,10 @@ class JvmBinaryTest(TestBase):
         self.add_to_build_file(
             "",
             """jvm_binary(
-  name = "foo",
-  main = "com.example.Foo",
-  manifest_entries = "foo",
-)""",
+              name = "foo",
+              main = "com.example.Foo",
+              manifest_entries = "foo",
+            )""",
         )
         with self.assertRaisesRegex(
             TargetDefinitionException,
@@ -215,10 +215,10 @@ class JvmBinaryTest(TestBase):
         self.add_to_build_file(
             "",
             """jvm_binary(
-  name = "foo",
-  main = "com.example.Foo",
-  manifest_entries = {jar("bad", "bad", "bad"): "foo"},
-)""",
+              name = "foo",
+              main = "com.example.Foo",
+              manifest_entries = {jar("bad", "bad", "bad"): "foo"},
+            )""",
         )
         with self.assertRaisesRegex(
             TargetDefinitionException,

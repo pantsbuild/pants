@@ -11,9 +11,9 @@ class NodeTest(Target):
 
     def __init__(self, script_name=None, timeout=None, address=None, payload=None, **kwargs):
         """
-    :param string script_name: The tests script name in package.json. Defaults to "test".
-    :param int timeout: The test target timeout.
-    """
+        :param string script_name: The tests script name in package.json. Defaults to "test".
+        :param int timeout: The test target timeout.
+        """
         payload = payload or Payload()
         payload.add_fields(
             {

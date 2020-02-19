@@ -20,11 +20,11 @@ class Artifact(PayloadField):
 
     def __init__(self, org, name, repo, publication_metadata=None):
         """
-    :param string org: Organization of this artifact, or groupId in maven parlance.
-    :param string name: Name of the artifact, or artifactId in maven parlance.
-    :param repo: The ``repo`` this artifact is published to.
-    :param publication_metadata: Optional extra publication metadata required by the ``repo``.
-    """
+        :param string org: Organization of this artifact, or groupId in maven parlance.
+        :param string name: Name of the artifact, or artifactId in maven parlance.
+        :param repo: The ``repo`` this artifact is published to.
+        :param publication_metadata: Optional extra publication metadata required by the ``repo``.
+        """
         if not isinstance(org, str):
             raise ValueError(f"org must be `str` but was {org} with type {type(org)}")
         if not isinstance(name, str):

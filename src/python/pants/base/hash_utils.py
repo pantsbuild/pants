@@ -194,8 +194,8 @@ class Sharder:
 
         def __init__(self, shard_spec):
             """
-      :param string shard_spec: A string of the form M/N where M, N are ints and 0 <= M < N.
-      """
+            :param string shard_spec: A string of the form M/N where M, N are ints and 0 <= M < N.
+            """
             super(Sharder.InvalidShardSpec, self).__init__(
                 "Invalid shard spec '{}', should be of the form M/N, where M, N are ints "
                 "and 0 <= M < N.".format(shard_spec)
@@ -211,8 +211,8 @@ class Sharder:
 
     def __init__(self, shard_spec):
         """
-    :param string shard_spec: A string of the form M/N where M, N are ints and 0 <= M < N.
-    """
+        :param string shard_spec: A string of the form M/N where M, N are ints and 0 <= M < N.
+        """
 
         def ensure_int(s):
             try:

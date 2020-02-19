@@ -55,79 +55,79 @@ class File1(ConfigFile):
             {
                 ConfigFormat.ini: dedent(
                     """
-          [DEFAULT]
-          name: foo
-          answer: 42
-          scale: 1.2
-          path: /a/b/%(answer)s
-          embed: %(path)s::foo
-          disclaimer:
-            Let it be known
-            that.
-        
-          [a]
-          list: [1, 2, 3, %(answer)s]
-          list2: +[7, 8, 9]
-          list3: -["x", "y", "z"]
-        
-          [b]
-          preempt: True
-          
-          [b.nested]
-          dict: {
-              'a': 1,
-              'b': %(answer)s,
-              'c': ['%(answer)s', '%(answer)s'],
-            }
-          
-          [b.nested.nested-again]
-          movie: inception
-          
-          [c]
-          name: overridden_from_default
-          interpolated_from_section: %(name)s is interpolated
-          recursively_interpolated_from_section: %(interpolated_from_section)s (again)
-          """
+                    [DEFAULT]
+                    name: foo
+                    answer: 42
+                    scale: 1.2
+                    path: /a/b/%(answer)s
+                    embed: %(path)s::foo
+                    disclaimer:
+                      Let it be known
+                      that.
+
+                    [a]
+                    list: [1, 2, 3, %(answer)s]
+                    list2: +[7, 8, 9]
+                    list3: -["x", "y", "z"]
+
+                    [b]
+                    preempt: True
+
+                    [b.nested]
+                    dict: {
+                        'a': 1,
+                        'b': %(answer)s,
+                        'c': ['%(answer)s', '%(answer)s'],
+                      }
+
+                    [b.nested.nested-again]
+                    movie: inception
+
+                    [c]
+                    name: overridden_from_default
+                    interpolated_from_section: %(name)s is interpolated
+                    recursively_interpolated_from_section: %(interpolated_from_section)s (again)
+                    """
                 ),
                 ConfigFormat.toml: dedent(
                     """
-          [DEFAULT]
-          name = "foo"
-          answer = 42
-          scale = 1.2
-          path = "/a/b/%(answer)s"
-          embed = "%(path)s::foo"
-          disclaimer = '''
-          Let it be known
-          that.'''
-        
-          [a]
-          # TODO: once TOML releases its new version with support for heterogenous lists, we should be 
-          # able to rewrite this to `[1, 2, 3, "%(answer)s"`. See 
-          # https://github.com/toml-lang/toml/issues/665. 
-          list = ["1", "2", "3", "%(answer)s"]
-          list2.add = [7, 8, 9]
-          list3.remove = ["x", "y", "z"]
-        
-          [b]
-          preempt = true
-        
-          [b.nested]
-          dict = '''
-          {
-            "a": 1,
-            "b": "%(answer)s",
-            "c": ["%(answer)s", "%(answer)s"],
-          }'''
-        
-          [b.nested.nested-again]
-          movie = "inception"
-          
-          [c]
-          name = "overridden_from_default"
-          interpolated_from_section = "%(name)s is interpolated"
-          recursively_interpolated_from_section = "%(interpolated_from_section)s (again)"
-          """
+                    [DEFAULT]
+                    name = "foo"
+                    answer = 42
+                    scale = 1.2
+                    path = "/a/b/%(answer)s"
+                    embed = "%(path)s::foo"
+                    disclaimer = '''
+                    Let it be known
+                    that.'''
+
+                    [a]
+                    # TODO: once TOML releases its new version with support for heterogenous lists, we should be 
+                    # able to rewrite this to `[1, 2, 3, "%(answer)s"`. See 
+                    # https://github.com/toml-lang/toml/issues/665. 
+                    list = ["1", "2", "3", "%(answer)s"]
+                    list2.add = [7, 8, 9]
+                    list3.remove = ["x", "y", "z"]
+
+                    [b]
+                    preempt = true
+
+                    [b.nested]
+                    dict = '''
+                    {
+                      "a": 1,
+                      "b": "%(answer)s",
+                      "c": ["%(answer)s", "%(answer)s"],
+                    }'''
+
+                    [b.nested.nested-again]
+                    movie = "inception"
+
+                    [c]
+                    name = "overridden_from_default"
+                    interpolated_from_section = "%(name)s is interpolated"
+                    recursively_interpolated_from_section = "%(interpolated_from_section)s (again)"
+                    """
                 ),
             },
         )
@@ -183,38 +183,38 @@ class File2(ConfigFile):
             {
                 ConfigFormat.ini: dedent(
                     """
-          [a]
-          fast: True
+                    [a]
+                    fast: True
 
-          [b]
-          preempt: False
+                    [b]
+                    preempt: False
 
-          [d]
-          list: +[0, 1],-[8, 9]
+                    [d]
+                    list: +[0, 1],-[8, 9]
 
-          [empty_section]
-          
-          [p.child]
-          no_values_in_parent: True
-          """
+                    [empty_section]
+
+                    [p.child]
+                    no_values_in_parent: True
+                    """
                 ),
                 ConfigFormat.toml: dedent(
                     """
-          [a]
-          fast = true
+                    [a]
+                    fast = true
 
-          [b]
-          preempt = false
+                    [b]
+                    preempt = false
 
-          [d]
-          list.add = [0, 1]
-          list.remove = [8, 9]
+                    [d]
+                    list.add = [0, 1]
+                    list.remove = [8, 9]
 
-          [empty_section]
-          
-          [p.child]
-          no_values_in_parent = true
-          """
+                    [empty_section]
+
+                    [p.child]
+                    no_values_in_parent = true
+                    """
                 ),
             },
         )

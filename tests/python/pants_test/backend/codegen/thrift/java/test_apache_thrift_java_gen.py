@@ -33,10 +33,10 @@ class ApacheThriftJavaGenTest(TaskTestBase):
             "src/thrift/com/foo/one.thrift",
             contents=dedent(
                 """
-    namespace java com.foo
+                namespace java com.foo
 
-    struct One {}
-    """
+                struct One {}
+                """
             ),
         )
         one = self.make_target(
@@ -56,20 +56,20 @@ class ApacheThriftJavaGenTest(TaskTestBase):
             "src/thrift/com/foo/one.thrift",
             contents=dedent(
                 """
-    namespace java com.foo
+                namespace java com.foo
 
-    struct One {}
-    """
+                struct One {}
+                """
             ),
         )
         self.create_file(
             "src/thrift/com/foo/bar/two.thrift",
             contents=dedent(
                 """
-    namespace java com.foo.bar
+                namespace java com.foo.bar
 
-    struct Two {}
-    """
+                struct Two {}
+                """
             ),
         )
         one = self.make_target(
@@ -89,10 +89,10 @@ class ApacheThriftJavaGenTest(TaskTestBase):
             "src/thrift/com/foo/one.thrift",
             contents=dedent(
                 """
-    namespace java com.foo
+                namespace java com.foo
 
-    struct One {}
-    """
+                struct One {}
+                """
             ),
         )
 

@@ -29,9 +29,9 @@ class PythonRequirements:
 
     def __call__(self, requirements_relpath="requirements.txt"):
         """
-    :param string requirements_relpath: The relpath from this BUILD file to the requirements file.
-    Defaults to a `requirements.txt` file sibling to the BUILD file.
-    """
+        :param string requirements_relpath: The relpath from this BUILD file to the requirements file.
+        Defaults to a `requirements.txt` file sibling to the BUILD file.
+        """
 
         requirements = []
         repository = None

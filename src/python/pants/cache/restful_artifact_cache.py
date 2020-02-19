@@ -37,12 +37,12 @@ class RESTfulArtifactCache(ArtifactCache):
         self, artifact_root, best_url_selector, local, read_timeout=4.0, write_timeout=4.0
     ):
         """
-    :param string artifact_root: The path under which cacheable products will be read/written.
-    :param BestUrlSelector best_url_selector: Url selector that supports fail-over. Each returned
-      url represents prefix for some RESTful service. We must be able to PUT and GET to any path
-      under this base.
-    :param BaseLocalArtifactCache local: local cache instance for storing and creating artifacts
-    """
+        :param string artifact_root: The path under which cacheable products will be read/written.
+        :param BestUrlSelector best_url_selector: Url selector that supports fail-over. Each returned
+          url represents prefix for some RESTful service. We must be able to PUT and GET to any path
+          under this base.
+        :param BaseLocalArtifactCache local: local cache instance for storing and creating artifacts
+        """
         super().__init__(artifact_root)
 
         self.best_url_selector = best_url_selector

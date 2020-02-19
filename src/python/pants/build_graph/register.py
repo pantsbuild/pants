@@ -28,8 +28,8 @@ class BuildFilePath:
 
     def __call__(self):
         """
-    :returns: The absolute path of this BUILD file.
-    """
+        :returns: The absolute path of this BUILD file.
+        """
         return os.path.join(get_buildroot(), self._parse_context.rel_path)
 
 

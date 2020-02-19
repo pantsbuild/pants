@@ -125,12 +125,12 @@ class OptionsBootstrapperTest(unittest.TestCase):
             fp.write(
                 dedent(
                     """
-      [foo]
-      bar: %(pants_workdir)s/baz
-
-      [fruit]
-      apple: %(pants_supportdir)s/banana
-      """
+                    [foo]
+                    bar: %(pants_workdir)s/baz
+            
+                    [fruit]
+                    apple: %(pants_supportdir)s/banana
+                    """
                 )
             )
             fp.close()
@@ -193,20 +193,20 @@ class OptionsBootstrapperTest(unittest.TestCase):
             fp1.write(
                 dedent(
                     """\
-         [compile.apt]
-         worker_count: 1
-  
-         [fruit]
-         apple: red
-         """
+                    [compile.apt]
+                    worker_count: 1
+
+                    [fruit]
+                    apple: red
+                    """
                 )
             )
             fp2.write(
                 dedent(
                     """\
-          [compile.apt]
-          worker_count: 2
-          """
+                    [compile.apt]
+                    worker_count: 2
+                    """
                 )
             )
             fp1.close()
@@ -230,9 +230,9 @@ class OptionsBootstrapperTest(unittest.TestCase):
             fp.write(
                 dedent(
                     """
-      [resolver]
-      resolver: coursier
-      """
+                    [resolver]
+                    resolver: coursier
+                    """
                 )
             )
             fp.close()

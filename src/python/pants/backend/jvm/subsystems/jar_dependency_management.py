@@ -214,8 +214,8 @@ class PinnedJarArtifactSet:
 
     def __init__(self, pinned_coordinates=None):
         """
-    :param pinned_coordinates: An optional list of coordinates to initialize the set with.
-    """
+        :param pinned_coordinates: An optional list of coordinates to initialize the set with.
+        """
         self._artifacts_to_versions = {}
         self._id = None
         if pinned_coordinates:

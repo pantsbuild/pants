@@ -22,10 +22,10 @@ class SubprocessExecutorTest(unittest.TestCase):
                 fp.write(
                     textwrap.dedent(
                         """
-            #!/bin/sh
-            echo ${env_var} >&2
-            echo "java.home={java_home}"
-          """.format(
+                        #!/bin/sh
+                        echo ${env_var} >&2
+                        echo "java.home={java_home}"
+                        """.format(
                             env_var=env_var, java_home=jre
                         )
                     ).strip()

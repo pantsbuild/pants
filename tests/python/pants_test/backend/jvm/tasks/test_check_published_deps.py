@@ -63,22 +63,22 @@ class CheckPublishedDepsTest(ConsoleTaskTestBase):
             "org.name/lib1/publish.properties",
             dedent(
                 """
-        revision.major.org.name%lib1=2
-        revision.minor.org.name%lib1=0
-        revision.patch.org.name%lib1=0
-        revision.sha.org.name%lib1=12345
-        """
+                revision.major.org.name%lib1=2
+                revision.minor.org.name%lib1=0
+                revision.patch.org.name%lib1=0
+                revision.sha.org.name%lib1=12345
+                """
             ),
         )
         write_db_file(
             "org.name/lib2/publish.properties",
             dedent(
                 """
-        revision.major.org.name%lib2=2
-        revision.minor.org.name%lib2=0
-        revision.patch.org.name%lib2=0
-        revision.sha.org.name%lib2=12345
-        """
+                revision.major.org.name%lib2=2
+                revision.minor.org.name%lib2=0
+                revision.patch.org.name%lib2=0
+                revision.sha.org.name%lib2=12345
+                """
             ),
         )
 
@@ -86,52 +86,52 @@ class CheckPublishedDepsTest(ConsoleTaskTestBase):
             "provider/BUILD",
             dedent(
                 """
-        java_library(name='lib1',
-          provides=artifact(
-            org='org.name',
-            name='lib1',
-            repo=repo),
-          sources=[])
-        java_library(name='lib2',
-          provides=artifact(
-            org='org.name',
-            name='lib2',
-            repo=repo),
-          sources=[])
-        """
+                java_library(name='lib1',
+                  provides=artifact(
+                    org='org.name',
+                    name='lib1',
+                    repo=repo),
+                  sources=[])
+                java_library(name='lib2',
+                  provides=artifact(
+                    org='org.name',
+                    name='lib2',
+                    repo=repo),
+                  sources=[])
+                """
             ),
         )
         self.add_to_build_file(
             "outdated/BUILD",
             dedent(
                 """
-        jar_library(name='outdated',
-          jars=[jar(org='org.name', name='lib1', rev='1.0.0')]
-        )
-        """
+                jar_library(name='outdated',
+                  jars=[jar(org='org.name', name='lib1', rev='1.0.0')]
+                )
+                """
             ),
         )
         self.add_to_build_file(
             "uptodate/BUILD",
             dedent(
                 """
-        jar_library(name='uptodate',
-          jars=[jar(org='org.name', name='lib2', rev='2.0.0')]
-        )
-        """
+                jar_library(name='uptodate',
+                  jars=[jar(org='org.name', name='lib2', rev='2.0.0')]
+                )
+                """
             ),
         )
         self.add_to_build_file(
             "both/BUILD",
             dedent(
                 """
-        target(name='both',
-          dependencies=[
-            'outdated',
-            'uptodate',
-          ]
-        )
-        """
+                target(name='both',
+                  dependencies=[
+                    'outdated',
+                    'uptodate',
+                  ]
+                )
+                """
             ),
         )
 

@@ -25,15 +25,15 @@ class JvmToolTaskTestBase(JvmTaskTestBase):
     @classmethod
     def alias_groups(cls):
         """
-    :API: public
-    """
+        :API: public
+        """
         # Aliases appearing in our real BUILD.tools.
         return build_file_aliases().merge(BuildFileAliases(targets={"target": Target}))
 
     def setUp(self):
         """
-    :API: public
-    """
+        :API: public
+        """
         super().setUp()
 
         # Use a synthetic subclass for proper isolation when bootstrapping within the test.
@@ -77,8 +77,8 @@ class JvmToolTaskTestBase(JvmTaskTestBase):
 
     def context(self, for_task_types=None, **kwargs):
         """
-    :API: public
-    """
+        :API: public
+        """
         # Add in the bootstrapper task type, so its options get registered and set.
         for_task_types = [self.bootstrap_task_type] + (for_task_types or [])
         return super().context(for_task_types=for_task_types, **kwargs)

@@ -45,22 +45,22 @@ class NodeResolveSourceDepsTest(TaskTestBase):
             "src/node/trans_dep/package.json",
             contents=dedent(
                 """
-      {
-        "name": "trans_dep",
-        "version": "0.0.1"
-      }
-    """
+                {
+                  "name": "trans_dep",
+                  "version": "0.0.1"
+                }
+                """
             ),
         )
         self.create_file(
             "src/node/trans_dep/index.js",
             contents=dedent(
                 """
-      const add = (num1, num2) => {
-        return num1 + num2;
-      };
-      module.exports.add = add;
-    """
+                const add = (num1, num2) => {
+                  return num1 + num2;
+                };
+                module.exports.add = add;
+                """
             ),
         )
         trans_dep = self.make_target(
@@ -100,8 +100,8 @@ class NodeResolveSourceDepsTest(TaskTestBase):
             os.path.join(src_root, "dep/cli.js"),
             contents=dedent(
                 """#!/usr/bin/env node
-        console.log('Hello world!');
-      """
+                console.log('Hello world!');
+                """
             ),
         )
         if trans_dep:
@@ -112,12 +112,12 @@ class NodeResolveSourceDepsTest(TaskTestBase):
                 os.path.join(src_root, "dep/index.js"),
                 contents=dedent(
                     """
-        const trans_dep = require('{require_dep}');
-        const addOne = (num) => {{
-          return trans_dep.add(num, 1);
-        }};
-        module.exports.addOne = addOne;
-      """.format(
+                    const trans_dep = require('{require_dep}');
+                    const addOne = (num) => {{
+                      return trans_dep.add(num, 1);
+                    }};
+                    module.exports.addOne = addOne;
+                    """.format(
                         require_dep=require_dep
                     )
                 ),
@@ -126,14 +126,14 @@ class NodeResolveSourceDepsTest(TaskTestBase):
                 os.path.join(src_root, "dep/package.json"),
                 contents=dedent(
                     """
-        {{
-          "name": "dep",
-          "version": "0.0.1",
-          "dependencies": {{
-            "trans_dep": "file:../trans_dep"
-          }}{bin_field}
-        }}
-      """.format(
+                    {{
+                      "name": "dep",
+                      "version": "0.0.1",
+                      "dependencies": {{
+                        "trans_dep": "file:../trans_dep"
+                      }}{bin_field}
+                    }}
+                    """.format(
                         bin_field=bin_field
                     )
                 ),
@@ -157,11 +157,11 @@ class NodeResolveSourceDepsTest(TaskTestBase):
                 os.path.join(src_root, "dep/package.json"),
                 contents=dedent(
                     """
-        {{
-          "name": "dep",
-          "version": "0.0.1"{bin_field}
-        }}
-      """.format(
+                    {{
+                      "name": "dep",
+                      "version": "0.0.1"{bin_field}
+                    }}
+                    """.format(
                         bin_field=bin_field
                     )
                 ),
@@ -170,11 +170,11 @@ class NodeResolveSourceDepsTest(TaskTestBase):
                 os.path.join(src_root, "dep/index.js"),
                 contents=dedent(
                     """
-        const addOne = (num) => {
-          return num + 1;
-        };
-        module.exports.addOne = addOne;
-      """
+                    const addOne = (num) => {
+                      return num + 1;
+                    };
+                    module.exports.addOne = addOne;
+                    """
                 ),
             )
             if make_target:
@@ -205,18 +205,18 @@ class NodeResolveSourceDepsTest(TaskTestBase):
             os.path.join(src_root, "app/package.json"),
             contents=dedent(
                 """
-      {{
-        "name": "app",
-        "version": "0.0.1",
-        "dependencies": {{
-          {dependencies}
-        }},
-        "bin": {{
-          "app": "./cli.js",
-          "app2": "./cli2.js"
-        }}
-      }}
-    """.format(
+                {{
+                  "name": "app",
+                  "version": "0.0.1",
+                  "dependencies": {{
+                    {dependencies}
+                  }},
+                  "bin": {{
+                    "app": "./cli.js",
+                    "app2": "./cli2.js"
+                  }}
+                }}
+                """.format(
                     dependencies=dependencies
                 )
             ),
@@ -229,9 +229,9 @@ class NodeResolveSourceDepsTest(TaskTestBase):
             os.path.join(src_root, "app/index.js"),
             contents=dedent(
                 """
-      const dep = require('{require_dep}');
-      console.log(dep.addOne(1));
-    """.format(
+                const dep = require('{require_dep}');
+                console.log(dep.addOne(1));
+                """.format(
                     require_dep=require_dep
                 )
             ),
@@ -240,16 +240,16 @@ class NodeResolveSourceDepsTest(TaskTestBase):
             os.path.join(src_root, "app/cli.js"),
             contents=dedent(
                 """#!/usr/bin/env node
-      console.log('cli');
-    """
+                console.log('cli');
+                """
             ),
         )
         self.create_file(
             os.path.join(src_root, "app/cli2.js"),
             contents=dedent(
                 """#!/usr/bin/env node
-      console.log('cli2');
-    """
+                console.log('cli2');
+                """
             ),
         )
         app = self.make_target(
@@ -271,20 +271,20 @@ class NodeResolveSourceDepsTest(TaskTestBase):
             os.path.join(src_root, "app/package.json"),
             contents=dedent(
                 """
-      {
-        "name": "app",
-        "version": "0.0.1",
-        "bin": "index.js"
-      }
-    """
+                {
+                  "name": "app",
+                  "version": "0.0.1",
+                  "bin": "index.js"
+                }
+                """
             ),
         )
         self.create_file(
             os.path.join(src_root, "app/index.js"),
             contents=dedent(
                 """
-      console.log('hello');
-    """
+                console.log('hello');
+                """
             ),
         )
         app = self.make_target(
@@ -315,18 +315,18 @@ class NodeResolveSourceDepsTest(TaskTestBase):
             "src/node/workspace/package.json",
             contents=dedent(
                 """
-      {
-        "name": "workspace",
-        "version": "1.0.0",
-        "private": true,
-        "workspaces": [
-          "./projects/dep"
-        ],
-        "dependencies": {
-          "app": "file:../app"
-        }
-      }
-    """
+                {
+                  "name": "workspace",
+                  "version": "1.0.0",
+                  "private": true,
+                  "workspaces": [
+                    "./projects/dep"
+                  ],
+                  "dependencies": {
+                    "app": "file:../app"
+                  }
+                }
+                """
             ),
         )
 
@@ -529,22 +529,22 @@ class NodeResolveSourceDepsTest(TaskTestBase):
             "src/node/dep/package.json",
             contents=dedent(
                 """
-      {
-        "name": "@shorts/dep",
-        "version": "0.0.1"
-      }
-    """
+                {
+                  "name": "@shorts/dep",
+                  "version": "0.0.1"
+                }
+                """
             ),
         )
         self.create_file(
             "src/node/dep/index.js",
             contents=dedent(
                 """
-      const addOne = (num) => {
-        return num + 1;
-      };
-      module.exports.addOne = addOne;
-    """
+                const addOne = (num) => {
+                  return num + 1;
+                };
+                module.exports.addOne = addOne;
+                """
             ),
         )
         dep = self.make_target(
@@ -611,22 +611,22 @@ class NodeResolveSourceDepsTest(TaskTestBase):
             "src/node/dep/package.json",
             contents=dedent(
                 """
-      {
-        "name": "@shorts/dep",
-        "version": "0.0.1"
-      }
-    """
+                {
+                  "name": "@shorts/dep",
+                  "version": "0.0.1"
+                }
+                """
             ),
         )
         self.create_file(
             "src/node/dep/index.js",
             contents=dedent(
                 """
-      const addOne = (num) => {
-        return num + 1;
-      };
-      module.exports.addOne = addOne;
-    """
+                const addOne = (num) => {
+                  return num + 1;
+                };
+                module.exports.addOne = addOne;
+                """
             ),
         )
         dep = self.make_target(

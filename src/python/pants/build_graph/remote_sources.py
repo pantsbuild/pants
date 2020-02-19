@@ -21,14 +21,14 @@ class RemoteSources(Target):
         self, address=None, payload=None, sources_target=None, dest=None, args=None, **kwargs
     ):
         """
-    :API: public
+        :API: public
 
-    :param string sources_target: The address of the (typically unpacked_jars) target to get sources
-      from.
-    :param dest: The target type of the synthetic target to generate (eg, java_library).
-    :param dict args: Any additional arguments necessary to construct the synthetic destination
-      target (sources and dependencies are supplied automatically).
-    """
+        :param string sources_target: The address of the (typically unpacked_jars) target to get sources
+          from.
+        :param dest: The target type of the synthetic target to generate (eg, java_library).
+        :param dict args: Any additional arguments necessary to construct the synthetic destination
+          target (sources and dependencies are supplied automatically).
+        """
         self.address = address
         if not sources_target:
             raise TargetDefinitionException(

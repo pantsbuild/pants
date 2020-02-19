@@ -236,15 +236,15 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         profile_path: Optional[str],
     ) -> None:
         """
-    :param build_root: The build root for this run.
-    :param options: The parsed options for this run.
-    :param options_bootstrapper: The OptionsBootstrapper instance to use.
-    :param build_config: The parsed build configuration for this run.
-    :param specs: The specs for this run, i.e. either the address or filesystem specs.
-    :param graph_session: A LegacyGraphSession instance for graph reuse.
-    :param is_daemon: Whether or not this run was launched with a daemon graph helper.
-    :param profile_path: The profile path - if any (from from the `PANTS_PROFILE` env var).
-    """
+        :param build_root: The build root for this run.
+        :param options: The parsed options for this run.
+        :param options_bootstrapper: The OptionsBootstrapper instance to use.
+        :param build_config: The parsed build configuration for this run.
+        :param specs: The specs for this run, i.e. either the address or filesystem specs.
+        :param graph_session: A LegacyGraphSession instance for graph reuse.
+        :param is_daemon: Whether or not this run was launched with a daemon graph helper.
+        :param profile_path: The profile path - if any (from from the `PANTS_PROFILE` env var).
+        """
         self._build_root = build_root
         self._options = options
         self._options_bootstrapper = options_bootstrapper

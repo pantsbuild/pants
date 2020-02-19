@@ -52,16 +52,16 @@ class PantsLoader:
             raise cls.InvalidLocaleError(
                 dedent(
                     """
-        Your system's preferred encoding is `{}`, but Pants requires `UTF-8`.
-        Specifically, Python's `locale.getpreferredencoding()` must resolve to `UTF-8`.
-
-        Fix it by setting the LC_* and LANG environment settings. Example:
-          LC_ALL=en_US.UTF-8
-          LANG=en_US.UTF-8
-        Or, bypass it by setting the below environment variable. 
-          {}=1
-        Note: we cannot guarantee consistent behavior with this bypass enabled.
-        """.format(
+                    Your system's preferred encoding is `{}`, but Pants requires `UTF-8`.
+                    Specifically, Python's `locale.getpreferredencoding()` must resolve to `UTF-8`.
+            
+                    Fix it by setting the LC_* and LANG environment settings. Example:
+                      LC_ALL=en_US.UTF-8
+                      LANG=en_US.UTF-8
+                    Or, bypass it by setting the below environment variable. 
+                      {}=1
+                    Note: we cannot guarantee consistent behavior with this bypass enabled.
+                    """.format(
                         encoding, cls.ENCODING_IGNORE_ENV_VAR
                     )
                 )

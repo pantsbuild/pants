@@ -14,19 +14,19 @@ class GrpcioMultipleGenTest(GrpcioTestBase):
             "src/grpcio/com/example/example.proto",
             contents=dedent(
                 """
-    syntax = "proto3";
-    package com.example;
-
-    service FooService {
-        rpc Foo(FooRequest) returns (FooReply) {}
-    }
-    message FooRequest {
-        string foo = 1;
-    }
-    message FooReply {
-        string bar = 1;
-    }
-    """
+                syntax = "proto3";
+                package com.example;
+            
+                service FooService {
+                    rpc Foo(FooRequest) returns (FooReply) {}
+                }
+                message FooRequest {
+                    string foo = 1;
+                }
+                message FooReply {
+                    string bar = 1;
+                }
+                """
             ),
         )
         example_target = self.make_target(

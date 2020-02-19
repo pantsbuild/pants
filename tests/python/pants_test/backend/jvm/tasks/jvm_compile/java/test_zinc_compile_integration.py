@@ -192,25 +192,25 @@ class ZincCompileIntegrationTest(BaseCompileIT):
                 _create_file(_build_file, "scala_library()")
                 _srcfile_content = dedent(
                     """
-                                package org.pantsbuild.cachetest
-                                object A {
-                                  def x(y: Option[Int] = None) = {
-                                    println("hello");
-                                  }
-                                }
-                                """
+                    package org.pantsbuild.cachetest
+                    object A {
+                      def x(y: Option[Int] = None) = {
+                        println("hello");
+                      }
+                    }
+                    """
                 )
                 _create_file(_srcfile_a, _srcfile_content)
                 _create_file(
                     _srcfile_b,
                     dedent(
                         """
-                                      package org.pantsbuild.cachetest
-                                      object B extends App {
-                                        A.x();
-                                        System.exit(0);
-                                      }
-                                      """
+                        package org.pantsbuild.cachetest
+                        object B extends App {
+                          A.x();
+                          System.exit(0);
+                        }
+                        """
                     ),
                 )
                 return _lib_spec, _srcfile_a, _srcfile_content

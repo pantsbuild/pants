@@ -117,10 +117,10 @@ class NailgunStreamStdinReader(_StoppableDaemonThread):
 
     def __init__(self, maybe_shutdown_socket, write_handle):
         """
-    :param socket sock: the socket to read nailgun protocol chunks from.
-    :param file write_handle: A file-like (usually the write end of a pipe/pty) onto which
-      to write data decoded from the chunks.
-    """
+        :param socket sock: the socket to read nailgun protocol chunks from.
+        :param file write_handle: A file-like (usually the write end of a pipe/pty) onto which
+          to write data decoded from the chunks.
+        """
         super().__init__(name=self.__class__.__name__)
         self._maybe_shutdown_socket = maybe_shutdown_socket
         self._write_handle = write_handle
@@ -186,13 +186,13 @@ class NailgunStreamWriter(_StoppableDaemonThread):
         self, in_fds, sock, chunk_types, chunk_eof_type, buf_size=None, select_timeout=None
     ):
         """
-    :param tuple in_fds: A tuple of input file descriptors to read from.
-    :param socket sock: the socket to emit nailgun protocol chunks over.
-    :param tuple chunk_types: A tuple of chunk types with a 1:1 positional association with in_files.
-    :param int chunk_eof_type: The nailgun chunk type for EOF (applies only to stdin).
-    :param int buf_size: the buffer size for reads from the file descriptor.
-    :param int select_timeout: the timeout (in seconds) for select.select() calls against the fd.
-    """
+        :param tuple in_fds: A tuple of input file descriptors to read from.
+        :param socket sock: the socket to emit nailgun protocol chunks over.
+        :param tuple chunk_types: A tuple of chunk types with a 1:1 positional association with in_files.
+        :param int chunk_eof_type: The nailgun chunk type for EOF (applies only to stdin).
+        :param int buf_size: the buffer size for reads from the file descriptor.
+        :param int select_timeout: the timeout (in seconds) for select.select() calls against the fd.
+        """
         super().__init__(name=self.__class__.__name__)
         # Validates that we've received file descriptor numbers.
         self._in_fds = [int(f) for f in in_fds]

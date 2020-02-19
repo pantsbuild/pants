@@ -88,22 +88,22 @@ class TestContext(Context):
     @contextmanager
     def new_workunit(self, name, labels=None, cmd="", log_config=None):
         """
-    :API: public
-    """
+        :API: public
+        """
         sys.stderr.write(f"\nStarting workunit {name}\n")
         yield TestContext.DummyWorkUnit()
 
     @property
     def log(self):
         """
-    :API: public
-    """
+        :API: public
+        """
         return self._logger
 
     def submit_background_work_chain(self, work_chain, parent_workunit_name=None):
         """
-    :API: public
-    """
+        :API: public
+        """
         # Just do the work synchronously, so we don't need a run tracker, background workers and so on.
         for work in work_chain:
             for args_tuple in work.args_tuples:
@@ -111,8 +111,8 @@ class TestContext(Context):
 
     def subproc_map(self, f, items):
         """
-    :API: public
-    """
+        :API: public
+        """
         # Just execute in-process.
         return list(map(f, items))
 

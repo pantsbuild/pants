@@ -394,8 +394,8 @@ class SimpleCodegenTask(Task):
 
     def resolve_deps(self, unresolved_deps):
         """
-    :API: public
-    """
+        :API: public
+        """
         deps = OrderedSet()
         for dep in unresolved_deps:
             try:

@@ -29,9 +29,9 @@ class SourcesField(PayloadField):
 
     def __init__(self, sources: FilesetWithSpec, ref_address=None) -> None:
         """
-    :param sources: FilesetWithSpec representing the underlying sources.
-    :param ref_address: optional address spec of target that provides these sources
-    """
+        :param sources: FilesetWithSpec representing the underlying sources.
+        :param ref_address: optional address spec of target that provides these sources
+        """
         self._sources = self._validate_sources(sources)
         self._ref_address = ref_address
 

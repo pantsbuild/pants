@@ -18,12 +18,12 @@ class NodeLintIntegrationTest(PantsRunIntegrationTest):
         path = self.EMPTY_DIRECTORY / "BUILD"
         content = dedent(
             """\
-      node_module(
-        name='javascriptstyle-empty',
-        sources=rglobs('package.json', 'yarn.lock', '*.js', '.eslintignore'),
-        package_manager='yarn',
-      )
-      """
+            node_module(
+              name='javascriptstyle-empty',
+              sources=rglobs('package.json', 'yarn.lock', '*.js', '.eslintignore'),
+              package_manager='yarn',
+            )
+            """
         )
         with self.temporary_file_content(str(path), content, binary_mode=False):
             yield

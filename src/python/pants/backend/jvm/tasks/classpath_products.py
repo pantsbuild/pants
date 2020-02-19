@@ -37,8 +37,8 @@ class MissingClasspathEntryError(Exception):
 
 class ClasspathProducts:
     """
-  :API: public
-  """
+    :API: public
+    """
 
     def __init__(self, pants_workdir, classpaths=None, excludes=None):
         self._classpaths = classpaths or UnionProducts()
@@ -48,8 +48,8 @@ class ClasspathProducts:
     @staticmethod
     def init_func(pants_workdir):
         """
-    :API: public
-    """
+        :API: public
+        """
         return lambda: ClasspathProducts(pants_workdir)
 
     @classmethod

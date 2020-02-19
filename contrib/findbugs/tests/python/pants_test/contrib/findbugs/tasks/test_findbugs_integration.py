@@ -85,15 +85,15 @@ class FindBugsTest(PantsRunIntegrationTest):
             exclude_file.write(
                 dedent(
                     """\
-        <?xml version="1.0" encoding="UTF-8"?>
-        <FindBugsFilter>
-          <Match>
-            <Bug pattern="NP_ALWAYS_NULL" />
-            <Class name="org.pantsbuild.contrib.findbugs.NormalWarning" />
-            <Method name="main" />
-          </Match>
-        </FindBugsFilter>
-      """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <FindBugsFilter>
+                      <Match>
+                        <Bug pattern="NP_ALWAYS_NULL" />
+                        <Class name="org.pantsbuild.contrib.findbugs.NormalWarning" />
+                        <Method name="main" />
+                      </Match>
+                    </FindBugsFilter>
+                    """
                 )
             )
             exclude_file.close()
@@ -112,11 +112,11 @@ class FindBugsTest(PantsRunIntegrationTest):
             exclude_file.write(
                 dedent(
                     """\
-        <?xml version="1.0" encoding="UTF-8"?>
-        <FindBugsFilter>
-          <Incomplete Tag
-        </FindBugsFilter>
-      """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <FindBugsFilter>
+                      <Incomplete Tag
+                    </FindBugsFilter>
+                    """
                 )
             )
             exclude_file.close()

@@ -174,9 +174,9 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
         self.assert_equal_with_printing(
             dedent(
                 """
-      2 Exceptions encountered:
-        Exception: An exception for B
-        Exception: An exception for B"""
+                2 Exceptions encountered:
+                  Exception: An exception for B
+                  Exception: An exception for B"""
             ).lstrip(),
             str(cm.exception),
         )
@@ -194,19 +194,19 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
         self.assert_equal_with_printing(
             dedent(
                 f"""
-      1 Exception encountered:
-      Computing Select(<{__name__}.B object at 0xEEEEEEEEE>, A)
-        Computing Task({fmt_rust_function(nested_raise)}(), <{__name__}.B object at 0xEEEEEEEEE>, A, true)
-          Throw(An exception for B)
-            Traceback (most recent call last):
-              File LOCATION-INFO, in call
-                val = func(*args)
-              File LOCATION-INFO, in nested_raise
-                fn_raises(x)
-              File LOCATION-INFO, in fn_raises
-                raise Exception(f'An exception for {{type(x).__name__}}')
-            Exception: An exception for B
-      """
+                1 Exception encountered:
+                Computing Select(<{__name__}.B object at 0xEEEEEEEEE>, A)
+                  Computing Task({fmt_rust_function(nested_raise)}(), <{__name__}.B object at 0xEEEEEEEEE>, A, true)
+                    Throw(An exception for B)
+                      Traceback (most recent call last):
+                        File LOCATION-INFO, in call
+                          val = func(*args)
+                        File LOCATION-INFO, in nested_raise
+                          fn_raises(x)
+                        File LOCATION-INFO, in fn_raises
+                          raise Exception(f'An exception for {{type(x).__name__}}')
+                      Exception: An exception for B
+                """
             ).lstrip()
             + "\n",
             remove_locations_from_traceback(str(cm.exception)),
@@ -255,34 +255,34 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
         self.assert_equal_with_printing(
             dedent(
                 f"""
-      1 Exception encountered:
-      Computing Select(<{__name__}..B object at 0xEEEEEEEEE>, A)
-        Computing Task(a_from_c_and_d(), <{__name__}..B object at 0xEEEEEEEEE>, A, true)
-          Computing Task(d_from_b_nested_raise(), <{__name__}..B object at 0xEEEEEEEEE>, =D, true)
-            Throw(An exception for B)
-              Traceback (most recent call last):
-                File LOCATION-INFO, in call
-                  val = func(*args)
-                File LOCATION-INFO, in d_from_b_nested_raise
-                  fn_raises(b)
-                File LOCATION-INFO, in fn_raises
-                  raise Exception('An exception for {{}}'.format(type(x).__name__))
-              Exception: An exception for B
-
-
-      Computing Select(<{__name__}..B object at 0xEEEEEEEEE>, A)
-        Computing Task(a_from_c_and_d(), <{__name__}..B object at 0xEEEEEEEEE>, A, true)
-          Computing Task(c_from_b_nested_raise(), <{__name__}..B object at 0xEEEEEEEEE>, =C, true)
-            Throw(An exception for B)
-              Traceback (most recent call last):
-                File LOCATION-INFO, in call
-                  val = func(*args)
-                File LOCATION-INFO, in c_from_b_nested_raise
-                  fn_raises(b)
-                File LOCATION-INFO, in fn_raises
-                  raise Exception('An exception for {{}}'.format(type(x).__name__))
-              Exception: An exception for B
-      """
+                1 Exception encountered:
+                Computing Select(<{__name__}..B object at 0xEEEEEEEEE>, A)
+                  Computing Task(a_from_c_and_d(), <{__name__}..B object at 0xEEEEEEEEE>, A, true)
+                    Computing Task(d_from_b_nested_raise(), <{__name__}..B object at 0xEEEEEEEEE>, =D, true)
+                      Throw(An exception for B)
+                        Traceback (most recent call last):
+                          File LOCATION-INFO, in call
+                            val = func(*args)
+                          File LOCATION-INFO, in d_from_b_nested_raise
+                            fn_raises(b)
+                          File LOCATION-INFO, in fn_raises
+                            raise Exception('An exception for {{}}'.format(type(x).__name__))
+                        Exception: An exception for B
+        
+        
+                Computing Select(<{__name__}..B object at 0xEEEEEEEEE>, A)
+                  Computing Task(a_from_c_and_d(), <{__name__}..B object at 0xEEEEEEEEE>, A, true)
+                    Computing Task(c_from_b_nested_raise(), <{__name__}..B object at 0xEEEEEEEEE>, =C, true)
+                      Throw(An exception for B)
+                        Traceback (most recent call last):
+                          File LOCATION-INFO, in call
+                            val = func(*args)
+                          File LOCATION-INFO, in c_from_b_nested_raise
+                            fn_raises(b)
+                          File LOCATION-INFO, in fn_raises
+                            raise Exception('An exception for {{}}'.format(type(x).__name__))
+                        Exception: An exception for B
+                """
             ).lstrip()
             + "\n",
             remove_locations_from_traceback(str(cm.exception)),
@@ -315,10 +315,10 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
         self.assert_equal_with_printing(
             dedent(
                 f"""
-      Rules with errors: 1
-        {fmt_rule(upcast)}:
-          No rule was available to compute MyInt. Maybe declare RootRule(MyInt)?
-        """
+                Rules with errors: 1
+                  {fmt_rule(upcast)}:
+                    No rule was available to compute MyInt. Maybe declare RootRule(MyInt)?
+                """
             ).strip(),
             str(cm.exception),
         )

@@ -108,14 +108,14 @@ class PytestTestConftest(PytestTestBase):
             "src/python/base/conftest.py",
             contents=dedent(
                 """
-    import pytest
-    
-    APPS = ['base']
-    INDEX = {}
-    
-    def pytest_configure(config):
-      INDEX.update((app, len(app)) for app in APPS)
-    """
+                import pytest
+
+                APPS = ['base']
+                INDEX = {}
+
+                def pytest_configure(config):
+                  INDEX.update((app, len(app)) for app in APPS)
+                """
             ),
         )
         self.add_to_build_file("src/python/base", target='python_library(sources=globs("*.py"))\n')
@@ -125,10 +125,10 @@ class PytestTestConftest(PytestTestBase):
             "src/python/base/app/conftest.py",
             contents=dedent(
                 """
-    from base.conftest import APPS
-    
-    APPS.append('app')
-    """
+                from base.conftest import APPS
+
+                APPS.append('app')
+                """
             ),
         )
         self.add_to_build_file(
@@ -139,11 +139,11 @@ class PytestTestConftest(PytestTestBase):
             "src/python/base/app/conftest_test.py",
             contents=dedent(
                 """
-    from base.conftest import INDEX
-    
-    def test_conftest_interaction():
-      assert {'base': 4, 'app': 3} == INDEX
-    """
+                from base.conftest import INDEX
+
+                def test_conftest_interaction():
+                  assert {'base': 4, 'app': 3} == INDEX
+                """
             ),
         )
         self.add_to_build_file(
@@ -181,12 +181,12 @@ class PytestTestFailedPexRun(PytestTestBase):
             "tests/test_green.py",
             dedent(
                 """
-          import unittest
+                import unittest
 
-          class GreenTest(unittest.TestCase):
-            def test_green(self):
-              self.assertTrue(True)
-        """
+                class GreenTest(unittest.TestCase):
+                    def test_green(self):
+                        self.assertTrue(True)
+                """
             ),
         )
         self.add_to_build_file("tests", 'python_tests(sources=["test_green.py"])')
@@ -208,16 +208,16 @@ class PytestTestFailedPexRun(PytestTestBase):
         with open(self.AlwaysFailingPexRunPytestRun.junitxml_path, mode="w") as fp:
             fp.write(
                 """
-          <testsuite errors="0" failures="1" name="pytest" skips="0" tests="1" time="0.001">
-            <testcase classname="tests.test_green.GreenTest"
-                      file=".pants.d/gs/8...6-DefaultFingerprintStrategy_e88d80fa140b/test_green.py"
-                      line="4"
-                      name="test_green"
-                      time="0.0001">
-              <failure message="AssertionError: False is not true"/>
-            </testcase>
-          </testsuite>
-          """
+                <testsuite errors="0" failures="1" name="pytest" skips="0" tests="1" time="0.001">
+                  <testcase classname="tests.test_green.GreenTest"
+                            file=".pants.d/gs/8...6-DefaultFingerprintStrategy_e88d80fa140b/test_green.py"
+                            line="4"
+                            name="test_green"
+                            time="0.0001">
+                    <failure message="AssertionError: False is not true"/>
+                  </testcase>
+                </testsuite>
+                """
             )
 
         self.do_test_failed_pex_run()
@@ -234,13 +234,13 @@ class PytestTest(PytestTestBase):
             "lib/core.py",
             dedent(
                 """
-          def one():  # line 1
-            return 1  # line 2
-                      # line 3
-                      # line 4
-          def two():  # line 5
-            return 2  # line 6
-        """
+                def one():  # line 1
+                  return 1  # line 2
+                            # line 3
+                            # line 4
+                def two():  # line 5
+                  return 2  # line 6
+                """
             ).strip(),
         )
         self.add_to_build_file(
@@ -251,12 +251,12 @@ class PytestTest(PytestTestBase):
             "app/app.py",
             dedent(
                 """
-          import core          # line 1
-                               # line 2
-                               # line 3
-          def use_two():       # line 4
-            return core.two()  # line 5
-        """
+                import core          # line 1
+                                     # line 2
+                                     # line 3
+                def use_two():       # line 4
+                  return core.two()  # line 5
+                """
             ).strip(),
         )
         self.add_to_build_file(
@@ -268,14 +268,14 @@ class PytestTest(PytestTestBase):
             "tests/test_app.py",
             dedent(
                 """
-          import unittest
+                import unittest
 
-          import app
-
-          class AppTest(unittest.TestCase):
-            def test_use_two(self):
-              self.assertEqual(2, app.use_two())
-        """
+                import app
+    
+                class AppTest(unittest.TestCase):
+                  def test_use_two(self):
+                    self.assertEqual(2, app.use_two())
+                """
             ),
         )
         self.add_to_build_file(
@@ -354,14 +354,14 @@ python_tests(
             "tests/test_core_green.py",
             dedent(
                 """
-          import unittest
-
-          import core
-
-          class CoreGreenTest(unittest.TestCase):
-            def test_one(self):
-              self.assertEqual(1, core.one())
-        """
+                import unittest
+    
+                import core
+    
+                class CoreGreenTest(unittest.TestCase):
+                    def test_one(self):
+                        self.assertEqual(1, core.one())
+                """
             ),
         )
 
@@ -369,14 +369,14 @@ python_tests(
             "tests/test_core_green2.py",
             dedent(
                 """
-          import unittest
-
-          import core
-
-          class CoreGreen2Test(unittest.TestCase):
-            def test_one(self):
-              self.assertEqual(1, core.one())
-        """
+                import unittest
+    
+                import core
+    
+                class CoreGreen2Test(unittest.TestCase):
+                    def test_one(self):
+                        self.assertEqual(1, core.one())
+                """
             ),
         )
 
@@ -384,14 +384,14 @@ python_tests(
             "tests/test_core_green3.py",
             dedent(
                 """
-          import unittest
-
-          import core
-
-          class CoreGreen3Test(unittest.TestCase):
-            def test_one(self):
-              self.assertEqual(1, core.one())
-        """
+                import unittest
+    
+                import core
+    
+                class CoreGreen3Test(unittest.TestCase):
+                    def test_one(self):
+                        self.assertEqual(1, core.one())
+                """
             ),
         )
 
@@ -399,11 +399,11 @@ python_tests(
             "tests/test_core_red.py",
             dedent(
                 """
-          import core
-
-          def test_two():
-            assert 1 == core.two()
-        """
+                import core
+    
+                def test_two():
+                    assert 1 == core.two()
+                """
             ),
         )
 
@@ -411,14 +411,14 @@ python_tests(
             "tests/test_core_red_in_class.py",
             dedent(
                 """
-          import unittest
-
-          import core
-
-          class CoreRedClassTest(unittest.TestCase):
-            def test_one_in_class(self):
-              self.assertEqual(1, core.two())
-        """
+                import unittest
+    
+                import core
+    
+                class CoreRedClassTest(unittest.TestCase):
+                    def test_one_in_class(self):
+                        self.assertEqual(1, core.two())
+                """
             ),
         )
 
@@ -426,13 +426,13 @@ python_tests(
             "tests/test_core_sleep.py",
             dedent(
                 """
-          import core
-          import time
-
-          def test_three():
-            time.sleep(10)
-            assert 1 == core.one()
-        """
+                import core
+                import time
+    
+                def test_three():
+                    time.sleep(10)
+                    assert 1 == core.one()
+                """
             ),
         )
 
@@ -440,9 +440,9 @@ python_tests(
             "tests/test_error.py",
             dedent(
                 """
-          def test_error(bad_fixture):
-            pass
-        """
+                def test_error(bad_fixture):
+                    pass
+                """
             ),
         )
 
@@ -450,11 +450,11 @@ python_tests(
             "tests/test_failure_outside_function.py",
             dedent(
                 """
-        def null():
-          pass
-
-        assert(False)
-        """
+                def null():
+                pass
+    
+                assert(False)
+                """
             ),
         )
 
@@ -699,9 +699,9 @@ python_tests(
             "src/python/util/math.py",
             dedent(
                 """
-          def one():  # line 1
-            return 1  # line 2
-        """
+                def one():  # line 1
+                    return 1  # line 2
+                """
             ).strip(),
         )
 
@@ -713,14 +713,14 @@ python_tests(
             "test/python/util/test_math.py",
             dedent(
                 """
-          import unittest
-
-          from util import math
-
-          class MathTest(unittest.TestCase):
-            def test_one(self):
-              self.assertEqual(1, math.one())
-        """
+                import unittest
+    
+                from util import math
+    
+                class MathTest(unittest.TestCase):
+                    def test_one(self):
+                        self.assertEqual(1, math.one())
+                """
             ),
         )
         test = self.target("test/python/util")
@@ -742,10 +742,10 @@ python_tests(
             "src/python/util/math.py",
             dedent(
                 """
-          from util import THE_LONELIEST_NUMBER  # line 1
-          def one():                             # line 2
-            return THE_LONELIEST_NUMBER          # line 3
-        """
+                from util import THE_LONELIEST_NUMBER  # line 1
+                def one():                             # line 2
+                    return THE_LONELIEST_NUMBER          # line 3
+                """
             ).strip(),
         )
 
@@ -753,8 +753,8 @@ python_tests(
             "src/python/util/__init__.py",
             dedent(
                 """
-          THE_LONELIEST_NUMBER = 1  # line 1
-        """
+                THE_LONELIEST_NUMBER = 1  # line 1
+                """
             ).strip(),
         )
 
@@ -766,14 +766,14 @@ python_tests(
             "src/python/util/math_test.py",
             dedent(
                 """
-          import unittest                                            # line 1
-
-          from util import math                                      # line 3
-
-          class MathTestInSameDirectoryAsSource(unittest.TestCase):  # line 5
-            def test_one(self):                                      # line 6
-              self.assertEqual(1, math.one())                        # line 7
-        """
+                import unittest                                            # line 1
+    
+                from util import math                                      # line 3
+    
+                class MathTestInSameDirectoryAsSource(unittest.TestCase):  # line 5
+                    def test_one(self):                                      # line 6
+                        self.assertEqual(1, math.one())                        # line 7
+                """
             ).strip(),
         )
 
@@ -830,9 +830,9 @@ python_tests(
             "src/python/util/math.py",
             dedent(
                 """
-          def one():  # line 1
-            return 1  # line 2
-        """
+                def one():  # line 1
+                    return 1  # line 2
+                """
             ).strip(),
         )
 
@@ -844,14 +844,14 @@ python_tests(
             "test/python/util_tests/test_math.py",
             dedent(
                 """
-          import unittest
-
-          from util import math
-
-          class MathTest(unittest.TestCase):
-            def test_one(self):
-              self.assertEqual(1, math.one())
-        """
+                import unittest
+    
+                from util import math
+    
+                class MathTest(unittest.TestCase):
+                    def test_one(self):
+                        self.assertEqual(1, math.one())
+                """
             ),
         )
         test = self.target("test/python/util_tests")
@@ -988,45 +988,45 @@ python_tests(
                 "test/python/passthru/test_passthru.py",
                 dedent(
                     """
-            import inspect
-            import os
-            import pytest
-            import unittest
-
-
-            class PassthruTest(unittest.TestCase):
-              def touch(self, path):
-                with open(path, 'wb') as fp:
-                  fp.close()
-
-              def mark_test_run(self):
-                caller_frame_record = inspect.stack()[1]
-
-                # For the slot breakdown of a frame record tuple, see:
-                #   https://docs.python.org/2/library/inspect.html#the-interpreter-stack
-                _, _, _, caller_func_name, _, _ = caller_frame_record
-
-                marker_file = os.path.join({marker_dir!r}, caller_func_name)
-                self.touch(marker_file)
-
-              def test_one(self):
-                self.mark_test_run()
-
-              @pytest.mark.purple
-              def test_two(self):
-                self.mark_test_run()
-
-              def test_three(self):
-                self.mark_test_run()
-
-              @pytest.mark.red
-              def test_four(self):
-                self.mark_test_run()
-
-              @pytest.mark.green
-              def test_five(self):
-                self.mark_test_run()
-          """.format(
+                    import inspect
+                    import os
+                    import pytest
+                    import unittest
+        
+        
+                    class PassthruTest(unittest.TestCase):
+                      def touch(self, path):
+                        with open(path, 'wb') as fp:
+                          fp.close()
+        
+                      def mark_test_run(self):
+                        caller_frame_record = inspect.stack()[1]
+        
+                        # For the slot breakdown of a frame record tuple, see:
+                        #   https://docs.python.org/2/library/inspect.html#the-interpreter-stack
+                        _, _, _, caller_func_name, _, _ = caller_frame_record
+        
+                        marker_file = os.path.join({marker_dir!r}, caller_func_name)
+                        self.touch(marker_file)
+        
+                      def test_one(self):
+                        self.mark_test_run()
+        
+                      @pytest.mark.purple
+                      def test_two(self):
+                        self.mark_test_run()
+        
+                      def test_three(self):
+                        self.mark_test_run()
+        
+                      @pytest.mark.red
+                      def test_four(self):
+                        self.mark_test_run()
+        
+                      @pytest.mark.green
+                      def test_five(self):
+                        self.mark_test_run()
+                    """.format(
                         marker_dir=marker_dir
                     )
                 ),

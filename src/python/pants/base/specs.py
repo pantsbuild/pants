@@ -311,11 +311,11 @@ class AddressSpecsMatcher:
 
     def matches_target_address_pair(self, address, target):
         """
-    :param Address address: An Address to match
-    :param HydratedTarget target: The Target for the address.
+        :param Address address: An Address to match
+        :param HydratedTarget target: The Target for the address.
 
-    :return: True if the given Address/HydratedTarget are included by this matcher.
-    """
+        :return: True if the given Address/HydratedTarget are included by this matcher.
+        """
         return self._target_tag_matches(target) and not self._excluded_by_pattern(address)
 
 

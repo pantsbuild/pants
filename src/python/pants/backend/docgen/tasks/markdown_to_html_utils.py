@@ -117,8 +117,8 @@ def choose_include_text(s, params, source_path):
 class IncludeExcerptPattern(markdown.inlinepatterns.Pattern):
     def __init__(self, source_path=None):
         """
-    :param string source_path: Path to source `.md` file.
-    """
+        :param string source_path: Path to source `.md` file.
+        """
         # Old-style class, so we must invoke __init__ this way.
         markdown.inlinepatterns.Pattern.__init__(self, INCLUDE_PATTERN)
         self.source_path = source_path
