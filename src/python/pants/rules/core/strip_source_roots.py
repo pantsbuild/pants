@@ -32,37 +32,13 @@ class SourceRootStrippedSources:
 class StripSourceRootsRequest:
   """A request to strip source roots for every file in the snapshot.
 
-  The call site must decide whether to allow the snapshot to include multiple source roots or not,
-  e.g. the snapshot including `src/python/lib.py` and `src/java/lib.java`. If the snapshot
-  is certain to only one have single source root among all the files, then the call site should pass
-  a `representative_path` for better performance. If the snapshot is likely to have more than one
-  snapshot, the call site should set `support_multiple_source_roots=True`, which has worse
-  performance but ensures correctness.
+  The call site may optionally give the field `representative_path` if it is confident that all the
+  files in the snapshot will only have one source root. Using `representative_path` results in
+  better performance because we only need to call `SourceRoots.find_by_path()` on one single file
+  rather than every file.
   """
   snapshot: Snapshot
-  multiple_source_roots: bool = False
   representative_path: Optional[str] = None
-
-  def __post_init__(self) -> None:
-    if self.multiple_source_roots and self.representative_path is not None:
-      raise ValueError(
-        "You requested `multiple_source_roots=True` but also gave a "
-        f"`representative_path` of `{self.representative_path}`. Please only do one of these "
-        "things.\n\nIf you expect your snapshot to only have one single source root, then you "
-        "should stop setting `multiple_source_roots=True` and keep setting "
-        "`representative_path` for better performance.\n\nIf you expect there to be one or more "
-        "source roots, keep setting `multiple_source_roots=True` and remove "
-        "`representative_path`."
-      )
-    if not self.multiple_source_roots and self.representative_path is None:
-      raise ValueError(
-        "You did not give a `representative_path` while using the default value of "
-        "`multiple_source_roots=False`. Please either give a `representative_path` value "
-        "or set `multiple_source_roots=True`.\n\nIf you expect your snapshot to only have "
-        "one single source root, then you should keep using `multiple_source_roots=False` "
-        "and set `representative_path` for better performance.\n\nIf you expect there to be one or "
-        "more source roots, set `multiple_source_roots=True`."
-      )
 
 
 @rule
@@ -83,13 +59,11 @@ async def strip_source_roots_from_snapshot(
     # Otherwise, create a source root by using the parent directory.
     return PurePath(path).parent.as_posix()
 
-  if not request.multiple_source_roots:
+  if request.representative_path is not None:
     resulting_digest = await Get[Digest](
       DirectoryWithPrefixToStrip(
         directory_digest=request.snapshot.directory_digest,
-        # NB: We are certain that `request.representative_path` is not None due to
-        # `StripSourceRootsRequest.__post_init__()`, but MyPy can't infer this.
-        prefix=determine_source_root(request.representative_path),  # type: ignore[arg-type]
+        prefix=determine_source_root(request.representative_path),
       )
     )
     resulting_snapshot = await Get[Snapshot](Digest, resulting_digest)

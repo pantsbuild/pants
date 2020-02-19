@@ -45,14 +45,12 @@ class StripSourceRootsTest(TestBase):
     def get_stripped_files_for_snapshot(
       paths: List[str],
       *,
-      multiple_source_roots: bool = False,
+      use_representative_path: bool = True,
       args: Optional[List[str]] = None,
     ) -> List[str]:
       input_snapshot = self.make_snapshot({fp: "" for fp in paths})
-      request = (
-        StripSourceRootsRequest(input_snapshot, representative_path=paths[0])
-        if not multiple_source_roots else
-        StripSourceRootsRequest(input_snapshot, multiple_source_roots=True)
+      request = StripSourceRootsRequest(
+        input_snapshot, representative_path=paths[0] if use_representative_path else None
       )
       return self.get_stripped_files(request, args=args)
 
@@ -77,10 +75,10 @@ class StripSourceRootsTest(TestBase):
     # Support for multiple source roots
     file_names = ["src/python/project/example.py", "src/java/com/project/example.java"]
     with pytest.raises(ExecutionError) as exc:
-      get_stripped_files_for_snapshot(file_names, multiple_source_roots=False)
+      get_stripped_files_for_snapshot(file_names, use_representative_path=True)
     assert "Cannot strip prefix src/python" in str(exc.value)
     assert sorted(
-      get_stripped_files_for_snapshot(file_names, multiple_source_roots=True)
+      get_stripped_files_for_snapshot(file_names, use_representative_path=False)
     ) == sorted(["project/example.py", "com/project/example.java"])
 
   def test_strip_target(self) -> None:
