@@ -11,7 +11,6 @@ from pants.backend.python.lint.python_format_target import (
   _ConcretePythonFormatTarget,
   format_python_target,
 )
-from pants.backend.python.rules import download_pex_bin
 from pants.base.specs import SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.fs import Digest, FileContent, InputFilesContent, Snapshot
@@ -21,15 +20,10 @@ from pants.engine.selectors import Params
 from pants.rules.core.fmt import AggregatedFmtResults
 from pants.source.wrapped_globs import EagerFilesetWithSpec
 from pants.testutil.option.util import create_options_bootstrapper
-from pants.testutil.subsystem.util import init_subsystems
 from pants.testutil.test_base import TestBase
 
 
 class PythonFormatTargetIntegrationTest(TestBase):
-
-  def setUp(self):
-    super().setUp()
-    init_subsystems([download_pex_bin.DownloadedPexBin.Factory])
 
   @classmethod
   def rules(cls):
@@ -38,11 +32,9 @@ class PythonFormatTargetIntegrationTest(TestBase):
       format_python_target,
       *black_rules(),
       *isort_rules(),
-      download_pex_bin.download_pex_bin,
       RootRule(_ConcretePythonFormatTarget),
       RootRule(BlackTarget),
       RootRule(IsortTarget),
-      RootRule(download_pex_bin.DownloadedPexBin.Factory),
     )
 
   def run_black_and_isort(
@@ -65,7 +57,6 @@ class PythonFormatTargetIntegrationTest(TestBase):
             "--backend-packages2=['pants.backend.python.lint.black', 'pants.backend.python.lint.isort']"
           ],
         ),
-        download_pex_bin.DownloadedPexBin.Factory.global_instance(),
       )
     )
     return results

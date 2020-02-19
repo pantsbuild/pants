@@ -7,7 +7,6 @@ import pytest
 
 from pants.backend.python.lint.bandit.rules import BanditTarget
 from pants.backend.python.lint.bandit.rules import rules as bandit_rules
-from pants.backend.python.rules import download_pex_bin
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.build_graph.address import Address
@@ -19,15 +18,10 @@ from pants.engine.selectors import Params
 from pants.rules.core.lint import LintResult
 from pants.source.wrapped_globs import EagerFilesetWithSpec
 from pants.testutil.option.util import create_options_bootstrapper
-from pants.testutil.subsystem.util import init_subsystems
 from pants.testutil.test_base import TestBase
 
 
 class BanditIntegrationTest(TestBase):
-
-  def setUp(self):
-    super().setUp()
-    init_subsystems([download_pex_bin.DownloadedPexBin.Factory])
 
   good_source = FileContent(path="test/good.py", content=b"hashlib.sha256()\n")
   # MD5 is a insecure hashing function
@@ -39,13 +33,7 @@ class BanditIntegrationTest(TestBase):
 
   @classmethod
   def rules(cls):
-    return (
-      *super().rules(),
-      *bandit_rules(),
-      download_pex_bin.download_pex_bin,
-      RootRule(BanditTarget),
-      RootRule(download_pex_bin.DownloadedPexBin.Factory),
-    )
+    return (*super().rules(), *bandit_rules(), RootRule(BanditTarget))
 
   def run_bandit(
     self,
@@ -76,11 +64,7 @@ class BanditIntegrationTest(TestBase):
       origin = SingleAddress(directory="test", name="target")
     target = BanditTarget(PythonTargetAdaptorWithOrigin(adaptor, origin))
     return self.request_single_product(
-      LintResult, Params(
-        target,
-        create_options_bootstrapper(args=args),
-        download_pex_bin.DownloadedPexBin.Factory.global_instance(),
-      ),
+      LintResult, Params(target, create_options_bootstrapper(args=args)),
     )
 
   def test_single_passing_source(self) -> None:

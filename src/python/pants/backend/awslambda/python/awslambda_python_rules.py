@@ -5,6 +5,12 @@ from dataclasses import dataclass
 
 from pants.backend.awslambda.common.awslambda_common_rules import AWSLambdaTarget, CreatedAWSLambda
 from pants.backend.awslambda.python.lambdex import Lambdex
+from pants.backend.python.rules import (
+  download_pex_bin,
+  pex,
+  pex_from_target_closure,
+  prepare_chrooted_python_sources,
+)
 from pants.backend.python.rules.pex import (
   CreatePex,
   Pex,
@@ -12,6 +18,7 @@ from pants.backend.python.rules.pex import (
   PexRequirements,
 )
 from pants.backend.python.rules.pex_from_target_closure import CreatePexFromTargetClosure
+from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.addressable import Addresses
 from pants.engine.fs import Digest, DirectoriesToMerge
@@ -20,6 +27,7 @@ from pants.engine.legacy.structs import PythonAWSLambdaAdaptor
 from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.python.python_setup import PythonSetup
+from pants.rules.core import strip_source_roots
 
 
 @dataclass(frozen=True)
@@ -81,6 +89,16 @@ async def setup_lambdex(lambdex: Lambdex) -> LambdexSetup:
 
 
 def rules():
-  return [create_python_awslambda,
-          UnionRule(AWSLambdaTarget, PythonAWSLambdaAdaptor),
-          setup_lambdex, subsystem_rule(Lambdex)]
+  return [
+    create_python_awslambda,
+    setup_lambdex,
+    UnionRule(AWSLambdaTarget, PythonAWSLambdaAdaptor),
+    subsystem_rule(Lambdex),
+    *download_pex_bin.rules(),
+    *pex.rules(),
+    *pex_from_target_closure.rules(),
+    *prepare_chrooted_python_sources.rules(),
+    *python_native_code.rules(),
+    *strip_source_roots.rules(),
+    *subprocess_environment.rules(),
+  ]
