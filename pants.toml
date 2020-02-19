@@ -63,6 +63,10 @@ backend_packages.add = [
   "internal_backend.sitegen",
   "internal_backend.utilities",
 ]
+backend_packages.remove = [
+  # We use the V2 isort implementation.
+  "pants.backend.python.lint.isort",
+]
 backend_packages2 = [
   "pants.backend.project_info",
   "pants.backend.python",

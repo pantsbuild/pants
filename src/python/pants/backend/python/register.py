@@ -26,8 +26,6 @@ from pants.backend.python.tasks.build_local_python_distributions import (
   BuildLocalPythonDistributions,
 )
 from pants.backend.python.tasks.gather_sources import GatherSources
-from pants.backend.python.tasks.isort_prep import IsortPrep
-from pants.backend.python.tasks.isort_run import IsortRun
 from pants.backend.python.tasks.local_python_distribution_artifact import (
   LocalPythonDistributionArtifact,
 )
@@ -87,8 +85,6 @@ def register_goals():
   task(name='setup-py', action=SetupPy).install()
   task(name='py', action=PythonBinaryCreate).install('binary')
   task(name='py-wheels', action=LocalPythonDistributionArtifact).install('binary')
-  task(name='isort-prep', action=IsortPrep).install('fmt')
-  task(name='isort', action=IsortRun).install('fmt')
   task(name='py', action=PythonBundle).install('bundle')
   task(name='unpack-wheels', action=UnpackWheels).install()
 
