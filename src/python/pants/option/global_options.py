@@ -58,6 +58,11 @@ class OwnersNotFoundBehavior(Enum):
   error = "error"
 
 
+class UnmatchedAddressSpecBehavior(Enum):
+  ErrorOnAnyUnmatched = 'error-on-any-unmatched'
+  NoErrorOnUnmatchedGlobs = 'no-error-on-unmatched-globs'
+
+
 class BuildFileImportsBehavior(Enum):
   allow = "allow"
   warn = "warn"
@@ -338,6 +343,9 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              help="What to do when files and globs specified in BUILD files, such as in the "
                   "`sources` field, cannot be found. This happens when the files do not exist on "
                   "your machine or when they are ignored by the `--pants-ignore` option.")
+    register('--unmatched-address-spec-behavior',
+             type=UnmatchedAddressSpecBehavior, default=UnmatchedAddressSpecBehavior.ErrorOnAnyUnmatched,
+             help='What to do when an address spec on the command-line fails to match any target.')
 
     # TODO(#7203): make a regexp option type!
     register('--exclude-target-regexp', advanced=True, type=list, default=[], daemon=False,

@@ -3,7 +3,7 @@
 
 import os.path
 from collections.abc import MutableMapping, MutableSequence
-from typing import Dict
+from typing import Dict, List
 
 from twitter.common.collections import OrderedSet
 
@@ -26,6 +26,7 @@ from pants.engine.parser import HydratedStruct
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.struct import Struct
+from pants.option.global_options import UnmatchedAddressSpecBehavior
 from pants.util.objects import TypeConstraintError
 
 
@@ -212,9 +213,21 @@ def _hydrate(item_type, spec_path, **kwargs):
   return item
 
 
+class UnmatchedTargetAddressError(ResolveError):
+  @classmethod
+  def merge_error_messages(cls, errors: List[Exception]):
+    joined = '\n========= BEGIN ERROR\n'.join(str(e) for e in errors)
+    return f'One or more command-line target specs failed to match\n========= BEGIN ERROR\n{joined}'
+
+  def __init__(self, errors):
+    super().__init__(self.merge_error_messages(errors))
+
+
 @rule
 async def addresses_with_origins_from_address_families(
-  address_mapper: AddressMapper, address_specs: AddressSpecs,
+  address_mapper: AddressMapper,
+    address_specs: AddressSpecs,
+    unmatched_behavior: UnmatchedAddressSpecBehavior,
 ) -> AddressesWithOrigins:
   """Given an AddressMapper and list of AddressSpecs, return matching AddressesWithOrigins.
 
@@ -232,6 +245,8 @@ async def addresses_with_origins_from_address_families(
   matched_addresses = OrderedSet()
   addr_to_origin: Dict[Address, AddressSpec] = {}
 
+  address_resolution_errors: List[Exception] = []
+
   for address_spec in address_specs:
     # NB: if an address spec is provided which expands to some number of targets, but those targets
     # match --exclude-target-regexp, we do NOT fail! This is why we wait to apply the tag and
@@ -240,8 +255,9 @@ async def addresses_with_origins_from_address_families(
     try:
       addr_families_for_spec = address_spec.matching_address_families(address_family_by_directory)
     except AddressSpec.AddressFamilyResolutionError as e:
-      raise ResolveError(e) from e
+      address_resolution_errors.append(AddressLookupError(e))
 
+    all_bfaddr_tgt_pairs = []
     try:
       all_bfaddr_tgt_pairs = address_spec.address_target_pairs_from_address_families(
         addr_families_for_spec
@@ -251,7 +267,7 @@ async def addresses_with_origins_from_address_families(
         # A target might be covered by multiple specs, so we take the most specific one.
         addr_to_origin[addr] = more_specific(addr_to_origin.get(addr), address_spec)
     except AddressSpec.AddressResolutionError as e:
-      raise AddressLookupError(e) from e
+      address_resolution_errors.append(ResolveError(e))
     except SingleAddress._SingleAddressResolutionError as e:
       _raise_did_you_mean(e.single_address_family, e.name, source=e)
 
@@ -260,6 +276,10 @@ async def addresses_with_origins_from_address_families(
       for (bfaddr, tgt) in all_bfaddr_tgt_pairs
       if address_specs.matcher.matches_target_address_pair(bfaddr, tgt)
     )
+
+  if unmatched_behavior != UnmatchedAddressSpecBehavior.NoErrorOnUnmatchedGlobs:
+    if address_resolution_errors:
+      raise UnmatchedTargetAddressError(address_resolution_errors)
 
   # NB: This may be empty, as the result of filtering by tag and exclude patterns!
   return AddressesWithOrigins(

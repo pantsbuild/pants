@@ -62,6 +62,7 @@ from pants.option.global_options import (
   BuildFileImportsBehavior,
   ExecutionOptions,
   GlobMatchErrorBehavior,
+  UnmatchedAddressSpecBehavior,
 )
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -417,6 +418,10 @@ class EngineInitializer:
       return glob_match_error_behavior
 
     @rule
+    def unmatched_address_spec_behavior_singleton() -> UnmatchedAddressSpecBehavior:
+      return UnmatchedAddressSpecBehavior(bootstrap_options.unmatched_address_spec_behavior)
+
+    @rule
     def build_configuration_singleton() -> BuildConfiguration:
       return build_configuration
 
@@ -438,6 +443,7 @@ class EngineInitializer:
       *(
         RootRule(Console),
         glob_match_error_behavior_singleton,
+        unmatched_address_spec_behavior_singleton,
         build_configuration_singleton,
         symbol_table_singleton,
         union_membership_singleton,
