@@ -133,6 +133,7 @@ async def create_pex(
           pex_build_environment=pex_build_environment,
           pex_args=argv,
           input_files=merged_digest,
+          python_repos=python_repos,
           description=f"Create a requirements PEX: {', '.join(request.requirements.requirements)}",
           output_files=(request.output_filename,)
         )

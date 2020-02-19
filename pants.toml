@@ -386,6 +386,9 @@ verify_commit = false
 interpreter_cache_dir = "%(pants_bootstrapdir)s/python_cache/interpreters"
 resolver_cache_dir = "%(pants_bootstrapdir)s/python_cache/requirements"
 
+[python-repos]
+repos.add = ["%(buildroot)s/"]
+
 [pytest]
 pytest_plugins.add = [
   # TODO(8528): implement a generic retry mechanism for the V2 test runner instead of using this

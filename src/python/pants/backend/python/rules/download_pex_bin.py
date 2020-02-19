@@ -14,6 +14,7 @@ from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.engine.platform import PlatformConstraint
 from pants.engine.rules import rule, subsystem_rule
 from pants.engine.selectors import Get
+from pants.python.python_repos import PythonRepos
 from pants.python.python_setup import PythonSetup
 
 
@@ -59,6 +60,7 @@ class DownloadedPexBin(HermeticPex):
     pex_args: Iterable[str],
     description: str,
     input_files: Optional[Digest] = None,
+    python_repos: Optional[PythonRepos] = None,
     **kwargs: Any
   ) -> ExecuteProcessRequest:
     """Creates an ExecuteProcessRequest that will run the pex CLI tool hermetically.
@@ -76,11 +78,16 @@ class DownloadedPexBin(HermeticPex):
     :param kwargs: Any additional :class:`ExecuteProcessRequest` kwargs to pass through.
     """
 
+    find_links_args = []
+    if python_repos:
+      for f in python_repos.repos:
+        find_links_args.extend(['-f', f])
+
     return super().create_execute_request(
       python_setup=python_setup,
       subprocess_encoding_environment=subprocess_encoding_environment,
       pex_path=self.executable,
-      pex_args=["--disable-cache"] + list(pex_args),
+      pex_args=["--disable-cache"] + find_links_args + list(pex_args),
       description=description,
       input_files=input_files or self.directory_digest,
       env=pex_build_environment.invocation_environment_dict,
