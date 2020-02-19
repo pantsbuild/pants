@@ -243,8 +243,8 @@ class TestStrategy(Enum):
                 *sorted(targets),
             ],
         }[
-            self
-        ]  # type: ignore[index]  # issues with understanding `self`
+            self  # type: ignore[index]  # issues with understanding `self`
+        ]
         if shard is not None and self in [self.v1_no_chroot, self.v1_chroot]:  # type: ignore[comparison-overlap]  # issues with understanding `self`
             result.insert(2, f"--test-pytest-test-shard={shard}")
         return result

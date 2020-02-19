@@ -53,8 +53,8 @@ class Stage(Enum):
             self.build_stable: r"tag IS present AND tag =~ ^release_.*$",
             self.build_unstable: r"tag IS NOT present AND type NOT IN (pull_request, cron)",
         }[
-            self
-        ]  # type: ignore[index]
+            self  # type: ignore[index]
+        ]
 
     @classmethod
     def all_entries(cls) -> List[Dict[str, str]]:
