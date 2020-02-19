@@ -117,7 +117,7 @@ class BlackIntegrationTest(TestBase):
     assert "1 file left unchanged" in fmt_result.stderr
     assert fmt_result.digest == self.get_digest([self.good_source, self.bad_source])
 
-  @pytest.mark.skip(reason="Get config file creation to work with options parsing")
+  @pytest.mark.skip(reason="#9148: The config file exists but parser.py cannot find it")
   def test_respects_config_file(self) -> None:
     lint_result, fmt_result = self.run_black(
       [self.needs_config_source], config="[tool.black]\nskip-string-normalization = 'true'\n",
