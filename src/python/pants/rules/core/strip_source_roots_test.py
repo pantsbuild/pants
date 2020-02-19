@@ -45,14 +45,14 @@ class StripSourceRootsTest(TestBase):
     def get_stripped_files_for_snapshot(
       paths: List[str],
       *,
-      support_multiple_source_roots: bool = False,
+      multiple_source_roots: bool = False,
       args: Optional[List[str]] = None,
     ) -> List[str]:
       input_snapshot = self.make_snapshot({fp: "" for fp in paths})
       request = (
         StripSourceRootsRequest(input_snapshot, representative_path=paths[0])
-        if not support_multiple_source_roots else
-        StripSourceRootsRequest(input_snapshot, support_multiple_source_roots=True)
+        if not multiple_source_roots else
+        StripSourceRootsRequest(input_snapshot, multiple_source_roots=True)
       )
       return self.get_stripped_files(request, args=args)
 
@@ -75,12 +75,12 @@ class StripSourceRootsTest(TestBase):
     assert f"NoSourceRootError: Could not find a source root for `{unrecognized_source_root}`" in str(exc.value)
 
     # Support for multiple source roots
-    multiple_source_roots = ["src/python/project/example.py", "src/java/com/project/example.java"]
+    file_names = ["src/python/project/example.py", "src/java/com/project/example.java"]
     with pytest.raises(ExecutionError) as exc:
-      get_stripped_files_for_snapshot(multiple_source_roots, support_multiple_source_roots=False)
+      get_stripped_files_for_snapshot(file_names, multiple_source_roots=False)
     assert "Cannot strip prefix src/python" in str(exc.value)
     assert sorted(
-      get_stripped_files_for_snapshot(multiple_source_roots, support_multiple_source_roots=True)
+      get_stripped_files_for_snapshot(file_names, multiple_source_roots=True)
     ) == sorted(["project/example.py", "com/project/example.java"])
 
   def test_strip_target(self) -> None:

@@ -40,28 +40,28 @@ class StripSourceRootsRequest:
   performance but ensures correctness.
   """
   snapshot: Snapshot
-  support_multiple_source_roots: bool = False
+  multiple_source_roots: bool = False
   representative_path: Optional[str] = None
 
   def __post_init__(self) -> None:
-    if self.support_multiple_source_roots and self.representative_path is not None:
+    if self.multiple_source_roots and self.representative_path is not None:
       raise ValueError(
-        "You requested `support_multiple_source_roots=True` but also gave a "
+        "You requested `multiple_source_roots=True` but also gave a "
         f"`representative_path` of `{self.representative_path}`. Please only do one of these "
-        f"things.\n\nIf you expect your snapshot to only have one single source root, then you "
-        f"should stop setting `support_multiple_source_roots=True` and keep setting "
-        f"`representative_path` for better performance.\n\nIf you expect there to be one or more "
-        f"source roots, keep setting `support_multiple_source_roots=True` and remove "
-        f"`representative_path`."
+        "things.\n\nIf you expect your snapshot to only have one single source root, then you "
+        "should stop setting `multiple_source_roots=True` and keep setting "
+        "`representative_path` for better performance.\n\nIf you expect there to be one or more "
+        "source roots, keep setting `multiple_source_roots=True` and remove "
+        "`representative_path`."
       )
-    if not self.support_multiple_source_roots and self.representative_path is None:
+    if not self.multiple_source_roots and self.representative_path is None:
       raise ValueError(
         "You did not give a `representative_path` while using the default value of "
-        "`support_multiple_source_roots=False`. Please either give a `representative_path` value "
-        "or set `support_multiple_source_roots=True`.\n\nIf you expect your snapshot to only have "
-        "one single source root, then you should keep using `support_multiple_source_roots=False` "
+        "`multiple_source_roots=False`. Please either give a `representative_path` value "
+        "or set `multiple_source_roots=True`.\n\nIf you expect your snapshot to only have "
+        "one single source root, then you should keep using `multiple_source_roots=False` "
         "and set `representative_path` for better performance.\n\nIf you expect there to be one or "
-        "more source roots, set `support_multiple_source_roots=True`."
+        "more source roots, set `multiple_source_roots=True`."
       )
 
 
@@ -83,7 +83,7 @@ async def strip_source_roots_from_snapshot(
     # Otherwise, create a source root by using the parent directory.
     return PurePath(path).parent.as_posix()
 
-  if not request.support_multiple_source_roots:
+  if not request.multiple_source_roots:
     resulting_digest = await Get[Digest](
       DirectoryWithPrefixToStrip(
         directory_digest=request.snapshot.directory_digest,
