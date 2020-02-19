@@ -47,7 +47,7 @@ class BanditIntegrationTest(TestBase):
   ) -> LintResult:
     args = ["--backend-packages2=pants.backend.python.lint.bandit"]
     if config:
-      # TODO: figure out how to get this file to exist...
+      # TODO(#9148): The config file exists but parser.py cannot find it
       self.create_file(relpath=".bandit", contents=config)
       args.append("--bandit-config=.bandit")
     if passthrough_args:
@@ -89,7 +89,7 @@ class BanditIntegrationTest(TestBase):
     assert result.exit_code == 0
     assert "No issues identified." in result.stdout
 
-  @pytest.mark.skip(reason="Get config file creation to work with options parsing")
+  @pytest.mark.skip(reason="#9148: The config file exists but parser.py cannot find it")
   def test_respects_config_file(self) -> None:
     result = self.run_bandit([self.bad_source], config="skips: ['B303']\n")
     assert result.exit_code == 0

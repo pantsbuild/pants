@@ -11,6 +11,7 @@ from pants.backend.python.rules import (
   prepare_chrooted_python_sources,
   python_create_binary,
   python_test_runner,
+  repl,
   run_setup_py,
 )
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
@@ -101,6 +102,7 @@ def rules():
     *python_test_runner.rules(),
     *python_create_binary.rules(),
     *python_native_code.rules(),
+    *repl.rules(),
     *run_setup_py.rules(),
     *subprocess_environment.rules(),
   )

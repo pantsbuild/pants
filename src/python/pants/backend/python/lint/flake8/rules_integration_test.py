@@ -48,7 +48,7 @@ class Flake8IntegrationTest(TestBase):
   ) -> LintResult:
     args = ["--backend-packages2=pants.backend.python.lint.flake8"]
     if config:
-      # TODO: figure out how to get this file to exist...
+      # TODO(#9148): The config file exists, but parser.py cannot find it
       self.create_file(relpath=".flake8", contents=config)
       args.append("--flake8-config=.flake8")
     if passthrough_args:
@@ -99,7 +99,7 @@ class Flake8IntegrationTest(TestBase):
     assert py3_result.exit_code == 0
     assert py3_result.stdout.strip() == ""
 
-  @pytest.mark.skip(reason="Get config file creation to work with options parsing")
+  @pytest.mark.skip(reason="#9148: The config file exists, but parser.py cannot find it")
   def test_respects_config_file(self) -> None:
     result = self.run_flake8([self.bad_source], config="[flake8]\nignore = F401\n")
     assert result.exit_code == 0
