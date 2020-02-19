@@ -66,34 +66,39 @@ pub mod nailgun;
 extern crate uname;
 
 #[derive(PartialOrd, Ord, Clone, Copy, Debug, Eq, PartialEq, Hash)]
-pub enum Platform {
+pub enum PlatformConstraint {
   Darwin,
   Linux,
   None,
 }
 
-impl Platform {
-  pub fn current_platform() -> Result<Platform, String> {
-    let platform_info = uname::uname().expect("Failed to get local platform info!");
+impl PlatformConstraint {
+  pub fn current_platform_constraint() -> Result<PlatformConstraint, String> {
+    let platform_info =
+      uname::uname().map_err(|_| "Failed to get local platform info!".to_string())?;
     match platform_info {
-      uname::Info { ref sysname, .. } if sysname.to_lowercase() == "darwin" => Ok(Platform::Darwin),
-      uname::Info { ref sysname, .. } if sysname.to_lowercase() == "linux" => Ok(Platform::Linux),
+      uname::Info { ref sysname, .. } if sysname.to_lowercase() == "darwin" => {
+        Ok(PlatformConstraint::Darwin)
+      }
+      uname::Info { ref sysname, .. } if sysname.to_lowercase() == "linux" => {
+        Ok(PlatformConstraint::Linux)
+      }
       uname::Info { ref sysname, .. } => Err(format!("Found unknown system name {}", sysname)),
     }
   }
 }
 
-impl TryFrom<&String> for Platform {
+impl TryFrom<&String> for PlatformConstraint {
   type Error = String;
   ///
-  /// This is a helper method to convert values from the python/engine/platform.py::Platform enum,
-  /// which have been serialized, into the rust Platform enum.
+  /// This is a helper method to convert values from the python/engine/platform.py::PlatformConstraint enum,
+  /// which have been serialized, into the rust PlatformConstraint enum.
   ///
   fn try_from(variant_candidate: &String) -> Result<Self, Self::Error> {
     match variant_candidate.as_ref() {
-      "darwin" => Ok(Platform::Darwin),
-      "linux" => Ok(Platform::Linux),
-      "none" => Ok(Platform::None),
+      "darwin" => Ok(PlatformConstraint::Darwin),
+      "linux" => Ok(PlatformConstraint::Linux),
+      "none" => Ok(PlatformConstraint::None),
       other => Err(format!(
         "Unknown, platform {:?} encountered in parsing",
         other
@@ -102,12 +107,12 @@ impl TryFrom<&String> for Platform {
   }
 }
 
-impl From<Platform> for String {
-  fn from(platform: Platform) -> String {
+impl From<PlatformConstraint> for String {
+  fn from(platform: PlatformConstraint) -> String {
     match platform {
-      Platform::Linux => "linux".to_string(),
-      Platform::Darwin => "osx".to_string(),
-      Platform::None => "none".to_string(),
+      PlatformConstraint::Linux => "linux".to_string(),
+      PlatformConstraint::Darwin => "osx".to_string(),
+      PlatformConstraint::None => "none".to_string(),
     }
   }
 }
@@ -210,7 +215,7 @@ pub struct ExecuteProcessRequest {
   /// see https://github.com/pantsbuild/pants/issues/6416.
   ///
   pub jdk_home: Option<PathBuf>,
-  pub target_platform: Platform,
+  pub target_platform: PlatformConstraint, //TODO I don't think we need this attr here
 
   pub is_nailgunnable: bool,
 }
@@ -219,7 +224,10 @@ impl TryFrom<MultiPlatformExecuteProcessRequest> for ExecuteProcessRequest {
   type Error = String;
 
   fn try_from(req: MultiPlatformExecuteProcessRequest) -> Result<Self, Self::Error> {
-    match req.0.get(&(Platform::None, Platform::None)) {
+    match req
+      .0
+      .get(&(PlatformConstraint::None, PlatformConstraint::None))
+    {
       Some(crossplatform_req) => Ok(crossplatform_req.clone()),
       None => Err(String::from(
         "Cannot coerce to a simple ExecuteProcessRequest, no cross platform request exists.",
@@ -233,7 +241,7 @@ impl TryFrom<MultiPlatformExecuteProcessRequest> for ExecuteProcessRequest {
 ///
 #[derive(Derivative, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct MultiPlatformExecuteProcessRequest(
-  pub BTreeMap<(Platform, Platform), ExecuteProcessRequest>,
+  pub BTreeMap<(PlatformConstraint, PlatformConstraint), ExecuteProcessRequest>,
 );
 
 impl MultiPlatformExecuteProcessRequest {
@@ -249,7 +257,7 @@ impl MultiPlatformExecuteProcessRequest {
 impl From<ExecuteProcessRequest> for MultiPlatformExecuteProcessRequest {
   fn from(req: ExecuteProcessRequest) -> Self {
     MultiPlatformExecuteProcessRequest(
-      vec![((Platform::None, Platform::None), req)]
+      vec![((PlatformConstraint::None, PlatformConstraint::None), req)]
         .into_iter()
         .collect(),
     )

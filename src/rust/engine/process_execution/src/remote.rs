@@ -22,7 +22,7 @@ use tokio_timer::Delay;
 
 use crate::{
   Context, ExecuteProcessRequest, ExecuteProcessRequestMetadata, ExecutionStats,
-  FallibleExecuteProcessResult, MultiPlatformExecuteProcessRequest, Platform,
+  FallibleExecuteProcessResult, MultiPlatformExecuteProcessRequest, PlatformConstraint,
 };
 use std;
 use std::cmp::min;
@@ -109,7 +109,7 @@ pub struct CommandRunner {
   execution_client: Arc<bazel_protos::remote_execution_grpc::ExecutionClient>,
   operations_client: Arc<bazel_protos::operations_grpc::OperationsClient>,
   store: Store,
-  platform: Platform,
+  platform: PlatformConstraint,
   executor: task_executor::Executor,
   // We use a buffer time for queuing of process requests so that the process's requested timeout more
   // accurately reflects how long the caller intended the process to last.
@@ -198,9 +198,12 @@ impl super::CommandRunner for CommandRunner {
     req: &MultiPlatformExecuteProcessRequest,
   ) -> Option<ExecuteProcessRequest> {
     for compatible_constraint in vec![
-      &(Platform::None, Platform::None),
-      &(self.platform, Platform::None),
-      &(self.platform, Platform::current_platform().unwrap()),
+      &(PlatformConstraint::None, PlatformConstraint::None),
+      &(self.platform, PlatformConstraint::None),
+      &(
+        self.platform,
+        PlatformConstraint::current_platform_constraint().unwrap(),
+      ),
     ]
     .iter()
     {
@@ -467,7 +470,7 @@ impl CommandRunner {
     oauth_bearer_token: Option<String>,
     headers: BTreeMap<String, String>,
     store: Store,
-    platform: Platform,
+    platform: PlatformConstraint,
     executor: task_executor::Executor,
     queue_buffer_time: Duration,
     backoff_incremental_wait: Duration,

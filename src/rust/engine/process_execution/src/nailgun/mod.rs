@@ -17,7 +17,7 @@ use crate::local::CapturedWorkdir;
 use crate::nailgun::nailgun_pool::NailgunProcessName;
 use crate::{
   Context, ExecuteProcessRequest, ExecuteProcessRequestMetadata, FallibleExecuteProcessResult,
-  MultiPlatformExecuteProcessRequest, Platform,
+  MultiPlatformExecuteProcessRequest, PlatformConstraint,
 };
 
 #[cfg(test)]
@@ -47,7 +47,7 @@ fn construct_nailgun_server_request(
   nailgun_name: &str,
   args_for_the_jvm: Vec<String>,
   jdk: PathBuf,
-  platform: Platform,
+  platform_constraint: PlatformConstraint,
 ) -> ExecuteProcessRequest {
   let mut full_args = args_for_the_jvm;
   full_args.push(NAILGUN_MAIN_CLASS.to_string());
@@ -65,7 +65,7 @@ fn construct_nailgun_server_request(
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
       hashing::EMPTY_DIGEST,
     jdk_home: Some(jdk),
-    target_platform: platform,
+    target_platform: platform_constraint,
     is_nailgunnable: true,
   }
 }

@@ -1,4 +1,4 @@
-use crate::{ExecuteProcessRequest, Platform, RelativePath};
+use crate::{ExecuteProcessRequest, PlatformConstraint, RelativePath};
 use hashing::{Digest, Fingerprint};
 use std::collections::hash_map::DefaultHasher;
 use std::collections::{BTreeMap, BTreeSet};
@@ -19,7 +19,7 @@ fn execute_process_request_equality() {
             description,
             unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule,
             jdk_home: None,
-            target_platform: Platform::None,
+            target_platform: PlatformConstraint::None,
             is_nailgunnable: false,
         };
 
