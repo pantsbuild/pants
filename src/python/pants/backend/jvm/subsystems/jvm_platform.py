@@ -9,17 +9,10 @@ from pants.base.revision import Revision
 from pants.java.distribution.distribution import DistributionLocator
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method, memoized_property
-from pants.util.strutil import safe_shlex_split
+from pants.option.option_util import flatten_shlexed_list
 
 
 logger = logging.getLogger(__name__)
-
-
-def flatten_and_shlex(list_of_shell):
-  ret = []
-  for elem in list_of_shell or ():
-    ret.extend(safe_shlex_split(elem))
-  return ret
 
 
 class JvmPlatform(Subsystem):
@@ -275,7 +268,7 @@ class JvmPlatformSettings:
     self.source_level = JvmPlatform.parse_java_version(source_level)
     self.target_level = JvmPlatform.parse_java_version(target_level)
     self.args = tuple(args or ())
-    self.jvm_options = tuple(flatten_and_shlex(jvm_options or ()))
+    self.jvm_options = tuple(flatten_shlexed_list(jvm_options or ()))
     self.name = name
     self._by_default = by_default
     self._validate_source_target()
