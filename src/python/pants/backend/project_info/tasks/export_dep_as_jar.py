@@ -6,6 +6,8 @@ import os
 import zipfile
 from collections import defaultdict
 
+from twitter.common.collections import OrderedSet
+
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
@@ -199,6 +201,7 @@ class ExportDepAsJar(ConsoleTask):
     info = {
       # this means 'dependencies'
       'targets': [],
+      'source_dependencies_in_classpath': [],
       'libraries': [],
       'roots': [],
       'id': current_target.id,
@@ -276,6 +279,13 @@ class ExportDepAsJar(ConsoleTask):
       info['platform'] = current_target.platform.name
       if hasattr(current_target, 'runtime_platform'):
         info['runtime_platform'] = current_target.runtime_platform.name
+
+    transitive_targets = OrderedSet([
+      dep.address.spec for dep in dependencies_needed_in_classpath
+      if dep in modulizable_target_set
+    ])
+    transitive_targets.update(info['targets'])
+    info['source_dependencies_in_classpath'] = [dep for dep in transitive_targets]
 
     return info
 
