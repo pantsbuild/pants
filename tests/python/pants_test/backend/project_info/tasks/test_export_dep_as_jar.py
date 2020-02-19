@@ -250,6 +250,20 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
 
     self.linear_build_graph = self.make_linear_graph(['a', 'b', 'c', 'd', 'e'], target_type=ScalaLibrary)
 
+    self.strict_deps_enabled = self.make_target(
+      'strict_deps:enabled',
+      target_type=JvmTarget,
+      dependencies=[self.scala_with_source_dep],
+      strict_deps=True
+    )
+
+    self.strict_deps_disabled = self.make_target(
+      'strict_deps:disabled',
+      target_type=JvmTarget,
+      dependencies=[self.scala_with_source_dep],
+      strict_deps=False
+    )
+
   def create_runtime_classpath_for_targets(self, target):
     def path_to_zjar_with_workdir(address: Address):
       return os.path.join(self.pants_workdir, address.path_safe_spec, "z.jar")
@@ -613,3 +627,16 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
       'org.apache:apache-jar:12.12.2012',
       result['targets'][spec]['libraries']
     )
+
+  def test_libraries_respect_strict_deps(self):
+    enabled_spec = self.strict_deps_enabled.address.spec
+    enabled_result = self.execute_export_json(enabled_spec)['targets'][enabled_spec]
+    disabled_spec = self.strict_deps_disabled.address.spec
+    disabled_result = self.execute_export_json(disabled_spec)['targets'][disabled_spec]
+
+    # Both the targets under test transitively depend on this target
+    # but it shouldn't be included in the strict deps case.
+    transitive_dependency_library_entry = self.jvm_target_with_sources.id
+
+    assert transitive_dependency_library_entry in disabled_result['libraries']
+    assert transitive_dependency_library_entry not in enabled_result['libraries']
