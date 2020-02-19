@@ -427,7 +427,7 @@ class _Locator(object):
     self._maximum_version = maximum_version
 
   def _scan_constraint_match(self, minimum_version, maximum_version, jdk):
-    """Finds a cached version matching the specified constraints
+    """Finds a cached version matching the specified constraints.
 
     :param Revision minimum_version: minimum jvm version to look for (eg, 1.7).
     :param Revision maximum_version: maximum jvm version to look for (eg, 1.7.9999).

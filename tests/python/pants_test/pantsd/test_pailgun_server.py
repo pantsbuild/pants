@@ -80,7 +80,8 @@ class TestPailgunServer(unittest.TestCase):
     mock_shutdown_request.assert_called_once_with(self.server, mock_request)
 
   def test_ensure_request_is_exclusive(self):
-    """Launch many requests, assert that every one is trying to enter the critical section, and assert that only one is doing so at a time."""
+    """Launch many requests, assert that every one is trying to enter the critical section, and
+    assert that only one is doing so at a time."""
     self.threads_to_start = 10
 
     # Queues are thread safe (https://docs.python.org/2/library/queue.html)
@@ -142,7 +143,10 @@ class TestPailgunServer(unittest.TestCase):
 
     # Wrap ensure_request_is_exclusive to notify when we acquire and release the lock.
     def mock_ensure_request_is_exclusive(request_lock_under_test):
-      """Wrap the lock under test. Every thread that calls this function has reached the critical section."""
+      """Wrap the lock under test.
+
+      Every thread that calls this function has reached the critical section.
+      """
       @contextmanager
       def wrapper(environment, request):
         # Assert that all threads are trying to handle a request.

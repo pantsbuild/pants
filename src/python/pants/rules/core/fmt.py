@@ -48,7 +48,8 @@ class AggregatedFmtResults:
   The `combined_digest` is used to ensure that none of the formatters overwrite each other. The
   language implementation should run each formatter one at a time and pipe the resulting digest of
   one formatter into the next. The `combined_digest` must contain all files for the target,
-  including any which were not re-formatted."""
+  including any which were not re-formatted.
+  """
   results: Tuple[FmtResult, ...]
   combined_digest: Digest
 

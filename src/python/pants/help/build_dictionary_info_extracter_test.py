@@ -26,7 +26,6 @@ class BuildDictionaryInfoExtracterTest(unittest.TestCase):
       lines.
 
         with indentations
-
       """
 
     self.assertEqual(('First line.', ['Subsequent', 'lines.', '', '  with indentations']),

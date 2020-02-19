@@ -19,8 +19,8 @@ from pants.util.contextutil import temporary_dir
 
 @union
 class ReplImplementation:
-  """This type proxies from the top-level `repl` goal to a specific REPL implementation
-  for a specific language or languages."""
+  """This type proxies from the top-level `repl` goal to a specific REPL implementation for a
+  specific language or languages."""
   addresses: Addresses
 
 

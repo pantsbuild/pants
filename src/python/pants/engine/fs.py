@@ -44,6 +44,7 @@ class FilesContent(Collection[FileContent]):
 
 class InputFilesContent(FilesContent):
   """A newtype wrapper for FilesContent.
+
   TODO(7710): This class is currently necessary because the engine
   otherwise finds a cycle between FilesContent <=> DirectoryDigest.
   """
@@ -172,9 +173,8 @@ class PathGlobsAndRoot:
 class Snapshot:
   """A Snapshot is a collection of file paths and dir paths fingerprinted by their names/content.
 
-  Snapshots are used to make it easier to isolate process execution by fixing the contents
-  of the files being operated on and easing their movement to and from isolated execution
-  sandboxes.
+  Snapshots are used to make it easier to isolate process execution by fixing the contents of the
+  files being operated on and easing their movement to and from isolated execution sandboxes.
   """
   directory_digest: Digest
   files: Tuple[str, ...]
@@ -259,8 +259,11 @@ class Workspace:
   def materialize_directory(
     self, directory_to_materialize: DirectoryToMaterialize
   ) -> MaterializeDirectoryResult:
-    """Materialize one single directory digest to disk. If you need to materialize multiple, you
-    should use the parallel materialize_directories() instead."""
+    """Materialize one single directory digest to disk.
+
+    If you need to materialize multiple, you should use the parallel materialize_directories()
+    instead.
+    """
     return self._scheduler.materialize_directory(directory_to_materialize)
 
   def materialize_directories(

@@ -13,8 +13,8 @@ from pants.util.objects import SubclassesOf, SuperclassesOf
 class Struct(Serializable, SerializableFactory, Validatable):
   """A serializable object.
 
-  A Struct is composed of basic python builtin types and other high-level Structs.
-  Structs can carry a name in which case they become addressable and can be reused.
+  A Struct is composed of basic python builtin types and other high-level Structs. Structs can carry
+  a name in which case they become addressable and can be reused.
   """
 
   # Fields dealing with inheritance.
@@ -111,9 +111,9 @@ class Struct(Serializable, SerializableFactory, Validatable):
   def address(self) -> Optional[Address]:
     """Return the address of this object, if any.
 
-    In general structs need not be identified by an address, in which case they are
-    generally embedded objects; ie: attributes values of enclosing named structs.
-    Any top-level struct, though, will be identifiable via a unique address.
+    In general structs need not be identified by an address, in which case they are generally
+    embedded objects; ie: attributes values of enclosing named structs. Any top-level struct,
+    though, will be identifiable via a unique address.
     """
     return cast(Optional[Address], self._kwargs.get('address'))
 
@@ -125,7 +125,8 @@ class Struct(Serializable, SerializableFactory, Validatable):
     For a target constructed in memory, this will be the simple class name, like 'JavaLibrary'.
 
     The end result is that the type alias should be the most natural way to refer to this target's
-    type to the author of the target instance."""
+    type to the author of the target instance.
+    """
     type_alias: Optional[str] = self._kwargs.get(self._TYPE_ALIAS_FIELD, None)
     return type_alias if type_alias is not None else type(self).__name__
 
@@ -133,7 +134,8 @@ class Struct(Serializable, SerializableFactory, Validatable):
   def abstract(self) -> bool:
     """Return `True` if this object has been marked as abstract.
 
-    Abstract objects are not validated. See: `validate_concrete`."""
+    Abstract objects are not validated. See: `validate_concrete`.
+    """
     return self._kwargs.get('abstract', False)
 
   # It only makes sense to inherit a subset of our own fields (we should not inherit new fields!),

@@ -10,9 +10,7 @@ from twitter.common.collections import OrderedSet
 
 
 def normalize_classname(classname):
-  """
-  Ensure the dot separated class name (zinc reported class not found may use '/' separator)
-  """
+  """Ensure the dot separated class name (zinc reported class not found may use '/' separator)"""
   return classname.replace('/', '.')
 
 
@@ -22,9 +20,7 @@ class ClassNotFoundError(namedtuple('CompileError', ['source', 'lineno', 'classn
 
 
 class CompileErrorExtractor:
-  """
-  Extract `ClassNotFoundError`s from pants compile log.
-  """
+  """Extract `ClassNotFoundError`s from pants compile log."""
 
   def __init__(self, error_patterns):
     self._error_patterns = [re.compile(p) for p in error_patterns]
@@ -70,9 +66,7 @@ class CompileErrorExtractor:
 
 
 class StringSimilarityRanker:
-  """
-  Sort strings according to their similarities to a given string.
-  """
+  """Sort strings according to their similarities to a given string."""
 
   def __init__(self, base_str):
     """
@@ -86,9 +80,7 @@ class StringSimilarityRanker:
 
 
 class MissingDependencyFinder:
-  """
-  Try to find missing dependencies from target's transitive dependencies.
-  """
+  """Try to find missing dependencies from target's transitive dependencies."""
 
   def __init__(self, dep_analyzer, error_extractor):
     self.dep_analyzer = dep_analyzer
@@ -97,9 +89,8 @@ class MissingDependencyFinder:
   def find(self, compile_failure_log, target):
     """Find missing deps on a best-effort basis from target's transitive dependencies.
 
-    Returns (class2deps, no_dep_found) tuple. `class2deps` contains classname
-    to deps that contain the class mapping. `no_dep_found` are the classnames that are
-    unable to find the deps.
+    Returns (class2deps, no_dep_found) tuple. `class2deps` contains classname to deps that contain
+    the class mapping. `no_dep_found` are the classnames that are unable to find the deps.
     """
     not_found_classnames = [err.classname for err in
                             self.compile_error_extractor.extract(compile_failure_log)]
@@ -108,10 +99,9 @@ class MissingDependencyFinder:
   def _select_target_candidates_for_class(self, classnames, target):
     """Select a target that contains the given classname.
 
-    When multiple candidates are available, not uncommon in 3rdparty dependencies,
-    they are ranked according to their string similiarities with the classname because
-    the way 3rdparty targets are conventionally named often shares similar naming
-    structure.
+    When multiple candidates are available, not uncommon in 3rdparty dependencies, they are ranked
+    according to their string similiarities with the classname because the way 3rdparty targets are
+    conventionally named often shares similar naming structure.
     """
     class2deps, no_dep_found = {}, set()
     for classname in classnames:

@@ -60,7 +60,8 @@ class MutationError(AttributeError):
 
 
 class AddressableTypeValidationError(TypeConstraintError):
-  """Indicates a value provided to an `AddressableDescriptor` failed to satisfy a type constraint."""
+  """Indicates a value provided to an `AddressableDescriptor` failed to satisfy a type
+  constraint."""
 
 
 class AddressableDescriptor:

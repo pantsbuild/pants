@@ -201,9 +201,9 @@ class Parser:
     def _create_flag_value_map(flags: Iterable[str]) -> DefaultDict[str, List[Optional[str]]]:
       """Returns a map of flag -> list of values, based on the given flag strings.
 
-      None signals no value given (e.g., -x, --foo).
-      The value is a list because the user may specify the same flag multiple times, and that's
-      sometimes OK (e.g., when appending to list-valued options).
+      None signals no value given (e.g., -x, --foo). The value is a list because the user may
+      specify the same flag multiple times, and that's sometimes OK (e.g., when appending to list-
+      valued options).
       """
       flag_value_map: DefaultDict[str, List[Optional[str]]] = defaultdict(list)
       for flag in flags:
@@ -564,8 +564,8 @@ class Parser:
   def parse_name_and_dest(*args, **kwargs):
     """Return the name and dest for an option registration.
 
-    If an explicit `dest` is specified, returns that and otherwise derives a default from the
-    option flags where '--foo-bar' -> 'foo_bar' and '-x' -> 'x'.
+    If an explicit `dest` is specified, returns that and otherwise derives a default from the option
+    flags where '--foo-bar' -> 'foo_bar' and '-x' -> 'x'.
     """
     arg = next((a for a in args if a.startswith('--')), args[0])
     name = arg.lstrip('-').replace('-', '_')

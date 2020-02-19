@@ -27,8 +27,7 @@ class TargetSourceFiles:
 @rule
 async def find_target_source_files(request: FindTargetSourceFilesRequest) -> TargetSourceFiles:
   """Find the `sources` for a target, possibly finding a subset of the original `sources` field if
-  the user supplied file arguments.
-  """
+  the user supplied file arguments."""
   adaptor = request.adaptor_with_origin.adaptor
   origin = request.adaptor_with_origin.origin
   resulting_snapshot = adaptor.sources.snapshot

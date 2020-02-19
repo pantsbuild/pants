@@ -7,10 +7,11 @@ from typing import Any, Callable, Iterable, Iterator, Optional
 
 
 class StreamingWorkunitHandler:
-  """StreamingWorkunitHandler's job is to periodically call each registered callback function with the
-  following kwargs:
-    workunits: Tuple[Dict[str, str], ...] - the workunit data itself
-    finished: bool - this will be set to True when the last chunk of workunit data is reported to the callback
+  """StreamingWorkunitHandler's job is to periodically call each registered callback function with
+  the following kwargs:
+
+  workunits: Tuple[Dict[str, str], ...] - the workunit data itself
+  finished: bool - this will be set to True when the last chunk of workunit data is reported to the callback
   """
 
   def __init__(self, scheduler: Any, callbacks: Iterable[Callable], report_interval_seconds: float):

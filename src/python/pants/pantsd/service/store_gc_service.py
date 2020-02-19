@@ -48,7 +48,10 @@ class StoreGCService(PantsService):
     self._set_next_gc()
 
   def run(self):
-    """Main service entrypoint. Called via Thread.start() via PantsDaemon.run()."""
+    """Main service entrypoint.
+
+    Called via Thread.start() via PantsDaemon.run().
+    """
     while not self._state.is_terminating:
       self._maybe_garbage_collect()
       self._maybe_extend_lease()

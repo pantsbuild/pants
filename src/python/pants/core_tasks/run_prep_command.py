@@ -29,8 +29,8 @@ class RunPrepCommandBase(Task):
   def register_options(cls, register):
     """Register options for this optionable.
 
-    In this case, there are no special options, but we want to use this opportunity to setup
-    goal validation in PrepCommand before the build graph is parsed.
+    In this case, there are no special options, but we want to use this opportunity to setup goal
+    validation in PrepCommand before the build graph is parsed.
     """
     super().register_options(register)
     PrepCommand.add_allowed_goal(cls.goal)

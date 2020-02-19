@@ -47,8 +47,8 @@ class BuildDictionaryInfoExtracter:
   def _is_custom_init(cls, init_func):
     """Check if init derives from object or from a custom implementation.
 
-    In Py2, we could check if __init__ was overridden with inspect.ismethod(obj_type). This no longer works in Py3, so
-    we have to use an alternative check.
+    In Py2, we could check if __init__ was overridden with inspect.ismethod(obj_type). This no
+    longer works in Py3, so we have to use an alternative check.
     """
     return 'slot wrapper' not in str(init_func)
 
@@ -56,8 +56,7 @@ class BuildDictionaryInfoExtracter:
   def get_description_from_docstring(cls, obj):
     """Returns a pair (description, details) from the obj's docstring.
 
-    description is a single line.
-    details is a list of subsequent lines, possibly empty.
+    description is a single line. details is a list of subsequent lines, possibly empty.
     """
     doc = obj.__doc__ or ''
     p = doc.find('\n')
@@ -88,10 +87,10 @@ class BuildDictionaryInfoExtracter:
   def _get_stanza_first_line_re(cls):
     """Returns a regex that can be used to find the first line of a stanza in a docstring.
 
-    The returned regex can be used to find the first line where there is not a data type
-    in the arg name (e.g., :param a:), where there is a data type in the arg name
-    (e.g., :param str a:), where there is a single word between the colons (e.g., :returns:),
-    and where a newline immediately follows the second colon in the stanza.
+    The returned regex can be used to find the first line where there is not a data type in the arg
+    name (e.g., :param a:), where there is a data type in the arg name (e.g., :param str a:), where
+    there is a single word between the colons (e.g., :returns:), and where a newline immediately
+    follows the second colon in the stanza.
     """
     return re.compile(r':(\w+)\s*(\w+\s+)?(\w*):\s*(.*)')
 

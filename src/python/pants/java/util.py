@@ -82,8 +82,8 @@ def execute_java_async(classpath, main, jvm_options=None, args=None, executor=No
                        workunit_factory=None, workunit_name=None, workunit_labels=None,
                        cwd=None, workunit_log_config=None, distribution=None,
                        create_synthetic_jar=True, synthetic_jar_dir=None):
-  """This is just like execute_java except that it returns a ProcessHandler rather than a return code.
-
+  """This is just like execute_java except that it returns a ProcessHandler rather than a return
+  code.
 
   If `workunit_factory` is supplied, does so in the context of a workunit.
 

@@ -93,7 +93,8 @@ def _compute_default_sources_globs(base_class, target_type):
 
 
 def _apply_default_sources_globs(base_class, target_type):
-  """Mutates the given TargetAdaptor subclass to apply default sources from the given legacy target type."""
+  """Mutates the given TargetAdaptor subclass to apply default sources from the given legacy target
+  type."""
   globs, excludes = _compute_default_sources_globs(base_class, target_type)
   base_class.default_sources_globs = globs
   base_class.default_sources_exclude_globs = excludes

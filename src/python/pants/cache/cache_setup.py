@@ -134,8 +134,8 @@ class CacheFactory:
 
   @staticmethod
   def make_task_cache_dirname(task):
-    """Use the task fingerprint as the name of the cache subdirectory to store
-    results from the task."""
+    """Use the task fingerprint as the name of the cache subdirectory to store results from the
+    task."""
     return task.fingerprint
 
   @memoized_property
@@ -211,7 +211,7 @@ class CacheFactory:
 
   # VisibleForTesting
   def _resolve(self, spec):
-    """Attempt resolving cache URIs when a remote spec is provided. """
+    """Attempt resolving cache URIs when a remote spec is provided."""
     if not spec.remote:
       return spec
 

@@ -80,7 +80,7 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
 
   @classmethod
   def use_pantsd_env_var(cls):
-    """We set our own ad-hoc pantsd configuration in most of these tests"""
+    """We set our own ad-hoc pantsd configuration in most of these tests."""
     return False
 
   @contextmanager

@@ -14,7 +14,7 @@ from pants.contrib.buildrefactor.buildozer import Buildozer
 
 
 class BuildozerTest(TaskTestBase):
-  """Test the buildozer tool"""
+  """Test the buildozer tool."""
 
   @classmethod
   def alias_groups(cls):
@@ -85,8 +85,8 @@ class BuildozerTest(TaskTestBase):
         os.path.join(self.build_root, spec, 'BUILD')))
 
   def _test_add_dependencies_with_targets(self, dependencies_to_add, roots, targets):
-    """
-    Test that a dependency is (or dependencies are) added to a BUILD file with buildozer.
+    """Test that a dependency is (or dependencies are) added to a BUILD file with buildozer.
+
     This can run on multiple context roots and multiple target objects.
     """
     for dependency_to_add in dependencies_to_add:

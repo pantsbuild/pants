@@ -64,8 +64,8 @@ _PROCESSOR_INFO_FILE = 'META-INF/services/javax.annotation.processing.Processor'
 class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
   """A common framework for JVM compilation.
 
-  To subclass for a specific JVM language, implement the static values and methods
-  mentioned below under "Subclasses must implement".
+  To subclass for a specific JVM language, implement the static values and methods mentioned below
+  under "Subclasses must implement".
   """
 
   size_estimators = create_size_estimators()
@@ -343,20 +343,20 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     """
 
   def create_extra_products_for_targets(self, targets):
-    """Allows subclasses to provide a method which creates extra products directly.
-    """
+    """Allows subclasses to provide a method which creates extra products directly."""
 
   def register_extra_products_from_contexts(self, targets, compile_contexts):
     """Allows subclasses to register additional products for targets.
 
-    It is called for valid targets at start, then for each completed invalid target,
-    separately, during compilation.
+    It is called for valid targets at start, then for each completed invalid target, separately,
+    during compilation.
     """
 
   def select_runtime_context(self, ccs):
     """Select the context that contains the paths for runtime classpath artifacts.
 
-    Subclasses may have more than one type of context."""
+    Subclasses may have more than one type of context.
+    """
     return ccs
 
   def __init__(self, *args, **kwargs):
@@ -798,7 +798,8 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
 
   def create_compile_jobs(self, compile_target, all_compile_contexts, invalid_dependencies, ivts,
     counter, classpath_product):
-    """Return a list of jobs, and a count of those jobs that represent meaningful ("countable") work."""
+    """Return a list of jobs, and a count of those jobs that represent meaningful ("countable")
+    work."""
 
     context_for_target = all_compile_contexts[compile_target]
     compile_context = self.select_runtime_context(context_for_target)

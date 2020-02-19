@@ -330,8 +330,7 @@ class _DirectoriesToMaterialize(Collection[DirectoryToMaterialize]):
 class SchedulerSession:
   """A handle to a shared underlying Scheduler and a unique Session.
 
-  Generally a Session corresponds to a single run of pants: some metrics are specific to
-  a Session.
+  Generally a Session corresponds to a single run of pants: some metrics are specific to a Session.
   """
 
   execution_error_type = ExecutionError
@@ -591,8 +590,11 @@ class SchedulerSession:
   def materialize_directory(
     self, directory_to_materialize: DirectoryToMaterialize
   ) -> MaterializeDirectoryResult:
-    """Materialize one single directory digest to disk. If you need to materialize multiple, you
-    should use the parallel materialize_directories() instead."""
+    """Materialize one single directory digest to disk.
+
+    If you need to materialize multiple, you should use the parallel materialize_directories()
+    instead.
+    """
     return self.materialize_directories((directory_to_materialize,)).dependencies[0]
 
   def materialize_directories(

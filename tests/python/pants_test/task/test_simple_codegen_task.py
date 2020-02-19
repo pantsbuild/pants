@@ -53,9 +53,9 @@ class DummyLibrary(DummyTargetBase):
 class DummyGen(SimpleCodegenTask):
   """Task which generates .java files for DummyLibraries.
 
-  In addition to fulfilling the bare-minimum requirements of being a SimpleCodegenTask subclass,
-  the methods in this class perform some validation to ensure that they are being called correctly
-  by SimpleCodegenTask.
+  In addition to fulfilling the bare-minimum requirements of being a SimpleCodegenTask subclass, the
+  methods in this class perform some validation to ensure that they are being called correctly by
+  SimpleCodegenTask.
   """
 
   sources_globs = ('**/*.java',)

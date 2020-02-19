@@ -17,12 +17,11 @@ from pants.contrib.go.tasks.go_workspace_task import GoWorkspaceTask
 class GoTest(PartitionedTestRunnerTaskMixin, GoWorkspaceTask):
   """Runs `go test` on Go packages.
 
-  To run a library's tests, GoTest only requires a Go workspace to be initialized
-  (see GoWorkspaceTask) with links to necessary source files. It does not require
-  GoCompile to first compile the library to be tested -- in fact, GoTest will ignore
-  any binaries in "$GOPATH/pkg/", because Go test files (which live in the package
-  they are testing) are ignored in normal compilation, so Go test must compile everything
-  from scratch.
+  To run a library's tests, GoTest only requires a Go workspace to be initialized (see
+  GoWorkspaceTask) with links to necessary source files. It does not require GoCompile to first
+  compile the library to be tested -- in fact, GoTest will ignore any binaries in "$GOPATH/pkg/",
+  because Go test files (which live in the package they are testing) are ignored in normal
+  compilation, so Go test must compile everything from scratch.
   """
 
   @classmethod
@@ -50,10 +49,8 @@ class GoTest(PartitionedTestRunnerTaskMixin, GoWorkspaceTask):
     gopath: str
 
   def _generate_args_for_targets(self, targets):
-    """
-    Generate a dict mapping target -> _GoTestTargetInfo so that the import path and gopath can be
-    reconstructed for spawning test commands regardless of how the targets are partitioned.
-    """
+    """Generate a dict mapping target -> _GoTestTargetInfo so that the import path and gopath can be
+    reconstructed for spawning test commands regardless of how the targets are partitioned."""
     return {
       t: self._GoTestTargetInfo(import_path=t.import_path, gopath=self.get_gopath(t))
       for t in targets

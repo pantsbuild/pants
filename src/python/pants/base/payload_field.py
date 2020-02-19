@@ -12,7 +12,10 @@ from pants.util.strutil import ensure_binary
 
 
 def combine_hashes(hashes):
-  """A simple helper function to combine other hashes.  Sorts the hashes before rolling them in."""
+  """A simple helper function to combine other hashes.
+
+  Sorts the hashes before rolling them in.
+  """
   hasher = sha1()
   for h in sorted(hashes):
     h = ensure_binary(h)
@@ -28,7 +31,7 @@ class PayloadField(ABC):
   _fingerprint_memo: ClassVar[Optional[str]] = None
 
   def fingerprint(self):
-    """A memoized sha1 hexdigest hashing the contents of this PayloadField
+    """A memoized sha1 hexdigest hashing the contents of this PayloadField.
 
     The fingerprint returns either a string or None.  If the return is None, consumers of the
     fingerprint may choose to elide this PayloadField from their combined hash computation.
@@ -72,7 +75,8 @@ class FingerprintedMixin:
 
     :API: public
 
-    :returns: a sha1 hexdigest hashing the contents of this structure."""
+    :returns: a sha1 hexdigest hashing the contents of this structure.
+    """
     raise NotImplementedError()
 
 

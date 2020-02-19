@@ -83,9 +83,8 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
       self._args.extend(safe_shlex_split(arg))
 
   def execute(self):
-    """Resolves the specified confs for the configured targets and returns an iterator over
-    tuples of (conf, jar path).
-    """
+    """Resolves the specified confs for the configured targets and returns an iterator over tuples
+    of (conf, jar path)."""
 
     deprecated_conditional(
       lambda: JvmResolveSubsystem.global_instance().get_options().resolver == 'ivy',

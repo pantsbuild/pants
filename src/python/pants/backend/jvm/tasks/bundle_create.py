@@ -178,7 +178,10 @@ class BundleCreate(BundleMixin, JvmBinaryTask):
     return bundle_dir
 
   def check_basename_conflicts(self, targets):
-    """Apps' basenames are used as bundle directory names. Ensure they are all unique."""
+    """Apps' basenames are used as bundle directory names.
+
+    Ensure they are all unique.
+    """
 
     basename_seen = {}
     for target in targets:

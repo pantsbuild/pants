@@ -67,9 +67,8 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
       return result.readlines()[0].strip()
 
   def _run_and_check(self, address_specs, incremental_import=None):
-    """
-    Invoke idea-plugin goal and check for target specs and project in the
-    generated project and workspace file.
+    """Invoke idea-plugin goal and check for target specs and project in the generated project and
+    workspace file.
 
     :param address_specs: list of address specs
     :return: n/a

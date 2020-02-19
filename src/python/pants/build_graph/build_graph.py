@@ -28,19 +28,19 @@ class BuildGraph(ABC):
   """
 
   class DuplicateAddressError(AddressLookupError):
-    """The same address appears multiple times in a dependency list
+    """The same address appears multiple times in a dependency list.
 
     :API: public
     """
 
   class TransitiveLookupError(AddressLookupError):
-    """Used to append the current node to the error message from an AddressLookupError
+    """Used to append the current node to the error message from an AddressLookupError.
 
     :API: public
     """
 
   class ManualSyntheticTargetError(AddressLookupError):
-    """Used to indicate that an synthetic target was defined manually
+    """Used to indicate that an synthetic target was defined manually.
 
     :API: public
     """
@@ -50,7 +50,8 @@ class BuildGraph(ABC):
           'Found a manually-defined target at synthetic address {}'.format(addr.spec))
 
   class NoDepPredicateWalk:
-    """This is a utility class to aid in graph traversals that don't have predicates on dependency edges."""
+    """This is a utility class to aid in graph traversals that don't have predicates on dependency
+    edges."""
 
     def __init__(self):
       self._worked = set()

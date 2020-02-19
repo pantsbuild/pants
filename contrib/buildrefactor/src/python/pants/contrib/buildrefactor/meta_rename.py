@@ -16,10 +16,10 @@ logger = logging.getLogger(__name__)
 
 
 class MetaRename(Task):
-  """Rename a target and update its dependees' dependencies with the new target name
+  """Rename a target and update its dependees' dependencies with the new target name.
 
-  Provides a mechanism for renaming the target's name within its local BUILD file.
-  Also renames the target wherever it's specified as a dependency.
+  Provides a mechanism for renaming the target's name within its local BUILD file. Also renames the
+  target wherever it's specified as a dependency.
   """
 
   @classmethod

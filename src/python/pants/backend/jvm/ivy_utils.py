@@ -399,7 +399,7 @@ class IvyResolveResult:
   def report_for_conf(self, conf):
     """Returns the path to the ivy report for the provided conf.
 
-     Returns None if there is no path.
+    Returns None if there is no path.
     """
     return self._reports_by_conf.get(conf)
 
@@ -549,8 +549,8 @@ class IvyModuleRef:
   def caller_key(self):
     """This returns an identifier for an IvyModuleRef that only retains the caller org and name.
 
-    Ivy represents dependees as `<caller/>`'s with just org and name and rev information.
-    This method returns a `<caller/>` representation of the current ref.
+    Ivy represents dependees as `<caller/>`'s with just org and name and rev information. This
+    method returns a `<caller/>` representation of the current ref.
     """
     return IvyModuleRef(name=self.name, org=self.org, rev=self._ANY_REV)
 
@@ -821,11 +821,12 @@ class IvyUtils:
 
   @classmethod
   def _hardlink_cachepath(cls, ivy_repository_cache_dir, inpath, hardlink_dir, outpath):
-    """hardlinks all paths listed in inpath that are under ivy_repository_cache_dir into hardlink_dir.
+    """hardlinks all paths listed in inpath that are under ivy_repository_cache_dir into
+    hardlink_dir.
 
-    If there is an existing hardlink for a file under inpath, it is used rather than creating
-    a new hardlink. Preserves all other paths. Writes the resulting paths to outpath.
-    Returns a map of path -> hardlink to that path.
+    If there is an existing hardlink for a file under inpath, it is used rather than creating a new
+    hardlink. Preserves all other paths. Writes the resulting paths to outpath. Returns a map of
+    path -> hardlink to that path.
     """
     safe_mkdir(hardlink_dir)
     # The ivy_repository_cache_dir might itself be a hardlink. In this case, ivy may return paths that

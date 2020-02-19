@@ -181,7 +181,8 @@ class JvmToolMixin:
 
   @classmethod
   def tool_jar_entry_from_products(cls, products, key, scope):
-    """Get a ClasspathEntry for the jar for the tool previously registered under key in the given scope.
+    """Get a ClasspathEntry for the jar for the tool previously registered under key in the given
+    scope.
 
     :param products: The products of the current pants run.
     :type products: :class:`pants.goal.products.Products`

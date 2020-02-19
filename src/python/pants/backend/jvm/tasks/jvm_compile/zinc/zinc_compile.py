@@ -168,8 +168,8 @@ class BaseZincCompile(JvmCompile):
   def incremental(self):
     """Zinc implements incremental compilation.
 
-    Setting this property causes the task infrastructure to clone the previous
-    results_dir for a target into the new results_dir for a target.
+    Setting this property causes the task infrastructure to clone the previous results_dir for a
+    target into the new results_dir for a target.
     """
     return self.get_options().incremental
 
@@ -577,8 +577,7 @@ class BaseZincCompile(JvmCompile):
     return res.output_directory_digest
 
   def _compute_local_only_inputs(self, classes_dir, relpath_to_analysis, jar_file):
-    """
-    Compute for the scratch inputs for ExecuteProcessRequest.
+    """Compute for the scratch inputs for ExecuteProcessRequest.
 
     If analysis file exists, then incremental compile is enabled. Otherwise, the compile is not
     incremental, an empty digest will be returned.

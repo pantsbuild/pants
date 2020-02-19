@@ -68,7 +68,10 @@ class PailgunService(PantsService):
     return PailgunServer(self._bind_addr, runner_factory, lifecycle_lock, self._request_complete_callback)
 
   def run(self):
-    """Main service entrypoint. Called via Thread.start() via PantsDaemon.run()."""
+    """Main service entrypoint.
+
+    Called via Thread.start() via PantsDaemon.run().
+    """
     self._logger.info('starting pailgun server on port {}'.format(self.pailgun_port))
 
     try:

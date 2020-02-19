@@ -182,8 +182,8 @@ class PantsRunIntegrationTest(unittest.TestCase):
 
   @classmethod
   def use_pantsd_env_var(cls):
-    """Subclasses may override to acknowledge that the tests cannot run when pantsd is enabled,
-    or they want to configure pantsd themselves.
+    """Subclasses may override to acknowledge that the tests cannot run when pantsd is enabled, or
+    they want to configure pantsd themselves.
 
     In those cases, --enable-pantsd will not be added to their configuration.
     This approach is coarsely grained, meaning we disable pantsd in some tests that actually run
@@ -273,9 +273,8 @@ class PantsRunIntegrationTest(unittest.TestCase):
       return ret
 
   def get_cache_subdir(self, cache_dir, subdir_glob='*/', other_dirs=()):
-    """Check that there is only one entry of `cache_dir` which matches the glob
-    specified by `subdir_glob`, excluding `other_dirs`, and
-    return it.
+    """Check that there is only one entry of `cache_dir` which matches the glob specified by
+    `subdir_glob`, excluding `other_dirs`, and return it.
 
     :param str cache_dir: absolute path to some directory.
     :param str subdir_glob: string specifying a glob for (one level down)
@@ -519,11 +518,10 @@ class PantsRunIntegrationTest(unittest.TestCase):
     self.assert_contains_log(msg, level, module, pants_run.stderr_data, pants_run.pid)
 
   def assert_contains_log(self, msg, level, module, log, pid=None):
-    """
-    Asserts that the passed log contains the message logged by the module at the level.
+    """Asserts that the passed log contains the message logged by the module at the level.
 
-    If pid is specified, performs an exact match including the pid of the pants process.
-    Otherwise performs a regex match asserting that some pid is present.
+    If pid is specified, performs an exact match including the pid of the pants process. Otherwise
+    performs a regex match asserting that some pid is present.
     """
     prefix = f"[{level}] {module}:pid="
     suffix = f": {msg}"

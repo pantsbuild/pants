@@ -14,7 +14,7 @@ from pants.util.memo import memoized_property
 
 
 class IvyOutdated(NailgunTask):
-  """Checks for outdated jar dependencies with Ivy"""
+  """Checks for outdated jar dependencies with Ivy."""
 
   _IVY_DEPENDENCY_UPDATE_MAIN = 'org.pantsbuild.tools.ivy.DependencyUpdateChecker'
 

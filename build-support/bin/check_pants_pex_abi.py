@@ -45,8 +45,9 @@ def create_parser() -> argparse.ArgumentParser:
 def parse_abi_from_filename(filename: str) -> str:
   """This parses out the abi from a wheel filename.
 
-  For example, `configparser-3.5.0-py2-abi3-any.whl` would return `abi3`.
-  See https://www.python.org/dev/peps/pep-0425/#use for how wheel filenames are defined."""
+  For example, `configparser-3.5.0-py2-abi3-any.whl` would return `abi3`. See
+  https://www.python.org/dev/peps/pep-0425/#use for how wheel filenames are defined.
+  """
   return filename.split("-")[-2]
 
 

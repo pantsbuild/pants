@@ -24,9 +24,8 @@ class JvmTaskTestBase(TaskTestBase):
     self.set_options_for_scope('resolver', resolver='ivy')
 
   def populate_runtime_classpath(self, context, classpath=None):
-    """
-    Helps actual test cases to populate the 'runtime_classpath' products data mapping
-    in the context, which holds the classpath value for targets.
+    """Helps actual test cases to populate the 'runtime_classpath' products data mapping in the
+    context, which holds the classpath value for targets.
 
     :API: public
 

@@ -18,8 +18,8 @@ from pants.contrib.go.tasks.go_workspace_task import GoWorkspaceTask
 class GoCompile(GoWorkspaceTask):
   """Compiles a Go package into either a library binary or executable binary.
 
-  GoCompile will populate the "bin/" and "pkg/" directories of each target's Go
-  workspace (see GoWorkspaceTask) with executables and library binaries respectively.
+  GoCompile will populate the "bin/" and "pkg/" directories of each target's Go workspace (see
+  GoWorkspaceTask) with executables and library binaries respectively.
   """
 
   @classmethod
@@ -72,10 +72,10 @@ class GoCompile(GoWorkspaceTask):
   @classmethod
   @memoized_method
   def _get_build_flags(cls, build_flags_from_option, is_flagged, target):
-    """Merge build flags with global < target < command-line order
+    """Merge build flags with global < target < command-line order.
 
-    Build flags can be defined as globals (in `pants.ini`), as arguments to a Target, and
-    via the command-line.
+    Build flags can be defined as globals (in `pants.ini`), as arguments to a Target, and via the
+    command-line.
     """
     # If self.get_options().build_flags returns a quoted string, remove the outer quotes,
     # which happens for flags passed from the command-line.

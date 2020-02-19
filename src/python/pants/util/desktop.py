@@ -9,7 +9,7 @@ from pants.util.osutil import get_os_name
 
 
 class IdeaNotFoundException(Exception):
-  """Could not find Idea executable"""
+  """Could not find Idea executable."""
 
 
 class OpenError(Exception):

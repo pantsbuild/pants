@@ -5,8 +5,9 @@ from pants.task.task import Task
 
 
 class DummyOptionsTask(Task):
-  """
-  This class is only used to test options with deprecations. Please see
+  """This class is only used to test options with deprecations.
+
+  Please see
   pants_test.option.test_options_integration.TestOptionsIntegration#test_options_deprecation_from_config
   """
 

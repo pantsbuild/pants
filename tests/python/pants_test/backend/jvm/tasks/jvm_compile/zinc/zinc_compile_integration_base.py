@@ -282,8 +282,8 @@ class BaseZincCompileIntegrationTest:
       self.assertIn(expected, pants_run.stdout_data)
 
   def test_barebones_logger_works(self):
-    """
-    Test that the barebones logger logs the expected warning.
+    """Test that the barebones logger logs the expected warning.
+
     TODO(#8312): this should be synced up with the normal logging output in order to use native-image zinc!
     """
     pants_run = self._compile_unused_import(use_barebones_logger=True)

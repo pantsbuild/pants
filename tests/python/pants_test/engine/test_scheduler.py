@@ -125,10 +125,8 @@ async def error_msg_test_rule(union_wrapper: UnionWrapper) -> UnionX:
 
 
 class TypeCheckFailWrapper:
-  """
-  This object wraps another object which will be used to demonstrate a type check failure when the
-  engine processes an `await Get(...)` statement.
-  """
+  """This object wraps another object which will be used to demonstrate a type check failure when
+  the engine processes an `await Get(...)` statement."""
 
   def __init__(self, inner):
     self.inner = inner

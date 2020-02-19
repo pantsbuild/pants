@@ -10,14 +10,16 @@ from pants_test.backend.python.pants_requirement_integration_test_base import (
 
 
 class PantsRequirementIntegrationTest(PantsRequirementIntegrationTestBase):
-  """A pants plugin should be able to depend on a pants_requirement() alone to
-  declare its dependencies on pants modules. This plugin, when added to the
-  pythonpath and backend_packages, should be able to declare new BUILD file
-  objects."""
+  """A pants plugin should be able to depend on a pants_requirement() alone to declare its
+  dependencies on pants modules.
+
+  This plugin, when added to the pythonpath and backend_packages, should be able to declare new
+  BUILD file objects.
+  """
 
   @classmethod
   def use_pantsd_env_var(cls):
-    """The test fails to run under pantsd because of a failure to initialize a subsystem"""
+    """The test fails to run under pantsd because of a failure to initialize a subsystem."""
     return False
 
   def run_with_testproject_backend_pkgs(self, cmd):

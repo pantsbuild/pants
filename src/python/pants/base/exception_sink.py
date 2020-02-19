@@ -210,7 +210,8 @@ class ExceptionSink:
   def exiter_as_until_exception(
     cls, new_exiter_fun: Callable[[Optional[Exiter]], Exiter]
   ) -> Iterator[None]:
-    """Temporarily override the global exiter, except this will unset it when an exception happens."""
+    """Temporarily override the global exiter, except this will unset it when an exception
+    happens."""
     previous_exiter = cls._exiter
     new_exiter = new_exiter_fun(previous_exiter)
     try:
@@ -221,8 +222,8 @@ class ExceptionSink:
 
   @classmethod
   def _reset_exiter(cls, exiter: Optional[Exiter]) -> None:
-    """
-    Class state:
+    """Class state:
+
     - Overwrites `cls._exiter`.
     Python state:
     - Overwrites sys.excepthook.
@@ -240,8 +241,8 @@ class ExceptionSink:
     interactive_output_stream,
     override_faulthandler_destination=True
   ):
-    """
-    Class state:
+    """Class state:
+
     - Overwrites `cls._interactive_output_stream`.
     OS state:
     - Overwrites the SIGUSR2 handler.
@@ -345,8 +346,8 @@ class ExceptionSink:
 
   @classmethod
   def reset_signal_handler(cls, signal_handler):
-    """
-    Class state:
+    """Class state:
+
     - Overwrites `cls._signal_handler`.
     OS state:
     - Overwrites signal handlers for SIGINT, SIGQUIT, and SIGTERM.
@@ -373,8 +374,7 @@ class ExceptionSink:
   @classmethod
   @contextmanager
   def trapped_signals(cls, new_signal_handler):
-    """
-    A contextmanager which temporarily overrides signal handling.
+    """A contextmanager which temporarily overrides signal handling.
 
     NB: This method calls signal.signal(), which will crash if not called from the main thread!
     """
@@ -387,9 +387,8 @@ class ExceptionSink:
   @classmethod
   @contextmanager
   def ignoring_sigint(cls):
-    """
-    A contextmanager which disables handling sigint in the current signal handler.
-    This allows threads that are not the main thread to ignore sigint.
+    """A contextmanager which disables handling sigint in the current signal handler. This allows
+    threads that are not the main thread to ignore sigint.
 
     NB: Only use this if you can't use ExceptionSink.trapped_signals().
 

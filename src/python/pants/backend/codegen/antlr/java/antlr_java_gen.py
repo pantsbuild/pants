@@ -125,10 +125,9 @@ class AntlrJavaGen(SimpleCodegenTask, NailgunTask):
   def _rearrange_output_for_package(self, target_workdir, java_package):
     """Rearrange the output files to match a standard Java structure.
 
-    Antlr emits a directory structure based on the relative path provided
-    for the grammar file. If the source root of the file is different from
-    the Pants build root, then the Java files end up with undesired parent
-    directories.
+    Antlr emits a directory structure based on the relative path provided for the grammar file. If
+    the source root of the file is different from the Pants build root, then the Java files end up
+    with undesired parent directories.
     """
     package_dir_rel = java_package.replace('.', os.path.sep)
     package_dir = os.path.join(target_workdir, package_dir_rel)

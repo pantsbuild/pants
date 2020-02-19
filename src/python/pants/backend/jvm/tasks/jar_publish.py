@@ -219,10 +219,11 @@ def pushdb_coordinate(jar, entry):
 def target_internal_dependencies(target):
   """Returns internal Jarable dependencies that were "directly" declared.
 
-  Directly declared deps are those that are explicitly listed in the definition of a
-  target, rather than being depended on transitively. But in order to walk through
-  aggregator targets such as `target`, `dependencies`, or `jar_library`, this recursively
-  descends the dep graph and stops at Jarable instances."""
+  Directly declared deps are those that are explicitly listed in the definition of a target, rather
+  than being depended on transitively. But in order to walk through aggregator targets such as
+  `target`, `dependencies`, or `jar_library`, this recursively descends the dep graph and stops at
+  Jarable instances.
+  """
   for dep in target.dependencies:
     if isinstance(dep, Jarable):
       yield dep
@@ -459,8 +460,10 @@ class JarPublish(HasTransitiveOptionMixin, ScmPublishMixin, JarTask):
       self.restart_at = parse_jarcoordinate(self.get_options().restart_at)
 
   def confirm_push(self, coord, version):
-    """Ask the user if a push should be done for a particular version of a
-       particular coordinate.   Return True if the push should be done"""
+    """Ask the user if a push should be done for a particular version of a particular coordinate.
+
+    Return True if the push should be done
+    """
     if not self.get_options().prompt:
       return True
     try:
@@ -476,7 +479,7 @@ class JarPublish(HasTransitiveOptionMixin, ScmPublishMixin, JarTask):
 
   def _copy_artifact(self, tgt, jar, version, typename, suffix='', extension='jar',
                      artifact_ext='', override_name=None):
-    """Copy the products for a target into the artifact path for the jar/version"""
+    """Copy the products for a target into the artifact path for the jar/version."""
     genmap = self.context.products.get(typename)
     product_mapping = genmap.get(tgt)
     if product_mapping is None:
@@ -509,8 +512,11 @@ class JarPublish(HasTransitiveOptionMixin, ScmPublishMixin, JarTask):
     return jvm_options
 
   def publish(self, publications, jar, entry, repo, published):
-    """Run ivy to publish a jar.  ivyxml_path is the path to the ivy file; published
-    is a list of jars published so far (including this one). entry is a pushdb entry."""
+    """Run ivy to publish a jar.
+
+    ivyxml_path is the path to the ivy file; published is a list of jars published so far (including
+    this one). entry is a pushdb entry.
+    """
 
     try:
       ivy = Bootstrapper.default_ivy()

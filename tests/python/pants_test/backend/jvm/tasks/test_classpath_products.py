@@ -522,8 +522,7 @@ class ClasspathProductsTest(TestBase):
                                        expected_canonical_classpath,
                                        expected_classspath_files,
                                        excludes=None):
-    """
-    Helper method to call `create_canonical_classpath` and verify generated canonical classpath.
+    """Helper method to call `create_canonical_classpath` and verify generated canonical classpath.
 
     :param ClasspathProducts classpath_products: Classpath products.
     :param list targets: List of targets to generate canonical classpath from.

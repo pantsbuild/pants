@@ -41,7 +41,7 @@ class BaseLocalArtifactCache(ArtifactCache):
 
   @contextmanager
   def _tmpfile(self, cache_key, use):
-    """Allocate tempfile on same device as cache with a suffix chosen to prevent collisions"""
+    """Allocate tempfile on same device as cache with a suffix chosen to prevent collisions."""
     with temporary_file(suffix=cache_key.id + use, root_dir=self._cache_root,
                         permissions=self._permissions) as tmpfile:
       yield tmpfile
@@ -117,7 +117,7 @@ class LocalArtifactCache(BaseLocalArtifactCache):
     safe_mkdir(self._cache_root)
 
   def prune(self, root):
-    """Prune stale cache files
+    """Prune stale cache files.
 
     If the option --cache-target-max-entry is greater than zero, then prune will remove all but n
     old cache files for each target/task.
@@ -177,8 +177,8 @@ class LocalArtifactCache(BaseLocalArtifactCache):
 class TempLocalArtifactCache(BaseLocalArtifactCache):
   """A local cache that does not actually store any files between calls.
 
-  This implementation does not have a backing _cache_root, and never
-  actually stores files between calls, but is useful for handling file IO for a remote cache.
+  This implementation does not have a backing _cache_root, and never actually stores files between
+  calls, but is useful for handling file IO for a remote cache.
   """
 
   def __init__(self, artifact_root, compression, permissions=None):

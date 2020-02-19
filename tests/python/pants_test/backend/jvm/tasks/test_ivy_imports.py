@@ -23,7 +23,7 @@ class IvyImportsTest(NailgunTaskTestBase):
 
   @contextmanager
   def sample_jarfile(self, filename):
-    """Create a jar file with a/b/c/data.txt and a/b/c/foo.proto"""
+    """Create a jar file with a/b/c/data.txt and a/b/c/foo.proto."""
     with temporary_dir() as temp_dir:
       jar_name = os.path.join(temp_dir, filename)
       with open_zip(jar_name, 'w') as proto_jarfile:

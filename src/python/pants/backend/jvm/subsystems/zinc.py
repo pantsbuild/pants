@@ -284,11 +284,10 @@ class Zinc:
   def _compiler_bridge_cache_dir(self):
     """A directory where we can store compiled copies of the `compiler-bridge`.
 
-    The compiler-bridge is specific to each scala version.
-    Currently we compile the `compiler-bridge` only once, while bootstrapping.
-    Then, we store it in the working directory under .pants.d/zinc/<cachekey>, where
-    <cachekey> is calculated using the locations of zinc, the compiler interface,
-    and the compiler bridge.
+    The compiler-bridge is specific to each scala version. Currently we compile the `compiler-
+    bridge` only once, while bootstrapping. Then, we store it in the working directory under
+    .pants.d/zinc/<cachekey>, where <cachekey> is calculated using the locations of zinc, the
+    compiler interface, and the compiler bridge.
     """
     hasher = sha1()
     for cp_entry in [self.zinc, self._compiler_interface, self._compiler_bridge]:
@@ -298,7 +297,7 @@ class Zinc:
     return os.path.join(self._workdir(), 'zinc', 'compiler-bridge', key)
 
   def _relative_to_buildroot(self, path):
-    """A utility function to create relative paths to the work dir"""
+    """A utility function to create relative paths to the work dir."""
     return fast_relpath(path, get_buildroot())
 
   def _run_bootstrapper(self, bridge_jar, context):
@@ -348,8 +347,8 @@ class Zinc:
       return self._compile_compiler_bridge(context)
 
   def _compile_compiler_bridge(self, context):
-    """Compile the compiler bridge to be used by zinc, using our scala bootstrapper.
-    It will compile and cache the jar, and materialize it if not already there.
+    """Compile the compiler bridge to be used by zinc, using our scala bootstrapper. It will compile
+    and cache the jar, and materialize it if not already there.
 
     :param context: The context of the task trying to compile the bridge.
                     This is mostly needed to use its scheduler to create digests of the relevant jars.

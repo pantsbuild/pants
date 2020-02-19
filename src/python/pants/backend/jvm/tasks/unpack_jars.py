@@ -14,9 +14,8 @@ from pants.util.objects import SubclassesOf
 class UnpackJarsFingerprintStrategy(DefaultFingerprintHashingMixin, FingerprintStrategy):
 
   def compute_fingerprint(self, target):
-    """UnpackedJars targets need to be re-unpacked if any of its configuration changes or any of
-    the jars they import have changed.
-    """
+    """UnpackedJars targets need to be re-unpacked if any of its configuration changes or any of the
+    jars they import have changed."""
     if isinstance(target, UnpackedJars):
       hasher = sha1()
       for cache_key in sorted(jar.cache_key() for jar in target.all_imported_jar_deps):

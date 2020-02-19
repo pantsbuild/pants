@@ -24,8 +24,8 @@ class Exiter:
   """A class that provides standard runtime exit behavior.
 
   `pants.base.exception_sink.ExceptionSink` handles exceptions and fatal signals, delegating to an
-  Exiter instance which can be set process-globally with ExceptionSink.reset_exiter(). Call
-  .exit() or .exit_and_fail() on an Exiter instance when you wish to exit the runtime.
+  Exiter instance which can be set process-globally with ExceptionSink.reset_exiter(). Call .exit()
+  or .exit_and_fail() on an Exiter instance when you wish to exit the runtime.
   """
 
   def __init__(self, exiter: Callable[[Union[ExitCode, str, object]], None] = sys.exit):

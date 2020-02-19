@@ -81,9 +81,9 @@ class PythonFile(object):
 
   @classmethod
   def _remove_coding_header(cls, blob):
-    """
-    There is a bug in ast.parse that cause it to throw a syntax error if
-    you have a header similar to...
+    """There is a bug in ast.parse that cause it to throw a syntax error if you have a header
+    similar to...
+
     # coding=utf-8,
 
     we replace this line with something else to bypass the bug.
@@ -142,6 +142,7 @@ class PythonFile(object):
   @classmethod
   def from_statement(cls, statement, filename='<expr>'):
     """A helper to construct a PythonFile from a triple-quoted string, for testing.
+
     :param statement: Python file contents
     :return: Instance of PythonFile
     """
@@ -155,7 +156,8 @@ class PythonFile(object):
 
   @classmethod
   def iter_tokens(cls, blob):
-    """ Iterate over tokens found in blob contents
+    """Iterate over tokens found in blob contents.
+
     :param blob: Input string with python file contents
     :return: token iterator
     """
@@ -169,7 +171,7 @@ class PythonFile(object):
 
   @staticmethod
   def translate_logical_line(start, end, contents, indent_stack, endmarker=False):
-    """Translate raw contents to logical lines"""
+    """Translate raw contents to logical lines."""
     # Remove leading blank lines.
     while contents[0] == '\n':
       start += 1
@@ -185,7 +187,7 @@ class PythonFile(object):
     return start, end + 1, indent
 
   def iter_logical_lines(self, blob):
-    """Returns an iterator of (start_line, stop_line, indent) for logical lines """
+    """Returns an iterator of (start_line, stop_line, indent) for logical lines."""
     indent_stack = []
     contents = []
     line_number_start = None
@@ -211,7 +213,7 @@ class PythonFile(object):
         line_number_start = None
 
   def line_range(self, line_number):
-    """Return a slice for the given line number"""
+    """Return a slice for the given line number."""
     if line_number <= 0 or line_number > len(self.lines):
       raise IndexError('NOTE: Python file line numbers are offset by 1.')
 
@@ -277,7 +279,7 @@ class Nit(object):
     self._lines = lines
 
   def __str__(self):
-    """Sanitize to Ascii for safe terminal output"""
+    """Sanitize to Ascii for safe terminal output."""
     flat = list(self.flatten_lines([self.message], self.lines))
     return '\n     |'.join(flat).encode('ascii', errors='replace').decode('ascii')
 
